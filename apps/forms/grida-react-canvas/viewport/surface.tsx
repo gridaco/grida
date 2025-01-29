@@ -19,10 +19,7 @@ import { supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext } from "./context";
-import {
-  useGroupSurfaceTransform,
-  useNodeSurfaceTransfrom,
-} from "./hooks/transform";
+import { useSelectionGroups, useNodeSurfaceTransfrom } from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
@@ -270,7 +267,7 @@ export function EditorSurface() {
     }
   );
 
-  const selectiondata = useGroupSurfaceTransform(...selection);
+  const selectiondata = useSelectionGroups(...selection);
 
   return (
     <SurfaceSelectionGroupProvider value={selectiondata}>
@@ -575,6 +572,7 @@ function NodeOverlay({
 
   const { is_component_consumer } = node.meta;
   readonly = readonly || is_component_consumer;
+  const is_flex = node.type === "container" && node.layout === "flex";
 
   return (
     <LayerOverlay

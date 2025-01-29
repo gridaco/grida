@@ -808,7 +808,7 @@ export function useEditorHotKeys() {
     "ctrl+g, meta+g",
     () => {
       // TODO:
-      toast("use ctrl+alt+g, meta+alt+g for grouping");
+      toast("use ⌥⌘G for grouping");
     },
     {
       preventDefault: true,

@@ -2,7 +2,7 @@ import {
   useEventTarget,
   useSurfaceGradientEditor,
 } from "@/grida-react-canvas/provider";
-import { useNodeSurfaceTransfrom } from "../hooks/transform";
+import { useNodeSurfaceTransfrom } from "../surface-hooks";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   const { transform, stops } = useSurfaceGradientEditor();

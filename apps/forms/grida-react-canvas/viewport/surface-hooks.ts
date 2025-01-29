@@ -7,10 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { ViewportSurfaceContext } from "../context";
+import { ViewportSurfaceContext } from "./context";
 import { cmath } from "@grida/cmath";
-import { SurfaceNodeObject, SurfaceSelectionGroup } from "../core";
-import { analyzeDistribution } from "../ui/distribution";
+import { SurfaceNodeObject, SurfaceSelectionGroup } from "./core";
+import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-react-canvas/domapi";
 import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 
@@ -36,24 +36,6 @@ function useNodeDomElement(node_id: string) {
     const element = document.getElementById(node_id);
     setNodeElement(element);
   }, [node_id]);
-
-  return nodeElement;
-}
-
-function useNodeDomElements(node_ids: string[]) {
-  const [nodeElement, setNodeElement] = useState<HTMLElement[] | null>(null);
-
-  useLayoutEffect(() => {
-    if (!node_ids.length) {
-      setNodeElement(null);
-      return;
-    }
-
-    const elements = node_ids
-      .map((node_id) => document.getElementById(node_id))
-      .filter(Boolean) as HTMLElement[];
-    setNodeElement(elements);
-  }, [node_ids]);
 
   return nodeElement;
 }
@@ -189,7 +171,7 @@ const __initial_surface_selection_group: SurfaceSelectionGroup = {
  * returns the relative transform of the group surface relative to the portal
  * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
  */
-export function useGroupSurfaceTransform(
+export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup {
   const {
@@ -280,7 +262,7 @@ export function useGroupSurfaceTransform(
     };
 
     updateTransform();
-  }, [selection, transform]);
+  }, [portal, selection, transform]);
 
   return data;
 }
