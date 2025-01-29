@@ -249,6 +249,8 @@ export function useEditorHotKeys() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -799,8 +801,22 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+a", (e) => {
-    // TODO:
-    toast.error("[container layout] is not implemented yet");
+    autoLayout("selection");
+  });
+
+  useHotkeys(
+    "ctrl+g, meta+g",
+    () => {
+      // TODO:
+      toast("use ⌥⌘G for grouping");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys("ctrl+alt+g, meta+alt+g", () => {
+    contain("selection");
   });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {

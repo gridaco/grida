@@ -190,10 +190,23 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           }
           case "sort": {
             const { selection, node_id } = gesture;
-            const layout = createLayoutSnapshot(state, selection);
+
+            // assure the selection shares the same parent
+            const parent_id = document.getParentId(state.document_ctx, node_id);
+            if (
+              !selection.every(
+                (it) =>
+                  document.getParentId(state.document_ctx, it) === parent_id
+              )
+            ) {
+              return;
+            }
+
+            const layout = createLayoutSnapshot(state, parent_id!, selection);
             const initial_index = layout.objects.findIndex(
               (it) => it.id === node_id
             );
+
             const initial_placement = {
               index: initial_index,
               rect: layout.objects[initial_index],
@@ -216,7 +229,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           }
           case "gap": {
             const { selection, axis } = gesture;
-            const layout = createLayoutSnapshot(state, selection);
+
+            // assure the selection shares the same parent
+            const parent_id = document.getParentId(
+              state.document_ctx,
+              selection[0]
+            );
+            if (
+              !selection.every(
+                (it) =>
+                  document.getParentId(state.document_ctx, it) === parent_id
+              )
+            ) {
+              return;
+            }
+
+            const layout = createLayoutSnapshot(state, parent_id!, selection);
             layout.objects.sort((a, b) => a[axis] - b[axis]);
 
             const [gap] = cmath.rect.getUniformGap(
@@ -257,20 +285,27 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
 function createLayoutSnapshot(
   state: IDocumentEditorState,
-  group: string[]
+  group: string,
+  items: string[]
 ): LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
-  const objects: LayoutSnapshot["objects"] = group.map((node_id) => {
-    const rect = cdom.getNodeBoundingRect(node_id)!;
+  const parent_rect = cdom.getNodeBoundingRect(group)!;
+  const objects: LayoutSnapshot["objects"] = items.map((node_id) => {
+    const abs_rect = cdom.getNodeBoundingRect(node_id)!;
+    const rel_rect = cmath.rect.translate(abs_rect, [
+      -parent_rect.x,
+      -parent_rect.y,
+    ]);
 
     return {
-      ...rect,
+      ...rel_rect,
       id: node_id,
     };
   });
 
   return {
+    group,
     objects,
   };
 }

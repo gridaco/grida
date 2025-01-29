@@ -2,9 +2,9 @@ import { cmath } from ".";
 
 export namespace dnd {
   export function test(t: cmath.Rectangle, objects: cmath.Rectangle[]) {
-    const points = objects.map((o) => cmath.rect.center(o));
+    const points = objects.map((o) => cmath.rect.getCenter(o));
 
-    const t_point = cmath.rect.center(t);
+    const t_point = cmath.rect.getCenter(t);
 
     // Use cmath.snap.vector2 to find the closest target point
     const [_, distance, [_i]] = cmath.align.vector2(t_point, points, Infinity);

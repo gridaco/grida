@@ -43,6 +43,8 @@ export type DocumentAction =
   | EditorA11yArrowAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
+  | EditorAutoLayoutAction
+  | EditorContainAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -248,6 +250,16 @@ export interface EditorDistributeEvenlyAction {
   type: "distribute-evenly";
   target: NodeID[] | "selection";
   axis: "x" | "y";
+}
+
+export interface EditorAutoLayoutAction {
+  type: "autolayout";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorContainAction {
+  type: "contain";
+  target: NodeID[] | "selection";
 }
 
 export type EditorConfigAction =

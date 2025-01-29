@@ -435,7 +435,7 @@ export namespace guide {
 
     const label = cmath.ui.formatNumber(gap, 1);
 
-    const counterAxis = cmath.counterAxis[axis];
+    const counterAxis = cmath.counterAxis(axis);
 
     const loop_gap_counter_axis_pos = cmath.range.mean(
       cmath.range.fromRectangle(origianl_rect_first, counterAxis),
@@ -482,7 +482,7 @@ export namespace guide {
     const { p: pos, o: origin } = p;
 
     // We'll pick a "counterAxis" coordinate (like the mid Y for axis="x", or mid X for axis="y")
-    const counterAxis = cmath.counterAxis[axis];
+    const counterAxis = cmath.counterAxis(axis);
     const anchorRectMid = cmath.range.mean(
       cmath.range.fromRectangle(anchor, counterAxis)
     );

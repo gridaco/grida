@@ -64,7 +64,7 @@ export function StandaloneDocumentEditor({
   }, [editable, dispatch]);
 
   const __dispatch = useMemo(
-    () => (editable ? dispatch ?? __noop : __noop),
+    () => (editable ? (dispatch ?? __noop) : __noop),
     [editable]
   );
 
@@ -1585,6 +1585,26 @@ export function useDocument() {
     [dispatch]
   );
 
+  const autoLayout = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "autolayout",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const contain = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "contain",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1823,6 +1843,8 @@ export function useDocument() {
       align,
       order,
       distributeEvenly,
+      autoLayout,
+      contain,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
@@ -1866,6 +1888,8 @@ export function useDocument() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -2022,10 +2046,12 @@ export function useTransform() {
   return useMemo(() => {
     const transform = state.transform;
     const scaleX = transform[0][0];
+    const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
       scaleX,
+      scaleY,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
@@ -2972,11 +2998,14 @@ class EditorConsumerError extends Error {
   }
 }
 
-export function useNode(node_id: string): grida.program.nodes.AnyNode & {
+export type NodeWithMeta = grida.program.nodes.AnyNode & {
   meta: {
     is_component_consumer: boolean;
+    is_flex_parent: boolean;
   };
-} {
+};
+
+export function useNode(node_id: string): NodeWithMeta {
   const { state } = useDocument();
 
   const {
@@ -3046,10 +3075,13 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     root.type === "instance" ||
     root.type === "template_instance";
 
+  const is_flex_parent = node.type === "container" && node.layout === "flex";
+
   return {
     ...node,
     meta: {
-      is_component_consumer: is_component_consumer,
+      is_component_consumer,
+      is_flex_parent,
     },
   };
 }

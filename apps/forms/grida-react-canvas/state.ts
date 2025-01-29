@@ -234,6 +234,14 @@ export type GestureTranslate = IGesture & {
  * Contains collection of nodes' bounding rect.
  */
 export interface LayoutSnapshot {
+  /**
+   * the grouping parent id
+   */
+  group: string;
+
+  /**
+   * relative objects to the parent
+   */
   objects: Array<cmath.Rectangle & { id: string }>;
 }
 
