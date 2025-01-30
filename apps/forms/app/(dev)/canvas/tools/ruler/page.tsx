@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Ruler } from "@grida/ruler";
+import { AxisRuler, type Tick } from "@grida/ruler";
 import { useGesture } from "@use-gesture/react";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { cmath } from "@grida/cmath";
@@ -20,6 +20,8 @@ const y_ranges: cmath.Range[] = rects.map((rect) => [
   rect.y,
   rect.y + rect.height,
 ]);
+
+const x_marks: Tick[] = [{ pos: 50, color: "red", text: "50" }];
 
 export default function RulerDemoPage() {
   useDisableSwipeBack();
@@ -55,8 +57,8 @@ export default function RulerDemoPage() {
 
   return (
     <main ref={ref} className="w-dvw h-dvh">
-      <div className="fixed top-0 left-0 right-0 border-b bg-background">
-        <Ruler
+      <div className="fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize">
+        <AxisRuler
           axis="x"
           width={window.innerWidth}
           height={24}
@@ -65,10 +67,11 @@ export default function RulerDemoPage() {
             translateX: offset.x,
           }}
           ranges={x_ranges}
+          marks={x_marks}
         />
       </div>
-      <div className="fixed top-0 left-0 bottom-0 border-r bg-background">
-        <Ruler
+      <div className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize">
+        <AxisRuler
           axis="y"
           width={24}
           height={window.innerHeight}

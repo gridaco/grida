@@ -1,14 +1,46 @@
 export type Axis = "x" | "y";
 export type Range = [a: number, b: number];
 
+export type Tick = {
+  pos: number;
+  color: string;
+  font?: string;
+  text?: string;
+  textColor?: string;
+  textAlign?: CanvasTextAlign;
+  textAlignOffset?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeHeight?: number;
+};
+
 export interface RulerOptions {
   readonly axis: Axis;
+  readonly zoom: number;
+  readonly offset: number;
+
+  /**
+   * priority 0
+   */
   readonly steps?: number[];
+
+  /**
+   * priority 1
+   */
   readonly ranges?: Range[];
-  readonly fadeThreshold?: number;
-  readonly scale: number;
-  readonly translate: number;
-  readonly labelOffset?: number;
+
+  /**
+   * priority 2
+   */
+  readonly marks?: Tick[];
+
+  /**
+   * overlap fade threshold
+   *
+   * @default 24
+   */
+  readonly overlapThreshold?: number;
+  readonly textSideOffset?: number;
   readonly tickHeight?: number;
 
   /**
@@ -29,12 +61,12 @@ export interface RulerOptions {
   /**
    * @default "rgba(80, 200, 255, 0.25)"
    */
-  readonly rangeBackgroundColor?: string;
+  readonly accentBackgroundColor?: string;
 
   /**
    * @default "rgba(80, 200, 255, 1)"
    */
-  readonly rangeTickColor?: string;
+  readonly accentColor?: string;
 }
 
 export class RulerCanvas implements RulerOptions {
@@ -42,19 +74,20 @@ export class RulerCanvas implements RulerOptions {
   private dpr: number;
   width: number = 0;
   height: number = 0;
-  readonly axis: Axis;
-  readonly steps: number[];
-  readonly fadeThreshold: number;
-  readonly scale: number;
-  readonly translate: number;
-  readonly labelOffset: number;
-  readonly font: string;
-  readonly ranges: Range[];
-  readonly backgroundColor: string;
-  readonly color: string;
-  readonly tickHeight: number;
-  readonly rangeBackgroundColor: string;
-  readonly rangeTickColor: string;
+  axis: Axis;
+  steps: number[];
+  overlapThreshold: number;
+  zoom: number;
+  offset: number;
+  textSideOffset: number;
+  font: string;
+  ranges: Range[];
+  marks: Tick[];
+  backgroundColor: string;
+  color: string;
+  tickHeight: number;
+  accentBackgroundColor: string;
+  accentColor: string;
 
   /**
    * the points that takes priority over default rendering.
@@ -69,16 +102,17 @@ export class RulerCanvas implements RulerOptions {
       axis,
       steps = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
       ranges = [],
-      fadeThreshold = 30,
-      translate = 0,
-      scale = 1,
-      labelOffset = 2,
+      marks = [],
+      overlapThreshold = 24,
+      offset = 0,
+      zoom = 1,
+      textSideOffset = 2,
       tickHeight = 4,
       font = "10px sans-serif",
       backgroundColor = "transparent",
       color = "rgba(128, 128, 128, 0.5)",
-      rangeBackgroundColor = "rgba(80, 200, 255, 0.25)",
-      rangeTickColor = "rgba(80, 200, 255, 1)",
+      accentBackgroundColor = "rgba(80, 200, 255, 0.25)",
+      accentColor = "rgba(80, 200, 255, 1)",
     }: RulerOptions
   ) {
     this.ctx = canvas.getContext("2d")!;
@@ -86,16 +120,17 @@ export class RulerCanvas implements RulerOptions {
     this.axis = axis;
     this.steps = steps;
     this.ranges = ranges;
-    this.fadeThreshold = fadeThreshold;
-    this.scale = scale;
-    this.translate = translate;
-    this.labelOffset = labelOffset;
+    this.marks = marks;
+    this.overlapThreshold = overlapThreshold;
+    this.zoom = zoom;
+    this.offset = offset;
+    this.textSideOffset = textSideOffset;
     this.font = font;
     this.backgroundColor = backgroundColor;
     this.color = color;
     this.tickHeight = tickHeight;
-    this.rangeBackgroundColor = rangeBackgroundColor;
-    this.rangeTickColor = rangeTickColor;
+    this.accentBackgroundColor = accentBackgroundColor;
+    this.accentColor = accentColor;
   }
 
   setSize(w: number, h: number) {
@@ -111,22 +146,25 @@ export class RulerCanvas implements RulerOptions {
   private getStepSize() {
     const minPxPerTick = 50;
     for (const s of this.steps) {
-      if (s * this.scale >= minPxPerTick) return s;
+      if (s * this.zoom >= minPxPerTick) return s;
     }
     return this.steps[this.steps.length - 1];
   }
 
-  private renderTick(
-    pos: number,
-    label: string,
-    color: string = this.color,
-    textAlign: CanvasTextAlign = "center",
-    textAlignOffset: number = 0
-  ) {
+  private renderTick(tick: Tick) {
+    const {
+      pos,
+      color,
+      font = this.font,
+      text,
+      textColor = color,
+      textAlign = "center",
+      textAlignOffset = 0,
+    } = tick;
     // skip if too close to priority points
     const skipThreshold = 10;
     for (const p of this.priorityPoints) {
-      const pCanvas = p * this.scale + this.translate;
+      const pCanvas = p * this.zoom + this.offset;
       if (Math.abs(pCanvas - pos) < skipThreshold) return;
     }
 
@@ -134,28 +172,36 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.strokeStyle = color;
     this.ctx.fillStyle = color;
     this.ctx.textAlign = textAlign;
+    this.ctx.font = font;
 
     if (this.axis === "x") {
       this.ctx.beginPath();
-      this.ctx.moveTo(pos, this.height - this.labelOffset - this.tickHeight);
+      this.ctx.moveTo(pos, this.height - this.textSideOffset - this.tickHeight);
       this.ctx.lineTo(pos, this.height);
       this.ctx.stroke();
-      this.ctx.fillText(
-        label,
-        pos + textAlignOffset,
-        this.height - this.labelOffset - (this.tickHeight + 4)
-      );
+      if (text) {
+        this.ctx.fillText(
+          text,
+          pos + textAlignOffset,
+          this.height - this.textSideOffset - (this.tickHeight + 4)
+        );
+      }
     } else {
       this.ctx.beginPath();
       this.ctx.moveTo(this.width, pos);
-      this.ctx.lineTo(this.width - (this.labelOffset + this.tickHeight), pos);
-      this.ctx.stroke();
-      this.ctx.translate(
-        this.width - (this.labelOffset + this.tickHeight + 4),
-        pos + textAlignOffset
+      this.ctx.lineTo(
+        this.width - (this.textSideOffset + this.tickHeight),
+        pos
       );
-      this.ctx.rotate(-Math.PI / 2);
-      this.ctx.fillText(label, 0, 0);
+      this.ctx.stroke();
+      if (text) {
+        this.ctx.translate(
+          this.width - (this.textSideOffset + this.tickHeight + 4),
+          pos + textAlignOffset
+        );
+        this.ctx.rotate(-Math.PI / 2);
+        this.ctx.fillText(text, 0, 0);
+      }
     }
 
     this.ctx.restore();
@@ -163,41 +209,80 @@ export class RulerCanvas implements RulerOptions {
 
   private renderRange(
     [start, end]: Range,
-    color: string = this.rangeBackgroundColor
+    color: string = this.accentBackgroundColor
   ) {
     const ctx = this.ctx;
-    const startCanvas = start * this.scale + this.translate;
-    const endCanvas = end * this.scale + this.translate;
+    const startCanvas = start * this.zoom + this.offset;
+    const endCanvas = end * this.zoom + this.offset;
 
     ctx.save();
     ctx.fillStyle = color;
 
+    const a = Math.min(startCanvas, endCanvas);
+    const b = Math.max(startCanvas, endCanvas);
     if (this.axis === "x") {
-      const x1 = Math.min(startCanvas, endCanvas);
-      const x2 = Math.max(startCanvas, endCanvas);
-      ctx.fillRect(x1, 0, x2 - x1, this.height);
-      this.renderTick(x1, String(start), this.rangeTickColor, "end", -4);
-      this.renderTick(x2, String(end), this.rangeTickColor, "start", 4);
+      ctx.fillRect(a, 0, b - a, this.height);
+      this.renderTick({
+        pos: a,
+        text: String(start),
+        color: this.accentColor,
+        textAlign: "end",
+        textAlignOffset: -4,
+      });
+      this.renderTick({
+        pos: b,
+        text: String(end),
+        color: this.accentColor,
+        textAlign: "start",
+        textAlignOffset: 4,
+      });
     } else {
-      const y1 = Math.min(startCanvas, endCanvas);
-      const y2 = Math.max(startCanvas, endCanvas);
-      ctx.fillRect(0, y1, this.width, y2 - y1);
-      this.renderTick(y1, String(start), this.rangeTickColor, "start", -4);
-      this.renderTick(y2, String(end), this.rangeTickColor, "end", 4);
+      ctx.fillRect(0, a, this.width, b - a);
+      this.renderTick({
+        pos: a,
+        text: String(start),
+        color: this.accentColor,
+        textAlign: "start",
+        textAlignOffset: -4,
+      });
+      this.renderTick({
+        pos: b,
+        text: String(end),
+        color: this.accentColor,
+        textAlign: "end",
+        textAlignOffset: 4,
+      });
     }
     ctx.restore();
+  }
+
+  update(opts: Partial<RulerOptions>) {
+    // update only the defined properties
+    for (const key in opts) {
+      if (opts[key as keyof RulerOptions] !== undefined) {
+        (this as any)[key] = opts[key as keyof RulerOptions];
+      }
+    }
+  }
+
+  private tickToCanvasSpace(tick: Tick): Tick {
+    return {
+      ...tick,
+      pos: tick.pos * this.zoom + this.offset,
+    };
   }
 
   draw() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    // background
+    // [background]
     ctx.save();
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
 
+    // [ranges]
     // merge & render ranges
     const mergedRanges = mergeOverlappingRanges(this.ranges);
     // clear existing priority points each time
@@ -207,25 +292,32 @@ export class RulerCanvas implements RulerOptions {
       this.priorityPoints.push(r[0], r[1]);
     }
 
-    ctx.font = this.font;
-    ctx.fillStyle = this.color;
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 1;
+    // [marks]
+    for (const m of this.marks) {
+      const c = this.tickToCanvasSpace(m);
+      this.renderTick(c);
+      this.priorityPoints.push(m.pos);
+    }
 
+    // [ticks]
     const step = this.getStepSize();
     const dimension = this.axis === "x" ? this.width : this.height;
-    const startUnit = -this.translate / this.scale;
-    const endUnit = startUnit + dimension / this.scale;
+    const startUnit = -this.offset / this.zoom;
+    const endUnit = startUnit + dimension / this.zoom;
     const firstTick = Math.floor(startUnit / step) * step;
 
     for (let t = firstTick; t < endUnit; t += step) {
-      const pos = t * this.scale + this.translate;
+      const pos = t * this.zoom + this.offset;
       if (pos < 0 || pos > dimension) continue;
       ctx.globalAlpha =
-        Math.abs(pos) < this.fadeThreshold
-          ? Math.abs(pos) / this.fadeThreshold
+        Math.abs(pos) < this.overlapThreshold
+          ? Math.abs(pos) / this.overlapThreshold
           : 1;
-      this.renderTick(pos, String(t));
+      this.renderTick({
+        pos: pos,
+        text: String(t),
+        color: this.color,
+      });
     }
     ctx.globalAlpha = 1;
   }
