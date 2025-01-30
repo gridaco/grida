@@ -18,62 +18,24 @@ export interface RulerOptions {
   readonly axis: Axis;
   readonly zoom: number;
   readonly offset: number;
-
-  /**
-   * priority 0
-   */
   readonly steps?: number[];
-
-  /**
-   * priority 1
-   */
   readonly ranges?: Range[];
-
-  /**
-   * priority 2
-   */
   readonly marks?: Tick[];
-
-  /**
-   * overlap fade threshold
-   *
-   * @default 24
-   */
   readonly overlapThreshold?: number;
   readonly textSideOffset?: number;
   readonly tickHeight?: number;
-
-  /**
-   * @default "10px sans-serif"
-   */
   readonly font?: string;
-
-  /**
-   * @default "transparent"
-   */
   readonly backgroundColor?: string;
-
-  /**
-   * @default "rgba(128, 128, 128, 0.5)"
-   */
   readonly color?: string;
-
-  /**
-   * @default "rgba(80, 200, 255, 0.25)"
-   */
   readonly accentBackgroundColor?: string;
-
-  /**
-   * @default "rgba(80, 200, 255, 1)"
-   */
   readonly accentColor?: string;
 }
 
 export class RulerCanvas implements RulerOptions {
   private ctx: CanvasRenderingContext2D;
   private dpr: number;
-  width: number = 0;
-  height: number = 0;
+  width = 0;
+  height = 0;
   axis: Axis;
   steps: number[];
   overlapThreshold: number;
@@ -88,13 +50,7 @@ export class RulerCanvas implements RulerOptions {
   tickHeight: number;
   accentBackgroundColor: string;
   accentColor: string;
-
-  /**
-   * the points that takes priority over default rendering.
-   *
-   * if the tick overlaps with this point, it will be set with alpha for better visibility.
-   */
-  readonly priorityPoints: number[] = [];
+  priorityPoints: number[] = [];
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -103,7 +59,7 @@ export class RulerCanvas implements RulerOptions {
       steps = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
       ranges = [],
       marks = [],
-      overlapThreshold = 24,
+      overlapThreshold = 80,
       offset = 0,
       zoom = 1,
       textSideOffset = 12,
@@ -143,11 +99,17 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
+  update(opts: Partial<RulerOptions>) {
+    for (const key in opts) {
+      if (opts[key as keyof RulerOptions] !== undefined) {
+        (this as any)[key] = opts[key as keyof RulerOptions];
+      }
+    }
+  }
+
   private getStepSize() {
     const minPxPerTick = 50;
-    for (const s of this.steps) {
-      if (s * this.zoom >= minPxPerTick) return s;
-    }
+    for (const s of this.steps) if (s * this.zoom >= minPxPerTick) return s;
     return this.steps[this.steps.length - 1];
   }
 
@@ -165,14 +127,24 @@ export class RulerCanvas implements RulerOptions {
       strokeHeight = this.tickHeight,
     } = tick;
 
-    // Skip if too close to priority points
-    const skipThreshold = 10;
+    // Base alpha fade if close to 0
+    let alpha =
+      Math.abs(pos) < this.overlapThreshold
+        ? Math.abs(pos) / this.overlapThreshold
+        : 1;
+
+    // Also fade if close to any priority point
     for (const p of this.priorityPoints) {
       const pCanvas = p * this.zoom + this.offset;
-      if (Math.abs(pCanvas - pos) < skipThreshold) return;
+      const dist = Math.abs(pCanvas - pos);
+      if (dist < this.overlapThreshold) {
+        // The closer the tick to a priority point, the smaller the alpha
+        alpha = Math.min(alpha, dist / this.overlapThreshold);
+      }
     }
 
     this.ctx.save();
+    this.ctx.globalAlpha = alpha;
     this.ctx.strokeStyle = strokeColor;
     this.ctx.lineWidth = strokeWidth;
     this.ctx.fillStyle = textColor;
@@ -180,7 +152,6 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.font = font;
 
     if (this.axis === "x") {
-      // Draw tick line
       const lineTop = this.height - strokeHeight;
       const lineBottom = this.height;
       this.ctx.beginPath();
@@ -188,8 +159,6 @@ export class RulerCanvas implements RulerOptions {
       this.ctx.lineTo(pos, lineBottom);
       this.ctx.stroke();
 
-      // If there's label text, place it at (height - textSideOffset)
-      // which is independent of strokeHeight
       if (text) {
         this.ctx.fillText(
           text,
@@ -198,7 +167,6 @@ export class RulerCanvas implements RulerOptions {
         );
       }
     } else {
-      // For y-axis, draw line from (width, pos) to (width - strokeHeight, pos).
       const lineRight = this.width;
       const lineLeft = this.width - strokeHeight;
       this.ctx.beginPath();
@@ -206,8 +174,6 @@ export class RulerCanvas implements RulerOptions {
       this.ctx.lineTo(lineLeft, pos);
       this.ctx.stroke();
 
-      // If there's label text, place it at (width - textSideOffset)
-      // again independent of strokeHeight.
       if (text) {
         this.ctx.translate(
           this.width - this.textSideOffset,
@@ -221,19 +187,16 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.restore();
   }
 
-  private renderRange(
-    [start, end]: Range,
-    color: string = this.accentBackgroundColor
-  ) {
+  private renderRange([start, end]: Range, color = this.accentBackgroundColor) {
     const ctx = this.ctx;
     const startCanvas = start * this.zoom + this.offset;
     const endCanvas = end * this.zoom + this.offset;
 
     ctx.save();
     ctx.fillStyle = color;
-
     const a = Math.min(startCanvas, endCanvas);
     const b = Math.max(startCanvas, endCanvas);
+
     if (this.axis === "x") {
       ctx.fillRect(a, 0, b - a, this.height);
       this.renderTick({
@@ -270,15 +233,6 @@ export class RulerCanvas implements RulerOptions {
     ctx.restore();
   }
 
-  update(opts: Partial<RulerOptions>) {
-    // update only the defined properties
-    for (const key in opts) {
-      if (opts[key as keyof RulerOptions] !== undefined) {
-        (this as any)[key] = opts[key as keyof RulerOptions];
-      }
-    }
-  }
-
   private tickToCanvasSpace(tick: Tick): Tick {
     return {
       ...tick,
@@ -290,30 +244,28 @@ export class RulerCanvas implements RulerOptions {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    // [background]
+    // background
     ctx.save();
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
 
-    // [ranges]
-    // merge & render ranges
+    // ranges
     const mergedRanges = mergeOverlappingRanges(this.ranges);
-    // clear existing priority points each time
     this.priorityPoints.length = 0;
     for (const r of mergedRanges) {
       this.renderRange(r);
       this.priorityPoints.push(r[0], r[1]);
     }
 
-    // [marks]
+    // marks
     for (const m of this.marks) {
       const c = this.tickToCanvasSpace(m);
       this.renderTick(c);
       this.priorityPoints.push(m.pos);
     }
 
-    // [ticks]
+    // steps
     const step = this.getStepSize();
     const dimension = this.axis === "x" ? this.width : this.height;
     const startUnit = -this.offset / this.zoom;
@@ -323,30 +275,23 @@ export class RulerCanvas implements RulerOptions {
     for (let t = firstTick; t < endUnit; t += step) {
       const pos = t * this.zoom + this.offset;
       if (pos < 0 || pos > dimension) continue;
-      ctx.globalAlpha =
-        Math.abs(pos) < this.overlapThreshold
-          ? Math.abs(pos) / this.overlapThreshold
-          : 1;
       this.renderTick({
         pos: pos,
         text: String(t),
         color: this.color,
       });
     }
-    ctx.globalAlpha = 1;
   }
 }
 
 function mergeOverlappingRanges(ranges: Range[]): Range[] {
   if (!ranges.length) return [];
-  // sort by start
   const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
   const merged: Range[] = [];
   let prev = sorted[0];
 
   for (let i = 1; i < sorted.length; i++) {
     const curr = sorted[i];
-    // overlap check
     if (curr[0] <= prev[1]) {
       prev = [prev[0], Math.max(prev[1], curr[1])];
     } else {

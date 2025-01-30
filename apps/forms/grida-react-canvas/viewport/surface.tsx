@@ -19,7 +19,7 @@ import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
-import { ViewportSurfaceContext } from "./context";
+import { ViewportSurfaceContext, useViewport } from "./context";
 import {
   SurfaceSelectionGroup,
   SurfaceSelectionGroupProvider,
@@ -1106,6 +1106,7 @@ function DistributeButton({
 function RulerGuideOverlay() {
   const { guides, startGuideGesture } = useEventTarget();
   const { scaleX, scaleY, transform } = useTransform();
+  const viewport = useViewport();
   const d = useSurfaceSelectionGroups();
 
   const bindX = useSurfaceGesture({
@@ -1164,9 +1165,9 @@ function RulerGuideOverlay() {
       >
         <AxisRuler
           axis="x"
-          width={window.innerWidth}
+          width={viewport?.clientWidth ?? 0}
           height={24}
-          overlapThreshold={40}
+          overlapThreshold={80}
           zoom={scaleX}
           offset={tx}
           ranges={ranges.x}
@@ -1192,8 +1193,8 @@ function RulerGuideOverlay() {
         <AxisRuler
           axis="y"
           width={24}
-          height={window.innerHeight}
-          overlapThreshold={40}
+          height={viewport?.clientHeight ?? 0}
+          overlapThreshold={80}
           zoom={scaleY}
           offset={ty}
           ranges={ranges.y}
@@ -1255,7 +1256,6 @@ function Guide({ axis, offset, idx }: Guide & { idx: number }) {
       if (event.key === "Escape") {
         (event.currentTarget as HTMLElement)?.blur();
       }
-      event.preventDefault();
       event.stopPropagation();
     },
     onDragStart: ({ event }) => {
