@@ -1,4 +1,8 @@
 {
   "name": "@grida/ruler",
-  "description": "Ruler component for Infinite Canvas"
+  "description": "Ruler component for Infinite Canvas",
+  "devDependencies": {
+    "@types/react": "^18",
+    "react": "^18.2.0"
+  }
 }
