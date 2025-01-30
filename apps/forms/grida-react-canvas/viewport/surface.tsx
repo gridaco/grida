@@ -132,6 +132,7 @@ export function EditorSurface() {
     pan,
     pointer,
     ruler,
+    pixelgrid,
     marquee,
     hovered_node_id,
     dropzone,
@@ -297,7 +298,7 @@ export function EditorSurface() {
         }}
       >
         {ruler === "on" && <RulerGuideOverlay />}
-        <PixelGridOverlay />
+        {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
 
         <div

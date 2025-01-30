@@ -544,6 +544,8 @@ interface IDocumentEditorEventTargetState {
 
   ruler: "on" | "off";
 
+  pixelgrid: "on" | "off";
+
   /**
    * @private - internal use only
    *
@@ -780,6 +782,7 @@ export function initDocumentEditorState({
       rotate_with_quantize: "off",
     },
     ruler: "on",
+    pixelgrid: "on",
     guides: [],
     active_duplication: null,
     document_ctx: document.Context.from(init.document).snapshot(),
