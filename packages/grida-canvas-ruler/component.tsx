@@ -14,7 +14,8 @@ export type RulerProps = Partial<
   height: number;
   steps?: number[];
   fadeThreshold?: number;
-  transform: { scaleX: number; translateX: number };
+  zoom: number;
+  offset: number;
 };
 
 export const AxisRuler: React.FC<RulerProps> = (props) => {
@@ -27,8 +28,8 @@ export const AxisRuler: React.FC<RulerProps> = (props) => {
       // Create once
       rulerRef.current = new RulerCanvas(canvasRef.current, {
         axis: props.axis,
-        zoom: props.transform.scaleX,
-        offset: props.transform.translateX,
+        zoom: props.zoom,
+        offset: props.offset,
       });
     }
 
@@ -38,8 +39,8 @@ export const AxisRuler: React.FC<RulerProps> = (props) => {
       steps: props.steps,
       ranges: props.ranges,
       overlapThreshold: props.overlapThreshold,
-      zoom: props.transform.scaleX,
-      offset: props.transform.translateX,
+      zoom: props.zoom,
+      offset: props.offset,
       textSideOffset: props.textSideOffset,
       font: props.font,
     });

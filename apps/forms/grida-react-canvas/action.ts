@@ -418,11 +418,17 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 
 // #region surface action
 export type SurfaceAction =
+  | EditorSurface_RulerStateAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
   | EditorSurface_StartGesture;
+
+export interface EditorSurface_RulerStateAction {
+  type: "surface/ruler";
+  state: "on" | "off";
+}
 
 export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";

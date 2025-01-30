@@ -91,6 +91,16 @@ export const keybindings_sheet = [
     keys: ["backspace", "delete"],
   },
   {
+    name: "Auto-layout",
+    description: "Auto-layout the current selection",
+    keys: ["shift+a"],
+  },
+  {
+    name: "Group with Container",
+    description: "Group the current selection with a container",
+    keys: ["ctrl+alt+g", "meta+alt+g"],
+  },
+  {
     name: "align left",
     description: "Align selection to the left",
     keys: ["alt+a"],
@@ -166,6 +176,11 @@ export const keybindings_sheet = [
     keys: ["["],
   },
   {
+    name: "hide/show ruler",
+    description: "Toggle ruler visibility",
+    keys: ["shift+r"],
+  },
+  {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
     keys: ["i"],
@@ -231,6 +246,8 @@ export function useEditorHotKeys() {
   const {
     cursor_mode,
     setCursorMode,
+    ruler,
+    setRulerState,
     tryExitContentEditMode,
     tryToggleContentEditMode,
   } = useEventTarget();
@@ -560,8 +577,11 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+r", () => {
-    // TODO:
-    toast.error("[ruler] is not implemented yet");
+    if (ruler === "on") {
+      setRulerState("off");
+    } else {
+      setRulerState("on");
+    }
   });
 
   useHotkeys(

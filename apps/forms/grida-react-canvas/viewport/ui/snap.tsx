@@ -16,9 +16,9 @@ function useSnapGuide(): guide.SnapGuide | undefined {
 
   return useMemo(() => {
     if (
-      // (gesture.type === "translate" ||
-      //   gesture.type === "nudge" ||
-      //   gesture.type === "scale") &&
+      (gesture.type === "translate" ||
+        gesture.type === "nudge" ||
+        gesture.type === "scale") &&
       surface_snapping
     ) {
       const { lines, points, rules: rays } = guide.plot(surface_snapping);

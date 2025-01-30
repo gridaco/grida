@@ -60,12 +60,10 @@ export default function RulerDemoPage() {
       <div className="fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize">
         <AxisRuler
           axis="x"
-          width={window.innerWidth}
+          width={typeof window === "undefined" ? 0 : window.innerWidth}
           height={24}
-          transform={{
-            scaleX: zoom,
-            translateX: offset.x,
-          }}
+          zoom={zoom}
+          offset={offset.x}
           ranges={x_ranges}
           marks={x_marks}
         />
@@ -74,11 +72,9 @@ export default function RulerDemoPage() {
         <AxisRuler
           axis="y"
           width={24}
-          height={window.innerHeight}
-          transform={{
-            scaleX: zoom,
-            translateX: offset.y,
-          }}
+          height={typeof window === "undefined" ? 0 : window.innerHeight}
+          zoom={zoom}
+          offset={offset.y}
           ranges={y_ranges}
         />
       </div>

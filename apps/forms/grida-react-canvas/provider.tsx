@@ -2126,6 +2126,7 @@ export function useEventTarget() {
     cursor_mode,
     marquee,
     debug,
+    ruler,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2135,6 +2136,16 @@ export function useEventTarget() {
     gesture.type === "nudge" ||
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
+
+  const setRulerState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -2464,6 +2475,9 @@ export function useEventTarget() {
       cursor_mode,
       setCursorMode,
       //
+      ruler,
+      setRulerState,
+      //
       hovered_node_id,
       dropzone,
       selection,
@@ -2508,6 +2522,9 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
+    //
+    ruler,
+    setRulerState,
     //
     hovered_node_id,
     dropzone,

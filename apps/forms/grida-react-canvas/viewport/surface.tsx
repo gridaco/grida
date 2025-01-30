@@ -39,6 +39,7 @@ import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
+import { AxisRuler } from "@grida/ruler";
 
 const DRAG_THRESHOLD = 2;
 
@@ -123,6 +124,7 @@ export function EditorSurface() {
     zoom,
     pan,
     pointer,
+    ruler,
     marquee,
     hovered_node_id,
     dropzone,
@@ -287,6 +289,7 @@ export function EditorSurface() {
           cursor: cursor,
         }}
       >
+        {ruler === "on" && <RulerGuideOverlay />}
         <FloatingCursorTooltip />
         {/* <div className="absolute w-full h-full z-50">
         {transform[0][0] > 4 && (
@@ -1092,4 +1095,67 @@ function DistributeButton({
       </button>
     </div>
   );
+}
+
+function RulerGuideOverlay() {
+  const { scaleX, scaleY, transform } = useTransform();
+  const d = useSurfaceSelectionGroups();
+
+  const bind = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      console.log("drag start");
+      event.preventDefault();
+    },
+  });
+
+  const ranges = useMemo(() => {
+    const flat = d.flatMap((g) => g.objects);
+    return flat
+      .map(({ boundingRect }) => {
+        const rect = cmath.rect.quantize(boundingRect, 0.01);
+        const x = cmath.range.fromRectangle(rect, "x");
+        const y = cmath.range.fromRectangle(rect, "y");
+        return { x, y };
+      })
+      .reduce(
+        (acc, { x, y }) => {
+          acc.x.push(x);
+          acc.y.push(y);
+          return acc;
+        },
+        { x: [] as cmath.Range[], y: [] as cmath.Range[] }
+      );
+  }, [d]);
+
+  const tx = transform[0][2];
+  const ty = transform[1][2];
+
+  return (
+    <div className="fixed w-full h-full pointer-events-none z-50">
+      <div
+        {...bind()}
+        className="z-10 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+      >
+        <AxisRuler
+          axis="x"
+          width={window.innerWidth}
+          height={24}
+          zoom={scaleX}
+          offset={tx}
+          ranges={ranges.x}
+        />
+      </div>
+      <div className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none">
+        <AxisRuler
+          axis="y"
+          width={24}
+          height={window.innerHeight}
+          zoom={scaleY}
+          offset={ty}
+          ranges={ranges.y}
+        />
+      </div>
+    </div>
+  );
+  //
 }

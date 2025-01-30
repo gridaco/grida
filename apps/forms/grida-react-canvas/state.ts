@@ -515,6 +515,8 @@ interface IDocumentEditorEventTargetState {
     // position_snap: cmath.Vector2;
   };
 
+  ruler: "on" | "off";
+
   /**
    * @private - internal use only
    *
@@ -670,6 +672,11 @@ export interface IMinimalDocumentState {
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
 }
 
+interface Guide {
+  readonly axis: "X" | "Y";
+  readonly offset: number;
+}
+
 export interface IDocumentState extends IMinimalDocumentState {
   selection: string[];
 
@@ -683,11 +690,11 @@ export interface IDocumentState extends IMinimalDocumentState {
   content_edit_mode?: ContentEditModeState;
 
   /**
-   * @private - internal use only
+   * the ruler guides.
    *
-   * refresh key
+   * objects sanps to this when ruler is on
    */
-  // __r: number;
+  guides: Guide[];
 }
 
 interface __TMP_HistoryExtension {
@@ -745,6 +752,8 @@ export function initDocumentEditorState({
       transform_with_preserve_aspect_ratio: "off",
       rotate_with_quantize: "off",
     },
+    ruler: "on",
+    guides: [],
     active_duplication: null,
     document_ctx: document.Context.from(init.document).snapshot(),
     // history: initialHistoryState(init),

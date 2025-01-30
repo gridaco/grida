@@ -22,6 +22,12 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 ): S {
   switch (action.type) {
     // #region [universal backend] canvas event target
+    case "surface/ruler": {
+      const { state: rulerstate } = action;
+      return produce(state, (draft) => {
+        draft.ruler = rulerstate;
+      });
+    }
     case "surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];
