@@ -1,7 +1,8 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
-import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
+import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
+import { Guide } from "@/grida-react-canvas/state";
 
 const q = 1;
 
@@ -14,6 +15,7 @@ export function snapGuideTranslation(
 ): { translated: number } {
   const anchorPoints = anchors
     .map((rect) => {
+      rect = cmath.rect.quantize(rect, q);
       const [a, b] = cmath.range.fromRectangle(rect, axis);
       const c = cmath.mean(a, b);
       return [a, b, c];
@@ -30,7 +32,10 @@ export function snapGuideTranslation(
 
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
-  anchors: cmath.Rectangle[],
+  anchors: {
+    objects?: cmath.Rectangle[];
+    guides?: Guide[];
+  },
   movement: cmath.ext.movement.Movement,
   threshold: number
 ): {
@@ -38,7 +43,8 @@ export function snapObjectsTranslation(
   snapping: SnapToObjectsResult | undefined;
 } {
   agents = agents.map((r) => cmath.rect.quantize(r, q));
-  anchors = anchors.map((r) => cmath.rect.quantize(r, q));
+  const anchorObjects =
+    anchors.objects?.map((r) => cmath.rect.quantize(r, q)) ?? [];
 
   const bounding_rect = cmath.rect.union(agents);
 
@@ -47,10 +53,14 @@ export function snapObjectsTranslation(
     q
   );
 
-  const result = snapToObjects(_virtually_moved_rect, anchors, {
-    x: movement[0] === null ? false : threshold,
-    y: movement[1] === null ? false : threshold,
-  });
+  const result = snapToCanvasGeometry(
+    _virtually_moved_rect,
+    { objects: anchorObjects, guides: anchors.guides ?? [] },
+    {
+      x: movement[0] === null ? false : threshold,
+      y: movement[1] === null ? false : threshold,
+    }
+  );
 
   const { translated: _translated } = result;
 

@@ -933,7 +933,7 @@ function self_nudge(
     );
     const { snapping } = snapObjectsTranslation(
       origin_rects,
-      snap_target_node_rects,
+      { objects: snap_target_node_rects },
       [dx, dy],
       DEFAULT_SNAP_NUDGE_THRESHOLD
     );

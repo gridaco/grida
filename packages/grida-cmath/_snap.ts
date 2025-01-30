@@ -5,6 +5,17 @@ interface IDistance {
   distance: number;
 }
 
+function bestDistance(...distances: (number | undefined)[]): number {
+  let min_distance = Infinity;
+  for (const distance of distances) {
+    if (distance === undefined) continue;
+    if (Math.abs(distance) < Math.abs(min_distance)) {
+      min_distance = distance;
+    }
+  }
+  return min_distance;
+}
+
 function bestAxisAlignedDistance(
   ...results: (IDistance | null)[]
 ): IDistance | null {
@@ -40,7 +51,10 @@ export type SnapToObjectsResult = {
   /**
    * The original anchors that were used as references for snapping.
    */
-  anchors: cmath.Rectangle[];
+  anchors: {
+    objects: cmath.Rectangle[];
+    guides: Guide[];
+  };
 
   /**
    * The calculated delta for snapping
@@ -68,40 +82,65 @@ export type SnapToObjectsResult = {
       | null;
   };
 
-  by_ruler: {};
+  by_guide: {
+    x: (cmath.ext.snap.Snap1DResult & { aligned_anchors_idx: number[] }) | null;
+    y: (cmath.ext.snap.Snap1DResult & { aligned_anchors_idx: number[] }) | null;
+  };
 };
 
 const dist2delta = (dist: number | undefined) =>
   dist === undefined || dist === Infinity ? 0 : dist;
 
-export function snapToObjects(
+type Guide = {
+  axis: cmath.Axis;
+  offset: number;
+};
+
+export function snapToCanvasGeometry(
   agent: cmath.Rectangle,
-  anchors: cmath.Rectangle[],
+  anchors: { objects: cmath.Rectangle[]; guides: Guide[] },
   config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
 ): SnapToObjectsResult {
   assert(agent, "Agent must be a valid rectangle.");
-  assert(anchors.length > 0, "Anchors must contain at least one rectangle.");
+  assert(
+    anchors.objects.length > 0 || anchors.guides.length > 0,
+    "Anchors must contain at least one rectangle or guide."
+  );
+
+  const { objects: anchorObjects, guides: anchorGuides } = anchors;
+
+  const snap_guide = snapToGuides(agent, anchorGuides, config, tolerance);
 
   const snap_geo = snapToObjects9PointsGeometry(
     agent,
-    anchors,
+    anchorObjects,
     config,
     tolerance
+  );
+
+  const _sofar_bestx = bestDistance(
+    snap_guide.x?.distance,
+    snap_geo.x?.distance
+  );
+  const _sofar_besty = bestDistance(
+    snap_guide.y?.distance,
+    snap_geo.y?.distance
   );
 
   const snap_spc = snapToObjectsSpace(
     cmath.rect.translate(agent, [
-      dist2delta(snap_geo.x?.distance),
-      dist2delta(snap_geo.y?.distance),
+      dist2delta(_sofar_bestx),
+      dist2delta(_sofar_besty),
     ]),
     agent,
-    anchors,
+    anchorObjects,
     config,
     tolerance
   );
-  const x = bestAxisAlignedDistance(snap_geo.x, snap_spc.x);
-  const y = bestAxisAlignedDistance(snap_geo.y, snap_spc.y);
+
+  const x = bestAxisAlignedDistance(snap_guide.x, snap_geo.x, snap_spc.x);
+  const y = bestAxisAlignedDistance(snap_guide.y, snap_geo.y, snap_spc.y);
 
   // Determine the final delta for each axis
   const x_delta = dist2delta(x?.distance);
@@ -124,8 +163,56 @@ export function snapToObjects(
       x: snap_spc.x?.distance === x?.distance ? snap_spc.x : null,
       y: snap_spc.y?.distance === y?.distance ? snap_spc.y : null,
     },
-    by_ruler: {},
+    by_guide: snap_guide,
     delta: [x_delta, y_delta],
+  };
+}
+
+function snapToGuides(
+  agent: cmath.Rectangle,
+  anchors: Guide[],
+  config: cmath.ext.snap.Snap2DAxisonfig,
+  tolerance = 0
+): {
+  x: (cmath.ext.snap.Snap1DResult & { aligned_anchors_idx: number[] }) | null;
+  y: (cmath.ext.snap.Snap1DResult & { aligned_anchors_idx: number[] }) | null;
+} {
+  const x_agent_points = cmath.range.to3PointsChunk(
+    cmath.range.fromRectangle(agent, "x")
+  );
+  const y_agent_points = cmath.range.to3PointsChunk(
+    cmath.range.fromRectangle(agent, "y")
+  );
+
+  const x_anchors: number[] = [];
+  const y_anchors: number[] = [];
+  const x_aligned_anchors_idx: number[] = [];
+  const y_aligned_anchors_idx: number[] = [];
+
+  for (let i = 0; i < anchors.length; i++) {
+    const g = anchors[i];
+    if (g.axis === "x") {
+      x_anchors.push(g.offset);
+      x_aligned_anchors_idx.push(i);
+    } else {
+      y_anchors.push(g.offset);
+      y_aligned_anchors_idx.push(i);
+    }
+  }
+
+  let x: cmath.ext.snap.Snap1DResult | null = null;
+  if (config.x) {
+    x = cmath.ext.snap.snap1D(x_agent_points, x_anchors, config.x, tolerance);
+  }
+
+  let y: cmath.ext.snap.Snap1DResult | null = null;
+  if (config.y) {
+    y = cmath.ext.snap.snap1D(y_agent_points, y_anchors, config.y, tolerance);
+  }
+
+  return {
+    x: x ? { ...x, aligned_anchors_idx: x_aligned_anchors_idx } : null,
+    y: y ? { ...y, aligned_anchors_idx: y_aligned_anchors_idx } : null,
   };
 }
 
@@ -355,6 +442,30 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
 }
 
 export namespace guide {
+  function __surface_snap_guide_by_guide(snapping: SnapToObjectsResult) {
+    const { by_guide, anchors, delta } = snapping;
+    const rules: cmath.ui.Rule[] = [];
+
+    if (by_guide.x && by_guide.x.distance === delta[0]) {
+      by_guide.x.hit_anchor_indices.forEach((idx) => {
+        rules.push([
+          "x",
+          anchors.guides[by_guide.x!.aligned_anchors_idx[idx]].offset,
+        ]);
+      });
+    }
+    if (by_guide.y && by_guide.y.distance === delta[1]) {
+      by_guide.y.hit_anchor_indices.forEach((idx) => {
+        rules.push([
+          "y",
+          anchors.guides[by_guide.y!.aligned_anchors_idx[idx]].offset,
+        ]);
+      });
+    }
+
+    return rules;
+  }
+
   //
   function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
     const { by_geometry, translated, anchors, delta } = context;
@@ -369,7 +480,7 @@ export namespace guide {
     const yPoints: cmath.Vector2[] = [];
 
     by_geometry.hit_points.anchors.forEach((hit, i) => {
-      const anchor9 = cmath.rect.to9PointsChunk(anchors[i]);
+      const anchor9 = cmath.rect.to9PointsChunk(anchors.objects[i]);
       hit.forEach(([xhit, yhit], j) => {
         if (x && xhit) xPoints.push(anchor9[j]);
         if (y && yhit) yPoints.push(anchor9[j]);
@@ -617,7 +728,7 @@ export namespace guide {
       handle_axis({
         ...x,
         aligned_anchors_idx: x.aligned_anchors_idx,
-        anchors: main_anchors,
+        anchors: main_anchors.objects,
         axis: "x",
       });
     }
@@ -626,7 +737,7 @@ export namespace guide {
       handle_axis({
         ...y,
         aligned_anchors_idx: y.aligned_anchors_idx,
-        anchors: main_anchors,
+        anchors: main_anchors.objects,
         axis: "y",
       });
     }
@@ -645,6 +756,7 @@ export namespace guide {
   export function plot(snapping: SnapToObjectsResult): SnapGuide {
     const lines: cmath.ui.Line[] = [];
     const points: cmath.Vector2[] = [];
+    const rules: cmath.ui.Rule[] = [];
 
     // #region by_geometry
     const by_geometry = __surface_snap_guide_by_geometry(snapping);
@@ -658,9 +770,12 @@ export namespace guide {
     lines.push(...by_spacing.lines);
     // #endregion by_spacing
 
+    // #region by_guide
+    rules.push(...__surface_snap_guide_by_guide(snapping));
+
     return {
       points,
-      rules: [],
+      rules,
       lines,
     };
   }

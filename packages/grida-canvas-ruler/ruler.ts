@@ -106,8 +106,8 @@ export class RulerCanvas implements RulerOptions {
       overlapThreshold = 24,
       offset = 0,
       zoom = 1,
-      textSideOffset = 2,
-      tickHeight = 4,
+      textSideOffset = 12,
+      tickHeight = 6,
       font = "10px sans-serif",
       backgroundColor = "transparent",
       color = "rgba(128, 128, 128, 0.5)",
@@ -165,7 +165,7 @@ export class RulerCanvas implements RulerOptions {
       strokeHeight = this.tickHeight,
     } = tick;
 
-    // skip if too close to priority points
+    // Skip if too close to priority points
     const skipThreshold = 10;
     for (const p of this.priorityPoints) {
       const pCanvas = p * this.zoom + this.offset;
@@ -180,25 +180,37 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.font = font;
 
     if (this.axis === "x") {
+      // Draw tick line
+      const lineTop = this.height - strokeHeight;
+      const lineBottom = this.height;
       this.ctx.beginPath();
-      this.ctx.moveTo(pos, this.height - this.textSideOffset - strokeHeight);
-      this.ctx.lineTo(pos, this.height);
+      this.ctx.moveTo(pos, lineTop);
+      this.ctx.lineTo(pos, lineBottom);
       this.ctx.stroke();
+
+      // If there's label text, place it at (height - textSideOffset)
+      // which is independent of strokeHeight
       if (text) {
         this.ctx.fillText(
           text,
           pos + textAlignOffset,
-          this.height - this.textSideOffset - (strokeHeight + 4)
+          this.height - this.textSideOffset
         );
       }
     } else {
+      // For y-axis, draw line from (width, pos) to (width - strokeHeight, pos).
+      const lineRight = this.width;
+      const lineLeft = this.width - strokeHeight;
       this.ctx.beginPath();
-      this.ctx.moveTo(this.width, pos);
-      this.ctx.lineTo(this.width - (this.textSideOffset + strokeHeight), pos);
+      this.ctx.moveTo(lineRight, pos);
+      this.ctx.lineTo(lineLeft, pos);
       this.ctx.stroke();
+
+      // If there's label text, place it at (width - textSideOffset)
+      // again independent of strokeHeight.
       if (text) {
         this.ctx.translate(
-          this.width - (this.textSideOffset + strokeHeight + 4),
+          this.width - this.textSideOffset,
           pos + textAlignOffset
         );
         this.ctx.rotate(-Math.PI / 2);

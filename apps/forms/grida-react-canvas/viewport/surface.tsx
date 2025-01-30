@@ -1110,14 +1110,14 @@ function RulerGuideOverlay() {
 
   const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      startGuideGesture("x", -1);
+      startGuideGesture("y", -1);
       event.preventDefault();
     },
   });
 
   const bindY = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      startGuideGesture("y", -1);
+      startGuideGesture("x", -1);
       event.preventDefault();
     },
   });
@@ -1144,9 +1144,9 @@ function RulerGuideOverlay() {
   const marks = guides.reduce(
     (acc, g) => {
       if (g.axis === "x") {
-        acc.x.push(g.offset);
-      } else {
         acc.y.push(g.offset);
+      } else {
+        acc.x.push(g.offset);
       }
       return acc;
     },
@@ -1160,7 +1160,7 @@ function RulerGuideOverlay() {
     <div className="fixed w-full h-full pointer-events-none z-50">
       <div
         {...bindX()}
-        className="fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+        className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
       >
         <AxisRuler
           axis="x"
@@ -1177,7 +1177,9 @@ function RulerGuideOverlay() {
                 text: m.toString(),
                 textAlign: "start",
                 textAlignOffset: 8,
-                strokeColor: "transparent",
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
                 color: "red",
               }) satisfies Tick
           )}
@@ -1185,7 +1187,7 @@ function RulerGuideOverlay() {
       </div>
       <div
         {...bindY()}
-        className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+        className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
       >
         <AxisRuler
           axis="y"
@@ -1202,14 +1204,16 @@ function RulerGuideOverlay() {
                 text: m.toString(),
                 textAlign: "end",
                 textAlignOffset: 8,
-                strokeColor: "transparent",
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
                 color: "red",
               }) satisfies Tick
           )}
         />
       </div>
       {/* Guides */}
-      <div className="z-30">
+      <div className="z-10">
         {guides.map((g, i) => {
           return <Guide key={i} idx={i} axis={g.axis} offset={g.offset} />;
         })}
@@ -1222,7 +1226,7 @@ function RulerGuideOverlay() {
 function Guide({ axis, offset, idx }: Guide & { idx: number }) {
   const { transform } = useTransform();
   const { startGuideGesture, deleteGuide } = useEventTarget();
-  const o = offsetToSurfaceSpace(offset, cmath.counterAxis(axis), transform);
+  const o = offsetToSurfaceSpace(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
 
@@ -1266,11 +1270,11 @@ function Guide({ axis, offset, idx }: Guide & { idx: number }) {
       tabIndex={idx}
       {...bind()}
       data-axis={axis}
-      className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ns-resize data-[axis='y']:cursor-ew-resize"
+      className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ew-resize data-[axis='y']:cursor-ns-resize"
     >
       <Rule
         width={hover || focused ? 1 : 0.5}
-        axis={axis}
+        axis={cmath.counterAxis(axis)}
         offset={o}
         padding={4}
         data-focus={focused}

@@ -127,7 +127,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               const t = cmath.transform.getTranslate(state.transform);
               const s = cmath.transform.getScale(state.transform);
 
-              const axi = axis === "x" ? 1 : 0;
+              const axi = axis === "x" ? 0 : 1;
 
               const next = {
                 axis,

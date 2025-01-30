@@ -2860,6 +2860,15 @@ export namespace cmath.range {
   }
 
   /**
+   * returns 3 point chunk, [start, mid, end]
+   * @param range
+   * @returns
+   */
+  export function to3PointsChunk(range: Range): [number, number, number] {
+    return [range[0], (range[0] + range[1]) / 2, range[1]];
+  }
+
+  /**
    * Groups ranges by their uniform gaps.
    *
    * This function identifies subsets of ranges where the gaps between consecutive ranges

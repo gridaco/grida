@@ -280,7 +280,10 @@ function __self_update_gesture_transform_translate(
 
   const { translated, snapping } = snapObjectsTranslation(
     initial_rects,
-    snap_target_node_rects,
+    {
+      objects: snap_target_node_rects,
+      guides: draft.ruler === "on" ? draft.guides : undefined,
+    },
     adj_movement,
     DEFAULT_SNAP_MOVEMNT_THRESHOLD
   );

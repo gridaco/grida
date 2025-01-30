@@ -693,7 +693,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             case "guide": {
               const { axis, idx: index, initial_offset } = draft.gesture;
 
-              const counter = axis === "x" ? 1 : 0;
+              const counter = axis === "x" ? 0 : 1;
               const m = movement[counter];
 
               const cdom = new domapi.CanvasDOM(state.transform);
@@ -705,7 +705,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 axis,
                 initial_offset,
                 [cdom.getNodeBoundingRect(state.document.root_id)!],
-                movement[counter],
+                m,
                 DEFAULT_SNAP_MOVEMNT_THRESHOLD
               );
 
