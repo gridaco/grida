@@ -79,6 +79,27 @@ export default function RulerDemoPage() {
           ranges={y_ranges}
         />
       </div>
+      <div className="fixed inset-0 -z-10">
+        <div
+          style={{
+            transform: `scale(${zoom}) translate(${offset.x}px, ${offset.y}px)`,
+            transformOrigin: "0 0",
+          }}
+        >
+          {rects.map((rect, i) => (
+            <div
+              key={i}
+              className="absolute border border-primary pointer-events-none"
+              style={{
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </main>
   );
 }
