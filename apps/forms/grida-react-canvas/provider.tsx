@@ -2126,6 +2126,8 @@ export function useEventTarget() {
     cursor_mode,
     marquee,
     debug,
+    ruler,
+    guides,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2135,6 +2137,16 @@ export function useEventTarget() {
     gesture.type === "nudge" ||
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
+
+  const setRulerState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -2379,6 +2391,30 @@ export function useEventTarget() {
 
   //
 
+  const startGuideGesture = useCallback(
+    (axis: cmath.Axis, idx: number | -1) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          idx: idx,
+          type: "guide",
+          axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteGuide = useCallback(
+    (idx: number) => {
+      dispatch({
+        type: "surface/guide/delete",
+        idx,
+      });
+    },
+    [dispatch]
+  );
+
   const startScaleGesture = useCallback(
     (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
@@ -2464,6 +2500,12 @@ export function useEventTarget() {
       cursor_mode,
       setCursorMode,
       //
+      ruler,
+      setRulerState,
+      guides,
+      startGuideGesture,
+      deleteGuide,
+      //
       hovered_node_id,
       dropzone,
       selection,
@@ -2472,6 +2514,7 @@ export function useEventTarget() {
       is_node_scaling,
       content_edit_mode,
       //
+
       startScaleGesture,
       startSortGesture,
       startGapGesture,
@@ -2508,6 +2551,12 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
+    //
+    ruler,
+    setRulerState,
+    guides,
+    startGuideGesture,
+    deleteGuide,
     //
     hovered_node_id,
     dropzone,

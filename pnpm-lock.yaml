@@ -192,6 +192,9 @@ importers:
       '@grida/cmath':
         specifier: workspace:*
         version: link:../../packages/grida-cmath
+      '@grida/ruler':
+        specifier: workspace:*
+        version: link:../../packages/grida-canvas-ruler
       '@grida/tokens':
         specifier: workspace:*
         version: link:../../packages/grida-tokens
@@ -776,6 +779,15 @@ importers:
       typescript:
         specifier: ^5
         version: 5.4.5
+
+  packages/grida-canvas-ruler:
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
 
   packages/grida-cmath:
     devDependencies:

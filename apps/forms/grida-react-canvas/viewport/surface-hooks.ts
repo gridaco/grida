@@ -92,6 +92,11 @@ export interface SurfaceSelectionGroup {
   boundingSurfaceRect: cmath.Rectangle;
 
   /**
+   * canvas-space bounding rect of the group
+   */
+  boundingRect: cmath.Rectangle;
+
+  /**
    * the absolute rotation of the group, used for displaying overlay
    * only present if single item. otherwise, it's 0
    */
@@ -208,6 +213,7 @@ function computeSurfaceSelectionGroup({
     group: group,
     ids: items,
     boundingSurfaceRect: surfaceBoundingRect,
+    boundingRect: boundingRect,
     size: [boundingRect.width, boundingRect.height],
     rotation: 0,
     style: {

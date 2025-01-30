@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useRef } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   DropzoneIndication,
   GestureState,
+  type Guide,
   useEventTarget,
 } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
@@ -18,7 +19,7 @@ import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
-import { ViewportSurfaceContext } from "./context";
+import { ViewportSurfaceContext, useViewport } from "./context";
 import {
   SurfaceSelectionGroup,
   SurfaceSelectionGroupProvider,
@@ -36,9 +37,15 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
+import {
+  vector2ToSurfaceSpace,
+  rectToSurfaceSpace,
+  offsetToSurfaceSpace,
+} from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
+import { AxisRuler, Tick } from "@grida/ruler";
+import { Rule } from "./ui/rule";
 
 const DRAG_THRESHOLD = 2;
 
@@ -123,6 +130,7 @@ export function EditorSurface() {
     zoom,
     pan,
     pointer,
+    ruler,
     marquee,
     hovered_node_id,
     dropzone,
@@ -287,6 +295,7 @@ export function EditorSurface() {
           cursor: cursor,
         }}
       >
+        {ruler === "on" && <RulerGuideOverlay />}
         <FloatingCursorTooltip />
         {/* <div className="absolute w-full h-full z-50">
         {transform[0][0] > 4 && (
@@ -1090,6 +1099,187 @@ function DistributeButton({
       >
         {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}
       </button>
+    </div>
+  );
+}
+
+function RulerGuideOverlay() {
+  const { guides, startGuideGesture } = useEventTarget();
+  const { scaleX, scaleY, transform } = useTransform();
+  const viewport = useViewport();
+  const d = useSurfaceSelectionGroups();
+
+  const bindX = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      startGuideGesture("y", -1);
+      event.preventDefault();
+    },
+  });
+
+  const bindY = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      startGuideGesture("x", -1);
+      event.preventDefault();
+    },
+  });
+
+  const ranges = useMemo(() => {
+    const flat = d.flatMap((g) => g.objects);
+    return flat
+      .map(({ boundingRect }) => {
+        const rect = cmath.rect.quantize(boundingRect, 0.01);
+        const x = cmath.range.fromRectangle(rect, "x");
+        const y = cmath.range.fromRectangle(rect, "y");
+        return { x, y };
+      })
+      .reduce(
+        (acc, { x, y }) => {
+          acc.x.push(x);
+          acc.y.push(y);
+          return acc;
+        },
+        { x: [] as cmath.Range[], y: [] as cmath.Range[] }
+      );
+  }, [d]);
+
+  const marks = guides.reduce(
+    (acc, g) => {
+      if (g.axis === "x") {
+        acc.y.push(g.offset);
+      } else {
+        acc.x.push(g.offset);
+      }
+      return acc;
+    },
+    { x: [] as number[], y: [] as number[] }
+  );
+
+  const tx = transform[0][2];
+  const ty = transform[1][2];
+
+  return (
+    <div className="fixed w-full h-full pointer-events-none z-50">
+      <div
+        {...bindX()}
+        className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+      >
+        <AxisRuler
+          axis="x"
+          width={viewport?.clientWidth ?? 0}
+          height={24}
+          overlapThreshold={80}
+          zoom={scaleX}
+          offset={tx}
+          ranges={ranges.x}
+          marks={marks.y.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "start",
+                textAlignOffset: 8,
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
+                color: "red",
+              }) satisfies Tick
+          )}
+        />
+      </div>
+      <div
+        {...bindY()}
+        className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+      >
+        <AxisRuler
+          axis="y"
+          width={24}
+          height={viewport?.clientHeight ?? 0}
+          overlapThreshold={80}
+          zoom={scaleY}
+          offset={ty}
+          ranges={ranges.y}
+          marks={marks.x.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "end",
+                textAlignOffset: 8,
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
+                color: "red",
+              }) satisfies Tick
+          )}
+        />
+      </div>
+      {/* Guides */}
+      <div className="z-10">
+        {guides.map((g, i) => {
+          return <Guide key={i} idx={i} axis={g.axis} offset={g.offset} />;
+        })}
+      </div>
+    </div>
+  );
+  //
+}
+
+function Guide({ axis, offset, idx }: Guide & { idx: number }) {
+  const { transform } = useTransform();
+  const { startGuideGesture, deleteGuide } = useEventTarget();
+  const o = offsetToSurfaceSpace(offset, axis, transform);
+  const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  const bind = useSurfaceGesture({
+    onFocus: ({ event }) => {
+      event.stopPropagation();
+      setFocused(true);
+    },
+    onBlur: ({ event }) => {
+      event.stopPropagation();
+      setFocused(false);
+    },
+    onHover: (s) => {
+      if (s.first) setHover(true);
+      if (s.last) setHover(false);
+    },
+    onPointerDown: ({ event }) => {
+      // ensure the div focuses
+      (event.currentTarget as HTMLElement)?.focus();
+      event.preventDefault();
+    },
+    onKeyDown: ({ event }) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        deleteGuide(idx);
+      }
+      if (event.key === "Escape") {
+        (event.currentTarget as HTMLElement)?.blur();
+      }
+      event.stopPropagation();
+    },
+    onDragStart: ({ event }) => {
+      startGuideGesture(axis, idx);
+      event.preventDefault();
+    },
+  });
+
+  return (
+    <div
+      role="button"
+      tabIndex={idx}
+      {...bind()}
+      data-axis={axis}
+      className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ew-resize data-[axis='y']:cursor-ns-resize"
+    >
+      <Rule
+        width={hover || focused ? 1 : 0.5}
+        axis={cmath.counterAxis(axis)}
+        offset={o}
+        padding={4}
+        data-focus={focused}
+        className="data-[focus='true']:text-workbench-accent-sky"
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { produce, type Draft } from "immer";
 import type { SurfaceAction } from "../action";
 import {
   DEFAULT_GAP_ALIGNMENT_TOLERANCE,
+  Guide,
   type CursorModeType,
   type IDocumentEditorState,
   type LayoutSnapshot,
@@ -22,6 +23,18 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 ): S {
   switch (action.type) {
     // #region [universal backend] canvas event target
+    case "surface/ruler": {
+      const { state: rulerstate } = action;
+      return produce(state, (draft) => {
+        draft.ruler = rulerstate;
+      });
+    }
+    case "surface/guide/delete": {
+      const { idx } = action;
+      return produce(state, (draft) => {
+        draft.guides.splice(idx, 1);
+      });
+    }
     case "surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];
@@ -107,6 +120,46 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.surface_snapping = undefined;
 
         switch (gesture.type) {
+          case "guide": {
+            const { axis, idx } = gesture;
+
+            if (idx === -1) {
+              const t = cmath.transform.getTranslate(state.transform);
+              const s = cmath.transform.getScale(state.transform);
+
+              const axi = axis === "x" ? 0 : 1;
+
+              const next = {
+                axis,
+                offset: -cmath.quantize(t[axi] * (1 / s[axi]), 1),
+              } satisfies Guide;
+              const idx = draft.guides.push(next) - 1;
+
+              // new
+              draft.gesture = {
+                type: "guide",
+                axis,
+                idx: idx,
+                offset: next.offset,
+                initial_offset: next.offset,
+                movement: cmath.vector2.zero,
+              };
+            } else {
+              // existing
+              const guide = state.guides[idx];
+              assert(guide.axis === axis, "guide gesture axis mismatch");
+              draft.gesture = {
+                type: "guide",
+                axis,
+                idx: idx,
+                offset: guide.offset,
+                initial_offset: guide.offset,
+                movement: cmath.vector2.zero,
+              };
+            }
+
+            break;
+          }
           case "curve": {
             const { node_id, segment, control } = gesture;
 
