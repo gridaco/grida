@@ -8,6 +8,7 @@ import type {
   GestureRotate,
   GestureScale,
   GestureSort,
+  GestureGuide,
   // GestureTranslate1DArrange,
   GestureTranslateVertex,
   IDocumentEditorState,
@@ -418,16 +419,25 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 
 // #region surface action
 export type SurfaceAction =
-  | EditorSurface_RulerStateAction
+  | EditorSurface_RulerAndGuideAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
   | EditorSurface_StartGesture;
 
+type EditorSurface_RulerAndGuideAction =
+  | EditorSurface_RulerStateAction
+  | EditorSurface_DeleteGuideAction;
+
 export interface EditorSurface_RulerStateAction {
   type: "surface/ruler";
   state: "on" | "off";
+}
+
+export interface EditorSurface_DeleteGuideAction {
+  type: "surface/guide/delete";
+  idx: number;
 }
 
 export type EditorSurface_EnterContentEditMode = {
@@ -446,6 +456,7 @@ export type EditorSurface_CursorMode = {
 export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
+    | Pick<GestureGuide, "type" | "axis" | "idx">
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
     | (Pick<GestureSort, "type" | "node_id"> & { selection: string[] })

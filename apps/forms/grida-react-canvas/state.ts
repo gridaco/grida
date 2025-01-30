@@ -166,6 +166,7 @@ interface IDocumentEditorTransformState {
 export type GestureState =
   | GestureIdle
   | GesturePan
+  | GestureGuide
   | GestureVirtualNudge
   | GestureTranslate
   | GestureSort
@@ -196,6 +197,32 @@ export type GestureIdle = {
  */
 export type GesturePan = IGesture & {
   readonly type: "pan";
+};
+
+/**
+ * Move or draw the guide line
+ */
+export type GestureGuide = IGesture & {
+  readonly type: "guide";
+  /**
+   * the axis of the guide
+   */
+  readonly axis: cmath.Axis;
+
+  /**
+   * the index, id of the guide
+   */
+  readonly idx: number;
+
+  /**
+   * initial offset of the guide
+   */
+  readonly initial_offset: number;
+
+  /**
+   * the current offset of the guide (can be snapped to objects)
+   */
+  offset: number;
 };
 
 /**
@@ -672,8 +699,8 @@ export interface IMinimalDocumentState {
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
 }
 
-interface Guide {
-  readonly axis: "X" | "Y";
+export interface Guide {
+  readonly axis: cmath.Axis;
   readonly offset: number;
 }
 

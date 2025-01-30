@@ -6,14 +6,17 @@ import { Axis, RulerCanvas, RulerOptions } from "./ruler";
 export type RulerProps = Partial<
   Pick<
     RulerOptions,
-    "marks" | "font" | "textSideOffset" | "overlapThreshold" | "ranges"
+    | "marks"
+    | "font"
+    | "textSideOffset"
+    | "overlapThreshold"
+    | "ranges"
+    | "steps"
   >
 > & {
   axis: Axis;
   width: number;
   height: number;
-  steps?: number[];
-  fadeThreshold?: number;
   zoom: number;
   offset: number;
 };

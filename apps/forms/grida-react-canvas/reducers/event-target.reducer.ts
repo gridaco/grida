@@ -688,6 +688,19 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               );
               break;
             }
+            case "guide": {
+              const { axis, idx: index, initial_offset } = draft.gesture;
+
+              const counter = axis === "x" ? 1 : 0;
+              const offset = cmath.quantize(
+                initial_offset + movement[counter],
+                1
+              );
+
+              draft.gesture.offset = offset;
+              draft.guides[index].offset = offset;
+              break;
+            }
             // [insertion mode - resize after insertion]
             case "scale": {
               self_update_gesture_transform(draft);

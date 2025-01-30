@@ -160,7 +160,11 @@ export class RulerCanvas implements RulerOptions {
       textColor = color,
       textAlign = "center",
       textAlignOffset = 0,
+      strokeColor = color,
+      strokeWidth = 1,
+      strokeHeight = this.tickHeight,
     } = tick;
+
     // skip if too close to priority points
     const skipThreshold = 10;
     for (const p of this.priorityPoints) {
@@ -169,34 +173,32 @@ export class RulerCanvas implements RulerOptions {
     }
 
     this.ctx.save();
-    this.ctx.strokeStyle = color;
-    this.ctx.fillStyle = color;
+    this.ctx.strokeStyle = strokeColor;
+    this.ctx.lineWidth = strokeWidth;
+    this.ctx.fillStyle = textColor;
     this.ctx.textAlign = textAlign;
     this.ctx.font = font;
 
     if (this.axis === "x") {
       this.ctx.beginPath();
-      this.ctx.moveTo(pos, this.height - this.textSideOffset - this.tickHeight);
+      this.ctx.moveTo(pos, this.height - this.textSideOffset - strokeHeight);
       this.ctx.lineTo(pos, this.height);
       this.ctx.stroke();
       if (text) {
         this.ctx.fillText(
           text,
           pos + textAlignOffset,
-          this.height - this.textSideOffset - (this.tickHeight + 4)
+          this.height - this.textSideOffset - (strokeHeight + 4)
         );
       }
     } else {
       this.ctx.beginPath();
       this.ctx.moveTo(this.width, pos);
-      this.ctx.lineTo(
-        this.width - (this.textSideOffset + this.tickHeight),
-        pos
-      );
+      this.ctx.lineTo(this.width - (this.textSideOffset + strokeHeight), pos);
       this.ctx.stroke();
       if (text) {
         this.ctx.translate(
-          this.width - (this.textSideOffset + this.tickHeight + 4),
+          this.width - (this.textSideOffset + strokeHeight + 4),
           pos + textAlignOffset
         );
         this.ctx.rotate(-Math.PI / 2);

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useRef } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   DropzoneIndication,
   GestureState,
+  type Guide,
   useEventTarget,
 } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
@@ -36,10 +37,15 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
+import {
+  vector2ToSurfaceSpace,
+  rectToSurfaceSpace,
+  offsetToSurfaceSpace,
+} from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
-import { AxisRuler } from "@grida/ruler";
+import { AxisRuler, Tick } from "@grida/ruler";
+import { Rule } from "./ui/rule";
 
 const DRAG_THRESHOLD = 2;
 
@@ -1098,12 +1104,20 @@ function DistributeButton({
 }
 
 function RulerGuideOverlay() {
+  const { guides, startGuideGesture } = useEventTarget();
   const { scaleX, scaleY, transform } = useTransform();
   const d = useSurfaceSelectionGroups();
 
-  const bind = useSurfaceGesture({
+  const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      console.log("drag start");
+      startGuideGesture("x", -1);
+      event.preventDefault();
+    },
+  });
+
+  const bindY = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      startGuideGesture("y", -1);
       event.preventDefault();
     },
   });
@@ -1127,35 +1141,136 @@ function RulerGuideOverlay() {
       );
   }, [d]);
 
+  const marks = guides.reduce(
+    (acc, g) => {
+      if (g.axis === "x") {
+        acc.x.push(g.offset);
+      } else {
+        acc.y.push(g.offset);
+      }
+      return acc;
+    },
+    { x: [] as number[], y: [] as number[] }
+  );
+
   const tx = transform[0][2];
   const ty = transform[1][2];
 
   return (
     <div className="fixed w-full h-full pointer-events-none z-50">
       <div
-        {...bind()}
-        className="z-10 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+        {...bindX()}
+        className="fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
       >
         <AxisRuler
           axis="x"
           width={window.innerWidth}
           height={24}
+          overlapThreshold={40}
           zoom={scaleX}
           offset={tx}
           ranges={ranges.x}
+          marks={marks.y.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "start",
+                textAlignOffset: 8,
+                strokeColor: "transparent",
+                color: "red",
+              }) satisfies Tick
+          )}
         />
       </div>
-      <div className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none">
+      <div
+        {...bindY()}
+        className="fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+      >
         <AxisRuler
           axis="y"
           width={24}
           height={window.innerHeight}
+          overlapThreshold={40}
           zoom={scaleY}
           offset={ty}
           ranges={ranges.y}
+          marks={marks.x.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "end",
+                textAlignOffset: 8,
+                strokeColor: "transparent",
+                color: "red",
+              }) satisfies Tick
+          )}
         />
+      </div>
+      {/* Guides */}
+      <div className="z-30">
+        {guides.map((g, i) => {
+          return <Guide key={i} idx={i} axis={g.axis} offset={g.offset} />;
+        })}
       </div>
     </div>
   );
   //
+}
+
+function Guide({ axis, offset, idx }: Guide & { idx: number }) {
+  const { transform } = useTransform();
+  const { startGuideGesture, deleteGuide } = useEventTarget();
+  const o = offsetToSurfaceSpace(offset, cmath.counterAxis(axis), transform);
+  const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  const bind = useSurfaceGesture({
+    onFocus: ({ event }) => {
+      event.stopPropagation();
+      setFocused(true);
+    },
+    onBlur: ({ event }) => {
+      event.stopPropagation();
+      setFocused(false);
+    },
+    onHover: (s) => {
+      if (s.first) setHover(true);
+      if (s.last) setHover(false);
+    },
+    onPointerDown: (s) => {
+      // ensure the div focuses
+      (s.event.currentTarget as HTMLElement)?.focus();
+      s.event.preventDefault();
+    },
+    onKeyDown: ({ event }) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        deleteGuide(idx);
+      }
+    },
+    onDragStart: ({ event }) => {
+      startGuideGesture(axis, idx);
+      event.preventDefault();
+    },
+  });
+
+  return (
+    <div
+      role="button"
+      tabIndex={idx}
+      {...bind()}
+      data-axis={axis}
+      className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ns-resize data-[axis='y']:cursor-ew-resize"
+    >
+      <Rule
+        width={hover || focused ? 1 : 0.5}
+        axis={axis}
+        offset={o}
+        padding={4}
+        data-focus={focused}
+        className="data-[focus='true']:text-workbench-accent-sky"
+      />
+    </div>
+  );
 }

@@ -645,8 +645,6 @@ export namespace guide {
   export function plot(snapping: SnapToObjectsResult): SnapGuide {
     const lines: cmath.ui.Line[] = [];
     const points: cmath.Vector2[] = [];
-    const x_ray_offsets: number[] = [];
-    const y_ray_offsets: number[] = [];
 
     // #region by_geometry
     const by_geometry = __surface_snap_guide_by_geometry(snapping);
@@ -660,18 +658,9 @@ export namespace guide {
     lines.push(...by_spacing.lines);
     // #endregion by_spacing
 
-    const rays: cmath.ui.Rule[] = [
-      ...Array.from(new Set(x_ray_offsets)).map(
-        (offset) => ["x", offset] satisfies cmath.ui.Rule
-      ),
-      ...Array.from(new Set(y_ray_offsets)).map(
-        (offset) => ["y", offset] satisfies cmath.ui.Rule
-      ),
-    ];
-
     return {
       points,
-      rules: rays,
+      rules: [],
       lines,
     };
   }
