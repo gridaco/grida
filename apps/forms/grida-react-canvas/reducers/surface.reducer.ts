@@ -35,6 +35,13 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.guides.splice(idx, 1);
       });
     }
+    case "surface/pixel-grid": {
+      const { state: pixelgridstate } = action;
+      return produce(state, (draft) => {
+        draft.pixelgrid = pixelgridstate;
+      });
+      break;
+    }
     case "surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];

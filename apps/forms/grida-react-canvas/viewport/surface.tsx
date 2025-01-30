@@ -45,6 +45,7 @@ import {
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler";
+import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
 
 const DRAG_THRESHOLD = 2;
@@ -131,6 +132,7 @@ export function EditorSurface() {
     pan,
     pointer,
     ruler,
+    pixelgrid,
     marquee,
     hovered_node_id,
     dropzone,
@@ -296,12 +298,9 @@ export function EditorSurface() {
         }}
       >
         {ruler === "on" && <RulerGuideOverlay />}
+        {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {/* <div className="absolute w-full h-full z-50">
-        {transform[0][0] > 4 && (
-          <PixelGrid zoomLevel={transform[0][0]} cellSize={1} />
-        )}
-      </div> */}
+
         <div
           style={{
             position: "absolute",
@@ -1103,6 +1102,22 @@ function DistributeButton({
   );
 }
 
+function PixelGridOverlay() {
+  const { transform, scaleX } = useTransform();
+  const viewport = useViewport();
+  return (
+    <div className="fixed inset-0">
+      {scaleX > 4 && (
+        <PixelGrid
+          transform={transform}
+          width={viewport?.clientWidth ?? 0}
+          height={viewport?.clientHeight ?? 0}
+        />
+      )}
+    </div>
+  );
+}
+
 function RulerGuideOverlay() {
   const { guides, startGuideGesture } = useEventTarget();
   const { scaleX, scaleY, transform } = useTransform();
@@ -1166,8 +1181,9 @@ function RulerGuideOverlay() {
         <AxisRuler
           axis="x"
           width={viewport?.clientWidth ?? 0}
-          height={24}
+          height={20}
           overlapThreshold={80}
+          textSideOffset={10}
           zoom={scaleX}
           offset={tx}
           ranges={ranges.x}
@@ -1192,9 +1208,10 @@ function RulerGuideOverlay() {
       >
         <AxisRuler
           axis="y"
-          width={24}
+          width={20}
           height={viewport?.clientHeight ?? 0}
           overlapThreshold={80}
+          textSideOffset={10}
           zoom={scaleY}
           offset={ty}
           ranges={ranges.y}

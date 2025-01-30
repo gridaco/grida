@@ -2126,6 +2126,7 @@ export function useEventTarget() {
     cursor_mode,
     marquee,
     debug,
+    pixelgrid,
     ruler,
     guides,
   } = state;
@@ -2142,6 +2143,16 @@ export function useEventTarget() {
     (state: "on" | "off") => {
       dispatch({
         type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const setPixelGridState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/pixel-grid",
         state,
       });
     },
@@ -2506,6 +2517,9 @@ export function useEventTarget() {
       startGuideGesture,
       deleteGuide,
       //
+      pixelgrid,
+      setPixelGridState,
+      //
       hovered_node_id,
       dropzone,
       selection,
@@ -2557,6 +2571,9 @@ export function useEventTarget() {
     guides,
     startGuideGesture,
     deleteGuide,
+    //
+    pixelgrid,
+    setPixelGridState,
     //
     hovered_node_id,
     dropzone,

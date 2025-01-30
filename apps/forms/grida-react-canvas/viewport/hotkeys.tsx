@@ -181,6 +181,11 @@ export const keybindings_sheet = [
     keys: ["shift+r"],
   },
   {
+    name: "hide/show pixel grid",
+    description: "Toggle pixel grid visibility",
+    keys: ["shift+'"],
+  },
+  {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
     keys: ["i"],
@@ -248,6 +253,8 @@ export function useEditorHotKeys() {
     setCursorMode,
     ruler,
     setRulerState,
+    pixelgrid,
+    setPixelGridState,
     tryExitContentEditMode,
     tryToggleContentEditMode,
   } = useEventTarget();
@@ -577,11 +584,15 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+r", () => {
-    if (ruler === "on") {
-      setRulerState("off");
-    } else {
-      setRulerState("on");
-    }
+    const next = ruler === "on" ? "off" : "on";
+    setRulerState(next);
+    toast.success(`Ruler ${next}`);
+  });
+
+  useHotkeys("shift+\", shift+'", () => {
+    const next = pixelgrid === "on" ? "off" : "on";
+    setPixelGridState(next);
+    toast.success(`Pixel Grid ${next}`);
   });
 
   useHotkeys(

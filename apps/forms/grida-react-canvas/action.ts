@@ -420,6 +420,7 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 // #region surface action
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
+  | EditorSurface_PixelGridStateAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
@@ -432,6 +433,11 @@ type EditorSurface_RulerAndGuideAction =
 
 export interface EditorSurface_RulerStateAction {
   type: "surface/ruler";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_PixelGridStateAction {
+  type: "surface/pixel-grid";
   state: "on" | "off";
 }
 
