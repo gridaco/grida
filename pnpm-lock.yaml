@@ -192,6 +192,9 @@ importers:
       '@grida/cmath':
         specifier: workspace:*
         version: link:../../packages/grida-cmath
+      '@grida/pixel-grid':
+        specifier: workspace:*
+        version: link:../../packages/grida-canvas-pixelgrid
       '@grida/ruler':
         specifier: workspace:*
         version: link:../../packages/grida-canvas-ruler
@@ -779,6 +782,15 @@ importers:
       typescript:
         specifier: ^5
         version: 5.4.5
+
+  packages/grida-canvas-pixelgrid:
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
 
   packages/grida-canvas-ruler:
     devDependencies:

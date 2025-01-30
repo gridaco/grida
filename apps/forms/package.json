@@ -24,6 +24,7 @@
     "@fingerprintjs/fingerprintjs": "^4.2.2",
     "@floating-ui/react": "^0.26.10",
     "@grida/cmath": "workspace:*",
+    "@grida/pixel-grid": "workspace:*",
     "@grida/ruler": "workspace:*",
     "@grida/tokens": "workspace:*",
     "@mdx-js/loader": "^3.0.1",
