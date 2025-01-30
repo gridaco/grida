@@ -5,6 +5,29 @@ import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
 
 const q = 1;
 
+export function snapGuideTranslation(
+  axis: cmath.Axis,
+  agent: number,
+  anchors: cmath.Rectangle[],
+  movement: number,
+  threshold: number
+): { translated: number } {
+  const anchorPoints = anchors
+    .map((rect) => {
+      const [a, b] = cmath.range.fromRectangle(rect, axis);
+      const c = cmath.mean(a, b);
+      return [a, b, c];
+    })
+    .flat();
+
+  const v = agent + movement;
+
+  const res = cmath.ext.snap.snap1D([v], anchorPoints, threshold);
+  const delta = res.distance === Infinity ? 0 : res.distance;
+
+  return { translated: v + delta };
+}
+
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: cmath.Rectangle[],

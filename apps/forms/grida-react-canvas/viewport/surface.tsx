@@ -1239,15 +1239,20 @@ function Guide({ axis, offset, idx }: Guide & { idx: number }) {
       if (s.first) setHover(true);
       if (s.last) setHover(false);
     },
-    onPointerDown: (s) => {
+    onPointerDown: ({ event }) => {
       // ensure the div focuses
-      (s.event.currentTarget as HTMLElement)?.focus();
-      s.event.preventDefault();
+      (event.currentTarget as HTMLElement)?.focus();
+      event.preventDefault();
     },
     onKeyDown: ({ event }) => {
       if (event.key === "Delete" || event.key === "Backspace") {
         deleteGuide(idx);
       }
+      if (event.key === "Escape") {
+        (event.currentTarget as HTMLElement)?.blur();
+      }
+      event.preventDefault();
+      event.stopPropagation();
     },
     onDragStart: ({ event }) => {
       startGuideGesture(axis, idx);

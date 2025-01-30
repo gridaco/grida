@@ -13,10 +13,11 @@ import type {
   EditorEventTarget_DragEnd,
   //
 } from "../action";
-import type {
-  GestureDraw,
-  IDocumentEditorState,
-  IMinimalDocumentState,
+import {
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  type GestureDraw,
+  type IDocumentEditorState,
+  type IMinimalDocumentState,
 } from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
@@ -38,6 +39,7 @@ import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
+import { snapGuideTranslation } from "./tools/snap";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -692,10 +694,22 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { axis, idx: index, initial_offset } = draft.gesture;
 
               const counter = axis === "x" ? 1 : 0;
-              const offset = cmath.quantize(
-                initial_offset + movement[counter],
-                1
+              const m = movement[counter];
+
+              const cdom = new domapi.CanvasDOM(state.transform);
+
+              // [snap the guide offset]
+              // 1. to pixel grid (quantize 1)
+              // 2. to objects geometry
+              const { translated } = snapGuideTranslation(
+                axis,
+                initial_offset,
+                [cdom.getNodeBoundingRect(state.document.root_id)!],
+                movement[counter],
+                DEFAULT_SNAP_MOVEMNT_THRESHOLD
               );
+
+              const offset = cmath.quantize(translated, 1);
 
               draft.gesture.offset = offset;
               draft.guides[index].offset = offset;
