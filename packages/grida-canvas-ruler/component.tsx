@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { RulerCanvas, RulerOptions } from "./ruler";
+import { Axis, RulerCanvas, RulerOptions } from "./ruler";
 
 export type RulerProps = Partial<
   Pick<RulerOptions, "font" | "labelOffset" | "fadeThreshold">
 > & {
+  axis: Axis;
   width: number;
   height: number;
   steps?: number[];
@@ -15,6 +16,7 @@ export type RulerProps = Partial<
 };
 
 export const Ruler: React.FC<RulerProps> = ({
+  axis,
   width,
   height,
   steps,
@@ -27,7 +29,7 @@ export const Ruler: React.FC<RulerProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
     const rc = new RulerCanvas(canvasRef.current, {
-      axis: "x",
+      axis: axis,
       steps,
       fadeThreshold,
       scale: transform.scaleX,
@@ -36,7 +38,7 @@ export const Ruler: React.FC<RulerProps> = ({
     });
     rc.setSize(width, height);
     rc.draw();
-  }, [width, height, steps, fadeThreshold, transform, labelOffset]);
+  }, [axis, width, height, steps, fadeThreshold, transform, labelOffset]);
 
   return <canvas ref={canvasRef} style={{ width, height }} />;
 };

@@ -1,5 +1,5 @@
-type Axis = "x" | "y";
-type Range = [a: number, b: number];
+export type Axis = "x" | "y";
+export type Range = [a: number, b: number];
 
 export interface RulerOptions {
   readonly axis: Axis;
@@ -11,6 +11,7 @@ export interface RulerOptions {
   readonly font?: string;
   readonly ranges?: Range[];
   readonly backgroundColor?: string;
+  readonly color?: string;
 }
 
 export class RulerCanvas implements RulerOptions {
@@ -25,6 +26,7 @@ export class RulerCanvas implements RulerOptions {
   readonly font: string;
   readonly ranges: Range[];
   readonly backgroundColor: string;
+  readonly color: string;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -37,6 +39,7 @@ export class RulerCanvas implements RulerOptions {
       labelOffset = 1,
       font = "10px sans-serif",
       backgroundColor = "#fff",
+      color = "#BABABA",
     }: RulerOptions
   ) {
     this.ctx = canvas.getContext("2d")!;
@@ -50,6 +53,7 @@ export class RulerCanvas implements RulerOptions {
     this.font = font;
     this.ranges = [];
     this.backgroundColor = backgroundColor;
+    this.color = color;
   }
 
   setSize(w: number, h: number) {
@@ -57,7 +61,6 @@ export class RulerCanvas implements RulerOptions {
     this.canvas.height = h * this.dpr;
     this.canvas.style.width = w + "px";
     this.canvas.style.height = h + "px";
-    // Use a transform so we can draw in CSS pixels
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
@@ -72,7 +75,6 @@ export class RulerCanvas implements RulerOptions {
   draw() {
     const w = this.canvas.width / this.dpr;
     const h = this.canvas.height / this.dpr;
-
     this.ctx.clearRect(0, 0, w, h);
     this.ctx.save();
     this.ctx.fillStyle = this.backgroundColor;
@@ -80,31 +82,44 @@ export class RulerCanvas implements RulerOptions {
     this.ctx.restore();
 
     this.ctx.font = this.font;
-    this.ctx.fillStyle = "#BABABA";
-    this.ctx.strokeStyle = "#BABABA";
+    this.ctx.fillStyle = this.color;
+    this.ctx.strokeStyle = this.color;
     this.ctx.lineWidth = 1;
-    this.ctx.textAlign = "center";
 
     const step = this.getStepSize();
+    const dimension = this.axis === "x" ? w : h;
     const startUnit = -this.translate / this.scale;
-    const endUnit = startUnit + w / this.scale;
+    const endUnit = startUnit + dimension / this.scale;
     const firstTick = Math.floor(startUnit / step) * step;
 
     for (let t = firstTick; t < endUnit; t += step) {
-      const xCanvas = t * this.scale + this.translate;
-      if (xCanvas < 0 || xCanvas > w) continue;
+      const pos = t * this.scale + this.translate;
+      if (pos < 0 || pos > dimension) continue;
 
-      const distFromLeft = Math.abs(xCanvas);
+      const dist = Math.abs(pos);
       this.ctx.globalAlpha =
-        distFromLeft < this.fadeThreshold
-          ? distFromLeft / this.fadeThreshold
-          : 1;
+        dist < this.fadeThreshold ? dist / this.fadeThreshold : 1;
 
-      this.ctx.beginPath();
-      this.ctx.moveTo(xCanvas, h - this.labelOffset - 8);
-      this.ctx.lineTo(xCanvas, h);
-      this.ctx.stroke();
-      this.ctx.fillText(String(t), xCanvas, h - this.labelOffset - 12);
+      this.ctx.textAlign = "center";
+      if (this.axis === "x") {
+        this.ctx.beginPath();
+        this.ctx.moveTo(pos, h - this.labelOffset - 8);
+        this.ctx.lineTo(pos, h);
+        this.ctx.stroke();
+        this.ctx.fillText(String(t), pos, h - this.labelOffset - 12);
+      } else {
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, pos);
+        this.ctx.lineTo(this.labelOffset + 8, pos);
+        this.ctx.stroke();
+
+        // Rotate labels so they read horizontally
+        this.ctx.save();
+        this.ctx.translate(this.labelOffset + 12, pos);
+        this.ctx.rotate(-Math.PI / 2);
+        this.ctx.fillText(String(t), 0, 0);
+        this.ctx.restore();
+      }
     }
     this.ctx.globalAlpha = 1;
   }
