@@ -977,6 +977,8 @@ function GapWithHandle({
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
 
+    if (!intersection) return null;
+
     let rect: cmath.Rectangle;
     if (axis === "x") {
       const x1 = a.x + a.width;
@@ -1004,6 +1006,8 @@ function GapWithHandle({
   }, [a, b, axis, offset]);
 
   const is_gesture = gesture.type === "gap";
+
+  if (!r) return null;
 
   return (
     <>
