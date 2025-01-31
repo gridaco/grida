@@ -1332,6 +1332,11 @@ export namespace grida.program.nodes {
       i.IRotation,
       i.IFill {
     type: "bitmap";
+
+    /**
+     * Pixel data: RGBA in row-major order, length = width * height * 4
+     */
+    data: Uint8ClampedArray;
   }
 
   /**

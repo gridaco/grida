@@ -15,6 +15,7 @@ import type {
 } from "../action";
 import {
   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+  GesturePaint,
   type GestureDraw,
   type IDocumentEditorState,
 } from "../state";
@@ -593,6 +594,52 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "paint": {
+            const new_node_id = nid();
+            const bitmap: grida.program.nodes.BitmapNode = {
+              type: "bitmap",
+              name: "bitmap",
+              id: new_node_id,
+              active: true,
+              locked: false,
+              position: "absolute",
+              left: 0,
+              top: 0,
+              opacity: 1,
+              width: 1,
+              height: 1,
+              rotation: 0,
+              zIndex: 0,
+              data: new Uint8ClampedArray([0, 0, 0, 255]),
+            };
+
+            const parent = __get_insert_target(draft);
+            self_insertNode(draft, parent, bitmap);
+
+            const cdom = new domapi.CanvasDOM(draft.transform);
+            // position relative to the parent
+            const parent_rect = cdom.getNodeBoundingRect(parent)!;
+            const node_relative_pos = cmath.vector2.quantize(
+              cmath.vector2.sub(state.pointer.position, [
+                parent_rect.x,
+                parent_rect.y,
+              ]),
+              1
+            );
+
+            bitmap.left = node_relative_pos[0];
+            bitmap.top = node_relative_pos[1];
+
+            draft.gesture = {
+              type: "paint",
+              mode: "pixel",
+              origin: node_relative_pos,
+              movement: cmath.vector2.zero,
+              points: [cmath.vector2.zero],
+              node_id: bitmap.id,
+            };
+
+            self_clearSelection(draft);
+
             // TODO:
             break;
           }
@@ -608,6 +655,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "draw":
             // keep if pencil mode
             if (draft.cursor_mode.tool === "pencil") break;
+          case "paint":
+            // keep for paint mode
+            break;
           case "path":
           case "hand":
             // keep
@@ -743,18 +793,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const {
                 gesture_modifiers: { tarnslate_with_axis_lock },
               } = state;
-              const mode = draft.gesture.mode;
-
-              const {
-                origin: origin,
-                points,
-                node_id,
-              } = state.gesture as GestureDraw;
-
-              const node = document.__getNodeById(
-                draft,
-                node_id
-              ) as grida.program.nodes.PathNode;
 
               const adj_movement =
                 tarnslate_with_axis_lock === "on"
@@ -762,6 +800,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   : movement;
 
               const point = cmath.ext.movement.normalize(adj_movement);
+
+              const mode = draft.gesture.mode;
+
+              const { origin, points, node_id } = state.gesture as GestureDraw;
+
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.PathNode;
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),
@@ -793,6 +840,66 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               node.width = bb.width;
               node.height = bb.height;
               node.vectorNetwork = vne.value;
+
+              break;
+            }
+            case "paint": {
+              const {
+                gesture_modifiers: { tarnslate_with_axis_lock },
+              } = state;
+
+              const adj_movement =
+                tarnslate_with_axis_lock === "on"
+                  ? cmath.ext.movement.axisLockedByDominance(movement)
+                  : movement;
+
+              const point = cmath.ext.movement.normalize(adj_movement);
+
+              const mode = draft.gesture.mode;
+              const { origin, points, node_id } = state.gesture as GesturePaint;
+
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.BitmapNode;
+              const nodePos: cmath.Vector2 = [node.left ?? 0, node.top ?? 0];
+              const localPos = cmath.vector2.sub(
+                state.pointer.position,
+                nodePos
+              );
+
+              const px = Math.floor(localPos[0]);
+              const py = Math.floor(localPos[1]);
+
+              // 1) Expand bitmap if painting outside current bounds
+              if (px < 0 || py < 0 || px >= node.width || py >= node.height) {
+                const newWidth = Math.max(node.width, px + 1);
+                const newHeight = Math.max(node.height, py + 1);
+                const newData = new Uint8ClampedArray(newWidth * newHeight * 4);
+                // Copy old data
+                for (let y = 0; y < node.height; y++) {
+                  for (let x = 0; x < node.width; x++) {
+                    const oldIdx = (y * node.width + x) * 4;
+                    const newIdx = (y * newWidth + x) * 4;
+                    newData[newIdx + 0] = node.data[oldIdx + 0];
+                    newData[newIdx + 1] = node.data[oldIdx + 1];
+                    newData[newIdx + 2] = node.data[oldIdx + 2];
+                    newData[newIdx + 3] = node.data[oldIdx + 3];
+                  }
+                }
+                node.width = newWidth;
+                node.height = newHeight;
+                node.data = newData;
+              }
+
+              // 2) Paint black if in range
+              if (px >= 0 && py >= 0 && px < node.width && py < node.height) {
+                const i = (py * node.width + px) * 4;
+                node.data[i + 0] = 0;
+                node.data[i + 1] = 0;
+                node.data[i + 2] = 0;
+                node.data[i + 3] = 255;
+              }
 
               break;
             }

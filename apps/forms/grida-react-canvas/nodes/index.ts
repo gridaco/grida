@@ -10,6 +10,7 @@ import { SVGPolyLineWidget } from "./polyline";
 import { IFrameWidget } from "./iframe";
 import { RichTextWidget } from "./richtext";
 import { PathWidget } from "./path";
+import { BitmapWidget } from "./bitmap";
 
 export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
@@ -25,6 +26,7 @@ export namespace ReactNodeRenderers {
   export const image = ImageWidget;
   export const video = VideoWidget;
   export const richtext = RichTextWidget;
+  export const bitmap = BitmapWidget;
   // export const icon = IconWidget;
   // export const Theme = ThemeWidget;
 }

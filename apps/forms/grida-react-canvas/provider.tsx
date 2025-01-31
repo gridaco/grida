@@ -2107,6 +2107,8 @@ export function useEventTargetCSSCursor() {
         return "crosshair";
       case "path":
         return "crosshair";
+      case "paint":
+        return "cell";
     }
   }, [cursor_mode]);
 }

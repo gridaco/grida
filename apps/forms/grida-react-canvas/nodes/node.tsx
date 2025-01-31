@@ -73,6 +73,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "image":
       case "video":
       case "text":
+      case "bitmap":
       case "vector":
       case "path":
       case "line":
@@ -128,6 +129,7 @@ export function NodeElement<P extends Record<string, any>>({
     strokeWidth: node.strokeWidth,
     strokeCap: node.strokeCap,
     cursor: node.cursor,
+    data: node.data,
     style: {
       ...style,
       ...node.style,

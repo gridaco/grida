@@ -187,6 +187,7 @@ export type GestureState =
   | GestureRotate
   | GestureCornerRadius
   | GestureDraw
+  | GesturePaint
   | GestureTranslateVertex
   | GestureCurve
   | GestureCurveA;
@@ -385,7 +386,28 @@ export type GestureDraw = IGesture & {
   readonly mode: "line" | "pencil";
 
   /**
-   * origin point - relative to content space
+   * origin point - relative to canvas space
+   */
+  readonly origin: cmath.Vector2;
+
+  /**
+   * record of points (movements)
+   * the absolute position of the points will be (p + origin)
+   */
+  points: cmath.Vector2[];
+
+  readonly node_id: string;
+};
+
+export type GesturePaint = IGesture & {
+  /**
+   * - paint pixels
+   */
+  readonly type: "paint";
+  readonly mode: "pixel";
+
+  /**
+   * origin point - relative to canvas space
    */
   readonly origin: cmath.Vector2;
 
