@@ -24,15 +24,14 @@ export class BitmapEditor {
     this.frame = frame;
   }
 
-  pixel([x, y]: cmath.Vector2, paint: grida.program.cg.SolidPaint) {
+  pixel([x, y]: cmath.Vector2, color: cmath.Vector4) {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
     const idx = (y * this.width + x) * 4;
-    const { r, g, b, a } = paint.color;
-    const A = Math.round(a * 255);
+    const [r, g, b, a] = color;
     this.data[idx] = r;
     this.data[idx + 1] = g;
     this.data[idx + 2] = b;
-    this.data[idx + 3] = A;
+    this.data[idx + 3] = a;
     this.frame++;
   }
 

@@ -272,6 +272,7 @@ export function useEditorHotKeys() {
     cut,
     copy,
     duplicate,
+    setClipboardColor,
     deleteNode,
     a11yarrow,
     nudgeResize,
@@ -469,10 +470,10 @@ export function useEditorHotKeys() {
                */
               sRGBHex: string;
             }) => {
+              const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
               // set fill if selection
               if (selection.length > 0) {
                 //
-                const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
                 actions.fill({
                   type: "solid",
                   color: rgba,
@@ -480,6 +481,9 @@ export function useEditorHotKeys() {
               }
               // copy to clipboard if no selection
               else {
+                // editor clipboard
+                setClipboardColor(rgba);
+                // os clipboard
                 window.navigator.clipboard
                   .writeText(result.sRGBHex)
                   .then(() => {

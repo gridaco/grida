@@ -21,7 +21,8 @@ export type Action =
   | EditorCameraAction
   | EditorAction
   | EditorUndoAction
-  | EditorRedoAction;
+  | EditorRedoAction
+  | EditorClipAction;
 
 export type InternalAction = __InternalResetAction;
 
@@ -134,6 +135,14 @@ export type EditorUndoAction = {
 
 export type EditorRedoAction = {
   type: "redo";
+};
+
+/**
+ * set to editor clipbard
+ */
+export type EditorClipAction = {
+  type: "clip/color";
+  color: grida.program.cg.RGBA8888;
 };
 
 // #region copy cut paste

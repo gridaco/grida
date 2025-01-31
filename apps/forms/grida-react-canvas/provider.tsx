@@ -1439,6 +1439,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const setClipboardColor = useCallback(
+    (color: grida.program.cg.RGBA8888) => {
+      dispatch({
+        type: "clip/color",
+        color,
+      });
+    },
+    [dispatch]
+  );
+
   const deleteNode = useCallback(
     (target: "selection" | (string & {}) = "selection") => {
       dispatch({
@@ -1836,6 +1846,7 @@ export function useDocument() {
       copy,
       paste,
       duplicate,
+      setClipboardColor,
       deleteNode,
       nudge,
       nudgeResize,
@@ -1881,6 +1892,7 @@ export function useDocument() {
     copy,
     paste,
     duplicate,
+    setClipboardColor,
     deleteNode,
     nudge,
     nudgeResize,

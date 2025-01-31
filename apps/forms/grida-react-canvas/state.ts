@@ -139,7 +139,7 @@ export type GestureModifiers = {
   rotate_with_quantize: "off" | number;
 };
 
-interface IDocumentEditorClipboardState {
+export interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
    */
@@ -164,7 +164,9 @@ interface IDocumentEditorClipboardState {
    *
    * @deprecated - not ready
    */
-  last_font_family?: string;
+  next_font_family?: string;
+  next_paint_color?: grida.program.cg.RGBA8888;
+  user_clipboard_color?: grida.program.cg.RGBA8888;
 }
 
 interface IDocumentEditorTransformState {
@@ -407,15 +409,15 @@ export type GesturePaint = IGesture & {
   readonly mode: "pixel";
 
   /**
-   * origin point - relative to canvas space
+   * color to paint
    */
-  readonly origin: cmath.Vector2;
+  readonly color: cmath.Vector4;
 
-  /**
-   * record of points (movements)
-   * the absolute position of the points will be (p + origin)
-   */
-  points: cmath.Vector2[];
+  // /**
+  //  * record of points (movements)
+  //  * the absolute position of the points will be (p + origin)
+  //  */
+  // points: cmath.Vector2[];
 
   readonly node_id: string;
 };
@@ -673,6 +675,7 @@ export type HistoryEntry = {
 type ContentEditModeState =
   | TextContentEditMode
   | PathContentEditMode
+  | BitmapContentEditMode
   | GradientContentEditMode;
 
 type TextContentEditMode = {
@@ -714,6 +717,11 @@ type PathContentEditMode = {
    * @deprecated - remove me - use global sanp pointer
    */
   path_cursor_position: cmath.Vector2;
+};
+
+type BitmapContentEditMode = {
+  type: "bitmap";
+  node_id: string;
 };
 
 /**

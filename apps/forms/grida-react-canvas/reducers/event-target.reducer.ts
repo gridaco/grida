@@ -16,6 +16,7 @@ import type {
 import {
   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   GesturePaint,
+  IDocumentEditorClipboardState,
   type GestureDraw,
   type IDocumentEditorState,
 } from "../state";
@@ -41,6 +42,8 @@ import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
 import { BitmapEditor } from "@/grida/bitmap";
+
+const black = { r: 0, g: 0, b: 0, a: 1 };
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -341,7 +344,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 height: 0,
                 rotation: 0,
                 zIndex: 0,
-                stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+                stroke: { type: "solid", color: black },
                 strokeCap: "butt",
                 strokeWidth: 1,
                 vectorNetwork: {
@@ -370,6 +373,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             //
+            break;
+          }
+          case "paint": {
+            self_paint(draft);
             break;
           }
         }
@@ -481,7 +488,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 0,
               rotation: 0,
               zIndex: 0,
-              stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+              stroke: { type: "solid", color: black },
               strokeCap: "butt",
             } as const;
 
@@ -595,54 +602,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "paint": {
-            const new_node_id = nid();
-            const bitmap: grida.program.nodes.BitmapNode = {
-              type: "bitmap",
-              name: "bitmap",
-              id: new_node_id,
-              active: true,
-              locked: false,
-              position: "absolute",
-              left: 0,
-              top: 0,
-              opacity: 1,
-              width: 1,
-              height: 1,
-              rotation: 0,
-              zIndex: 0,
-              dataframe: 0,
-              data: new Uint8ClampedArray([0, 0, 0, 255]),
-            };
-
-            const parent = __get_insert_target(draft);
-            self_insertNode(draft, parent, bitmap);
-
-            const cdom = new domapi.CanvasDOM(draft.transform);
-            // position relative to the parent
-            const parent_rect = cdom.getNodeBoundingRect(parent)!;
-            const node_relative_pos = cmath.vector2.quantize(
-              cmath.vector2.sub(state.pointer.position, [
-                parent_rect.x,
-                parent_rect.y,
-              ]),
-              1
-            );
-
-            bitmap.left = node_relative_pos[0];
-            bitmap.top = node_relative_pos[1];
-
-            draft.gesture = {
-              type: "paint",
-              mode: "pixel",
-              origin: node_relative_pos,
-              movement: cmath.vector2.zero,
-              points: [cmath.vector2.zero],
-              node_id: bitmap.id,
-            };
-
-            self_clearSelection(draft);
-
-            // TODO:
+            self_paint(draft);
             break;
           }
         }
@@ -847,68 +807,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             case "paint": {
-              const { node_id } = state.gesture as GesturePaint;
-              const node = document.__getNodeById(
-                draft,
-                node_id
-              ) as grida.program.nodes.BitmapNode;
-
-              const nodePos: cmath.Vector2 = [node.left || 0, node.top || 0];
-              const localPos = cmath.vector2.sub(
-                state.pointer.position,
-                nodePos
-              );
-
-              let px = Math.floor(localPos[0]);
-              let py = Math.floor(localPos[1]);
-
-              const editor = new BitmapEditor(
-                node.width,
-                node.height,
-                node.data,
-                node.dataframe
-              );
-
-              // Negative shift: we need to move the data and shift node coords
-              let shiftX = 0;
-              let shiftY = 0;
-              if (px < 0) {
-                shiftX = -px;
-                px += shiftX;
-                node.left! -= shiftX;
-              }
-              if (py < 0) {
-                shiftY = -py;
-                py += shiftY;
-                node.top! -= shiftY;
-              }
-              if (shiftX > 0 || shiftY > 0) {
-                editor.resize(
-                  node.width + shiftX,
-                  node.height + shiftY,
-                  shiftX,
-                  shiftY
-                );
-              }
-
-              // Expand on right/bottom
-              if (px >= editor.width || py >= editor.height) {
-                const newW = Math.max(editor.width, px + 1);
-                const newH = Math.max(editor.height, py + 1);
-                editor.resize(newW, newH);
-              }
-
-              // Paint pixel (black)
-              editor.pixel([px, py], {
-                type: "solid",
-                color: { r: 0, g: 0, b: 0, a: 1 },
-              });
-
-              // Update node
-              node.width = editor.width;
-              node.height = editor.height;
-              node.data = editor.data;
-              node.dataframe = editor.frame;
+              self_paint(draft);
               break;
             }
             case "curve": {
@@ -1157,6 +1056,132 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   }
   //
   return state;
+}
+
+function self_paint(draft: Draft<IDocumentEditorState>) {
+  let node_id =
+    draft.content_edit_mode?.type === "bitmap"
+      ? draft.content_edit_mode.node_id
+      : null;
+
+  let color: cmath.Vector4;
+  if (draft.gesture && draft.gesture.type == "paint") {
+    color = draft.gesture.color;
+  } else {
+    color = get_next_brush_pain_color(draft);
+  }
+
+  if (node_id) {
+    const node = document.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.BitmapNode;
+
+    const nodePos: cmath.Vector2 = [node.left || 0, node.top || 0];
+    const localPos = cmath.vector2.sub(draft.pointer.position, nodePos);
+
+    let px = Math.floor(localPos[0]);
+    let py = Math.floor(localPos[1]);
+
+    const editor = new BitmapEditor(
+      node.width,
+      node.height,
+      node.data,
+      node.dataframe
+    );
+
+    // Negative shift: we need to move the data and shift node coords
+    let shiftX = 0;
+    let shiftY = 0;
+    if (px < 0) {
+      shiftX = -px;
+      px += shiftX;
+      node.left! -= shiftX;
+    }
+    if (py < 0) {
+      shiftY = -py;
+      py += shiftY;
+      node.top! -= shiftY;
+    }
+    if (shiftX > 0 || shiftY > 0) {
+      editor.resize(node.width + shiftX, node.height + shiftY, shiftX, shiftY);
+    }
+
+    // Expand on right/bottom
+    if (px >= editor.width || py >= editor.height) {
+      const newW = Math.max(editor.width, px + 1);
+      const newH = Math.max(editor.height, py + 1);
+      editor.resize(newW, newH);
+    }
+
+    // Paint pixel
+    editor.pixel([px, py], color);
+
+    // Update node
+    node.width = editor.width;
+    node.height = editor.height;
+    node.data = editor.data;
+    node.dataframe = editor.frame;
+  } else {
+    const new_node_id = nid();
+
+    const bitmap: grida.program.nodes.BitmapNode = {
+      type: "bitmap",
+      name: "bitmap",
+      id: new_node_id,
+      active: true,
+      locked: false,
+      position: "absolute",
+      left: 0,
+      top: 0,
+      opacity: 1,
+      width: 1,
+      height: 1,
+      rotation: 0,
+      zIndex: 0,
+      dataframe: 0,
+      data: new Uint8ClampedArray(color),
+    };
+
+    const parent = __get_insert_target(draft);
+    self_insertNode(draft, parent, bitmap);
+
+    const cdom = new domapi.CanvasDOM(draft.transform);
+    // position relative to the parent
+    const parent_rect = cdom.getNodeBoundingRect(parent)!;
+    const node_relative_pos = cmath.vector2.quantize(
+      cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
+      1
+    );
+
+    bitmap.left = node_relative_pos[0];
+    bitmap.top = node_relative_pos[1];
+
+    self_clearSelection(draft);
+
+    node_id = new_node_id;
+  }
+
+  if (draft.gesture.type === "idle") {
+    draft.gesture = {
+      type: "paint",
+      mode: "pixel",
+      movement: cmath.vector2.zero,
+      // points: [cmath.vector2.zero],
+      color: color,
+      node_id: node_id,
+    };
+  }
+
+  draft.content_edit_mode = { type: "bitmap", node_id: node_id };
+}
+
+function get_next_brush_pain_color(
+  state: IDocumentEditorClipboardState
+): cmath.Vector4 {
+  return grida.program.cg.rgba_to_unit8_chunk(
+    state.next_paint_color ?? state.user_clipboard_color ?? black
+  );
 }
 
 function self_start_gesture_scale_draw_new_node(

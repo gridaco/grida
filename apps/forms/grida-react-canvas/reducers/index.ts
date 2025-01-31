@@ -68,6 +68,12 @@ export default function reducer<S extends IDocumentEditorState>(
           }
         });
       }
+    case "clip/color": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.user_clipboard_color = action.color;
+        draft.next_paint_color = action.color;
+      });
+    }
     default:
       return historyExtension(state, action, _reducer(state, action));
   }

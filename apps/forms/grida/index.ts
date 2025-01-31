@@ -3,6 +3,7 @@ import type { vn } from "./vn";
 
 // TODO: remove this dependency
 import type { DocumentDispatcher } from "@/grida-react-canvas";
+import { cmath } from "@grida/cmath";
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
@@ -1894,6 +1895,10 @@ export namespace grida.program.cg {
       b: color.b,
       a: color.a * alpha,
     };
+  }
+
+  export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
+    return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
   }
 
   /**

@@ -47,9 +47,7 @@ export const BitmapViewer: React.FC<BitmapViewerProps> = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    rendererRef.current = new BitmapRenderer(width, height, data, {
-      antialias: false,
-    });
+    rendererRef.current = new BitmapRenderer(width, height, data);
     rendererRef.current.mount(containerRef.current);
     rendererRef.current.render();
     return () => {
@@ -68,12 +66,7 @@ class BitmapRenderer {
   private ctx: CanvasRenderingContext2D;
   private imageData: ImageData;
 
-  constructor(
-    width: number,
-    height: number,
-    data: Uint8ClampedArray,
-    { antialias = false } = {}
-  ) {
+  constructor(width: number, height: number, data: Uint8ClampedArray) {
     // Just make the canvas exactly match the bitmap.
     this.canvas = document.createElement("canvas");
     this.canvas.width = width;
@@ -84,7 +77,6 @@ class BitmapRenderer {
     // Disable smoothing and force pixelated rendering
     this.canvas.style.imageRendering = "pixelated";
     this.ctx = this.canvas.getContext("2d")!;
-    this.ctx.imageSmoothingEnabled = antialias;
 
     // Convert data to ImageData
     this.imageData = new ImageData(data, width, height);
