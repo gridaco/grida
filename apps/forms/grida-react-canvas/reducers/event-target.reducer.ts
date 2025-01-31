@@ -14,10 +14,9 @@ import type {
   //
 } from "../action";
 import {
-  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   type GestureDraw,
   type IDocumentEditorState,
-  type IMinimalDocumentState,
 } from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
@@ -39,7 +38,7 @@ import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
-import { snapGuideTranslation } from "./tools/snap";
+import { snapGuideTranslation, threshold } from "./tools/snap";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -706,7 +705,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 initial_offset,
                 [cdom.getNodeBoundingRect(state.document.root_id)!],
                 m,
-                DEFAULT_SNAP_MOVEMNT_THRESHOLD
+                threshold(
+                  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+                  draft.transform
+                )
               );
 
               const offset = cmath.quantize(translated, 1);

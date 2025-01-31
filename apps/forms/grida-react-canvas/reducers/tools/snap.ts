@@ -6,6 +6,23 @@ import { Guide } from "@/grida-react-canvas/state";
 
 const q = 1;
 
+/**
+ *
+ * calculate the final threshold for ux with factor and zoom (transform).
+ *
+ * @example
+ * Perfect fit for the given data—simply ceiling(5 / zoom).
+ * - f(5) = 1
+ * - f(4) = 2
+ * - f(1) = 5
+ * - f(0.5) = 10
+ * - f(0.02) = 250
+ */
+export function threshold(factor: number, t: number | cmath.Transform): number {
+  const zoom = typeof t === "number" ? t : cmath.transform.getScale(t)[0];
+  return cmath.quantize(Math.ceil(factor / zoom), 1) - 0.5;
+}
+
 export function snapGuideTranslation(
   axis: cmath.Axis,
   agent: number,

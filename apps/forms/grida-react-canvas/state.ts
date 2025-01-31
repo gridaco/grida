@@ -16,9 +16,18 @@ import type { SnapToObjectsResult } from "@grida/cmath/_snap";
 export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
 /**
- * snap threshold applyed when movement (real gesture) is applied
+ * The base snap threshold (in px) used during a real pointer movement (drag gesture).
+ *
+ * In practice, the final threshold often scales inversely with the current zoom level:
+ *
+ * ```ts
+ * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR / zoom);
+ * ```
+ *
+ * At higher zoom levels, the threshold becomes smaller for more precise snapping;
+ * at lower zoom levels, it grows for a smoother user experience.
  */
-export const DEFAULT_SNAP_MOVEMNT_THRESHOLD = 4;
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
 
 /**
  * snap threshold applyed when nudge (fake gesture) is applied

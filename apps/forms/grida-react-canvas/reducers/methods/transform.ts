@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import {
-  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   type IDocumentEditorState,
 } from "../../state";
 import { self_insertSubDocument } from "./insert";
@@ -9,7 +9,11 @@ import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../domapi";
-import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
+import {
+  getSnapTargets,
+  snapObjectsTranslation,
+  threshold,
+} from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
@@ -285,7 +289,7 @@ function __self_update_gesture_transform_translate(
       guides: draft.ruler === "on" ? draft.guides : undefined,
     },
     adj_movement,
-    DEFAULT_SNAP_MOVEMNT_THRESHOLD
+    threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
   );
 
   draft.surface_snapping = snapping;
