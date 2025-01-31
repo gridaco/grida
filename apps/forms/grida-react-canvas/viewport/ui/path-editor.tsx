@@ -91,7 +91,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
         const ta = s.ta;
         const tb = s.tb;
         const is_neighbouring = a_point === s.a || a_point === s.b;
-        if (!is_neighbouring) return <></>;
+        if (!is_neighbouring) return null;
 
         return (
           <React.Fragment key={i}>
