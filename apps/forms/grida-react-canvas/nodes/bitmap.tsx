@@ -6,6 +6,7 @@ export const BitmapWidget = ({
   width,
   height,
   data,
+  dataframe,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.BitmapNode>) => {
@@ -16,7 +17,12 @@ export const BitmapWidget = ({
       style={{ ...divStyles, overflow: "hidden" }}
       {...queryattributes(props)}
     >
-      <BitmapViewer width={width} height={height} data={data} />
+      <BitmapViewer
+        width={width}
+        height={height}
+        data={data}
+        frame={dataframe}
+      />
     </div>
   );
 };
@@ -27,12 +33,14 @@ interface BitmapViewerProps {
   width: number;
   height: number;
   data: Uint8ClampedArray;
+  frame?: number;
 }
 
 export const BitmapViewer: React.FC<BitmapViewerProps> = ({
   width,
   height,
   data,
+  frame,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<BitmapRenderer>();
@@ -50,7 +58,7 @@ export const BitmapViewer: React.FC<BitmapViewerProps> = ({
       }
       rendererRef.current = undefined;
     };
-  }, [width, height, data]);
+  }, [width, height, data, frame]);
 
   return <div ref={containerRef} />;
 };

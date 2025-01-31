@@ -1334,6 +1334,11 @@ export namespace grida.program.nodes {
     type: "bitmap";
 
     /**
+     * version of the bitmap data to trigger re-rendering
+     */
+    dataframe: number;
+
+    /**
      * Pixel data: RGBA in row-major order, length = width * height * 4
      */
     data: Uint8ClampedArray;

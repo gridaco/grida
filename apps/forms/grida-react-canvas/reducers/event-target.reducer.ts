@@ -40,6 +40,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
+import { BitmapEditor } from "@/grida/bitmap";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -609,6 +610,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 1,
               rotation: 0,
               zIndex: 0,
+              dataframe: 0,
               data: new Uint8ClampedArray([0, 0, 0, 255]),
             };
 
@@ -843,64 +845,70 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               break;
             }
+
             case "paint": {
-              const {
-                gesture_modifiers: { tarnslate_with_axis_lock },
-              } = state;
-
-              const adj_movement =
-                tarnslate_with_axis_lock === "on"
-                  ? cmath.ext.movement.axisLockedByDominance(movement)
-                  : movement;
-
-              const point = cmath.ext.movement.normalize(adj_movement);
-
-              const mode = draft.gesture.mode;
-              const { origin, points, node_id } = state.gesture as GesturePaint;
-
+              const { node_id } = state.gesture as GesturePaint;
               const node = document.__getNodeById(
                 draft,
                 node_id
               ) as grida.program.nodes.BitmapNode;
-              const nodePos: cmath.Vector2 = [node.left ?? 0, node.top ?? 0];
+
+              const nodePos: cmath.Vector2 = [node.left || 0, node.top || 0];
               const localPos = cmath.vector2.sub(
                 state.pointer.position,
                 nodePos
               );
 
-              const px = Math.floor(localPos[0]);
-              const py = Math.floor(localPos[1]);
+              let px = Math.floor(localPos[0]);
+              let py = Math.floor(localPos[1]);
 
-              // 1) Expand bitmap if painting outside current bounds
-              if (px < 0 || py < 0 || px >= node.width || py >= node.height) {
-                const newWidth = Math.max(node.width, px + 1);
-                const newHeight = Math.max(node.height, py + 1);
-                const newData = new Uint8ClampedArray(newWidth * newHeight * 4);
-                // Copy old data
-                for (let y = 0; y < node.height; y++) {
-                  for (let x = 0; x < node.width; x++) {
-                    const oldIdx = (y * node.width + x) * 4;
-                    const newIdx = (y * newWidth + x) * 4;
-                    newData[newIdx + 0] = node.data[oldIdx + 0];
-                    newData[newIdx + 1] = node.data[oldIdx + 1];
-                    newData[newIdx + 2] = node.data[oldIdx + 2];
-                    newData[newIdx + 3] = node.data[oldIdx + 3];
-                  }
-                }
-                node.width = newWidth;
-                node.height = newHeight;
-                node.data = newData;
+              const editor = new BitmapEditor(
+                node.width,
+                node.height,
+                node.data,
+                node.dataframe
+              );
+
+              // Negative shift: we need to move the data and shift node coords
+              let shiftX = 0;
+              let shiftY = 0;
+              if (px < 0) {
+                shiftX = -px;
+                px += shiftX;
+                node.left! -= shiftX;
+              }
+              if (py < 0) {
+                shiftY = -py;
+                py += shiftY;
+                node.top! -= shiftY;
+              }
+              if (shiftX > 0 || shiftY > 0) {
+                editor.resize(
+                  node.width + shiftX,
+                  node.height + shiftY,
+                  shiftX,
+                  shiftY
+                );
               }
 
-              // 2) Paint black if in range
-              if (px >= 0 && py >= 0 && px < node.width && py < node.height) {
-                const i = (py * node.width + px) * 4;
-                node.data[i + 0] = 0;
-                node.data[i + 1] = 0;
-                node.data[i + 2] = 0;
-                node.data[i + 3] = 255;
+              // Expand on right/bottom
+              if (px >= editor.width || py >= editor.height) {
+                const newW = Math.max(editor.width, px + 1);
+                const newH = Math.max(editor.height, py + 1);
+                editor.resize(newW, newH);
               }
 
+              // Paint pixel (black)
+              editor.pixel([px, py], {
+                type: "solid",
+                color: { r: 0, g: 0, b: 0, a: 1 },
+              });
+
+              // Update node
+              node.width = editor.width;
+              node.height = editor.height;
+              node.data = editor.data;
+              node.dataframe = editor.frame;
               break;
             }
             case "curve": {

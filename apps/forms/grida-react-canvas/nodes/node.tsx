@@ -130,6 +130,7 @@ export function NodeElement<P extends Record<string, any>>({
     strokeCap: node.strokeCap,
     cursor: node.cursor,
     data: node.data,
+    dataframe: node.dataframe,
     style: {
       ...style,
       ...node.style,
