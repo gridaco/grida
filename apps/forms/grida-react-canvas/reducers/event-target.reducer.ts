@@ -777,22 +777,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               // get the box of the points
               const bb = vne.getBBox();
+              const raw_offset: cmath.Vector2 = [bb.x, bb.y];
+              // snap/round the offset so it doesn't keep producing sub-pixel re-centers
+              const snapped_offset = cmath.vector2.quantize(raw_offset, 1);
 
-              // delta is the x, y of the new bounding box - as it started from [0, 0]
-              const delta: cmath.Vector2 = [bb.x, bb.y];
+              vne.translate(cmath.vector2.invert(snapped_offset));
 
-              // update the points with the delta (so the most left top point is to be [0, 0])
-              vne.translate(cmath.vector2.invert(delta));
-
-              const new_pos = cmath.vector2.add(origin, delta);
-
-              // update the node position & dimension
+              const new_pos = cmath.vector2.add(origin, snapped_offset);
               node.left = new_pos[0];
               node.top = new_pos[1];
               node.width = bb.width;
               node.height = bb.height;
-
-              // finally, update the node's vector network
               node.vectorNetwork = vne.value;
 
               break;
