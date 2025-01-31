@@ -196,6 +196,7 @@ export default function initialNode(
     }
     case "vector":
     case "path":
+    case "bitmap":
     case "component":
     case "instance":
     case "template_instance": {

@@ -3,7 +3,6 @@ import type { vn } from "./vn";
 
 // TODO: remove this dependency
 import type { DocumentDispatcher } from "@/grida-react-canvas";
-import { cmath } from "@grida/cmath";
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
@@ -633,6 +632,7 @@ export namespace grida.program.nodes {
     | ContainerNode
     | HTMLIFrameNode
     | HTMLRichTextNode
+    | BitmapNode
     | VectorNode
     | PathNode
     | LineNode
@@ -664,6 +664,7 @@ export namespace grida.program.nodes {
     | __TPrototypeNode<
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
+    | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<PathNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<LineNode>, __base_scene_node_properties>>
@@ -715,6 +716,7 @@ export namespace grida.program.nodes {
    */
   export type AnyNode = Omit<
     Partial<TextNode> &
+      Partial<BitmapNode> &
       Partial<VectorNode> &
       Partial<PathNode> &
       Partial<LineNode> &
@@ -1309,6 +1311,27 @@ export namespace grida.program.nodes {
      * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#srcdoc
      */
     srcdoc?: tokens.StringValueExpression;
+  }
+
+  /**
+   * [Bitmap Node]
+   *
+   * Bitmap node is a node that can have a bitmap data as a grid.
+   *
+   * This is used non-performance intensive graphics, e.g. for 255x255 pixel art.
+   *
+   * For loading png, jpg, etc. images, use {@link ImageNode} instead.
+   */
+  export interface BitmapNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill {
+    type: "bitmap";
   }
 
   /**

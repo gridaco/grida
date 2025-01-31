@@ -241,6 +241,11 @@ export const keybindings_sheet = [
     keys: ["p"],
   },
   {
+    name: "brush",
+    description: "Brush tool",
+    keys: ["b"],
+  },
+  {
     name: "container",
     description: "Container tool",
     keys: ["a", "f"],
@@ -737,6 +742,10 @@ export function useEditorHotKeys() {
 
   useHotkeys("shift+p", () => {
     setCursorMode({ type: "draw", tool: "pencil" });
+  });
+
+  useHotkeys("b", () => {
+    setCursorMode({ type: "paint" });
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

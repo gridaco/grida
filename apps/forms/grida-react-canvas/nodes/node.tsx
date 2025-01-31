@@ -199,6 +199,7 @@ const fillings = {
   line: "none",
   path: "none",
   polyline: "none",
+  bitmap: "background",
 } as const;
 
 function HrefWrapper({

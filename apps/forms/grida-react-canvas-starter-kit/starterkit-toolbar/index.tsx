@@ -12,7 +12,7 @@ import {
   TextIcon,
   CaretDownIcon,
 } from "@radix-ui/react-icons";
-import { PenToolIcon } from "lucide-react";
+import { BrushIcon, PenToolIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +106,8 @@ export function ToolIcon({
       return <PenToolIcon {...props} />;
     case "image":
       return <ImageIcon {...props} />;
+    case "paint":
+      return <BrushIcon {...props} />;
     default:
       return null;
   }

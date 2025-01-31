@@ -64,6 +64,9 @@ export type CursorMode =
       tool: "line" | "pencil";
     }
   | {
+      type: "paint";
+    }
+  | {
       type: "path";
     };
 

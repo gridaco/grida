@@ -592,6 +592,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             break;
           }
+          case "paint": {
+            // TODO:
+            break;
+          }
         }
       });
     }
