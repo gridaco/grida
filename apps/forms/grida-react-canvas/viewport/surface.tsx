@@ -47,6 +47,7 @@ import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler";
 import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
+import { BitmapEditorBrush } from "@/grida/bitmap";
 
 const DRAG_THRESHOLD = 2;
 
@@ -300,6 +301,9 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
+        {cursor_mode?.type === "brush" && (
+          <BrushCursor brush={cursor_mode.brush} />
+        )}
 
         <div
           style={{
@@ -432,6 +436,45 @@ function FloatingCursorTooltip() {
       </div>
     );
   }
+}
+
+function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
+  const { transform, scaleX } = useTransform();
+  const { pointer } = useEventTarget();
+  const pos = vector2ToSurfaceSpace(
+    // quantize position to canvas space 1.
+    cmath.vector2.quantize(pointer.position, 1),
+    // pointer.position,
+    transform
+  );
+  const { size: _size } = brush;
+  const size = _size * scaleX;
+
+  return (
+    <svg
+      className="absolute pointer-events-none transform-gpu"
+      style={{
+        zIndex: 99,
+        top: pos[1],
+        left: pos[0],
+        overflow: "visible",
+        transform: `translate(-50%, -50%)`,
+      }}
+      width={size}
+      height={size}
+    >
+      <rect
+        x={0}
+        y={0}
+        width={size}
+        height={size}
+        fill="transparent"
+        stroke="black"
+        strokeWidth={1}
+      />
+      {/* <circle r={size / 2} fill="transparent" stroke="black" strokeWidth={2} /> */}
+    </svg>
+  );
 }
 
 function get_cursor_tooltip_value(gesture: GestureState) {

@@ -4,6 +4,7 @@ import type { SurfaceAction } from "../action";
 import {
   DEFAULT_GAP_ALIGNMENT_TOLERANCE,
   Guide,
+  SYSTEM_BRUSHES,
   type CursorModeType,
   type IDocumentEditorState,
   type LayoutSnapshot,
@@ -82,6 +83,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   }
           //   //
           // }
+          case "bitmap": {
+            const brush = SYSTEM_BRUSHES["paint"];
+            draft.content_edit_mode = {
+              type: "bitmap",
+              node_id: node_id,
+              brush: brush,
+            };
+            draft.cursor_mode = { type: "brush", brush: brush };
+            break;
+          }
         }
       });
 
@@ -118,6 +129,14 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.cursor_mode = cursor_mode;
       });
     }
+    case "surface/brush/size": {
+      const { size } = action;
+
+      return produce(state, (draft) => {
+        if (draft.cursor_mode.type !== "brush") return;
+        draft.cursor_mode.brush.size = size;
+      });
+    }
     case "surface/gesture/start": {
       const { gesture } = action;
 
@@ -150,6 +169,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 offset: next.offset,
                 initial_offset: next.offset,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             } else {
               // existing
@@ -162,6 +183,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 offset: guide.offset,
                 initial_offset: guide.offset,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             }
 
@@ -203,6 +226,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.gesture = {
               type: "corner-radius",
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
               node_id: node_id,
             };
@@ -243,6 +268,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               initial_verticies: verticies,
               vertex: index,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               initial_position: [node.left!, node.top!],
             };
             break;
@@ -279,6 +306,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               layout: layout,
               placement: initial_placement,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
             };
 
             draft.dropzone = {
@@ -336,6 +365,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 initial_gap: gap,
                 gap: gap,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             } else {
               // assert the selection to be a flex container
@@ -362,6 +393,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 initial_gap: mainAxisGap,
                 gap: mainAxisGap,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
               //
             }
@@ -429,6 +462,8 @@ function self_start_gesture_scale(
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: rects,
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     selection: selection,
     direction: direction,
   };
@@ -478,5 +513,7 @@ function self_start_gesture_rotate(
     selection: selection,
     rotation: rotation,
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
   };
 }

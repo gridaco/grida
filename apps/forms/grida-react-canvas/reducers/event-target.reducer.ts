@@ -41,7 +41,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import { BitmapEditor } from "@/grida/bitmap";
+import { BitmapEditor, BitmapEditorBrush } from "@/grida/bitmap";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
@@ -86,6 +86,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.pointer = {
           position: canvas_space_pointer_position,
+          last: draft.pointer.position,
         };
 
         if (draft.content_edit_mode?.type === "path") {
@@ -438,6 +439,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             draft.gesture = {
               type: "pan",
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
             };
             break;
           }
@@ -540,6 +543,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               mode: tool,
               origin: node_relative_pos,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               points: [cmath.vector2.zero],
               node_id: vector.id,
             };
@@ -580,6 +585,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 control: "ta",
                 initial: cmath.vector2.zero,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
                 invert: false,
               };
             } else if (segments.length === 1) {
@@ -689,6 +696,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           if (draft.gesture.type === "idle") return;
           if (draft.gesture.type === "nudge") return;
 
+          draft.gesture.last = draft.gesture.movement;
           draft.gesture.movement = movement;
 
           switch (draft.gesture.type) {
@@ -1059,6 +1067,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 }
 
 function self_brush(draft: Draft<IDocumentEditorState>) {
+  assert(draft.cursor_mode.type === "brush");
+
   let node_id =
     draft.content_edit_mode?.type === "bitmap"
       ? draft.content_edit_mode.node_id
@@ -1071,17 +1081,23 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     color = get_next_brush_pain_color(draft);
   }
 
+  const brush = draft.cursor_mode.brush;
+
   if (node_id) {
     const node = document.__getNodeById(
       draft,
       node_id
     ) as grida.program.nodes.BitmapNode;
 
-    const nodePos: cmath.Vector2 = [node.left || 0, node.top || 0];
-    const localPos = cmath.vector2.sub(draft.pointer.position, nodePos);
-
-    let px = Math.floor(localPos[0]);
-    let py = Math.floor(localPos[1]);
+    const nodepos: cmath.Vector2 = [node.left!, node.top!];
+    const relpos = cmath.vector2.quantize(
+      cmath.vector2.sub(draft.pointer.position, nodepos),
+      1
+    );
+    const rellast = cmath.vector2.quantize(
+      cmath.vector2.sub(draft.pointer.last, nodepos),
+      1
+    );
 
     const image = draft.document.images[node.imageRef];
     assert(image.type === "bitmap");
@@ -1094,6 +1110,7 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     );
 
     // Negative shift: we need to move the data and shift node coords
+    let [px, py] = relpos;
     let shiftX = 0;
     let shiftY = 0;
     if (px < 0) {
@@ -1118,9 +1135,14 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     }
 
     // Paint
-    const brush = (draft.gesture as GestureBrush).brush;
+    const pixels = cmath.raster.bresenham(rellast, relpos);
     editor.color = color;
-    editor.paint([px, py], brush);
+    for (const p of pixels) {
+      if (px >= 0 && py >= 0 && px < editor.width && py < editor.height) {
+        editor.paint(p, brush);
+      }
+    }
+    // editor.paint([px, py], brush);
 
     // update image
     draft.document.images[node.imageRef] = {
@@ -1181,12 +1203,9 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     draft.gesture = {
       type: "brush",
       movement: cmath.vector2.zero,
-      // points: [cmath.vector2.zero],
+      first: cmath.vector2.zero,
+      last: cmath.vector2.zero,
       color: color,
-      brush: {
-        blend: "source-over",
-        size: 1,
-      },
       node_id: node_id,
     };
   }
@@ -1194,10 +1213,7 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
   draft.content_edit_mode = {
     type: "bitmap",
     node_id: node_id,
-    brush: {
-      blend: "source-over",
-      size: 1,
-    },
+    brush: brush,
   };
 }
 
@@ -1224,6 +1240,8 @@ function self_start_gesture_scale_draw_new_node(
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     selection: [new_node_id],
     direction: "se",
   };
@@ -1247,6 +1265,8 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
     initial_rects: rects,
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     is_currently_cloned: false,
   };
 }

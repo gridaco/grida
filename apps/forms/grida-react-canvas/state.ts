@@ -35,6 +35,19 @@ export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
  */
 export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
+export const SYSTEM_BRUSHES = {
+  paint: {
+    blend: "source-over",
+    size: 4,
+  } satisfies BitmapEditorBrush,
+  eraser: {
+    blend: "destination-out",
+    size: 8,
+  } satisfies BitmapEditorBrush,
+} as const;
+
+export type SystemBrushName = keyof typeof SYSTEM_BRUSHES;
+
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
   ignores_root: true,
@@ -66,7 +79,7 @@ export type CursorMode =
     }
   | {
       type: "brush";
-      brush: "eraser" | "paint";
+      brush: BitmapEditorBrush;
     }
   | {
       type: "path";
@@ -203,6 +216,16 @@ interface IGesture {
    * raw movement - independent of the offset or origin, purely the movement of the mouse.
    */
   movement: cmath.Vector2;
+
+  /**
+   * first movement of the drag
+   */
+  first: cmath.Vector2;
+
+  /**
+   * last movement of the drag
+   */
+  last: cmath.Vector2;
 }
 
 export type GestureIdle = {
@@ -410,7 +433,6 @@ export type GestureBrush = IGesture & {
    * color to paint
    */
   readonly color: cmath.Vector4;
-  readonly brush: BitmapEditorBrush;
 
   // /**
   //  * record of points (movements)
@@ -574,6 +596,7 @@ interface IDocumentEditorEventTargetState {
 
   pointer: {
     position: cmath.Vector2;
+    last: cmath.Vector2;
     // position_snap: cmath.Vector2;
   };
 
@@ -818,6 +841,7 @@ export function initDocumentEditorState({
     hovered_vertex_idx: null,
     pointer: {
       position: cmath.vector2.zero,
+      last: cmath.vector2.zero,
     },
     history: {
       future: [],

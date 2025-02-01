@@ -109,6 +109,7 @@ import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
+import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -434,11 +435,18 @@ export default function CanvasPlayground() {
                           </>
                         )}
                         {!uiHidden && (
-                          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                            <PlaygroundToolbar
-                              onAddButtonClick={libraryDialog.openDialog}
-                            />
-                          </div>
+                          <>
+                            <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
+                              <div className="relative left-8">
+                                <BrushToolbar />
+                              </div>
+                            </div>
+                            <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                              <PlaygroundToolbar
+                                onAddButtonClick={libraryDialog.openDialog}
+                              />
+                            </div>
+                          </>
                         )}
                       </ViewportRoot>
                       <DevtoolsPanel />

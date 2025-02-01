@@ -430,6 +430,7 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
   | EditorSurface_PixelGridStateAction
+  | EditorSurface_BrushSizeAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
@@ -448,6 +449,11 @@ export interface EditorSurface_RulerStateAction {
 export interface EditorSurface_PixelGridStateAction {
   type: "surface/pixel-grid";
   state: "on" | "off";
+}
+
+export interface EditorSurface_BrushSizeAction {
+  type: "surface/brush/size";
+  size: number;
 }
 
 export interface EditorSurface_DeleteGuideAction {

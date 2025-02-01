@@ -8,6 +8,7 @@ import {
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
 import { useEffect, useRef } from "react";
+import { SYSTEM_BRUSHES } from "../state";
 
 export const keybindings_sheet = [
   {
@@ -754,11 +755,11 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("b", () => {
-    setCursorMode({ type: "brush", brush: "paint" });
+    setCursorMode({ type: "brush", brush: SYSTEM_BRUSHES["paint"] });
   });
 
   useHotkeys("e", () => {
-    setCursorMode({ type: "brush", brush: "eraser" });
+    setCursorMode({ type: "brush", brush: SYSTEM_BRUSHES["eraser"] });
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

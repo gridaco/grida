@@ -1682,6 +1682,7 @@ export namespace grida.program.nodes {
           } as AnyNode;
         }
         // TODO:
+        case "bitmap":
         case "ellipse":
         case "iframe":
         case "image":

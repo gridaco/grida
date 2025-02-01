@@ -1,4 +1,4 @@
-import type { CursorMode } from "../state";
+import { SYSTEM_BRUSHES, type CursorMode } from "../state";
 
 export type ToolbarToolType =
   | "cursor"
@@ -28,7 +28,7 @@ export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
     case "path":
       return "path";
     case "brush":
-      return cm.brush;
+      return cm.brush.blend === "destination-out" ? "eraser" : "paint";
   }
 }
 
@@ -51,7 +51,7 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
       return { type: "path" };
     case "paint":
     case "eraser":
-      return { type: "brush", brush: tt };
+      return { type: "brush", brush: SYSTEM_BRUSHES[tt] };
     default:
       return { type: "cursor" };
   }

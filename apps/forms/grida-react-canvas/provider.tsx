@@ -2183,6 +2183,16 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const setBrushSize = useCallback(
+    (size: number) => {
+      dispatch({
+        type: "surface/brush/size",
+        size,
+      });
+    },
+    [dispatch]
+  );
+
   const _throttled_pointer_move_with_raycast = useCallback(
     throttle((event: PointerEvent, position) => {
       // this is throttled - as it is expensive
@@ -2524,6 +2534,7 @@ export function useEventTarget() {
       marquee,
       cursor_mode,
       setCursorMode,
+      setBrushSize,
       //
       ruler,
       setRulerState,
@@ -2579,6 +2590,7 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
+    setBrushSize,
     //
     ruler,
     setRulerState,

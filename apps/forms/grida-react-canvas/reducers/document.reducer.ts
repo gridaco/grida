@@ -643,6 +643,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/try-exit":
     case "surface/cursor-mode":
+    case "surface/brush/size":
     case "surface/gesture/start": {
       return surfaceReducer(state, action);
     }
