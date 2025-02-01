@@ -246,6 +246,11 @@ export const keybindings_sheet = [
     keys: ["b"],
   },
   {
+    name: "eraser",
+    description: "Eraser tool",
+    keys: ["e"],
+  },
+  {
     name: "container",
     description: "Container tool",
     keys: ["a", "f"],
@@ -749,7 +754,11 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("b", () => {
-    setCursorMode({ type: "paint" });
+    setCursorMode({ type: "brush", brush: "paint" });
+  });
+
+  useHotkeys("e", () => {
+    setCursorMode({ type: "brush", brush: "eraser" });
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

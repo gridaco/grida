@@ -11,6 +11,7 @@ export type ToolbarToolType =
   | "line"
   | "pencil"
   | "paint"
+  | "eraser"
   | "path";
 
 export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
@@ -26,8 +27,8 @@ export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
       return cm.tool;
     case "path":
       return "path";
-    case "paint":
-      return "paint";
+    case "brush":
+      return cm.brush;
   }
 }
 
@@ -49,7 +50,8 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
     case "path":
       return { type: "path" };
     case "paint":
-      return { type: "paint" };
+    case "eraser":
+      return { type: "brush", brush: tt };
     default:
       return { type: "cursor" };
   }

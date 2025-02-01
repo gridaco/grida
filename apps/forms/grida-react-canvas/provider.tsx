@@ -2119,7 +2119,7 @@ export function useEventTargetCSSCursor() {
         return "crosshair";
       case "path":
         return "crosshair";
-      case "paint":
+      case "brush":
         return "cell";
     }
   }, [cursor_mode]);

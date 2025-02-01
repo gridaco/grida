@@ -375,8 +375,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             //
             break;
           }
-          case "paint": {
-            self_paint(draft);
+          case "brush": {
+            self_brush(draft);
             break;
           }
         }
@@ -601,8 +601,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             break;
           }
-          case "paint": {
-            self_paint(draft);
+          case "brush": {
+            self_brush(draft);
             break;
           }
         }
@@ -617,7 +617,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "draw":
             // keep if pencil mode
             if (draft.cursor_mode.tool === "pencil") break;
-          case "paint":
+          case "brush":
             // keep for paint mode
             break;
           case "path":
@@ -807,7 +807,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             case "paint": {
-              self_paint(draft);
+              self_brush(draft);
               break;
             }
             case "curve": {
@@ -1058,7 +1058,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   return state;
 }
 
-function self_paint(draft: Draft<IDocumentEditorState>) {
+function self_brush(draft: Draft<IDocumentEditorState>) {
   let node_id =
     draft.content_edit_mode?.type === "bitmap"
       ? draft.content_edit_mode.node_id

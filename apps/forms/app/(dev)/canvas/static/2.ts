@@ -93,4 +93,5 @@ export default {
       style: {},
     },
   },
+  images: {},
 } satisfies grida.program.document.IDocumentDefinition;
