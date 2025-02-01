@@ -1083,11 +1083,14 @@ function self_paint(draft: Draft<IDocumentEditorState>) {
     let px = Math.floor(localPos[0]);
     let py = Math.floor(localPos[1]);
 
+    const image = draft.document.images[node.imageRef];
+    assert(image.type === "bitmap");
+
     const editor = new BitmapEditor(
       node.width,
       node.height,
-      node.data,
-      node.dataframe
+      image.data,
+      image.version
     );
 
     // Negative shift: we need to move the data and shift node coords
@@ -1117,13 +1120,19 @@ function self_paint(draft: Draft<IDocumentEditorState>) {
     // Paint pixel
     editor.pixel([px, py], color);
 
+    // update image
+    draft.document.images[node.imageRef] = {
+      type: "bitmap",
+      data: editor.data,
+      version: editor.frame,
+    };
+
     // Update node
     node.width = editor.width;
     node.height = editor.height;
-    node.data = editor.data;
-    node.dataframe = editor.frame;
   } else {
     const new_node_id = nid();
+    const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
     const bitmap: grida.program.nodes.BitmapNode = {
       type: "bitmap",
@@ -1139,11 +1148,15 @@ function self_paint(draft: Draft<IDocumentEditorState>) {
       height: 1,
       rotation: 0,
       zIndex: 0,
-      dataframe: 0,
-      data: new Uint8ClampedArray(color),
+      imageRef: new_bitmap_ref_id,
     };
 
     const parent = __get_insert_target(draft);
+    draft.document.images[new_bitmap_ref_id] = {
+      type: "bitmap",
+      data: new Uint8ClampedArray(color),
+      version: 0,
+    };
     self_insertNode(draft, parent, bitmap);
 
     const cdom = new domapi.CanvasDOM(draft.transform);

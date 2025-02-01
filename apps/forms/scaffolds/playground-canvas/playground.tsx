@@ -205,7 +205,7 @@ export default function CanvasPlayground() {
       document: state.document,
     } satisfies grida.io.DocumentFileModel;
 
-    const blob = new Blob([JSON.stringify(documentData, null, 2)], {
+    const blob = new Blob([grida.io.stringify(documentData)], {
       type: "application/json",
     });
 

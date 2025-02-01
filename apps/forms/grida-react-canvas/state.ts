@@ -778,7 +778,11 @@ interface __TMP_HistoryExtension {
 export interface IDocumentEditorInit
   extends IDocumentEditorConfig,
     grida.program.document.IDocumentTemplatesRepository {
-  document: grida.program.document.IDocumentDefinition;
+  document: Pick<
+    grida.program.document.IDocumentDefinition,
+    "nodes" | "root_id"
+  > &
+    Partial<grida.program.document.IDocumentImagesRepository>;
 }
 
 export interface IDocumentEditorState
@@ -797,7 +801,12 @@ export function initDocumentEditorState({
 }: Omit<IDocumentEditorInit, "debug"> & {
   debug?: boolean;
 }): IDocumentEditorState {
-  const s = new document.DocumentState(init.document);
+  const def: grida.program.document.IDocumentDefinition = {
+    images: {},
+    ...init.document,
+  };
+
+  const s = new document.DocumentState(def);
 
   // console.log("i", init["transform"]);
 
@@ -827,7 +836,7 @@ export function initDocumentEditorState({
     pixelgrid: "on",
     guides: [],
     active_duplication: null,
-    document_ctx: document.Context.from(init.document).snapshot(),
+    document_ctx: document.Context.from(def).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
@@ -836,5 +845,6 @@ export function initDocumentEditorState({
     googlefonts: s.fonts().map((family) => ({ family })),
     cursor_mode: { type: "cursor" },
     ...init,
+    document: def,
   };
 }

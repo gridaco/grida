@@ -106,6 +106,10 @@ export function NodeElement<P extends Record<string, any>>({
     );
   }, [USER_CHILDREN, children]);
 
+  const node_image_data = node.imageRef
+    ? document.document.images[node.imageRef]
+    : undefined;
+
   const renderprops = {
     text: computed.text,
     props: computed.props,
@@ -129,8 +133,16 @@ export function NodeElement<P extends Record<string, any>>({
     strokeWidth: node.strokeWidth,
     strokeCap: node.strokeCap,
     cursor: node.cursor,
-    data: node.data,
-    dataframe: node.dataframe,
+    data: node_image_data
+      ? "data" in node_image_data
+        ? node_image_data.data
+        : undefined
+      : undefined,
+    version: node_image_data
+      ? "version" in node_image_data
+        ? node_image_data.version
+        : undefined
+      : undefined,
     style: {
       ...style,
       ...node.style,

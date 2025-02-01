@@ -6,10 +6,10 @@ export const BitmapWidget = ({
   width,
   height,
   data,
-  dataframe,
+  version,
   style,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.BitmapNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RenderingContextBitmapNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
 
   return (
@@ -17,12 +17,7 @@ export const BitmapWidget = ({
       style={{ ...divStyles, overflow: "hidden" }}
       {...queryattributes(props)}
     >
-      <BitmapViewer
-        width={width}
-        height={height}
-        data={data}
-        frame={dataframe}
-      />
+      <BitmapViewer width={width} height={height} data={data} frame={version} />
     </div>
   );
 };

@@ -17,6 +17,40 @@ export namespace grida {
       doctype: "v0_document";
       document: grida.program.document.IDocumentDefinition;
     }
+
+    export function parse(content: string): DocumentFileModel {
+      const json = JSON.parse(content);
+
+      const images = json.document.images ?? {};
+
+      // serialize by type
+      // url    | string
+      // bitmap | Array => Uint8ClampedArray
+      for (const key of Object.keys(images)) {
+        const entry = images[key];
+        if (entry.type === "bitmap" && Array.isArray(entry.data)) {
+          entry.data = new Uint8ClampedArray(entry.data);
+        }
+      }
+
+      return {
+        doctype: "v0_document",
+        document: {
+          root_id: json.document.root_id,
+          nodes: json.document.nodes,
+          images: images,
+        },
+      } satisfies DocumentFileModel;
+    }
+
+    export function stringify(model: DocumentFileModel): string {
+      return JSON.stringify(model, (key, value) => {
+        if (value instanceof Uint8ClampedArray) {
+          return Array.from(value);
+        }
+        return value;
+      });
+    }
   }
 
   export namespace program {
@@ -217,6 +251,29 @@ export namespace grida.program.document {
   }
 
   /**
+   * contains all images (data) under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface IDocumentImagesRepository {
+    images: Record<
+      string,
+      | {
+          type: "url";
+          url: string;
+        }
+      | {
+          type: "bitmap";
+          /**
+           * Pixel data: RGBA in row-major order, length = width * height * 4
+           */
+          data: Uint8ClampedArray;
+          version: number;
+        }
+    >;
+  }
+
+  /**
    * contains all original template definition under this defined document in k:v pair
    */
   export interface IDocumentTemplatesRepository {
@@ -300,7 +357,9 @@ export namespace grida.program.document {
    * }
    * ```
    */
-  export interface IDocumentDefinition extends IDocumentNodesRepository {
+  export interface IDocumentDefinition
+    extends IDocumentNodesRepository,
+      IDocumentImagesRepository {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */
@@ -718,6 +777,7 @@ export namespace grida.program.nodes {
   export type AnyNode = Omit<
     Partial<TextNode> &
       Partial<BitmapNode> &
+      Partial<RenderingContextBitmapNode> &
       Partial<VectorNode> &
       Partial<PathNode> &
       Partial<LineNode> &
@@ -1322,6 +1382,8 @@ export namespace grida.program.nodes {
    * This is used non-performance intensive graphics, e.g. for 255x255 pixel art.
    *
    * For loading png, jpg, etc. images, use {@link ImageNode} instead.
+   *
+   * The bitmap data can by found in {@link document.IDocumentImagesRepository} images[this.id].data
    */
   export interface BitmapNode
     extends i.IBaseNode,
@@ -1332,17 +1394,14 @@ export namespace grida.program.nodes {
       i.IZIndex,
       i.IRotation,
       i.IFill {
-    type: "bitmap";
+    readonly type: "bitmap";
+    readonly imageRef: string;
+  }
 
-    /**
-     * version of the bitmap data to trigger re-rendering
-     */
-    dataframe: number;
-
-    /**
-     * Pixel data: RGBA in row-major order, length = width * height * 4
-     */
-    data: Uint8ClampedArray;
+  export interface RenderingContextBitmapNode extends BitmapNode {
+    readonly type: "bitmap";
+    readonly version: number;
+    readonly data: Uint8ClampedArray;
   }
 
   /**
@@ -1669,6 +1728,7 @@ export namespace grida.program.nodes {
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
     ): document.IDocumentDefinition {
       const document: document.IDocumentDefinition = {
+        images: {},
         nodes: {},
         root_id: "",
       };
