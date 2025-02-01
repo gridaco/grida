@@ -2854,7 +2854,7 @@ export namespace cmath.raster {
    * // ]
    * ```
    */
-  export function bresenhamLine(
+  export function bresenham(
     a: cmath.Vector2,
     b: cmath.Vector2
   ): Array<Vector2> {
@@ -2881,6 +2881,60 @@ export namespace cmath.raster {
       }
     }
     return pixels;
+  }
+
+  /**
+   * Computes all integer pixel coordinates within a circle centered at `center` with radius `radius`.
+   * Optionally, clips the points to the bounding box specified by `clipRect`.
+   *
+   * @param center - The center of the circle `[cx, cy]`.
+   * @param radius - The radius of the circle in pixels.
+   * @param clipRect - An optional `{ x, y, width, height }` rectangle for clipping.
+   *                   If omitted, no clipping is applied.
+   * @returns A list of `[x, y]` pixel coordinates inside the circle.
+   *
+   * @example
+   * // Circle fill with no clipping
+   * const pixels = circle([50, 50], 10);
+   *
+   * @example
+   * // Circle fill, clipped to a rectangle at (40,40) of size 100x100
+   * const clippedPixels = circle([50, 50], 10, { x: 40, y: 40, width: 100, height: 100 });
+   */
+  export function circle(
+    center: cmath.Vector2,
+    radius: number,
+    clipRect?: cmath.Rectangle
+  ): Array<[number, number]> {
+    const [cx, cy] = center;
+    const rSq = radius * radius;
+    const results: Array<cmath.Vector2> = [];
+
+    // If we have a clipRect, define bounds; otherwise, -∞ to +∞
+    const minX = clipRect ? clipRect.x : -Infinity;
+    const minY = clipRect ? clipRect.y : -Infinity;
+    const maxX = clipRect ? clipRect.x + clipRect.width - 1 : Infinity;
+    const maxY = clipRect ? clipRect.y + clipRect.height - 1 : Infinity;
+
+    const yStart = Math.floor(cy - radius);
+    const yEnd = Math.floor(cy + radius);
+
+    for (let y = yStart; y <= yEnd; y++) {
+      const dy = y - cy;
+      const horizontalSpan = Math.sqrt(rSq - dy * dy);
+      if (isNaN(horizontalSpan)) continue; // outside circle
+
+      const left = Math.floor(cx - horizontalSpan);
+      const right = Math.floor(cx + horizontalSpan);
+
+      for (let x = left; x <= right; x++) {
+        // Clip to rectangle if provided
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        results.push([x, y]);
+      }
+    }
+
+    return results;
   }
 }
 
