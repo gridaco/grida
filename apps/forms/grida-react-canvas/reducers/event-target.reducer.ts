@@ -15,7 +15,7 @@ import type {
 } from "../action";
 import {
   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
-  GesturePaint,
+  GestureBrush,
   IDocumentEditorClipboardState,
   type GestureDraw,
   type IDocumentEditorState,
@@ -806,7 +806,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
             }
 
-            case "paint": {
+            case "brush": {
               self_brush(draft);
               break;
             }
@@ -1065,7 +1065,7 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       : null;
 
   let color: cmath.Vector4;
-  if (draft.gesture && draft.gesture.type == "paint") {
+  if (draft.gesture && draft.gesture.type == "brush") {
     color = draft.gesture.color;
   } else {
     color = get_next_brush_pain_color(draft);
@@ -1117,8 +1117,10 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       editor.resize(newW, newH);
     }
 
-    // Paint pixel
-    editor.pixel([px, py], color);
+    // Paint
+    const brush = (draft.gesture as GestureBrush).brush;
+    editor.color = color;
+    editor.paint([px, py], brush);
 
     // update image
     draft.document.images[node.imageRef] = {
@@ -1177,16 +1179,26 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
 
   if (draft.gesture.type === "idle") {
     draft.gesture = {
-      type: "paint",
-      mode: "pixel",
+      type: "brush",
       movement: cmath.vector2.zero,
       // points: [cmath.vector2.zero],
       color: color,
+      brush: {
+        blend: "source-over",
+        size: 1,
+      },
       node_id: node_id,
     };
   }
 
-  draft.content_edit_mode = { type: "bitmap", node_id: node_id };
+  draft.content_edit_mode = {
+    type: "bitmap",
+    node_id: node_id,
+    brush: {
+      blend: "source-over",
+      size: 1,
+    },
+  };
 }
 
 function get_next_brush_pain_color(

@@ -11,6 +11,7 @@ import {
   MixIcon,
   TextIcon,
   CaretDownIcon,
+  EraserIcon,
 } from "@radix-ui/react-icons";
 import { BrushIcon, PenToolIcon } from "lucide-react";
 import {
@@ -108,6 +109,8 @@ export function ToolIcon({
       return <ImageIcon {...props} />;
     case "paint":
       return <BrushIcon {...props} />;
+    case "eraser":
+      return <EraserIcon {...props} />;
     default:
       return null;
   }

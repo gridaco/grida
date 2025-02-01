@@ -106,15 +106,15 @@ export function NodeElement<P extends Record<string, any>>({
     );
   }, [USER_CHILDREN, children]);
 
-  const node_image_data = node.imageRef
-    ? document.document.images[node.imageRef]
-    : undefined;
-
   const renderprops = {
+    context: {
+      images: document.document.images,
+    },
     text: computed.text,
     props: computed.props,
     src: computed.src,
     html: computed.html,
+    imageRef: node.imageRef,
     loop: node.loop,
     muted: node.muted,
     autoplay: node.autoplay,
@@ -133,16 +133,6 @@ export function NodeElement<P extends Record<string, any>>({
     strokeWidth: node.strokeWidth,
     strokeCap: node.strokeCap,
     cursor: node.cursor,
-    data: node_image_data
-      ? "data" in node_image_data
-        ? node_image_data.data
-        : undefined
-      : undefined,
-    version: node_image_data
-      ? "version" in node_image_data
-        ? node_image_data.version
-        : undefined
-      : undefined,
     style: {
       ...style,
       ...node.style,
@@ -155,9 +145,11 @@ export function NodeElement<P extends Record<string, any>>({
     // height: node.height,
     cornerRadius: node.cornerRadius,
     // @ts-ignore
-  } satisfies
-    | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-    | grida.program.nodes.AnyNode;
+  } satisfies grida.program.document.IGlobalRenderingContext &
+    (
+      | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
+      | grida.program.nodes.AnyNode
+    );
 
   if (!node.active) return <></>;
 

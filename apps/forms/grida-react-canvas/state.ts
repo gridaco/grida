@@ -3,6 +3,7 @@ import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+import type { BitmapEditorBrush } from "@/grida/bitmap";
 
 // #region config
 
@@ -190,7 +191,7 @@ export type GestureState =
   | GestureRotate
   | GestureCornerRadius
   | GestureDraw
-  | GesturePaint
+  | GestureBrush
   | GestureTranslateVertex
   | GestureCurve
   | GestureCurveA;
@@ -402,17 +403,14 @@ export type GestureDraw = IGesture & {
   readonly node_id: string;
 };
 
-export type GesturePaint = IGesture & {
-  /**
-   * - paint pixels
-   */
-  readonly type: "paint";
-  readonly mode: "pixel";
+export type GestureBrush = IGesture & {
+  readonly type: "brush";
 
   /**
    * color to paint
    */
   readonly color: cmath.Vector4;
+  readonly brush: BitmapEditorBrush;
 
   // /**
   //  * record of points (movements)
@@ -723,6 +721,7 @@ type PathContentEditMode = {
 type BitmapContentEditMode = {
   type: "bitmap";
   node_id: string;
+  brush: BitmapEditorBrush;
 };
 
 /**

@@ -1,23 +1,32 @@
 import React, { useEffect, useRef } from "react";
 import queryattributes from "./utils/attributes";
 import { grida } from "@/grida";
+import assert from "assert";
 
 export const BitmapWidget = ({
+  context,
   width,
   height,
-  data,
-  version,
+  imageRef,
   style,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RenderingContextBitmapNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.BitmapNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
+
+  const imagedata = context.images[imageRef];
+  assert(imagedata.type === "bitmap");
 
   return (
     <div
       style={{ ...divStyles, overflow: "hidden" }}
       {...queryattributes(props)}
     >
-      <BitmapViewer width={width} height={height} data={data} frame={version} />
+      <BitmapViewer
+        width={width}
+        height={height}
+        data={imagedata.data}
+        frame={imagedata.version}
+      />
     </div>
   );
 };

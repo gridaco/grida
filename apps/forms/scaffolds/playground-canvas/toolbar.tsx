@@ -190,12 +190,14 @@ export function PlaygroundToolbar({
             { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
             { value: "path", label: "Path tool", shortcut: "P" },
             { value: "paint", label: "Brush tool", shortcut: "B" },
+            { value: "eraser", label: "Eraser tool", shortcut: "E" },
           ]}
           onValueChange={(v) => {
             setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
-
+        <VerticalDivider />
+        <div className="border bg-red-500 rounded-full w-5 h-5" />
         <VerticalDivider />
         <Popover>
           <PopoverTrigger asChild>

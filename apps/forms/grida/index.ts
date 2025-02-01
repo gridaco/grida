@@ -487,14 +487,17 @@ export namespace grida.program.document {
   type INodeWithHtmlDocumentQueryDataAttributes<N extends nodes.Node> =
     INodeHtmlDocumentQueryDataAttributes & N;
 
+  export type IGlobalRenderingContext = { context: IDocumentImagesRepository };
+
   /**
    * final props that matches the react rendering signature
    */
   export type IComputedNodeReactRenderProps<N extends nodes.Node> =
-    INodeWithHtmlDocumentQueryDataAttributes<N> & {
-      style: React.CSSProperties;
-      //
-    };
+    IGlobalRenderingContext &
+      INodeWithHtmlDocumentQueryDataAttributes<N> & {
+        style: React.CSSProperties;
+        //
+      };
 
   /**
    * Definition:
@@ -777,7 +780,6 @@ export namespace grida.program.nodes {
   export type AnyNode = Omit<
     Partial<TextNode> &
       Partial<BitmapNode> &
-      Partial<RenderingContextBitmapNode> &
       Partial<VectorNode> &
       Partial<PathNode> &
       Partial<LineNode> &
@@ -1396,12 +1398,6 @@ export namespace grida.program.nodes {
       i.IFill {
     readonly type: "bitmap";
     readonly imageRef: string;
-  }
-
-  export interface RenderingContextBitmapNode extends BitmapNode {
-    readonly type: "bitmap";
-    readonly version: number;
-    readonly data: Uint8ClampedArray;
   }
 
   /**

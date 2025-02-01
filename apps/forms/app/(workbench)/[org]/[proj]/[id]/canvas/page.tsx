@@ -189,6 +189,7 @@ function Toolbar() {
             { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
             { value: "path", label: "Path tool", shortcut: "P" },
             { value: "paint", label: "Brush tool", shortcut: "B" },
+            { value: "eraser", label: "Eraser tool", shortcut: "E" },
           ]}
           onValueChange={(v) => {
             setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
