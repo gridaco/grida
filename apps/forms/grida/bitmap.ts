@@ -1,4 +1,4 @@
-import type { cmath } from "@grida/cmath";
+import { cmath } from "@grida/cmath";
 
 /**
  * A brush configuration for pixel-based painting operations.
@@ -39,35 +39,39 @@ export class BitmapEditor {
   }
 
   /**
-   * Paints using a brush config (blend mode + size).
-   * For pixel-art, a large size can just fill a square or a circle region.
+   * Applies a circular brush stroke at the specified position, using the given brush configuration.
+   *
+   * @param p - The center coordinate [x, y] where the brush is applied.
+   * @param brush - The brush parameters (blend mode, size, etc.).
+   *
+   * Paints all pixels inside the brush circle:
+   * - If `blend` is `"source-over"`, it applies the current color.
+   * - If `blend` is `"destination-out"`, it erases by setting alpha = 0.
    */
-  paint([cx, cy]: cmath.Vector2, brush: BitmapEditorBrush) {
-    // Simple circle fill
-    const radius = Math.floor(brush.size / 2);
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        // Optional: check circular boundary (for a round brush)
-        if (dx * dx + dy * dy > radius * radius) continue;
+  paint(p: cmath.Vector2, brush: BitmapEditorBrush) {
+    const r = brush.size / 2;
+    const fillPoints = cmath.raster.circle(p, r, {
+      x: 0,
+      y: 0,
+      width: this.width,
+      height: this.height,
+    });
 
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 0 || y < 0 || x >= this.width || y >= this.height) continue;
-
-        const idx = (y * this.width + x) * 4;
-        if (brush.blend === "destination-out") {
-          // Eraser => set alpha=0
-          this.data[idx + 3] = 0;
-        } else {
-          // Normal paint => overwrite
-          const [r, g, b, a] = this.color;
-          this.data[idx] = r;
-          this.data[idx + 1] = g;
-          this.data[idx + 2] = b;
-          this.data[idx + 3] = a;
-        }
+    for (const [x, y] of fillPoints) {
+      const i = (y * this.width + x) * 4;
+      if (brush.blend === "destination-out") {
+        // erase
+        this.data[i + 3] = 0;
+      } else {
+        // paint
+        const [rr, gg, bb, aa] = this.color;
+        this.data[i + 0] = rr;
+        this.data[i + 1] = gg;
+        this.data[i + 2] = bb;
+        this.data[i + 3] = aa;
       }
     }
+
     this.frame++;
   }
 
