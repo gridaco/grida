@@ -47,7 +47,7 @@ import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler";
 import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
-import { BitmapEditorBrush } from "@/grida/bitmap";
+import type { BitmapEditorBrush } from "@grida/bitmap";
 
 const DRAG_THRESHOLD = 2;
 

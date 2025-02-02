@@ -41,7 +41,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import { BitmapEditor, BitmapEditorBrush } from "@/grida/bitmap";
+import { BitmapEditor, BitmapEditorBrush } from "@grida/bitmap";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
@@ -1102,7 +1102,7 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     const image = draft.document.images[node.imageRef];
     assert(image.type === "bitmap");
 
-    const editor = new BitmapEditor(
+    const bme = new BitmapEditor(
       node.width,
       node.height,
       image.data,
@@ -1124,22 +1124,22 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       node.top! -= shiftY;
     }
     if (shiftX > 0 || shiftY > 0) {
-      editor.resize(node.width + shiftX, node.height + shiftY, shiftX, shiftY);
+      bme.resize(node.width + shiftX, node.height + shiftY, shiftX, shiftY);
     }
 
     // Expand on right/bottom
-    if (px >= editor.width || py >= editor.height) {
-      const newW = Math.max(editor.width, px + 1);
-      const newH = Math.max(editor.height, py + 1);
-      editor.resize(newW, newH);
+    if (px >= bme.width || py >= bme.height) {
+      const newW = Math.max(bme.width, px + 1);
+      const newH = Math.max(bme.height, py + 1);
+      bme.resize(newW, newH);
     }
 
     // Paint
     const pixels = cmath.raster.bresenham(rellast, relpos);
-    editor.color = color;
+    bme.color = color;
     for (const p of pixels) {
-      if (px >= 0 && py >= 0 && px < editor.width && py < editor.height) {
-        editor.paint(p, brush);
+      if (px >= 0 && py >= 0 && px < bme.width && py < bme.height) {
+        bme.paint(p, brush);
       }
     }
     // editor.paint([px, py], brush);
@@ -1147,13 +1147,13 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     // update image
     draft.document.images[node.imageRef] = {
       type: "bitmap",
-      data: editor.data,
-      version: editor.frame,
+      data: bme.data,
+      version: bme.frame,
     };
 
     // Update node
-    node.width = editor.width;
-    node.height = editor.height;
+    node.width = bme.width;
+    node.height = bme.height;
   } else {
     const new_node_id = nid();
     const new_bitmap_ref_id = nid(); // TODO: use other id generator

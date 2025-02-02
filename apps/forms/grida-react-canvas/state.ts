@@ -3,7 +3,7 @@ import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
-import type { BitmapEditorBrush } from "@/grida/bitmap";
+import type { BitmapEditor, BitmapEditorBrush } from "@grida/bitmap";
 
 // #region config
 
@@ -745,6 +745,7 @@ type BitmapContentEditMode = {
   type: "bitmap";
   node_id: string;
   brush: BitmapEditorBrush;
+  // editor: BitmapEditor;
 };
 
 /**
