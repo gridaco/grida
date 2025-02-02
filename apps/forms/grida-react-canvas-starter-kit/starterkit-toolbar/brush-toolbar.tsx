@@ -5,7 +5,7 @@ import { cn } from "@/utils";
 import { useEventTarget } from "@/grida-react-canvas/provider";
 
 export default function BrushToolbar() {
-  const { cursor_mode, setBrushSize } = useEventTarget();
+  const { cursor_mode, changeBrushSize } = useEventTarget();
 
   if (cursor_mode.type !== "brush") return null;
 
@@ -19,7 +19,9 @@ export default function BrushToolbar() {
           min={1}
           max={36}
           value={size ? [size] : undefined}
-          onValueChange={(values) => setBrushSize?.(values[0])}
+          onValueChange={(values) =>
+            changeBrushSize?.({ type: "set", value: values[0] })
+          }
         />
       </div>
     </div>

@@ -232,6 +232,11 @@ export const keybindings_sheet = [
     keys: ["l"],
   },
   {
+    name: "container",
+    description: "Container tool",
+    keys: ["a", "f"],
+  },
+  {
     name: "pencil",
     description: "Pencil tool",
     keys: ["shift+p"],
@@ -252,11 +257,58 @@ export const keybindings_sheet = [
     keys: ["e"],
   },
   {
-    name: "container",
-    description: "Container tool",
-    keys: ["a", "f"],
+    name: "increase brush size",
+    description: "Increase brush size",
+    keys: ["]"],
+  },
+  {
+    name: "decrease brush size",
+    description: "Decrease brush size",
+    keys: ["["],
+  },
+  {
+    name: "set opacity to 0%",
+    description: "Set opacity to 0%",
+    keys: ["0+0"],
+  },
+  {
+    name: "set opacity to 10%",
+    description: "Set opacity to 10%",
+    keys: ["1"],
+  },
+  {
+    name: "set opacity to 50%",
+    description: "Set opacity to 50%",
+    keys: ["5"],
+  },
+  {
+    name: "set opacity to 100%",
+    description: "Set opacity to 100%",
+    keys: ["0"],
   },
 ];
+
+function useSingleDoublePressHotkey(
+  key: string,
+  cb: (pressType: "single" | "double") => void,
+  options?: Parameters<typeof useHotkeys>[2]
+) {
+  const lastTime = useRef(0);
+
+  useHotkeys(
+    key,
+    () => {
+      const now = Date.now();
+      if (now - lastTime.current < 300) {
+        cb("double");
+      } else {
+        cb("single");
+      }
+      lastTime.current = now;
+    },
+    options
+  );
+}
 
 export function useEditorHotKeys() {
   const {
@@ -264,6 +316,7 @@ export function useEditorHotKeys() {
     setCursorMode,
     ruler,
     setRulerState,
+    changeBrushSize,
     pixelgrid,
     setPixelGridState,
     tryExitContentEditMode,
@@ -762,13 +815,19 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "brush", brush: SYSTEM_BRUSHES["eraser"] });
   });
 
-  useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
+  useHotkeys("1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
     if (selection.length) {
       const i = parseInt(e.key);
       const o = i / 10;
       setOpacity("selection", o);
       toast.success(`opacity: ${o}`);
     }
+  });
+
+  useSingleDoublePressHotkey("0", (type) => {
+    const o = type === "single" ? 1 : 0;
+    setOpacity("selection", o);
+    toast.success(`opacity: ${o}`);
   });
 
   useHotkeys("shift+0", (e) => {
@@ -803,11 +862,19 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("]", (e) => {
-    order("selection", "front");
+    if (cursor_mode.type === "brush") {
+      changeBrushSize({ type: "delta", value: 1 });
+    } else {
+      order("selection", "front");
+    }
   });
 
   useHotkeys("[", (e) => {
-    order("selection", "back");
+    if (cursor_mode.type === "brush") {
+      changeBrushSize({ type: "delta", value: -1 });
+    } else {
+      order("selection", "back");
+    }
   });
 
   useHotkeys("alt+a", (e) => {

@@ -134,7 +134,18 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         if (draft.cursor_mode.type !== "brush") return;
-        draft.cursor_mode.brush.size = size;
+        switch (size.type) {
+          case "set":
+            draft.cursor_mode.brush.size = size.value;
+            break;
+          case "delta":
+            draft.cursor_mode.brush.size += size.value;
+            break;
+        }
+        draft.cursor_mode.brush.size = Math.max(
+          1,
+          draft.cursor_mode.brush.size
+        );
       });
     }
     case "surface/gesture/start": {

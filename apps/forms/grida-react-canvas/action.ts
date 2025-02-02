@@ -453,7 +453,7 @@ export interface EditorSurface_PixelGridStateAction {
 
 export interface EditorSurface_BrushSizeAction {
   type: "surface/brush/size";
-  size: number;
+  size: TChange<number>;
 }
 
 export interface EditorSurface_DeleteGuideAction {

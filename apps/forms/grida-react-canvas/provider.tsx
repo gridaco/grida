@@ -2183,8 +2183,8 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const setBrushSize = useCallback(
-    (size: number) => {
+  const changeBrushSize = useCallback(
+    (size: TChange<number>) => {
       dispatch({
         type: "surface/brush/size",
         size,
@@ -2534,7 +2534,7 @@ export function useEventTarget() {
       marquee,
       cursor_mode,
       setCursorMode,
-      setBrushSize,
+      changeBrushSize,
       //
       ruler,
       setRulerState,
@@ -2590,7 +2590,7 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
-    setBrushSize,
+    changeBrushSize,
     //
     ruler,
     setRulerState,
