@@ -5,24 +5,16 @@ import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/utils";
 import { useEventTarget } from "@/grida-react-canvas/provider";
 import {
-  DotIcon,
   DotsHorizontalIcon,
   TransparencyGridIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
+import { BitmapEditorBrush, BitmapEditorRuntimeBrush } from "@grida/bitmap";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  BitmapEditorBrush,
-  BitmapEditorRuntimeBrush,
   createGrainBrushTexture,
   createSprayBrushTexture,
   createSquarePixelBrushTexture,
-} from "@grida/bitmap";
+} from "@grida/bitmap/texture-factory";
 import {
   Popover,
   PopoverAnchor,
@@ -153,21 +145,21 @@ export default function BrushToolbar() {
           <hr />
           <div className="flex flex-col gap-1">
             <BrushItem
-              label="Pixel Brush"
-              thumbnail="/brushes/brush-preview-1.png"
+              label="Pixel Brush 4"
+              thumbnail="/brushes/brush-preview-0.png"
               onClick={() => {
                 changeBrush({
                   blend: "source-over",
                   hardness: 1,
-                  size: [8, 8],
+                  size: [4, 4],
                   spacing: 1,
                   texture: createSquarePixelBrushTexture(8),
                 });
               }}
             />
             <BrushItem
-              label="Spray Brush"
-              thumbnail="/brushes/brush-preview-2.png"
+              label="Pixel Spray Brush 40"
+              thumbnail="/brushes/brush-preview-1.png"
               onClick={() => {
                 changeBrush({
                   blend: "source-over",
@@ -179,8 +171,8 @@ export default function BrushToolbar() {
               }}
             />
             <BrushItem
-              label="Grain Brush"
-              thumbnail="/brushes/brush-preview-3.png"
+              label="Pixel Grain Brush 100"
+              thumbnail="/brushes/brush-preview-2.png"
               onClick={() => {
                 changeBrush({
                   blend: "source-over",

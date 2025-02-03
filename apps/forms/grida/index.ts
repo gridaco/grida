@@ -268,6 +268,8 @@ export namespace grida.program.document {
            * Pixel data: RGBA in row-major order, length = width * height * 4
            */
           data: Uint8ClampedArray;
+          width: number;
+          height: number;
           version: number;
         }
     >;

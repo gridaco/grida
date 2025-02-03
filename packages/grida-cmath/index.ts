@@ -2995,6 +2995,79 @@ export namespace cmath.raster {
   }
 
   /**
+   * Resizes a bitmap to the specified dimensions using nearest-neighbor scaling.
+   * Internally, this computes scaling factors and delegates to {@link scale}.
+   *
+   * @param bitmap - The source bitmap to resize.
+   * @param dst - The destination dimensions as [width, height].
+   * @returns A new bitmap with the resized dimensions.
+   *
+   * @example
+   * ```ts
+   * const resized = cmath.raster.resize(originalBitmap, [200, 150]);
+   * ```
+   */
+  export function resize(bitmap: Bitmap, dst: cmath.Vector2): Bitmap {
+    const [w2, h2] = dst;
+    const factorX = w2 / bitmap.width;
+    const factorY = h2 / bitmap.height;
+    return scale(bitmap, [factorX, factorY]);
+  }
+
+  /**
+   * Pads a Bitmap to the specified dimensions without scaling the source.
+   * The source image is centered on a new canvas filled with a background color.
+   *
+   * @param bitmap - The source Bitmap.
+   * @param dst - The destination dimensions as [width, height].
+   * @param bg - The background color as an RGBA array. Default is transparent [0, 0, 0, 0].
+   * @returns A new Bitmap with the source image centered on a padded canvas.
+   *
+   * @example
+   * ```ts
+   * const padded = cmath.raster.pad(originalBitmap, [300, 300], [255, 255, 255, 255]);
+   * ```
+   */
+  export function pad(
+    bitmap: Bitmap,
+    dst: cmath.Vector2,
+    bg: cmath.Vector4 = [0, 0, 0, 0]
+  ): Bitmap {
+    const [dstWidth, dstHeight] = dst;
+    const out = new Uint8ClampedArray(dstWidth * dstHeight * 4);
+
+    // Fill the new canvas with the background color.
+    for (let i = 0; i < dstWidth * dstHeight; i++) {
+      const idx = i * 4;
+      out[idx] = bg[0];
+      out[idx + 1] = bg[1];
+      out[idx + 2] = bg[2];
+      out[idx + 3] = bg[3];
+    }
+
+    // Center the source image on the new canvas.
+    const offsetX = Math.floor((dstWidth - bitmap.width) / 2);
+    const offsetY = Math.floor((dstHeight - bitmap.height) / 2);
+
+    for (let y = 0; y < bitmap.height; y++) {
+      for (let x = 0; x < bitmap.width; x++) {
+        const srcIdx = (y * bitmap.width + x) * 4;
+        const dstX = x + offsetX;
+        const dstY = y + offsetY;
+        if (dstX < 0 || dstX >= dstWidth || dstY < 0 || dstY >= dstHeight)
+          continue;
+        const dstIdx = (dstY * dstWidth + dstX) * 4;
+        out[dstIdx] = bitmap.data[srcIdx];
+        out[dstIdx + 1] = bitmap.data[srcIdx + 1];
+        out[dstIdx + 2] = bitmap.data[srcIdx + 2];
+        out[dstIdx + 3] = bitmap.data[srcIdx + 3];
+      }
+    }
+
+    return { width: dstWidth, height: dstHeight, data: out };
+  }
+
+  /**
    * Computes a Gaussian weight based on a normalized distance.
    *
    * This function calculates a weight using a Gaussian function:
@@ -3030,28 +3103,6 @@ export namespace cmath.raster {
   export function gaussian(normDist: number, hardness: number): number {
     const kHard = 2; // Lower k: gentler falloff.
     const kSoft = 10; // Higher k: steeper falloff.
-    const k = hardness * kHard + (1 - hardness) * kSoft;
-    return Math.exp(-k * normDist * normDist);
-  }
-
-  /**
-   * Computes a Gaussian weight for a pixel's opacity based on its normalized distance
-   * from the brush center. This algorithm interpolates between a steep falloff (for very soft tips)
-   * and a gentle falloff (for hard tips) by adjusting the parameter k.
-   *
-   * For instance:
-   * - With hardness = 0 (fully soft), we might choose k = 20 so that nearly all pixels
-   *   outside a tiny central area are near transparent.
-   * - With hardness = 1 (fully hard), we choose k = 2 so that the weight remains near 1
-   *   until close to the edge.
-   *
-   * @param normDist - The normalized distance from the brush center (0 at center, 1 at edge).
-   * @param hardness - A value between 0 (soft) and 1 (hard).
-   * @returns The computed opacity weight (0 to 1).
-   */
-  export function gaussianWeight(normDist: number, hardness: number): number {
-    const kHard = 2; // Gentle falloff for a hard brush.
-    const kSoft = 20; // Steep falloff for a soft brush.
     const k = hardness * kHard + (1 - hardness) * kSoft;
     return Math.exp(-k * normDist * normDist);
   }

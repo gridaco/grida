@@ -1094,10 +1094,6 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       cmath.vector2.sub(draft.pointer.position, nodepos),
       1
     );
-    // const rellast = cmath.vector2.quantize(
-    //   cmath.vector2.sub(draft.pointer.last, nodepos),
-    //   1
-    // );
 
     const image = draft.document.images[node.imageRef];
     assert(image.type === "bitmap");
@@ -1112,7 +1108,12 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     } else {
       bme = new BitmapLayerEditor(
         node.imageRef,
-        { x: 0, y: 0, width: node.width, height: node.height },
+        {
+          x: nodepos[0],
+          y: nodepos[1],
+          width: node.width,
+          height: node.height,
+        },
         image.data,
         image.version
       );
@@ -1120,28 +1121,21 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     }
     bme.open();
 
-    // Negative shift: we need to move the data and shift node coords
-    let [px, py] = relpos;
-
-    // FIXME:
-    // Expand on right/bottom
-    if (px >= bme.width || py >= bme.height) {
-      const newW = Math.max(bme.width, px + 1);
-      const newH = Math.max(bme.height, py + 1);
-      bme.resize(newW, newH);
-    }
-
-    // Paint
-    bme.brush(relpos, { ...brush, color: color });
+    // brush
+    bme.brush(relpos, { ...brush, color: color }, "auto");
 
     // update image
     draft.document.images[node.imageRef] = {
       type: "bitmap",
       data: bme.data,
       version: bme.frame,
+      width: bme.width,
+      height: bme.height,
     };
 
-    // Update node
+    // transform node
+    node.left = bme.x;
+    node.top = bme.y;
     node.width = bme.width;
     node.height = bme.height;
   } else {
@@ -1169,6 +1163,8 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     draft.document.images[new_bitmap_ref_id] = {
       type: "bitmap",
       data: new Uint8ClampedArray(color),
+      width: 1,
+      height: 1,
       version: 0,
     };
     self_insertNode(draft, parent, bitmap);

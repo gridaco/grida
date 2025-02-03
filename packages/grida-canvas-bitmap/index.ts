@@ -107,6 +107,18 @@ export type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
 };
 
 /**
+ * Represents the mode for handling overflow when painting on a layer.
+ *
+ * - `"clip"`: Any pixels that fall outside the current layer bounds are ignored (clipped).
+ * - `"auto"`: The layer's bounding rectangle is automatically resized and repositioned
+ *   to include all painted pixels, ensuring that no new paints are lost due to clipping.
+ *
+ * This type is used as a configuration option to control how the layer behaves when a paint
+ * operation extends beyond its current boundaries.
+ */
+type OverflowMode = "clip" | "auto";
+
+/**
  * [BitmapLayerEditor] is a class that provides a simple API for editing a bitmap layer.
  *
  * It manages the pixel painting, width, height resizing and the position translation of the layer as pixel out-paints.
@@ -120,6 +132,14 @@ export class BitmapLayerEditor {
   private _data: Uint8ClampedArray;
   get data() {
     return this._data;
+  }
+
+  get x() {
+    return this._rect.x;
+  }
+
+  get y() {
+    return this._rect.y;
   }
 
   get width() {
@@ -275,7 +295,7 @@ export class BitmapLayerEditor {
     const halfW = brushWidth / 2;
     const halfH = brushHeight / 2;
 
-    // Scale the main texture (if provided) to match the brush area.
+    // Process texture(s) if provided.
     let processedTexture: cmath.raster.Bitmap | undefined;
     if (brush.texture) {
       const factorX = brushWidth / brush.texture.width;
@@ -283,7 +303,6 @@ export class BitmapLayerEditor {
       processedTexture = cmath.raster.scale(brush.texture, [factorX, factorY]);
     }
 
-    // If a texture kernel is provided, scale its texture to match the brush area.
     let kernelTextureMask: cmath.raster.Bitmap | undefined;
     if (brush.kernel && brush.kernel.type === "texture") {
       const kernelTex = brush.kernel.texture;
@@ -292,7 +311,6 @@ export class BitmapLayerEditor {
       kernelTextureMask = cmath.raster.scale(kernelTex, [factorX, factorY]);
     }
 
-    // If either a main texture or a kernel texture mask is provided, use rectangular fill.
     if (processedTexture || kernelTextureMask) {
       const left = Math.floor(p[0] - halfW);
       const right = Math.floor(p[0] + halfW);
@@ -304,19 +322,14 @@ export class BitmapLayerEditor {
         for (let x = left; x < right; x++) {
           if (x < 0 || x >= this.width) continue;
 
-          // For rectangular fill, use the maximum ratio to compute normalized distance.
           const dx = x - p[0];
           const dy = y - p[1];
           const normDist = Math.max(Math.abs(dx) / halfW, Math.abs(dy) / halfH);
-
-          // Compute the base weight using a Gaussian falloff, unless the brush is fully hard.
-          const baseWeight =
+          let weight =
             brush.hardness < 1
               ? cmath.raster.gaussian(normDist, brush.hardness)
               : 1;
-          let weight = baseWeight;
 
-          // If a main texture is available, sample its alpha channel.
           if (processedTexture) {
             const relX = x - (p[0] - halfW);
             const relY = y - (p[1] - halfH);
@@ -334,7 +347,6 @@ export class BitmapLayerEditor {
             }
           }
 
-          // If a kernel texture mask is available, sample its alpha channel.
           if (kernelTextureMask) {
             const relX = x - (p[0] - halfW);
             const relY = y - (p[1] - halfH);
@@ -363,7 +375,7 @@ export class BitmapLayerEditor {
         }
       }
     } else {
-      // No main texture or texture kernel provided: use the kernel shape if available, otherwise default to ellipse.
+      // Determine the brush fill points.
       let fills: [number, number][];
       if (brush.kernel) {
         switch (brush.kernel.type) {
@@ -371,24 +383,24 @@ export class BitmapLayerEditor {
             fills = cmath.raster.ellipse(p, [halfW, halfH]);
             break;
           case "rectangle":
-            const rect = {
+            fills = cmath.raster.rectangle({
               x: p[0] - halfW,
               y: p[1] - halfH,
               width: brushWidth,
               height: brushHeight,
-            };
-            fills = cmath.raster.rectangle(rect);
+            });
             break;
-          // For any unrecognized kernel type, fallback to elliptical region.
           default:
             fills = cmath.raster.ellipse(p, [halfW, halfH]);
             break;
         }
       } else {
-        // Default fallback: use an elliptical region.
         fills = cmath.raster.ellipse(p, [halfW, halfH]);
       }
+
       for (const [x, y] of fills) {
+        // Double-check that the point is within current viewbox.
+        if (x < 0 || x >= this.width || y < 0 || y >= this.height) continue;
         const dx = x - p[0];
         const dy = y - p[1];
         const normDist = Math.sqrt((dx / halfW) ** 2 + (dy / halfH) ** 2);
@@ -410,35 +422,85 @@ export class BitmapLayerEditor {
     this._frame++;
   }
 
-  public brush(p: cmath.Vector2, brush: BitmapEditorRuntimeBrush) {
+  /**
+   * Updated brush method: pads the layer to include the next stamp's bounding box
+   * before painting, ensuring overflow paints are accurately rendered.
+   */
+  public brush(
+    p: cmath.Vector2,
+    brush: BitmapEditorRuntimeBrush,
+    overflow: "clip" | "auto"
+  ): void {
     if (!this.gesture) return;
-
-    const last_gesture_pos = this.gesture.position;
     this.gesture.position = p;
+    const lastPos = this.last_painted_pos;
 
-    const last_painted_pos = this.last_painted_pos;
-    let paint_start_pos = last_painted_pos;
-
-    // Enforce spacing: if a last point exists and the distance is less than spacing, skip painting.
-    if (brush.spacing) {
-      if (last_painted_pos) {
-        const d = cmath.vector2.distance(last_painted_pos, p);
-        if (d < brush.spacing) {
-          return; // Ignore this paint step.
-        } else {
-          paint_start_pos = null;
-        }
+    // If no previous point exists, paint immediately.
+    if (!lastPos) {
+      if (overflow === "auto") {
+        const bbox = stampbbox(p, brush);
+        this.expand_to_fit(bbox);
       }
-    }
-
-    if (!paint_start_pos) {
       this.paint(p, brush);
-    } else {
-      const pixels = cmath.raster.bresenham(paint_start_pos, p);
-      for (const p of pixels) {
-        this.paint(p, brush);
+      this.last_painted_pos = p;
+      return;
+    }
+
+    // Calculate the full Bresenham path from lastPos to p.
+    const points = cmath.raster.bresenham(lastPos, p);
+    let lastPainted = lastPos;
+
+    for (const pt of points) {
+      // Only paint if the distance from the last painted point meets spacing.
+      if (
+        brush.spacing &&
+        cmath.vector2.distance(lastPainted, pt) < brush.spacing
+      )
+        continue;
+      if (overflow === "auto") {
+        const bbox = stampbbox(pt, brush);
+        this.expand_to_fit(bbox);
+      }
+      this.paint(pt, brush);
+      lastPainted = pt;
+    }
+    this.last_painted_pos = p;
+  }
+
+  /**
+   * Pads the layer if the given bounding box is outside the current layer.
+   */
+  private expand_to_fit(bbox: cmath.Rectangle): void {
+    if (!cmath.rect.contains(bbox, this._rect)) {
+      const newRect = cmath.rect.union([this._rect, bbox]);
+      this.expand(newRect);
+    }
+  }
+
+  /**
+   * Expands the layer to the new rectangle, preserving current pixel data.
+   */
+  private expand(newRect: cmath.Rectangle): void {
+    const newWidth = newRect.width;
+    const newHeight = newRect.height;
+    const newData = new Uint8ClampedArray(newWidth * newHeight * 4);
+    const offsetX = this._rect.x - newRect.x;
+    const offsetY = this._rect.y - newRect.y;
+    for (let y = 0; y < this._rect.height; y++) {
+      for (let x = 0; x < this._rect.width; x++) {
+        const oldIdx = (y * this._rect.width + x) * 4;
+        const newX = x + offsetX;
+        const newY = y + offsetY;
+        const newIdx = (newY * newWidth + newX) * 4;
+        newData[newIdx] = this._data[oldIdx];
+        newData[newIdx + 1] = this._data[oldIdx + 1];
+        newData[newIdx + 2] = this._data[oldIdx + 2];
+        newData[newIdx + 3] = this._data[oldIdx + 3];
       }
     }
+    this._rect = newRect;
+    this._data = newData;
+    this._frame++;
   }
 
   public close(): void {
@@ -447,49 +509,6 @@ export class BitmapLayerEditor {
 
   public open(): void {
     if (!this.gesture) this.gesture = { position: null };
-  }
-
-  resize(newWidth: number, newHeight: number, shiftX = 0, shiftY = 0) {
-    const newData = new Uint8ClampedArray(newWidth * newHeight * 4);
-    for (let y = 0; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        const oldIdx = (y * this.width + x) * 4;
-        const ny = y + shiftY;
-        const nx = x + shiftX;
-        if (nx < 0 || ny < 0 || nx >= newWidth || ny >= newHeight) continue;
-        const newIdx = (ny * newWidth + nx) * 4;
-        newData[newIdx] = this._data[oldIdx];
-        newData[newIdx + 1] = this._data[oldIdx + 1];
-        newData[newIdx + 2] = this._data[oldIdx + 2];
-        newData[newIdx + 3] = this._data[oldIdx + 3];
-      }
-    }
-    this.rect.width = newWidth;
-    this.rect.height = newHeight;
-    this._data = newData;
-    this._frame++;
-  }
-
-  scale(factor: number) {
-    const scaledWidth = Math.max(1, Math.floor(this.width * factor));
-    const scaledHeight = Math.max(1, Math.floor(this.height * factor));
-    const newData = new Uint8ClampedArray(scaledWidth * scaledHeight * 4);
-    for (let y = 0; y < scaledHeight; y++) {
-      for (let x = 0; x < scaledWidth; x++) {
-        const srcX = Math.floor(x / factor);
-        const srcY = Math.floor(y / factor);
-        const srcIdx = (srcY * this.width + srcX) * 4;
-        const dstIdx = (y * scaledWidth + x) * 4;
-        newData[dstIdx] = this._data[srcIdx];
-        newData[dstIdx + 1] = this._data[srcIdx + 1];
-        newData[dstIdx + 2] = this._data[srcIdx + 2];
-        newData[dstIdx + 3] = this._data[srcIdx + 3];
-      }
-    }
-    this.rect.width = scaledWidth;
-    this.rect.height = scaledHeight;
-    this._data = newData;
-    this._frame++;
   }
 
   /**
@@ -525,138 +544,18 @@ export class BitmapLayerEditor {
 }
 
 /**
- * Dynamically creates a spray texture.
- *
- * The texture is generated as an ImageData-like object (width, height, and a flat RGBA array)
- * with randomly placed opaque dots. The density parameter controls the probability (per pixel)
- * that a dot is drawn.
- *
- * @param width - The width of the texture in pixels.
- * @param height - The height of the texture in pixels.
- * @param density - A number between 0 and 1 indicating the probability of a pixel being a dot.
- *                  Default is 0.1 (10% chance).
- * @returns A Texture object containing the generated spray pattern.
- *
- * @example
- * const texture = createSprayTexture(128, 128, 0.15);
- * // Use `texture` as the spray brush texture.
+ * Computes the bounding box for a brush stamp at point `p`.
  */
-export function createSprayBrushTexture(
-  width: number,
-  height: number,
-  density: number = 0.1
-): cmath.raster.Bitmap {
-  const data = new Uint8ClampedArray(width * height * 4);
-
-  // For each pixel, decide randomly if it should be an opaque dot.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-      if (Math.random() < density) {
-        // Draw a black dot (fully opaque)
-        data[idx] = 0; // R
-        data[idx + 1] = 0; // G
-        data[idx + 2] = 0; // B
-        data[idx + 3] = 255; // A
-      } else {
-        // Transparent pixel
-        data[idx] = 0;
-        data[idx + 1] = 0;
-        data[idx + 2] = 0;
-        data[idx + 3] = 0;
-      }
-    }
-  }
-
-  return { width, height, data };
-}
-
-/**
- * Dynamically creates a grain brush texture that is more center-intensive and uses
- * non-fully opaque (gradient) dots to produce a smoother, more natural texture.
- *
- * For each pixel, a pseudo-random noise value is computed using the deterministic
- * `cmath.raster.noise` function. In addition, the probability for a pixel to receive
- * a dot is modulated by its distance from the center of the texture. Pixels near the center
- * (where the normalized distance is 0) use the full base threshold, while pixels toward the edge
- * (normalized distance near 1) have an effective threshold near 0.
- *
- * Instead of using a binary threshold to decide between full opacity (255) and transparency,
- * this implementation computes a gradient alpha value based on how far below the effective threshold
- * the noise value falls. Specifically, if the noise value `n` is below the effective threshold,
- * the alpha is set to:
- *
- *   alpha = 255 * (1 - (n / effectiveThreshold))
- *
- * This produces a smoother variation in opacity, generating a more visually appealing grain pattern.
- *
- * @param width - The width of the texture in pixels.
- * @param height - The height of the texture in pixels.
- * @param threshold - A base number between 0 and 1 indicating the probability for a dot at the center.
- *                    Lower threshold values result in fewer dots. Default is 0.1.
- * @returns A Bitmap object containing the generated grain pattern.
- *
- * @example
- * const grainTexture = createGrainBrushTexture(128, 128, 0.15);
- * // Use `grainTexture` as the grain brush texture in your painting application.
- */
-export function createGrainBrushTexture(
-  width: number,
-  height: number,
-  threshold: number = 0.1
-): cmath.raster.Bitmap {
-  const data = new Uint8ClampedArray(width * height * 4);
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-
-      // Compute normalized distance from the texture center.
-      const dx = x - centerX;
-      const dy = y - centerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const normDist = dist / maxDistance;
-
-      // Calculate effective threshold so that the brush is more densely dotted at the center.
-      const effectiveThreshold = threshold * Math.pow(1 - normDist, 2);
-
-      // Compute a deterministic noise value in the range [0, 1].
-      const n = cmath.raster.noise(x, y);
-
-      if (n < effectiveThreshold && effectiveThreshold > 0) {
-        // Instead of drawing a fully opaque dot, compute a gradient alpha value.
-        const intensity = 1 - n / effectiveThreshold;
-        const alpha = Math.round(255 * intensity);
-        data[idx] = 0; // Red
-        data[idx + 1] = 0; // Green
-        data[idx + 2] = 0; // Blue
-        data[idx + 3] = alpha; // Alpha (gradient based on noise)
-      } else {
-        // Transparent pixel.
-        data[idx] = 0;
-        data[idx + 1] = 0;
-        data[idx + 2] = 0;
-        data[idx + 3] = 0;
-      }
-    }
-  }
-
-  return { width, height, data };
-}
-
-export function createSquarePixelBrushTexture(
-  size: number
-): cmath.raster.Bitmap {
-  const totalPixels = size * size;
-  const data = new Uint8ClampedArray(totalPixels * 4);
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = 0; // R
-    data[i + 1] = 0; // G
-    data[i + 2] = 0; // B
-    data[i + 3] = 255; // A (fully opaque)
-  }
-  return { width: size, height: size, data };
+function stampbbox(
+  p: cmath.Vector2,
+  brush: BitmapEditorRuntimeBrush
+): cmath.Rectangle {
+  const halfW = brush.size[0] / 2;
+  const halfH = brush.size[1] / 2;
+  return {
+    x: Math.floor(p[0] - halfW),
+    y: Math.floor(p[1] - halfH),
+    width: brush.size[0],
+    height: brush.size[1],
+  };
 }
