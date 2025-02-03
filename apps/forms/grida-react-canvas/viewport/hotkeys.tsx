@@ -8,7 +8,6 @@ import {
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
 import { useEffect, useRef } from "react";
-import { SYSTEM_BRUSHES } from "../state";
 
 export const keybindings_sheet = [
   {
@@ -312,8 +311,8 @@ function useSingleDoublePressHotkey(
 
 export function useEditorHotKeys() {
   const {
-    cursor_mode,
-    setCursorMode,
+    tool,
+    setTool,
     ruler,
     setRulerState,
     changeBrushSize,
@@ -442,20 +441,17 @@ export function useEditorHotKeys() {
     "space",
     (e) => {
       // cancel if already in hand tool, but not triggered by hotkey
-      if (
-        cursor_mode.type === "hand" &&
-        !__hand_tool_triggered_by_hotkey.current
-      )
+      if (tool.type === "hand" && !__hand_tool_triggered_by_hotkey.current)
         return;
 
       // check if up or down
       switch (e.type) {
         case "keydown":
-          setCursorMode({ type: "hand" });
+          setTool({ type: "hand" });
           __hand_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          setCursorMode({ type: "cursor" });
+          setTool({ type: "cursor" });
           __hand_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -473,20 +469,17 @@ export function useEditorHotKeys() {
     "z",
     (e) => {
       // cancel if already in zoom tool, but not triggered by hotkey
-      if (
-        cursor_mode.type === "zoom" &&
-        !__zoom_tool_triggered_by_hotkey.current
-      )
+      if (tool.type === "zoom" && !__zoom_tool_triggered_by_hotkey.current)
         return;
 
       // check if up or down
       switch (e.type) {
         case "keydown":
-          setCursorMode({ type: "zoom" });
+          setTool({ type: "zoom" });
           __zoom_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          setCursorMode({ type: "cursor" });
+          setTool({ type: "cursor" });
           __zoom_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -772,52 +765,50 @@ export function useEditorHotKeys() {
   // keyup
 
   useHotkeys("v, escape", () => {
-    setCursorMode({ type: "cursor" });
+    setTool({ type: "cursor" });
   });
 
   useHotkeys("h", () => {
-    setCursorMode({ type: "hand" });
+    setTool({ type: "hand" });
   });
 
   useHotkeys("a, f", () => {
-    setCursorMode({ type: "insert", node: "container" });
+    setTool({ type: "insert", node: "container" });
   });
 
   useHotkeys("r", () => {
-    setCursorMode({ type: "insert", node: "rectangle" });
+    setTool({ type: "insert", node: "rectangle" });
   });
 
   useHotkeys("o", () => {
-    setCursorMode({ type: "insert", node: "ellipse" });
+    setTool({ type: "insert", node: "ellipse" });
   });
 
   useHotkeys("t", () => {
-    setCursorMode({ type: "insert", node: "text" });
+    setTool({ type: "insert", node: "text" });
   });
 
   useHotkeys("l", () => {
-    setCursorMode({ type: "draw", tool: "line" });
+    setTool({ type: "draw", tool: "line" });
   });
 
   useHotkeys("p", () => {
-    setCursorMode({ type: "path" });
+    setTool({ type: "path" });
   });
 
   useHotkeys("shift+p", () => {
-    setCursorMode({ type: "draw", tool: "pencil" });
+    setTool({ type: "draw", tool: "pencil" });
   });
 
   useHotkeys("b", () => {
-    setCursorMode({
+    setTool({
       type: "brush",
-      brush: { ...SYSTEM_BRUSHES["paint"], opacity: 1 },
     });
   });
 
   useHotkeys("e", () => {
-    setCursorMode({
-      type: "brush",
-      brush: { ...SYSTEM_BRUSHES["eraser"], opacity: 1 },
+    setTool({
+      type: "eraser",
     });
   });
 
@@ -868,7 +859,7 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("]", (e) => {
-    if (cursor_mode.type === "brush") {
+    if (tool.type === "brush") {
       changeBrushSize({ type: "delta", value: 1 });
     } else {
       order("selection", "front");
@@ -876,7 +867,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("[", (e) => {
-    if (cursor_mode.type === "brush") {
+    if (tool.type === "brush") {
       changeBrushSize({ type: "delta", value: -1 });
     } else {
       order("selection", "back");

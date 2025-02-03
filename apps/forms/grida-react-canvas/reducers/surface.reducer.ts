@@ -4,8 +4,7 @@ import type { SurfaceAction } from "../action";
 import {
   DEFAULT_GAP_ALIGNMENT_TOLERANCE,
   Guide,
-  SYSTEM_BRUSHES,
-  type CursorModeType,
+  type ToolModeType,
   type IDocumentEditorState,
   type LayoutSnapshot,
 } from "../state";
@@ -84,15 +83,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   //
           // }
           case "bitmap": {
-            const brush = SYSTEM_BRUSHES["paint"];
-            draft.content_edit_mode = {
-              type: "bitmap",
-              node_id: node_id,
-              brush: brush,
-            };
-            draft.cursor_mode = {
+            draft.tool = {
               type: "brush",
-              brush: { opacity: 1, ...brush },
             };
             self_clearSelection(draft);
             break;
@@ -107,41 +99,35 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.content_edit_mode = undefined;
       });
     }
-    case "surface/cursor-mode": {
-      const { cursor_mode } = action;
-      const path_edit_mode_valid_cursor_modes: CursorModeType[] = [
+    case "surface/tool": {
+      const { tool } = action;
+      const path_edit_mode_valid_tool_modes: ToolModeType[] = [
         "cursor",
         "hand",
         "path",
       ];
-      const text_edit_mode_valid_cursor_modes: CursorModeType[] = ["cursor"];
+      const text_edit_mode_valid_tool_modes: ToolModeType[] = ["cursor"];
       return produce(state, (draft) => {
         // validate cursor mode
         if (draft.content_edit_mode) {
           switch (draft.content_edit_mode.type) {
             case "path":
-              if (!path_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
-                return;
+              if (!path_edit_mode_valid_tool_modes.includes(tool.type)) return;
               break;
             case "text":
-              if (!text_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
-                return;
+              if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
               break;
           }
         }
 
-        draft.cursor_mode = cursor_mode;
+        draft.tool = tool;
       });
     }
     case "surface/brush": {
       const { brush } = action;
       return produce(state, (draft) => {
-        if (draft.cursor_mode.type === "brush") {
-          draft.cursor_mode.brush = { opacity: 1, ...brush };
-        }
-
-        if (draft.content_edit_mode?.type === "bitmap") {
-          draft.content_edit_mode.brush = brush;
+        if (draft.tool.type === "brush") {
+          draft.brush = { opacity: 1, ...brush };
         }
       });
       break;
@@ -150,22 +136,19 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { size } = action;
 
       return produce(state, (draft) => {
-        if (draft.cursor_mode.type !== "brush") return;
+        if (draft.tool.type !== "brush") return;
         switch (size.type) {
           case "set":
-            draft.cursor_mode.brush.size = [size.value, size.value];
+            draft.brush.size = [size.value, size.value];
             break;
           case "delta":
-            draft.cursor_mode.brush.size = cmath.vector2.add(
-              draft.cursor_mode.brush.size,
-              [size.value, size.value]
-            );
+            draft.brush.size = cmath.vector2.add(draft.brush.size, [
+              size.value,
+              size.value,
+            ]);
             break;
         }
-        draft.cursor_mode.brush.size = cmath.vector2.max(
-          [1, 1],
-          draft.cursor_mode.brush.size
-        );
+        draft.brush.size = cmath.vector2.max([1, 1], draft.brush.size);
       });
       break;
     }
@@ -173,20 +156,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { opacity } = action;
 
       return produce(state, (draft) => {
-        if (draft.cursor_mode.type !== "brush") return;
+        if (draft.tool.type !== "brush") return;
         switch (opacity.type) {
           case "set":
-            draft.cursor_mode.brush.opacity = opacity.value;
+            draft.brush.opacity = opacity.value;
             break;
           case "delta":
-            draft.cursor_mode.brush.opacity += opacity.value;
+            draft.brush.opacity += opacity.value;
             break;
         }
-        draft.cursor_mode.brush.opacity = cmath.clamp(
-          draft.cursor_mode.brush.opacity,
-          0,
-          1
-        );
+        draft.brush.opacity = cmath.clamp(draft.brush.opacity, 0, 1);
       });
 
       break;

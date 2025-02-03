@@ -35,23 +35,6 @@ export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
  */
 export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
-export const SYSTEM_BRUSHES = {
-  paint: {
-    blend: "source-over",
-    size: [4, 4],
-    hardness: 0,
-    spacing: 1,
-  } satisfies BitmapEditorBrush,
-  eraser: {
-    blend: "destination-out",
-    size: [8, 8],
-    hardness: 0.5,
-    spacing: 1,
-  } satisfies BitmapEditorBrush,
-} as const;
-
-export type SystemBrushName = keyof typeof SYSTEM_BRUSHES;
-
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
   ignores_root: true,
@@ -62,8 +45,8 @@ const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
 
 export type DocumentDispatcher = (action: Action) => void;
 
-export type CursorModeType = CursorMode["type"];
-export type CursorMode =
+export type ToolModeType = ToolMode["type"];
+export type ToolMode =
   | {
       type: "cursor";
     }
@@ -82,10 +65,7 @@ export type CursorMode =
       tool: "line" | "pencil";
     }
   | {
-      type: "brush";
-      brush: BitmapEditorBrush & {
-        opacity: number;
-      };
+      type: "brush" | "eraser";
     }
   | {
       type: "path";
@@ -188,6 +168,7 @@ export interface IDocumentEditorClipboardState {
   next_font_family?: string;
   next_paint_color?: grida.program.cg.RGBA8888;
   user_clipboard_color?: grida.program.cg.RGBA8888;
+  brush: BitmapEditorBrush & { opacity: number };
 }
 
 interface IDocumentEditorTransformState {
@@ -613,11 +594,11 @@ interface IDocumentEditorEventTargetState {
   /**
    * @private - internal use only
    *
-   * cursor mode
+   * current tool mode
    *
    * @default {type: "cursor"}
    */
-  cursor_mode: CursorMode;
+  tool: ToolMode;
 
   /**
    * target node id to measure distance between the selection
@@ -671,6 +652,10 @@ interface IDocumentEditorConfig {
 
 interface IDocumentGoogleFontsState {
   googlefonts: { family: string }[];
+}
+
+interface IDocumentBrusesState {
+  brushes: BitmapEditorBrush[];
 }
 
 export type HistoryEntry = {
@@ -759,7 +744,6 @@ type PathContentEditMode = {
 type BitmapContentEditMode = {
   type: "bitmap";
   node_id: string;
-  brush: BitmapEditorBrush;
 };
 
 /**
@@ -829,6 +813,7 @@ export interface IDocumentEditorState
     IDocumentEditorTransformState,
     IDocumentEditorEventTargetState,
     IDocumentGoogleFontsState,
+    IDocumentBrusesState,
     grida.program.document.IDocumentTemplatesRepository,
     __TMP_HistoryExtension,
     IDocumentState {}
@@ -882,7 +867,15 @@ export function initDocumentEditorState({
     surface_measurement_targeting_locked: false,
     surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
-    cursor_mode: { type: "cursor" },
+    brushes: [],
+    tool: { type: "cursor" },
+    brush: {
+      name: "Default",
+      hardness: 1,
+      size: [4, 4],
+      spacing: 1,
+      opacity: 1,
+    },
     ...init,
     document: def,
   };

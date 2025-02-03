@@ -20,7 +20,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import {
-  cursormode_to_toolbar_value,
+  toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-react-canvas/toolbar";
@@ -139,15 +139,15 @@ export function PlaygroundToolbar({
 }: {
   onAddButtonClick?: () => void;
 }) {
-  const { setCursorMode, cursor_mode } = useEventTarget();
+  const { setTool, tool } = useEventTarget();
 
-  const value = cursormode_to_toolbar_value(cursor_mode);
+  const value = toolmode_to_toolbar_value(tool);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
       <ToggleGroup
         onValueChange={(v) => {
-          setCursorMode(
+          setTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -164,7 +164,7 @@ export function PlaygroundToolbar({
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <VerticalDivider />
@@ -183,7 +183,7 @@ export function PlaygroundToolbar({
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <ToolsGroup
@@ -191,11 +191,11 @@ export function PlaygroundToolbar({
           options={[
             { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
             { value: "path", label: "Path tool", shortcut: "P" },
-            { value: "paint", label: "Brush tool", shortcut: "B" },
+            { value: "brush", label: "Brush tool", shortcut: "B" },
             { value: "eraser", label: "Eraser tool", shortcut: "E" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <VerticalDivider />

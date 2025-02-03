@@ -1,6 +1,5 @@
 "use client";
-import React, { useState, useRef, useCallback, useEffect } from "react";
-
+import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/utils";
 import { useEventTarget } from "@/grida-react-canvas/provider";
@@ -43,15 +42,15 @@ export function useSliderState() {
 }
 
 export default function BrushToolbar() {
-  const { cursor_mode, changeBrush, changeBrushSize, changeBrushOpacity } =
+  const { tool, brush, changeBrush, changeBrushSize, changeBrushOpacity } =
     useEventTarget();
 
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
 
-  if (cursor_mode.type !== "brush") return null;
+  if (tool.type !== "brush") return null;
 
-  const { size, opacity } = cursor_mode.brush;
+  const { size, opacity } = brush;
 
   return (
     <div className="w-10 flex flex-col items-start gap-2 p-1 border bg-background/50 backdrop-blur-lg shadow rounded-md pointer-events-auto">
@@ -79,7 +78,7 @@ export default function BrushToolbar() {
           sideOffset={8}
           className="w-40 h-40 p-0 overflow-hidden"
         >
-          <BrushPreview brush={cursor_mode.brush} label={<>Size</>} />
+          <BrushPreview brush={brush} label={<>Size</>} />
         </PopoverContent>
       </Popover>
       <Popover open={opacitypop.active}>
@@ -107,12 +106,12 @@ export default function BrushToolbar() {
           className="w-40 h-40 p-0 overflow-hidden"
         >
           <BrushPreview
-            brush={cursor_mode.brush}
+            brush={brush}
             label={
               <>
                 <span className="font-bold">Opacity</span>
                 <span className="ms-2">
-                  {Math.round(cursor_mode.brush.opacity * 100) + "%"}
+                  {Math.round(brush.opacity * 100) + "%"}
                 </span>
               </>
             }
@@ -149,7 +148,7 @@ export default function BrushToolbar() {
               thumbnail="/brushes/brush-preview-0.png"
               onClick={() => {
                 changeBrush({
-                  blend: "source-over",
+                  name: "Pixel Brush 4",
                   hardness: 1,
                   size: [4, 4],
                   spacing: 1,
@@ -162,7 +161,7 @@ export default function BrushToolbar() {
               thumbnail="/brushes/brush-preview-1.png"
               onClick={() => {
                 changeBrush({
-                  blend: "source-over",
+                  name: "Pixel Spray Brush 40",
                   hardness: 1,
                   size: [40, 40],
                   spacing: 10,
@@ -175,7 +174,7 @@ export default function BrushToolbar() {
               thumbnail="/brushes/brush-preview-2.png"
               onClick={() => {
                 changeBrush({
-                  blend: "source-over",
+                  name: "Pixel Grain Brush 100",
                   hardness: 1,
                   size: [100, 100],
                   spacing: 10,

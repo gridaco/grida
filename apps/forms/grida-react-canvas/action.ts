@@ -1,7 +1,7 @@
 import type { tokens } from "@grida/tokens";
 import type { grida } from "@/grida";
 import type {
-  CursorMode,
+  ToolMode,
   GestureCornerRadius,
   GestureCurve,
   GestureGap,
@@ -483,8 +483,8 @@ export type EditorSurface_ExitContentEditMode = {
 };
 
 export type EditorSurface_CursorMode = {
-  type: "surface/cursor-mode";
-  cursor_mode: CursorMode;
+  type: "surface/tool";
+  tool: ToolMode;
 };
 
 export type EditorSurface_StartGesture = {

@@ -1,4 +1,4 @@
-import { SYSTEM_BRUSHES, type CursorMode } from "../state";
+import type { ToolMode } from "../state";
 
 export type ToolbarToolType =
   | "cursor"
@@ -10,11 +10,11 @@ export type ToolbarToolType =
   | "image"
   | "line"
   | "pencil"
-  | "paint"
+  | "brush"
   | "eraser"
   | "path";
 
-export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
+export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
   switch (cm.type) {
     case "cursor":
     case "zoom":
@@ -28,11 +28,13 @@ export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
     case "path":
       return "path";
     case "brush":
-      return cm.brush.blend === "destination-out" ? "eraser" : "paint";
+      return "brush";
+    case "eraser":
+      return "eraser";
   }
 }
 
-export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
+export function toolbar_value_to_cursormode(tt: ToolbarToolType): ToolMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
@@ -49,9 +51,10 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
       return { type: "draw", tool: tt };
     case "path":
       return { type: "path" };
-    case "paint":
+    case "brush":
+      return { type: "brush" };
     case "eraser":
-      return { type: "brush", brush: { opacity: 1, ...SYSTEM_BRUSHES[tt] } };
+      return { type: "brush" };
     default:
       return { type: "cursor" };
   }

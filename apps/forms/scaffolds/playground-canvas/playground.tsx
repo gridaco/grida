@@ -111,11 +111,19 @@ import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 
+type UIConfig = {
+  sidebar: "hidden" | "visible";
+  toolbar: "hidden" | "visible";
+};
+
 export default function CanvasPlayground() {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
-  const [uiHidden, setUiHidden] = useState(false);
+  const [ui, setUI] = useState<UIConfig>({
+    sidebar: "visible",
+    toolbar: "visible",
+  });
   const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
@@ -165,7 +173,17 @@ export default function CanvasPlayground() {
   );
 
   useHotkeys("meta+\\, ctrl+\\", () => {
-    setUiHidden((v) => !v);
+    setUI((ui) => ({
+      ...ui,
+      sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
+    }));
+  });
+
+  useHotkeys("meta+shift+\\, ctrl+shift+\\", () => {
+    setUI((ui) => ({
+      ...ui,
+      toolbar: ui.toolbar === "visible" ? "hidden" : "visible",
+    }));
   });
 
   useHotkeys(
@@ -274,7 +292,7 @@ export default function CanvasPlayground() {
           >
             <Hotkyes />
             <div className="flex w-full h-full">
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside>
                   {libraryDialog.open ? (
                     <>
@@ -415,7 +433,7 @@ export default function CanvasPlayground() {
                           <StandaloneDocumentContent />
                         </AutoInitialFitTransformer>
 
-                        {!uiHidden && (
+                        {ui.sidebar === "visible" && (
                           <>
                             <div className="absolute top-4 left-4 z-50">
                               <Button
@@ -434,7 +452,7 @@ export default function CanvasPlayground() {
                       </div> */}
                           </>
                         )}
-                        {!uiHidden && (
+                        {ui.toolbar === "visible" && (
                           <>
                             <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
                               <div className="relative left-8">
@@ -454,7 +472,7 @@ export default function CanvasPlayground() {
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
               </EditorSurfaceClipboardSyncProvider>
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside className="h-full">
                   <SidebarRoot side="right">
                     <div className="p-2">
@@ -489,7 +507,7 @@ export default function CanvasPlayground() {
             </div>
           </StandaloneDocumentEditor>
         </ErrorBoundary>
-        {!uiHidden && <HelpFab />}
+        {ui.toolbar === "visible" && <HelpFab />}
       </main>
     </TooltipProvider>
   );

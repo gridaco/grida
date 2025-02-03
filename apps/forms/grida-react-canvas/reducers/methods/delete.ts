@@ -51,7 +51,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   // clear state (not all state needs to be cleared. this can be safely removed or optimzied after testing)
   draft.hovered_vertex_idx = null;
   draft.content_edit_mode = undefined;
-  draft.cursor_mode = { type: "cursor" };
+  draft.tool = { type: "cursor" };
 
   return true;
 }

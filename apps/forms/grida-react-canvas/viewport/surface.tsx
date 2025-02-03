@@ -138,7 +138,8 @@ export function EditorSurface() {
     hovered_node_id,
     dropzone,
     selection,
-    cursor_mode,
+    tool,
+    brush,
     is_node_transforming,
     is_node_translating,
     content_edit_mode,
@@ -301,9 +302,7 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {cursor_mode?.type === "brush" && (
-          <BrushCursor brush={cursor_mode.brush} />
-        )}
+        {tool?.type === "brush" && <BrushCursor brush={brush} />}
 
         <div
           style={{
@@ -364,9 +363,7 @@ export function EditorSurface() {
           >
             <SurfaceGroup
               hidden={
-                !!marquee ||
-                cursor_mode.type !== "cursor" ||
-                is_node_transforming
+                !!marquee || tool.type !== "cursor" || is_node_transforming
               }
             >
               {hovered_node_id && (
@@ -585,19 +582,19 @@ function SelectionGroupOverlay({
 }: SurfaceSelectionGroup & {
   readonly?: boolean;
 }) {
-  const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
+  const { multipleSelectionOverlayClick, tool } = useEventTarget();
 
   const { distributeEvenly } = useDocument();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
-  const enabled = !readonly && cursor_mode.type === "cursor";
+  const enabled = !readonly && tool.type === "cursor";
 
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
+        if (tool.type !== "insert" && tool.type !== "draw") {
           // otherwise, it should be stopped here
           // prevent default to prevent the master event target from changing the selection
           event.preventDefault();

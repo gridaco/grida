@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SlashIcon,
   BoxIcon,
@@ -8,7 +8,6 @@ import {
   HandIcon,
   FrameIcon,
   ImageIcon,
-  MixIcon,
   TextIcon,
   CaretDownIcon,
   EraserIcon,
@@ -107,7 +106,7 @@ export function ToolIcon({
       return <PenToolIcon {...props} />;
     case "image":
       return <ImageIcon {...props} />;
-    case "paint":
+    case "brush":
       return <BrushIcon {...props} />;
     case "eraser":
       return <EraserIcon {...props} />;

@@ -142,7 +142,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { node_ids_from_point } = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor":
           case "hand":
             // ignore
@@ -159,7 +159,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "insert":
             const parent = __get_insert_target(draft);
 
-            const nnode = initialNode(draft.cursor_mode.node);
+            const nnode = initialNode(draft.tool.node);
 
             const cdom = new domapi.CanvasDOM(draft.transform);
             const parent_rect = cdom.getNodeBoundingRect(parent)!;
@@ -193,7 +193,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             self_insertNode(draft, parent, nnode);
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
 
             // if the node is text, enter content edit mode
@@ -253,7 +253,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
 
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor": {
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
             // ignore if in content edit mode
@@ -401,7 +401,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.dropzone = undefined;
         draft.surface_snapping = undefined;
 
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor": {
             // TODO: improve logic
             if (shiftKey) {
@@ -454,7 +454,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 1,
             };
             //
-            const nnode = initialNode(draft.cursor_mode.node, {
+            const nnode = initialNode(draft.tool.node, {
               left: initial_rect.x,
               top: initial_rect.y,
               width: initial_rect.width,
@@ -462,7 +462,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             });
 
             self_insertNode(draft, parent, nnode);
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
             self_start_gesture_scale_draw_new_node(draft, {
               new_node_id: nnode.id,
@@ -472,7 +472,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "draw": {
-            const tool = draft.cursor_mode.tool;
+            const tool = draft.tool.tool;
 
             let vector:
               | grida.program.nodes.PathNode
@@ -620,10 +620,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "draw":
             // keep if pencil mode
-            if (draft.cursor_mode.tool === "pencil") break;
+            if (draft.tool.tool === "pencil") break;
           case "brush":
             // keep for paint mode
             break;
@@ -650,7 +650,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
           }
           case "cursor": {
@@ -668,13 +668,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
           }
           case "insert":
           default:
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
         }
 
@@ -1067,7 +1067,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 }
 
 function self_brush(draft: Draft<IDocumentEditorState>) {
-  assert(draft.cursor_mode.type === "brush");
+  assert(draft.tool.type === "brush");
 
   let node_id =
     draft.content_edit_mode?.type === "bitmap"
@@ -1081,7 +1081,7 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     color = get_next_brush_pain_color(draft);
   }
 
-  const brush = draft.cursor_mode.brush;
+  const brush = draft.brush;
 
   if (node_id) {
     const node = document.__getNodeById(
@@ -1122,7 +1122,8 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     bme.open();
 
     // brush
-    bme.brush(relpos, { ...brush, color: color }, "auto");
+
+    bme.brush(relpos, { color, ...brush }, "source-over", "auto");
 
     // update image
     draft.document.images[node.imageRef] = {
@@ -1199,7 +1200,6 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
   draft.content_edit_mode = {
     type: "bitmap",
     node_id: node_id,
-    brush: brush,
   };
 }
 

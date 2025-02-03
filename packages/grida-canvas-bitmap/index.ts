@@ -43,14 +43,14 @@ export interface TextureKernel {
  */
 export type Kernel = EllipseKernel | RectangleKernel | TextureKernel;
 
-interface IBitmapEditorBrush {
-  /**
-   * Determines how the brush output is composited onto the canvas.
-   * - `"source-over"`: Normal paint mode (paint on top).
-   * - `"destination-out"`: Eraser mode (erase existing pixels).
-   */
-  blend: "source-over" | "destination-out";
+/**
+ * Determines how the brush output is composited onto the canvas.
+ * - `"source-over"`: Normal paint mode (paint on top).
+ * - `"destination-out"`: Eraser mode (erase existing pixels).
+ */
+type BlendMode = "source-over" | "destination-out";
 
+interface IBitmapEditorBrush {
   /**
    * The size of the brush in pixels.
    *
@@ -94,9 +94,11 @@ interface IBitmapEditorBrush {
   kernel?: Kernel;
 }
 
-export type BitmapEditorBrush = IBitmapEditorBrush;
+export type BitmapEditorBrush = IBitmapEditorBrush & {
+  name: string;
+};
 
-export type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
+export type BitmapEditorRuntimeBrush = IBitmapEditorBrush & {
   /**
    * The opacity of the brush.
    *
@@ -289,7 +291,11 @@ export class BitmapLayerEditor {
    * @param p - The center coordinate [x, y] of the brush stamp.
    * @param brush - The runtime brush parameters.
    */
-  private paint(p: cmath.Vector2, brush: BitmapEditorRuntimeBrush): void {
+  private paint(
+    p: cmath.Vector2,
+    brush: BitmapEditorRuntimeBrush,
+    blend: BlendMode
+  ): void {
     const brushWidth = brush.size[0];
     const brushHeight = brush.size[1];
     const halfW = brushWidth / 2;
@@ -365,13 +371,7 @@ export class BitmapLayerEditor {
           }
 
           const idx = (y * this.width + x) * 4;
-          this.blend_pixel(
-            idx,
-            weight,
-            brush.blend,
-            brush.color,
-            brush.opacity
-          );
+          this.blend_pixel(idx, weight, blend, brush.color, brush.opacity);
         }
       }
     } else {
@@ -409,13 +409,7 @@ export class BitmapLayerEditor {
             ? cmath.raster.gaussian(normDist, brush.hardness)
             : 1;
         const idx = (y * this.width + x) * 4;
-        this.blend_pixel(
-          idx,
-          baseWeight,
-          brush.blend,
-          brush.color,
-          brush.opacity
-        );
+        this.blend_pixel(idx, baseWeight, blend, brush.color, brush.opacity);
       }
     }
     this.last_painted_pos = p;
@@ -429,6 +423,7 @@ export class BitmapLayerEditor {
   public brush(
     p: cmath.Vector2,
     brush: BitmapEditorRuntimeBrush,
+    blend: BlendMode,
     overflow: "clip" | "auto"
   ): void {
     if (!this.gesture) return;
@@ -441,8 +436,8 @@ export class BitmapLayerEditor {
         const bbox = stampbbox(p, brush);
         this.expand_to_fit(bbox);
       }
-      this.paint(p, brush);
-      this.last_painted_pos = p;
+      this.paint(p, brush, blend);
+
       return;
     }
 
@@ -461,10 +456,9 @@ export class BitmapLayerEditor {
         const bbox = stampbbox(pt, brush);
         this.expand_to_fit(bbox);
       }
-      this.paint(pt, brush);
+      this.paint(pt, brush, blend);
       lastPainted = pt;
     }
-    this.last_painted_pos = p;
   }
 
   /**
@@ -505,6 +499,7 @@ export class BitmapLayerEditor {
 
   public close(): void {
     this.gesture = null;
+    this.last_painted_pos = null;
   }
 
   public open(): void {
