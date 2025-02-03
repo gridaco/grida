@@ -2836,6 +2836,275 @@ export namespace cmath.transform {
  */
 export namespace cmath.raster {
   /**
+   * Returns the fractional part of a number.
+   *
+   * @param x - The input number.
+   * @returns The fractional part of x.
+   *
+   * @example
+   * ```ts
+   * const frac = fract(3.14); // 0.14
+   * ```
+   */
+  export function fract(x: number): number {
+    return x - Math.floor(x);
+  }
+
+  /**
+   * Computes a pseudo-random noise value for the given 2D coordinates.
+   *
+   * This function generates white noise based on the input coordinates by using a simple hash
+   * based on the sine function and a set of pre-determined constants. The constants
+   * `12.9898`, `78.233`, and `43758.5453` are used as "magic numbers" that have been empirically
+   * chosen to produce a good spread of values. They ensure that small differences in input coordinates
+   * yield significant changes in the output, a technique commonly seen in GLSL noise implementations.
+   *
+   * The calculation performed is:
+   *   noise(x, y) = fract(sin(x * 12.9898 + y * 78.233) * 43758.5453)
+   * where `fract` returns the fractional part of a number.
+   *
+   * @param x - The x-coordinate.
+   * @param y - The y-coordinate.
+   * @returns A pseudo-random noise value in the range [0, 1].
+   *
+   * @example
+   * ```ts
+   * const value = cmath.raster.noise(12.34, 56.78);
+   * console.log(value); // e.g., 0.8453
+   * ```
+   *
+   * @remarks
+   * While this method is fast and useful for generating grain or noise patterns in graphics applications,
+   * it is not suitable for high-quality noise generation.
+   */
+  export function noise(x: number, y: number): number {
+    return fract(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453);
+  }
+
+  /**
+   * A Bitmap represents a raw grid of pixels.
+   *
+   * This is a foundational model for 2D raster-based graphics.
+   * It contains the width, height, and a flat array of pixel data (RGBA).
+   *
+   * @example
+   * const bmp: Bitmap = {
+   *   width: 256,
+   *   height: 256,
+   *   data: new Uint8ClampedArray(256 * 256 * 4),
+   * };
+   */
+  export type Bitmap = {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+  };
+
+  /**
+   * Tiles a source bitmap over a specified target area.
+   *
+   * This function creates a new bitmap by repeating (tiling) the source bitmap
+   * to cover the target dimensions. The source image is repeated both horizontally
+   * and vertically using modulo arithmetic.
+   *
+   * @param source - The source bitmap to tile.
+   * @param width - The desired width of the output bitmap.
+   * @param height - The desired height of the output bitmap.
+   * @returns A new Bitmap object with the given target dimensions, filled by tiling the source.
+   *
+   * @example
+   * const sourceBitmap: Bitmap = { width: 100, height: 100, data: sourceData };
+   * const tiledBitmap = cmath.raster.tile(sourceBitmap, 300, 200);
+   * // tiledBitmap now has width 300 and height 200, with the 100x100 source repeated.
+   */
+  export function tile(source: Bitmap, width: number, height: number): Bitmap {
+    const out = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Wrap around source coordinates using modulo arithmetic.
+        const srcX = x % source.width;
+        const srcY = y % source.height;
+        const srcIdx = (srcY * source.width + srcX) * 4;
+        const tgtIdx = (y * width + x) * 4;
+
+        out[tgtIdx] = source.data[srcIdx];
+        out[tgtIdx + 1] = source.data[srcIdx + 1];
+        out[tgtIdx + 2] = source.data[srcIdx + 2];
+        out[tgtIdx + 3] = source.data[srcIdx + 3];
+      }
+    }
+
+    return { width: width, height: height, data: out };
+  }
+
+  /**
+   * Scales a Bitmap by separate factors along the x and y axes.
+   *
+   * This function creates a new Bitmap that is a scaled version of the source Bitmap.
+   * The scaling factors are applied independently to the width and height.
+   *
+   * When scaling up (i.e. when either factor > 1), each destination pixel is mapped
+   * back to a source pixel using a nearest-neighbor approach (via Math.floor). This
+   * means that multiple destination pixels may be filled with the same source pixel's
+   * value, resulting in a blocky, pixelated appearance. No interpolation or smoothing
+   * is performed by this algorithm.
+   *
+   * @param bitmap - The source Bitmap to scale.
+   * @param factor - The scaling factors as a 2D vector [factorX, factorY]. Both values must be positive.
+   * @returns A new Bitmap with its dimensions scaled by the specified factors.
+   *
+   * @example
+   * ```ts
+   * const originalBitmap: Bitmap = { width: 100, height: 100, data: originalData };
+   * const scaledBitmap = cmath.raster.scale(originalBitmap, [2, 1.5]);
+   * // scaledBitmap.width ≈ 200, scaledBitmap.height ≈ 150.
+   * ```
+   *
+   * @remarks
+   * When scaling up, each destination pixel is computed by mapping its coordinate back to
+   * the source image using nearest-neighbor sampling (via Math.floor). This approach replicates
+   * source pixels over multiple destination pixels, which can result in a blocky or pixelated
+   * appearance when the image is enlarged.
+   */
+  export function scale(bitmap: Bitmap, factor: [number, number]): Bitmap {
+    const [factorX, factorY] = factor;
+    if (factorX <= 0 || factorY <= 0) {
+      throw new Error("Scaling factors must be positive.");
+    }
+    const width = Math.max(1, Math.floor(bitmap.width * factorX));
+    const height = Math.max(1, Math.floor(bitmap.height * factorY));
+    const out = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Compute the corresponding source pixel using inverse mapping.
+        const srcX = Math.floor(x / factorX);
+        const srcY = Math.floor(y / factorY);
+        const srcIdx = (srcY * bitmap.width + srcX) * 4;
+        const dstIdx = (y * width + x) * 4;
+
+        out[dstIdx] = bitmap.data[srcIdx];
+        out[dstIdx + 1] = bitmap.data[srcIdx + 1];
+        out[dstIdx + 2] = bitmap.data[srcIdx + 2];
+        out[dstIdx + 3] = bitmap.data[srcIdx + 3];
+      }
+    }
+
+    return { width: width, height: height, data: out };
+  }
+
+  /**
+   * Computes a Gaussian weight based on a normalized distance.
+   *
+   * This function calculates a weight using a Gaussian function:
+   *
+   *   f(x) = exp(-x² / (2σ²))
+   *
+   * In this implementation, we reformulate it using a parameter `k` (where k = 1/(2σ²)).
+   * The `hardness` parameter, ranging from 0 to 1, interpolates between two preset k values,
+   * controlling the steepness of the falloff:
+   *
+   * - When hardness is 0, a higher k (e.g., 10) is used, resulting in a very steep decay.
+   * - When hardness is 1, a lower k (e.g., 2) is used, producing a gentler decay.
+   *
+   * This mathematical function is useful for simulating gradual transitions.
+   * For example, in a digital painting application, you might use this function to compute
+   * the per-pixel opacity of a painting stroke—pixels near the center of the stroke receive a
+   * higher weight, while those further away fade out rapidly.
+   *
+   * @param normDist - The normalized distance from the center (typically in the range [0, 1]).
+   * @param hardness - A value between 0 and 1 that adjusts the steepness of the falloff.
+   *                   A value of 0 produces a rapid decay (concentrating the effect near the center),
+   *                   whereas 1 produces a gentler decay.
+   * @returns The computed weight.
+   *
+   * @example
+   * // In a digital painting tool, calculate the opacity weight for a pixel:
+   * const normDist = 0.5; // e.g., pixel is halfway from the stroke's center to its edge.
+   * const hardness = 0.0; // soft setting: steep decay
+   * const opacityWeight = gaussian(normDist, hardness);
+   *
+   * // Use `opacityWeight` to modulate the alpha channel when blending the stroke.
+   */
+  export function gaussian(normDist: number, hardness: number): number {
+    const kHard = 2; // Lower k: gentler falloff.
+    const kSoft = 10; // Higher k: steeper falloff.
+    const k = hardness * kHard + (1 - hardness) * kSoft;
+    return Math.exp(-k * normDist * normDist);
+  }
+
+  /**
+   * Computes a Gaussian weight for a pixel's opacity based on its normalized distance
+   * from the brush center. This algorithm interpolates between a steep falloff (for very soft tips)
+   * and a gentle falloff (for hard tips) by adjusting the parameter k.
+   *
+   * For instance:
+   * - With hardness = 0 (fully soft), we might choose k = 20 so that nearly all pixels
+   *   outside a tiny central area are near transparent.
+   * - With hardness = 1 (fully hard), we choose k = 2 so that the weight remains near 1
+   *   until close to the edge.
+   *
+   * @param normDist - The normalized distance from the brush center (0 at center, 1 at edge).
+   * @param hardness - A value between 0 (soft) and 1 (hard).
+   * @returns The computed opacity weight (0 to 1).
+   */
+  export function gaussianWeight(normDist: number, hardness: number): number {
+    const kHard = 2; // Gentle falloff for a hard brush.
+    const kSoft = 20; // Steep falloff for a soft brush.
+    const k = hardness * kHard + (1 - hardness) * kSoft;
+    return Math.exp(-k * normDist * normDist);
+  }
+
+  /**
+   * Generalized smoothstep function.
+   *
+   * This function is analogous to GLSL's built-in smoothstep (and its variant "smootherstep"),
+   * but allows you to specify the order (N) for a customizable falloff curve.
+   *
+   * @param N - The order of the smoothStep (e.g., N=2 corresponds to the common "smootherstep").
+   * @param x - A value in the range [0, 1].
+   * @returns The smoothed value.
+   */
+  export function smoothstep(N: number, x: number): number {
+    x = clamp(x, 0, 1);
+    let result = 0;
+    for (let n = 0; n <= N; ++n) {
+      result +=
+        pascaltriangle(-N - 1, n) *
+        pascaltriangle(2 * N + 1, N - n) *
+        Math.pow(x, N + n + 1);
+    }
+    return result;
+  }
+
+  /**
+   * Computes the binomial coefficient using a generalized formulation of Pascal's Triangle.
+   *
+   * This function calculates the value of the binomial coefficient (often read as "a choose b") without
+   * explicitly using factorials. It supports cases where `a` may be negative by using a generalized
+   * formulation derived from Pascal's Triangle.
+   *
+   * @param a - The upper parameter in the binomial coefficient expression; can be negative.
+   * @param b - The lower parameter (a non-negative integer) representing the number of selections.
+   * @returns The computed binomial coefficient.
+   *
+   * @remarks
+   * The calculation performed is equivalent to:
+   * \[
+   * \binom{a}{b} = \frac{a \cdot (a-1) \cdot \ldots \cdot (a-b+1)}{b!}
+   * \]
+   * This iterative approach avoids direct factorial computation, which allows for handling negative values for `a`.
+   */
+  export function pascaltriangle(a: number, b: number): number {
+    let result = 1;
+    for (let i = 0; i < b; ++i) {
+      result *= (a - i) / (i + 1);
+    }
+    return result;
+  }
+
+  /**
    * Returns all integer pixel coordinates (x, y) along a straight line
    * between (x0, y0) and (x1, y1) using Bresenham's algorithm.
    *
@@ -2935,6 +3204,30 @@ export namespace cmath.raster {
     }
 
     return results;
+  }
+
+  export function ellipse(
+    center: cmath.Vector2,
+    radius: cmath.Vector2
+  ): cmath.Vector2[] {
+    const [cx, cy] = center;
+    const [rx, ry] = radius;
+    const points: cmath.Vector2[] = [];
+    const startX = Math.ceil(cx - rx);
+    const endX = Math.floor(cx + rx);
+    const startY = Math.ceil(cy - ry);
+    const endY = Math.floor(cy + ry);
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1) {
+          points.push([x, y]);
+        }
+      }
+    }
+    return points;
   }
 }
 
