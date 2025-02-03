@@ -10,7 +10,10 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
 } from "../action";
-import type { IDocumentEditorState } from "../state";
+import {
+  DEFAULT_SNAP_NUDGE_THRESHOLD,
+  type IDocumentEditorState,
+} from "../state";
 import { grida } from "@/grida";
 import assert from "assert";
 import { document } from "../document-query";
@@ -160,7 +163,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const target_node_ids =
           target === "selection" ? state.selection : [target];
-        self_duplicateNode(draft, ...target_node_ids);
+        self_duplicateNode(draft, new Set(target_node_ids));
       });
       break;
     }
@@ -752,9 +755,9 @@ function self_nudge(
       origin_rects,
       snap_target_node_rects,
       [dx, dy],
-      [0.1, 0.1]
+      DEFAULT_SNAP_NUDGE_THRESHOLD
     );
-    draft.gesture.surface_snapping = snapping;
+    draft.surface_snapping = snapping;
   }
 
   for (const node_id of targets) {

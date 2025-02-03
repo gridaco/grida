@@ -124,6 +124,7 @@ function PreviewState({
         margin={0}
         borderRadius={0}
         origin_size={size}
+        // @ts-ignore lib dependency mismatch
         type="scaling"
       />
     </>

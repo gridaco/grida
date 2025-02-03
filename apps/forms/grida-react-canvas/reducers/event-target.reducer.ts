@@ -37,7 +37,7 @@ import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
-import { pointToSurfaceSpace, toCanvasSpace } from "../utils/transform";
+import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -109,7 +109,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const adj_movement =
               cmath.ext.movement.axisLockedByDominance(movement);
 
-            const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
+            const adj_pos = cmath.vector2.add(
+              a.p,
+              cmath.ext.movement.normalize(adj_movement),
+              n_offset
+            );
             draft.content_edit_mode.path_cursor_position = adj_pos;
           } else {
             draft.content_edit_mode.path_cursor_position =
@@ -142,7 +146,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               2,
               draft.transform,
               // map the cursor position back to surface space
-              pointToSurfaceSpace(draft.pointer.position, draft.transform)
+              vector2ToSurfaceSpace(draft.pointer.position, draft.transform)
             );
             break;
           case "insert":
@@ -383,6 +387,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
         draft.marquee = undefined;
+        draft.dropzone = undefined;
+        draft.surface_snapping = undefined;
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -648,7 +654,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
         }
 
-        self_maybe_end_gesture_translate(draft);
+        self_maybe_end_gesture(draft);
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
       });
@@ -692,6 +698,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               self_update_gesture_transform(draft);
               break;
             }
+            case "sort": {
+              self_update_gesture_transform(draft);
+              break;
+            }
             case "rotate": {
               self_update_gesture_transform(draft);
               break;
@@ -718,7 +728,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? cmath.ext.movement.axisLockedByDominance(movement)
                   : movement;
 
-              const point = adj_movement;
+              const point = cmath.ext.movement.normalize(adj_movement);
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),
@@ -848,7 +858,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const bb_a = vne.getBBox();
 
               for (const i of content_edit_mode.selected_vertices) {
-                vne.translateVertex(i, adj_movement);
+                vne.translateVertex(
+                  i,
+                  cmath.ext.movement.normalize(adj_movement)
+                );
               }
 
               const bb_b = vne.getBBox();
@@ -904,6 +917,47 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               break;
               //
+            }
+            case "gap": {
+              const { layout, axis, initial_gap, min_gap } = draft.gesture;
+              const delta = movement[axis === "x" ? 0 : 1];
+              const side: "left" | "top" = axis === "x" ? "left" : "top";
+
+              const sorted = layout.objects
+                .slice()
+                .sort((a, b) => a[axis] - b[axis]);
+
+              const gap = cmath.quantize(
+                Math.max(initial_gap + delta, min_gap),
+                1
+              );
+
+              // start from the first sorted object's position.
+              let currentPos = sorted[0][axis];
+
+              // Calculate new positions considering each rect's dimension.
+              const transformed = sorted.map((obj) => {
+                const next = { ...obj };
+                next[axis] = cmath.quantize(currentPos, 1);
+                currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
+                return next;
+              });
+
+              // Update layout objects with new positions.
+              draft.gesture.layout.objects = transformed;
+              draft.gesture.gap = gap;
+
+              // Apply transform to the actual nodes.
+              transformed.forEach((obj) => {
+                const node = document.__getNodeById(
+                  draft,
+                  obj.id
+                ) as grida.program.nodes.i.IPositioning;
+
+                node[side] = obj[axis];
+              });
+
+              break;
             }
           }
         });
@@ -982,16 +1036,30 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   };
 }
 
-function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
-  if (draft.gesture.type !== "translate") return;
-  if (draft.gesture.is_currently_cloned) {
-    // update the selection as the cloned nodes
-    self_selectNode(draft, "reset", ...draft.gesture.selection);
+function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
+  switch (draft.gesture.type) {
+    case "translate": {
+      if (draft.gesture.is_currently_cloned) {
+        // update the selection as the cloned nodes
+        self_selectNode(draft, "reset", ...draft.gesture.selection);
+      }
+      draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+    case "sort": {
+      const { placement } = draft.gesture;
+      const node = draft.document.nodes[
+        draft.gesture.node_id
+      ] as grida.program.nodes.i.IPositioning;
+      node.left = placement.rect.x;
+      node.top = placement.rect.y;
+
+      break;
+    }
   }
 
-  draft.surface_measurement_targeting_locked = false;
   draft.gesture = { type: "idle" };
-  draft.dropzone_node_id = undefined;
+  draft.dropzone = undefined;
 }
 
 /**

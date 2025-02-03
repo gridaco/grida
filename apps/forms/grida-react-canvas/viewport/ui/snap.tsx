@@ -1,101 +1,69 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Crosshair } from "./crosshair";
-import { useDocument, useTransform } from "@/grida-react-canvas/provider";
+import { useEventTarget } from "@/grida-react-canvas/provider";
+import {
+  lineToSurfaceSpace,
+  offsetToSurfaceSpace,
+  vector2ToSurfaceSpace,
+} from "@/grida-react-canvas/utils/transform";
+import { Rule } from "./rule";
 import { cmath } from "@grida/cmath";
-import { pointToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { guide } from "@grida/cmath/_snap";
+import { Line } from "./line";
 
-function useSnapGuide() {
-  const { state } = useDocument();
-  const { gesture } = state;
+function useSnapGuide(): guide.SnapGuide | undefined {
+  const { gesture, transform, surface_snapping } = useEventTarget();
 
-  if (
-    (gesture.type === "translate" ||
-      gesture.type === "nudge" ||
-      gesture.type === "scale") &&
-    gesture.surface_snapping
-  ) {
-    const { anchors, distance } = gesture.surface_snapping;
-
-    return {
-      x: anchors.x.map((x) => cmath.vector2.add(x, distance)),
-      y: anchors.y.map((y) => cmath.vector2.add(y, distance)),
-    };
-  }
+  return useMemo(() => {
+    if (
+      (gesture.type === "translate" ||
+        gesture.type === "nudge" ||
+        gesture.type === "scale") &&
+      surface_snapping
+    ) {
+      const { lines, points, rules: rays } = guide.plot(surface_snapping);
+      // finally, map the vectors to the surface space
+      return {
+        lines: lines.map((l) => lineToSurfaceSpace(l, transform)),
+        points: points.map((p) => vector2ToSurfaceSpace(p, transform)),
+        rules: rays.map((r) => {
+          const axis = r[0];
+          return [axis, offsetToSurfaceSpace(r[1], axis, transform)];
+        }),
+      } satisfies guide.SnapGuide;
+    }
+  }, [gesture, transform, surface_snapping]);
 }
 
 export function SnapGuide() {
   const guide = useSnapGuide();
-  const { transform } = useTransform();
 
   if (!guide) return <></>;
 
   return (
     <div>
-      {guide.x?.map((snap, i) => {
-        const p = pointToSurfaceSpace(snap, transform);
+      {guide.lines.map((l, i) => (
+        <Line key={i} {...l} />
+      ))}
+      {guide.rules.map(([axis, offset], i) => (
+        <Rule key={i} axis={cmath.counterAxis[axis]} offset={offset} />
+      ))}
+      {guide.points.map((p, i) => {
         return (
-          <React.Fragment key={i}>
-            <div
-              style={{
-                position: "absolute",
-                left: p[0],
-                top: p[1],
-                transform: "translate(-50%, -50%)",
-                willChange: "transform",
-                // background: "red",
-              }}
-            >
-              <Crosshair />
-            </div>
-            <Rule axis="y" offset={p[0]} />
-          </React.Fragment>
-        );
-      })}
-      {guide.y?.map((snap, i) => {
-        const p = pointToSurfaceSpace(snap, transform);
-        return (
-          <React.Fragment key={i}>
-            <div
-              style={{
-                position: "absolute",
-                left: p[0],
-                top: p[1],
-                transform: "translate(-50%, -50%)",
-                willChange: "transform",
-                // background: "red",
-              }}
-            >
-              <Crosshair />
-            </div>
-            <Rule axis="x" offset={p[1]} />
-          </React.Fragment>
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: p[0],
+              top: p[1],
+              transform: "translate(-50%, -50%)",
+              willChange: "transform",
+            }}
+          >
+            <Crosshair />
+          </div>
         );
       })}
     </div>
-  );
-}
-
-function Rule({
-  axis,
-  offset,
-  width = 1,
-}: {
-  axis: "x" | "y";
-  offset: number;
-  width?: number;
-}) {
-  return (
-    <div
-      style={{
-        opacity: 0.5,
-        position: "absolute",
-        transform:
-          axis === "x" ? `translateY(${offset}px)` : `translateX(${offset}px)`,
-        width: axis === "x" ? "100%" : width,
-        height: axis === "y" ? "100%" : width,
-        background: "red",
-        willChange: "transform",
-      }}
-    />
   );
 }

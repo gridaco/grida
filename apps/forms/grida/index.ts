@@ -1188,16 +1188,16 @@ export namespace grida.program.nodes {
     ];
   }
 
-  /**
-   * @deprecated - not ready - do not use in production
-   */
-  export interface GroupNode
-    extends i.IBaseNode,
-      i.ISceneNode,
-      i.IChildrenReference,
-      i.IExpandable {
-    //
-  }
+  // /**
+  //  * @deprecated - not ready - do not use in production
+  //  */
+  // export interface GroupNode
+  //   extends i.IBaseNode,
+  //     i.ISceneNode,
+  //     i.IChildrenReference,
+  //     i.IExpandable {
+  //   //
+  // }
 
   export interface TextNode
     extends i.IBaseNode,

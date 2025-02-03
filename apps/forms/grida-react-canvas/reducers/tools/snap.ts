@@ -1,50 +1,41 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
-import { axisAligned } from "@grida/cmath/_snap";
+import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
 
-export function snapMovement(
-  origin: cmath.Vector2,
-  references: cmath.Vector2[],
-  movement: cmath.Vector2,
-  threshold: cmath.Vector2
-) {
-  const virtually_moved = cmath.vector2.add(origin, movement);
-
-  const result = axisAligned([virtually_moved], references, threshold);
-
-  return {
-    movement: result.value[0],
-    snapping: result,
-  };
-}
+const q = 1;
 
 export function snapObjectsTranslation(
-  objects: cmath.Rectangle[],
-  references: cmath.Rectangle[],
-  movement: cmath.Vector2,
-  threshold: cmath.Vector2
-) {
-  const bounding_rect = cmath.rect.union(objects);
+  agents: cmath.Rectangle[],
+  anchors: cmath.Rectangle[],
+  movement: cmath.ext.movement.Movement,
+  threshold: number
+): {
+  translated: { position: cmath.Vector2 }[];
+  snapping: SnapToObjectsResult | undefined;
+} {
+  agents = agents.map((r) => cmath.rect.quantize(r, q));
+  anchors = anchors.map((r) => cmath.rect.quantize(r, q));
 
-  const _virtually_moved_rect = cmath.rect.translate(bounding_rect, movement);
+  const bounding_rect = cmath.rect.union(agents);
 
-  const origin_points = Object.values(
-    cmath.rect.to9Points(_virtually_moved_rect)
+  const _virtually_moved_rect = cmath.rect.quantize(
+    cmath.rect.translate(bounding_rect, cmath.ext.movement.normalize(movement)),
+    q
   );
 
-  const target_points = references
-    .map((r) => Object.values(cmath.rect.to9Points(r)))
-    .flat();
+  const result = snapToObjects(_virtually_moved_rect, anchors, {
+    x: movement[0] === null ? false : threshold,
+    y: movement[1] === null ? false : threshold,
+  });
 
-  const result = axisAligned(origin_points, target_points, threshold);
-  const { value: points } = result;
+  const { translated: _translated } = result;
 
   // top left point of the bounding box
-  const bounding_box_snapped_xy = points[0];
+  const bounding_box_snapped_xy: cmath.Vector2 = [_translated.x, _translated.y];
 
   // return each xy point of input selection relative to the snapped bounding box
-  const translated = objects.map((r) => {
+  const translated = agents.map((r) => {
     const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
@@ -63,7 +54,7 @@ export function getSnapTargets(
   }: {
     document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
   }
-) {
+): string[] {
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(

@@ -5,6 +5,7 @@
   "scripts": {
     "test": "pnpm -r --filter 'packages/*' run test"
   },
+  "packageManager": "pnpm@9.15.4",
   "resolutions": {
     "@design-sdk/figma-node": "0.0.25",
     "@design-sdk/figma-core": "0.0.53",
@@ -20,6 +21,8 @@
     "prosemirror-view": "1.36.0"
   },
   "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
     "typescript": "^5.3.3"
   }
 }
