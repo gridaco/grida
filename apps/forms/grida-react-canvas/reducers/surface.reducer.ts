@@ -126,7 +126,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/brush": {
       const { brush } = action;
       return produce(state, (draft) => {
-        if (draft.tool.type === "brush") {
+        if (draft.tool.type === "brush" || draft.tool.type === "eraser") {
           draft.brush = { opacity: 1, ...brush };
         }
       });
@@ -136,7 +136,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { size } = action;
 
       return produce(state, (draft) => {
-        if (draft.tool.type !== "brush") return;
+        if (!(draft.tool.type === "brush" || draft.tool.type === "eraser"))
+          return;
         switch (size.type) {
           case "set":
             draft.brush.size = [size.value, size.value];

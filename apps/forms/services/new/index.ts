@@ -200,7 +200,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
                   crossAxisGap: 0,
                 },
               },
-              images: {},
+              textures: {},
             },
           },
         } satisfies CanvasDocumentSnapshotSchema as {},

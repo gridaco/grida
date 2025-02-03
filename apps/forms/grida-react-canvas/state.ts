@@ -804,7 +804,7 @@ export interface IDocumentEditorInit
     grida.program.document.IDocumentDefinition,
     "nodes" | "root_id"
   > &
-    Partial<grida.program.document.IDocumentImagesRepository>;
+    Partial<grida.program.document.IDocumentTexturesRepository>;
 }
 
 export interface IDocumentEditorState
@@ -825,7 +825,7 @@ export function initDocumentEditorState({
   debug?: boolean;
 }): IDocumentEditorState {
   const def: grida.program.document.IDocumentDefinition = {
-    images: {},
+    textures: {},
     ...init.document,
   };
 

@@ -48,7 +48,7 @@ export default function BrushToolbar() {
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
 
-  if (tool.type !== "brush") return null;
+  if (!(tool.type === "brush" || tool.type === "eraser")) return null;
 
   const { size, opacity } = brush;
 

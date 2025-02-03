@@ -302,7 +302,9 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {tool?.type === "brush" && <BrushCursor brush={brush} />}
+        {(tool?.type === "brush" || tool?.type === "eraser") && (
+          <BrushCursor brush={brush} />
+        )}
 
         <div
           style={{

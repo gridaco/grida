@@ -25,10 +25,10 @@ export namespace grida {
 
       // serialize by type
       // url    | string
-      // bitmap | Array => Uint8ClampedArray
+      // texture | Array => Uint8ClampedArray
       for (const key of Object.keys(images)) {
         const entry = images[key];
-        if (entry.type === "bitmap" && Array.isArray(entry.data)) {
+        if (entry.type === "texture" && Array.isArray(entry.data)) {
           entry.data = new Uint8ClampedArray(entry.data);
         }
       }
@@ -38,7 +38,7 @@ export namespace grida {
         document: {
           root_id: json.document.root_id,
           nodes: json.document.nodes,
-          images: images,
+          textures: images,
         },
       } satisfies DocumentFileModel;
     }
@@ -255,23 +255,13 @@ export namespace grida.program.document {
    *
    * @see {@link IDocumentDefinition}
    */
-  export interface IDocumentImagesRepository {
-    images: Record<
+  export interface IDocumentTexturesRepository {
+    textures: Record<
       string,
-      | {
-          type: "url";
-          url: string;
-        }
-      | {
-          type: "bitmap";
-          /**
-           * Pixel data: RGBA in row-major order, length = width * height * 4
-           */
-          data: Uint8ClampedArray;
-          width: number;
-          height: number;
-          version: number;
-        }
+      cmath.raster.Bitmap & {
+        type: "texture";
+        version: number;
+      }
     >;
   }
 
@@ -361,7 +351,7 @@ export namespace grida.program.document {
    */
   export interface IDocumentDefinition
     extends IDocumentNodesRepository,
-      IDocumentImagesRepository {
+      IDocumentTexturesRepository {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */
@@ -489,7 +479,9 @@ export namespace grida.program.document {
   type INodeWithHtmlDocumentQueryDataAttributes<N extends nodes.Node> =
     INodeHtmlDocumentQueryDataAttributes & N;
 
-  export type IGlobalRenderingContext = { context: IDocumentImagesRepository };
+  export type IGlobalRenderingContext = {
+    context: IDocumentTexturesRepository;
+  };
 
   /**
    * final props that matches the react rendering signature
@@ -1387,7 +1379,7 @@ export namespace grida.program.nodes {
    *
    * For loading png, jpg, etc. images, use {@link ImageNode} instead.
    *
-   * The bitmap data can by found in {@link document.IDocumentImagesRepository} images[this.id].data
+   * The bitmap data can by found in {@link document.IDocumentTexturesRepository} images[this.id].data
    */
   export interface BitmapNode
     extends i.IBaseNode,
@@ -1727,7 +1719,7 @@ export namespace grida.program.nodes {
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
     ): document.IDocumentDefinition {
       const document: document.IDocumentDefinition = {
-        images: {},
+        textures: {},
         nodes: {},
         root_id: "",
       };

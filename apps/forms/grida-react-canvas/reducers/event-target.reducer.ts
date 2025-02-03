@@ -376,6 +376,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             //
             break;
           }
+          case "eraser":
           case "brush": {
             self_brush(draft);
             break;
@@ -608,6 +609,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             break;
           }
+          case "eraser":
           case "brush": {
             self_brush(draft);
             break;
@@ -625,6 +627,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             // keep if pencil mode
             if (draft.tool.tool === "pencil") break;
           case "brush":
+          case "eraser":
             // keep for paint mode
             break;
           case "path":
@@ -1066,80 +1069,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   return state;
 }
 
-function self_brush(draft: Draft<IDocumentEditorState>) {
-  assert(draft.tool.type === "brush");
-
-  let node_id =
-    draft.content_edit_mode?.type === "bitmap"
-      ? draft.content_edit_mode.node_id
-      : null;
-
-  let color: cmath.Vector4;
-  if (draft.gesture && draft.gesture.type == "brush") {
-    color = draft.gesture.color;
-  } else {
-    color = get_next_brush_pain_color(draft);
-  }
-
-  const brush = draft.brush;
-
-  if (node_id) {
-    const node = document.__getNodeById(
-      draft,
-      node_id
-    ) as grida.program.nodes.BitmapNode;
-
-    const nodepos: cmath.Vector2 = [node.left!, node.top!];
-    const relpos = cmath.vector2.quantize(
-      cmath.vector2.sub(draft.pointer.position, nodepos),
-      1
-    );
-
-    const image = draft.document.images[node.imageRef];
-    assert(image.type === "bitmap");
-
-    // set up the editor from global.
-    let bme: BitmapLayerEditor;
-    if (
-      __global_editors.bitmap &&
-      __global_editors.bitmap.id === node.imageRef
-    ) {
-      bme = __global_editors.bitmap;
-    } else {
-      bme = new BitmapLayerEditor(
-        node.imageRef,
-        {
-          x: nodepos[0],
-          y: nodepos[1],
-          width: node.width,
-          height: node.height,
-        },
-        image.data,
-        image.version
-      );
-      __global_editors.bitmap = bme;
-    }
-    bme.open();
-
-    // brush
-
-    bme.brush(relpos, { color, ...brush }, "source-over", "auto");
-
-    // update image
-    draft.document.images[node.imageRef] = {
-      type: "bitmap",
-      data: bme.data,
-      version: bme.frame,
-      width: bme.width,
-      height: bme.height,
-    };
-
-    // transform node
-    node.left = bme.x;
-    node.top = bme.y;
-    node.width = bme.width;
-    node.height = bme.height;
-  } else {
+function self_prepare_bitmap_node(
+  draft: Draft<IDocumentEditorState>,
+  node_id: string | null
+): Draft<grida.program.nodes.BitmapNode> {
+  if (!node_id) {
     const new_node_id = nid();
     const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
@@ -1161,11 +1095,11 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     };
 
     const parent = __get_insert_target(draft);
-    draft.document.images[new_bitmap_ref_id] = {
-      type: "bitmap",
-      data: new Uint8ClampedArray(color),
-      width: 1,
-      height: 1,
+    draft.document.textures[new_bitmap_ref_id] = {
+      type: "texture",
+      data: new Uint8ClampedArray(0),
+      width: 0,
+      height: 0,
       version: 0,
     };
     self_insertNode(draft, parent, bitmap);
@@ -1183,8 +1117,90 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
 
     self_clearSelection(draft);
 
-    node_id = new_node_id;
+    return document.__getNodeById(
+      draft,
+      new_node_id
+    ) as grida.program.nodes.BitmapNode;
+  } else {
+    return document.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.BitmapNode;
   }
+}
+
+function self_brush(draft: Draft<IDocumentEditorState>) {
+  assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
+
+  let node_id =
+    draft.content_edit_mode?.type === "bitmap"
+      ? draft.content_edit_mode.node_id
+      : null;
+
+  let color: cmath.Vector4;
+  if (draft.gesture && draft.gesture.type == "brush") {
+    color = draft.gesture.color;
+  } else {
+    color = get_next_brush_pain_color(draft);
+  }
+
+  const blendmode =
+    draft.tool.type === "brush" ? "source-over" : "destination-out";
+  const brush = draft.brush;
+
+  const node = self_prepare_bitmap_node(draft, node_id);
+
+  const nodepos: cmath.Vector2 = [node.left!, node.top!];
+  const relpos = cmath.vector2.quantize(
+    cmath.vector2.sub(draft.pointer.position, nodepos),
+    1
+  );
+
+  const image = draft.document.textures[node.imageRef];
+  assert(image.type === "texture");
+
+  // set up the editor from global.
+  let bme: BitmapLayerEditor;
+  if (__global_editors.bitmap && __global_editors.bitmap.id === node.imageRef) {
+    bme = __global_editors.bitmap;
+  } else {
+    bme = new BitmapLayerEditor(
+      node.imageRef,
+      {
+        x: nodepos[0],
+        y: nodepos[1],
+        width: node.width,
+        height: node.height,
+      },
+      image.data,
+      image.version
+    );
+    __global_editors.bitmap = bme;
+  }
+  bme.open();
+
+  // brush
+  bme.brush(
+    relpos,
+    { color, ...brush },
+    blendmode,
+    blendmode === "source-over" ? "auto" : "clip"
+  );
+
+  // update image
+  draft.document.textures[node.imageRef] = {
+    type: "texture",
+    data: bme.data,
+    version: bme.frame,
+    width: bme.width,
+    height: bme.height,
+  };
+
+  // transform node
+  node.left = bme.x;
+  node.top = bme.y;
+  node.width = bme.width;
+  node.height = bme.height;
 
   if (draft.gesture.type === "idle") {
     draft.gesture = {
@@ -1193,13 +1209,13 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       first: cmath.vector2.zero,
       last: cmath.vector2.zero,
       color: color,
-      node_id: node_id,
+      node_id: node.id,
     };
   }
 
   draft.content_edit_mode = {
     type: "bitmap",
-    node_id: node_id,
+    node_id: node.id,
   };
 }
 

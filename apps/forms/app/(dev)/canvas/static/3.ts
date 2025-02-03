@@ -80,5 +80,5 @@ export default {
       return acc;
     }, {}),
   },
-  images: {},
+  textures: {},
 } satisfies grida.program.document.IDocumentDefinition;

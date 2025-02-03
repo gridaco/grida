@@ -315,5 +315,5 @@ export default {
       style: {},
     },
   },
-  images: {},
+  textures: {},
 } satisfies grida.program.document.IDocumentDefinition;

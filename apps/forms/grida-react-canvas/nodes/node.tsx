@@ -108,7 +108,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   const renderprops = {
     context: {
-      images: document.document.images,
+      textures: document.document.textures,
     },
     text: computed.text,
     props: computed.props,
