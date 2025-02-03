@@ -22,6 +22,10 @@ const nextconfig = {
         destination: `${DOCS_URL}/:path*`,
       },
       {
+        source: "/blog/:path*",
+        destination: `${DOCS_URL}/blog/:path*`,
+      },
+      {
         source: "/lsd",
         destination: `https://lsd-web.vercel.app/lsd`,
       },

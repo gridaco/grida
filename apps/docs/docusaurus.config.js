@@ -58,7 +58,7 @@ const config = {
   title: "Grida",
   tagline: "Grida documentations",
   url: "https://grida.co",
-  baseUrl: "/docs/",
+  baseUrl: "/docs",
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
   projectName: "grida", // Usually your repo name.
@@ -89,6 +89,12 @@ const config = {
             docId: "intro",
             position: "left",
             label: "Docs",
+          },
+          {
+            to: '/blog', 
+            activeBasePath: 'blog',
+            label: 'Blog', 
+            position: 'left'
           },
           {
             type: "doc",
