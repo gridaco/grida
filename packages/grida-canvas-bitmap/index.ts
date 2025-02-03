@@ -49,7 +49,7 @@ export type BitmapEditorBrush = {
   texture?: cmath.raster.Bitmap;
 };
 
-type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
+export type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
   /**
    * The opacity of the brush.
    *
