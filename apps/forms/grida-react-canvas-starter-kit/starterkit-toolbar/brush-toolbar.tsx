@@ -27,7 +27,10 @@ import {
   Popover,
   PopoverAnchor,
   PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 export function useSliderState() {
   const [active, setActive] = useState(false);
@@ -125,54 +128,102 @@ export default function BrushToolbar() {
         </PopoverContent>
       </Popover>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild className="w-full">
+      <Popover>
+        <PopoverTrigger asChild className="w-full">
           <Button size="xs" variant="ghost" className="p-1">
             <DotsHorizontalIcon />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem
-            onSelect={() => {
-              changeBrush({
-                blend: "source-over",
-                hardness: 1,
-                size: [40, 40],
-                spacing: 10,
-                texture: createSprayBrushTexture(40, 40, 0.1),
-              });
-            }}
-          >
-            Spray Brush
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              changeBrush({
-                blend: "source-over",
-                hardness: 1,
-                size: [100, 100],
-                spacing: 10,
-                texture: createGrainBrushTexture(100, 100, 0.1),
-              });
-            }}
-          >
-            Grain Brush
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              changeBrush({
-                blend: "source-over",
-                hardness: 1,
-                size: [8, 8],
-                spacing: 1,
-                texture: createSquarePixelBrushTexture(8),
-              });
-            }}
-          >
-            Pixel Brush
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="center"
+          sideOffset={8}
+          className="w-72 h-96 p-0 overflow-scroll"
+        >
+          <div className="flex flex-col p-4 gap-4">
+            <div className="grid gap-2">
+              <Label className="text-xs">Hardness</Label>
+              <Slider min={0} max={100} />
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-xs">Spacing</Label>
+              <Slider min={0} max={100} />
+            </div>
+          </div>
+          <hr />
+          <div className="flex flex-col gap-1">
+            <BrushItem
+              label="Pixel Brush"
+              thumbnail="/brushes/brush-preview-1.png"
+              onClick={() => {
+                changeBrush({
+                  blend: "source-over",
+                  hardness: 1,
+                  size: [8, 8],
+                  spacing: 1,
+                  texture: createSquarePixelBrushTexture(8),
+                });
+              }}
+            />
+            <BrushItem
+              label="Spray Brush"
+              thumbnail="/brushes/brush-preview-2.png"
+              onClick={() => {
+                changeBrush({
+                  blend: "source-over",
+                  hardness: 1,
+                  size: [40, 40],
+                  spacing: 10,
+                  texture: createSprayBrushTexture(40, 40, 0.1),
+                });
+              }}
+            />
+            <BrushItem
+              label="Grain Brush"
+              thumbnail="/brushes/brush-preview-3.png"
+              onClick={() => {
+                changeBrush({
+                  blend: "source-over",
+                  hardness: 1,
+                  size: [100, 100],
+                  spacing: 10,
+                  texture: createGrainBrushTexture(100, 100, 0.1),
+                });
+              }}
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function BrushItem({
+  selected,
+  className,
+  brush,
+  thumbnail,
+  label,
+  ...props
+}: React.HtmlHTMLAttributes<HTMLDivElement> & {
+  selected?: boolean;
+  label: string;
+  thumbnail: string;
+  brush?: BitmapEditorBrush;
+}) {
+  return (
+    <div
+      {...props}
+      data-selected={selected}
+      className={cn(
+        "w-full rounded-sm hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent",
+        className
+      )}
+    >
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="w-full h-16 mt-2">
+        <img className="w-full h-full" src={thumbnail} alt={label} />
+      </div>
     </div>
   );
 }

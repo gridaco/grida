@@ -14,10 +14,7 @@ import { cmath } from "@grida/cmath";
 
 // export type StandardKernel = CircleKernel | RectangleKernel | TextureKernel;
 
-/**
- * A brush configuration for pixel-based painting operations.
- */
-export type BitmapEditorBrush = {
+interface IBitmapEditorBrush {
   /**
    * Determines how the brush output is composited onto the canvas.
    * - `"source-over"`: Normal paint mode (paint on top).
@@ -47,7 +44,9 @@ export type BitmapEditorBrush = {
   spacing: number;
 
   texture?: cmath.raster.Bitmap;
-};
+}
+
+export type BitmapEditorBrush = IBitmapEditorBrush;
 
 export type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
   /**
