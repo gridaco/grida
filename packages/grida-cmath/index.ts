@@ -3229,6 +3229,38 @@ export namespace cmath.raster {
     }
     return points;
   }
+
+  /**
+   * Generates an array of integer pixel coordinates within a given rectangle.
+   *
+   * This function returns all pixel coordinates contained within the specified rectangle.
+   * The rectangle is defined by its top-left corner (`x`, `y`) and its dimensions (`width`, `height`).
+   *
+   * @param rect - A rectangle defined by `{ x, y, width, height }`.
+   * @returns An array of `[x, y]` tuples, where each tuple represents an integer pixel coordinate inside the rectangle.
+   *
+   * @example
+   * ```ts
+   * const rect = { x: 40, y: 35, width: 20, height: 30 };
+   * const points = cmath.raster.rectangle(rect);
+   * // points will contain coordinates for pixels within the rectangle spanning:
+   * // x from 40 to 60 and y from 35 to 65.
+   * ```
+   */
+  export function rectangle(rect: cmath.Rectangle): cmath.Vector2[] {
+    const points: cmath.Vector2[] = [];
+    const startX = Math.ceil(rect.x);
+    const endX = Math.floor(rect.x + rect.width);
+    const startY = Math.ceil(rect.y);
+    const endY = Math.floor(rect.y + rect.height);
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        points.push([x, y]);
+      }
+    }
+    return points;
+  }
 }
 
 export namespace cmath.range {

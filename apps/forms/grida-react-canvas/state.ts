@@ -3,7 +3,7 @@ import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
-import type { BitmapEditor, BitmapEditorBrush } from "@grida/bitmap";
+import type { BitmapLayerEditor, BitmapEditorBrush } from "@grida/bitmap";
 
 // #region config
 
@@ -704,7 +704,7 @@ export type HistoryEntry = {
  * a global class based editor instances
  */
 export const __global_editors = {
-  bitmap: null as BitmapEditor | null,
+  bitmap: null as BitmapLayerEditor | null,
 };
 
 class A {}

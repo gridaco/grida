@@ -16,7 +16,6 @@ import type {
 import {
   __global_editors,
   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
-  GestureBrush,
   IDocumentEditorClipboardState,
   type GestureDraw,
   type IDocumentEditorState,
@@ -42,7 +41,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
-import { BitmapEditor, BitmapEditorBrush } from "@grida/bitmap";
+import { BitmapLayerEditor } from "@grida/bitmap";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
@@ -1104,17 +1103,16 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     assert(image.type === "bitmap");
 
     // set up the editor from global.
-    let bme: BitmapEditor;
+    let bme: BitmapLayerEditor;
     if (
       __global_editors.bitmap &&
       __global_editors.bitmap.id === node.imageRef
     ) {
       bme = __global_editors.bitmap;
     } else {
-      bme = new BitmapEditor(
+      bme = new BitmapLayerEditor(
         node.imageRef,
-        node.width,
-        node.height,
+        { x: 0, y: 0, width: node.width, height: node.height },
         image.data,
         image.version
       );
@@ -1124,22 +1122,8 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
 
     // Negative shift: we need to move the data and shift node coords
     let [px, py] = relpos;
-    let shiftX = 0;
-    let shiftY = 0;
-    if (px < 0) {
-      shiftX = -px;
-      px += shiftX;
-      node.left! -= shiftX;
-    }
-    if (py < 0) {
-      shiftY = -py;
-      py += shiftY;
-      node.top! -= shiftY;
-    }
-    if (shiftX > 0 || shiftY > 0) {
-      bme.resize(node.width + shiftX, node.height + shiftY, shiftX, shiftY);
-    }
 
+    // FIXME:
     // Expand on right/bottom
     if (px >= bme.width || py >= bme.height) {
       const newW = Math.max(bme.width, px + 1);
@@ -1148,13 +1132,6 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     }
 
     // Paint
-    // const pixels = cmath.raster.bresenham(rellast, relpos);
-    // for (const p of pixels) {
-    //   if (px >= 0 && py >= 0 && px < bme.width && py < bme.height) {
-    //     bme.brush(p, brush);
-    //   }
-    // }
-    // editor.paint([px, py], brush);
     bme.brush(relpos, { ...brush, color: color });
 
     // update image

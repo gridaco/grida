@@ -1,18 +1,47 @@
 import { cmath } from "@grida/cmath";
 
-// export interface CircleKernel {
-//   type: "circle";
-// }
+/**
+ * Represents an elliptical brush kernel.
+ *
+ * This kernel defines the brush's influence area as an ellipse.
+ * A circle is treated as a special case of an ellipse, so using an ellipse for round brushes
+ * offers better compatibility without significant overhead.
+ */
+export interface EllipseKernel {
+  type: "ellipse";
+}
 
-// export interface RectangleKernel {
-//   type: "rectangle";
-// }
+/**
+ * Represents a rectangular brush kernel.
+ *
+ * This kernel defines the brush's influence area as a rectangle.
+ * It is typically used for brushes with a square or rectangular tip.
+ */
+export interface RectangleKernel {
+  type: "rectangle";
+}
 
-// export interface TextureKernel {
-//   type: "texture";
-// }
+/**
+ * Represents a texture-based brush kernel.
+ *
+ * This kernel uses a bitmap texture to define the shape and alpha mask of the brush tip.
+ * The provided texture (a Bitmap) determines the spatial influence of the brush.
+ */
+export interface TextureKernel {
+  type: "texture";
+  texture: cmath.raster.Bitmap;
+}
 
-// export type StandardKernel = CircleKernel | RectangleKernel | TextureKernel;
+/**
+ * A union type that represents any brush kernel.
+ *
+ * A brush kernel defines the spatial influence of a brush tip.
+ * It can be one of the following:
+ * - An elliptical kernel (EllipseKernel) for round brushes.
+ * - A rectangular kernel (RectangleKernel) for square or rectangular brushes.
+ * - A texture-based kernel (TextureKernel) that uses a bitmap to shape the brush.
+ */
+export type Kernel = EllipseKernel | RectangleKernel | TextureKernel;
 
 interface IBitmapEditorBrush {
   /**
@@ -43,7 +72,26 @@ interface IBitmapEditorBrush {
    */
   spacing: number;
 
+  /**
+   * An optional bitmap texture for the brush.
+   *
+   * When provided, this texture (a Bitmap) defines the appearance of the brush tip,
+   * allowing for textured or spray brush effects. The texture is typically scaled to
+   * match the brush’s dimensions when painting.
+   */
   texture?: cmath.raster.Bitmap;
+
+  /**
+   * An optional kernel that defines the spatial influence of the brush tip.
+   *
+   * The kernel determines the shape of the area affected by the brush. It can be one of:
+   * - **EllipseKernel**: An elliptical influence area, ideal for round brushes (with a circle as a special case).
+   * - **RectangleKernel**: A rectangular influence area, suitable for square or rectangular brushes.
+   * - **TextureKernel**: Uses a bitmap texture to define both the shape and alpha mask of the brush tip.
+   *
+   * In our model, the term "kernel" represents the underlying shape that governs how the brush applies its effect across pixels.
+   */
+  kernel?: Kernel;
 }
 
 export type BitmapEditorBrush = IBitmapEditorBrush;
@@ -58,11 +106,37 @@ export type BitmapEditorRuntimeBrush = BitmapEditorBrush & {
   color: cmath.Vector4;
 };
 
-export class BitmapEditor {
-  width: number;
-  height: number;
-  data: Uint8ClampedArray;
-  frame: number;
+/**
+ * [BitmapLayerEditor] is a class that provides a simple API for editing a bitmap layer.
+ *
+ * It manages the pixel painting, width, height resizing and the position translation of the layer as pixel out-paints.
+ */
+export class BitmapLayerEditor {
+  private _rect: cmath.Rectangle;
+  get rect() {
+    return this._rect;
+  }
+
+  private _data: Uint8ClampedArray;
+  get data() {
+    return this._data;
+  }
+
+  get width() {
+    return this._rect.width;
+  }
+
+  get height() {
+    return this._rect.height;
+  }
+
+  /**
+   * the current version of the data. (data checksum)
+   */
+  private _frame: number;
+  get frame() {
+    return this._frame;
+  }
 
   private gesture: {
     position: cmath.Vector2 | null;
@@ -72,16 +146,15 @@ export class BitmapEditor {
 
   constructor(
     readonly id: string,
-    width: number,
-    height: number,
+    rect: cmath.Rectangle,
     data: Uint8ClampedArray,
     frame = 0
   ) {
-    this.width = width;
-    this.height = height;
-    this.data = data;
-    this.frame = frame;
+    this._rect = rect;
+    this._data = data;
+    this._frame = frame;
   }
+
   /**
    * Blends a single pixel on the canvas using proper alpha compositing.
    *
@@ -117,10 +190,10 @@ export class BitmapEditor {
       const aSrc = weight * opacity; // effective source alpha (0..1)
 
       // Get the destination pixel color and alpha.
-      const dstR = this.data[i];
-      const dstG = this.data[i + 1];
-      const dstB = this.data[i + 2];
-      const dstA = this.data[i + 3];
+      const dstR = this._data[i];
+      const dstG = this._data[i + 1];
+      const dstB = this._data[i + 2];
+      const dstA = this._data[i + 3];
       const aDst = dstA / 255;
 
       // Compute the new alpha using the destination-out blend formula.
@@ -132,17 +205,17 @@ export class BitmapEditor {
       const outG = Math.round(dstG * (1 - aSrc));
       const outB = Math.round(dstB * (1 - aSrc));
 
-      this.data[i] = outR;
-      this.data[i + 1] = outG;
-      this.data[i + 2] = outB;
-      this.data[i + 3] = Math.round(outA * 255);
+      this._data[i] = outR;
+      this._data[i + 1] = outG;
+      this._data[i + 2] = outB;
+      this._data[i + 3] = Math.round(outA * 255);
       return;
     } else if (blend === "source-over") {
       // Get the destination pixel color.
-      const dstR = this.data[i];
-      const dstG = this.data[i + 1];
-      const dstB = this.data[i + 2];
-      const dstA = this.data[i + 3];
+      const dstR = this._data[i];
+      const dstG = this._data[i + 1];
+      const dstB = this._data[i + 2];
+      const dstA = this._data[i + 3];
 
       // The brush color modulated by weight and opacity.
       const [srcR, srcG, srcB, srcA] = color;
@@ -165,42 +238,44 @@ export class BitmapEditor {
           (srcB * aSrc + dstB * aDst * (1 - aSrc)) / outA
         );
         const outAByte = Math.round(outA * 255);
-        this.data[i] = outR;
-        this.data[i + 1] = outG;
-        this.data[i + 2] = outB;
-        this.data[i + 3] = outAByte;
+        this._data[i] = outR;
+        this._data[i + 1] = outG;
+        this._data[i + 2] = outB;
+        this._data[i + 3] = outAByte;
       } else {
         // If fully transparent, set pixel to transparent black.
-        this.data[i] = 0;
-        this.data[i + 1] = 0;
-        this.data[i + 2] = 0;
-        this.data[i + 3] = 0;
+        this._data[i] = 0;
+        this._data[i + 1] = 0;
+        this._data[i + 2] = 0;
+        this._data[i + 3] = 0;
       }
     }
   }
 
   /**
-   * Applies a brush stroke on the canvas at the given position.
+   * Applies a brush stamp on the canvas at the given position.
    *
-   * The brush is defined by its size, blend mode, hardness, and an optional texture.
-   * If no texture is provided, an elliptical region is used (via cmath.raster.ellipse).
-   * If a texture is provided, the brush stroke covers the full rectangular area defined
-   * by the brush size (without being clipped to an ellipse) and the texture is scaled
-   * to match this area.
+   * The brush is defined by its size, blend mode, hardness, and optionally by a kernel or texture.
+   * When a texture is provided, the brush stroke covers the full rectangular area defined
+   * by the brush size and the texture is scaled to match this area.
    *
-   * Additionally, the `spacing` property is used to ensure that successive brush stamps
-   * are only applied if the pointer has moved sufficiently.
+   * Additionally, if a TextureKernel is provided (via the `kernel` property with type "texture"),
+   * its bitmap is used as a mask to modulate the stroke, effectively masking the main texture (or
+   * a filled rectangle) with that kernel.
    *
-   * @param p - The center coordinate [x, y] of the brush stroke.
-   * @param brush - The brush parameters.
+   * When neither a main texture nor a texture kernel is provided, the brush’s shape is determined
+   * by the kernel property (if provided) or defaults to an elliptical region.
+   *
+   * @param p - The center coordinate [x, y] of the brush stamp.
+   * @param brush - The runtime brush parameters.
    */
-  private paint(p: cmath.Vector2, brush: BitmapEditorRuntimeBrush) {
+  private paint(p: cmath.Vector2, brush: BitmapEditorRuntimeBrush): void {
     const brushWidth = brush.size[0];
     const brushHeight = brush.size[1];
     const halfW = brushWidth / 2;
     const halfH = brushHeight / 2;
 
-    // If a texture is provided, scale it to match the brush area.
+    // Scale the main texture (if provided) to match the brush area.
     let processedTexture: cmath.raster.Bitmap | undefined;
     if (brush.texture) {
       const factorX = brushWidth / brush.texture.width;
@@ -208,52 +283,73 @@ export class BitmapEditor {
       processedTexture = cmath.raster.scale(brush.texture, [factorX, factorY]);
     }
 
-    // Determine whether to use elliptical or rectangular fill:
-    if (processedTexture) {
-      // Use a rectangular region covering the full brush area.
-      // Define the bounds of the brush area.
+    // If a texture kernel is provided, scale its texture to match the brush area.
+    let kernelTextureMask: cmath.raster.Bitmap | undefined;
+    if (brush.kernel && brush.kernel.type === "texture") {
+      const kernelTex = brush.kernel.texture;
+      const factorX = brushWidth / kernelTex.width;
+      const factorY = brushHeight / kernelTex.height;
+      kernelTextureMask = cmath.raster.scale(kernelTex, [factorX, factorY]);
+    }
+
+    // If either a main texture or a kernel texture mask is provided, use rectangular fill.
+    if (processedTexture || kernelTextureMask) {
       const left = Math.floor(p[0] - halfW);
       const right = Math.floor(p[0] + halfW);
       const top = Math.floor(p[1] - halfH);
       const bottom = Math.floor(p[1] + halfH);
 
-      // Iterate over each pixel in the rectangular brush area.
       for (let y = top; y < bottom; y++) {
-        // Skip rows outside the canvas.
         if (y < 0 || y >= this.height) continue;
         for (let x = left; x < right; x++) {
-          // Skip columns outside the canvas.
           if (x < 0 || x >= this.width) continue;
 
-          // Compute normalized distance using the maximum ratio for a rectangle.
+          // For rectangular fill, use the maximum ratio to compute normalized distance.
           const dx = x - p[0];
           const dy = y - p[1];
           const normDist = Math.max(Math.abs(dx) / halfW, Math.abs(dy) / halfH);
 
           // Compute the base weight using a Gaussian falloff, unless the brush is fully hard.
-          let baseWeight: number;
-          if (brush.hardness < 1) {
-            baseWeight = cmath.raster.gaussian(normDist, brush.hardness);
-          } else {
-            baseWeight = 1;
-          }
+          const baseWeight =
+            brush.hardness < 1
+              ? cmath.raster.gaussian(normDist, brush.hardness)
+              : 1;
           let weight = baseWeight;
 
-          // Sample the processed texture to modulate the weight.
-          // Compute relative coordinates within the brush area.
-          const relX = x - (p[0] - halfW);
-          const relY = y - (p[1] - halfH);
-          const texX = Math.floor(relX);
-          const texY = Math.floor(relY);
-          if (
-            texX >= 0 &&
-            texX < processedTexture.width &&
-            texY >= 0 &&
-            texY < processedTexture.height
-          ) {
-            const texIdx = (texY * processedTexture.width + texX) * 4;
-            const texAlpha = processedTexture.data[texIdx + 3];
-            weight = baseWeight * (texAlpha / 255);
+          // If a main texture is available, sample its alpha channel.
+          if (processedTexture) {
+            const relX = x - (p[0] - halfW);
+            const relY = y - (p[1] - halfH);
+            const texX = Math.floor(relX);
+            const texY = Math.floor(relY);
+            if (
+              texX >= 0 &&
+              texX < processedTexture.width &&
+              texY >= 0 &&
+              texY < processedTexture.height
+            ) {
+              const texIdx = (texY * processedTexture.width + texX) * 4;
+              const texAlpha = processedTexture.data[texIdx + 3];
+              weight *= texAlpha / 255;
+            }
+          }
+
+          // If a kernel texture mask is available, sample its alpha channel.
+          if (kernelTextureMask) {
+            const relX = x - (p[0] - halfW);
+            const relY = y - (p[1] - halfH);
+            const maskX = Math.floor(relX);
+            const maskY = Math.floor(relY);
+            if (
+              maskX >= 0 &&
+              maskX < kernelTextureMask.width &&
+              maskY >= 0 &&
+              maskY < kernelTextureMask.height
+            ) {
+              const maskIdx = (maskY * kernelTextureMask.width + maskX) * 4;
+              const maskAlpha = kernelTextureMask.data[maskIdx + 3];
+              weight *= maskAlpha / 255;
+            }
           }
 
           const idx = (y * this.width + x) * 4;
@@ -267,26 +363,51 @@ export class BitmapEditor {
         }
       }
     } else {
-      // No texture provided: use elliptical fill.
-      const fills = cmath.raster.ellipse(p, [halfW, halfH]);
+      // No main texture or texture kernel provided: use the kernel shape if available, otherwise default to ellipse.
+      let fills: [number, number][];
+      if (brush.kernel) {
+        switch (brush.kernel.type) {
+          case "ellipse":
+            fills = cmath.raster.ellipse(p, [halfW, halfH]);
+            break;
+          case "rectangle":
+            const rect = {
+              x: p[0] - halfW,
+              y: p[1] - halfH,
+              width: brushWidth,
+              height: brushHeight,
+            };
+            fills = cmath.raster.rectangle(rect);
+            break;
+          // For any unrecognized kernel type, fallback to elliptical region.
+          default:
+            fills = cmath.raster.ellipse(p, [halfW, halfH]);
+            break;
+        }
+      } else {
+        // Default fallback: use an elliptical region.
+        fills = cmath.raster.ellipse(p, [halfW, halfH]);
+      }
       for (const [x, y] of fills) {
         const dx = x - p[0];
         const dy = y - p[1];
         const normDist = Math.sqrt((dx / halfW) ** 2 + (dy / halfH) ** 2);
-
-        let baseWeight: number;
-        if (brush.hardness < 1) {
-          baseWeight = cmath.raster.gaussian(normDist, brush.hardness);
-        } else {
-          baseWeight = 1;
-        }
-        const weight = baseWeight;
+        const baseWeight =
+          brush.hardness < 1
+            ? cmath.raster.gaussian(normDist, brush.hardness)
+            : 1;
         const idx = (y * this.width + x) * 4;
-        this.blend_pixel(idx, weight, brush.blend, brush.color, brush.opacity);
+        this.blend_pixel(
+          idx,
+          baseWeight,
+          brush.blend,
+          brush.color,
+          brush.opacity
+        );
       }
     }
     this.last_painted_pos = p;
-    this.frame++;
+    this._frame++;
   }
 
   public brush(p: cmath.Vector2, brush: BitmapEditorRuntimeBrush) {
@@ -337,16 +458,16 @@ export class BitmapEditor {
         const nx = x + shiftX;
         if (nx < 0 || ny < 0 || nx >= newWidth || ny >= newHeight) continue;
         const newIdx = (ny * newWidth + nx) * 4;
-        newData[newIdx] = this.data[oldIdx];
-        newData[newIdx + 1] = this.data[oldIdx + 1];
-        newData[newIdx + 2] = this.data[oldIdx + 2];
-        newData[newIdx + 3] = this.data[oldIdx + 3];
+        newData[newIdx] = this._data[oldIdx];
+        newData[newIdx + 1] = this._data[oldIdx + 1];
+        newData[newIdx + 2] = this._data[oldIdx + 2];
+        newData[newIdx + 3] = this._data[oldIdx + 3];
       }
     }
-    this.width = newWidth;
-    this.height = newHeight;
-    this.data = newData;
-    this.frame++;
+    this.rect.width = newWidth;
+    this.rect.height = newHeight;
+    this._data = newData;
+    this._frame++;
   }
 
   scale(factor: number) {
@@ -359,16 +480,16 @@ export class BitmapEditor {
         const srcY = Math.floor(y / factor);
         const srcIdx = (srcY * this.width + srcX) * 4;
         const dstIdx = (y * scaledWidth + x) * 4;
-        newData[dstIdx] = this.data[srcIdx];
-        newData[dstIdx + 1] = this.data[srcIdx + 1];
-        newData[dstIdx + 2] = this.data[srcIdx + 2];
-        newData[dstIdx + 3] = this.data[srcIdx + 3];
+        newData[dstIdx] = this._data[srcIdx];
+        newData[dstIdx + 1] = this._data[srcIdx + 1];
+        newData[dstIdx + 2] = this._data[srcIdx + 2];
+        newData[dstIdx + 3] = this._data[srcIdx + 3];
       }
     }
-    this.width = scaledWidth;
-    this.height = scaledHeight;
-    this.data = newData;
-    this.frame++;
+    this.rect.width = scaledWidth;
+    this.rect.height = scaledHeight;
+    this._data = newData;
+    this._frame++;
   }
 
   /**
@@ -380,18 +501,18 @@ export class BitmapEditor {
    * @returns An array of unique colors.
    *
    * @example
-   * const uniqueColors = editor.getColors();
+   * const uniqueColors = editor.colors;
    * console.log(uniqueColors); // e.g., [ [0, 0, 0, 255], [255, 255, 255, 255], ... ]
    */
-  public getColors(): cmath.Vector4[] {
+  public get colors(): cmath.Vector4[] {
     const colors: cmath.Vector4[] = [];
     const seen = new Set<string>();
 
-    for (let i = 0; i < this.data.length; i += 4) {
-      const r = this.data[i];
-      const g = this.data[i + 1];
-      const b = this.data[i + 2];
-      const a = this.data[i + 3];
+    for (let i = 0; i < this._data.length; i += 4) {
+      const r = this._data[i];
+      const g = this._data[i + 1];
+      const b = this._data[i + 2];
+      const a = this._data[i + 3];
       const key = `${r},${g},${b},${a}`;
       if (!seen.has(key)) {
         seen.add(key);
