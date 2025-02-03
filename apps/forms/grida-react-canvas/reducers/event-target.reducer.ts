@@ -14,6 +14,7 @@ import type {
   //
 } from "../action";
 import {
+  __global_editors,
   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   GestureBrush,
   IDocumentEditorClipboardState,
@@ -1094,20 +1095,32 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
       cmath.vector2.sub(draft.pointer.position, nodepos),
       1
     );
-    const rellast = cmath.vector2.quantize(
-      cmath.vector2.sub(draft.pointer.last, nodepos),
-      1
-    );
+    // const rellast = cmath.vector2.quantize(
+    //   cmath.vector2.sub(draft.pointer.last, nodepos),
+    //   1
+    // );
 
     const image = draft.document.images[node.imageRef];
     assert(image.type === "bitmap");
 
-    const bme = new BitmapEditor(
-      node.width,
-      node.height,
-      image.data,
-      image.version
-    );
+    // set up the editor from global.
+    let bme: BitmapEditor;
+    if (
+      __global_editors.bitmap &&
+      __global_editors.bitmap.id === node.imageRef
+    ) {
+      bme = __global_editors.bitmap;
+    } else {
+      bme = new BitmapEditor(
+        node.imageRef,
+        node.width,
+        node.height,
+        image.data,
+        image.version
+      );
+      __global_editors.bitmap = bme;
+    }
+    bme.open();
 
     // Negative shift: we need to move the data and shift node coords
     let [px, py] = relpos;
@@ -1135,14 +1148,14 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
     }
 
     // Paint
-    const pixels = cmath.raster.bresenham(rellast, relpos);
-    bme.color = color;
-    for (const p of pixels) {
-      if (px >= 0 && py >= 0 && px < bme.width && py < bme.height) {
-        bme.paint(p, brush);
-      }
-    }
+    // const pixels = cmath.raster.bresenham(rellast, relpos);
+    // for (const p of pixels) {
+    //   if (px >= 0 && py >= 0 && px < bme.width && py < bme.height) {
+    //     bme.brush(p, brush);
+    //   }
+    // }
     // editor.paint([px, py], brush);
+    bme.brush(relpos, { ...brush, color: color });
 
     // update image
     draft.document.images[node.imageRef] = {
@@ -1273,6 +1286,10 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
 
 function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
   switch (draft.gesture.type) {
+    case "brush": {
+      __global_editors.bitmap?.close();
+      break;
+    }
     case "translate": {
       if (draft.gesture.is_currently_cloned) {
         // update the selection as the cloned nodes

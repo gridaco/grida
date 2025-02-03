@@ -38,11 +38,15 @@ export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 export const SYSTEM_BRUSHES = {
   paint: {
     blend: "source-over",
-    size: 4,
+    size: [4, 4],
+    hardness: 0,
+    spacing: 1,
   } satisfies BitmapEditorBrush,
   eraser: {
     blend: "destination-out",
-    size: 8,
+    size: [8, 8],
+    hardness: 0.5,
+    spacing: 1,
   } satisfies BitmapEditorBrush,
 } as const;
 
@@ -79,7 +83,9 @@ export type CursorMode =
     }
   | {
       type: "brush";
-      brush: BitmapEditorBrush;
+      brush: BitmapEditorBrush & {
+        opacity: number;
+      };
     }
   | {
       type: "path";
@@ -694,6 +700,15 @@ export type HistoryEntry = {
 //   };
 // }
 
+/**
+ * a global class based editor instances
+ */
+export const __global_editors = {
+  bitmap: null as BitmapEditor | null,
+};
+
+class A {}
+
 type ContentEditModeState =
   | TextContentEditMode
   | PathContentEditMode
@@ -745,7 +760,6 @@ type BitmapContentEditMode = {
   type: "bitmap";
   node_id: string;
   brush: BitmapEditorBrush;
-  // editor: BitmapEditor;
 };
 
 /**

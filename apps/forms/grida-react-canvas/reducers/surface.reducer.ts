@@ -15,7 +15,7 @@ import assert from "assert";
 import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
 import { grida } from "@/grida";
-import { self_selectNode } from "./methods";
+import { self_clearSelection, self_selectNode } from "./methods";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
@@ -90,7 +90,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               node_id: node_id,
               brush: brush,
             };
-            draft.cursor_mode = { type: "brush", brush: brush };
+            draft.cursor_mode = {
+              type: "brush",
+              brush: { opacity: 1, ...brush },
+            };
+            self_clearSelection(draft);
             break;
           }
         }
@@ -129,6 +133,19 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.cursor_mode = cursor_mode;
       });
     }
+    case "surface/brush": {
+      const { brush } = action;
+      return produce(state, (draft) => {
+        if (draft.cursor_mode.type === "brush") {
+          draft.cursor_mode.brush = { opacity: 1, ...brush };
+        }
+
+        if (draft.content_edit_mode?.type === "bitmap") {
+          draft.content_edit_mode.brush = brush;
+        }
+      });
+      break;
+    }
     case "surface/brush/size": {
       const { size } = action;
 
@@ -136,17 +153,43 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         if (draft.cursor_mode.type !== "brush") return;
         switch (size.type) {
           case "set":
-            draft.cursor_mode.brush.size = size.value;
+            draft.cursor_mode.brush.size = [size.value, size.value];
             break;
           case "delta":
-            draft.cursor_mode.brush.size += size.value;
+            draft.cursor_mode.brush.size = cmath.vector2.add(
+              draft.cursor_mode.brush.size,
+              [size.value, size.value]
+            );
             break;
         }
-        draft.cursor_mode.brush.size = Math.max(
-          1,
+        draft.cursor_mode.brush.size = cmath.vector2.max(
+          [1, 1],
           draft.cursor_mode.brush.size
         );
       });
+      break;
+    }
+    case "surface/brush/opacity": {
+      const { opacity } = action;
+
+      return produce(state, (draft) => {
+        if (draft.cursor_mode.type !== "brush") return;
+        switch (opacity.type) {
+          case "set":
+            draft.cursor_mode.brush.opacity = opacity.value;
+            break;
+          case "delta":
+            draft.cursor_mode.brush.opacity += opacity.value;
+            break;
+        }
+        draft.cursor_mode.brush.opacity = cmath.clamp(
+          draft.cursor_mode.brush.opacity,
+          0,
+          1
+        );
+      });
+
+      break;
     }
     case "surface/gesture/start": {
       const { gesture } = action;

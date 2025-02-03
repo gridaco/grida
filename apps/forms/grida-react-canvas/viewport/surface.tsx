@@ -439,7 +439,7 @@ function FloatingCursorTooltip() {
 }
 
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
-  const { transform, scaleX } = useTransform();
+  const { transform, scaleX, scaleY } = useTransform();
   const { pointer } = useEventTarget();
   const pos = vector2ToSurfaceSpace(
     // quantize position to canvas space 1.
@@ -448,7 +448,7 @@ function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
     transform
   );
   const { size: _size } = brush;
-  const size = _size * scaleX;
+  const [width, height] = cmath.vector2.multiply(_size, [scaleX, scaleY]);
 
   return (
     <svg
@@ -460,14 +460,14 @@ function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
         overflow: "visible",
         transform: `translate(-50%, -50%)`,
       }}
-      width={size}
-      height={size}
+      width={width}
+      height={height}
     >
       <rect
         x={0}
         y={0}
-        width={size}
-        height={size}
+        width={width}
+        height={height}
         fill="transparent"
         stroke="black"
         strokeWidth={1}

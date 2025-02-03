@@ -51,7 +51,7 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
       return { type: "path" };
     case "paint":
     case "eraser":
-      return { type: "brush", brush: SYSTEM_BRUSHES[tt] };
+      return { type: "brush", brush: { opacity: 1, ...SYSTEM_BRUSHES[tt] } };
     default:
       return { type: "cursor" };
   }

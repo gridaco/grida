@@ -15,6 +15,7 @@ import type {
   SurfaceRaycastTargeting,
 } from "./state";
 import { cmath } from "@grida/cmath";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 export type Action =
   | InternalAction
@@ -430,7 +431,9 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
   | EditorSurface_PixelGridStateAction
-  | EditorSurface_BrushSizeAction
+  | EditorSurface_ChangeBrushAction
+  | EditorSurface_ChangeBrushSizeAction
+  | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
@@ -451,9 +454,19 @@ export interface EditorSurface_PixelGridStateAction {
   state: "on" | "off";
 }
 
-export interface EditorSurface_BrushSizeAction {
+export interface EditorSurface_ChangeBrushAction {
+  type: "surface/brush";
+  brush: BitmapEditorBrush;
+}
+
+export interface EditorSurface_ChangeBrushSizeAction {
   type: "surface/brush/size";
   size: TChange<number>;
+}
+
+export interface EditorSurface_ChangeBrushOpacityAction {
+  type: "surface/brush/opacity";
+  opacity: TChange<number>;
 }
 
 export interface EditorSurface_DeleteGuideAction {

@@ -34,6 +34,7 @@ import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -1439,6 +1440,8 @@ export function useDocument() {
     [dispatch]
   );
 
+  const clipboardColor = state.user_clipboard_color;
+
   const setClipboardColor = useCallback(
     (color: grida.program.cg.RGBA8888) => {
       dispatch({
@@ -1846,6 +1849,7 @@ export function useDocument() {
       copy,
       paste,
       duplicate,
+      clipboardColor,
       setClipboardColor,
       deleteNode,
       nudge,
@@ -1892,6 +1896,7 @@ export function useDocument() {
     copy,
     paste,
     duplicate,
+    clipboardColor,
     setClipboardColor,
     deleteNode,
     nudge,
@@ -2183,11 +2188,31 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const changeBrush = useCallback(
+    (brush: BitmapEditorBrush) => {
+      dispatch({
+        type: "surface/brush",
+        brush,
+      });
+    },
+    [dispatch]
+  );
+
   const changeBrushSize = useCallback(
     (size: TChange<number>) => {
       dispatch({
         type: "surface/brush/size",
         size,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrushOpacity = useCallback(
+    (opacity: TChange<number>) => {
+      dispatch({
+        type: "surface/brush/opacity",
+        opacity,
       });
     },
     [dispatch]
@@ -2534,7 +2559,9 @@ export function useEventTarget() {
       marquee,
       cursor_mode,
       setCursorMode,
+      changeBrush,
       changeBrushSize,
+      changeBrushOpacity,
       //
       ruler,
       setRulerState,
@@ -2590,7 +2617,9 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
+    changeBrush,
     changeBrushSize,
+    changeBrushOpacity,
     //
     ruler,
     setRulerState,

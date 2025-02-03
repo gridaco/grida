@@ -808,11 +808,17 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("b", () => {
-    setCursorMode({ type: "brush", brush: SYSTEM_BRUSHES["paint"] });
+    setCursorMode({
+      type: "brush",
+      brush: { ...SYSTEM_BRUSHES["paint"], opacity: 1 },
+    });
   });
 
   useHotkeys("e", () => {
-    setCursorMode({ type: "brush", brush: SYSTEM_BRUSHES["eraser"] });
+    setCursorMode({
+      type: "brush",
+      brush: { ...SYSTEM_BRUSHES["eraser"], opacity: 1 },
+    });
   });
 
   useHotkeys("1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

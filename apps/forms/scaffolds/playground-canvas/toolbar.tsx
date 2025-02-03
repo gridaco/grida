@@ -28,6 +28,8 @@ import {
   ToolIcon,
   ToolsGroup,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { ColorPicker } from "../sidecontrol/controls/color-picker";
+import { toggleVariants } from "@/components/ui/toggle";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -197,7 +199,7 @@ export function PlaygroundToolbar({
           }}
         />
         <VerticalDivider />
-        <div className="border bg-red-500 rounded-full w-5 h-5" />
+        <ClipboardColor />
         <VerticalDivider />
         <Popover>
           <PopoverTrigger asChild>
@@ -219,6 +221,71 @@ export function PlaygroundToolbar({
         </Button>
       </ToggleGroup>
     </div>
+  );
+}
+
+const defaultColors = {
+  red: { r: 255, g: 0, b: 0, a: 1 },
+  green: { r: 0, g: 255, b: 0, a: 1 },
+  blue: { r: 0, g: 0, b: 255, a: 1 },
+  yellow: { r: 255, g: 255, b: 0, a: 1 },
+  orange: { r: 255, g: 165, b: 0, a: 1 },
+  purple: { r: 128, g: 0, b: 128, a: 1 },
+  pink: { r: 255, g: 192, b: 203, a: 1 },
+  cyan: { r: 0, g: 255, b: 255, a: 1 },
+  magenta: { r: 255, g: 0, b: 255, a: 1 },
+  black: { r: 0, g: 0, b: 0, a: 1 },
+  white: { r: 255, g: 255, b: 255, a: 1 },
+  gray: { r: 128, g: 128, b: 128, a: 1 },
+  silver: { r: 192, g: 192, b: 192, a: 1 },
+  brown: { r: 165, g: 42, b: 42, a: 1 },
+  olive: { r: 128, g: 128, b: 0, a: 1 },
+  navy: { r: 0, g: 0, b: 128, a: 1 },
+  teal: { r: 0, g: 128, b: 128, a: 1 },
+  maroon: { r: 128, g: 0, b: 0, a: 1 },
+  gold: { r: 255, g: 215, b: 0, a: 1 },
+  indigo: { r: 75, g: 0, b: 130, a: 1 },
+};
+
+function ClipboardColor() {
+  const { clipboardColor, setClipboardColor } = useDocument();
+
+  const color = clipboardColor ?? { r: 0, g: 0, b: 0, a: 1 };
+
+  // TODO:
+  // - recent colors
+  // - document colors
+  // - named colors
+  const options = Object.entries(defaultColors).map(([id, color]) => ({
+    id,
+    color,
+  }));
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        className={toggleVariants({ variant: "default", size: "default" })}
+      >
+        <div
+          className="border rounded-full w-5 h-5"
+          style={{
+            background: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
+          }}
+        />
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        side="bottom"
+        sideOffset={16}
+        className="p-0"
+      >
+        <ColorPicker
+          color={color}
+          onColorChange={setClipboardColor}
+          options={options}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 
