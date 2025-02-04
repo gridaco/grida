@@ -873,7 +873,7 @@ export function initDocumentEditorState({
       name: "Default",
       hardness: 1,
       size: [4, 4],
-      spacing: 1,
+      spacing: 0,
       opacity: 1,
     },
     ...init,

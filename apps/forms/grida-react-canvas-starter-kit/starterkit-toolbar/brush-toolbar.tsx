@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { cmath } from "@grida/cmath";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export function useSliderState() {
   const [active, setActive] = useState(false);
@@ -47,6 +49,7 @@ export default function BrushToolbar() {
 
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
+  const [detailOpen, setDetailOpen] = useState(false);
 
   if (!(tool.type === "brush" || tool.type === "eraser")) return null;
 
@@ -54,6 +57,11 @@ export default function BrushToolbar() {
 
   return (
     <div className="w-10 flex flex-col items-start gap-2 p-1 border bg-background/50 backdrop-blur-lg shadow rounded-md pointer-events-auto">
+      <BrushDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        brush={brush}
+      />
       {/* Paint Brush Size */}
       <Popover open={sizepop.active}>
         <PopoverAnchor className="w-full">
@@ -131,61 +139,119 @@ export default function BrushToolbar() {
           sideOffset={8}
           className="w-72 h-96 p-0 overflow-scroll"
         >
-          <div className="flex flex-col p-4 gap-4">
-            <div className="grid gap-2">
-              <Label className="text-xs">Hardness</Label>
-              <Slider min={0} max={100} />
-            </div>
-            <div className="grid gap-2">
-              <Label className="text-xs">Spacing</Label>
-              <Slider min={0} max={100} />
-            </div>
-          </div>
-          <hr />
           <div className="flex flex-col gap-1">
-            <BrushItem
-              label="Pixel Brush 4"
-              thumbnail="/brushes/brush-preview-0.png"
-              onClick={() => {
-                changeBrush({
-                  name: "Pixel Brush 4",
-                  hardness: 1,
-                  size: [4, 4],
-                  spacing: 1,
-                  texture: createSquarePixelBrushTexture(8),
-                });
-              }}
-            />
-            <BrushItem
-              label="Pixel Spray Brush 40"
-              thumbnail="/brushes/brush-preview-1.png"
-              onClick={() => {
-                changeBrush({
-                  name: "Pixel Spray Brush 40",
-                  hardness: 1,
-                  size: [40, 40],
-                  spacing: 10,
-                  texture: createSprayBrushTexture(40, 40, 0.1),
-                });
-              }}
-            />
-            <BrushItem
-              label="Pixel Grain Brush 100"
-              thumbnail="/brushes/brush-preview-2.png"
-              onClick={() => {
-                changeBrush({
-                  name: "Pixel Grain Brush 100",
-                  hardness: 1,
-                  size: [100, 100],
-                  spacing: 10,
-                  texture: createGrainBrushTexture(100, 100, 0.1),
-                });
-              }}
-            />
+            {brushes.map((item) => {
+              const selected = brush.name === item.brush.name;
+              return (
+                <BrushItem
+                  key={item.brush.name}
+                  label={item.label}
+                  thumbnail={item.thumbnail}
+                  selected={selected}
+                  onClick={() => {
+                    changeBrush(item.brush);
+                    if (selected) {
+                      setDetailOpen(true);
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
         </PopoverContent>
       </Popover>
     </div>
+  );
+}
+
+const brushes = [
+  {
+    label: "Pixel Brush 1",
+    thumbnail: "/brushes/brush-preview-1.png",
+    brush: {
+      name: "Pixel Brush 1",
+      hardness: 1,
+      size: [1, 1] satisfies cmath.Vector2,
+      spacing: 0,
+      texture: createSquarePixelBrushTexture(4),
+    },
+  },
+  {
+    label: "Pixel Brush 4",
+    thumbnail: "/brushes/brush-preview-2.png",
+    brush: {
+      name: "Pixel Brush 4",
+      hardness: 1,
+      size: [4, 4] satisfies cmath.Vector2,
+      spacing: 0,
+      texture: createSquarePixelBrushTexture(4),
+    },
+  },
+  {
+    label: "Pixel Spray Brush 40",
+    thumbnail: "/brushes/brush-preview-3.png",
+    brush: {
+      name: "Pixel Spray Brush 40",
+      hardness: 1,
+      size: [40, 40] satisfies cmath.Vector2,
+      spacing: 0.2,
+      texture: createSprayBrushTexture(40, 40, 0.1),
+    },
+  },
+  {
+    label: "Pixel Grain Brush 100",
+    thumbnail: "/brushes/brush-preview-4.png",
+    brush: {
+      name: "Pixel Grain Brush 100",
+      hardness: 1,
+      size: [100, 100] satisfies cmath.Vector2,
+      spacing: 0.2,
+      texture: createGrainBrushTexture(100, 100, 0.1),
+    },
+  },
+  {
+    label: "Pixel Scatter Brush 100",
+    thumbnail: "/brushes/brush-preview-5.png",
+    brush: {
+      name: "Pixel Scatter Brush 100",
+      hardness: 1,
+      size: [100, 100] satisfies cmath.Vector2,
+      spacing: 0.2,
+      texture: createGrainBrushTexture(100, 100, 0.01),
+    },
+  },
+];
+
+function BrushDetailDialog({
+  brush,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  brush: BitmapEditorBrush;
+}) {
+  const { thumbnail } = brushes.find((item) => item.brush.name === brush.name)!;
+  return (
+    <Dialog {...props}>
+      {/*  */}
+      <DialogContent className="flex">
+        <aside className="flex-1 flex flex-col p-4 gap-4">
+          <div className="grid gap-2">
+            <Label className="text-xs">Hardness</Label>
+            <Slider min={0} max={100} />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs">Spacing</Label>
+            <Slider min={0} max={100} />
+          </div>
+        </aside>
+        <aside className="flex-1">
+          <img
+            className="w-full h-32 object-contain"
+            src={thumbnail}
+            alt={brush.name}
+          />
+        </aside>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -207,13 +273,17 @@ function BrushItem({
       {...props}
       data-selected={selected}
       className={cn(
-        "w-full rounded-sm hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent",
+        "w-full rounded-sm hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent select-none",
         className
       )}
     >
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="w-full h-16 mt-2">
-        <img className="w-full h-full" src={thumbnail} alt={label} />
+        <img
+          className="w-full h-full select-none pointer-events-none"
+          src={thumbnail}
+          alt={label}
+        />
       </div>
     </div>
   );

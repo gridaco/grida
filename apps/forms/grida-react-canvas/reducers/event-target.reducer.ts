@@ -378,7 +378,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "eraser":
           case "brush": {
-            self_brush(draft);
+            self_brush(draft, { is_gesture: false });
             break;
           }
         }
@@ -611,7 +611,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "eraser":
           case "brush": {
-            self_brush(draft);
+            self_brush(draft, { is_gesture: true });
             break;
           }
         }
@@ -818,7 +818,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             case "brush": {
-              self_brush(draft);
+              self_brush(draft, { is_gesture: true });
               break;
             }
             case "curve": {
@@ -1077,6 +1077,19 @@ function self_prepare_bitmap_node(
     const new_node_id = nid();
     const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
+    const cdom = new domapi.CanvasDOM(draft.transform);
+    const parent = __get_insert_target(draft);
+    const parent_rect = cdom.getNodeBoundingRect(parent)!;
+    const node_relative_pos = cmath.vector2.quantize(
+      cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
+      1
+    );
+
+    const width = 0;
+    const height = 0;
+    const x = node_relative_pos[0];
+    const y = node_relative_pos[1];
+
     const bitmap: grida.program.nodes.BitmapNode = {
       type: "bitmap",
       name: "bitmap",
@@ -1084,17 +1097,16 @@ function self_prepare_bitmap_node(
       active: true,
       locked: false,
       position: "absolute",
-      left: 0,
-      top: 0,
       opacity: 1,
-      width: 1,
-      height: 1,
       rotation: 0,
       zIndex: 0,
+      left: x,
+      top: y,
+      width: width,
+      height: height,
       imageRef: new_bitmap_ref_id,
     };
 
-    const parent = __get_insert_target(draft);
     draft.document.textures[new_bitmap_ref_id] = {
       type: "texture",
       data: new Uint8ClampedArray(0),
@@ -1102,25 +1114,19 @@ function self_prepare_bitmap_node(
       height: 0,
       version: 0,
     };
+
+    console.log("new", node_relative_pos, x, y, bitmap);
+
     self_insertNode(draft, parent, bitmap);
 
-    const cdom = new domapi.CanvasDOM(draft.transform);
-    // position relative to the parent
-    const parent_rect = cdom.getNodeBoundingRect(parent)!;
-    const node_relative_pos = cmath.vector2.quantize(
-      cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
-      1
-    );
-
-    bitmap.left = node_relative_pos[0];
-    bitmap.top = node_relative_pos[1];
-
-    self_clearSelection(draft);
-
-    return document.__getNodeById(
+    const node = document.__getNodeById(
       draft,
       new_node_id
     ) as grida.program.nodes.BitmapNode;
+
+    self_clearSelection(draft);
+
+    return node;
   } else {
     return document.__getNodeById(
       draft,
@@ -1129,7 +1135,14 @@ function self_prepare_bitmap_node(
   }
 }
 
-function self_brush(draft: Draft<IDocumentEditorState>) {
+function self_brush(
+  draft: Draft<IDocumentEditorState>,
+  {
+    is_gesture,
+  }: {
+    is_gesture: boolean;
+  }
+) {
   assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
 
   let node_id =
@@ -1151,10 +1164,6 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
   const node = self_prepare_bitmap_node(draft, node_id);
 
   const nodepos: cmath.Vector2 = [node.left!, node.top!];
-  const relpos = cmath.vector2.quantize(
-    cmath.vector2.sub(draft.pointer.position, nodepos),
-    1
-  );
 
   const image = draft.document.textures[node.imageRef];
   assert(image.type === "texture");
@@ -1179,9 +1188,12 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
   }
   bme.open();
 
+  const pos: cmath.Vector2 = [...draft.pointer.position];
+
   // brush
   bme.brush(
-    relpos,
+    // relpos,
+    pos,
     { color, ...brush },
     blendmode,
     blendmode === "source-over" ? "auto" : "clip"
@@ -1202,21 +1214,27 @@ function self_brush(draft: Draft<IDocumentEditorState>) {
   node.width = bme.width;
   node.height = bme.height;
 
-  if (draft.gesture.type === "idle") {
-    draft.gesture = {
-      type: "brush",
-      movement: cmath.vector2.zero,
-      first: cmath.vector2.zero,
-      last: cmath.vector2.zero,
-      color: color,
-      node_id: node.id,
-    };
+  if (is_gesture) {
+    if (draft.gesture.type === "idle") {
+      draft.gesture = {
+        type: "brush",
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        color: color,
+        node_id: node.id,
+      };
+    }
+  } else {
+    bme.close();
   }
 
   draft.content_edit_mode = {
     type: "bitmap",
     node_id: node.id,
   };
+
+  return bme;
 }
 
 function get_next_brush_pain_color(

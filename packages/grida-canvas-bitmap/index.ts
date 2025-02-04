@@ -421,44 +421,66 @@ export class BitmapLayerEditor {
    * before painting, ensuring overflow paints are accurately rendered.
    */
   public brush(
-    p: cmath.Vector2,
+    p: cmath.Vector2, // p is now an absolute coordinate.
     brush: BitmapEditorRuntimeBrush,
     blend: BlendMode,
     overflow: "clip" | "auto"
   ): void {
     if (!this.gesture) return;
+    // p is absolute.
     this.gesture.position = p;
-    const lastPos = this.last_painted_pos;
 
-    // If no previous point exists, paint immediately.
-    if (!lastPos) {
-      if (overflow === "auto") {
-        const bbox = stampbbox(p, brush);
-        this.expand_to_fit(bbox);
-      }
-      this.paint(p, brush, blend);
+    // Use p as absolute for expansion.
+    if (overflow === "auto") {
+      const bbox = stampbbox(p, brush); // bbox is in absolute coordinates.
+      this.expand_to_fit(bbox);
+    }
 
+    // Convert p from absolute to layer-local coordinates:
+    const localP: cmath.Vector2 = [p[0] - this._rect.x, p[1] - this._rect.y];
+
+    // If there's no previously painted point, paint immediately.
+    if (!this.last_painted_pos) {
+      this.paint(localP, brush, blend);
+      this.last_painted_pos = p; // Store the absolute point.
       return;
     }
 
-    // Calculate the full Bresenham path from lastPos to p.
-    const points = cmath.raster.bresenham(lastPos, p);
-    let lastPainted = lastPos;
+    // Compute the Bresenham path in absolute coordinates.
+    const points = cmath.raster.bresenham(
+      cmath.vector2.quantize(this.last_painted_pos, 1),
+      cmath.vector2.quantize(p, 1)
+    );
+    let lastPainted = this.last_painted_pos;
+
+    // Calculate an effective brush size (using the larger of width or height)
+    const effectiveBrushSize = Math.max(brush.size[0], brush.size[1]);
+    // Compute the required center-to-center distance (spacing is now a percentage, e.g. 1.0 = 100%)
+    const requiredDistance = brush.spacing * effectiveBrushSize;
 
     for (const pt of points) {
-      // Only paint if the distance from the last painted point meets spacing.
+      // Only paint if the distance from the last painted point is at least the requiredDistance.
       if (
         brush.spacing &&
-        cmath.vector2.distance(lastPainted, pt) < brush.spacing
+        cmath.vector2.distance(lastPainted, pt) < requiredDistance
       )
         continue;
+
       if (overflow === "auto") {
         const bbox = stampbbox(pt, brush);
         this.expand_to_fit(bbox);
       }
-      this.paint(pt, brush, blend);
+      // Convert each point from absolute to local coordinates.
+      const localPt: cmath.Vector2 = [
+        pt[0] - this._rect.x,
+        pt[1] - this._rect.y,
+      ];
+      this.paint(localPt, brush, blend);
       lastPainted = pt;
     }
+
+    // Store the absolute point for continuity.
+    this.last_painted_pos = p;
   }
 
   /**

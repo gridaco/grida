@@ -83,6 +83,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   //
           // }
           case "bitmap": {
+            draft.content_edit_mode = {
+              type: "bitmap",
+              node_id: node_id,
+            };
             draft.tool = {
               type: "brush",
             };

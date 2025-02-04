@@ -2125,6 +2125,7 @@ export function useEventTargetCSSCursor() {
       case "path":
         return "crosshair";
       case "brush":
+      case "eraser":
         return "cell";
     }
   }, [tool]);
