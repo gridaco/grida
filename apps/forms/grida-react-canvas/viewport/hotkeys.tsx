@@ -544,7 +544,6 @@ export function useEditorHotKeys() {
                     );
                   });
               }
-              result.sRGBHex;
             }
           )
           .catch((e: any) => {});

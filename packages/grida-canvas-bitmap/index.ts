@@ -336,9 +336,10 @@ export class BitmapLayerEditor {
               ? cmath.raster.gaussian(normDist, brush.hardness)
               : 1;
 
+          const relX = x - left;
+          const relY = y - top;
+
           if (processedTexture) {
-            const relX = x - (p[0] - halfW);
-            const relY = y - (p[1] - halfH);
             const texX = Math.floor(relX);
             const texY = Math.floor(relY);
             if (
@@ -354,8 +355,6 @@ export class BitmapLayerEditor {
           }
 
           if (kernelTextureMask) {
-            const relX = x - (p[0] - halfW);
-            const relY = y - (p[1] - halfH);
             const maskX = Math.floor(relX);
             const maskY = Math.floor(relY);
             if (

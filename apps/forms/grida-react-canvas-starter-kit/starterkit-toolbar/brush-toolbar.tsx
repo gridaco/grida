@@ -2,9 +2,10 @@
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/utils";
-import { useEventTarget } from "@/grida-react-canvas/provider";
+import { useDocument, useEventTarget } from "@/grida-react-canvas/provider";
 import {
   DotsHorizontalIcon,
+  SquareIcon,
   TransparencyGridIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cmath } from "@grida/cmath";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
+import toast from "react-hot-toast";
+import { grida } from "@/grida";
 
 export function useSliderState() {
   const [active, setActive] = useState(false);
@@ -89,6 +93,9 @@ export default function BrushToolbar() {
           <BrushPreview brush={brush} label={<>Size</>} />
         </PopoverContent>
       </Popover>
+      <div className="w-full aspect-square flex items-center justify-center">
+        <EyedropButton />
+      </div>
       <Popover open={opacitypop.active}>
         <PopoverAnchor className="w-full">
           <div className="w-full h-40">
@@ -228,7 +235,8 @@ function BrushDetailDialog({
 }: React.ComponentProps<typeof Dialog> & {
   brush: BitmapEditorBrush;
 }) {
-  const { thumbnail } = brushes.find((item) => item.brush.name === brush.name)!;
+  const definedbrush = brushes.find((item) => item.brush.name === brush.name);
+  if (!definedbrush) return null;
   return (
     <Dialog {...props}>
       {/*  */}
@@ -246,7 +254,7 @@ function BrushDetailDialog({
         <aside className="flex-1">
           <img
             className="w-full h-32 object-contain"
-            src={thumbnail}
+            src={definedbrush.thumbnail}
             alt={brush.name}
           />
         </aside>
@@ -286,6 +294,30 @@ function BrushItem({
         />
       </div>
     </div>
+  );
+}
+
+function EyedropButton() {
+  const { setClipboardColor } = useDocument();
+  const { isSupported, open } = useEyeDropper();
+
+  const mod = () => {
+    if (isSupported) {
+      open()?.then((result) => {
+        const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
+        // editor clipboard
+        setClipboardColor(rgba);
+      });
+    } else {
+      toast.error("This feature is not supported in your browser.");
+    }
+  };
+
+  return (
+    <div
+      onPointerDown={mod}
+      className="w-5 h-5 rounded border-2 border-primary/20"
+    />
   );
 }
 

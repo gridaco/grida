@@ -54,7 +54,7 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): ToolMode {
     case "brush":
       return { type: "brush" };
     case "eraser":
-      return { type: "brush" };
+      return { type: "eraser" };
     default:
       return { type: "cursor" };
   }

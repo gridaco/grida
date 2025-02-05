@@ -34,6 +34,7 @@ import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import { vn } from "@/grida/vn";
 import { self_moveNode } from "./methods/move";
+import "core-js/features/object/group-by";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,

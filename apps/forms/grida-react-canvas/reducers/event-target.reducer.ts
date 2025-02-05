@@ -1115,8 +1115,6 @@ function self_prepare_bitmap_node(
       version: 0,
     };
 
-    console.log("new", node_relative_pos, x, y, bitmap);
-
     self_insertNode(draft, parent, bitmap);
 
     const node = document.__getNodeById(
