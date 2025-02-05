@@ -67,9 +67,17 @@ export default function WWW() {
       <Header></Header>
       <Hero></Hero>
       <section>
-        <div className="my-40">
+        <motion.div
+          initial={{
+            y: 50,
+          }}
+          animate={{
+            y: 0,
+          }}
+          className="my-40"
+        >
           <Demo />
-        </div>
+        </motion.div>
         <div className="my-60 relative">
           <FeatureSection
             badge={"Canvas"}
