@@ -12,6 +12,7 @@ export type ToolbarToolType =
   | "pencil"
   | "brush"
   | "eraser"
+  | "flood-fill"
   | "path";
 
 export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
@@ -31,6 +32,8 @@ export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
       return "brush";
     case "eraser":
       return "eraser";
+    case "flood-fill":
+      return "flood-fill";
   }
 }
 
@@ -55,6 +58,8 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): ToolMode {
       return { type: "brush" };
     case "eraser":
       return { type: "eraser" };
+    case "flood-fill":
+      return { type: "flood-fill" };
     default:
       return { type: "cursor" };
   }

@@ -381,6 +381,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             self_brush(draft, { is_gesture: false });
             break;
           }
+          case "flood-fill": {
+            assert(state.content_edit_mode?.type === "bitmap");
+            self_floodfill(draft, state.content_edit_mode.imageRef);
+            break;
+          }
         }
       });
     }
@@ -628,6 +633,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             if (draft.tool.tool === "pencil") break;
           case "brush":
           case "eraser":
+          case "flood-fill":
             // keep for paint mode
             break;
           case "path":
@@ -1230,9 +1236,23 @@ function self_brush(
   draft.content_edit_mode = {
     type: "bitmap",
     node_id: node.id,
+    imageRef: node.imageRef,
   };
 
   return bme;
+}
+
+function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
+  const color = get_next_brush_pain_color(draft);
+  const bme = __global_editors.bitmap!;
+  bme.floodfill(draft.pointer.position, color);
+  draft.document.textures[imageRef] = {
+    type: "texture",
+    data: bme.data,
+    version: bme.frame,
+    width: bme.width,
+    height: bme.height,
+  };
 }
 
 function get_next_brush_pain_color(

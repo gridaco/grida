@@ -65,7 +65,7 @@ export type ToolMode =
       tool: "line" | "pencil";
     }
   | {
-      type: "brush" | "eraser";
+      type: "brush" | "eraser" | "flood-fill";
     }
   | {
       type: "path";
@@ -744,6 +744,7 @@ type PathContentEditMode = {
 type BitmapContentEditMode = {
   type: "bitmap";
   node_id: string;
+  imageRef: string;
 };
 
 /**

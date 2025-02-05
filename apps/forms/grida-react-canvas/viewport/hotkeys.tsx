@@ -256,6 +256,11 @@ export const keybindings_sheet = [
     keys: ["e"],
   },
   {
+    name: "paint bucket",
+    description: "Paint bucket tool",
+    keys: ["g"],
+  },
+  {
     name: "increase brush size",
     description: "Increase brush size",
     keys: ["]"],
@@ -311,6 +316,7 @@ function useSingleDoublePressHotkey(
 
 export function useEditorHotKeys() {
   const {
+    content_edit_mode,
     tool,
     setTool,
     ruler,
@@ -809,6 +815,14 @@ export function useEditorHotKeys() {
     setTool({
       type: "eraser",
     });
+  });
+
+  useHotkeys("g", () => {
+    if (content_edit_mode?.type === "bitmap") {
+      setTool({
+        type: "flood-fill",
+      });
+    }
   });
 
   useHotkeys("1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

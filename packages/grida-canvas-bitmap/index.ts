@@ -483,6 +483,39 @@ export class BitmapLayerEditor {
   }
 
   /**
+   * Performs a flood fill starting from the given absolute coordinate.
+   *
+   * This method converts the absolute coordinate to layer-local coordinates and
+   * applies a flood fill on the underlying bitmap data using the provided fill color.
+   * The flood fill algorithm modifies the layer's pixel data directly.
+   *
+   * @param p - The absolute coordinate [x, y] where the flood fill should start.
+   * @param fill - The fill color as a Vector4 ([r, g, b, a]).
+   */
+  public floodfill(p: cmath.Vector2, fill: cmath.Vector4): void {
+    const localP: cmath.Vector2 = cmath.vector2.quantize(
+      [p[0] - this._rect.x, p[1] - this._rect.y],
+      1
+    );
+    if (
+      localP[0] < 0 ||
+      localP[0] >= this._rect.width ||
+      localP[1] < 0 ||
+      localP[1] >= this._rect.height
+    ) {
+      return;
+    }
+
+    const bitmap: cmath.raster.Bitmap = {
+      width: this._rect.width,
+      height: this._rect.height,
+      data: this._data,
+    };
+    cmath.raster.floodfill(bitmap, localP, fill);
+    this._frame++;
+  }
+
+  /**
    * Pads the layer if the given bounding box is outside the current layer.
    */
   private expand_to_fit(bbox: cmath.Rectangle): void {

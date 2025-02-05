@@ -83,9 +83,14 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   //
           // }
           case "bitmap": {
+            const node = document.__getNodeById(
+              draft,
+              node_id
+            ) as grida.program.nodes.BitmapNode;
             draft.content_edit_mode = {
               type: "bitmap",
-              node_id: node_id,
+              node_id: node.id,
+              imageRef: node.imageRef,
             };
             draft.tool = {
               type: "brush",
@@ -101,6 +106,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/content-edit-mode/try-exit": {
       return produce(state, (draft) => {
         draft.content_edit_mode = undefined;
+        draft.tool = { type: "cursor" };
       });
     }
     case "surface/tool": {
@@ -111,6 +117,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         "path",
       ];
       const text_edit_mode_valid_tool_modes: ToolModeType[] = ["cursor"];
+      const bitmap_edit_mode_valid_tool_modes: ToolModeType[] = [
+        "brush",
+        "eraser",
+        "flood-fill",
+      ];
       return produce(state, (draft) => {
         // validate cursor mode
         if (draft.content_edit_mode) {
@@ -120,6 +131,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               break;
             case "text":
               if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
+              break;
+            case "bitmap":
+              if (!bitmap_edit_mode_valid_tool_modes.includes(tool.type)) {
+                draft.content_edit_mode = undefined;
+              }
               break;
           }
         }

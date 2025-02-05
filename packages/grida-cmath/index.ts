@@ -819,6 +819,12 @@ export namespace cmath.vector2 {
   }
 }
 
+export namespace cmath.vector4 {
+  export function identical(a: Vector4, b: Vector4): boolean {
+    return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+  }
+}
+
 export namespace cmath.compass {
   /**
    * Inverted cardinal directions `nw -> se, ne -> sw` and so on
@@ -3225,7 +3231,7 @@ export namespace cmath.raster {
     center: cmath.Vector2,
     radius: number,
     clipRect?: cmath.Rectangle
-  ): Array<[number, number]> {
+  ): Array<cmath.Vector2> {
     const [cx, cy] = center;
     const rSq = radius * radius;
     const results: Array<cmath.Vector2> = [];
@@ -3311,6 +3317,63 @@ export namespace cmath.raster {
       }
     }
     return points;
+  }
+
+  /**
+   * Performs a flood fill on a bitmap starting from the given coordinate.
+   *
+   * The algorithm fills contiguous pixels that match the target color (the color at the starting point)
+   * with the provided fillColor using an iterative stack-based approach.
+   *
+   * **Note:** This function modifies the input bitmap's data directly.
+   *
+   * @param bitmap - The bitmap to fill.
+   * @param pos - The x y coordinate to start filling.
+   * @param fill - The color to fill with, as [r, g, b, a].
+   *
+   * @remarks
+   * The function first checks whether the starting pixel's color is already identical to the fillColor.
+   * If they match, it returns immediately without performing any fill operations.
+   */
+  export function floodfill(
+    bitmap: Bitmap,
+    pos: cmath.Vector2,
+    fill: Vector4
+  ): void {
+    const [x, y] = pos;
+    const { width, height, data } = bitmap;
+    const idx = (y * width + x) * 4;
+    const targetColor: Vector4 = [
+      data[idx],
+      data[idx + 1],
+      data[idx + 2],
+      data[idx + 3],
+    ];
+    if (cmath.vector4.identical(targetColor, fill)) return;
+
+    const stack: [number, number][] = [[x, y]];
+
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      const i = (y * width + x) * 4;
+      const currColor: Vector4 = [
+        data[i],
+        data[i + 1],
+        data[i + 2],
+        data[i + 3],
+      ];
+      if (!cmath.vector4.identical(currColor, targetColor)) continue;
+
+      data[i] = fill[0];
+      data[i + 1] = fill[1];
+      data[i + 2] = fill[2];
+      data[i + 3] = fill[3];
+
+      if (x > 0) stack.push([x - 1, y]);
+      if (x < width - 1) stack.push([x + 1, y]);
+      if (y > 0) stack.push([x, y - 1]);
+      if (y < height - 1) stack.push([x, y + 1]);
+    }
   }
 }
 
