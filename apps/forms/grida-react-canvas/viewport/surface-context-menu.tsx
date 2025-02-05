@@ -15,7 +15,8 @@ import {
 export function EditorSurfaceContextMenu({
   children,
 }: React.PropsWithChildren<{}>) {
-  const { selection, state, paste, order, deleteNode } = useDocument();
+  const { selection, state, paste, order, autoLayout, contain, deleteNode } =
+    useDocument();
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useSelection();
 
@@ -53,6 +54,7 @@ export function EditorSurfaceContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
       <ContextMenuContent className="min-w-52">
         <ContextMenuItem
           disabled={!can_copy}
@@ -94,6 +96,27 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!has_selection}
           onSelect={() => {
+            contain("selection");
+          }}
+          className="text-xs"
+        >
+          Group with Container
+          <ContextMenuShortcut>{"⌥⌘G"}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={!has_selection}
+          onSelect={() => {
+            autoLayout("selection");
+          }}
+          className="text-xs"
+        >
+          Auto-Layout
+          <ContextMenuShortcut>{"⇧A"}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={!has_selection}
+          onSelect={() => {
             deleteNode("selection");
           }}
           className="text-xs"
@@ -101,6 +124,7 @@ export function EditorSurfaceContextMenu({
           Delete
           <ContextMenuShortcut>{"⌫"}</ContextMenuShortcut>
         </ContextMenuItem>
+
         {/* <ContextMenuItem
           disabled={!can_toggle_active}
           // onSelect={actions}

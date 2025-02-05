@@ -3,20 +3,16 @@ import React from "react";
 // import type { Rectangle } from "../types";
 // import * as k from "./k";
 
-const font_size = 11;
-
 export function SizeMeterLabel({
   size,
-  margin = 0,
+  offset = 0,
   rect,
-  zoom = 1,
   className,
 }: {
   size: cmath.Vector2;
-  margin?: number;
+  offset?: number;
 } & {
   rect: cmath.Rectangle;
-  zoom?: number;
   className?: string;
 }) {
   const { x, y, width, height } = rect;
@@ -30,10 +26,8 @@ export function SizeMeterLabel({
       label={text}
       x={centerX}
       y={bottomY}
-      anchor="s"
-      margin={margin}
-      zoom={zoom}
-      zIndex={5}
+      side="bottom"
+      sideOffset={offset}
       className={className}
     />
   );
@@ -43,69 +37,49 @@ export function MeterLabel({
   x,
   y,
   label,
-  anchor,
-  zoom,
-  margin = 0,
-  zIndex = 5,
-  weight = 500,
+  side,
+  sideOffset,
   className,
 }: {
   x: number;
   y: number;
-  weight?: React.CSSProperties["fontWeight"];
   label: string;
-  anchor: "w" | "n" | "s" | "e";
-  margin?: number;
-  zoom: number;
-  zIndex?: number;
+  side: "left" | "right" | "top" | "bottom";
+  sideOffset: number;
   className?: string;
 }) {
-  const labelWidth = (label.length * font_size) / 1.8; // Estimate text width
-  const viewWidth = labelWidth + 4; // 4 is for horizontal padding
-  const viewHeight = font_size + 2; // 2 is for vertical padding
-
   let t: [number, number] = [0, 0];
-  switch (anchor) {
-    case "s": {
-      t = [x * zoom - viewWidth / 2, y * zoom + margin];
+  switch (side) {
+    case "left":
+      t = [-sideOffset, 0];
       break;
-    }
-    case "n": {
-      t = [x * zoom - viewWidth / 2, y * zoom - margin - viewHeight];
+    case "right":
+      t = [sideOffset, 0];
       break;
-    }
-    case "e": {
-      t = [x * zoom + margin, y * zoom - viewHeight / 2];
+    case "top":
+      t = [0, -sideOffset];
       break;
-    }
-    case "w": {
-      t = [x * zoom - margin - viewWidth, y * zoom - viewHeight / 2];
+    case "bottom":
+      t = [0, sideOffset];
       break;
-    }
   }
 
   const [tx, ty] = t;
 
   return (
     <div
-      id="size-meter"
-      style={{
-        minWidth: viewWidth,
-        position: "absolute",
-        pointerEvents: "none",
-        transform: `translate3d(${tx}px, ${ty}px, 0)`,
-        willChange: "transform, opacity",
-        boxSizing: "border-box",
-        whiteSpace: "nowrap",
-        borderRadius: 4,
-        color: "white",
-        fontSize: font_size,
-        fontFamily: "Inter, sans-serif",
-        fontWeight: weight,
-        textAlign: "center",
-        zIndex: zIndex,
-      }}
       className={className}
+      style={{
+        position: "absolute",
+        left: x + tx,
+        top: y + ty,
+        transform: "translate(-50%, -50%)",
+        padding: "2px 4px",
+        fontSize: 10,
+        borderRadius: 4,
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+      }}
     >
       {label}
     </div>

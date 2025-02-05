@@ -1,7 +1,7 @@
 import assert from "assert";
 
 /**
- * A canvas math module.
+ * cmath, a 2D canvas math module.
  */
 export namespace cmath {
   export const PI = Math.PI;
@@ -11,6 +11,17 @@ export namespace cmath {
   export const sin = Math.sin;
   export const asin = Math.asin;
   export const tan = Math.tan;
+
+  /**
+   * Represents a single axis in 2D space.
+   *
+   * Also known as horizontal (x-axis) or vertical (y-axis) direction.
+   */
+  export type Axis = "x" | "y";
+
+  export const counterAxis = (axis: Axis) => {
+    return axis === "x" ? "y" : "x";
+  };
 
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
@@ -35,6 +46,87 @@ export namespace cmath {
    */
   export type Vector2 = [number, number];
 
+  /**
+   * Represents a 1D range (line segment). where a <= b
+   *
+   * - [a] start
+   * - [b] end
+   * - [length] b - a
+   * - [center] (a + b / 2) or (a + length / 2) = mean of a and b
+   */
+  export type Range = [number, number];
+
+  /**
+   * A 4-dimensional vector. (commonly used for areas, colors, etc.)
+   */
+  export type Vector4 = [number, number, number, number];
+
+  /**
+   * Represents a 2D affine transformation matrix.
+   *
+   * A 2D affine transform is used to perform linear transformations (e.g., scaling, rotation, skewing)
+   * and translations (shifting position) in 2D space. The matrix is represented as a 2x3 matrix:
+   *
+   * ```
+   * [ a, b, tx ]
+   * [ c, d, ty ]
+   * ```
+   *
+   * Where:
+   * - `a` and `d` are scaling factors along the x and y axes, respectively.
+   * - `b` and `c` are the skewing (shearing) factors.
+   * - `tx` and `ty` are translation (movement) along the x and y axes, respectively.
+   *
+   * ### Mathematical Formulation
+   * When applied to a vector `[x, y]`, the transform produces a new vector `[x', y']` as follows:
+   *
+   * ```
+   * x' = a * x + b * y + tx
+   * y' = c * x + d * y + ty
+   * ```
+   *
+   * ### Example Transformations
+   * - **Translation**:
+   *   ```
+   *   [ 1, 0, tx ]
+   *   [ 0, 1, ty ]
+   *   ```
+   *   Moves a point by `tx` along the x-axis and `ty` along the y-axis.
+   *
+   * - **Scaling**:
+   *   ```
+   *   [ sx, 0, 0 ]
+   *   [ 0, sy, 0 ]
+   *   ```
+   *   Scales a point by `sx` along the x-axis and `sy` along the y-axis.
+   *
+   * - **Rotation (θ degrees)**:
+   *   ```
+   *   [ cos(θ), -sin(θ), 0 ]
+   *   [ sin(θ),  cos(θ), 0 ]
+   *   ```
+   *   Rotates a point counterclockwise by `θ` degrees about the origin.
+   *
+   * - **Skewing**:
+   *   ```
+   *   [ 1, tan(α), 0 ]
+   *   [ tan(β), 1, 0 ]
+   *   ```
+   *   Skews a point horizontally by angle `α` and vertically by angle `β`.
+   *
+   * ### Common Use Cases
+   * - Transforming shapes or points in 2D graphics.
+   * - Applying geometric transformations in computer graphics or simulations.
+   * - Modeling affine transformations in coordinate systems.
+   *
+   * @example
+   * // Rotate a vector [1, 0] by 90 degrees and translate by [2, 3]
+   * const transform: Transform = [
+   *   [0, -1, 2], // Rotation and translation
+   *   [1,  0, 3],
+   * ];
+   * ```
+   */
   export type Transform = [[number, number, number], [number, number, number]];
 
   /**
@@ -56,6 +148,7 @@ export namespace cmath {
   };
 
   export type RectangleSide = "top" | "right" | "bottom" | "left";
+  export type RectangleDimension = "width" | "height";
 
   export type CardinalDirection =
     | "n"
@@ -164,6 +257,259 @@ export namespace cmath {
   export function principalAngle(angle: number): number {
     return ((angle + 180) % 360) - 180;
   }
+
+  /**
+   * Determines whether an angle (in degrees) is closer to the x-axis (horizontal)
+   * or the y-axis (vertical).
+   *
+   * - "x" if the angle is closer to 0° or 180°
+   * - "y" if the angle is closer to 90° or 270°
+   *
+   * @param angle - The angle in degrees (can be any real number).
+   * @returns `"x"` if closer to horizontal, `"y"` if closer to vertical.
+   *
+   * @example
+   * closestAxis(10);   // "x"
+   * closestAxis(85);   // "y"
+   * closestAxis(179);  // "x"
+   * closestAxis(270);  // "y"
+   */
+  export function angleToAxis(angle: number): Axis {
+    // 1) Normalize to [0, 360)
+    const a = ((angle % 360) + 360) % 360;
+
+    // 2) Distances from canonical horizontal angles (0° & 180°)
+    //    (360° is effectively the same as 0°, so you don't need to include both)
+    const distHorizontal = Math.min(
+      Math.abs(a - 0),
+      Math.abs(a - 180),
+      Math.abs(a - 360)
+    );
+
+    // 3) Distances from canonical vertical angles (90° & 270°)
+    const distVertical = Math.min(Math.abs(a - 90), Math.abs(a - 270));
+
+    // 4) Compare the two distances
+    return distHorizontal <= distVertical ? "x" : "y";
+  }
+
+  /**
+   * Move an array item to a different position. Returns a new array with the item moved to the new position.
+   */
+  export function arrayMove<T>(array: T[], from: number, to: number): T[] {
+    const newArray = array.slice();
+    newArray.splice(
+      to < 0 ? newArray.length + to : to,
+      0,
+      newArray.splice(from, 1)[0]
+    );
+
+    return newArray;
+  }
+
+  /**
+   * Checks if all elements in an array are equal, with optional tolerance.
+   *
+   * @param arr - The array of numbers to check.
+   * @param tolerance - The allowable difference for values to be considered equal. Defaults to 0 (strict equality).
+   * @returns `true` if all elements in the array are equal within the given tolerance, otherwise `false`.
+   *
+   * @example
+   * isUniform([1, 1, 1]); // true
+   * isUniform([1.001, 1.002, 1.0009], 0.01); // true
+   * isUniform([1, 2, 3]); // false
+   */
+  export function isUniform(arr: number[], tolerance: number = 0): boolean {
+    if (arr.length <= 1) return true;
+
+    const first = arr[0];
+
+    if (tolerance === 0) {
+      return arr.every((value) => value === first);
+    } else {
+      return arr.every((value) => Math.abs(value - first) <= tolerance);
+    }
+  }
+
+  /**
+   * Finds the mode (most frequent value) in an array of numbers.
+   *
+   * The mode is the value that appears most often in the array. If the array is empty, `undefined` is returned.
+   *
+   * @param arr - An array of numbers to find the mode from.
+   * @returns The most frequent number in the array, or `undefined` if the array is empty.
+   *
+   * @example
+   * // Single mode
+   * const result1 = mode([1, 2, 2, 3]);
+   * console.log(result1); // 2
+   *
+   * @example
+   * // Multiple modes (returns the first encountered)
+   * const result2 = mode([1, 2, 2, 3, 3]);
+   * console.log(result2); // 2 or 3
+   *
+   * @example
+   * // Empty array
+   * const result3 = mode([]);
+   * console.log(result3); // undefined
+   *
+   * @remarks
+   * - The function uses a frequency map to count occurrences and identifies the most frequent value.
+   * - In the case of ties (multiple numbers with the same highest frequency), the first number encountered is returned.
+   */
+  export function mode(arr: number[]): number | undefined {
+    const frequency: Record<number, number> = {};
+    arr.forEach((num) => {
+      frequency[num] = (frequency[num] || 0) + 1;
+    });
+
+    let mostFrequent: [number, number] = [undefined as any, 0];
+
+    for (const key in frequency) {
+      const count = frequency[key];
+      const value = Number(key); // Convert the string key to a number
+      if (count > mostFrequent[1]) {
+        mostFrequent = [value, count];
+      }
+    }
+
+    return mostFrequent[0];
+  }
+
+  /**
+   * Calculates the mean (average) of an array of numbers.
+   *
+   * The mean is computed by summing all elements in the array and dividing by the number of elements.
+   *
+   * @param values - An array of numbers for which the mean is to be calculated.
+   * @returns The mean (average) of the provided numbers.
+   *
+   * @throws {Error} If the input array is empty.
+   *
+   * @example
+   * ```typescript
+   * const data = [5, 10, 15, 20];
+   * const avg = cmath.stats.mean(data);
+   * console.log(avg); // Outputs: 12.5
+   * ```
+   */
+  export function mean(...values: cmath.Scalar[]): cmath.Scalar {
+    assert(values.length > 0, "Cannot compute mean of an empty array.");
+
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    return sum / values.length;
+  }
+
+  /**
+   * Generates all combinations of size `k` from the given array.
+   *
+   * @param arr - The input array.
+   * @param k - The size of each combination.
+   * @returns An array of combinations (each combination is an array).
+   *
+   * @see https://en.wikipedia.org/wiki/Combination
+   */
+  export function combinations<T>(arr: T[], k: number): T[][] {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+
+    const [first, ...rest] = arr;
+
+    // Include the first element in the combination
+    const includeFirst = combinations(rest, k - 1).map((combo) => [
+      first,
+      ...combo,
+    ]);
+
+    // Exclude the first element from the combination
+    const excludeFirst = combinations(rest, k);
+
+    return [...includeFirst, ...excludeFirst];
+  }
+
+  /**
+   * Generates all permutations of size `k` from the given array.
+   *
+   * @param arr - The input array.
+   * @param k - The size of each permutation.
+   * @returns An array of permutations (each permutation is an array).
+   *
+   * @see https://en.wikipedia.org/wiki/Permutation
+   */
+  export function permutations<T>(arr: T[], k: number): T[][] {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+
+    return arr.flatMap((item, index) =>
+      permutations(
+        [...arr.slice(0, index), ...arr.slice(index + 1)],
+        k - 1
+      ).map((perm) => [item, ...perm])
+    );
+  }
+
+  /**
+   * Generates the power set or subsets of a given array.
+   *
+   * If `k` is not specified, the function returns the full power set, which includes all subsets
+   * of all possible sizes (from 0 to `n`, where `n` is the length of the input array).
+   * If `k` is specified, the function returns only the subsets of size `k`.
+   *
+   * @param arr - The input array for which the subsets are to be generated.
+   * @param k - (Optional) The size of subsets to generate. If -1, all subsets are generated.
+   * @returns An array of arrays representing the subsets of the input array.
+   *          - If `k` is omitted, returns the full power set.
+   *          - If `k` is specified, returns only the subsets of size `k`.
+   *
+   * @example
+   * ```typescript
+   * // Generate the full power set
+   * const powerSet = cmath.powerset([1, 2, 3]);
+   * console.log(powerSet);
+   * // Output:
+   * // [
+   * //   [],
+   * //   [1], [2], [3],
+   * //   [1, 2], [1, 3], [2, 3],
+   * //   [1, 2, 3]
+   * // ]
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Generate all subsets of size 2
+   * const subsetsOfSize2 = cmath.powerset([1, 2, 3], 2);
+   * console.log(subsetsOfSize2);
+   * // Output:
+   * // [ [1, 2], [1, 3], [2, 3] ]
+   * ```
+   *
+   * @remarks
+   * - If `k` is negative or greater than the length of the array, an empty array is returned.
+   * - Includes the empty set ([]), which is part of the standard mathematical definition of a powerset.
+   * - The number of subsets returned when `k` is specified is \( \binom{n}{k} \), where \( n \) is the length of the input array.
+   * - This function utilizes the `cmath.combinations` function internally to generate subsets of specific sizes.
+   *
+   * @see https://en.wikipedia.org/wiki/Power_set
+   */
+  export function powerset<T>(arr: T[], k: number = -1): T[][] {
+    if (k === -1) {
+      // Generate the full power set
+      const result: T[][] = [[]]; // Start with the empty set
+      for (let size = 1; size <= arr.length; size++) {
+        result.push(...cmath.combinations(arr, size));
+      }
+      return result;
+    } else {
+      // Validate the `k` parameter
+      if (k < 0 || k > arr.length) {
+        return []; // No subsets possible for invalid `k`
+      }
+      // Generate subsets of size `k`
+      return cmath.combinations(arr, k);
+    }
+  }
 }
 
 /**
@@ -174,6 +520,41 @@ export namespace cmath.vector2 {
    * The zero vector `[0, 0]`.
    */
   export const zero: Vector2 = [0, 0];
+
+  /**
+   * Constructs a 2D vector where one of the components (`a` or `b`) is assigned to the main axis (`x` or `y`).
+   *
+   * This function allows flexible assignment of scalar values to specific axes in 2D space
+   * based on the specified main axis.
+   *
+   * @param a - The scalar value to assign to the main axis.
+   * @param b - The scalar value to assign to the counter axis.
+   * @param mainAxis - The primary axis (`"x"` or `"y"`) to which `a` should be assigned.
+   *
+   * @returns A 2D vector `[a, b]` if `mainAxis` is `"x"`, or `[b, a]` if `mainAxis` is `"y"`.
+   *
+   * @example
+   * ```typescript
+   * // Assign 5 to the x-axis and 10 to the y-axis
+   * const vector1 = cmath.vector2.withMainAxis(5, 10, "x");
+   * console.log(vector1); // [5, 10]
+   *
+   * // Assign 5 to the y-axis and 10 to the x-axis
+   * const vector2 = cmath.vector2.withMainAxis(5, 10, "y");
+   * console.log(vector2); // [10, 5]
+   * ```
+   *
+   * @remarks
+   * This is particularly useful in scenarios where the primary axis needs to be specified dynamically,
+   * such as when configuring flexible layouts or computations in 2D space.
+   */
+  export function axisOriented(a: Scalar, b: Scalar, mainAxis: Axis): Vector2 {
+    if (mainAxis === "x") {
+      return [a, b];
+    } else {
+      return [b, a];
+    }
+  }
 
   export function isZero(vector: Vector2): boolean {
     return vector[0] === 0 && vector[1] === 0;
@@ -350,6 +731,34 @@ export namespace cmath.vector2 {
   }
 
   /**
+   * Calculates the Euclidean distance between two 2D vectors.
+   *
+   * The Euclidean distance is the straight-line distance between two points in a 2D space.
+   * It is computed using the formula:
+   * \[
+   * d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}
+   * \]
+   *
+   * @param a - The first 2D vector `[x1, y1]`.
+   * @param b - The second 2D vector `[x2, y2]`.
+   * @returns The Euclidean distance as a number.
+   *
+   * @example
+   * // Distance between two points
+   * const a: cmath.Vector2 = [3, 4];
+   * const b: cmath.Vector2 = [6, 8];
+   * const dist = cmath.vector2.distance(a, b);
+   * console.log(dist); // Outputs: 5
+   *
+   * @remarks
+   * - Uses `Math.hypot` for precision and efficiency.
+   * - The distance is always a non-negative scalar value.
+   */
+  export function distance(a: Vector2, b: Vector2): number {
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+
+  /**
    * Applies a 2D transformation matrix to a vector.
    *
    * This function takes a 2D vector `[x, y]` and applies an affine transformation
@@ -404,9 +813,168 @@ export namespace cmath.vector2 {
 
     return [a * x + b * y + tx, c * x + d * y + ty];
   }
+
+  export function identical(a: Vector2, b: Vector2): boolean {
+    return a[0] === b[0] && a[1] === b[1];
+  }
+}
+
+export namespace cmath.compass {
+  /**
+   * Inverted cardinal directions `nw -> se, ne -> sw` and so on
+   *
+   * @internal
+   */
+  const __inverted_cardinal_directions = {
+    nw: "se",
+    ne: "sw",
+    sw: "ne",
+    se: "nw",
+    n: "s",
+    e: "w",
+    s: "n",
+    w: "e",
+  } as const;
+
+  /**
+   * Inverts a cardinal direction to its opposite.
+   *
+   * This function takes a cardinal direction (e.g., "n", "e", "nw") and returns
+   * its opposite direction (e.g., "n" becomes "s", "ne" becomes "sw").
+   *
+   * @param direction - The cardinal direction to invert. Must be one of the following:
+   *   - `"n"`: North
+   *   - `"e"`: East
+   *   - `"s"`: South
+   *   - `"w"`: West
+   *   - `"ne"`: North-East
+   *   - `"se"`: South-East
+   *   - `"sw"`: South-West
+   *   - `"nw"`: North-West
+   * @returns The inverted cardinal direction, as follows:
+   *   - `"n"` -> `"s"`
+   *   - `"e"` -> `"w"`
+   *   - `"s"` -> `"n"`
+   *   - `"w"` -> `"e"`
+   *   - `"ne"` -> `"sw"`
+   *   - `"se"` -> `"nw"`
+   *   - `"sw"` -> `"ne"`
+   *   - `"nw"` -> `"se"`
+   *
+   * @example
+   * const inverted = cmath.invertCardinalDirection("n");
+   * console.log(inverted); // "s"
+   *
+   * const invertedDiagonal = cmath.invertCardinalDirection("ne");
+   * console.log(invertedDiagonal); // "sw"
+   *
+   * @remarks
+   * - This function is useful for geometric computations or UI layouts where
+   *   directional relationships need to be reversed.
+   */
+  export function invertDirection(
+    direction: CardinalDirection
+  ): CardinalDirection {
+    return __inverted_cardinal_directions[direction];
+  }
+
+  /**
+   * Converts a strictly orthogonal cardinal direction (n, e, s, w) to the corresponding
+   * rectangle side (top, right, bottom, left).
+   *
+   * Diagonal directions (ne, nw, se, sw) return `undefined`.
+   *
+   * @param direction - The cardinal direction to convert, one of:
+   *   - `"n"` (north)
+   *   - `"e"` (east)
+   *   - `"s"` (south)
+   *   - `"w"` (west)
+   *   - or a diagonal (e.g. `"ne"`) which yields `undefined`.
+   *
+   * @returns The corresponding `RectangleSide` ("top", "right", "bottom", "left")
+   *          if the direction is orthogonal, otherwise `undefined`.
+   *
+   * @example
+   * ```
+   * const side1 = toRectangleSide("n");
+   * // side1 === "top"
+   *
+   * const side2 = toRectangleSide("ne");
+   * // side2 === undefined
+   * ```
+   *
+   * @remarks
+   * This is often used for translating a directional label (`"n"`, `"s"`, etc.)
+   * to an actual rectangle edge in UI layouts or alignment logic.
+   */
+  export function toRectangleSide(
+    direction: CardinalDirection
+  ): RectangleSide | undefined {
+    switch (direction) {
+      case "n":
+        return "top";
+      case "e":
+        return "right";
+      case "s":
+        return "bottom";
+      case "w":
+        return "left";
+    }
+  }
 }
 
 export namespace cmath.rect {
+  const __axis_map = {
+    dimension: {
+      x: "width",
+      y: "height",
+    },
+  } as const;
+
+  /**
+   * get size of the rectangle in the given axis
+   *
+   * - `x` -> `width`
+   * - `y` -> `height`
+   *
+   * @param rect
+   * @param axis
+   * @returns size of the rectangle in the given axis
+   */
+  export function getAxisDimension(rect: Rectangle, axis: Axis): number {
+    return rect[__axis_map.dimension[axis]];
+  }
+
+  /**
+   * Quantizes the position and size of a rectangle by snapping its coordinates and dimensions
+   * to the nearest multiples of the given step.
+   *
+   * @remarks
+   * This function may lose precision and distort the rectangle's original geometry
+   * because it applies quantization to each property individually.
+   *
+   * @param rect - The rectangle to quantize.
+   * @param step - A single step value or a 2D vector ([xStep, yStep]).
+   * @returns A new rectangle with quantized `x`, `y`, `width`, and `height`.
+   */
+  export function quantize(rect: Rectangle, step: Scalar | Vector2): Rectangle {
+    if (typeof step === "number") {
+      return {
+        x: cmath.quantize(rect.x, step),
+        y: cmath.quantize(rect.y, step),
+        width: cmath.quantize(rect.width, step),
+        height: cmath.quantize(rect.height, step),
+      };
+    } else {
+      return {
+        x: cmath.quantize(rect.x, step[0]),
+        y: cmath.quantize(rect.y, step[1]),
+        width: cmath.quantize(rect.width, step[0]),
+        height: cmath.quantize(rect.height, step[1]),
+      };
+    }
+  }
+
   /**
    * Translates a rectangle by a given vector.
    *
@@ -807,6 +1375,18 @@ export namespace cmath.rect {
     };
   }
 
+  export type Rectangle9Points = {
+    topLeft: Vector2;
+    topRight: Vector2;
+    bottomRight: Vector2;
+    bottomLeft: Vector2;
+    topCenter: Vector2;
+    rightCenter: Vector2;
+    bottomCenter: Vector2;
+    leftCenter: Vector2;
+    center: Vector2;
+  };
+
   /**
    * Returns an object containing 9 control points of a rectangle: 4 corners, 4 midpoints, and the center.
    *
@@ -821,40 +1401,58 @@ export namespace cmath.rect {
    * // {
    * //   topLeft: [10, 20],
    * //   topRight: [40, 20],
-   * //   bottomLeft: [10, 60],
    * //   bottomRight: [40, 60],
+   * //   bottomLeft: [10, 60],
    * //   topCenter: [25, 20],
-   * //   leftCenter: [10, 40],
    * //   rightCenter: [40, 40],
    * //   bottomCenter: [25, 60],
+   * //   leftCenter: [10, 40],
    * //   center: [25, 40],
    * // }
    */
-  export function to9Points(rect: Rectangle): {
-    topLeft: Vector2;
-    topRight: Vector2;
-    bottomLeft: Vector2;
-    bottomRight: Vector2;
-    topCenter: Vector2;
-    leftCenter: Vector2;
-    rightCenter: Vector2;
-    bottomCenter: Vector2;
-    center: Vector2;
-  } {
+  export function to9Points(rect: Rectangle): Rectangle9Points {
     const { x, y, width, height } = rect;
 
     // Compute the points
     return {
       topLeft: [x, y],
       topRight: [x + width, y],
-      bottomLeft: [x, y + height],
       bottomRight: [x + width, y + height],
+      bottomLeft: [x, y + height],
       topCenter: [x + width / 2, y],
-      leftCenter: [x, y + height / 2],
       rightCenter: [x + width, y + height / 2],
       bottomCenter: [x + width / 2, y + height],
+      leftCenter: [x, y + height / 2],
       center: [x + width / 2, y + height / 2],
     };
+  }
+
+  /**
+   * A chunk array of 9 control points of a rectangle, with the exact order:
+   *
+   * `[topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center]`
+   */
+  export type TRectangle9PointsChunk<T> = [
+    T, // topLeft
+    T, // topRight
+    T, // bottomRight
+    T, // bottomLeft
+    T, // topCenter
+    T, // rightCenter
+    T, // bottomCenter
+    T, // leftCenter
+    T, // center
+  ];
+
+  export function to9PointsChunk(
+    r: cmath.Rectangle
+  ): TRectangle9PointsChunk<cmath.Vector2> {
+    // prettier-ignore
+    //      0        1         2            3           4          5            6             7           8
+    const { topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center } = cmath.rect.to9Points(r)
+    // prettier-ignore
+    //      0        1         2            3           4          5            6             7           8
+    return [topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center];
   }
 
   export function getCardinalPoint(
@@ -892,16 +1490,16 @@ export namespace cmath.rect {
    *
    * @example
    * const rect = { x: 10, y: 20, width: 30, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [25, 40]
    *
    * @example
    * // Handles rectangles with zero width or height
    * const rect = { x: 10, y: 20, width: 0, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [10, 40]
    */
-  export function center(rect: cmath.Rectangle): cmath.Vector2 {
+  export function getCenter(rect: cmath.Rectangle): cmath.Vector2 {
     const centerX = rect.x + rect.width / 2;
     const centerY = rect.y + rect.height / 2;
     return [centerX, centerY];
@@ -1035,7 +1633,7 @@ export namespace cmath.rect {
    *
    * @param rectangles - An array of rectangles to project.
    * @param projectionAxis - The axis to calculate projections on ("x" for comparing vertical ranges, "y" for comparing horizontal ranges).
-   * @returns A `Vector2` representing the overlapping range of projections along the counter-axis, or `null` if the rectangles do not overlap.
+   * @returns {Range} representing the overlapping range of projections along the counter-axis, or `null` if the rectangles do not overlap.
    *
    *
    * ### Visual Explanation
@@ -1084,8 +1682,8 @@ export namespace cmath.rect {
    */
   export function axisProjectionIntersection(
     rectangles: cmath.Rectangle[],
-    projectionAxis: "x" | "y"
-  ): cmath.Vector2 | null {
+    projectionAxis: Axis
+  ): Range | null {
     if (rectangles.length < 2) {
       throw new Error(
         "At least two rectangles are required to compute axis-aligned projection."
@@ -1138,7 +1736,7 @@ export namespace cmath.rect {
    * @remarks
    * - The function performs a strict equality check on the `x`, `y`, `width`, and `height` properties.
    */
-  export function identical(
+  export function isIdentical(
     rectA: cmath.Rectangle,
     rectB: cmath.Rectangle
   ): boolean {
@@ -1148,6 +1746,32 @@ export namespace cmath.rect {
       rectA.width === rectB.width &&
       rectA.height === rectB.height
     );
+  }
+
+  /**
+   * Checks if all rectangles in the given array are uniform (identical in position and dimensions).
+   *
+   * Two rectangles are considered uniform if their `x`, `y`, `width`, and `height`
+   * properties are exactly the same.
+   *
+   * @param rects - An array of rectangles to check.
+   * @returns `true` if all rectangles are uniform, or if the array contains zero or one rectangle. Otherwise, `false`.
+   *
+   * @example
+   * const rect1 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect2 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect3 = { x: 15, y: 25, width: 35, height: 45 };
+   *
+   * isUniform(rect1, rect2); // true
+   * isUniform(rect1, rect2, rect3); // false
+   * isUniform(); // true (empty input is considered uniform)
+   */
+  export function isUniform(...rects: cmath.Rectangle[]): boolean {
+    if (rects.length <= 1) return true;
+
+    const [first, ...rest] = rects;
+
+    return rest.every((rect) => cmath.rect.isIdentical(first, rect));
   }
 
   /**
@@ -1255,6 +1879,62 @@ export namespace cmath.rect {
   }
 
   /**
+   * Aligns rectangle `a` relative to rectangle `b` along a specified axis.
+   *
+   * @param a the rectangle to align
+   * @param b the rectangle to align to
+   * @param alignment - The alignment type of each axis (horizontal and vertical).
+   */
+  export function alignA(
+    a: Rectangle,
+    b: Rectangle,
+    alignment: {
+      horizontal?: "none" | "min" | "max" | "center";
+      vertical?: "none" | "min" | "max" | "center";
+    }
+  ): Rectangle {
+    let newX = a.x;
+    let newY = a.y;
+
+    // Horizontal alignment
+    if (alignment.horizontal) {
+      switch (alignment.horizontal) {
+        case "min":
+          newX = b.x;
+          break;
+        case "max":
+          newX = b.x + b.width - a.width;
+          break;
+        case "center":
+          newX = b.x + (b.width - a.width) / 2;
+          break;
+      }
+    }
+
+    // Vertical alignment
+    if (alignment.vertical) {
+      switch (alignment.vertical) {
+        case "min":
+          newY = b.y;
+          break;
+        case "max":
+          newY = b.y + b.height - a.height;
+          break;
+        case "center":
+          newY = b.y + (b.height - a.height) / 2;
+          break;
+      }
+    }
+
+    return {
+      x: newX,
+      y: newY,
+      width: a.width,
+      height: a.height,
+    };
+  }
+
+  /**
    * Calculates the gaps (spaces) between adjacent rectangles along a specified axis.
    *
    * @param rectangles - An array of rectangles to calculate the gaps for.
@@ -1270,10 +1950,7 @@ export namespace cmath.rect {
    * const gaps = getDistribution(rectangles, "x");
    * console.log(gaps); // [10, 10]
    */
-  export function getGaps(
-    rectangles: cmath.Rectangle[],
-    axis: "x" | "y"
-  ): number[] {
+  export function getGaps(rectangles: cmath.Rectangle[], axis: Axis): number[] {
     if (rectangles.length < 2) {
       return [];
     }
@@ -1297,6 +1974,42 @@ export namespace cmath.rect {
     }
 
     return gaps;
+  }
+
+  /**
+   * Calculates the uniform gap between adjacent rectangles along a specified axis.
+   *
+   * @param rectangles - An array of rectangles to calculate the uniform gap for.
+   * @param axis - The axis to calculate the gap along ("x" or "y").
+   * @param tolerance - The maximum allowed deviation from a uniform gap.
+   *
+   * @returns `[unfiorm, gaps]` A tuple containing the uniform gap (if found, most present or biggest) and an array of gaps between adjacent rectangles.
+   *
+   */
+  export function getUniformGap(
+    rectangles: cmath.Rectangle[],
+    axis: Axis,
+    tolerance: number = 0
+  ): [unfiorm: number | undefined, gaps: number[]] {
+    // Calculate the gaps between rectangles along the specified axis
+    const gaps = getGaps(rectangles, axis);
+
+    if (gaps.length === 0) {
+      return [undefined, []]; // No gaps if fewer than 2 rectangles
+    }
+
+    // Check if all gaps are uniform within the specified tolerance
+    const is_uniform = cmath.isUniform(gaps, tolerance);
+    if (is_uniform) {
+      const most = cmath.mode(gaps);
+      if (most !== undefined) {
+        return [most, gaps];
+      } else {
+        return [Math.max(...gaps), gaps];
+      }
+    } else {
+      return [undefined, gaps];
+    }
   }
 
   /**
@@ -1341,7 +2054,7 @@ export namespace cmath.rect {
    */
   export function distributeEvenly(
     rectangles: cmath.Rectangle[],
-    axis: "x" | "y"
+    axis: Axis
   ): cmath.Rectangle[] {
     if (rectangles.length < 2) return rectangles;
 
@@ -1384,52 +2097,41 @@ export namespace cmath.rect {
 }
 
 /**
- * Math utilities for "snapping" features.
+ * Alignment utilities for mathematical and graphical computations.
  *
  * @example
- * - snap to pixel grid - snap by `1`
- * - snap to objects
+ * - Align scalar values to a grid
+ * - Align 2D vectors to the nearest target positions
  */
-export namespace cmath.snap {
+export namespace cmath.align {
   /**
-   * Snaps a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
+   * Aligns a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
    *
-   * This function is useful for aligning scalar values (e.g., positions, sizes, or grid snapping) to a discrete set of
-   * target values while ensuring the snap occurs only within a defined threshold.
+   * This function is useful for aligning scalar values (e.g., positions, sizes, or grid alignment) to a discrete set of
+   * target values while ensuring the alignment occurs only within a defined threshold.
    *
-   * @param point - The scalar value to snap.
-   * @param targets - An array of existing scalar values to snap to.
-   * @param threshold - The maximum allowed distance for snapping. Must be non-negative.
+   * @param point - The scalar value to align.
+   * @param targets - An array of existing scalar values to align to.
+   * @param threshold - The maximum allowed distance for alignment. Must be non-negative.
    *
-   * @returns A tuple `[value, distance, indicies]`:
-   * - `value`: The closest scalar value from the targets within the threshold, or the original scalar if no snapping occurs.
-   * - `distance`: The signed distance between the input scalar and the snapped target. Returns `Infinity` if no target is within the threshold.
-   * - `indicies`: An array of indices of the targets that are within the threshold.
+   * @returns A tuple `[value, distance, indices]` where:
+   * - `value`: is the nearest scalar (if within threshold) or the original `point` (if not).
+   * - `distance`: is the signed distance `point - value` to that nearest scalar. (or `Infinity` if not aligned).
+   * - `indices` are all target indices whose distance matches the minimum distance exactly.
+   *
+   * @throws If `threshold` is negative or if `targets` is empty.
    *
    * @example
-   * // Snap to the nearest value within a threshold
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 20, 25], 6);
-   * console.log(snapped); // 10
-   * console.log(distance); // 5
-   * console.log(indicies); // [0]
+   * ```ts
+   * // Suppose we have targets [10, 20, 20, 40], and point=22 with threshold=5.
+   * // The minimal distance is 2 (to '20'), and note there are two '20's.
+   * // So the function returns value=20, distance=2 (signed=22 - 20), indices=[1,2].
    *
-   * // No snapping occurs as no target is within the threshold
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [1, 2, 3], 5);
-   * console.log(snapped); // 15
-   * console.log(distance); // Infinity
-   * console.log(indicies); // []
-   *
-   * // Snap to an exact match if it exists in the targets
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 15, 20], 5);
-   * console.log(snapped); // 15
-   * console.log(distance); // 0
-   * console.log(indicies); // [1]
-   *
-   * @remarks
-   * - The `distance` value is signed, indicating the direction of the difference between the input scalar and the snapped value.
-   * - If `targets` is empty, the function returns the original scalar and `Infinity` for the distance.
-   * - If `threshold` is 0, snapping will only occur for exact matches.
-   * - Negative threshold values are not allowed and will throw an error.
+   * const [value, dist, indices] = cmath.align.scalar(22, [10, 20, 20, 40], 5);
+   * console.log(value);   // 20
+   * console.log(dist);    // 2
+   * console.log(indices); // [1, 2]
+   * ```
    */
   export function scalar(
     point: Scalar,
@@ -1437,32 +2139,113 @@ export namespace cmath.snap {
     threshold: number
   ): [value: Scalar, distance: number, indicies: number[]] {
     assert(threshold >= 0, "Threshold must be a non-negative number.");
-    if (targets.length === 0) return [point, Infinity, []];
+    assert(targets.length > 0, "At least one target is required.");
 
-    let nearest: cmath.Scalar | null = null;
-    let min_d = Infinity;
-    let signedDistance = 0;
-    const indicies: number[] = [];
+    // 1) Find the absolute minimum distance among all targets
+    let minAbsDistance = Infinity;
+    let bestSignedDistance = 0;
+    let bestValue: number | null = null;
 
-    let i = 0;
-    for (const target of targets) {
-      const distance = point - target; // Signed distance
-      const absDistance = Math.abs(distance); // Absolute distance for comparison
+    // We also gather all indices that match this minimum distance
+    const bestIndices: number[] = [];
 
-      if (absDistance <= threshold) {
-        indicies.push(i);
-        if (absDistance < min_d) {
-          min_d = absDistance;
-          nearest = target;
-          signedDistance = distance; // Keep the signed distance
-        }
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const signedDist = point - target;
+      const absDist = Math.abs(signedDist);
+
+      if (absDist < minAbsDistance) {
+        // Found a strictly closer target
+        minAbsDistance = absDist;
+        bestValue = target;
+        bestSignedDistance = signedDist;
+        bestIndices.length = 0; // clear out any previous indices
+        bestIndices.push(i);
+      } else if (absDist === minAbsDistance) {
+        // This target is equally close as the min
+        bestIndices.push(i);
       }
-      i++;
     }
 
-    return nearest !== null
-      ? [nearest, signedDistance, indicies]
-      : [point, Infinity, indicies];
+    // 2) Check threshold
+    // If the min distance is greater than threshold, do NOT snap
+    if (minAbsDistance > threshold) {
+      return [point, Infinity, []];
+    }
+
+    // 3) Return the snapped scalar + signed distance + all equally-close indices
+    return [bestValue!, bestSignedDistance, bestIndices];
+  }
+
+  /**
+   * Aligns a 2D vector to the nearest vector(s) from an array of target vectors if it is within a specified threshold.
+   *
+   * This function is useful for aligning 2D points (e.g., grid or object alignment),
+   * ensuring that alignment only occurs if the distance to the target is within a given threshold.
+   *
+   * @param point - The 2D vector `[x, y]` to align.
+   * @param targets - An array of 2D vectors to which the point might align.
+   * @param threshold - The maximum allowed Euclidean distance for alignment. Must be non-negative.
+   * @returns A tuple `[value, distance, indices]` where:
+   *   - `value`: The nearest target vector if within threshold, otherwise the original `point`.
+   *   - `distance`: The Euclidean distance `dist(point, value)` if alignment occurs; otherwise `Infinity`.
+   *   - `indices`: **All** target indices whose distance from `point` is exactly equal to the minimum distance (ties).
+   *
+   * @throws If `threshold` is negative or if `targets` is empty.
+   *
+   * @example
+   * // Suppose we have multiple points at the same nearest distance:
+   * //   targets = [[0, 0], [5, 5], [5, 5], [10, 10]]
+   * //   point = [6, 6], threshold = 3
+   * // The minimal distance (~1.414) is to both [5, 5] entries (indices 1 and 2).
+   * //
+   * // The function returns:
+   * //   value   = [5, 5]
+   * //   distance = ~1.41421356237
+   * //   indices  = [1, 2]
+   *
+   * const [snappedVec, dist, tiedIndices] = cmath.align.vector2([6, 6], [[0,0],[5,5],[5,5],[10,10]], 3);
+   * console.log(snappedVec);   // [5, 5]
+   * console.log(dist);         // ~1.41421356237
+   * console.log(tiedIndices);  // [1, 2]
+   */
+  export function vector2(
+    point: cmath.Vector2,
+    targets: cmath.Vector2[],
+    threshold: number
+  ): [value: cmath.Vector2, distance: number, indices: number[]] {
+    assert(threshold >= 0, "Threshold must be a non-negative number.");
+    assert(targets.length > 0, "At least one target is required.");
+
+    let minDistance = Infinity;
+    let bestValue: cmath.Vector2 | null = null;
+    const bestIndices: number[] = [];
+
+    // 1) Find absolute minimum distance among all targets
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const dist = cmath.vector2.distance(point, target);
+
+      if (dist < minDistance) {
+        // Found a strictly closer target
+        minDistance = dist;
+        bestValue = target;
+        bestIndices.length = 0; // Reset
+        bestIndices.push(i);
+      } else if (dist === minDistance) {
+        // This target ties for closest
+        bestIndices.push(i);
+      }
+    }
+
+    // 2) Check threshold
+    if (minDistance > threshold) {
+      // Return original point if no target is within threshold
+      return [point, Infinity, []];
+    }
+
+    // 3) Return the snapped vector, distance, and all equally-close indices
+    return [bestValue!, minDistance, bestIndices];
   }
 }
 
@@ -2047,30 +2830,588 @@ export namespace cmath.transform {
   }
 }
 
-export namespace cmath.measure {}
-export namespace cmath.auxiliary_line {}
-export namespace cmath.auxiliary_line.rectangular {
-  // fromPointToVector
-  // sideToPoint
+export namespace cmath.range {
+  /**
+   * Calculates the mean (average center) of multiple numerical ranges.
+   *
+   * @param ranges - A variable number of ranges, each represented as a `[start, end]` tuple.
+   * @returns The mean center as a single number.
+   *
+   * @example
+   * ```typescript
+   * const meanCenter = cmath.range.mean([0, 10], [20, 30], [40, 50]);
+   * console.log(meanCenter); // Output: 25
+   * ```
+   */
+  export function mean(...ranges: Range[]): number {
+    return (
+      ranges
+        .map(([start, end]) => (start + end) / 2)
+        .reduce((sum, midpoint) => sum + midpoint, 0) / ranges.length
+    );
+  }
+
+  export function fromRectangle(rect: Rectangle, axis: cmath.Axis): Range {
+    return [rect[axis], rect[axis] + cmath.rect.getAxisDimension(rect, axis)];
+  }
+
+  export function length(range: Range): number {
+    return range[1] - range[0];
+  }
+
+  /**
+   * returns 3 point chunk, [start, mid, end]
+   * @param range
+   * @returns
+   */
+  export function to3PointsChunk(range: Range): [number, number, number] {
+    return [range[0], (range[0] + range[1]) / 2, range[1]];
+  }
+
+  /**
+   * Groups ranges by their uniform gaps.
+   *
+   * This function identifies subsets of ranges where the gaps between consecutive ranges
+   * are consistent within a specified tolerance. Gaps are calculated as the distance
+   * between the end of one range and the start of the next. Overlapping ranges are ignored.
+   *
+   * @param ranges - An array of numerical ranges, each represented as a `[start, end]` tuple.
+   * @param tolerance - The allowable deviation for gaps to be considered uniform. Defaults to `0`.
+   * @returns An array of grouped ranges with uniform gaps. Each group contains:
+   *   - `loop`: The indices of the ranges in the group.
+   *   - `min`: The minimum start value among the grouped ranges.
+   *   - `max`: The maximum end value among the grouped ranges.
+   *   - `gap`: The uniform gap between consecutive ranges (always non-negative). 0 when only one range is present.
+   *
+   * @example
+   * ```typescript
+   * const ranges: cmath.Range[] = [
+   *   [0, 10],
+   *   [15, 25],
+   *   [30, 40],
+   * ];
+   * const result = cmath.range.groupRangesByUniformGap(ranges);
+   * console.log(result);
+   * // Output:
+   * // [
+   * //   { loop: [0], min: 0, max: 10, gap: 0 },
+   * //   { loop: [1], min: 15, max: 25, gap: 0 },
+   * //   { loop: [2], min: 30, max: 40, gap: 0 },
+   * //   { loop: [0, 1], min: 0, max: 25, gap: 5 },
+   * //   { loop: [0, 2], min: 0, max: 40, gap: 20 },
+   * //   { loop: [1, 2], min: 15, max: 40, gap: 5 },
+   * //   { loop: [0, 1, 2], min: 0, max: 40, gap: 5 },
+   * // ]
+   * ```
+   *
+   * @remarks
+   * - The function uses the power set approach, which has exponential time complexity. It's recommended to use it with a reasonable number of ranges.
+   * - Overlapping ranges are allowed as long as the gaps between their end and start points are consistent.
+   * - The `tolerance` parameter allows for slight variations in gaps, which is useful in scenarios with floating-point precision issues.
+   */
+  export function groupRangesByUniformGap(
+    ranges: Range[],
+    k: number = -1,
+    tolerance: number = 0
+  ): {
+    loop: number[];
+    min: number;
+    max: number;
+    gap: number;
+  }[] {
+    const subsets = cmath.powerset(ranges, k);
+    const result: {
+      loop: number[];
+      min: number;
+      max: number;
+      gap: number;
+    }[] = [];
+
+    main: for (const subset of subsets) {
+      if (subset.length === 0) continue;
+
+      if (subset.length === 1) {
+        const idx = ranges.indexOf(subset[0]);
+        const [start, end] = subset[0];
+        result.push({ loop: [idx], min: start, max: end, gap: 0 });
+        continue;
+      }
+
+      const subsetIndices = ranges
+        .map((r, i) => (subset.includes(r) ? i : -1))
+        .filter((i) => i !== -1);
+
+      const sorted = subsetIndices
+        .slice()
+        .sort((a, b) => ranges[a][0] - ranges[b][0]);
+
+      const distances: number[] = [];
+      for (let i = 1; i < sorted.length; i++) {
+        const [p0, p1] = [ranges[sorted[i - 1]], ranges[sorted[i]]];
+        const dist = p1[0] - p0[1];
+        if (dist < 0) continue main;
+        distances.push(dist);
+      }
+
+      if (cmath.isUniform(distances, tolerance)) {
+        const starts = sorted.map((i) => ranges[i][0]);
+        const ends = sorted.map((i) => ranges[i][1]);
+        result.push({
+          loop: sorted,
+          min: Math.min(...starts),
+          max: Math.max(...ends),
+          gap: distances[0] ?? 0,
+        });
+      }
+    }
+    return result;
+  }
+}
+
+export namespace cmath.ext.snap {
+  /**
+   * A Vector2 that can take null values for each axis.
+   *
+   * This is for representing snap points that is infinity (or ignore) in counter axis.
+   *
+   * E.g. for 2D snapping, but where each axis are snapped independently.
+   */
+  export type AxisAlignedPoint =
+    | [number, number]
+    | [number, null]
+    | [null, number];
+
+  export type Snap1DResult = {
+    /**
+     * the distance (delta) needs to be applied to the agents to snap within the threshold.
+     *
+     * `Infinity` if no snap.
+     *
+     * @example
+     *
+     * const translated = agents.map((p) => p + distance);
+     */
+    distance: Scalar;
+
+    /**
+     * the indices of the agents that satisfied the snap.
+     */
+    hit_agent_indices: Scalar[];
+
+    /**
+     * the indices of the anchors that the agents snapped to.
+     */
+    hit_anchor_indices: Scalar[];
+  };
+
+  /**
+   * Snaps an array of scalar points to the nearest target points within a specified threshold.
+   *
+   * @param agents - An array of scalar points to snap.
+   * @param anchors - An array of existing scalar points to snap to.
+   * @param threshold - The maximum allowed distance for snapping.
+   * @param tolerance - The tolerance for delta matching.
+   * @returns {Snap1DResult} The result of the snapping operation.
+   */
+  export function snap1D(
+    agents: Scalar[],
+    anchors: Scalar[],
+    threshold: Scalar,
+    tolerance = 0
+  ): Snap1DResult {
+    if (anchors.length === 0) {
+      return {
+        distance: Infinity,
+        hit_agent_indices: [],
+        hit_anchor_indices: [],
+      };
+    }
+
+    assert(threshold >= 0, "Threshold must be a non-negative number.");
+    assert(tolerance >= 0, "Epsilon must be a non-negative number.");
+
+    let minDelta = Infinity;
+    let signedDelta = 0;
+    const hit_agent_indicies: number[] = [];
+    const hit_anchor_indicies = new Set<number>();
+
+    // Iterate through each origin to find the minimal delta
+    for (let i = 0; i < agents.length; i++) {
+      const point = agents[i];
+      // Find the closest snapping target
+      const [snap, delta, indicies] = cmath.align.scalar(
+        point,
+        anchors,
+        threshold
+      );
+
+      const signedDeltaForPoint = snap - point;
+
+      if (Math.abs(delta) <= threshold) {
+        if (
+          minDelta === Infinity ||
+          Math.abs(signedDeltaForPoint - signedDelta) <= tolerance
+        ) {
+          hit_agent_indicies.push(i);
+          indicies.forEach((idx) => hit_anchor_indicies.add(idx));
+
+          // Update minDelta and signedDelta if a smaller delta is found
+          if (Math.abs(delta) < Math.abs(minDelta)) {
+            minDelta = delta;
+            signedDelta = signedDeltaForPoint;
+          }
+        }
+      }
+    }
+
+    // If no snapping occurs
+    if (minDelta === Infinity) {
+      return {
+        distance: Infinity,
+        hit_agent_indices: [],
+        hit_anchor_indices: [],
+      };
+    }
+
+    // Compute the final snapping delta
+    const delta = signedDelta;
+
+    return {
+      distance: delta,
+      hit_agent_indices: hit_agent_indicies,
+      hit_anchor_indices: Array.from(hit_anchor_indicies),
+    };
+  }
+
+  export type Snap2DAxisonfig = {
+    /**
+     * false: no snap, otherwise threshold value.
+     */
+    x: false | number;
+    /**
+     * false: no snap, otherwise threshold value.
+     */
+    y: false | number;
+  };
+
+  export type Sanp2DAxisAlignedResult = {
+    x: cmath.ext.snap.Snap1DResult | null;
+    y: cmath.ext.snap.Snap1DResult | null;
+  };
+
+  /**
+   * Snaps an array of points to the nearest target point along each axis independently.
+   * The snapping delta is computed for each axis separately and applied to all points.
+   *
+   * @param agents - An array of 2D points (Vector2) to snap.
+   * @param anchors - An array of existing 2D points to snap to.
+   * @param threshold - The maximum allowed single-axis distance for snapping.
+   * @returns The snapped points and the delta applied:
+   *          - `value`: The translated points.
+   *          - `distance`: The delta vector applied to align the points.
+   */
+  export function snap2DAxisAligned(
+    agents: cmath.Vector2[],
+    anchors: cmath.ext.snap.AxisAlignedPoint[],
+    config: Snap2DAxisonfig,
+    tolerance = 0
+  ): Sanp2DAxisAlignedResult {
+    assert(agents.length > 0, "Agents must contain at least one point.");
+    assert(anchors.length > 0, "Anchors must contain at least one point.");
+
+    // Separate the scalar points for each axis
+    const x_agent_points = agents.map(([x]) => x);
+    const y_agent_points = agents.map(([_, y]) => y);
+
+    // Separate anchor points into x and y components
+    const x_anchor_points = anchors
+      .map(([x]) => x)
+      .filter((x): x is number => x !== null);
+    const y_anchor_points = anchors
+      .map(([_, y]) => y)
+      .filter((y): y is number => y !== null);
+
+    // snap each axis
+    let x_snap: cmath.ext.snap.Snap1DResult | null = null;
+    if (config.x) {
+      assert(config.x > 0, "Threshold must be a non-negative number.");
+      x_snap = cmath.ext.snap.snap1D(
+        x_agent_points,
+        x_anchor_points,
+        config.x,
+        tolerance
+      );
+    }
+
+    let y_snap: cmath.ext.snap.Snap1DResult | null = null;
+    if (config.y) {
+      assert(config.y > 0, "Threshold must be a non-negative number.");
+      y_snap = cmath.ext.snap.snap1D(
+        y_agent_points,
+        y_anchor_points,
+        config.y,
+        tolerance
+      );
+    }
+
+    return {
+      x: x_snap,
+      y: y_snap,
+    };
+  }
+
+  /**
+   * Namespace for spacing-related snapping and range calculations.
+   *
+   * This module provides utilities for working with 1D ranges, calculating spaces between them,
+   * and projecting new ranges based on existing ones.
+   *
+   * **Definitions & Design**
+   * - loops
+   *    - are aligned ranges with identical gaps (2 or more ranges). but for simplicity, we do this by combinations of ranges (exactly 2 ranges)
+   * - each loop has a projected snap extension, `next` (`a`) and `center` (virtually a, b, and center, where b being mirror of a)
+   *    - a projected loop data will contain multiple delta (space)
+   *      - one is from ‘this’ loop, others from other loops’ space, but within the same direction.
+   *    - the delta can be interpreted as ...
+   *      - a = loop[-1] + delta (the a point is last loop item (biggest) plus delta.
+   *      - b = loop[0] - delta (b is mirrored a)
+   *      - center = mean(loop[0].a, loop[-1].b)
+   * - the hit test of the range will take direction 1 or -1 (mirrored)
+   *    - the `a` testing is used for testing hit between `a` and input’s `a`
+   *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input’s `b`
+   * - how to tell why it’s snapped
+   *    - when input’s a, b or c is hit, it will contain to which loop it’s hit. and the space (except c).
+   *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one’s loop
+   *
+   *
+   * ```
+   *                            1          2
+   * range       |           [-----]    [-----]             |
+   * space       |                 |----|                   |
+   * projections |      |----|     |----|     |----|        |
+   * targets     |      |             |            |        |
+   * align       |     (b)           (c)          (a)       |
+   * ```
+   *
+   * In above example, the new segment (range) `ab` have virtually 4 possible snap points to be evenly spaced.
+   * - (a) point the `a` of the new segment can snap to.
+   * - (b) point the `b` of the new segment can snap to.
+   * - (c) point the `center` of the new segment can snap to. (if the ab is smaller than the space)
+   *  - the sub-virtual `cb`, `ca` point will be calculated as new segment is determined.
+   *  - (cb) `c - length / 2` point the `b` of the new segment can snap to. (if smaller than the space)
+   *  - (ca) `c + length / 2` point the `a` of the new segment can snap to. (if smaller than the space)
+   *
+   * Additionally, in more than 2 segment cases, the space between certain combination can also be registered as a or b point.
+   * For example,
+   *
+   * ```
+   *                         1          2                   3
+   * range       |        [-----]    [-----]             [-----]        |
+   * space       |              |----|     |-------------|              |
+   *             |               (1_2)          (2_3)                   |
+   * projections |   |----|     |----|     |----|              |----|   |
+   * reason      |   (1_2)      (1_2)      (1_2)               ^(1_2)   | // the ^(1_2) is applied to 3rd
+   * ```
+   *
+   * This way, we can provide additional ux-friendly snapping points for the user.
+   */
+  export namespace spacing {
+    export type ProjectionPoint = {
+      /**
+       * position
+       */
+      p: number;
+
+      /**
+       * origin position
+       */
+      o: number;
+
+      /**
+       * forwared loop (gap) index (including self)
+       *
+       * -1 if not forwarded
+       */
+      fwd: number;
+    };
+
+    export type DistributionGeometry1D = {
+      /**
+       * the ranges to calculate the space from
+       */
+      ranges: cmath.Range[];
+
+      /**
+       * combinations of ranges (overlapping ignored)
+       * @example
+       * ```
+       * ranges = [[0, 10], [20, 30], [40, 50]];
+       * loops = [[0, 1], [0, 2], [1, 2]];
+       * ```
+       */
+      loops: number[][];
+
+      /**
+       * index-aligned gaps of each loops
+       *
+       * @example
+       *
+       * ```
+       * // gaps[0] is the gap between loops[0][0] and loops[0][1]
+       * ranges = [[0, 10], [20, 30], [40, 50]];
+       * loops = [[0, 1], [0, 2], [1, 2]];
+       * gaps = [10, 30, 10];
+       * ```
+       */
+      gaps: number[];
+
+      /**
+       * index-aligned projections of `a` points and the gap value applied to this point
+       *
+       * this is not conidered as a "range" since [0] and [1] is not ensured to be in the same direction. ([1] can be smaller than [0])
+       *
+       * from [1] anchor, the delta is applied, resulting in the [0] point.
+       */
+      a: ProjectionPoint[][];
+
+      /**
+       * index-aligned projections of `b` points
+       *
+       * this is not conidered as a "range" since [0] and [1] is not ensured to be in the same direction. ([1] can be smaller than [0])
+       *
+       * from [1] anchor, the delta is applied, resulting in the [0] point.
+       */
+      b: ProjectionPoint[][];
+    };
+
+    /**
+     * calculates the space between two ranges, returns a set of projections of the next range for each combination.
+     *
+     * @param ranges the ranges to calculate the space from
+     * @param agentLength optional agent input. the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
+     *
+     * @remarks
+     * - ignores the combination if overlaps (to ensure positive space)
+     */
+    export function plotDistributionGeometry(
+      ranges: cmath.Range[],
+      agentLength?: Scalar
+    ): DistributionGeometry1D {
+      const grouped = cmath.range.groupRangesByUniformGap(ranges, 2);
+
+      const loops: [number, number][] = [];
+      const gaps: number[] = [];
+      const a: ProjectionPoint[][] = [];
+      const b: ProjectionPoint[][] = [];
+
+      grouped.forEach((group, i) => {
+        const { loop, gap, min, max } = group;
+
+        const _a: ProjectionPoint[] = [];
+        const _b: ProjectionPoint[] = [];
+
+        if (gap > 0) {
+          // [default gap extensions]
+          // default a b points
+
+          _a.push({ p: max + gap, o: max, fwd: i });
+          _b.push({ p: min - gap, o: min, fwd: i });
+
+          // [center extensions]
+          if (agentLength) {
+            if (loop.length === 2) {
+              // center a b points
+              // if the agent is smaller than the gap, we can also plot the a b based on center.
+              if (agentLength < gap) {
+                // | (gap) |a|  |c|  |b| (gap) |
+                // |       [-----------] < agent
+
+                const center_range = [ranges[loop[0]][1], ranges[loop[1]][0]];
+                const center = cmath.mean(...center_range);
+
+                // const center = (min + max) / 2;
+                const egap = (gap - agentLength) / 2; // gap that will be applied on each side
+                const cpa = center - agentLength / 2;
+                const cpb = center + agentLength / 2;
+
+                _a.push({ p: cpa, o: cpa - egap, fwd: -1 });
+                _b.push({ p: cpb, o: cpb + egap, fwd: -1 });
+              }
+            }
+          }
+        }
+
+        // [forwarded gaps]
+        // extended a b points with gap of the other loops where it is in the same direction
+        // Compare with other loops to extend projections
+        grouped.forEach((test, j) => {
+          // skip self
+          if (i === j) return;
+          if (test.gap <= 0) return;
+
+          // normal direction
+          if (test.max < group.max) {
+            _a.push({ p: group.max + test.gap, o: group.max, fwd: j });
+          }
+
+          if (test.min > group.min) {
+            _b.push({ p: group.min - test.gap, o: group.min, fwd: j });
+          }
+        });
+
+        // add to the result
+        loops.push(loop as [number, number]);
+        gaps.push(gap);
+        a.push(Array.from(_a));
+        b.push(Array.from(_b));
+      });
+
+      return {
+        ranges,
+        loops,
+        gaps,
+        a,
+        b,
+      };
+    }
+  }
 }
 
 export namespace cmath.ext.movement {
-  type Movement = Vector2;
+  /**
+   * indicates a movement within 2D space.
+   *
+   * each can be null, when null, it treated as 0 or ignored depending on the context.
+   *
+   * this is to indicate the context of the movement vector, where 0 means no movement, but null means to ignore that axis.
+   */
+  export type Movement = [number | null, number | null];
+
+  /**
+   * normalizes the movement vector. null is treated as 0.
+   * @returns a signed {@link Vector2}
+   */
+  export function normalize(m: Movement): Vector2 {
+    return [m[0] ?? 0, m[1] ?? 0];
+  }
 
   /**
    * returns a new movement vector with single axis locked by dominance.
+   *
+   * the other axis will be null.
+   *
    * @param m
    * @returns
    */
   export function axisLockedByDominance(m: Movement): Movement {
     const [x, y] = m;
-    const abs_x = Math.abs(x);
-    const abs_y = Math.abs(y);
+    const abs_x = Math.abs(x ?? 0);
+    const abs_y = Math.abs(y ?? 0);
 
     if (abs_x > abs_y) {
-      return [x, 0];
+      return [x, null];
     } else {
-      return [0, y];
+      return [null, y];
     }
   }
 }
@@ -2134,3 +3475,104 @@ export namespace cmath.ext.viewport {
     ];
   }
 }
+
+export namespace cmath.ui {
+  /**
+   * `['x', 100]` will draw a y-axis line at x=100
+   */
+  export type Rule = [axis: "x" | "y", offset: number];
+
+  export type Point = {
+    label?: string;
+    x: number;
+    y: number;
+  };
+
+  export type Line = {
+    label?: string;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+
+  /**
+   * Ensures that (x1, y1) <= (x2, y2) in a canonical way.
+   *
+   * - If `line.x1 > line.x2`, swaps the endpoints.
+   * - If `line.x1 === line.x2` but `y1 > y2`, swaps the endpoints.
+   *
+   * This is often useful so that two line segments describing the
+   * “same” geometric positions will have identical (x1, y1, x2, y2).
+   *
+   * @param line - The line to be normalized, e.g. `{ x1, y1, x2, y2, label? }`.
+   * @returns A new `Line` object with possibly swapped endpoints, ensuring
+   *          `(x1 < x2)` or `(x1 === x2 && y1 <= y2)`.
+   */
+  export function normalizeLine<
+    T extends {
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      label?: string;
+    },
+  >(line: T): T {
+    let { x1, y1, x2, y2 } = line;
+
+    // If the line is “backwards” in x, or has the same x but backwards in y, swap:
+    if (x1 > x2 || (x1 === x2 && y1 > y2)) {
+      const tempX = x1;
+      const tempY = y1;
+      x1 = x2;
+      y1 = y2;
+      x2 = tempX;
+      y2 = tempY;
+    }
+
+    // Return a new line object in the same shape:
+    return {
+      ...line,
+      x1,
+      y1,
+      x2,
+      y2,
+    };
+  }
+
+  /**
+   * Formats a number to the specified precision only when needed.
+   *
+   * If the number, after rounding, is an integer (i.e. no meaningful fractional part remains),
+   * the function returns the integer as a string without trailing zeros. Otherwise, it formats the
+   * number to the provided decimal precision using `toFixed()`.
+   *
+   * @param num - The number to format.
+   * @param precision - The number of decimal places to round to.
+   * @returns The formatted number as a string. For example:
+   * - `formatNumber(1, 1)` returns `"1"`.
+   * - `formatNumber(1.2222, 1)` returns `"1.2"`.
+   * - `formatNumber(9.0001, 2)` returns `"9"`.
+   *
+   * @example
+   * // Returns "1" because 9.0001 rounds to 9 with 2 decimal precision and no fractional part remains.
+   * formatNumber(9.0001, 2);
+   *
+   * @example
+   * // Returns "9.12" because the rounded value has a non-zero fractional part.
+   * formatNumber(9.1234, 2);
+   */
+  export function formatNumber(num: number, precision: number): string {
+    const factor = 10 ** precision;
+    const rounded = Math.round(num * factor) / factor;
+    // If no decimal part remains, return integer form; otherwise use toFixed
+    return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
+  }
+}
+
+// export namespace cmath.measure {}
+// export namespace cmath.auxiliary_line {}
+// export namespace cmath.auxiliary_line.rectangular {
+//   // fromPointToVector
+//   // sideToPoint
+// }

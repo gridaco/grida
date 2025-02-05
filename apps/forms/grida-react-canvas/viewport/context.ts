@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 interface ViewportSurfaceContext {
   portal?: HTMLDivElement | null;
@@ -7,3 +7,13 @@ interface ViewportSurfaceContext {
 
 export const ViewportSurfaceContext =
   createContext<ViewportSurfaceContext | null>(null);
+
+export function useViewport() {
+  const context = useContext(ViewportSurfaceContext);
+  if (!context) {
+    throw new Error(
+      "useViewportSurface must be used within a ViewportSurfaceProvider"
+    );
+  }
+  return context.portal;
+}

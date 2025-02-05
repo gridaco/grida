@@ -27,7 +27,7 @@ export function measure(
   a: cmath.Rectangle,
   b: cmath.Rectangle
 ): Measurement | null {
-  if (cmath.rect.identical(a, b)) return null;
+  if (cmath.rect.isIdentical(a, b)) return null;
   const intersection = cmath.rect.intersection(a, b)!;
 
   // If no intersection

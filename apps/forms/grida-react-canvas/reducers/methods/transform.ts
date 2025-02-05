@@ -1,33 +1,25 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
+import {
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+  type IDocumentEditorState,
+} from "../../state";
 import { self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
+import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../domapi";
-import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
+import {
+  getSnapTargets,
+  snapObjectsTranslation,
+  threshold,
+} from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import { grida } from "@/grida";
 import { vn } from "@/grida/vn";
 import nid from "../tools/id";
-
-const SNAP: cmath.Vector2 = [4, 4];
-
-/**
- * Inverted cardinal directions `nw -> se, ne -> sw` and so on
- */
-const inverted_cardinal_directions = {
-  nw: "se",
-  ne: "sw",
-  sw: "ne",
-  se: "nw",
-  n: "s",
-  e: "w",
-  s: "n",
-  w: "e",
-} as const;
 
 /**
  * Cardinal direction vector
@@ -58,10 +50,14 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
   if (draft.gesture.type === "translate-vertex") return;
   if (draft.gesture.type === "curve") return;
+  if (draft.gesture.type === "gap") return;
 
   switch (draft.gesture.type) {
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
+    }
+    case "sort": {
+      return __self_update_gesture_transform_translate_sort(draft);
     }
     case "scale": {
       return __self_update_gesture_transform_scale(draft);
@@ -152,6 +148,10 @@ function __self_update_gesture_transform_translate(
 
       // set the flag
       draft.gesture.is_currently_cloned = true;
+      draft.active_duplication = {
+        origins: initial_selection,
+        clones: initial_clone_ids,
+      };
 
       break;
     }
@@ -169,6 +169,7 @@ function __self_update_gesture_transform_translate(
       draft.selection = initial_selection;
       draft.surface_measurement_target = undefined;
       draft.surface_measurement_targeting_locked = false;
+      draft.active_duplication = null;
       break;
     }
   }
@@ -258,21 +259,21 @@ function __self_update_gesture_transform_translate(
         draft.document_ctx = document.Context.from(draft.document).snapshot();
       });
 
-      if (is_parent_changed) draft.dropzone_node_id = new_parent_id;
+      if (is_parent_changed) {
+        draft.dropzone = { type: "node", node_id: new_parent_id };
+      }
 
       break;
     }
     case "off": {
-      draft.dropzone_node_id = undefined;
+      draft.dropzone = undefined;
       break;
     }
   }
   // #endregion
 
-  const snap_target_node_ids = getSnapTargets(current_selection, draft);
-
   const cdom = new domapi.CanvasDOM(draft.transform);
-
+  const snap_target_node_ids = getSnapTargets(current_selection, draft);
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
       const r = cdom.getNodeBoundingRect(node_id);
@@ -283,12 +284,15 @@ function __self_update_gesture_transform_translate(
 
   const { translated, snapping } = snapObjectsTranslation(
     initial_rects,
-    snap_target_node_rects,
+    {
+      objects: snap_target_node_rects,
+      guides: draft.ruler === "on" ? draft.guides : undefined,
+    },
     adj_movement,
-    SNAP
+    threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
   );
 
-  draft.gesture.surface_snapping = snapping;
+  draft.surface_snapping = snapping;
 
   try {
     let i = 0;
@@ -336,6 +340,81 @@ function __self_update_gesture_transform_translate(
   }
 }
 
+function __self_update_gesture_transform_translate_sort(
+  draft: Draft<IDocumentEditorState>
+) {
+  assert(draft.gesture.type === "sort", "Gesture type must be translate-swap");
+
+  const { layout, movement, node_id, node_initial_rect, placement } =
+    draft.gesture;
+
+  // [moving node]
+  // apply movement as-is to moving node
+  const moving_rect = cmath.rect.translate(node_initial_rect, movement);
+  const moving_node = document.__getNodeById(
+    draft,
+    node_id
+  ) as grida.program.nodes.i.IPositioning;
+  moving_node.left = moving_rect.x;
+  moving_node.top = moving_rect.y;
+
+  // [dnd testing]
+  const { index: dnd_target_index } = dnd.test(moving_rect, layout.objects);
+
+  // if no change, return
+  if (dnd_target_index === placement.index) return;
+
+  // recalculate the layout following the index change
+  // while keeping the order of the objects, re-assign the rect.
+  const __moved = cmath.arrayMove(
+    layout.objects,
+    placement.index,
+    dnd_target_index
+  );
+
+  // update the layout
+  draft.gesture.layout.objects = layout.objects.map((obj, i) => {
+    const next_rect_ref = __moved[i];
+    // this center-aligns the object to the next rect, while keeping the size.
+    const next_rect = cmath.rect.alignA(obj, next_rect_ref, {
+      horizontal: "center",
+      vertical: "center",
+    });
+
+    return { ...next_rect, id: obj.id };
+  });
+
+  // TODO: currently, the index is always identical to initial placement index, we need to update the entire logic, for this index to change, and layout order not to change.
+  const next_placement_index = layout.objects.findIndex(
+    (obj) => obj.id === node_id
+  );
+
+  const next_placement_rect = layout.objects[next_placement_index];
+
+  // // update the placement
+  draft.gesture.placement = {
+    index: next_placement_index,
+    rect: next_placement_rect,
+  };
+
+  // // update the dropzone
+  draft.dropzone = {
+    type: "rect",
+    rect: next_placement_rect,
+  };
+
+  // update the position of the real nodes (except the moving node)
+  layout.objects.forEach((obj, i) => {
+    if (obj.id === node_id) return;
+    const node = document.__getNodeById(
+      draft,
+      obj.id
+    ) as grida.program.nodes.i.IPositioning;
+    node.left = obj.x;
+    node.top = obj.y;
+  });
+}
+
 function __self_update_gesture_transform_scale(
   draft: Draft<IDocumentEditorState>
 ) {
@@ -356,11 +435,11 @@ function __self_update_gesture_transform_scale(
   // get the origin point based on handle
   const origin =
     transform_with_center_origin === "on"
-      ? cmath.rect.center(initial_bounding_rectangle)
+      ? cmath.rect.getCenter(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
           // maps the resize handle (direction) to the transform origin point (inverse)
-          inverted_cardinal_directions[direction]
+          cmath.compass.invertDirection(direction)
         );
 
   /**
@@ -393,7 +472,7 @@ function __self_update_gesture_transform_scale(
     SNAP
   );
 
-  draft.gesture.surface_snapping = snapping;
+  draft.surface_snapping = snapping;
   // #endregion
    */
 
@@ -494,6 +573,7 @@ function __self_update_gesture_transform_rotate(
 
   const node = document.__getNodeById(draft, selection);
 
+  draft.gesture.rotation = angle;
   draft.document.nodes[selection] = nodeReducer(node, {
     type: "node/change/rotation",
     rotation: { type: "set", value: angle },
