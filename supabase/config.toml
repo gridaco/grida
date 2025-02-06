@@ -80,18 +80,28 @@ port = 54324
 [storage]
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
+file_size_limit = "150MiB"
 
 # Image transformation API is available to Supabase Pro plan.
-# [storage.image_transformation]
-# enabled = true
+[storage.image_transformation]
+enabled = true
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+[storage.buckets.avatars]
+public = true
+file_size_limit = "10MiB"
+allowed_mime_types = ["image/*"]
+
+[storage.buckets.assets]
+public = false
+file_size_limit = "30MiB"
+
+[storage.buckets.assets-public]
+public = true
+file_size_limit = "30MiB"
+
+[storage.buckets.grida-forms]
+public = true
+
 
 [auth]
 enabled = true

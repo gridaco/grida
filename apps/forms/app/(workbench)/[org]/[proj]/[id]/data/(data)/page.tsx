@@ -39,7 +39,7 @@ export default function DataIndexPage() {
       }
       case "v0_bucket": {
         router.replace(
-          editorlink(".", {
+          editorlink("objects", {
             basepath: state.basepath,
             document_id: state.document_id,
           })
