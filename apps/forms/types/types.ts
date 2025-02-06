@@ -108,7 +108,8 @@ export type FormInputType =
   | "signature"
   | "range"
   | "search"
-  | "json";
+  | "json"
+  | "canvas";
 
 export type FormFieldAutocompleteType =
   | "off"
@@ -484,7 +485,12 @@ export interface Project {
   created_at: string;
 }
 
-export type GDocumentType = "v0_form" | "v0_site" | "v0_schema" | "v0_canvas";
+export type GDocumentType =
+  | "v0_form"
+  | "v0_site"
+  | "v0_schema"
+  | "v0_bucket"
+  | "v0_canvas";
 
 export interface GDocument {
   id: string;

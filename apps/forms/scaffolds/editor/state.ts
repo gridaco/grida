@@ -62,6 +62,7 @@ export type EditorInit =
   | FormDocumentEditorInit
   | SiteDocumentEditorInit
   | SchemaDocumentEditorInit
+  | BucketDocumentEditorInit
   | CanvasDocumentEditorInit;
 
 export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
@@ -85,6 +86,10 @@ export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_schema";
   supabase_project: GridaXSupabase.SupabaseProject | null;
   tables: ReadonlyArray<SchemaDocumentTableInit>;
+}
+
+export interface BucketDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_bucket";
 }
 
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {

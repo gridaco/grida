@@ -24,6 +24,16 @@ export const grida_forms_client = createClient<Database, "grida_forms">(
   }
 );
 
+export const grida_storage_client = createClient<Database, "grida_storage">(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  {
+    db: {
+      schema: "grida_storage",
+    },
+  }
+);
+
 export const grida_canvas_client = createClient<Database, "grida_canvas">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -87,6 +97,20 @@ export const createServerComponentWorkspaceClient = (
     {
       options: {
         db: { schema: "public" },
+      },
+    }
+  );
+
+export const createServerComponentStorageClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createServerComponentClient<Database, "grida_storage">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_storage" },
       },
     }
   );

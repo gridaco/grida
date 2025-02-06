@@ -16,6 +16,7 @@ import type {
   GDocSchemaTable,
   TableMenuItem,
   CanvasDocumentEditorInit,
+  BucketDocumentEditorInit,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -36,6 +37,8 @@ export function initialEditorState(init: EditorInit): EditorState {
       return initialSiteEditorState(init);
     case "v0_schema":
       return initialDatabaseEditorState(init);
+    case "v0_bucket":
+      return initialBucketEditorState(init);
     case "v0_canvas":
       return initialCanvasEditorState(init);
     default:
@@ -266,6 +269,29 @@ function initialDatabaseEditorState(
   };
 }
 
+function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
+  const base = initialBaseDocumentEditorState(init);
+
+  // @ts-ignore
+  return {
+    ...base,
+    pages: sitedocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "files",
+    documents: {},
+    sidebar: {
+      mode: "project",
+      mode_data: {
+        disabled: false,
+        tables: [],
+        menus: [],
+      },
+    },
+    tables: [],
+  };
+}
 /**
  * // FIXME: not ready
  * @deprecated @beta
