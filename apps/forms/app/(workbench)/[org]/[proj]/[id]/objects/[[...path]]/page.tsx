@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FolderIcon,
   MoreHorizontalIcon,
@@ -34,6 +34,18 @@ import { useEditorState } from "@/scaffolds/editor";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { MimeTypeIcon } from "@/components/mime-type-icon";
+import { useFilePicker } from "use-file-picker";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 type PathTokens = string[];
 
@@ -56,8 +68,11 @@ type EntryItem =
       modified?: string;
     };
 
+type StorageEditorTask = { type: "upload" } | { type: "download" };
+
 interface IStorageEditor {
-  objects: {}[];
+  tasks: StorageEditorTask[];
+  objects: EntryItem[];
   upload: (file: File) => Promise<any>;
   download: (path: string) => Promise<any>;
   list: (path: string) => Promise<EntryItem[]>;
@@ -66,16 +81,92 @@ interface IStorageEditor {
   move: (path: string, newPath: string) => Promise<any>;
 }
 
+const mockDelay = (ms: number = 300): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 function useStorageEditor(): IStorageEditor {
-  const upload = useCallback(async (file: File) => {}, []);
-  const download = useCallback(async (path: string) => new Blob(), []);
-  const list = useCallback(async (path: string) => [], []);
-  const deleteFile = useCallback(async (path: string) => {}, []);
-  const rename = useCallback(async (path: string, newName: string) => {}, []);
-  const move = useCallback(async (path: string, newPath: string) => {}, []);
+  const [files, setFiles] = useState<EntryItem[]>([
+    {
+      key: "Documents",
+      name: "Documents",
+      type: "folder",
+      path_tokens: ["Documents"],
+    },
+    {
+      key: "Report.docx",
+      name: "Report.docx",
+      type: "file",
+      path_tokens: ["Report.docx"],
+      mimetype:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      size: "2.3 MB",
+      modified: "2023-05-10",
+    },
+    // ... more dummy entries
+  ]);
+
+  const upload = useCallback(async (file: File) => {
+    await mockDelay();
+    const newFile: EntryItem = {
+      type: "file",
+      name: file.name,
+      key: file.name,
+      path_tokens: [file.name],
+      mimetype: file.type,
+      size: `${file.size} bytes`,
+      modified: new Date().toISOString(),
+    };
+    setFiles((prev) => [...prev, newFile]);
+    return newFile;
+  }, []);
+
+  const download = useCallback(async (path: string) => {
+    await mockDelay();
+    return new Blob([`Mock content for ${path}`], { type: "text/plain" });
+  }, []);
+
+  const list = useCallback(
+    async (path: string) => {
+      await mockDelay();
+      // For simplicity, no filtering by `path`
+      return files;
+    },
+    [files]
+  );
+
+  const deleteFile = useCallback(async (path: string) => {
+    await mockDelay();
+    setFiles((prev) => prev.filter((item) => item.key !== path));
+  }, []);
+
+  const rename = useCallback(async (path: string, newName: string) => {
+    await mockDelay();
+    setFiles((prev) =>
+      prev.map((item) =>
+        item.key === path ? { ...item, name: newName, key: newName } : item
+      )
+    );
+  }, []);
+
+  const move = useCallback(async (path: string, newPath: string) => {
+    await mockDelay();
+    const newTokens = newPath.split("/");
+    setFiles((prev) =>
+      prev.map((item) =>
+        item.key === path
+          ? {
+              ...item,
+              path_tokens: newTokens,
+              key: newTokens[newTokens.length - 1],
+            }
+          : item
+      )
+    );
+  }, []);
 
   return {
-    objects: [],
+    tasks: [],
+    objects: files,
     upload,
     download,
     list,
@@ -176,18 +267,35 @@ const __dummy_files: EntryItem[] = [
   },
 ];
 
+const __tools_card_classes =
+  "flex flex-col justify-between bg-background border p-4 rounded-lg shadow-sm h-20 aspect-video select-none cursor-pointer";
+
 function Tools() {
+  const { upload } = useStorageEditor();
+  const { openFilePicker, filesContent } = useFilePicker({ multiple: false });
+  const createFolderDialog = useDialogState();
+
+  useEffect(() => {
+    //
+  }, [filesContent]);
+
   return (
-    <nav className="flex flex-wrap gap-4">
-      <div className="flex flex-col justify-between bg-background border p-4 rounded-lg shadow-sm h-20 aspect-video select-none cursor-pointer">
-        <UploadIcon className="w-4 h-4" />
-        <span className="text-xs text-muted-foreground">Upload</span>
-      </div>
-      <div className="flex flex-col justify-between bg-background border p-4 rounded-lg shadow-sm h-20 aspect-video select-none cursor-pointer">
-        <FolderIcon className="w-4 h-4" />
-        <span className="text-xs text-muted-foreground">Create Folder</span>
-      </div>
-    </nav>
+    <>
+      <nav className="flex flex-wrap gap-4">
+        <div className={__tools_card_classes} onClick={openFilePicker}>
+          <UploadIcon className="w-4 h-4" />
+          <span className="text-xs text-muted-foreground">Upload</span>
+        </div>
+        <div
+          className={__tools_card_classes}
+          onClick={createFolderDialog.openDialog}
+        >
+          <FolderIcon className="w-4 h-4" />
+          <span className="text-xs text-muted-foreground">Create Folder</span>
+        </div>
+      </nav>
+      <CreateFolderDialog {...createFolderDialog.props} />
+    </>
   );
 }
 
@@ -209,6 +317,8 @@ export default function FileExplorer({
 
   const paths = useMemo(() => generatePaths(path), [path]);
   const router = useRouter();
+
+  const files = __dummy_files;
 
   const onFileDoubleClick = (e: React.MouseEvent, file: EntryItem) => {
     const href =
@@ -284,37 +394,43 @@ export default function FileExplorer({
             </Button>
           </div>
         </div>
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {__dummy_files.map((file, index) => (
-              <FileItemComponent
-                key={index}
-                file={file}
-                view={viewMode}
-                onDoubleClick={(e) => {
-                  onFileDoubleClick(e, file);
-                }}
-              />
-            ))}
-          </div>
+        {files.length === 0 ? (
+          <FolderEmptyState />
         ) : (
-          <div className="flex flex-col space-y-2">
-            <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
-              <span className="w-1/2 text-sm">Name</span>
-              <span className="w-1/4 text-sm">Size</span>
-              <span className="w-1/4 text-sm">Modified</span>
-            </div>
-            {__dummy_files.map((file, index) => (
-              <FileItemComponent
-                key={index}
-                file={file}
-                view={viewMode}
-                onDoubleClick={(e) => {
-                  onFileDoubleClick(e, file);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {__dummy_files.map((file, index) => (
+                  <FileItemComponent
+                    key={index}
+                    file={file}
+                    view={viewMode}
+                    onDoubleClick={(e) => {
+                      onFileDoubleClick(e, file);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
+                  <span className="w-1/2 text-sm">Name</span>
+                  <span className="w-1/4 text-sm">Size</span>
+                  <span className="w-1/4 text-sm">Modified</span>
+                </div>
+                {__dummy_files.map((file, index) => (
+                  <FileItemComponent
+                    key={index}
+                    file={file}
+                    view={viewMode}
+                    onDoubleClick={(e) => {
+                      onFileDoubleClick(e, file);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </aside>
       {preview && (
@@ -411,6 +527,51 @@ function FilePreviewSidebar() {
       <Button variant="ghost" size="icon">
         <Cross2Icon />
       </Button>
+    </div>
+  );
+}
+
+function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            <FolderIcon className="w-5 h-5 inline me-2 align-middle" />
+            Create folder
+          </DialogTitle>
+        </DialogHeader>
+        <hr />
+        <div>
+          <div className="grid gap-2">
+            <Label>Name</Label>
+            <Input
+              autoFocus
+              autoComplete="off"
+              name="name"
+              placeholder="Folder name"
+              pattern="^(?!.*\/).+$"
+              title="Folder name must not contain '/'"
+            />
+          </div>
+        </div>
+        <hr />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Cancel</Button>
+          </DialogClose>
+          <Button>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FolderEmptyState() {
+  return (
+    <div className="w-full px-4 py-8 flex flex-col items-center justify-center gap-4">
+      <h6 className="text-lg">Drop files here to upload</h6>
+      <Button>Upload</Button>
     </div>
   );
 }
