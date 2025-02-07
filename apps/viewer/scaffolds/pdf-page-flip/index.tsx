@@ -128,7 +128,7 @@ const PDFViewer = ({
 
   return (
     <main className="w-full h-full flex flex-col overflow-hidden">
-      <header className="border-b py-2 px-5">
+      <header className="border-b py-2 px-5 z-50">
         {title && <h1 className="text-sm font-semibold">{title}</h1>}
       </header>
       <div className="w-full h-full p-20">
