@@ -6,7 +6,7 @@ import { Document, Page } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { pdfjs } from "react-pdf";
-import { useMeasure } from "@uidotdev/usehooks";
+import { useMeasure, useMediaQuery } from "@uidotdev/usehooks";
 import { PDFDocumentProxy } from "pdfjs-dist";
 
 type OnDocumentLoadSuccess = (document: PDFDocumentProxy) => void;
@@ -59,13 +59,21 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
 
 FlipPage.displayName = "FlipPage";
 
-const PDFViewer = ({ file, title }: { file: string; title?: string }) => {
+const PDFViewer = ({
+  file,
+  title = file,
+}: {
+  file: string;
+  title?: string;
+}) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [rawSize, setRawSize] = useState<
     { width: number; height: number } | undefined
   >(undefined);
   const book = useRef(null);
+
+  const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
 
   const [ref, { width: _width, height: _height }] = useMeasure();
 
@@ -119,16 +127,18 @@ const PDFViewer = ({ file, title }: { file: string; title?: string }) => {
   );
 
   return (
-    <main className="w-full h-full flex flex-col">
+    <main className="w-full h-full flex flex-col overflow-hidden">
       <header className="border-b py-2 px-5">
         {title && <h1 className="text-sm font-semibold">{title}</h1>}
       </header>
       <div className="w-full h-full p-20">
-        <div ref={ref} className="w-full h-full flex flex-col justify-center">
+        <div
+          ref={ref}
+          className="w-full h-full flex flex-col justify-center items-center"
+        >
           <Document
             file={file}
             onLoadSuccess={(document) => {
-              // @ts-expect-error version
               onDocumentLoadSuccess(document);
             }}
             loading=""
@@ -149,9 +159,10 @@ const PDFViewer = ({ file, title }: { file: string; title?: string }) => {
                   startPage={0}
                   showPageCorners={true}
                   flippingTime={600}
-                  // usePortrait={true}
+                  usePortrait={isPortrait}
                   startZIndex={0}
                   drawShadow={true}
+                  autoSize
                 >
                   {Array.from(new Array(numPages), (_, index) => (
                     <FlipPage
@@ -168,7 +179,7 @@ const PDFViewer = ({ file, title }: { file: string; title?: string }) => {
           </Document>
         </div>
       </div>
-      <div className="absolute bottom-0 w-full flex justify-center">
+      <div className="absolute bottom-4 w-full flex justify-center">
         <NavigationPageNumberControl
           page={currentPage}
           numPages={numPages}
@@ -228,7 +239,7 @@ function NavigationPageNumberControl({
   return (
     <div className="mt-4 flex items-center gap-4">
       <span className="text-sm">
-        <input
+        {/* <input
           type="number"
           className="w-7 rounded border"
           onChange={(e) => {
@@ -237,7 +248,7 @@ function NavigationPageNumberControl({
               onPageChange?.(value - 1);
             }
           }}
-        />
+        /> */}
         {page + 1}-{Math.min(page + 2, numPages)} / {numPages}
       </span>
     </div>
