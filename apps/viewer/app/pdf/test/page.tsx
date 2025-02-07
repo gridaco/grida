@@ -1,9 +1,14 @@
-import PDFViewer from "@/scaffolds/pdf-page-flip";
+"use client";
+import dynamic from "next/dynamic";
+
+const Viewer = dynamic(() => import("@/scaffolds/pdf-page-flip"), {
+  ssr: false,
+});
 
 export default function PDFViewerTestPage() {
   return (
     <main className="w-dvw h-dvh">
-      <PDFViewer file={"/testfiles/file-example_PDF_1MB.pdf"} />
+      <Viewer file={"/testfiles/file-example_PDF_1MB.pdf"} />
     </main>
   );
 }
