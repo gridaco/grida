@@ -1,10 +1,12 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import Image from "next/image";
 import * as k from "@/app/(www-2025)/data";
 
 export function Demo1() {
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
+  const scrollRef = useRef(null);
   const [activeTabIndex, setActiveTabIndex] = useState(0); // Default active tab index
   const [tabUnderlineWidth, setTabUnderlineWidth] = useState(0);
   const [tabUnderlineLeft, setTabUnderlineLeft] = useState(0);
@@ -20,11 +22,15 @@ export function Demo1() {
   }, [activeTabIndex]);
 
   return (
-    <div className="w-full mx-0 my-40">
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.5, ease: "easeOut" }}
+      className="w-full mx-0 my-40"
+    >
       <div className="flex flex-col items-center justify-center my-16 gap-10">
         {/* Tabs List with Sliding Underline */}
         <div className="relative flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center text-slate-400">
-          {/* Sliding Underline */}
           <span
             className="absolute bottom-0 top-0 -z-10 flex overflow-hidden rounded-full transition-all duration-300"
             style={{
@@ -45,7 +51,7 @@ export function Demo1() {
                   ? "bg-black text-white dark:invert"
                   : "hover:text-slate-300"
               }`}
-              onClick={() => setActiveTabIndex(index)} // Update active tab index
+              onClick={() => setActiveTabIndex(index)}
             >
               {category}
             </button>
@@ -54,7 +60,7 @@ export function Demo1() {
 
         {/* Tabs Content */}
         <div className="container md:h-[776px] w-full overflow-hidden">
-          <Image
+          <motion.img
             className="w-full h-full object-cover"
             src={
               k.imagesDemo1[
@@ -66,9 +72,12 @@ export function Demo1() {
             alt={k.demo_1_categories[activeTabIndex]}
             width={1400}
             height={776}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1 }}
           />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

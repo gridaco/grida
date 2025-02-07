@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import Image from "next/image";
 import * as k from "@/app/(www-2025)/data";
 import clsx from "clsx";
@@ -22,7 +23,12 @@ export function Demo2() {
   }, [activeTabIndex]);
 
   return (
-    <div className="w-full mx-0">
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.5, ease: "easeOut" }}
+      className="w-full mx-0"
+    >
       <div className="flex flex-col items-center justify-center my-16 gap-10 py-20">
         {/* Tabs List with Sliding Underline */}
         <div className="relative flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center text-slate-400">
@@ -47,7 +53,7 @@ export function Demo2() {
                   ? "bg-black text-white dark:invert"
                   : "hover:text-slate-200"
               }`}
-              onClick={() => setActiveTabIndex(index)} // Update active tab index
+              onClick={() => setActiveTabIndex(index)}
             >
               {category}
             </button>
@@ -126,7 +132,7 @@ export function Demo2() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

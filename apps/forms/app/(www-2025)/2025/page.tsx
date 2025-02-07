@@ -9,8 +9,8 @@ import Footer from "@/app/(www-2025)/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 
 function Demo() {
@@ -21,43 +21,33 @@ function Demo() {
   };
 
   return (
-    <div className="relative -mt-40 mb-32">
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.5, ease: "easeOut" }}
+      className="relative -mt-40 mb-32"
+    >
       <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden relative">
         {/* Overlay for lock */}
         {isLocked && (
-          <motion.div
-            className="absolute inset-0 bg-slate-950/10 shadow-xl z-20 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
+          <div className="absolute inset-0 bg-slate-950/10 shadow-xl z-20 flex items-center justify-center">
             <button
               className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-400 focus:outline-none"
               onClick={unlockDemo}
             >
               Jump to Canvas
             </button>
-          </motion.div>
+          </div>
         )}
 
         {/* Iframe */}
-        <motion.div
-          className={`w-full h-full ${
-            isLocked ? "pointer-events-none" : "pointer-events-auto"
-          }`}
-          initial={{ opacity: 1, y: 100, scale: 1 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            delay: 0.2,
-            duration: 0.3,
-            type: "spring",
-            damping: 20,
-          }}
+        <div
+          className={`w-full h-full ${isLocked ? "pointer-events-none" : "pointer-events-auto"}`}
         >
           <iframe src="/canvas" className="w-full h-full" />
-        </motion.div>
+        </div>
       </Card>
-    </div>
+    </motion.div>
   );
 }
 
@@ -122,7 +112,12 @@ export default function WWW() {
             }
             button={"Start CMS"}
           />
-          <div className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+            className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32"
+          >
             <CmsCard
               media={{
                 src: "/assets/placeholder-image.png",
@@ -163,7 +158,7 @@ export default function WWW() {
               title={"Title"}
               excerpt={"excerpt"}
             />
-          </div>
+          </motion.div>
         </div>
         <div className="my-60 relative">
           <FeatureSection
@@ -223,7 +218,7 @@ function FeatureSection({
   button: string;
 }) {
   return (
-    <div className="flex flex-col container mx-auto items-center justify-center">
+    <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
       <Badge
         variant="secondary"
         className="text-lg font-medium rounded-full bg-slate-100 text-slate-600"
@@ -279,7 +274,12 @@ function CmsCard({
 
 function CtaSection() {
   return (
-    <div className="container mx-xl flex flex-col-reverse gap-16 md:flex md:flex-row justify-between mt-80 mb-60">
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 50 }}
+      transition={{ duration: 1.5, ease: "easeOut" }}
+      className="container mx-xl flex flex-col-reverse gap-16 md:flex md:flex-row justify-between mt-80 mb-60"
+    >
       <div className="flex flex-col">
         <p className="text-left text-5xl lg:text-6xl font-semibold">
           Design editor tool with customizable templates.
@@ -301,6 +301,6 @@ function CtaSection() {
         height={900}
         className="max-h-[300px] max-w-[300px] lg:max-h-[500px] lg:max-w-[500px]"
       />
-    </div>
+    </motion.div>
   );
 }

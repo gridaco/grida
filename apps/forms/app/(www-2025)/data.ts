@@ -1,5 +1,5 @@
 export const demo_1_categories = [
-  "Import from Figma",
+  "Free Pixel drawing",
   "UI/UX Builder",
   "Icon & Shape Templates",
   "AI Copywriter",
@@ -7,7 +7,7 @@ export const demo_1_categories = [
 ];
 
 export const imagesDemo1 = {
-  "Import from Figma": "/affiliate/poc/images/import-from-figma.png",
+  "Free Pixel drawing": "/affiliate/poc/images/pixel-drawing.png",
   "UI/UX Builder": "/affiliate/poc/images/ux-ui-builder.png",
   "Icon & Shape Templates": "/affiliate/poc/images/icon-shape-templates.png",
   "AI Copywriter": "/affiliate/poc/images/ai-copywriter.png",
