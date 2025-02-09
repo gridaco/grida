@@ -117,10 +117,10 @@ function ModeProjectHiearchy() {
           {loading ? (
             <>
               <div className="w-full grid gap-2">
-                <Skeleton className="w-full h-10" />
-                <Skeleton className="w-full h-10" />
-                <Skeleton className="w-full h-10" />
-                <Skeleton className="w-full h-10" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-full h-5" />
               </div>
             </>
           ) : (

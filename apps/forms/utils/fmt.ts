@@ -57,3 +57,11 @@ export function pad_number(n: number, pad: number): string {
 
 // // Usage
 // hashText('Hello, world!').then(console.log);  // Outputs the SHA-256 hash of "Hello, world!"
+
+export function fmt_bytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}

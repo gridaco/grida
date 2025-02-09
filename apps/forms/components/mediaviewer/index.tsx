@@ -336,7 +336,11 @@ export function StandaloneMediaView({
     }
   }
 
-  return <div>Preview not available for this file type ({contentType})</div>;
+  return (
+    <div className="text-xs text-muted-foreground">
+      Preview not available for this file type ({contentType})
+    </div>
+  );
 }
 
 const ProgressiveImage = ({

@@ -6,14 +6,9 @@ import React, {
   useReducer,
   useState,
 } from "react";
+import { format } from "date-fns";
 import { produce } from "immer";
-import {
-  FolderIcon,
-  MoreHorizontalIcon,
-  GridIcon,
-  ListIcon,
-  UploadIcon,
-} from "lucide-react";
+import { FolderIcon, GridIcon, ListIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,8 +32,19 @@ import {
 } from "@/components/ui/breadcrumb";
 import { editorlink } from "@/lib/forms/url";
 import { useEditorState } from "@/scaffolds/editor";
-import { useRouter, useSearchParams } from "next/navigation";
-import { CaretDownIcon, Cross2Icon } from "@radix-ui/react-icons";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  CaretDownIcon,
+  CheckCircledIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Cross2Icon,
+  CrossCircledIcon,
+  TrashIcon,
+  DotsHorizontalIcon,
+  InputIcon,
+  ExclamationTriangleIcon,
+} from "@radix-ui/react-icons";
 import { MimeTypeIcon } from "@/components/mime-type-icon";
 import { useFilePicker } from "use-file-picker";
 import {
@@ -56,210 +62,31 @@ import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
 import { wellkown } from "@/utils/mimetype";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Spinner } from "@/components/spinner";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-function fmtbytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+import { fmt_bytes } from "@/utils/fmt";
+import StorageEditorProvider, {
+  EntityNode,
+  FileNode,
+  generatePaths,
+  reducer,
+  StorageApi,
+  StorageEditorDispatcherProvider,
+  StorageEditorTask,
+  StorageEditorUploadingTask,
+  useStorageEditor,
+} from "../core";
 
-const __mock_elay = (ms: number = 300): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-type PathTokens = string[];
-
-type FileNode = {
-  type: "file";
-  name: string;
-  key: string;
-  path_tokens: PathTokens;
-  mimetype: string;
-  size?: number;
-  modified?: string;
-  url: string;
-  thumbnail?: string;
-};
-
-type FolderNode = {
-  type: "folder";
-  name: string;
-  key: string;
-  path_tokens: PathTokens;
-  size?: number;
-  modified?: string;
-};
-
-type NodeItem = FileNode | FolderNode;
-
-type StorageEditorTask = { type: "upload" } | { type: "download" };
-
-interface StorageEditorState {
-  refreshkey: number;
-  dir: string;
-  tasks: StorageEditorTask[];
-  nodes: Record<string, NodeItem>;
-}
-
-const StorageEditorContext = React.createContext<StorageEditorState | null>(
-  null
-);
-const StorageEditorProvider = StorageEditorContext.Provider;
-const StorageEditorDispatcherContext = React.createContext<
-  (action: StorageEditorAction) => void
->(() => {});
-const StorageEditorDispatcherProvider = StorageEditorDispatcherContext.Provider;
-
-function __useDispatch() {
-  const context = React.useContext(StorageEditorDispatcherContext);
-  if (!context) {
-    throw new Error("useDispatch must be used within a StorageEditorProvider");
-  }
-  return context;
-}
-
-function __useStorageEditorState() {
-  const context = React.useContext(StorageEditorContext);
-  if (!context) {
-    throw new Error(
-      "useStorageEditor must be used within a StorageEditorProvider"
-    );
-  }
-  return context;
-}
-
-type StorageEditorAction =
-  | { type: "cd"; dir: string }
-  | { type: "refresh" }
-  | { type: "add"; key: string; node: NodeItem }
-  | { type: "remove"; key: string };
-
-function reducer(
-  state: StorageEditorState,
-  action: StorageEditorAction
-): StorageEditorState {
-  return produce(state, (draft) => {
-    switch (action.type) {
-      case "cd": {
-        draft.dir = action.dir;
-        break;
-      }
-      case "add": {
-        const { key, node } = action;
-        draft.nodes[key] = { ...node, key } satisfies NodeItem;
-        break;
-      }
-      case "refresh": {
-        draft.refreshkey++;
-        break;
-      }
-    }
-  });
-}
-
-interface IStorageEditor extends Omit<StorageEditorState, "nodes"> {
-  nodes: NodeItem[];
-  upload: (file: File) => Promise<any>;
-  cd: (dir: string) => void;
-  // download: (path: string) => Promise<any>;
-  // list: (path: string) => Promise<NodeItem[]>;
-  refresh: () => void;
-  delete: (path: string) => Promise<any>;
-  // rename: (path: string, newName: string) => Promise<any>;
-  // move: (path: string, newPath: string) => Promise<any>;
-}
-
-function useStorageEditor(): IStorageEditor {
-  const {
-    dir,
-    refreshkey,
-    nodes: __all_nodes,
-    tasks,
-  } = __useStorageEditorState();
-  const dispatch = __useDispatch();
-
-  const currentTokens = useMemo(
-    () => (dir ? dir.split("/").filter(Boolean) : []),
-    [dir]
-  );
-
-  const currentDirNodes: NodeItem[] = useMemo(() => {
-    return Object.values(__all_nodes).filter(
-      (node) =>
-        node.path_tokens.length === currentTokens.length + 1 &&
-        currentTokens.every((token, i) => token === node.path_tokens[i])
-    );
-  }, [__all_nodes, currentTokens]);
-
-  const __cd = useCallback(
-    (dir: string) => {
-      dispatch({ type: "cd", dir });
-    },
-    [dispatch]
-  );
-
-  const __refresh = useCallback(() => {
-    dispatch({ type: "refresh" });
-  }, [dispatch]);
-
-  const __add = useCallback(
-    (key: string, node: NodeItem) => {
-      dispatch({ type: "add", key, node });
-    },
-    [dispatch]
-  );
-
-  const __remove = useCallback(
-    (key: string) => {
-      dispatch({ type: "remove", key });
-    },
-    [dispatch]
-  );
-
-  const upload = useCallback(
-    async (file: File) => {
-      await __mock_elay();
-      const url = URL.createObjectURL(file);
-      const newFile: NodeItem = {
-        type: "file",
-        name: file.name,
-        key: file.name,
-        path_tokens: [file.name],
-        mimetype: file.type,
-        size: file.size,
-        modified: new Date().toISOString(),
-        url: url,
-        thumbnail: url,
-      };
-      __add(file.name, newFile);
-      return newFile;
-    },
-    [__add]
-  );
-
-  const deleteFile = useCallback(
-    async (key: string) => {
-      await __mock_elay();
-      __remove(key);
-    },
-    [__remove]
-  );
-
-  return {
-    refreshkey,
-    dir,
-    tasks,
-    nodes: currentDirNodes,
-    upload,
-    cd: __cd,
-    refresh: __refresh,
-    delete: deleteFile,
-  };
-}
-
-function generatePaths(segments: string[]): PathTokens[] {
-  return segments.map((_, i) => segments.slice(0, i + 1));
+/**
+ * function to return a value from a list of options or a fallback value
+ *
+ * often used with optional query parameters
+ */
+function q<T>(s: string | null, options: T[], fallback: T): T {
+  return options.includes(s as any) ? (s as any) : fallback;
 }
 
 const __tools_card_classes =
@@ -268,11 +95,10 @@ const __tools_card_classes =
 function Tools() {
   const { upload } = useStorageEditor();
   const { openFilePicker, plainFiles } = useFilePicker({ multiple: false });
-  const createFolderDialog = useDialogState();
+  const createFolderDialog = useDialogState("mkdir", { refreshkey: true });
 
   useEffect(() => {
     plainFiles.forEach((file) => {
-      console.log("Uploading file", file);
       upload(file);
     });
   }, [plainFiles, upload]);
@@ -292,7 +118,10 @@ function Tools() {
           <span className="text-xs text-muted-foreground">Create Folder</span>
         </div>
       </nav>
-      <CreateFolderDialog {...createFolderDialog.props} />
+      <CreateFolderDialog
+        key={createFolderDialog.refreshkey}
+        {...createFolderDialog.props}
+      />
     </>
   );
 }
@@ -307,59 +136,104 @@ export default function FileExplorer({
     path?: string[];
   };
 }) {
+  const api: StorageApi = useMemo(() => {
+    const sb = createClientComponentClient();
+    const __api = sb.storage.from("dummy");
+    const rmrf = async (path: string) => {
+      alert("not ready");
+    };
+    return { rmrf, ...__api } as StorageApi;
+  }, []);
+
   const { path = [] } = params;
   const [state, dispatch] = useReducer(reducer, {
-    nodes: {},
+    objects: {},
     dir: path.join("/"),
     refreshkey: 0,
     tasks: [],
+    api: api,
   });
 
   return (
     <StorageEditorProvider value={state}>
       <StorageEditorDispatcherProvider value={dispatch}>
-        {<Folder />}
+        <Folder />
       </StorageEditorDispatcherProvider>
     </StorageEditorProvider>
   );
 }
 
+type View = "grid" | "list";
+
 function Folder() {
-  const searchparams = useSearchParams();
+  const searchParams = useSearchParams();
   const [state] = useEditorState();
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const { dir, nodes } = useStorageEditor();
+  const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
+  const storage = useStorageEditor();
+  const { dir, nodes } = storage;
 
   const paths = useMemo(() => generatePaths(dir.split("/")), [dir]);
   const router = useRouter();
+  const pathname = usePathname();
 
-  const previewkey = searchparams.get("preview");
+  const createQueryString = useCallback(
+    (name: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(name, value);
+
+      return params.toString();
+    },
+    [searchParams]
+  );
+
+  const previewkey = searchParams.get("preview");
+  const setPreview = (key: string) =>
+    router.push(pathname + "?" + createQueryString("preview", key));
+  const view = q<View>(searchParams.get("view"), ["grid", "list"], "list");
+  const setView = (view: View) =>
+    router.push(pathname + "?" + createQueryString("view", view));
   const previewfile = nodes.find((n) => n.name === previewkey);
 
-  const onFileClick = (e: React.MouseEvent, file: NodeItem) => {
+  const onNodeClick = (e: React.MouseEvent, file: EntityNode) => {
     if (file.type === "folder") return;
-    router.push("?preview=" + file.name);
+    setPreview(file.name);
   };
 
-  const onFileDoubleClick = (e: React.MouseEvent, file: NodeItem) => {
-    const href =
-      file.type === "folder"
-        ? editorlink("objects/[[...path]]", {
+  const onNodeDoubleClick = (e: React.MouseEvent, file: EntityNode) => {
+    const handler: (href: string) => void =
+      e.metaKey || e.ctrlKey ? (l) => open(l, "_blank") : router.push;
+
+    switch (file.type) {
+      case "folder": {
+        handler(
+          editorlink("objects/[[...path]]", {
             path: file.path_tokens,
             document_id: state.document_id,
             basepath: state.basepath,
           })
-        : "?preview=" + file.name;
-    if (e.metaKey || e.ctrlKey) {
-      open(href, "_blank");
-    } else {
-      router.push(href);
+        );
+        break;
+      }
+      case "file": {
+        handler(`?${createQueryString("preview", file.name)}`);
+        break;
+      }
     }
+  };
+
+  const onNodeDelete = (file: EntityNode) => {
+    deleteConfirmDialog.openDialog(file);
+  };
+
+  const onNodeRename = (file: EntityNode) => {
+    const newname = prompt("Rename file", file.name);
+    if (!newname) return;
+    storage.mv(file.name, newname);
   };
 
   return (
     <div className="flex flex-1 h-full">
-      <aside className="w-full container mx-auto p-4 overflow-y-scroll">
+      <aside className="relative w-full container mx-auto p-4 overflow-y-scroll">
         <div className="my-8">
           <Tools />
         </div>
@@ -400,16 +274,16 @@ function Folder() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setViewMode("grid")}
-              className={cn(viewMode === "grid" && "bg-muted")}
+              onClick={() => setView("grid")}
+              className={cn(view === "grid" && "bg-muted")}
             >
               <GridIcon className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setViewMode("list")}
-              className={cn(viewMode === "list" && "bg-muted")}
+              onClick={() => setView("list")}
+              className={cn(view === "list" && "bg-muted")}
             >
               <ListIcon className="h-4 w-4" />
             </Button>
@@ -419,17 +293,19 @@ function Folder() {
           <FolderEmptyState />
         ) : (
           <>
-            {viewMode === "grid" ? (
+            {view === "grid" ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {nodes.map((file, index) => (
-                  <FileItemComponent
+                  <EntityNodeItemComponent
                     key={index}
-                    file={file}
-                    view={viewMode}
-                    onClick={(e) => onFileClick(e, file)}
+                    node={file}
+                    view={view}
+                    onClick={(e) => onNodeClick(e, file)}
                     onDoubleClick={(e) => {
-                      onFileDoubleClick(e, file);
+                      onNodeDoubleClick(e, file);
                     }}
+                    onDeleteClick={() => onNodeDelete(file)}
+                    onRenameClick={() => onNodeRename(file)}
                   />
                 ))}
               </div>
@@ -441,26 +317,32 @@ function Folder() {
                   <span className="w-1/4 text-sm">Modified</span>
                 </div>
                 {nodes.map((file, index) => (
-                  <FileItemComponent
+                  <EntityNodeItemComponent
                     key={index}
-                    file={file}
-                    view={viewMode}
-                    onClick={(e) => onFileClick(e, file)}
+                    node={file}
+                    view={view}
+                    onClick={(e) => onNodeClick(e, file)}
                     onDoubleClick={(e) => {
-                      onFileDoubleClick(e, file);
+                      onNodeDoubleClick(e, file);
                     }}
+                    onDeleteClick={() => onNodeDelete(file)}
+                    onRenameClick={() => onNodeRename(file)}
                   />
                 ))}
               </div>
             )}
           </>
         )}
+        <div className="absolute bottom-4 right-8 ">
+          <UploadsModal />
+        </div>
       </aside>
+      <ConfirmDeleteDialog {...deleteConfirmDialog.props} />
       {previewfile?.type === "file" && (
         <aside className="border-s">
           <FilePreviewSidebar
             file={previewfile}
-            onClose={() => router.push("?preview")}
+            onClose={() => setPreview("")}
           />
         </aside>
       )}
@@ -468,20 +350,24 @@ function Folder() {
   );
 }
 
-const FileItemComponent = ({
-  file,
+const EntityNodeItemComponent = ({
+  node,
   view,
+  onDeleteClick,
+  onRenameClick,
   className,
   ...props
 }: {
-  file: NodeItem;
+  node: EntityNode;
   view: "grid" | "list";
+  onDeleteClick?: () => void;
+  onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
   const commonClasses =
     "group relative flex items-center rounded-lg p-2 transition-colors select-none cursor-pointer";
 
   return (
-    <ContextMenu>
+    <ContextMenu modal={false}>
       <ContextMenuTrigger>
         <div
           className={cn(
@@ -497,53 +383,68 @@ const FileItemComponent = ({
             <div className="flex flex-col items-center">
               <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded">
                 <MimeTypeIcon
-                  type={file.type === "folder" ? "folder" : file.mimetype}
+                  type={node.type === "folder" ? "folder" : node.mimetype}
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium">{file.name}</span>
+              <span className="mt-2 text-sm font-medium">{node.name}</span>
             </div>
           ) : (
             <>
               <span className="w-1/2 text-sm font-medium truncate">
                 <MimeTypeIcon
-                  type={file.type === "folder" ? "folder" : file.mimetype}
+                  type={node.type === "folder" ? "folder" : node.mimetype}
                   className="inline align-middle me-2 w-4 h-4"
                 />
-                {file.name}
+                {node.name}
               </span>
               <span className="w-1/4 text-sm text-muted-foreground truncate">
-                {file.size ? fmtbytes(file.size) : ""}
+                {node.size ? fmt_bytes(node.size) : ""}
               </span>
               <span className="w-1/4 text-sm text-muted-foreground truncate">
-                {file.modified}
+                {node.modified
+                  ? format(new Date(node.modified), "yyyy-MM-dd HH:mm a")
+                  : ""}
               </span>
             </>
           )}
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 className="absolute right-1 top-1 h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+                onClick={(e) => e.stopPropagation()}
               >
-                <MoreHorizontalIcon className="h-4 w-4" />
+                <DotsHorizontalIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Rename</DropdownMenuItem>
-              <DropdownMenuItem>Move</DropdownMenuItem>
-              <DropdownMenuItem>Download</DropdownMenuItem>
-              <DropdownMenuItem>Delete</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onRenameClick}>
+                <InputIcon className="me-2" />
+                Rename
+              </DropdownMenuItem>
+              {/* <DropdownMenuItem>Move</DropdownMenuItem> */}
+              {/* <DropdownMenuItem>Download</DropdownMenuItem> */}
+              <DropdownMenuItem onSelect={onDeleteClick}>
+                <TrashIcon className="me-2" />
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem>Open</ContextMenuItem>
-        <ContextMenuItem>Rename</ContextMenuItem>
-        <ContextMenuItem>Move</ContextMenuItem>
-        <ContextMenuItem>Download</ContextMenuItem>
-        <ContextMenuItem>Delete</ContextMenuItem>
+        {/* <ContextMenuItem>Open</ContextMenuItem> */}
+        <ContextMenuItem onSelect={onRenameClick}>
+          <InputIcon className="me-2" />
+          Rename
+        </ContextMenuItem>
+        {/* <ContextMenuItem>Move</ContextMenuItem> */}
+        {/* <ContextMenuItem>Download</ContextMenuItem> */}
+        <ContextMenuItem onSelect={onDeleteClick}>
+          <TrashIcon className="me-2" />
+          Delete
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -560,9 +461,14 @@ function FilePreviewSidebar({
 
   return (
     <>
-      <div className="min-w-96 max-w-96 h-full flex flex-col">
+      <div className="min-w-96 w-96 h-full flex flex-col">
         <header className="flex items-center justify-start px-2 py-4 border-b gap-2">
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="min-w-10"
+          >
             <Cross2Icon />
           </Button>
           <span className="text-sm font-medium truncate">{file.name}</span>
@@ -600,6 +506,9 @@ function FilePreviewSidebar({
 }
 
 function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
+  const [name, setName] = useState("");
+  const { mkdir, cd } = useStorageEditor();
+
   return (
     <Dialog {...props}>
       <DialogContent>
@@ -610,7 +519,14 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
           </DialogTitle>
         </DialogHeader>
         <hr />
-        <div>
+        <form
+          id="create-folder-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            props.onOpenChange?.(false);
+            mkdir(name);
+          }}
+        >
           <div className="grid gap-2">
             <Label>Name</Label>
             <Input
@@ -618,17 +534,19 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
               autoComplete="off"
               name="name"
               placeholder="Folder name"
-              pattern="^(?!.*\/).+$"
+              pattern="^(?!\.\.$)(?!\.\.\.$)(?!.*\/).+$"
               title="Folder name must not contain '/'"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
-        </div>
+        </form>
         <hr />
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
-          <Button>Create</Button>
+          <Button form="create-folder-form">Create</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -702,6 +620,154 @@ function CreateViewerLinkDialog({
           <Button>Create</Button>
         </DialogFooter>
       </DialogContent>
+    </Dialog>
+  );
+}
+
+function UploadsModal() {
+  const { tasks } = useStorageEditor();
+  const [tab, setTab] = useState<"all" | "completed" | "failed">("all");
+
+  const [open, setOpen] = useState(false);
+
+  const filteredTasks = useMemo(() => {
+    const uploads = tasks.filter(
+      (task) => task.type === "upload"
+    ) as StorageEditorUploadingTask[];
+    switch (tab) {
+      case "all":
+        return uploads;
+      case "completed":
+        return uploads.filter((task) => task.staus === "completed");
+      case "failed":
+        return uploads.filter((task) => task.staus === "failed");
+    }
+  }, [tab, tasks]);
+
+  useEffect(() => {
+    if (tasks.length > 0) {
+      setOpen(true);
+    }
+  }, [tasks]);
+
+  return (
+    <Collapsible
+      className="w-96 border rounded-lg shadow-xl bg-background"
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <header
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-between px-4 py-2"
+      >
+        <span className="text-sm font-medium">Uploads</span>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="icon">
+            {open ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          </Button>
+          {/* <Button variant="ghost" size="icon">
+            <Cross2Icon />
+          </Button> */}
+        </div>
+      </header>
+      <CollapsibleContent className="min-h-96 border-t">
+        <Tabs
+          value={tab}
+          onValueChange={setTab as any}
+          className="w-full h-full p-4"
+        >
+          <TabsList>
+            <TabsTrigger value="all">All Uploads</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="failed">Failed</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-col gap-2 p-4">
+          {filteredTasks.map((task, index) => (
+            <UploadItem key={index} {...task} />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function UploadItem({ file, staus, progress }: StorageEditorTask) {
+  const l_type = file.name.split(".").pop();
+  const l_name = file.name.replace(`.${l_type}`, "");
+
+  return (
+    <div
+      data-status={staus}
+      className="w-full flex items-center gap-4 data-[status='completed']:text-muted-foreground"
+    >
+      <div>
+        {staus === "progress" && <Spinner className="w-5 h-5" />}
+        {staus === "completed" && <CheckCircledIcon className="w-5 h-5" />}
+        {staus === "failed" && (
+          <CrossCircledIcon className="w-5 h-5 text-destructive" />
+        )}
+      </div>
+      <div className="flex-1 flex flex-col gap-1 overflow-hidden">
+        <div className="text-sm font-medium truncate">{l_name}</div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Badge
+            variant="outline"
+            className="uppercase rounded text-[9px] px-1 py-0.5"
+          >
+            {l_type}
+          </Badge>
+          <span className="text-xs">{fmt_bytes(file.size)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const upload_status_text = {
+  idle: "Idle",
+  progress: "Uploading",
+  completed: "Completed",
+  failed: "Failed",
+} as const;
+
+function ConfirmDeleteDialog({
+  data,
+  ...props
+}: {
+  data?: EntityNode;
+} & React.ComponentProps<typeof Dialog>) {
+  const storage = useStorageEditor();
+
+  return (
+    <Dialog {...props}>
+      {data && (
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <ExclamationTriangleIcon className="inline align-middle me-2 w-4 h-4" />
+              Delete {data.name}
+            </DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogDescription>
+            Are you sure you want to delete this {data.type}?
+          </DialogDescription>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost">Cancel</Button>
+            </DialogClose>
+            <DialogClose asChild>
+              <Button
+                onClick={() => storage.rm(data.key)}
+                variant="destructive"
+              >
+                Delete
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
