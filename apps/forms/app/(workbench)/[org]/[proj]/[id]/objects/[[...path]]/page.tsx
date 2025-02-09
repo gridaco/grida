@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { format } from "date-fns";
-import { produce } from "immer";
+import Link from "next/link";
 import { FolderIcon, GridIcon, ListIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,7 +66,6 @@ import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-
 import { fmt_bytes } from "@/utils/fmt";
 import StorageEditorProvider, {
   EntityNode,
@@ -139,10 +138,11 @@ export default function FileExplorer({
   const api: StorageApi = useMemo(() => {
     const sb = createClientComponentClient();
     const __api = sb.storage.from("dummy");
-    const rmrf = async (path: string) => {
-      alert("not ready");
-    };
-    return { rmrf, ...__api } as StorageApi;
+    // const rmrf = async (path: string) => {
+    //   alert("not ready");
+    // };
+    // __api["rmrf"] = rmrf;
+    return __api as StorageApi;
   }, []);
 
   const { path = [] } = params;
@@ -242,13 +242,15 @@ function Folder() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink
-                    href={editorlink("objects", {
-                      document_id: state.document_id,
-                      basepath: state.basepath,
-                    })}
-                  >
-                    Home
+                  <BreadcrumbLink asChild>
+                    <Link
+                      href={editorlink("objects", {
+                        document_id: state.document_id,
+                        basepath: state.basepath,
+                      })}
+                    >
+                      Home
+                    </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 {paths.map((path, index) => {
@@ -262,7 +264,9 @@ function Folder() {
                     <React.Fragment key={index}>
                       <BreadcrumbSeparator />
                       <BreadcrumbItem>
-                        <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
+                        <BreadcrumbLink asChild>
+                          <Link href={href}>{label}</Link>
+                        </BreadcrumbLink>
                       </BreadcrumbItem>
                     </React.Fragment>
                   );
