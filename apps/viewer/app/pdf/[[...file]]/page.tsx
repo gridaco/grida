@@ -8,17 +8,13 @@ const Viewer = dynamic(() => import("@/scaffolds/pdf-page-flip"), {
 
 type PdfViewerApp = "" | "page-flip";
 
-export default function PDFViewerPage({
-  params,
-}: {
-  params: {
-    file: string[] | undefined;
-  };
-}) {
+type Params = Promise<{ file: string[] }>;
+
+export default async function PDFViewerPage({ params }: { params: Params }) {
   const searchparams = useSearchParams();
   const qapp: PdfViewerApp = (searchparams.get("app") as PdfViewerApp) ?? "";
   const qfile = searchparams.get("file");
-  const pfile = params.file?.[0];
+  const pfile = (await params).file?.[0];
 
   const file = (pfile || qfile)!;
 
