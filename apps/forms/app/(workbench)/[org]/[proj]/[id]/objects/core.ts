@@ -105,7 +105,9 @@ type StorageApi = StorageFileApi & {
 
 interface StorageEditorState {
   refreshkey: number;
+  basepath: string;
   dir: string;
+  absdir: string;
   tasks: StorageEditorTask[];
   objects: Record<string, FileNode>;
   api: StorageApi;
@@ -237,6 +239,7 @@ interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
 
 function useStorageEditor(): IStorageEditor {
   const {
+    basepath,
     dir,
     refreshkey,
     objects: __all_nodes,
@@ -247,9 +250,14 @@ function useStorageEditor(): IStorageEditor {
 
   const root = useMemo(() => tree(__all_nodes), [__all_nodes]);
 
+  const absdir = useMemo(
+    () => [basepath, dir].filter(Boolean).join("/"),
+    [basepath, dir]
+  );
+
   const current_dir_nodes: EntityNode[] = useMemo(() => {
-    if (!dir) return root;
-    const tokens = dir.split("/").filter(Boolean);
+    if (!absdir) return root;
+    const tokens = absdir.split("/").filter(Boolean);
     let current = root;
     for (const token of tokens) {
       const folder = current.find(
@@ -259,7 +267,7 @@ function useStorageEditor(): IStorageEditor {
       current = folder.children;
     }
     return current;
-  }, [dir, root]);
+  }, [absdir, root]);
 
   const __list = useCallback(
     async (dir: string, objects: Record<string, FileNode>) => {
@@ -342,7 +350,7 @@ function useStorageEditor(): IStorageEditor {
   );
 
   const upload = useCallback(
-    async (file: File, _dir: string = dir) => {
+    async (file: File, _dir: string = absdir) => {
       const key = _dir ? `${_dir}/${file.name}` : file.name;
       __task_push_uploading(key, file);
 
@@ -374,7 +382,7 @@ function useStorageEditor(): IStorageEditor {
     },
     [
       api,
-      dir,
+      absdir,
       __add,
       __task_push_uploading,
       __task_complete_uploading,
@@ -384,7 +392,7 @@ function useStorageEditor(): IStorageEditor {
 
   const mkdir = useCallback(
     async (name: string) => {
-      const newdir = `${dir}/${name}`;
+      const newdir = `${absdir}/${name}`;
       upload(
         new File([], EMPTY_FOLDER_PLACEHOLDER_FILE, {
           type: "application/octet-stream",
@@ -392,7 +400,7 @@ function useStorageEditor(): IStorageEditor {
         newdir
       );
     },
-    [dir, upload]
+    [absdir, upload]
   );
 
   const mv = useCallback(
@@ -496,14 +504,17 @@ function useStorageEditor(): IStorageEditor {
   // #region lifecycle hooks
   useEffect(() => {
     // [list & seed]
-    list(dir);
+    console.log("seed", absdir);
+    list(absdir);
     // console.log("seed", dir, data, error);
-  }, [dir, list, refreshkey]);
+  }, [absdir, list, refreshkey]);
   // #endregion
 
   return {
+    basepath,
     refreshkey,
     dir,
+    absdir,
     tasks,
     nodes: current_dir_nodes,
     upload,

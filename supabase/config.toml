@@ -99,6 +99,14 @@ file_size_limit = "30MiB"
 public = true
 file_size_limit = "30MiB"
 
+[storage.buckets.storage]
+public = false
+objects_path="seed/buckets/storage"
+
+[storage.buckets.storage-public]
+public = true
+objects_path="seed/buckets/storage"
+
 [storage.buckets.grida-forms]
 public = true
 

@@ -356,10 +356,16 @@ export type TableMenuItem = MenuItem<
 interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
+    mode_build: {
+      disabled: boolean;
+    };
     mode_data: {
       disabled: boolean;
-      tables: TableMenuItem[];
-      menus: MenuItem<GDocTableID>[];
+      tables?: TableMenuItem[];
+      menus?: MenuItem<GDocTableID>[];
+    };
+    mode_connect: {
+      disabled: boolean;
     };
   };
 }

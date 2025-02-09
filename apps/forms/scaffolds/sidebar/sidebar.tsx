@@ -65,7 +65,10 @@ export function Sidebar() {
             <TabsTrigger value="project">
               <ResourceTypeIcon type="project" className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="build" disabled={state.doctype === "v0_schema"}>
+            <TabsTrigger
+              value="build"
+              disabled={state.sidebar.mode_build.disabled}
+            >
               <HammerIcon className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger
@@ -74,7 +77,10 @@ export function Sidebar() {
             >
               <DatabaseIcon className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="connect">
+            <TabsTrigger
+              value="connect"
+              disabled={state.sidebar.mode_connect.disabled}
+            >
               <PlugIcon className="w-4 h-4" />
             </TabsTrigger>
           </TabsList>

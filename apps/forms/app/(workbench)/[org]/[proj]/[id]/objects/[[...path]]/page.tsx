@@ -78,6 +78,7 @@ import StorageEditorProvider, {
   StorageEditorUploadingTask,
   useStorageEditor,
 } from "../core";
+import toast from "react-hot-toast";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -125,6 +126,11 @@ function Tools() {
   );
 }
 
+const BUCLET = {
+  public: "storage-public",
+  private: "storage-private",
+};
+
 export default function FileExplorer({
   params,
 }: {
@@ -135,9 +141,11 @@ export default function FileExplorer({
     path?: string[];
   };
 }) {
+  const [{ document_id }] = useEditorState();
+
   const api: StorageApi = useMemo(() => {
     const sb = createClientComponentClient();
-    const __api = sb.storage.from("dummy");
+    const __api = sb.storage.from(BUCLET.public);
     // const rmrf = async (path: string) => {
     //   alert("not ready");
     // };
@@ -148,7 +156,9 @@ export default function FileExplorer({
   const { path = [] } = params;
   const [state, dispatch] = useReducer(reducer, {
     objects: {},
+    basepath: document_id,
     dir: path.join("/"),
+    absdir: document_id + "/" + path.join("/"),
     refreshkey: 0,
     tasks: [],
     api: api,
@@ -249,7 +259,13 @@ function Folder() {
                         basepath: state.basepath,
                       })}
                     >
-                      Home
+                      Home{" "}
+                      <Badge
+                        variant="outline"
+                        className="text-xs px-1.5 text-muted-foreground"
+                      >
+                        Public
+                      </Badge>
                     </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -485,7 +501,14 @@ function FilePreviewSidebar({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="end">
-                <DropdownMenuItem>Copy Link</DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    window.navigator.clipboard.writeText(file.url);
+                    toast("Link copied to clipboard");
+                  }}
+                >
+                  Copy Link
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={createlinkDialog.openDialog}>
                   Create Viewer Link
                 </DropdownMenuItem>
@@ -747,8 +770,8 @@ function ConfirmDeleteDialog({
     <Dialog {...props}>
       {data && (
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+          <DialogHeader className="overflow-hidden">
+            <DialogTitle className="truncate">
               <ExclamationTriangleIcon className="inline align-middle me-2 w-4 h-4" />
               Delete {data.name}
             </DialogTitle>

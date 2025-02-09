@@ -1939,18 +1939,21 @@ export type Database = {
           id: string
           name: string
           project_id: number
+          public: boolean
         }
         Insert: {
           created_at?: string
           id: string
           name: string
           project_id: number
+          public?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           project_id?: number
+          public?: boolean
         }
         Relationships: []
       }
@@ -2549,6 +2552,7 @@ export type Database = {
           has_connection_supabase: boolean
           responses: number
           max_responses: number
+          is_public: boolean
         }[]
       }
     }

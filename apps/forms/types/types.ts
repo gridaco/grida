@@ -500,6 +500,7 @@ export interface GDocument {
   organization_id: number;
   doctype: GDocumentType;
   title: string;
+  is_public: boolean;
   form_id: string | null;
   has_connection_supabase: boolean;
   responses: number | null;
