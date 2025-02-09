@@ -158,7 +158,7 @@ export default function FileExplorer({
 
   const { path = [] } = params;
   const [state, dispatch] = useReducer(reducer, {
-    loading: false,
+    loading: true,
     bucket_id: BUCLET.public,
     public: true,
     objects: {},
@@ -344,7 +344,11 @@ function Folder() {
         )}
         <div className="mt-4">
           {nodes.length === 0 ? (
-            <FolderEmptyState />
+            storage.loading ? (
+              <FolderLoadingState />
+            ) : (
+              <FolderEmptyState />
+            )
           ) : (
             <>
               {view === "grid" ? (
@@ -638,9 +642,18 @@ function FolderEmptyState() {
   );
 }
 
+function FolderLoadingState() {
+  return (
+    <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
+      <Spinner className="w-8 h-8" />
+      <h6 className="text-xs text-muted-foreground">Loading...</h6>
+    </div>
+  );
+}
+
 // type Viewer = {
 //   type: "pdf";
-//   app: "flipbook" | "none";
+//   app: "page-flip" | "none";
 //   url: string;
 // };
 // const [viewer, setViewer] = useState<Viewer | undefined>(undefined);
@@ -671,8 +684,7 @@ function CreateViewerLinkDialog({
               </TabsContent>
               <TabsContent value="flipbook" className="w-full h-full">
                 <iframe
-                  // src={`https://viewer.grida.co/pdf?file=${file.url}&app=page-flip`}
-                  src={`http://localhost:3001/pdf?file=${file.url}&app=page-flip`}
+                  src={`https://viewer.grida.co/pdf?file=${file.url}&app=page-flip`}
                   width="100%"
                   height="100%"
                 />

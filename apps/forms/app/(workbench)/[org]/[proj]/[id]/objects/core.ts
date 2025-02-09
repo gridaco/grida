@@ -289,6 +289,10 @@ function reducer(
 ): StorageEditorState {
   return produce(state, (draft) => {
     switch (action.type) {
+      case "loading": {
+        draft.loading = action.loading;
+        break;
+      }
       case "list": {
         // seed objects in dir
         // TODO: this won't clear removed files
