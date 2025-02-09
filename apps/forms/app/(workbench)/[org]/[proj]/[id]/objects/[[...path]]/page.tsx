@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { FolderIcon, GridIcon, ListIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,8 @@ import {
   DotsHorizontalIcon,
   InputIcon,
   ExclamationTriangleIcon,
+  LockOpen1Icon,
+  ReloadIcon,
 } from "@radix-ui/react-icons";
 import { MimeTypeIcon } from "@/components/mime-type-icon";
 import { useFilePicker } from "use-file-picker";
@@ -155,6 +158,9 @@ export default function FileExplorer({
 
   const { path = [] } = params;
   const [state, dispatch] = useReducer(reducer, {
+    loading: false,
+    bucket_id: BUCLET.public,
+    public: true,
     objects: {},
     basepath: document_id,
     dir: path.join("/"),
@@ -180,6 +186,7 @@ function Folder() {
   const [state] = useEditorState();
   const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
   const storage = useStorageEditor();
+
   const { dir, nodes } = storage;
 
   const paths = useMemo(() => generatePaths(dir.split("/")), [dir]);
@@ -247,7 +254,7 @@ function Folder() {
         <div className="my-8">
           <Tools />
         </div>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Breadcrumb>
               <BreadcrumbList>
@@ -260,12 +267,14 @@ function Folder() {
                       })}
                     >
                       Home{" "}
-                      <Badge
-                        variant="outline"
-                        className="text-xs px-1.5 text-muted-foreground"
-                      >
-                        Public
-                      </Badge>
+                      {storage.public && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 text-muted-foreground"
+                        >
+                          Public
+                        </Badge>
+                      )}
                     </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -292,6 +301,18 @@ function Folder() {
           </nav>
           <div className="flex space-x-2">
             <Button
+              disabled={storage.loading}
+              variant="outline"
+              onClick={() => storage.refresh()}
+            >
+              {storage.loading ? (
+                <Spinner className="h-4 w-4 me-2" />
+              ) : (
+                <ReloadIcon className="h-4 w-4 me-2" />
+              )}
+              Reload
+            </Button>
+            <Button
               variant="outline"
               size="icon"
               onClick={() => setView("grid")}
@@ -309,50 +330,64 @@ function Folder() {
             </Button>
           </div>
         </div>
-        {nodes.length === 0 ? (
-          <FolderEmptyState />
-        ) : (
-          <>
-            {view === "grid" ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {nodes.map((file, index) => (
-                  <EntityNodeItemComponent
-                    key={index}
-                    node={file}
-                    view={view}
-                    onClick={(e) => onNodeClick(e, file)}
-                    onDoubleClick={(e) => {
-                      onNodeDoubleClick(e, file);
-                    }}
-                    onDeleteClick={() => onNodeDelete(file)}
-                    onRenameClick={() => onNodeRename(file)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
-                  <span className="w-1/2 text-sm">Name</span>
-                  <span className="w-1/4 text-sm">Size</span>
-                  <span className="w-1/4 text-sm">Modified</span>
-                </div>
-                {nodes.map((file, index) => (
-                  <EntityNodeItemComponent
-                    key={index}
-                    node={file}
-                    view={view}
-                    onClick={(e) => onNodeClick(e, file)}
-                    onDoubleClick={(e) => {
-                      onNodeDoubleClick(e, file);
-                    }}
-                    onDeleteClick={() => onNodeDelete(file)}
-                    onRenameClick={() => onNodeRename(file)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
+        {storage.public && (
+          <div className="py-4">
+            <Alert>
+              <LockOpen1Icon className="w-4 h-4" />
+              <AlertTitle>Public Bucket</AlertTitle>
+              <AlertDescription>
+                This bucket is public and only meant for serving public files.{" "}
+                <b>DO NOT</b> upload sensitive files here.
+              </AlertDescription>
+            </Alert>
+          </div>
         )}
+        <div className="mt-4">
+          {nodes.length === 0 ? (
+            <FolderEmptyState />
+          ) : (
+            <>
+              {view === "grid" ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {nodes.map((file, index) => (
+                    <EntityNodeItemComponent
+                      key={index}
+                      node={file}
+                      view={view}
+                      onClick={(e) => onNodeClick(e, file)}
+                      onDoubleClick={(e) => {
+                        onNodeDoubleClick(e, file);
+                      }}
+                      onDeleteClick={() => onNodeDelete(file)}
+                      onRenameClick={() => onNodeRename(file)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
+                    <span className="w-1/2 text-sm">Name</span>
+                    <span className="w-1/4 text-sm">Size</span>
+                    <span className="w-1/4 text-sm">Modified</span>
+                  </div>
+                  {nodes.map((file, index) => (
+                    <EntityNodeItemComponent
+                      key={index}
+                      node={file}
+                      view={view}
+                      onClick={(e) => onNodeClick(e, file)}
+                      onDoubleClick={(e) => {
+                        onNodeDoubleClick(e, file);
+                      }}
+                      onDeleteClick={() => onNodeDelete(file)}
+                      onRenameClick={() => onNodeRename(file)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
         <div className="absolute bottom-4 right-8 ">
           <UploadsModal />
         </div>
@@ -407,7 +442,9 @@ const EntityNodeItemComponent = ({
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium">{node.name}</span>
+              <span className="mt-2 text-sm font-medium truncate">
+                {node.name}
+              </span>
             </div>
           ) : (
             <>
@@ -601,50 +638,85 @@ function FolderEmptyState() {
   );
 }
 
+// type Viewer = {
+//   type: "pdf";
+//   app: "flipbook" | "none";
+//   url: string;
+// };
+// const [viewer, setViewer] = useState<Viewer | undefined>(undefined);
+
 function CreateViewerLinkDialog({
   file,
   ...props
 }: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
   const known = wellkown(file.mimetype);
+
+  const Body = () => {
+    switch (known) {
+      case "pdf": {
+        return (
+          <>
+            <Tabs className="w-full h-full">
+              <TabsList>
+                <TabsTrigger value="none">Plain</TabsTrigger>
+                <TabsTrigger value="flipbook">Flip Book</TabsTrigger>
+              </TabsList>
+              <TabsContent value="none" className="w-full h-full">
+                <object
+                  data={file.url}
+                  type={file.mimetype}
+                  width="100%"
+                  height="100%"
+                />
+              </TabsContent>
+              <TabsContent value="flipbook" className="w-full h-full">
+                <iframe
+                  // src={`https://viewer.grida.co/pdf?file=${file.url}&app=page-flip`}
+                  src={`http://localhost:3001/pdf?file=${file.url}&app=page-flip`}
+                  width="100%"
+                  height="100%"
+                />
+              </TabsContent>
+            </Tabs>
+          </>
+        );
+      }
+      case undefined:
+        return (
+          <div>
+            <p>Viewer not available for this file type {file.mimetype}</p>
+          </div>
+        );
+      default: {
+        return (
+          <div>
+            <p>Viewer not available for {known}</p>
+          </div>
+        );
+      }
+    }
+  };
+
   return (
     <Dialog {...props}>
       <DialogContent className="flex flex-col max-w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]">
         <DialogHeader>
-          <DialogTitle>Create Sharable Viewer Link</DialogTitle>
+          <DialogTitle className="flex items-center">
+            Create Sharable Viewer Link
+            {known && <Badge className="ms-2">{known}</Badge>}
+          </DialogTitle>
           <DialogDescription></DialogDescription>
         </DialogHeader>
         <div className="w-full flex-1 overflow-hidden">
-          {known === "pdf" && (
-            <>
-              <Tabs className="w-full h-full">
-                <TabsList>
-                  <TabsTrigger value="plain">Plain</TabsTrigger>
-                  <TabsTrigger value="flipbook">Flip Book</TabsTrigger>
-                </TabsList>
-                <TabsContent value="plain" className="w-full h-full">
-                  <object
-                    data={file.url}
-                    type={file.mimetype}
-                    width="100%"
-                    height="100%"
-                  />
-                </TabsContent>
-                <TabsContent value="flipbook" className="w-full h-full">
-                  <iframe
-                    src={`https://viewer.grida.co/pdf?file=${file.url}&app=page-flip`}
-                    width="100%"
-                    height="100%"
-                  />
-                </TabsContent>
-              </Tabs>
-            </>
-          )}
+          <Body />
         </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
-          <Button>Create</Button>
+          <DialogClose asChild>
+            <Button>Create</Button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

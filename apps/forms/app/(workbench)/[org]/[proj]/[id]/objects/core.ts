@@ -104,10 +104,37 @@ type StorageApi = StorageFileApi & {
 };
 
 interface StorageEditorState {
+  loading: boolean;
+  /**
+   * bucket id
+   */
+  bucket_id: string;
+
+  /**
+   * bucket is public
+   */
+  public: boolean;
+
+  /**
+   * refresh key to refresh (list) current dir
+   */
   refreshkey: number;
+
+  /**
+   * base path of the storage, relative to the bucket
+   */
   basepath: string;
+
+  /**
+   * current directory
+   */
   dir: string;
+
+  /**
+   * absolute directory (basepath + dir)
+   */
   absdir: string;
+
   tasks: StorageEditorTask[];
   objects: Record<string, FileNode>;
   api: StorageApi;
@@ -123,151 +150,17 @@ const StorageEditorDispatcherContext = React.createContext<
 const StorageEditorDispatcherProvider = StorageEditorDispatcherContext.Provider;
 
 function __useDispatch() {
-  const context = React.useContext(StorageEditorDispatcherContext);
-  if (!context) {
+  const dispatch = React.useContext(StorageEditorDispatcherContext);
+  if (!dispatch) {
     throw new Error("useDispatch must be used within a StorageEditorProvider");
   }
-  return context;
-}
 
-function __useStorageEditorState() {
-  const context = React.useContext(StorageEditorContext);
-  if (!context) {
-    throw new Error(
-      "useStorageEditor must be used within a StorageEditorProvider"
-    );
-  }
-  return context;
-}
-
-type StorageEditorAction =
-  | { type: "list"; dir: string; objects: Record<string, FileNode> }
-  | { type: "cd"; dir: string }
-  | { type: "refresh" }
-  | { type: "add"; key: string; object: FileNode }
-  | { type: "remove"; key: string }
-  | { type: "tasks/uploading/push"; task: StorageEditorUploadingTask }
-  | { type: "tasks/uploading/complete"; id: string }
-  | { type: "tasks/uploading/fail"; id: string }
-  | { type: "tasks/deleting/push"; task: StorageEditorDeletingTask }
-  | { type: "tasks/deleting/complete"; id: string }
-  | { type: "tasks/deleting/fail"; id: string };
-
-function reducer(
-  state: StorageEditorState,
-  action: StorageEditorAction
-): StorageEditorState {
-  return produce(state, (draft) => {
-    switch (action.type) {
-      case "list": {
-        // seed objects in dir
-        Object.assign(draft.objects, action.objects);
-        break;
-      }
-      case "cd": {
-        draft.dir = action.dir;
-        break;
-      }
-      case "add": {
-        const { key, object } = action;
-        draft.objects[key] = { ...object, key };
-        break;
-      }
-      case "remove": {
-        delete draft.objects[action.key];
-        break;
-      }
-      case "refresh": {
-        draft.refreshkey++;
-        break;
-      }
-      case "tasks/uploading/push": {
-        draft.tasks.push(action.task);
-        break;
-      }
-      case "tasks/uploading/complete": {
-        const t = draft.tasks.find((task) => task.id === action.id);
-        if (t) {
-          t.staus = "completed";
-          t.progress = 1;
-        }
-        break;
-      }
-      case "tasks/uploading/fail": {
-        const t = draft.tasks.find((task) => task.id === action.id);
-        if (t) {
-          t.staus = "failed";
-          t.progress = 0;
-        }
-        break;
-      }
-      case "tasks/deleting/push": {
-        draft.tasks.push(action.task);
-        break;
-      }
-      case "tasks/deleting/complete": {
-        const t = draft.tasks.find((task) => task.id === action.id);
-        if (t) {
-          t.staus = "completed";
-          t.progress = 1;
-        }
-        break;
-      }
-      case "tasks/deleting/fail": {
-        const t = draft.tasks.find((task) => task.id === action.id);
-        if (t) {
-          t.staus = "failed";
-          t.progress = 0;
-        }
-        break;
-      }
-    }
-  });
-}
-
-interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
-  nodes: EntityNode[];
-  upload: (file: File) => Promise<any>;
-  mkdir: (name: string) => Promise<any>;
-  cd: (dir: string) => void;
-  mv: (path: string, newPath: string) => Promise<any>;
-  // download: (path: string) => Promise<any>;
-  list: (path: string) => Promise<any>;
-  refresh: () => void;
-  rm: (path: string, recursive?: boolean) => Promise<any>;
-}
-
-function useStorageEditor(): IStorageEditor {
-  const {
-    basepath,
-    dir,
-    refreshkey,
-    objects: __all_nodes,
-    tasks,
-    api,
-  } = __useStorageEditorState();
-  const dispatch = __useDispatch();
-
-  const root = useMemo(() => tree(__all_nodes), [__all_nodes]);
-
-  const absdir = useMemo(
-    () => [basepath, dir].filter(Boolean).join("/"),
-    [basepath, dir]
+  const __set_loading = useCallback(
+    async (loading: boolean) => {
+      dispatch({ type: "loading", loading });
+    },
+    [dispatch]
   );
-
-  const current_dir_nodes: EntityNode[] = useMemo(() => {
-    if (!absdir) return root;
-    const tokens = absdir.split("/").filter(Boolean);
-    let current = root;
-    for (const token of tokens) {
-      const folder = current.find(
-        (node) => node.type === "folder" && node.name === token
-      );
-      if (!folder || !folder.children) return [];
-      current = folder.children;
-    }
-    return current;
-  }, [absdir, root]);
 
   const __list = useCallback(
     async (dir: string, objects: Record<string, FileNode>) => {
@@ -349,18 +242,198 @@ function useStorageEditor(): IStorageEditor {
     [dispatch]
   );
 
+  return {
+    dispatch,
+    __set_loading,
+    __list,
+    __cd,
+    __refresh,
+    __add,
+    __remove,
+    __task_push_uploading,
+    __task_complete_uploading,
+    __task_fail_uploading,
+    __task_push_deleting,
+    __task_complete_deleting,
+    __task_fail_deleting,
+  };
+}
+
+function __useStorageEditorState() {
+  const context = React.useContext(StorageEditorContext);
+  if (!context) {
+    throw new Error(
+      "useStorageEditor must be used within a StorageEditorProvider"
+    );
+  }
+  return context;
+}
+
+type StorageEditorAction =
+  | { type: "loading"; loading: boolean }
+  | { type: "list"; dir: string; objects: Record<string, FileNode> }
+  | { type: "cd"; dir: string }
+  | { type: "refresh" }
+  | { type: "add"; key: string; object: FileNode }
+  | { type: "remove"; key: string }
+  | { type: "tasks/uploading/push"; task: StorageEditorUploadingTask }
+  | { type: "tasks/uploading/complete"; id: string }
+  | { type: "tasks/uploading/fail"; id: string }
+  | { type: "tasks/deleting/push"; task: StorageEditorDeletingTask }
+  | { type: "tasks/deleting/complete"; id: string }
+  | { type: "tasks/deleting/fail"; id: string };
+
+function reducer(
+  state: StorageEditorState,
+  action: StorageEditorAction
+): StorageEditorState {
+  return produce(state, (draft) => {
+    switch (action.type) {
+      case "list": {
+        // seed objects in dir
+        // TODO: this won't clear removed files
+        Object.assign(draft.objects, action.objects);
+        break;
+      }
+      case "cd": {
+        draft.dir = action.dir;
+        break;
+      }
+      case "add": {
+        const { key, object } = action;
+        draft.objects[key] = { ...object, key };
+        break;
+      }
+      case "remove": {
+        delete draft.objects[action.key];
+        break;
+      }
+      case "refresh": {
+        draft.refreshkey++;
+        break;
+      }
+      case "tasks/uploading/push": {
+        draft.tasks.push(action.task);
+        break;
+      }
+      case "tasks/uploading/complete": {
+        const t = draft.tasks.find((task) => task.id === action.id);
+        if (t) {
+          t.staus = "completed";
+          t.progress = 1;
+        }
+        break;
+      }
+      case "tasks/uploading/fail": {
+        const t = draft.tasks.find((task) => task.id === action.id);
+        if (t) {
+          t.staus = "failed";
+          t.progress = 0;
+        }
+        break;
+      }
+      case "tasks/deleting/push": {
+        draft.tasks.push(action.task);
+        break;
+      }
+      case "tasks/deleting/complete": {
+        const t = draft.tasks.find((task) => task.id === action.id);
+        if (t) {
+          t.staus = "completed";
+          t.progress = 1;
+        }
+        break;
+      }
+      case "tasks/deleting/fail": {
+        const t = draft.tasks.find((task) => task.id === action.id);
+        if (t) {
+          t.staus = "failed";
+          t.progress = 0;
+        }
+        break;
+      }
+    }
+  });
+}
+
+interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
+  nodes: EntityNode[];
+  upload: (file: File) => Promise<any>;
+  mkdir: (name: string) => Promise<any>;
+  cd: (dir: string) => void;
+  mv: (path: string, newPath: string) => Promise<any>;
+  // download: (path: string) => Promise<any>;
+  list: (path: string) => Promise<any>;
+  refresh: () => void;
+  rm: (path: string, recursive?: boolean) => Promise<any>;
+}
+
+function useStorageEditor(): IStorageEditor {
+  const {
+    loading,
+    bucket_id,
+    public: _public,
+    basepath,
+    dir,
+    refreshkey,
+    objects: __all_nodes,
+    tasks,
+    api,
+  } = __useStorageEditorState();
+
+  const {
+    __set_loading,
+    __list,
+    __cd,
+    __refresh,
+    __add,
+    __remove,
+    __task_push_uploading,
+    __task_complete_uploading,
+    __task_fail_uploading,
+    __task_push_deleting,
+    __task_complete_deleting,
+    __task_fail_deleting,
+  } = __useDispatch();
+
+  const root = useMemo(() => tree(__all_nodes), [__all_nodes]);
+
+  const absdir = useMemo(
+    () => [basepath, dir].filter(Boolean).join("/"),
+    [basepath, dir]
+  );
+
+  const current_dir_nodes: EntityNode[] = useMemo(() => {
+    if (!dir) return root;
+    const tokens = dir.split("/").filter(Boolean);
+    let current = root;
+    for (const token of tokens) {
+      const folder = current.find(
+        (node) => node.type === "folder" && node.name === token
+      );
+      if (!folder || !folder.children) return [];
+      current = folder.children;
+    }
+    return current;
+  }, [dir, root]);
+
+  const abspath = useCallback(
+    (path: string) => [basepath, path].filter(Boolean).join("/"),
+    [basepath]
+  );
+
   const upload = useCallback(
-    async (file: File, _dir: string = absdir) => {
+    async (file: File, _dir: string = dir) => {
       const key = _dir ? `${_dir}/${file.name}` : file.name;
       __task_push_uploading(key, file);
 
-      const { data, error } = await api.upload(key, file);
+      const { data, error } = await api.upload(abspath(key), file);
       if (error) {
         //
         __task_fail_uploading(key);
       } else {
         //
-        const url = api.getPublicUrl(key).data.publicUrl;
+        const url = api.getPublicUrl(abspath(key)).data.publicUrl;
 
         // await __mock_elay();
         // const url = URL.createObjectURL(file);
@@ -382,7 +455,8 @@ function useStorageEditor(): IStorageEditor {
     },
     [
       api,
-      absdir,
+      abspath,
+      dir,
       __add,
       __task_push_uploading,
       __task_complete_uploading,
@@ -392,26 +466,25 @@ function useStorageEditor(): IStorageEditor {
 
   const mkdir = useCallback(
     async (name: string) => {
-      const newdir = `${absdir}/${name}`;
       upload(
         new File([], EMPTY_FOLDER_PLACEHOLDER_FILE, {
           type: "application/octet-stream",
         }),
-        newdir
+        dir + "/" + name
       );
     },
-    [absdir, upload]
+    [dir, upload]
   );
 
   const mv = useCallback(
     async (from: string, to: string) => {
-      const { data, error } = await api.move(from, to);
+      const { data, error } = await api.move(abspath(from), abspath(to));
       const file = __all_nodes[from];
       if (!file) return;
       __add(to, file);
       __remove(from);
     },
-    [api, __all_nodes, __add, __remove]
+    [api, abspath, __all_nodes, __add, __remove]
   );
 
   const rm = useCallback(
@@ -425,7 +498,7 @@ function useStorageEditor(): IStorageEditor {
         type: file.type,
       });
 
-      const { data, error } = await api.remove([key]);
+      const { data, error } = await api.remove([abspath(key)]);
 
       if (error) {
         __task_fail_deleting(key);
@@ -437,6 +510,7 @@ function useStorageEditor(): IStorageEditor {
     },
     [
       api,
+      abspath,
       __all_nodes,
       __task_push_deleting,
       __remove,
@@ -447,7 +521,7 @@ function useStorageEditor(): IStorageEditor {
 
   const list = useCallback(
     async (path: string) => {
-      const { data, error } = await api.list(path);
+      const { data, error } = await api.list(abspath(path));
       if (error) {
         console.error("[error while list]", error);
         return;
@@ -479,7 +553,7 @@ function useStorageEditor(): IStorageEditor {
           }
           const name = maybefile.name;
           const key = [path, maybefile.name].join("/");
-          const url = api.getPublicUrl(key).data.publicUrl;
+          const url = api.getPublicUrl(abspath(key)).data.publicUrl;
           acc[key] = {
             type: "file",
             name: name,
@@ -498,19 +572,22 @@ function useStorageEditor(): IStorageEditor {
 
       __list(path, objects);
     },
-    [api, __list]
+    [api, abspath, __list]
   );
 
   // #region lifecycle hooks
   useEffect(() => {
     // [list & seed]
-    console.log("seed", absdir);
-    list(absdir);
+    __set_loading(true);
+    list(dir).finally(() => __set_loading(false));
     // console.log("seed", dir, data, error);
-  }, [absdir, list, refreshkey]);
+  }, [__set_loading, dir, list, refreshkey]);
   // #endregion
 
   return {
+    bucket_id,
+    public: _public,
+    loading,
     basepath,
     refreshkey,
     dir,

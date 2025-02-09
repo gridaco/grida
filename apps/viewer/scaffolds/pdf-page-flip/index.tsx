@@ -61,12 +61,13 @@ FlipPage.displayName = "FlipPage";
 
 const PDFViewer = ({
   file,
-  title = file,
+  title: _title = file,
 }: {
   file: string;
   title?: string;
 }) => {
   const [numPages, setNumPages] = useState<number>(0);
+  const [title, setTitle] = useState<string>(_title);
   const [currentPage, setCurrentPage] = useState(0);
   const [rawSize, setRawSize] = useState<
     { width: number; height: number } | undefined
@@ -80,6 +81,15 @@ const PDFViewer = ({
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
     document: PDFDocumentProxy
   ) => {
+    document.getMetadata().then(({ info }) => {
+      try {
+        const pdfTitle = (info as any)["Title"];
+        if (pdfTitle) {
+          setTitle(pdfTitle);
+        }
+      } catch (e) {}
+    });
+
     setNumPages(document.numPages);
     document.getPage(1).then((page) => {
       const [

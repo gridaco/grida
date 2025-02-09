@@ -194,6 +194,7 @@ export async function POST(request: NextRequest) {
       try {
         const setup = new BucketDocumentSetupAssistantService(project_id, {
           name: data.name,
+          public: data.public,
         });
         const { id } = await setup.createBucketDocument();
 

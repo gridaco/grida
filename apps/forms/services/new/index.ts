@@ -143,7 +143,7 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
 export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantService {
   constructor(
     readonly project_id: number,
-    private readonly seed: { name: string }
+    private readonly seed: { name: string; public: boolean }
   ) {
     super(project_id, "v0_bucket");
   }
@@ -177,7 +177,7 @@ export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantS
   }
 
   async createBucketDocument() {
-    const { name } = this.seed;
+    const { name, public: is_public } = this.seed;
 
     // pre-validation
     const isvalidname = await this.validateName();
@@ -199,6 +199,7 @@ export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantS
         id: masterdoc_ref.id,
         name: name,
         project_id: this.project_id,
+        public: is_public,
       })
       .select()
       .single();
