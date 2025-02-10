@@ -12,6 +12,7 @@ import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
 import { css } from "@/grida/css";
+import { TransparencyGrid } from "@grida/transparency-grid";
 // import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
@@ -55,7 +56,7 @@ export function StandaloneDocumentBackground({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { background } = useDocument();
+  const { background, transform } = useDocument();
 
   const backgroundColor = useMemo(() => {
     if (!background) return undefined;
@@ -63,7 +64,18 @@ export function StandaloneDocumentBackground({
   }, [background]);
 
   return (
-    <div style={{ backgroundColor: backgroundColor }} {...props}>
+    <div {...props}>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <TransparencyGrid
+          transform={transform}
+          width={typeof window !== "undefined" ? window.innerWidth : 0}
+          height={typeof window !== "undefined" ? window.innerHeight : 0}
+        />
+      </div>
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ backgroundColor: backgroundColor }}
+      />
       {children}
     </div>
   );
