@@ -201,6 +201,9 @@ importers:
       '@grida/tokens':
         specifier: workspace:*
         version: link:../../packages/grida-tokens
+      '@grida/transparency-grid':
+        specifier: workspace:*
+        version: link:../../packages/grida-canvas-transparency-grid
       '@mdx-js/loader':
         specifier: ^3.0.1
         version: 3.0.1(webpack@5.95.0)
@@ -848,6 +851,15 @@ importers:
         version: 18.3.1
 
   packages/grida-canvas-ruler:
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+
+  packages/grida-canvas-transparency-grid:
     devDependencies:
       '@types/react':
         specifier: 18.2.58
