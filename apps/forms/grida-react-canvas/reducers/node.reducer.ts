@@ -175,10 +175,18 @@ export default function nodeReducer<
         switch (action.fill.type) {
           case "linear_gradient":
           case "radial_gradient":
-            draft.fill = { ...action.fill, id: `gradient-${v4()}` };
+            draft.fill = {
+              ...(action.fill as
+                | grida.program.cg.LinearGradientPaint
+                | grida.program.cg.RadialGradientPaint),
+              id: `gradient-${v4()}`,
+            };
             break;
           case "solid":
-            draft.fill = action.fill;
+            draft.fill = action.fill as
+              | grida.program.nodes.i.props.SolidPaintToken
+              | grida.program.cg.SolidPaint;
+            break;
         }
         break;
       }
@@ -212,10 +220,20 @@ export default function nodeReducer<
             switch (action.stroke.type) {
               case "linear_gradient":
               case "radial_gradient":
-                draft.stroke = { ...action.stroke, id: `gradient-${v4()}` };
+                draft.stroke = {
+                  ...(action.stroke as
+                    | grida.program.cg.LinearGradientPaint
+                    | grida.program.cg.RadialGradientPaint),
+                  id: `gradient-${v4()}`,
+                };
                 break;
               case "solid":
-                draft.stroke = action.stroke;
+                // FIXME:
+                // @ts-expect-error
+                draft.stroke = action.stroke as
+                  | grida.program.nodes.i.props.SolidPaintToken
+                  | grida.program.cg.SolidPaint;
+                break;
             }
             break;
           }

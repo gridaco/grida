@@ -227,6 +227,7 @@ export namespace iofigma {
         return {
           nodes,
           root_id: rootNode.id,
+          properties: {},
         };
       }
 

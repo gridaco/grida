@@ -1627,6 +1627,7 @@ export type Database = {
         | "audio"
         | "video"
         | "json"
+        | "canvas"
       form_method: "post" | "get" | "dialog"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
@@ -1913,6 +1914,46 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_storage: {
+    Tables: {
+      bucket_document: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: number
+          public: boolean
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          project_id: number
+          public?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: number
+          public?: boolean
         }
         Relationships: []
       }
@@ -2511,11 +2552,12 @@ export type Database = {
           has_connection_supabase: boolean
           responses: number
           max_responses: number
+          is_public: boolean
         }[]
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site" | "v0_schema" | "v0_canvas"
+      doctype: "v0_form" | "v0_site" | "v0_schema" | "v0_canvas" | "v0_bucket"
       language_code:
         | "en"
         | "ko"
@@ -2633,3 +2675,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

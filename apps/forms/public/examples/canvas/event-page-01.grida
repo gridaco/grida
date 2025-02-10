@@ -970,6 +970,12 @@
         "fontWeight": 600
       }
     },
-    "root_id": "291:302"
+    "root_id": "291:302",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
   }
 }

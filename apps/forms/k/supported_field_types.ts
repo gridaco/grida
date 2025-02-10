@@ -34,6 +34,7 @@ export const fieldlabels: Record<FormInputType, string> = {
   range: "Range",
   search: "Search for Reference",
   json: "JSON",
+  canvas: "Canvas",
 };
 
 export const supported_field_types: FormInputType[] = [

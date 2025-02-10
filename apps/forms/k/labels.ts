@@ -6,6 +6,7 @@ export namespace Labels {
     v0_form: "Form",
     v0_site: "Site",
     v0_canvas: "Canvas",
+    v0_bucket: "Storage",
   } as const;
 
   export function doctype(dt: GDocumentType) {

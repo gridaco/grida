@@ -73,36 +73,45 @@ export function StandaloneDocumentEditor({
     [initial, editable, debug]
   );
 
-  const rootnode = initial.document.nodes[initial.document.root_id];
-  assert(rootnode, "root node is not found");
-  const shallowRootProps = useMemo(() => {
-    if (rootnode.type === "component") {
-      // transform property definitions to props with default values
-      const virtual_props_from_definition = Object.entries(
-        rootnode.properties
-      ).reduce(
-        (acc, [key, value]) => {
-          acc[key] = value.default;
-          return acc;
-        },
-        {} as Record<string, tokens.StringValueExpression>
-      );
+  // TODO:
+  // const rootnode = initial.document.nodes[initial.document.root_id];
+  // assert(rootnode, "root node is not found");
+  // const shallowRootProps = useMemo(() => {
+  //   if (rootnode.type === "component") {
+  //     // transform property definitions to props with default values
+  //     const virtual_props_from_definition = Object.entries(
+  //       rootnode.properties
+  //     ).reduce(
+  //       (acc, [key, value]) => {
+  //         acc[key] = value.default;
+  //         return acc;
+  //       },
+  //       {} as Record<string, tokens.StringValueExpression>
+  //     );
 
-      return virtual_props_from_definition;
-    }
-    if (rootnode.type === "template_instance") {
-      const defaultProps = initial.templates![rootnode.template_id].default;
-      return Object.assign({}, defaultProps, rootnode.props);
-    } else {
-      return {};
-    }
-  }, [rootnode]);
+  //     return virtual_props_from_definition;
+  //   }
+  //   if (rootnode.type === "template_instance") {
+  //     const defaultProps = initial.templates![rootnode.template_id].default;
+  //     return Object.assign({}, defaultProps, rootnode.props);
+  //   } else {
+  //     return {};
+  //   }
+  // }, [rootnode]);
+
+  const props = Object.entries(state.document.properties ?? {}).reduce(
+    (acc, [key, value]) => {
+      acc[key] = value.default;
+      return acc;
+    },
+    {} as Record<string, tokens.StringValueExpression>
+  );
 
   return (
     <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
-          <DataProvider data={{ props: shallowRootProps }}>
+          <DataProvider data={{ props: props }}>
             <EditorGoogleFontsManager>
               {/*  */}
               {children}
@@ -388,7 +397,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      fill:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
@@ -401,7 +416,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeStroke = useCallback(
-    (node_id: string, stroke: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      stroke:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/stroke",
@@ -875,10 +896,18 @@ export function useNodeAction(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => nodeActions.changeNodeCornerRadius(node_id, value),
-      fill: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeFill(node_id, value),
-      stroke: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeStroke(node_id, value),
+      fill: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeFill(node_id, value),
+      stroke: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeStroke(node_id, value),
       strokeWidth: (change: TChange<number>) =>
         nodeActions.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: grida.program.cg.StrokeCap) =>
@@ -949,7 +978,7 @@ export function useNodeAction(node_id: string | undefined) {
   }, [node_id, nodeActions]);
 }
 
-const compareProperty: PropertyCompareFn<grida.program.nodes.AnyNode> = (
+const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
   key,
   a,
   b
@@ -978,8 +1007,8 @@ export function useSelection() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        nodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        nodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: ["id", "type", "userdata"],
@@ -1026,7 +1055,7 @@ export function useSelection() {
 
   const rotation = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.rotation.ids.forEach((id) => {
+      mixedProperties.rotation?.ids.forEach((id) => {
         __actions.changeNodeRotation(id, change);
       });
     },
@@ -1035,7 +1064,7 @@ export function useSelection() {
 
   const opacity = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.opacity.ids.forEach((id) => {
+      mixedProperties.opacity?.ids.forEach((id) => {
         __actions.changeNodeOpacity(id, change);
       });
     },
@@ -1044,7 +1073,7 @@ export function useSelection() {
 
   const width = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.width.ids.forEach((id) => {
+      mixedProperties.width?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "width", value);
       });
     },
@@ -1053,7 +1082,7 @@ export function useSelection() {
 
   const height = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.height.ids.forEach((id) => {
+      mixedProperties.height?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "height", value);
       });
     },
@@ -1062,7 +1091,7 @@ export function useSelection() {
 
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
-      mixedProperties.position.ids.forEach((id) => {
+      mixedProperties.position?.ids.forEach((id) => {
         __actions.changeNodePositioningMode(id, position);
       });
     },
@@ -1142,7 +1171,12 @@ export function useSelection() {
   );
 
   const fill = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.fill?.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);
       });
@@ -1151,7 +1185,12 @@ export function useSelection() {
   );
 
   const stroke = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.stroke?.ids.forEach((id) => {
         __actions.changeNodeStroke(id, value);
       });
@@ -1327,8 +1366,8 @@ export function useSelectionPaints() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        allnodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        allnodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: (key) => {
@@ -1348,7 +1387,14 @@ export function useSelectionPaints() {
   const paints = mixedProperties.fill?.values ?? [];
 
   const setPaint = useCallback(
-    (index: number, value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      index: number,
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+        | null
+    ) => {
       const group = paints[index];
       group.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);
@@ -1373,6 +1419,19 @@ export function useDocument() {
   const { selection, transform } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
+
+  const backgroundColor = state.document.backgroundColor;
+  const setBackgroundColor = useCallback(
+    (
+      backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"]
+    ) => {
+      dispatch({
+        type: "background-color",
+        backgroundColor,
+      });
+    },
+    [dispatch]
+  );
 
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
@@ -1785,8 +1844,8 @@ export function useDocument() {
   const schemaDefineProperty = useCallback(
     (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/define",
-        name: name,
+        type: "document/properties/define",
+        key: name,
         definition: definition,
       });
     },
@@ -1796,9 +1855,9 @@ export function useDocument() {
   const schemaRenameProperty = useCallback(
     (name: string, newName: string) => {
       dispatch({
-        type: "document/schema/property/rename",
-        name,
-        newName,
+        type: "document/properties/rename",
+        key: name,
+        newKey: newName,
       });
     },
     [dispatch]
@@ -1807,8 +1866,8 @@ export function useDocument() {
   const schemaUpdateProperty = useCallback(
     (name: string, definition: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/update",
-        name: name,
+        type: "document/properties/update",
+        key: name,
         definition: definition,
       });
     },
@@ -1817,7 +1876,7 @@ export function useDocument() {
 
   const schemaDeleteProperty = useCallback(
     (name: string) => {
-      dispatch({ type: "document/schema/property/delete", name: name });
+      dispatch({ type: "document/properties/delete", key: name });
     },
     [dispatch]
   );
@@ -1827,6 +1886,9 @@ export function useDocument() {
       state,
       selection,
       transform,
+      //
+      background: backgroundColor,
+      setBackground: setBackgroundColor,
       //
       select,
       blur,
@@ -1872,6 +1934,9 @@ export function useDocument() {
     state,
     selection,
     transform,
+    //
+    backgroundColor,
+    setBackgroundColor,
     //
     select,
     blur,
@@ -2991,28 +3056,6 @@ export function useSurfacePathEditor() {
 }
 
 /**
- * @deprecated - WIP
- * @returns
- */
-export function useSurfaceGradientEditor() {
-  const [state, dispatch] = __useInternal();
-  assert(
-    state.content_edit_mode && state.content_edit_mode.type === "gradient"
-  );
-
-  const node = state.document.nodes[
-    state.content_edit_mode.node_id
-  ] as grida.program.nodes.i.IFill;
-  const fill = node.fill;
-  assert(fill?.type === "linear_gradient");
-
-  const { transform, stops } = fill;
-
-  //
-  return useMemo(() => ({ transform, stops }), [transform, stops]);
-}
-
-/**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode() {
@@ -3063,7 +3106,7 @@ class EditorConsumerError extends Error {
   }
 }
 
-export type NodeWithMeta = grida.program.nodes.AnyNode & {
+export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
   meta: {
     is_component_consumer: boolean;
     is_flex_parent: boolean;
@@ -3127,12 +3170,12 @@ export function useNode(node_id: string): NodeWithMeta {
     node_definition = templates[template_id].nodes[node_id];
   }
 
-  const node: grida.program.nodes.AnyNode = useMemo(() => {
+  const node: grida.program.nodes.UnknwonNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
       node_change || {}
-    ) as grida.program.nodes.AnyNode;
+    ) as grida.program.nodes.UnknwonNode;
   }, [node_definition, node_change]);
 
   const is_component_consumer =
@@ -3151,18 +3194,26 @@ export function useNode(node_id: string): NodeWithMeta {
   };
 }
 
-export function useComputedNode(node_id: string) {
+export function useComputedNode(
+  node_id: string
+): grida.program.nodes.UnknwonComputedNode {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, html, src, href } = node;
-  const computed = useComputed({
-    text: text,
-    html: html,
-    src: src,
-    href: href,
-    props: props,
-  });
+  const { active, style, component_id, props, text, html, src, href, fill } =
+    node;
 
-  return computed;
+  const computed = useComputed(
+    {
+      text,
+      html,
+      src,
+      href,
+      props,
+      fill,
+    },
+    true
+  );
+
+  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
 export function useTemplateDefinition(template_id: string) {

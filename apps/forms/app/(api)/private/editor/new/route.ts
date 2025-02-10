@@ -5,6 +5,7 @@ import {
   FormDocumentSetupAssistantService,
   SiteDocumentSetupAssistantService,
   CanvasDocumentSetupAssistantService,
+  BucketDocumentSetupAssistantService,
 } from "@/services/new";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -13,6 +14,8 @@ import type { GDocumentType } from "@/types";
 import assert from "assert";
 import { EditorApiResponse } from "@/types/private/api";
 import {
+  bucket_validation_messages,
+  isValidBucketName,
   isValidSchemaName,
   schemaname_validation_messages,
 } from "@/services/utils/regex";
@@ -24,6 +27,12 @@ export type NewDocumentRequest =
       project_id: number;
       doctype: "v0_schema";
       name: string;
+    }
+  | {
+      project_id: number;
+      doctype: "v0_bucket";
+      name: string;
+      public: boolean;
     }
   | {
       project_id: number;
@@ -168,6 +177,49 @@ export async function POST(request: NextRequest) {
         }
 
         console.error("error while creating new schema", e);
+        return NextResponse.error();
+      }
+      break;
+    }
+    case "v0_bucket": {
+      if (!isValidBucketName(data.name)) {
+        return NextResponse.json({
+          data: null,
+          error: {
+            message: bucket_validation_messages["invalid"],
+          },
+        } as NewDocumentResponse);
+      }
+
+      try {
+        const setup = new BucketDocumentSetupAssistantService(project_id, {
+          name: data.name,
+          public: data.public,
+        });
+        const { id } = await setup.createBucketDocument();
+
+        return NextResponse.json({
+          data: {
+            document_id: id,
+            redirect: editorlink(".", {
+              proj: project_ref.name,
+              org: project_ref.organization!.name,
+              origin,
+              document_id: id,
+            }),
+          },
+        } satisfies NewDocumentResponse);
+      } catch (e) {
+        if (e instanceof Error) {
+          return NextResponse.json({
+            data: null,
+            error: {
+              message: e.message,
+            },
+          } as NewDocumentResponse);
+        }
+
+        console.error("error while creating new bucket", e);
         return NextResponse.error();
       }
       break;

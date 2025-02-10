@@ -346,7 +346,7 @@ export function SidebarSectionHeaderActions({
   return (
     <span
       className={cn(
-        "invisible text-xs font-normal text-muted-foreground group-hover:visible",
+        "flex justify-center invisible text-xs font-normal text-muted-foreground group-hover:visible",
         className
       )}
     >

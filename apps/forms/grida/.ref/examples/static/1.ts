@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import { grida } from "../../../index";
 import { cmath } from "@grida/cmath";
 
 const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -315,4 +315,5 @@ export default {
       style: {},
     },
   },
+  globals: {},
 } satisfies grida.program.document.IDocumentDefinition;

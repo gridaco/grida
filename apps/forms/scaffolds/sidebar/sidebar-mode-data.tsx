@@ -271,7 +271,7 @@ export function ModeData() {
         {...newTableDialog.props}
         key={newTableDialog.refreshkey}
       />
-      {renderMenuItems(state.sidebar.mode_data.tables, {
+      {renderMenuItems(state.sidebar.mode_data.tables ?? [], {
         renderEmptyState: () => <EmptyState />,
         renderFallback: () => {
           return (
@@ -331,7 +331,7 @@ export function ModeData() {
           </SidebarMenuItem>
         ),
       })}
-      {renderMenuItems(state.sidebar.mode_data.menus)}
+      {renderMenuItems(state.sidebar.mode_data.menus ?? [])}
     </>
   );
 }

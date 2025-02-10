@@ -30,8 +30,17 @@ export function ImportFromGridaFileJsonDialog({
     if (filesContent.length > 0) {
       try {
         const fileContent = filesContent[0].content;
-        const parsedDocument = JSON.parse(fileContent);
-        onImport?.(parsedDocument);
+        const parsed = JSON.parse(fileContent);
+        const verified = {
+          doctype: parsed.doctype!,
+          document: {
+            root_id: parsed.document.root_id!,
+            nodes: parsed.document.nodes!,
+            properties: parsed.document.properties ?? {},
+            backgroundColor: parsed.document.backgroundColor,
+          },
+        } satisfies grida.io.DocumentFileModel;
+        onImport?.(verified);
         toast.success("File successfully imported!");
         props.onOpenChange?.(false); // Close the dialog
       } catch (error) {

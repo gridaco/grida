@@ -395,7 +395,7 @@ export default function databaseRecucer(
       return produce(state, (draft) => {
         const tb = schematableinit(table);
         draft.tables.push(tb as Draft<GDocTable>);
-        draft.sidebar.mode_data.tables.push(
+        draft.sidebar.mode_data.tables!.push(
           table_to_sidebar_table_menu(tb, {
             basepath: draft.basepath,
             document_id: draft.document_id,
@@ -429,7 +429,7 @@ export default function databaseRecucer(
         if (table) {
           draft.tables = draft.tables.filter((t) => t.id !== table_id);
           draft.sidebar.mode_data.tables =
-            draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
+            draft.sidebar.mode_data.tables!.filter((t) => t.id !== table_id);
           delete draft.tablespace[table_id];
           draft.datagrid_table_id = null;
         }
