@@ -1,3 +1,6 @@
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user_profile();
+
+
 create policy "Allow read if the template is public 1scojuy_0"
 on "storage"."objects"
 as permissive
