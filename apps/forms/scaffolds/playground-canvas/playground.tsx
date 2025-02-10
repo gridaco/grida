@@ -444,7 +444,7 @@ export default function CanvasPlayground() {
                           </div>
                         )}
                       </ViewportRoot>
-                      <DevtoolsPanel />
+                      {pref.debug && <DevtoolsPanel />}
                     </StandaloneDocumentBackground>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
