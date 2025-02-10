@@ -54,8 +54,8 @@ function Demo() {
 export default function WWW() {
   return (
     <main>
-      <Header></Header>
-      <Hero></Hero>
+      <Header />
+      <Hero />
       <section>
         <motion.div
           initial={{
