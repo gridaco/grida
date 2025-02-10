@@ -82,6 +82,7 @@ import StorageEditorProvider, {
   useStorageEditor,
 } from "../core";
 import toast from "react-hot-toast";
+import { useQueryState } from "@/utils/use-query-state";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -97,7 +98,7 @@ const __tools_card_classes =
 
 function Tools() {
   const { upload } = useStorageEditor();
-  const { openFilePicker, plainFiles } = useFilePicker({ multiple: false });
+  const { openFilePicker, plainFiles } = useFilePicker({ multiple: true });
   const createFolderDialog = useDialogState("mkdir", { refreshkey: true });
 
   useEffect(() => {
@@ -203,13 +204,11 @@ function Folder() {
     [searchParams]
   );
 
-  const previewkey = searchParams.get("preview");
-  const setPreview = (key: string) =>
-    router.push(pathname + "?" + createQueryString("preview", key));
-  const view = q<View>(searchParams.get("view"), ["grid", "list"], "list");
-  const setView = (view: View) =>
-    router.push(pathname + "?" + createQueryString("view", view));
-  const previewfile = nodes.find((n) => n.name === previewkey);
+  const [preview, setPreview] = useQueryState("preview");
+  const previewfile = nodes.find((n) => n.name === preview);
+  const [view, setView] = useQueryState<View>("view", "list", {
+    accepted: ["list", "grid"],
+  });
 
   const onNodeClick = (e: React.MouseEvent, file: EntityNode) => {
     if (file.type === "folder") return;
@@ -378,7 +377,7 @@ function Folder() {
                     <EntityNodeItemComponent
                       key={index}
                       node={file}
-                      view={view}
+                      view={view ?? "list"}
                       onClick={(e) => onNodeClick(e, file)}
                       onDoubleClick={(e) => {
                         onNodeDoubleClick(e, file);
@@ -418,7 +417,7 @@ const EntityNodeItemComponent = ({
   ...props
 }: {
   node: EntityNode;
-  view: "grid" | "list";
+  view: View;
   onDeleteClick?: () => void;
   onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
@@ -622,7 +621,7 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
 }
 
 function FolderEmptyState() {
-  const { openFilePicker, plainFiles } = useFilePicker({ multiple: false });
+  const { openFilePicker, plainFiles } = useFilePicker({ multiple: true });
   const { upload } = useStorageEditor();
 
   useEffect(() => {

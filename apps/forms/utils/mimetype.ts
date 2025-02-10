@@ -7,7 +7,8 @@ export type WellknownMediaType =
   | "pdf"
   | "sheet"
   | "document"
-  | "presentation";
+  | "presentation"
+  | "zip";
 
 export function wellkown(type: string): WellknownMediaType | undefined {
   if (type.startsWith("audio/")) return "audio";
@@ -19,4 +20,5 @@ export function wellkown(type: string): WellknownMediaType | undefined {
   if (type.includes("sheet")) return "sheet";
   if (type.includes("presentation")) return "presentation";
   if (type.includes("document")) return "document";
+  if (type.includes("zip")) return "zip";
 }

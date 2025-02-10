@@ -45,7 +45,6 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
     >
       {/* <div className="page-content w-full h-full flex items-center justify-center"> */}
       <Page
-        loading=""
         pageNumber={props.pageNumber}
         width={props.width}
         height={props.height}
@@ -153,7 +152,7 @@ const PDFViewer = ({
             }}
             loading=""
           >
-            {!_width || !_height ? (
+            {!width || !width ? (
               <></>
             ) : (
               <>

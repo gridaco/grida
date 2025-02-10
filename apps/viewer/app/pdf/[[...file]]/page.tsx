@@ -1,39 +1,24 @@
-"use client";
-import dynamic from "next/dynamic";
-import { redirect, useSearchParams } from "next/navigation";
-
-const Viewer = dynamic(() => import("@/scaffolds/pdf-page-flip"), {
-  ssr: false,
-});
+import PDFViewer from "./viewer";
 
 type PdfViewerApp = "" | "page-flip";
 
-type Params = Promise<{ file: string[] }>;
+type Params = Promise<{ file: string[] | undefined }>;
+type SearchParams = Promise<{
+  file?: string | undefined;
+  app?: PdfViewerApp | undefined;
+}>;
 
-export default async function PDFViewerPage({ params }: { params: Params }) {
-  const searchparams = useSearchParams();
-  const qapp: PdfViewerApp = (searchparams.get("app") as PdfViewerApp) ?? "";
-  const qfile = searchparams.get("file");
-  const pfile = (await params).file?.[0];
+export default async function PDFViewerPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
+  const { file: _p_file } = await params;
+  const { file: _q_file, app = "" } = await searchParams;
 
-  const file = (pfile || qfile)!;
+  const file = (_p_file?.[0] || _q_file)!;
 
-  switch (qapp) {
-    case "page-flip":
-      return (
-        <main className="w-dvw h-dvh">
-          <Viewer file={file} />
-        </main>
-      );
-    default:
-      return (
-        <main className="w-dvw h-dvh">
-          <object
-            data={file}
-            type="application/pdf"
-            className="w-full h-full"
-          />
-        </main>
-      );
-  }
+  return <PDFViewer app={app} file={file} />;
 }

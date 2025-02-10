@@ -9,6 +9,7 @@ import {
   FileTypeIcon,
   FileSpreadsheetIcon,
   PresentationIcon,
+  FileArchiveIcon,
 } from "lucide-react";
 
 export function MimeTypeIcon({
@@ -40,6 +41,8 @@ export function MimeTypeIcon({
         return <FileTextIcon className={className} />;
       case "presentation":
         return <PresentationIcon className={className} />;
+      case "zip":
+        return <FileArchiveIcon className={className} />;
       default:
         return <FileIcon className={className} />;
     }
