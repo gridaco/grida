@@ -253,6 +253,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
           __schema_version: "2024-12-31",
           pages: {
             one: {
+              root_id: "root",
               nodes: {
                 root: {
                   id: "root",
@@ -279,7 +280,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
                   crossAxisGap: 0,
                 },
               },
-              root_id: "root",
+              properties: {},
             },
           },
         } satisfies CanvasDocumentSnapshotSchema as {},

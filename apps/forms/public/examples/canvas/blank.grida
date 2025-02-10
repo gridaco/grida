@@ -33,6 +33,12 @@
         "children": []
       }
     },
-    "root_id": "root"
+    "root_id": "root",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
   }
 }

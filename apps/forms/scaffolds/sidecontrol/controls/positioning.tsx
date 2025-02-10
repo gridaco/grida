@@ -27,7 +27,7 @@ export function PositioningModeControl({
   value,
   onValueChange,
 }: {
-  value: TMixed<PositioningMode>;
+  value?: TMixed<PositioningMode>;
   onValueChange?: (value: PositioningMode) => void;
 }) {
   return (

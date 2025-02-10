@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useContext, useEffect, useLayoutEffect, useRef } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { useDocument, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
+import { css } from "@/grida/css";
 // import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
@@ -40,6 +47,24 @@ export function StandaloneDocumentContent({
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
         <NodeElement node_id={root_id} />
       </UserDocumentCustomRendererContext.Provider>
+    </div>
+  );
+}
+
+export function StandaloneDocumentBackground({
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  const { background } = useDocument();
+
+  const backgroundColor = useMemo(() => {
+    if (!background) return undefined;
+    return "#" + css.rgbaToHex(background);
+  }, [background]);
+
+  return (
+    <div style={{ backgroundColor: backgroundColor }} {...props}>
+      {children}
     </div>
   );
 }

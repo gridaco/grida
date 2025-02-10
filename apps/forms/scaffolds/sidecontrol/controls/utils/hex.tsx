@@ -7,9 +7,11 @@ export default function HexValueInput<T extends RGB | RGBA>({
   className,
   value: initialValue,
   onValueChange,
+  disabled,
 }: React.HtmlHTMLAttributes<HTMLInputElement> & {
   value: T;
   onValueChange?: (color: T) => void;
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState<T>(initialValue);
@@ -116,6 +118,7 @@ export default function HexValueInput<T extends RGB | RGBA>({
       onChange={handleChange}
       onFocus={handleFocus}
       spellCheck={false}
+      disabled={disabled}
     />
   );
 }
