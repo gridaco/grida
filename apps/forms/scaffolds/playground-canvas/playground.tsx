@@ -294,7 +294,7 @@ export default function CanvasPlayground() {
                     </>
                   ) : (
                     <>
-                      <SidebarRoot>
+                      <SidebarRoot className="hidden sm:block">
                         <SidebarSection className="mt-4">
                           <span className="px-2">
                             <DropdownMenu>
@@ -434,10 +434,6 @@ export default function CanvasPlayground() {
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
                             </div>
-
-                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                        <KeyboardInputOverlay />
-                      </div> */}
                           </>
                         )}
                         {!uiHidden && (
@@ -455,7 +451,7 @@ export default function CanvasPlayground() {
               </EditorSurfaceClipboardSyncProvider>
               {!uiHidden && (
                 <aside className="h-full">
-                  <SidebarRoot side="right">
+                  <SidebarRoot side="right" className="hidden sm:block">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
                         <Zoom
