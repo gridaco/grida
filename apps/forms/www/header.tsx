@@ -29,7 +29,7 @@ export default function Header() {
         <Link href="/playground" className="hidden md:block">
           <Button variant="link">Playground</Button>
         </Link>
-        <Link href="/templates" className="hidden md:block">
+        <Link href="/forms/templates" className="hidden md:block">
           <Button variant="link">Templates</Button>
         </Link>
         <div className="flex-1 h-8 border-r mx-4" />
