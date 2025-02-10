@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import Header from "@/app/(www-2025)/header";
 import Hero from "@/app/(www-2025)/hero";
@@ -9,11 +9,25 @@ import Footer from "@/app/(www-2025)/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import { motion, useInView } from "framer-motion";
-import { useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 
-function Demo() {
+export default function WWW() {
+  return (
+    <main className="container mx-auto">
+      <Header />
+      <Hero />
+      <SectionMainDemo />
+      <SectionA />
+      <SectionB />
+      <SectionC />
+      <SectionCTA />
+      <Footer />
+    </main>
+  );
+}
+
+function SectionMainDemo() {
   const [isLocked, setIsLocked] = useState(true);
 
   const unlockDemo = () => {
@@ -22,10 +36,19 @@ function Demo() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.5, ease: "easeOut" }}
-      className="relative -mt-40 mb-32"
+      initial={{
+        opacity: 0,
+        y: 50,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        delay: 0.5,
+        duration: 1.5,
+        ease: "easeOut",
+      }}
     >
       <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden relative">
         {/* Overlay for lock */}
@@ -37,8 +60,6 @@ function Demo() {
             <Button>Click to play</Button>
           </div>
         )}
-
-        {/* Iframe */}
         <div
           className={`w-full h-full ${isLocked ? "pointer-events-none" : "pointer-events-auto"}`}
         >
@@ -49,162 +70,7 @@ function Demo() {
   );
 }
 
-export default function WWW() {
-  return (
-    <main className="container mx-auto">
-      <Header />
-      <Hero />
-      <section>
-        <motion.div
-          initial={{
-            y: 50,
-          }}
-          animate={{
-            y: 0,
-          }}
-          className="my-40"
-        >
-          <Demo />
-        </motion.div>
-        <div className="my-60 relative">
-          <FeatureSection
-            badge={"Canvas"}
-            title={"Design editor tool with customizable templates."}
-            excerpt={
-              "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
-            }
-            button={"Open your Canvas"}
-          />
-          <div className="relative">
-            <div className="absolute inset-0 -z-10 flex justify-center items-center">
-              <svg
-                width="1400px"
-                height="1400px"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <radialGradient
-                    id="blueCircle"
-                    cx="50%"
-                    cy="50%"
-                    r="50%"
-                    fx="50%"
-                    fy="50%"
-                  >
-                    <stop offset="0%" stopColor="rgba(135, 206, 250, 0.5)" />
-                    <stop offset="100%" stopColor="rgba(135, 206, 250, 0)" />
-                  </radialGradient>
-                </defs>
-                <circle cx="700" cy="700" r="700" fill="url(#blueCircle)" />
-              </svg>
-            </div>
-            <Demo1 />
-          </div>
-        </div>
-        <div className="my-60">
-          <FeatureSection
-            badge={"CMS"}
-            title={"This is CMS."}
-            excerpt={
-              "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
-            }
-            button={"Start CMS"}
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-            className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32"
-          >
-            <CmsCard
-              media={{
-                src: "/assets/placeholder-image.png",
-                alt: "card",
-                width: 1000,
-                height: 800,
-              }}
-              title={"Title"}
-              excerpt={"excerpt"}
-            />
-            <CmsCard
-              media={{
-                src: "/assets/placeholder-image.png",
-                alt: "card",
-                width: 1000,
-                height: 800,
-              }}
-              title={"Title"}
-              excerpt={"excerpt"}
-            />
-            <CmsCard
-              media={{
-                src: "/assets/placeholder-image.png",
-                alt: "card",
-                width: 1000,
-                height: 800,
-              }}
-              title={"Title"}
-              excerpt={"excerpt"}
-            />
-            <CmsCard
-              media={{
-                src: "/assets/placeholder-image.png",
-                alt: "card",
-                width: 1000,
-                height: 800,
-              }}
-              title={"Title"}
-              excerpt={"excerpt"}
-            />
-          </motion.div>
-        </div>
-        <div className="my-60 relative">
-          <FeatureSection
-            badge={"Forms"}
-            title={"Design editor tool with customizable templates."}
-            excerpt={
-              "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
-            }
-            button={"Open your Canvas"}
-          />
-          <div className="">
-            {/* <div className="absolute inset-0 -z-10 flex justify-center items-center">
-              <svg
-                width="1400px"
-                height="1400px"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient
-                    id="horizontalGradient"
-                    x1="0%"
-                    y1="100%"
-                    x2="0%"
-                    y2="0%"
-                  >
-                    <stop offset="0%" stopColor="rgba(166, 152, 255, 0.9)" />
-                    <stop offset="100%" stopColor="rgba(250, 255, 229, 0)" />
-                  </linearGradient>
-                </defs>
-                <rect
-                  width="1400"
-                  height="1400"
-                  fill="url(horizontalGradient)"
-                />
-              </svg>
-            </div> */}
-
-            <Demo2 />
-          </div>
-        </div>
-        <CtaSection />
-        <Footer />
-      </section>
-    </main>
-  );
-}
-
-function FeatureSection({
+function SectionHeader({
   badge,
   title,
   excerpt,
@@ -237,7 +103,7 @@ function FeatureSection({
   );
 }
 
-function CmsCard({
+function MediaCard({
   media,
   title,
   excerpt,
@@ -270,7 +136,153 @@ function CmsCard({
   );
 }
 
-function CtaSection() {
+function SectionA() {
+  return (
+    <section className="my-60 relative">
+      <SectionHeader
+        badge={"Canvas"}
+        title={"Design editor tool with customizable templates."}
+        excerpt={
+          "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
+        }
+        button={"Open your Canvas"}
+      />
+      <div className="relative">
+        <div className="absolute inset-0 -z-10 flex justify-center items-center">
+          <svg
+            width="1400px"
+            height="1400px"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <radialGradient
+                id="blueCircle"
+                cx="50%"
+                cy="50%"
+                r="50%"
+                fx="50%"
+                fy="50%"
+              >
+                <stop offset="0%" stopColor="rgba(135, 206, 250, 0.5)" />
+                <stop offset="100%" stopColor="rgba(135, 206, 250, 0)" />
+              </radialGradient>
+            </defs>
+            <circle cx="700" cy="700" r="700" fill="url(#blueCircle)" />
+          </svg>
+        </div>
+        <Demo1 />
+      </div>
+    </section>
+  );
+}
+
+function SectionB() {
+  return (
+    <section className="my-60">
+      <SectionHeader
+        badge={"CMS"}
+        title={"This is CMS."}
+        excerpt={
+          "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
+        }
+        button={"Start CMS"}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+        className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32"
+      >
+        <MediaCard
+          media={{
+            src: "/assets/placeholder-image.png",
+            alt: "card",
+            width: 1000,
+            height: 800,
+          }}
+          title={"Title"}
+          excerpt={"excerpt"}
+        />
+        <MediaCard
+          media={{
+            src: "/assets/placeholder-image.png",
+            alt: "card",
+            width: 1000,
+            height: 800,
+          }}
+          title={"Title"}
+          excerpt={"excerpt"}
+        />
+        <MediaCard
+          media={{
+            src: "/assets/placeholder-image.png",
+            alt: "card",
+            width: 1000,
+            height: 800,
+          }}
+          title={"Title"}
+          excerpt={"excerpt"}
+        />
+        <MediaCard
+          media={{
+            src: "/assets/placeholder-image.png",
+            alt: "card",
+            width: 1000,
+            height: 800,
+          }}
+          title={"Title"}
+          excerpt={"excerpt"}
+        />
+      </motion.div>
+    </section>
+  );
+}
+
+function SectionC() {
+  return (
+    <section className="my-60 relative">
+      <SectionHeader
+        badge={"Forms"}
+        title={"Design editor tool with customizable templates."}
+        excerpt={
+          "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
+        }
+        button={"Open your Canvas"}
+      />
+      <div className="">
+        {/* <div className="absolute inset-0 -z-10 flex justify-center items-center">
+        <svg
+          width="1400px"
+          height="1400px"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient
+              id="horizontalGradient"
+              x1="0%"
+              y1="100%"
+              x2="0%"
+              y2="0%"
+            >
+              <stop offset="0%" stopColor="rgba(166, 152, 255, 0.9)" />
+              <stop offset="100%" stopColor="rgba(250, 255, 229, 0)" />
+            </linearGradient>
+          </defs>
+          <rect
+            width="1400"
+            height="1400"
+            fill="url(horizontalGradient)"
+          />
+        </svg>
+      </div> */}
+
+        <Demo2 />
+      </div>
+    </section>
+  );
+}
+
+function SectionCTA() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 50 }}
