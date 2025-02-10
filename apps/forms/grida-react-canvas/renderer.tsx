@@ -13,6 +13,7 @@ import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
 import { css } from "@/grida/css";
 import { TransparencyGrid } from "@grida/transparency-grid";
+import { useMeasure } from "@uidotdev/usehooks";
 // import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
@@ -63,19 +64,26 @@ export function StandaloneDocumentBackground({
     return "#" + css.rgbaToHex(background);
   }, [background]);
 
+  const [visiblearea, { width, height }] = useMeasure();
+
   return (
     <div {...props}>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div
+        ref={visiblearea}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {/* root bg - transparency grid */}
         <TransparencyGrid
           transform={transform}
-          width={typeof window !== "undefined" ? window.innerWidth : 0}
-          height={typeof window !== "undefined" ? window.innerHeight : 0}
+          width={width ?? 0}
+          height={height ?? 0}
+        />
+        {/* background color */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{ backgroundColor: backgroundColor }}
         />
       </div>
-      <div
-        className="absolute inset-0 overflow-hidden"
-        style={{ backgroundColor: backgroundColor }}
-      />
       {children}
     </div>
   );
