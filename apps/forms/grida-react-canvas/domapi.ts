@@ -69,6 +69,16 @@ export namespace domapi {
         [1 / this.scale[0], 1 / this.scale[1]]
       );
 
+      // ignore floating point to 0.001 precision
+      // // quantized to 0.01 precision
+      // const qrect = {
+      //   x: Math.round(rect.x * 1000) / 1000,
+      //   y: Math.round(rect.y * 1000) / 1000,
+      //   width: Math.round(rect.width * 1000) / 1000,
+      //   height: Math.round(rect.height * 1000) / 1000,
+      // };
+      // return qrect
+
       return rect;
     }
   }

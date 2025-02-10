@@ -16,6 +16,7 @@ import type {
   GDocSchemaTable,
   TableMenuItem,
   CanvasDocumentEditorInit,
+  BucketDocumentEditorInit,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -36,6 +37,8 @@ export function initialEditorState(init: EditorInit): EditorState {
       return initialSiteEditorState(init);
     case "v0_schema":
       return initialDatabaseEditorState(init);
+    case "v0_bucket":
+      return initialBucketEditorState(init);
     case "v0_canvas":
       return initialCanvasEditorState(init);
     default:
@@ -206,6 +209,9 @@ function initialDatabaseEditorState(
     documents: {},
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
+      mode_build: {
+        disabled: true,
+      },
       mode_data: {
         disabled: false,
         tables: init.tables
@@ -241,6 +247,9 @@ function initialDatabaseEditorState(
           ),
         menus: [],
       },
+      mode_connect: {
+        disabled: false,
+      },
     },
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
@@ -266,6 +275,33 @@ function initialDatabaseEditorState(
   };
 }
 
+function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
+  const base = initialBaseDocumentEditorState(init);
+
+  // @ts-ignore
+  return {
+    ...base,
+    pages: sitedocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "files",
+    documents: {},
+    sidebar: {
+      mode: "project",
+      mode_build: {
+        disabled: true,
+      },
+      mode_data: {
+        disabled: true,
+      },
+      mode_connect: {
+        disabled: true,
+      },
+    },
+    tables: [],
+  };
+}
 /**
  * // FIXME: not ready
  * @deprecated @beta
@@ -303,10 +339,16 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
+      mode_build: {
+        disabled: false,
+      },
       mode_data: {
         disabled: false,
         tables: [],
         menus: [],
+      },
+      mode_connect: {
+        disabled: false,
       },
     },
     tables: [],
@@ -335,7 +377,9 @@ function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
     },
     sidebar: {
       mode: "build",
-      mode_data: { tables: [], menus: [], disabled: true },
+      mode_data: { disabled: true },
+      mode_build: { disabled: false },
+      mode_connect: { disabled: true },
     },
     tables: [],
   };
@@ -530,6 +574,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             data: {},
           },
         ],
+      },
+      mode_build: {
+        disabled: false,
+      },
+      mode_connect: {
+        disabled: false,
       },
     },
     tables: values,

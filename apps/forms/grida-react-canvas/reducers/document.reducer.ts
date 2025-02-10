@@ -10,7 +10,10 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
 } from "../action";
-import type { IDocumentEditorState } from "../state";
+import {
+  DEFAULT_SNAP_NUDGE_THRESHOLD,
+  type IDocumentEditorState,
+} from "../state";
 import { grida } from "@/grida";
 import assert from "assert";
 import { document } from "../document-query";
@@ -25,10 +28,12 @@ import {
   self_selectNode,
 } from "./methods";
 import { cmath } from "@grida/cmath";
+import { layout } from "@grida/cmath/_layout";
 import { domapi } from "../domapi";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import { vn } from "@/grida/vn";
+import { self_moveNode } from "./methods/move";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -160,7 +165,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const target_node_ids =
           target === "selection" ? state.selection : [target];
-        self_duplicateNode(draft, ...target_node_ids);
+        self_duplicateNode(draft, new Set(target_node_ids));
       });
       break;
     }
@@ -394,6 +399,179 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       break;
     }
+    case "autolayout": {
+      const { target } = action;
+      const target_node_ids = target === "selection" ? state.selection : target;
+
+      // group by parent
+      const groups = Object.groupBy(
+        // omit root node
+        target_node_ids.filter((id) => id !== state.document.root_id),
+        (node_id) => {
+          return document.getParentId(state.document_ctx, node_id)!;
+        }
+      );
+
+      const cdom = new domapi.CanvasDOM(state.transform);
+
+      const layouts = Object.keys(groups).map((parent_id) => {
+        const g = groups[parent_id]!;
+
+        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+
+        const rects = g
+          .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+          // make the rects relative to the parent
+          .map((rect) =>
+            cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
+          )
+          .map((rect) => cmath.rect.quantize(rect, 1));
+
+        // guess the layout
+        const lay = layout.flex.guess(rects);
+
+        return {
+          parent: parent_id,
+          layout: lay,
+          children: g,
+        };
+      });
+
+      return produce(state, (draft) => {
+        const insertions: grida.program.nodes.NodeID[] = [];
+        layouts.forEach(({ parent, layout, children }) => {
+          const container_prototype: grida.program.nodes.NodePrototype = {
+            type: "container",
+            // layout
+            layout: "flex",
+            width: "auto",
+            height: "auto",
+            top: cmath.quantize(layout.union.y, 1),
+            left: cmath.quantize(layout.union.x, 1),
+            direction: layout.direction,
+            mainAxisGap: cmath.quantize(layout.spacing, 1),
+            crossAxisGap: cmath.quantize(layout.spacing, 1),
+            mainAxisAlignment: layout.mainAxisAlignment,
+            crossAxisAlignment: layout.crossAxisAlignment,
+            padding: children.length === 1 ? 16 : 0,
+            // children (empty when init)
+            children: [],
+            // position
+            position: "absolute",
+          };
+
+          const container_id = self_insertSubDocument(
+            draft,
+            parent,
+            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+              container_prototype,
+              nid
+            )
+          );
+
+          // [move children to container]
+          children = layout.orders.map((i) => children[i]);
+          children.forEach((child_id) => {
+            self_moveNode(draft, child_id, container_id);
+          });
+
+          // [reset children position]
+          children.forEach((child_id) => {
+            const child = document.__getNodeById(draft, child_id);
+            (draft.document.nodes[
+              child_id
+            ] as grida.program.nodes.i.IPositioning) = {
+              ...child,
+              position: "relative",
+              top: undefined,
+              right: undefined,
+              bottom: undefined,
+              left: undefined,
+            };
+          });
+
+          insertions.push(container_id);
+        });
+
+        self_selectNode(draft, "reset", ...insertions);
+      });
+
+      break;
+    }
+    case "contain": {
+      const { target } = action;
+      const target_node_ids = target === "selection" ? state.selection : target;
+
+      // group by parent
+      const groups = Object.groupBy(
+        // omit root node
+        target_node_ids.filter((id) => id !== state.document.root_id),
+        (node_id) => {
+          return document.getParentId(state.document_ctx, node_id)!;
+        }
+      );
+
+      return produce(state, (draft) => {
+        const insertions: grida.program.nodes.NodeID[] = [];
+        Object.keys(groups).forEach((parent_id) => {
+          const g = groups[parent_id]!;
+          const cdom = new domapi.CanvasDOM(state.transform);
+
+          const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+
+          const rects = g
+            .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+            // make the rects relative to the parent
+            .map((rect) =>
+              cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
+            )
+            .map((rect) => cmath.rect.quantize(rect, 1));
+
+          const union = cmath.rect.union(rects);
+
+          const container_prototype: grida.program.nodes.NodePrototype = {
+            type: "container",
+            // layout
+            top: cmath.quantize(union.y, 1),
+            left: cmath.quantize(union.x, 1),
+            width: union.width,
+            height: union.height,
+            // children (empty when init)
+            children: [],
+            // position
+            position: "absolute",
+          };
+
+          const container_id = self_insertSubDocument(
+            draft,
+            parent_id,
+            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+              container_prototype,
+              nid
+            )
+          );
+
+          // [move children to container]
+          g.forEach((id) => {
+            self_moveNode(draft, id, container_id);
+          });
+
+          // [adjust children position]
+          g.forEach((id) => {
+            const child = document.__getNodeById(draft, id);
+            if ("left" in child && typeof child.left === "number")
+              child.left -= union.x;
+            if ("top" in child && typeof child.top === "number")
+              child.top -= union.y;
+          });
+
+          insertions.push(container_id);
+        });
+
+        self_selectNode(draft, "reset", ...insertions);
+      });
+      break;
+    }
     //
     case "delete-vertex":
     case "select-vertex":
@@ -459,6 +637,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
     }
     //
+    case "surface/ruler":
+    case "surface/guide/delete":
+    case "surface/pixel-grid":
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/try-exit":
     case "surface/cursor-mode":
@@ -737,6 +918,9 @@ function self_nudge(
   dx: number,
   dy: number
 ) {
+  // clear the previous surface snapping
+  draft.surface_snapping = undefined;
+
   // for nudge, gesture is not required, but only for surface ux.
   if (draft.gesture.type === "nudge") {
     const cdpm = new domapi.CanvasDOM(draft.transform);
@@ -750,11 +934,11 @@ function self_nudge(
     );
     const { snapping } = snapObjectsTranslation(
       origin_rects,
-      snap_target_node_rects,
+      { objects: snap_target_node_rects },
       [dx, dy],
-      [0.1, 0.1]
+      DEFAULT_SNAP_NUDGE_THRESHOLD
     );
-    draft.gesture.surface_snapping = snapping;
+    draft.surface_snapping = snapping;
   }
 
   for (const node_id of targets) {

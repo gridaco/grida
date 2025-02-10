@@ -4,8 +4,12 @@ import type {
   CursorMode,
   GestureCornerRadius,
   GestureCurve,
+  GestureGap,
   GestureRotate,
   GestureScale,
+  GestureSort,
+  GestureGuide,
+  // GestureTranslate1DArrange,
   GestureTranslateVertex,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
@@ -40,6 +44,8 @@ export type DocumentAction =
   | EditorA11yArrowAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
+  | EditorAutoLayoutAction
+  | EditorContainAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -247,6 +253,16 @@ export interface EditorDistributeEvenlyAction {
   axis: "x" | "y";
 }
 
+export interface EditorAutoLayoutAction {
+  type: "autolayout";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorContainAction {
+  type: "contain";
+  target: NodeID[] | "selection";
+}
+
 export type EditorConfigAction =
   | EditorConfigure_RaycastTargeting
   | EditorConfigure_Measurement
@@ -403,11 +419,32 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 
 // #region surface action
 export type SurfaceAction =
+  | EditorSurface_RulerAndGuideAction
+  | EditorSurface_PixelGridStateAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
   | EditorSurface_StartGesture;
+
+type EditorSurface_RulerAndGuideAction =
+  | EditorSurface_RulerStateAction
+  | EditorSurface_DeleteGuideAction;
+
+export interface EditorSurface_RulerStateAction {
+  type: "surface/ruler";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_PixelGridStateAction {
+  type: "surface/pixel-grid";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_DeleteGuideAction {
+  type: "surface/guide/delete";
+  idx: number;
+}
 
 export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";
@@ -425,8 +462,11 @@ export type EditorSurface_CursorMode = {
 export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
+    | Pick<GestureGuide, "type" | "axis" | "idx">
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
+    | (Pick<GestureSort, "type" | "node_id"> & { selection: string[] })
+    | (Pick<GestureGap, "type" | "axis"> & { selection: string | string[] })
     | Pick<GestureCornerRadius, "type" | "node_id">
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;

@@ -4,6 +4,7 @@ import { ResourceTypeIcon } from "../resource-type-icon";
 import type { GDocument, GDocumentType } from "@/types";
 import { Badge } from "../ui/badge";
 import { Labels } from "@/k/labels";
+import { LockOpen1Icon, LockOpen2Icon } from "@radix-ui/react-icons";
 
 export function GridCard({
   title,
@@ -11,6 +12,7 @@ export function GridCard({
   thumbnail,
   max_responses,
   has_connection_supabase,
+  is_public,
   doctype,
 }: GDocument & { thumbnail?: string }) {
   return (
@@ -37,6 +39,7 @@ export function GridCard({
           <Badges
             doctype={doctype}
             has_connection_supabase={has_connection_supabase}
+            is_public={is_public}
           />
         </div>
         <span className="text-xs opacity-50">
@@ -68,6 +71,7 @@ export function RowCard({
   updated_at,
   doctype,
   has_connection_supabase,
+  is_public,
 }: GDocument & { thumbnail?: string }) {
   return (
     <div className="flex items-center border rounded-md overflow-hidden h-16 shadow bg-background">
@@ -91,6 +95,7 @@ export function RowCard({
             <Badges
               doctype={doctype}
               has_connection_supabase={has_connection_supabase}
+              is_public={is_public}
             />
           </span>
           <span className="flex gap-2">
@@ -125,9 +130,11 @@ export function RowCard({
 function Badges({
   doctype,
   has_connection_supabase,
+  is_public,
 }: {
   doctype: GDocumentType;
   has_connection_supabase: boolean;
+  is_public: boolean;
 }) {
   return (
     <>
@@ -140,6 +147,15 @@ function Badges({
       {has_connection_supabase && (
         <Badge variant="outline" className="p-1">
           <ResourceTypeIcon type="form-x-supabase" className="w-4 h-4" />
+        </Badge>
+      )}
+      {is_public && (
+        <Badge
+          variant="outline"
+          className="text-xs text-muted-foreground font-normal font-mono px-1.5"
+        >
+          <LockOpen1Icon className="me-1 w-3 h-3" />
+          Public
         </Badge>
       )}
     </>

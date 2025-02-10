@@ -2,7 +2,45 @@ import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
-import type { SnapResult } from "@grida/cmath/_snap";
+import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+
+// #region config
+
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
+
+/**
+ * The base snap threshold (in px) used during a real pointer movement (drag gesture).
+ *
+ * In practice, the final threshold often scales inversely with the current zoom level:
+ *
+ * ```ts
+ * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR / zoom);
+ * ```
+ *
+ * At higher zoom levels, the threshold becomes smaller for more precise snapping;
+ * at lower zoom levels, it grows for a smoother user experience.
+ */
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
+
+/**
+ * snap threshold applyed when nudge (fake gesture) is applied
+ */
+export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
+
+const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
+  target: "auto",
+  ignores_root: true,
+  ignores_locked: true,
+};
+
+// #endregion config
 
 export type DocumentDispatcher = (action: Action) => void;
 
@@ -37,12 +75,6 @@ export type CursorMode =
 export type Marquee = {
   a: cmath.Vector2;
   b: cmath.Vector2;
-};
-
-const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
-  target: "auto",
-  ignores_root: true,
-  ignores_locked: true,
 };
 
 export type SurfaceRaycastTargeting = {
@@ -143,8 +175,11 @@ interface IDocumentEditorTransformState {
 export type GestureState =
   | GestureIdle
   | GesturePan
+  | GestureGuide
   | GestureVirtualNudge
   | GestureTranslate
+  | GestureSort
+  | GestureGap
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -163,14 +198,40 @@ interface IGesture {
 }
 
 export type GestureIdle = {
-  type: "idle";
+  readonly type: "idle";
 };
 
 /**
  * Pan the viewport - a.k.a hand tool
  */
 export type GesturePan = IGesture & {
-  type: "pan";
+  readonly type: "pan";
+};
+
+/**
+ * Move or draw the guide line
+ */
+export type GestureGuide = IGesture & {
+  readonly type: "guide";
+  /**
+   * the axis of the guide
+   */
+  readonly axis: cmath.Axis;
+
+  /**
+   * the index, id of the guide
+   */
+  readonly idx: number;
+
+  /**
+   * initial offset of the guide
+   */
+  readonly initial_offset: number;
+
+  /**
+   * the current offset of the guide (can be snapped to objects)
+   */
+  offset: number;
 };
 
 /**
@@ -181,79 +242,149 @@ export type GesturePan = IGesture & {
  * this is required to tell the surface that it is nudging, thus, show snaps & related ux
  */
 export type GestureVirtualNudge = {
-  type: "nudge";
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapResult;
+  readonly type: "nudge";
 };
 
 export type GestureTranslate = IGesture & {
   // translate (move)
-  type: "translate";
+  readonly type: "translate";
   selection: string[];
 
   /**
    * initial selection of the nodes - the original node ids
    */
-  initial_selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_clone_ids: string[];
-  initial_rects: cmath.Rectangle[];
+  readonly initial_selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_clone_ids: string[];
+  readonly initial_rects: cmath.Rectangle[];
 
   /**
    * indicator between gesture events to ensure if the current selection is cloned ones or not
    */
   is_currently_cloned: boolean;
+};
+
+/**
+ * Sanpshot used for arrangement.
+ *
+ * Contains collection of nodes' bounding rect.
+ */
+export interface LayoutSnapshot {
+  /**
+   * the type of the layout
+   */
+  type: "flex" | "group";
 
   /**
-   * surface snap guides - result of snap while translate (move) gesture
+   * the grouping parent id
    */
-  surface_snapping?: SnapResult;
+  group: string;
+
+  /**
+   * relative objects to the parent
+   */
+  objects: Array<cmath.Rectangle & { id: string }>;
+}
+
+/**
+ * Sort the node within the layout (re-order)
+ */
+export type GestureSort = IGesture & {
+  readonly type: "sort";
+
+  /**
+   * the current moving node id of this gesture
+   */
+  readonly node_id: string;
+
+  /**
+   * initial position of moving node {@link GestureSort.node_id}
+   */
+  readonly node_initial_rect: cmath.Rectangle;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
+
+  /**
+   * the selection will be at this position (when dropped)
+   */
+  placement: {
+    /**
+     * the current rect (placed) of the moving node.
+     * this should be identical to layout.objects[index]
+     */
+    rect: cmath.Rectangle;
+
+    /**
+     * index of the node's rect within the current layout snapshot
+     */
+    index: number;
+  };
+};
+
+/**
+ * Sort the node within the layout (re-order)
+ */
+export type GestureGap = IGesture & {
+  readonly type: "gap";
+
+  readonly axis: "x" | "y";
+
+  readonly min_gap: number;
+  readonly initial_gap: number;
+
+  gap: number;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
 };
 
 export type GestureScale = IGesture & {
   // scale (resize)
-  type: "scale";
-  selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_rects: cmath.Rectangle[];
-  direction: cmath.CardinalDirection;
-
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapResult;
+  readonly type: "scale";
+  readonly selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_rects: cmath.Rectangle[];
+  readonly direction: cmath.CardinalDirection;
 };
 
 export type GestureRotate = IGesture & {
-  type: "rotate";
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "rotate";
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
   // TODO: support multiple selection
-  selection: string;
-  offset: cmath.Vector2;
+  readonly selection: string;
+  readonly offset: cmath.Vector2;
+
+  /**
+   * the current rotation of the selection
+   */
+  rotation: number;
 };
 
 export type GestureCornerRadius = IGesture & {
   /**
    * - corner-radius
    */
-  type: "corner-radius";
-  node_id: string;
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "corner-radius";
+  readonly node_id: string;
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
 export type GestureDraw = IGesture & {
   /**
    * - draw points
    */
-  type: "draw";
-  mode: "line" | "pencil";
+  readonly type: "draw";
+  readonly mode: "line" | "pencil";
 
   /**
    * origin point - relative to content space
    */
-  origin: cmath.Vector2;
+  readonly origin: cmath.Vector2;
 
   /**
    * record of points (movements)
@@ -261,7 +392,7 @@ export type GestureDraw = IGesture & {
    */
   points: cmath.Vector2[];
 
-  node_id: string;
+  readonly node_id: string;
 };
 
 /**
@@ -276,51 +407,51 @@ export type GestureTranslateVertex = IGesture & {
   /**
    * initial (snapshot) value of the points
    */
-  initial_verticies: cmath.Vector2[];
+  readonly initial_verticies: cmath.Vector2[];
 
   /**
    * index of the vertex
    */
-  vertex: number;
+  readonly vertex: number;
 
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * initial position of node
    */
-  initial_position: cmath.Vector2;
+  readonly initial_position: cmath.Vector2;
 };
 
 /**
  * curves the existing segment
  */
 export type GestureCurve = IGesture & {
-  type: "curve";
+  readonly type: "curve";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * segment index
    */
-  segment: number;
+  readonly segment: number;
 
   /**
    * control point
    */
-  control: "ta" | "tb";
+  readonly control: "ta" | "tb";
 
   /**
    * initial position of the control point
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
 
 /**
@@ -329,33 +460,49 @@ export type GestureCurve = IGesture & {
  * This is used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
  */
 export type GestureCurveA = IGesture & {
-  type: "curve-a";
+  readonly type: "curve-a";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * vertex index
    */
-  vertex: number;
+  readonly vertex: number;
 
   /**
    * control point - always `ta`
    */
-  control: "ta";
+  readonly control: "ta";
 
   /**
    * initial position of the control point - always `zero`
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
+
+/**
+ * Indication of the dropzone
+ *
+ * - type: "node" - dropzone is a node
+ * - type: "rect" - dropzone is a rect (in canvas space)
+ */
+export type DropzoneIndication =
+  | {
+      type: "node";
+      node_id: string;
+    }
+  | {
+      type: "rect";
+      rect: cmath.Rectangle;
+    };
 
 /**
  * [Surface Support State]
@@ -367,14 +514,10 @@ interface IDocumentEditorEventTargetState {
 
   gesture_modifiers: GestureModifiers;
 
-  // =============
-
   /**
-   * last movement of translate (move) gesture
-   *
-   * this is saved and used when "repeat duplicate"
+   * the latest snap result from the gesture
    */
-  // last_translate_movement?: cmath.Vector2;
+  surface_snapping?: SnapToObjectsResult;
 
   /**
    * general hover state
@@ -389,7 +532,7 @@ interface IDocumentEditorEventTargetState {
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
    */
-  dropzone_node_id?: string;
+  dropzone?: DropzoneIndication;
 
   /**
    * the config of how the surface raycast targeting should be
@@ -403,28 +546,14 @@ interface IDocumentEditorEventTargetState {
    */
   surface_raycast_detected_node_ids: string[];
 
-  // /**
-  //  * @private - internal use only
-  //  *
-  //  * relative cursor position to the event target (position in viewport space)
-  //  *
-  //  * @default [0, 0]
-  //  */
-  // __surface_cursor_position: cmath.Vector2;
-
-  // /**
-  //  * @private - internal use only
-  //  *
-  //  * relative cursor position to document root (position in artboard (document) space)
-  //  *
-  //  * @default [0, 0]
-  //  */
-  // __cursor_position: cmath.Vector2;
-
   pointer: {
     position: cmath.Vector2;
     // position_snap: cmath.Vector2;
   };
+
+  ruler: "on" | "off";
+
+  pixelgrid: "on" | "off";
 
   /**
    * @private - internal use only
@@ -446,6 +575,33 @@ interface IDocumentEditorEventTargetState {
    * Marquee transform in canvas space
    */
   marquee?: Marquee;
+
+  /**
+   * active, repeatable duplication state
+   */
+  active_duplication: ActiveDuplication | null;
+}
+
+/**
+ * used for "repeated duplicate", where accumulating the delta between the original and the clone, forwarding that delta to the next clone.
+ *
+ * [accumulated duplicate]
+ * - [set]
+ *    - as clone / duplicate happens, we save each id of original and duplicated.
+ * - [reset]
+ *    - whenever the active clone is considered no longer valid, e.g. when origianl is deleted. (to detect this easily we use a strict diff of the selection change)
+ *    - the current history change shall only contain the diff of the clone, otherwise, reset.
+ *      - this includes the selection change.
+ *      - as long as the history (change) is made within the clone, it kept valid.
+ *    - as history changes backward, reset. (accumulated duplicate related states are reset (set null) as history goes backward)
+ *    - as the focus (selection) changes, reset.
+ *
+ * **Note:** currently we simply reset whenever selection is changed.
+ * => this is enough for now, but as we support api access, we'll actually need to track the change.
+ */
+export interface ActiveDuplication {
+  origins: grida.program.nodes.NodeID[];
+  clones: grida.program.nodes.NodeID[];
 }
 
 interface IDocumentEditorConfig {
@@ -554,6 +710,11 @@ export interface IMinimalDocumentState {
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
 }
 
+export interface Guide {
+  readonly axis: cmath.Axis;
+  readonly offset: number;
+}
+
 export interface IDocumentState extends IMinimalDocumentState {
   selection: string[];
 
@@ -567,11 +728,11 @@ export interface IDocumentState extends IMinimalDocumentState {
   content_edit_mode?: ContentEditModeState;
 
   /**
-   * @private - internal use only
+   * the ruler guides.
    *
-   * refresh key
+   * objects sanps to this when ruler is on
    */
-  // __r: number;
+  guides: Guide[];
 }
 
 interface __TMP_HistoryExtension {
@@ -629,6 +790,10 @@ export function initDocumentEditorState({
       transform_with_preserve_aspect_ratio: "off",
       rotate_with_quantize: "off",
     },
+    ruler: "on",
+    pixelgrid: "on",
+    guides: [],
+    active_duplication: null,
     document_ctx: document.Context.from(init.document).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,

@@ -45,6 +45,7 @@ import {
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
+  GitHubLogoIcon,
   OpenInNewWindowIcon,
   PlayIcon,
   PlusIcon,
@@ -107,6 +108,7 @@ import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
+import { SlackIcon } from "lucide-react";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -353,6 +355,25 @@ export default function CanvasPlayground() {
                                     </Link>
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
+                                <DropdownMenuSeparator />
+                                <Link
+                                  href="https://github.com/gridaco/grida"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <GitHubLogoIcon className="me-2" />
+                                    GitHub
+                                  </DropdownMenuItem>
+                                </Link>
+                                <Link
+                                  href="https://grida.co/join-slack"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <SlackIcon className="me-2 w-4 h-4" />
+                                    Slack Community
+                                  </DropdownMenuItem>
+                                </Link>
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <span className="font-bold text-xs">

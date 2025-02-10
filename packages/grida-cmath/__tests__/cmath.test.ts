@@ -40,3 +40,42 @@ describe("cmath.quantize", () => {
     expect(cmath.quantize(0.123456, 0.000001)).toBeCloseTo(0.123456);
   });
 });
+
+describe("cmath.powerset", () => {
+  test("should return the full powerset when k is -1 or not provided", () => {
+    const input = [1, 2, 3];
+    const result1 = cmath.powerset(input);
+    const result2 = cmath.powerset(input, -1);
+
+    expect(result1).toEqual([
+      [],
+      [1],
+      [2],
+      [3],
+      [1, 2],
+      [1, 3],
+      [2, 3],
+      [1, 2, 3],
+    ]);
+    expect(result2).toEqual(result1);
+  });
+
+  test("should return subsets of a specific size k", () => {
+    const input = [1, 2, 3];
+    const result = cmath.powerset(input, 2);
+    expect(result).toEqual([
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ]);
+  });
+
+  test("should return an empty array if k is out of range", () => {
+    expect(cmath.powerset([1, 2], 5)).toEqual([]);
+    expect(cmath.powerset([], 2)).toEqual([]);
+  });
+
+  test("should handle an empty array (k = -1)", () => {
+    expect(cmath.powerset([], -1)).toEqual([[]]);
+  });
+});

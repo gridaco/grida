@@ -485,7 +485,12 @@ export interface Project {
   created_at: string;
 }
 
-export type GDocumentType = "v0_form" | "v0_site" | "v0_schema" | "v0_canvas";
+export type GDocumentType =
+  | "v0_form"
+  | "v0_site"
+  | "v0_schema"
+  | "v0_bucket"
+  | "v0_canvas";
 
 export interface GDocument {
   id: string;
@@ -495,6 +500,7 @@ export interface GDocument {
   organization_id: number;
   doctype: GDocumentType;
   title: string;
+  is_public: boolean;
   form_id: string | null;
   has_connection_supabase: boolean;
   responses: number | null;

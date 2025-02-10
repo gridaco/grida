@@ -13,10 +13,10 @@ import type {
   EditorEventTarget_DragEnd,
   //
 } from "../action";
-import type {
-  GestureDraw,
-  IDocumentEditorState,
-  IMinimalDocumentState,
+import {
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+  type GestureDraw,
+  type IDocumentEditorState,
 } from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
@@ -37,7 +37,8 @@ import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
-import { pointToSurfaceSpace, toCanvasSpace } from "../utils/transform";
+import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
+import { snapGuideTranslation, threshold } from "./tools/snap";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -109,7 +110,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const adj_movement =
               cmath.ext.movement.axisLockedByDominance(movement);
 
-            const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
+            const adj_pos = cmath.vector2.add(
+              a.p,
+              cmath.ext.movement.normalize(adj_movement),
+              n_offset
+            );
             draft.content_edit_mode.path_cursor_position = adj_pos;
           } else {
             draft.content_edit_mode.path_cursor_position =
@@ -142,7 +147,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               2,
               draft.transform,
               // map the cursor position back to surface space
-              pointToSurfaceSpace(draft.pointer.position, draft.transform)
+              vector2ToSurfaceSpace(draft.pointer.position, draft.transform)
             );
             break;
           case "insert":
@@ -383,6 +388,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
         draft.marquee = undefined;
+        draft.dropzone = undefined;
+        draft.surface_snapping = undefined;
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -648,7 +655,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
         }
 
-        self_maybe_end_gesture_translate(draft);
+        self_maybe_end_gesture(draft);
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
       });
@@ -682,6 +689,34 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               );
               break;
             }
+            case "guide": {
+              const { axis, idx: index, initial_offset } = draft.gesture;
+
+              const counter = axis === "x" ? 0 : 1;
+              const m = movement[counter];
+
+              const cdom = new domapi.CanvasDOM(state.transform);
+
+              // [snap the guide offset]
+              // 1. to pixel grid (quantize 1)
+              // 2. to objects geometry
+              const { translated } = snapGuideTranslation(
+                axis,
+                initial_offset,
+                [cdom.getNodeBoundingRect(state.document.root_id)!],
+                m,
+                threshold(
+                  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+                  draft.transform
+                )
+              );
+
+              const offset = cmath.quantize(translated, 1);
+
+              draft.gesture.offset = offset;
+              draft.guides[index].offset = offset;
+              break;
+            }
             // [insertion mode - resize after insertion]
             case "scale": {
               self_update_gesture_transform(draft);
@@ -689,6 +724,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             // this is to handle "immediately drag move node"
             case "translate": {
+              self_update_gesture_transform(draft);
+              break;
+            }
+            case "sort": {
               self_update_gesture_transform(draft);
               break;
             }
@@ -718,7 +757,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? cmath.ext.movement.axisLockedByDominance(movement)
                   : movement;
 
-              const point = adj_movement;
+              const point = cmath.ext.movement.normalize(adj_movement);
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),
@@ -738,22 +777,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               // get the box of the points
               const bb = vne.getBBox();
+              const raw_offset: cmath.Vector2 = [bb.x, bb.y];
+              // snap/round the offset so it doesn't keep producing sub-pixel re-centers
+              const snapped_offset = cmath.vector2.quantize(raw_offset, 1);
 
-              // delta is the x, y of the new bounding box - as it started from [0, 0]
-              const delta: cmath.Vector2 = [bb.x, bb.y];
+              vne.translate(cmath.vector2.invert(snapped_offset));
 
-              // update the points with the delta (so the most left top point is to be [0, 0])
-              vne.translate(cmath.vector2.invert(delta));
-
-              const new_pos = cmath.vector2.add(origin, delta);
-
-              // update the node position & dimension
+              const new_pos = cmath.vector2.add(origin, snapped_offset);
               node.left = new_pos[0];
               node.top = new_pos[1];
               node.width = bb.width;
               node.height = bb.height;
-
-              // finally, update the node's vector network
               node.vectorNetwork = vne.value;
 
               break;
@@ -848,7 +882,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const bb_a = vne.getBBox();
 
               for (const i of content_edit_mode.selected_vertices) {
-                vne.translateVertex(i, adj_movement);
+                vne.translateVertex(
+                  i,
+                  cmath.ext.movement.normalize(adj_movement)
+                );
               }
 
               const bb_b = vne.getBBox();
@@ -904,6 +941,69 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               break;
               //
+            }
+            case "gap": {
+              const { layout, axis, initial_gap, min_gap } = draft.gesture;
+              const delta = movement[axis === "x" ? 0 : 1];
+              const side: "left" | "top" = axis === "x" ? "left" : "top";
+
+              switch (layout.type) {
+                case "group": {
+                  const sorted = layout.objects
+                    .slice()
+                    .sort((a, b) => a[axis] - b[axis]);
+
+                  const gap = cmath.quantize(
+                    Math.max(initial_gap + delta, min_gap),
+                    1
+                  );
+
+                  // start from the first sorted object's position.
+                  let currentPos = sorted[0][axis];
+
+                  // Calculate new positions considering each rect's dimension.
+                  const transformed = sorted.map((obj) => {
+                    const next = { ...obj };
+                    next[axis] = cmath.quantize(currentPos, 1);
+                    currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
+                    return next;
+                  });
+
+                  // Update layout objects with new positions.
+                  draft.gesture.layout.objects = transformed;
+                  draft.gesture.gap = gap;
+
+                  // Apply transform to the actual nodes.
+                  transformed.forEach((obj) => {
+                    const node = document.__getNodeById(
+                      draft,
+                      obj.id
+                    ) as grida.program.nodes.i.IPositioning;
+
+                    node[side] = obj[axis];
+                  });
+                  break;
+                }
+
+                case "flex": {
+                  const gap = cmath.quantize(
+                    Math.max(initial_gap + delta, min_gap),
+                    1
+                  );
+
+                  const container = document.__getNodeById(draft, layout.group);
+                  draft.document.nodes[layout.group] = nodeReducer(container, {
+                    type: "node/change/gap",
+                    gap: gap,
+                    node_id: container.id,
+                  });
+
+                  draft.gesture.gap = gap;
+                  break;
+                }
+              }
+
+              break;
             }
           }
         });
@@ -982,16 +1082,30 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   };
 }
 
-function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
-  if (draft.gesture.type !== "translate") return;
-  if (draft.gesture.is_currently_cloned) {
-    // update the selection as the cloned nodes
-    self_selectNode(draft, "reset", ...draft.gesture.selection);
+function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
+  switch (draft.gesture.type) {
+    case "translate": {
+      if (draft.gesture.is_currently_cloned) {
+        // update the selection as the cloned nodes
+        self_selectNode(draft, "reset", ...draft.gesture.selection);
+      }
+      draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+    case "sort": {
+      const { placement } = draft.gesture;
+      const node = draft.document.nodes[
+        draft.gesture.node_id
+      ] as grida.program.nodes.i.IPositioning;
+      node.left = placement.rect.x;
+      node.top = placement.rect.y;
+
+      break;
+    }
   }
 
-  draft.surface_measurement_targeting_locked = false;
   draft.gesture = { type: "idle" };
-  draft.dropzone_node_id = undefined;
+  draft.dropzone = undefined;
 }
 
 /**

@@ -42,6 +42,7 @@ import {
   NewDocumentResponse,
 } from "@/app/(api)/private/editor/new/route";
 import toast from "react-hot-toast";
+import { Switch } from "@/components/ui/switch";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -71,6 +72,7 @@ export function CreateNewDocumentButton({
   } = useWorkspace();
 
   const newDatabaseDialog = useDialogState();
+  const newBucketDialog = useDialogState();
 
   const router = useRouter();
 
@@ -213,13 +215,23 @@ export function CreateNewDocumentButton({
             <DropdownMenuSeparator />
           </DropdownMenuGroup>
           <DropdownMenuGroup>
-            <DropdownMenuLabel>CMS / Commerce</DropdownMenuLabel>
+            <DropdownMenuLabel>Database / Storage</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
               <ResourceTypeIcon
                 type="database"
                 className="w-4 h-4 me-2 align-middle"
               />
               Database
+              <Badge variant="outline" className="ms-auto">
+                beta
+              </Badge>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={newBucketDialog.openDialog}>
+              <ResourceTypeIcon
+                type="v0_bucket"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Storage
               <Badge variant="outline" className="ms-auto">
                 beta
               </Badge>
@@ -233,16 +245,6 @@ export function CreateNewDocumentButton({
                 className="w-4 h-4 me-2 align-middle"
               />
               Localization
-              <Badge variant="outline" className="ms-auto">
-                soon
-              </Badge>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <ResourceTypeIcon
-                type="commerce"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Store
               <Badge variant="outline" className="ms-auto">
                 soon
               </Badge>
@@ -275,6 +277,16 @@ export function CreateNewDocumentButton({
                 soon
               </Badge>
             </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <ResourceTypeIcon
+                type="commerce"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Store
+              <Badge variant="outline" className="ms-auto">
+                soon
+              </Badge>
+            </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -282,6 +294,11 @@ export function CreateNewDocumentButton({
         project_id={project_id}
         project_name={project_name}
         {...newDatabaseDialog.props}
+      />
+      <CreateNewBucketDialog
+        project_id={project_id}
+        project_name={project_name}
+        {...newBucketDialog.props}
       />
     </>
   );
@@ -401,7 +418,7 @@ function CreateNewDatabaseDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="ghost">Close</Button>
+            <Button variant="ghost">Cancel</Button>
           </DialogClose>
           <Button
             disabled={save_disabled}
@@ -414,4 +431,105 @@ function CreateNewDatabaseDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function CreateNewBucketDialog({
+  project_id,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  project_id: number;
+  project_name: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const [name, setName] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+
+  const onSaveClick = () => {
+    setBusy(true);
+    create_new_document({
+      project_id: project_id,
+      doctype: "v0_bucket",
+      name: name,
+      public: isPublic,
+    })
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+        }
+        if (data) {
+          setError(undefined);
+
+          // client side redirect
+          router.push(data.redirect);
+          return;
+        }
+
+        // this shall not be raeched when success
+        setBusy(false);
+      })
+      .catch(() => {
+        setError("Unknown error. Please try again.");
+        setBusy(false);
+      });
+  };
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New Storage</DialogTitle>
+          <DialogDescription>Create a new storage bucket</DialogDescription>
+        </DialogHeader>
+        <hr />
+        <div className="w-full flex flex-col gap-5">
+          <div className="grid gap-2">
+            <Label>Name of bucket</Label>
+            <Input
+              autoFocus
+              required
+              minLength={1}
+              placeholder="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <span className="text-muted-foreground text-xs max-w-80">
+              {error && (
+                <span className="text-destructive">
+                  {error}
+                  <br />
+                  <br />
+                </span>
+              )}
+              <>
+                Bucket name should be unique across the project. lowercase and
+                underscore `_` only.
+              </>
+            </span>
+          </div>
+          <hr />
+          <div className="flex gap-4">
+            <Switch disabled checked={isPublic} onCheckedChange={setIsPublic} />
+            <div className="grid gap-2">
+              <Label>Public Bucket</Label>
+              <span className="text-xs text-muted-foreground">
+                Anyone can read files from this bucket.
+              </span>
+            </div>
+          </div>
+        </div>
+        <hr />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Cancel</Button>
+          </DialogClose>
+          <Button disabled={busy} onClick={onSaveClick} className="min-w-20">
+            {busy ? <Spinner /> : <>Create</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+  //
 }
