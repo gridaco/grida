@@ -1,10 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion } from "framer-motion";
 import Image from "next/image";
-import * as k from "@/app/(www-2025)/data";
+import * as k from "./data";
 import clsx from "clsx";
-import bentomainbg from "@/app/(www-2025)/bento-fullsize-video-card-background.png";
+import bentomainbg from "@/app/(www)/(home)/.home/bento-fullsize-video-card-background.png";
 
 export function Demo2() {
   const tabsRef = useRef<(HTMLElement | null)[]>([]);

@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import Image from "next/image";
-import * as k from "@/app/(www-2025)/data";
+import * as k from "./data";
 
 export function Demo1() {
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
