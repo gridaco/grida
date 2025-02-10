@@ -12,7 +12,7 @@ import Hero from "./.sections/hero";
 import Demo from "./.sections/demo";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Header from "@/www/header";
+import Header from "../header";
 import Footer from "@/www/footer";
 import { FAQ } from "./.sections/faq";
 

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
-import Header from "@/app/(www)/(home)/.home/header";
+import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Hero from "@/app/(www)/(home)/.home/hero";
 import { Demo1 } from "./.home/demo-1";
