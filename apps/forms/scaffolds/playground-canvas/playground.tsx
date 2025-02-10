@@ -15,7 +15,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
+import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -105,10 +105,15 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
+
+const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -132,6 +137,7 @@ export default function CanvasPlayground() {
       editable: true,
       debug: pref.debug,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -158,7 +164,8 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
+        properties: {},
+        backgroundColor: CANVAS_BG_COLOR,
       },
     })
   );
@@ -407,7 +414,7 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                    <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                       <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
                         <AutoInitialFitTransformer>
@@ -442,7 +449,7 @@ export default function CanvasPlayground() {
                         )}
                       </ViewportRoot>
                       <DevtoolsPanel />
-                    </div>
+                    </StandaloneDocumentBackground>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
               </EditorSurfaceClipboardSyncProvider>
@@ -473,7 +480,13 @@ export default function CanvasPlayground() {
                     <FontFamilyListProvider fonts={fonts}>
                       <Align />
                       <hr />
-                      <Selection empty={<__TMP_ComponentProperties />} />
+                      <Selection
+                        empty={
+                          <div className="mt-4 mb-10">
+                            <DocumentProperties />
+                          </div>
+                        }
+                      />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
@@ -511,6 +524,7 @@ function ExampleSwitch({
     "event-page-01.grida",
     "component-01.grida",
     "layout-01.grida",
+    "globals-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>

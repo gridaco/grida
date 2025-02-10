@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import { grida } from "../../../index";
 
 function randcolor(): grida.program.cg.RGBA8888 {
   return {
@@ -10,7 +10,7 @@ function randcolor(): grida.program.cg.RGBA8888 {
 }
 
 function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
-  const rects = [];
+  const rects: grida.program.nodes.RectangleNode[] = [];
   for (let i = 0; i < 1000; i++) {
     rects.push({
       id: `rect_${i}`,
@@ -80,4 +80,5 @@ export default {
       return acc;
     }, {}),
   },
+  globals: {},
 } satisfies grida.program.document.IDocumentDefinition;

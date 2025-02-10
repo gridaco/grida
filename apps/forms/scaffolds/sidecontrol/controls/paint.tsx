@@ -20,17 +20,53 @@ import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
+import { Button } from "@/components/ui/button";
+import { useSchema } from "../schema";
+import { tokens } from "@grida/tokens";
+import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
 
 export function PaintControl({
   value,
   onValueChange,
   removable,
 }: {
-  value?: grida.program.cg.Paint;
-  onValueChange?: (value: grida.program.cg.PaintWithoutID | null) => void;
+  value?: grida.program.nodes.i.props.PropsPaintValue;
+  onValueChange?: (
+    value: ComputedPaintWithoutID | TokenizedPaint | null
+  ) => void;
   removable?: boolean;
 }) {
-  const onTabChange = useCallback(
+  if (tokens.is.tokenized(value)) {
+    return (
+      <TokenizedPaintControl
+        value={value as TokenizedPaint}
+        onValueChange={onValueChange}
+      />
+    );
+  } else {
+    return (
+      <ComputedPaintControl
+        value={value as ComputedPaint}
+        onValueChange={onValueChange}
+      />
+    );
+  }
+}
+
+type ComputedPaint = grida.program.cg.Paint;
+type ComputedPaintWithoutID = grida.program.cg.PaintWithoutID;
+type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
+
+function ComputedPaintControl({
+  value,
+  onValueChange,
+  removable,
+}: {
+  value?: ComputedPaint;
+  onValueChange?: (value: ComputedPaintWithoutID | null) => void;
+  removable?: boolean;
+}) {
+  const onTypeChange = useCallback(
     (type: grida.program.cg.Paint["type"]) => {
       const to = type;
 
@@ -184,7 +220,7 @@ export function PaintControl({
         </PopoverTrigger>
       )}
       <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
-        <Tabs value={value?.type} onValueChange={onTabChange as any}>
+        <Tabs value={value?.type} onValueChange={onTypeChange as any}>
           <TabsList className="m-2">
             <TabsTrigger value="solid">
               <SolidPaintIcon active={value?.type === "solid"} />
@@ -202,15 +238,26 @@ export function PaintControl({
           </TabsList>
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
-              <ColorPicker
-                color={value.color}
-                onColorChange={(color) => {
-                  onValueChange?.({
-                    type: "solid",
-                    color,
-                  });
-                }}
-              />
+              <>
+                <ColorPicker
+                  color={value.color}
+                  onColorChange={(color) => {
+                    onValueChange?.({
+                      type: "solid",
+                      color,
+                    });
+                  }}
+                />
+                <ContextVariableColors
+                  onSelect={(token) => {
+                    onValueChange?.({
+                      type: "solid",
+                      // @ts-ignore
+                      color: token,
+                    });
+                  }}
+                />
+              </>
             )}
           </TabsContent>
           <TabsContent value="linear_gradient" className="p-2">
@@ -226,6 +273,94 @@ export function PaintControl({
         </Tabs>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function TokenizedPaintControl({
+  value,
+  removable,
+  onValueChange,
+}: {
+  value: TokenizedPaint;
+  removable?: boolean;
+  onValueChange?: (value: TokenizedPaint | null) => void;
+}) {
+  const computed = useComputed(
+    {
+      value,
+    },
+    true
+  );
+
+  const identifier = value.color;
+
+  return (
+    <Popover>
+      <PopoverTrigger>
+        <PaintInputContainer>
+          <PaintChip paint={computed.value as any as ComputedPaint} />
+          <span className="text-xs text-muted-foreground ms-2">
+            {tokens.factory.strfy.stringValueExpression(
+              identifier as tokens.PropertyAccessExpression
+            )}
+          </span>
+          {/* {removable && (
+          <button
+            onClick={onRemovePaint}
+            className="px-1 py-1 me-0.5 text-muted-foreground"
+          >
+            <Cross2Icon className="w-3.5 h-3.5" />
+          </button>
+        )} */}
+        </PaintInputContainer>
+      </PopoverTrigger>
+      <PopoverContent>
+        <ContextVariableColors
+          onSelect={(token) => {
+            onValueChange?.({
+              type: "solid",
+              color: token,
+            });
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ContextVariableColors({
+  onSelect,
+}: {
+  onSelect?: (token: tokens.PropertyAccessExpression) => void;
+}) {
+  const schema = useSchema();
+  const colors = Object.entries(schema?.properties ?? {}).filter(
+    ([key, def]) => {
+      return def.type === "rgba";
+    }
+  );
+
+  return (
+    <div className="space-y-1">
+      {colors.map(([key, def]) => (
+        <Button
+          key={key}
+          variant="ghost"
+          size="xs"
+          className="flex items-center justify-start gap-1 px-1 py-0.5 w-full"
+          onClick={() => {
+            const exp = tokens.factory.createPropertyAccessExpression([
+              "props",
+              key,
+            ]);
+            onSelect?.(exp);
+          }}
+        >
+          <PaintChip paint={{ type: "solid", color: def.default }} />
+          <span className="text-xs">{key}</span>
+        </Button>
+      ))}
+    </div>
   );
 }
 

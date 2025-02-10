@@ -391,7 +391,7 @@ export function useSingleSelection(
       boundingSurfaceRect: boundingSurfaceRect,
       distribution: distribution,
       node: {
-        ...(node as grida.program.nodes.AnyNode),
+        ...(node as grida.program.nodes.UnknwonNode),
         meta: {
           is_flex_parent,
           // TODO:

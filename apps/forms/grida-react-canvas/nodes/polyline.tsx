@@ -15,7 +15,7 @@ interface PolylineNode
     grida.program.nodes.i.IOpacity,
     grida.program.nodes.i.IZIndex,
     grida.program.nodes.i.IRotation,
-    grida.program.nodes.i.IFill,
+    grida.program.nodes.i.IFill<grida.program.cg.Paint>,
     grida.program.nodes.i.IStroke {
   type: "polyline";
   points: grida.program.cg.Vector2[];
