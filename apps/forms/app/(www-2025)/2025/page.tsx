@@ -30,13 +30,11 @@ function Demo() {
       <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden relative">
         {/* Overlay for lock */}
         {isLocked && (
-          <div className="absolute inset-0 bg-slate-950/10 shadow-xl z-20 flex items-center justify-center">
-            <button
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-400 focus:outline-none"
-              onClick={unlockDemo}
-            >
-              Jump to Canvas
-            </button>
+          <div
+            className="absolute inset-0 bg-primary/20 z-20 flex items-center justify-center cursor-pointer"
+            onClick={unlockDemo}
+          >
+            <Button>Click to play</Button>
           </div>
         )}
 
@@ -44,7 +42,7 @@ function Demo() {
         <div
           className={`w-full h-full ${isLocked ? "pointer-events-none" : "pointer-events-auto"}`}
         >
-          <iframe src="/canvas" className="w-full h-full" />
+          <iframe src="https://app.grida.co/canvas" className="w-full h-full" />
         </div>
       </Card>
     </motion.div>
@@ -53,7 +51,7 @@ function Demo() {
 
 export default function WWW() {
   return (
-    <main>
+    <main className="container mx-auto">
       <Header />
       <Hero />
       <section>
@@ -285,13 +283,11 @@ function CtaSection() {
           Design editor tool with customizable templates.
         </p>
         <div className="flex gap-4 mt-20">
-          <Button className="px-8 py-6 border-2 border-black flex gap-2 group">
-            <p className="text-lg font-normal">Start your project</p>
+          <Button className="flex gap-2 group">
+            <span>Start your project</span>
             <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
           </Button>
-          <Button variant="outline" className="px-8 py-6 border-2 border-black">
-            <p className="text-lg font-normal">Try to demo</p>
-          </Button>
+          <Button variant="outline">Try the demo</Button>
         </div>
       </div>
       <Image
