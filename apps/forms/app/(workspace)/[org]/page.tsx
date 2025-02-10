@@ -77,13 +77,17 @@ export default function DashboardProjectsPage({
             <>
               {projects.length === 0 && (
                 <Card>
-                  <CardContent>
+                  <CardContent className="py-16">
                     <CardHeader />
-                    <div className="flex flex-col items-center justify-center gap-4">
-                      <BoxSelectIcon className="w-12 h-12 text-muted-foreground" />
-                      <h2 className="text-lg font-bold mt-4">No project yet</h2>
+                    <div className="flex flex-col items-center justify-center gap-8">
+                      <div className="flex flex-col gap-2 items-center">
+                        <BoxSelectIcon className="w-12 h-12 text-muted-foreground" />
+                        <h2 className="text-lg text-muted-foreground">
+                          No projects yet
+                        </h2>
+                      </div>
                       <CreateNewProjectDialog org={organization.name}>
-                        <Button variant="secondary">
+                        <Button variant="outline">
                           <PlusIcon className="inline w-4 h-4 me-2" />
                           Create your first project
                         </Button>
