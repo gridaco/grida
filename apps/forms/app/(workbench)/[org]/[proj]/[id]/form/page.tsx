@@ -74,6 +74,7 @@ export default function FormDashboard() {
         </SectorHeader>
         <DeleteFormSection />
       </Sector>
+      <div className="h-40" />
     </main>
   );
 }
