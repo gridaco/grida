@@ -34,6 +34,27 @@ const features: { title: string; href: string; description: string }[] = [
     description:
       "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
   },
+  {
+    title: "Figma CI",
+    href: "/figma",
+    description:
+      "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
+  },
+];
+
+const resources: { title: string; href: string }[] = [
+  {
+    title: "Docs",
+    href: "/docs",
+  },
+  {
+    title: "The Bundle",
+    href: "/bundle",
+  },
+  {
+    title: "Join Slack",
+    href: "/pricing",
+  },
 ];
 
 export default function Header() {
@@ -68,13 +89,20 @@ export default function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <Link href="/docs" legacyBehavior passHref>
-                  <NavigationMenuLink
-                    className={`${navigationMenuTriggerStyle()}`}
-                  >
-                    <p className="font-normal">Docs</p>
-                  </NavigationMenuLink>
-                </Link>
+                <NavigationMenuTrigger className="font-normal">
+                  Resources
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
+                    {resources.map((component) => (
+                      <ListItem
+                        key={component.title}
+                        title={component.title}
+                        href={component.href}
+                      />
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
                 <Link href="/pricing" legacyBehavior passHref>

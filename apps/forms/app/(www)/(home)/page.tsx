@@ -65,7 +65,7 @@ function SectionMainDemo() {
           data-locked={isLocked}
           className="w-full h-full pointer-events-none data-[locked='false']:pointer-events-auto"
         >
-          <iframe src="https://app.grida.co/canvas" className="w-full h-full" />
+          <iframe src="/canvas" className="w-full h-full" />
         </div>
       </Card>
     </motion.div>

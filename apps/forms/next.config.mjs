@@ -1,5 +1,7 @@
 import withMDX from "@next/mdx";
 
+const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = withMDX()({
   pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
@@ -64,6 +66,24 @@ const nextConfig = withMDX()({
         source: "/theme/embed/backgrounds/:path*",
         destination: "https://bg.grida.co/embed/:path*",
         permanent: false,
+      },
+    ];
+  },
+  rewrites: async () => {
+    return [
+      // docs
+      {
+        source: "/docs/:path*",
+        destination: `${DOCS_URL}/:path*`,
+      },
+      // The-Bundle
+      {
+        source: "/bundle",
+        destination: `https://the-bundle-web.vercel.app/bundle`,
+      },
+      {
+        source: "/bundle/:path*",
+        destination: `https://the-bundle-web.vercel.app/bundle/:path*`,
       },
     ];
   },
