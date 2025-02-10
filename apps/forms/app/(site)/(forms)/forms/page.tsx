@@ -8,13 +8,13 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import Hero from "./sections/hero";
-import Demo from "./sections/demo";
+import Hero from "./.sections/hero";
+import Demo from "./.sections/demo";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
-import { FAQ } from "./sections/faq";
+import { FAQ } from "./.sections/faq";
 
 export default function Home() {
   return (
@@ -77,8 +77,6 @@ export default function Home() {
             </div>
           </div>
         </section>
-        <div className="h-96" />
-        <Pricing />
         <section className="mt-72">
           <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
