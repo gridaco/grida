@@ -3113,13 +3113,6 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
   };
 };
 
-export function useNode(node_id: string): grida.program.nodes.UnknwonNode & {
-  meta: {
-    is_component_consumer: boolean;
-    is_flex_parent: boolean;
-  };
-};
-
 export function useNode(node_id: string): NodeWithMeta {
   const { state } = useDocument();
 
