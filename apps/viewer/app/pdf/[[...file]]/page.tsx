@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import PDFViewer from "./viewer";
 
 type PdfViewerApp = "" | "page-flip";
@@ -18,7 +19,11 @@ export default async function PDFViewerPage({
   const { file: _p_file } = await params;
   const { file: _q_file, app = "" } = await searchParams;
 
-  const file = (_p_file?.[0] || _q_file)!;
+  const file = (_q_file || _p_file?.[0])!;
+
+  if (!file) {
+    redirect("/");
+  }
 
   return <PDFViewer app={app} file={file} />;
 }
