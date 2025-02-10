@@ -70,7 +70,7 @@ export function StandaloneDocumentBackground({
     <div {...props}>
       <div
         ref={visiblearea}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
+        className="absolute inset-0 pointer-events-none overflow-hidden -z-10"
       >
         {/* root bg - transparency grid */}
         <TransparencyGrid
