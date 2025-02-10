@@ -683,7 +683,7 @@ function CreateViewerLinkDialog({
               </TabsContent>
               <TabsContent value="flipbook" className="w-full h-full">
                 <iframe
-                  src={`https://viewer.grida.co/pdf?file=${file.url}&app=page-flip`}
+                  src={`https://viewer.grida.co/pdf?url=${file.url}&app=page-flip`}
                   width="100%"
                   height="100%"
                 />

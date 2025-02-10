@@ -5,7 +5,7 @@ type PdfViewerApp = "" | "page-flip";
 
 type Params = Promise<{ file: string[] | undefined }>;
 type SearchParams = Promise<{
-  file?: string | undefined;
+  url?: string | undefined;
   app?: PdfViewerApp | undefined;
 }>;
 
@@ -17,7 +17,7 @@ export default async function PDFViewerPage({
   searchParams: SearchParams;
 }) {
   const { file: _p_file } = await params;
-  const { file: _q_file, app = "" } = await searchParams;
+  const { url: _q_file, app = "" } = await searchParams;
 
   const file = (_q_file || _p_file?.[0])!;
 
