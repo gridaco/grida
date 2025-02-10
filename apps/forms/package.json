@@ -27,6 +27,7 @@
     "@grida/pixel-grid": "workspace:*",
     "@grida/ruler": "workspace:*",
     "@grida/tokens": "workspace:*",
+    "@grida/transparency-grid": "workspace:*",
     "@mdx-js/loader": "^3.0.1",
     "@mdx-js/react": "^3.0.1",
     "@monaco-editor/react": "^4.6.0",

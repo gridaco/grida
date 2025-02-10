@@ -1,0 +1,8 @@
+{
+  "name": "@grida/transparency-grid",
+  "description": "Transparency Grid component for Infinite Canvas",
+  "devDependencies": {
+    "@types/react": "^18",
+    "react": "^18.2.0"
+  }
+}
