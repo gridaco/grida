@@ -11,9 +11,11 @@ import { useMeasure } from "@uidotdev/usehooks";
 
 export function SidebarRoot({
   side = "left",
+  className,
   children,
 }: React.PropsWithChildren<{
   side?: "left" | "right";
+  className?: string;
 }>) {
   return (
     <nav
@@ -21,7 +23,8 @@ export function SidebarRoot({
         "relative w-60 h-full shrink-0 overflow-y-auto",
         // apply slightly dimmed background for main content
         "bg-workbench-panel",
-        side === "left" ? "border-e" : "border-s"
+        side === "left" ? "border-e" : "border-s",
+        className
       )}
     >
       {children}
