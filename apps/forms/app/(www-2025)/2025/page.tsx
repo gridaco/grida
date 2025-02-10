@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/utils";
 
 export default function WWW() {
   return (
@@ -54,14 +55,15 @@ function SectionMainDemo() {
         {/* Overlay for lock */}
         {isLocked && (
           <div
-            className="absolute inset-0 bg-primary/20 z-20 flex items-center justify-center cursor-pointer"
+            className="absolute inset-0 bg-black/20 z-20 flex items-center justify-center cursor-pointer"
             onClick={unlockDemo}
           >
             <Button>Click to play</Button>
           </div>
         )}
         <div
-          className={`w-full h-full ${isLocked ? "pointer-events-none" : "pointer-events-auto"}`}
+          data-locked={isLocked}
+          className="w-full h-full pointer-events-none data-[locked='false']:pointer-events-auto"
         >
           <iframe src="https://app.grida.co/canvas" className="w-full h-full" />
         </div>
@@ -93,7 +95,9 @@ function SectionHeader({
         <span className="text-5xl lg:text-6xl font-bold py-10 text-center">
           {title}
         </span>
-        <p className=" text-lg opacity-80 text-center">{excerpt}</p>
+        <p className="max-w-xl mx-auto text-lg text-muted-foreground text-center">
+          {excerpt}
+        </p>
       </div>
       <Button variant="link" className="text-lg mt-20">
         {button}
@@ -150,9 +154,8 @@ function SectionA() {
       <div className="relative">
         <div className="absolute inset-0 -z-10 flex justify-center items-center">
           <svg
-            width="1400px"
-            height="1400px"
             xmlns="http://www.w3.org/2000/svg"
+            className="w-full aspect-square overflow-visible"
           >
             <defs>
               <radialGradient

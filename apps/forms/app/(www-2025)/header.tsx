@@ -15,7 +15,7 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-const components: { title: string; href: string; description: string }[] = [
+const features: { title: string; href: string; description: string }[] = [
   {
     title: "Canvas",
     href: "/canvas",
@@ -51,11 +51,11 @@ export default function Header() {
             <NavigationMenuList>
               <NavigationMenuItem>
                 <NavigationMenuTrigger className="font-normal">
-                  Products
+                  Features
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
-                    {components.map((component) => (
+                    {features.map((component) => (
                       <ListItem
                         key={component.title}
                         title={component.title}
@@ -126,8 +126,8 @@ const ListItem = React.forwardRef<
           )}
           {...props}
         >
-          <div className="font-medium leading-none">{title}</div>
-          <p className="line-clamp-2 leading-snug text-muted-foreground">
+          <span className="leading-none">{title}</span>
+          <p className="line-clamp-2 leading-snug text-muted-foreground text-xs">
             {children}
           </p>
         </a>

@@ -18,7 +18,7 @@ export default function Hero() {
             The editor to craft, customize,
             <br /> and create seamlessly.
           </h1>
-          <p className="text-lg text-muted-foreground text-left">
+          <p className="max-w-md text-lg text-muted-foreground text-left">
             Grida combines custom branding, intuitive design, and
             developer-friendly tools to streamline your workflow. Design
             smarter, manage seamlessly, and create without limits.
