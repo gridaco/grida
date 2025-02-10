@@ -19,10 +19,9 @@ export namespace cmath {
    */
   export type Axis = "x" | "y";
 
-  export const counterAxis = {
-    x: "y",
-    y: "x",
-  } as const;
+  export const counterAxis = (axis: Axis) => {
+    return axis === "x" ? "y" : "x";
+  };
 
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
@@ -1491,16 +1490,16 @@ export namespace cmath.rect {
    *
    * @example
    * const rect = { x: 10, y: 20, width: 30, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [25, 40]
    *
    * @example
    * // Handles rectangles with zero width or height
    * const rect = { x: 10, y: 20, width: 0, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [10, 40]
    */
-  export function center(rect: cmath.Rectangle): cmath.Vector2 {
+  export function getCenter(rect: cmath.Rectangle): cmath.Vector2 {
     const centerX = rect.x + rect.width / 2;
     const centerY = rect.y + rect.height / 2;
     return [centerX, centerY];
@@ -1737,7 +1736,7 @@ export namespace cmath.rect {
    * @remarks
    * - The function performs a strict equality check on the `x`, `y`, `width`, and `height` properties.
    */
-  export function identical(
+  export function isIdentical(
     rectA: cmath.Rectangle,
     rectB: cmath.Rectangle
   ): boolean {
@@ -1772,7 +1771,7 @@ export namespace cmath.rect {
 
     const [first, ...rest] = rects;
 
-    return rest.every((rect) => cmath.rect.identical(first, rect));
+    return rest.every((rect) => cmath.rect.isIdentical(first, rect));
   }
 
   /**
@@ -2858,6 +2857,15 @@ export namespace cmath.range {
 
   export function length(range: Range): number {
     return range[1] - range[0];
+  }
+
+  /**
+   * returns 3 point chunk, [start, mid, end]
+   * @param range
+   * @returns
+   */
+  export function to3PointsChunk(range: Range): [number, number, number] {
+    return [range[0], (range[0] + range[1]) / 2, range[1]];
   }
 
   /**

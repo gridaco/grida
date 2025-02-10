@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import {
-  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   type IDocumentEditorState,
 } from "../../state";
 import { self_insertSubDocument } from "./insert";
@@ -9,7 +9,11 @@ import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../domapi";
-import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
+import {
+  getSnapTargets,
+  snapObjectsTranslation,
+  threshold,
+} from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
@@ -144,6 +148,10 @@ function __self_update_gesture_transform_translate(
 
       // set the flag
       draft.gesture.is_currently_cloned = true;
+      draft.active_duplication = {
+        origins: initial_selection,
+        clones: initial_clone_ids,
+      };
 
       break;
     }
@@ -161,6 +169,7 @@ function __self_update_gesture_transform_translate(
       draft.selection = initial_selection;
       draft.surface_measurement_target = undefined;
       draft.surface_measurement_targeting_locked = false;
+      draft.active_duplication = null;
       break;
     }
   }
@@ -275,9 +284,12 @@ function __self_update_gesture_transform_translate(
 
   const { translated, snapping } = snapObjectsTranslation(
     initial_rects,
-    snap_target_node_rects,
+    {
+      objects: snap_target_node_rects,
+      guides: draft.ruler === "on" ? draft.guides : undefined,
+    },
     adj_movement,
-    DEFAULT_SNAP_MOVEMNT_THRESHOLD
+    threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
   );
 
   draft.surface_snapping = snapping;
@@ -423,7 +435,7 @@ function __self_update_gesture_transform_scale(
   // get the origin point based on handle
   const origin =
     transform_with_center_origin === "on"
-      ? cmath.rect.center(initial_bounding_rectangle)
+      ? cmath.rect.getCenter(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
           // maps the resize handle (direction) to the transform origin point (inverse)

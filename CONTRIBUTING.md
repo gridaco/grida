@@ -31,13 +31,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ```bash
 supabase start
+supabase seed buckets
 ```
 
 ### Supabase Types
 
 ```bash
-npx supabase gen types --lang=typescript \
-  --project-id "$PROJECT_REF" \
+npx supabase gen types typescript --local \
   --schema public \
   --schema grida_g11n \
   --schema grida_x_supabase \
@@ -46,6 +46,7 @@ npx supabase gen types --lang=typescript \
   --schema grida_commerce \
   --schema grida_forms_secure \
   --schema grida_forms \
+  --schema grida_storage \
   > database.types.ts
 ```
 

@@ -91,6 +91,16 @@ export const keybindings_sheet = [
     keys: ["backspace", "delete"],
   },
   {
+    name: "Auto-layout",
+    description: "Auto-layout the current selection",
+    keys: ["shift+a"],
+  },
+  {
+    name: "Group with Container",
+    description: "Group the current selection with a container",
+    keys: ["ctrl+alt+g", "meta+alt+g"],
+  },
+  {
     name: "align left",
     description: "Align selection to the left",
     keys: ["alt+a"],
@@ -166,6 +176,16 @@ export const keybindings_sheet = [
     keys: ["["],
   },
   {
+    name: "hide/show ruler",
+    description: "Toggle ruler visibility",
+    keys: ["shift+r"],
+  },
+  {
+    name: "hide/show pixel grid",
+    description: "Toggle pixel grid visibility",
+    keys: ["shift+'"],
+  },
+  {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
     keys: ["i"],
@@ -231,6 +251,10 @@ export function useEditorHotKeys() {
   const {
     cursor_mode,
     setCursorMode,
+    ruler,
+    setRulerState,
+    pixelgrid,
+    setPixelGridState,
     tryExitContentEditMode,
     tryToggleContentEditMode,
   } = useEventTarget();
@@ -249,6 +273,8 @@ export function useEditorHotKeys() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -558,8 +584,15 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+r", () => {
-    // TODO:
-    toast.error("[ruler] is not implemented yet");
+    const next = ruler === "on" ? "off" : "on";
+    setRulerState(next);
+    toast.success(`Ruler ${next}`);
+  });
+
+  useHotkeys("shift+\", shift+'", () => {
+    const next = pixelgrid === "on" ? "off" : "on";
+    setPixelGridState(next);
+    toast.success(`Pixel Grid ${next}`);
   });
 
   useHotkeys(
@@ -799,8 +832,22 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+a", (e) => {
-    // TODO:
-    toast.error("[container layout] is not implemented yet");
+    autoLayout("selection");
+  });
+
+  useHotkeys(
+    "ctrl+g, meta+g",
+    () => {
+      // TODO:
+      toast("use ⌥⌘G for grouping");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys("ctrl+alt+g, meta+alt+g", () => {
+    contain("selection");
   });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {

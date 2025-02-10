@@ -64,7 +64,7 @@ export function StandaloneDocumentEditor({
   }, [editable, dispatch]);
 
   const __dispatch = useMemo(
-    () => (editable ? dispatch ?? __noop : __noop),
+    () => (editable ? (dispatch ?? __noop) : __noop),
     [editable]
   );
 
@@ -1644,6 +1644,26 @@ export function useDocument() {
     [dispatch]
   );
 
+  const autoLayout = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "autolayout",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const contain = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "contain",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1885,6 +1905,8 @@ export function useDocument() {
       align,
       order,
       distributeEvenly,
+      autoLayout,
+      contain,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
@@ -1931,6 +1953,8 @@ export function useDocument() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -2087,10 +2111,12 @@ export function useTransform() {
   return useMemo(() => {
     const transform = state.transform;
     const scaleX = transform[0][0];
+    const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
       scaleX,
+      scaleY,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
@@ -2165,6 +2191,9 @@ export function useEventTarget() {
     cursor_mode,
     marquee,
     debug,
+    pixelgrid,
+    ruler,
+    guides,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2174,6 +2203,26 @@ export function useEventTarget() {
     gesture.type === "nudge" ||
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
+
+  const setRulerState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const setPixelGridState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/pixel-grid",
+        state,
+      });
+    },
+    [dispatch]
+  );
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -2418,6 +2467,30 @@ export function useEventTarget() {
 
   //
 
+  const startGuideGesture = useCallback(
+    (axis: cmath.Axis, idx: number | -1) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          idx: idx,
+          type: "guide",
+          axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteGuide = useCallback(
+    (idx: number) => {
+      dispatch({
+        type: "surface/guide/delete",
+        idx,
+      });
+    },
+    [dispatch]
+  );
+
   const startScaleGesture = useCallback(
     (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
@@ -2452,7 +2525,7 @@ export function useEventTarget() {
         type: "surface/gesture/start",
         gesture: {
           type: "gap",
-          selection: Array.isArray(selection) ? selection : [selection],
+          selection: selection,
           axis,
         },
       });
@@ -2503,6 +2576,15 @@ export function useEventTarget() {
       cursor_mode,
       setCursorMode,
       //
+      ruler,
+      setRulerState,
+      guides,
+      startGuideGesture,
+      deleteGuide,
+      //
+      pixelgrid,
+      setPixelGridState,
+      //
       hovered_node_id,
       dropzone,
       selection,
@@ -2511,6 +2593,7 @@ export function useEventTarget() {
       is_node_scaling,
       content_edit_mode,
       //
+
       startScaleGesture,
       startSortGesture,
       startGapGesture,
@@ -2547,6 +2630,15 @@ export function useEventTarget() {
     marquee,
     cursor_mode,
     setCursorMode,
+    //
+    ruler,
+    setRulerState,
+    guides,
+    startGuideGesture,
+    deleteGuide,
+    //
+    pixelgrid,
+    setPixelGridState,
     //
     hovered_node_id,
     dropzone,
@@ -2716,7 +2808,6 @@ export function useDataTransferEventTarget() {
 
   const onpaste = useCallback(
     (event: ClipboardEvent) => {
-      console.log("onpaste", event);
       if (event.defaultPrevented) return;
       // cancel if on contenteditable / form element
       if (
@@ -3015,11 +3106,21 @@ class EditorConsumerError extends Error {
   }
 }
 
+export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
+  meta: {
+    is_component_consumer: boolean;
+    is_flex_parent: boolean;
+  };
+};
+
 export function useNode(node_id: string): grida.program.nodes.UnknwonNode & {
   meta: {
     is_component_consumer: boolean;
+    is_flex_parent: boolean;
   };
-} {
+};
+
+export function useNode(node_id: string): NodeWithMeta {
   const { state } = useDocument();
 
   const {
@@ -3089,10 +3190,13 @@ export function useNode(node_id: string): grida.program.nodes.UnknwonNode & {
     root.type === "instance" ||
     root.type === "template_instance";
 
+  const is_flex_parent = node.type === "container" && node.layout === "flex";
+
   return {
     ...node,
     meta: {
-      is_component_consumer: is_component_consumer,
+      is_component_consumer,
+      is_flex_parent,
     },
   };
 }

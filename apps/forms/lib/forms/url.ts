@@ -24,6 +24,10 @@ type EditorPageParamsMap = {
   design: {};
   canvas: {};
   data: {};
+  objects: {};
+  "objects/[[...path]]": {
+    path?: string[];
+  };
   "data/responses": {};
   "data/responses/sessions": {};
   "data/analytics": {};
@@ -66,6 +70,12 @@ export function editorlink<P extends EditorPageType>(
     //   return `${origin}/${basepath}/${form_id}/settings/customize`;
     // case "settings/general":
     //   return `${origin}/${basepath}/${form_id}/settings/general`;
+    case "objects":
+      return `${origin}/${basepath}/${id}/objects`;
+    case "objects/[[...path]]":
+      const { path } = params as unknown as { path?: string[] };
+      if (path) return `${origin}/${basepath}/${id}/objects/${path.join("/")}`;
+      else return `${origin}/${basepath}/${id}/objects`;
     case "design":
       return `${origin}/${basepath}/${id}/design`;
     case "canvas":

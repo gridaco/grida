@@ -61,7 +61,6 @@
     "eslint-plugin-import": "^2.20.1",
     "jest": "26.4.2",
     "plugin": "^0.3.3",
-    "prettier": "^1.19.1",
     "prisma": "^3.14.0",
     "serverless-domain-manager": "^5.1.0",
     "serverless-dotenv-plugin": "^3.1.0",

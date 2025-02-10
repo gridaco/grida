@@ -2,6 +2,7 @@ import React from "react";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -11,11 +12,13 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import { cmath } from "@grida/cmath";
 import { Input } from "@/components/ui/input";
-import { useTransform } from "@/grida-react-canvas/provider";
+import { useEventTarget, useTransform } from "@/grida-react-canvas/provider";
 import { cn } from "@/utils";
 
 export function ZoomControl({ className }: { className?: string }) {
   const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
+  const { ruler, setRulerState, pixelgrid, setPixelGridState } =
+    useEventTarget();
 
   const [scaleX, scaleY] = cmath.transform.getScale(transform);
 
@@ -27,7 +30,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <span className="text-xs text-muted-foreground">{pct + "%"}</span>
         <CaretDownIcon className="ms-1" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end" className="min-w-36">
+      <DropdownMenuContent side="bottom" align="end" className="min-w-52">
         <Input
           type="number"
           value={pct + ""}
@@ -41,41 +44,83 @@ export function ZoomControl({ className }: { className?: string }) {
           className={WorkbenchUI.inputVariants({ size: "sm" })}
         />
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={zoomIn} className="text-xs">
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={zoomIn}
+          className="text-xs"
+        >
           Zoom in
           <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={zoomOut} className="text-xs">
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={zoomOut}
+          className="text-xs"
+        >
           Zoom out
           <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => fit("*")} className="text-xs">
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => fit("*")}
+          className="text-xs"
+        >
           Zoom to fit
           <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => fit("selection")} className="text-xs">
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
+          onSelect={() => fit("selection")}
+          className="text-xs"
+        >
           Zoom to selection
           <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
           onSelect={() => scale(0.5, "center")}
           className="text-xs"
         >
           Zoom to 50%
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
           onSelect={() => scale(1, "center")}
           className="text-xs"
         >
           Zoom to 100%
           <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={false}
           onSelect={() => scale(2, "center")}
           className="text-xs"
         >
           Zoom to 200%
-        </DropdownMenuItem>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={pixelgrid === "on"}
+          onSelect={() => {
+            if (pixelgrid === "on") setPixelGridState("off");
+            if (pixelgrid === "off") setPixelGridState("on");
+          }}
+          className="text-xs"
+        >
+          Pixel Grid
+          <DropdownMenuShortcut>⇧'</DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={ruler === "on"}
+          onSelect={() => {
+            if (ruler === "on") setRulerState("off");
+            if (ruler === "off") setRulerState("on");
+          }}
+          className="text-xs"
+        >
+          Ruler
+          <DropdownMenuShortcut>⇧R</DropdownMenuShortcut>
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

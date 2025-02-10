@@ -48,7 +48,7 @@ function NodeHierarchyItemContextMenuWrapper({
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="min-w-52">
         <ContextMenuItem
           onSelect={() => {
             copy(node_id);

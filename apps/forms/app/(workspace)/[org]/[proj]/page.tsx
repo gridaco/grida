@@ -140,10 +140,10 @@ function DocumentsGrid({
     <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
       <header className="flex text-sm opacity-80">
         <span className="flex-1">
-          Form
+          Documents
           <span className="ml-2 text-xs opacity-50">{documents.length}</span>
         </span>
-        <span className="w-32">Responses</span>
+        <span className="w-32">Entries</span>
         <span className="w-44">Updated At</span>
       </header>
       {documents?.map((doc, i) => (
