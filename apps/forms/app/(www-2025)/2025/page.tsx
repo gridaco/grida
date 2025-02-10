@@ -2,10 +2,10 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Header from "@/app/(www-2025)/header";
+import Footer from "@/www/footer";
 import Hero from "@/app/(www-2025)/hero";
 import { Demo1 } from "@/app/(www-2025)/demo-1";
 import { Demo2 } from "@/app/(www-2025)/demo-2";
-import Footer from "@/app/(www-2025)/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";

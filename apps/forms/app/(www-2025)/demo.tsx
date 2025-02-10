@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 
-const Prompt = dynamic(() => import("@/app/(site)/(forms)/forms/ai/prompt"), {
+const Prompt = dynamic(() => import("@/app/(www)/(forms)/forms/ai/prompt"), {
   ssr: false,
 });
 
