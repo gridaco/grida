@@ -2,9 +2,9 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Header from "@/www/header";
-import Hero from "@/app/(www)/(home)/.home/hero";
-import Content1 from "./.home/content-1";
-import Content3 from "./.home/content-3";
+import Hero from "@/app/(www)/(home)/_home/hero";
+import Content1 from "./_home/content-1";
+import Content3 from "./_home/content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
@@ -23,7 +23,7 @@ export default function WWW() {
   return (
     <main className="overflow-x-hidden">
       <Header />
-      <Section container>
+      <Section container className="overflow-visible">
         <Hero />
       </Section>
       <Section container className="-mt-40">
@@ -139,7 +139,7 @@ function SquareCard({
         <span className="absolute z-10">{foreground}</span>
       </div>
       <div className="flex flex-col">
-        <p className="text-lg font-medium">{title}</p>
+        <p className="text-xl font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{excerpt}</p>
       </div>
     </Link>
@@ -224,7 +224,7 @@ function SectionB() {
         viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut", delay: 0.2 }}
-        className="grid grid-cols-2 lg:flex lg:flex-row gap-5 lg:gap-6 items-start justify-center mt-32"
+        className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
       >
         <SquareCard
           href={sitemap.links.canvas}
@@ -240,7 +240,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
               Canvas
             </div>
           }
@@ -261,7 +261,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
               Forms
             </div>
           }
@@ -282,7 +282,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
               Database
             </div>
           }
@@ -303,7 +303,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
               The Bundle
             </div>
           }
@@ -337,8 +337,8 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border py-10 px-10 gap-6 sm:gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex flex-col sm:flex sm:flex-row justify-between items-start">
+      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
+        <div className="flex justify-between items-center">
           <h6 className=" text-lg font-semibold">
             Document Cloud for Enterprise
           </h6>
