@@ -61,12 +61,10 @@ export default function Header() {
   return (
     <div className="absolute top-0 left-0 right-0 z-50">
       <header className="container mx-auto flex justify-between items-center py-4 px-4 lg:py-8 lg:px-24">
-        <div className="flex">
-          <Link href="/" className="flex items-center justify-center gap-2">
-            <GridaLogo className="w-5 h-5" />
-            <span className="text-lg font-bold">Grida</span>
-          </Link>
-        </div>
+        <Link href="/" className="flex items-center justify-center gap-2">
+          <GridaLogo className="w-5 h-5" />
+          <span className="text-lg font-bold">Grida</span>
+        </Link>
         <div className="flex gap-4 lg:gap-12 items-center">
           <NavigationMenu>
             <NavigationMenuList>

@@ -27,14 +27,18 @@ export default function WWW() {
         <SectionMainDemo />
       </Section>
       <Section container className="mt-40">
+        <SectionC />
+      </Section>
+      <Section container className="mt-40">
         <SectionA />
+      </Section>
+      <Section container className="mt-40">
+        <SectionD />
       </Section>
       <Section container className="mt-40">
         <SectionB />
       </Section>
-      <Section container className="mt-40">
-        <SectionC />
-      </Section>
+
       <SectionFooterContainer className="flex flex-col">
         <Section className="flex-1">
           <SectionCTA />
@@ -116,7 +120,7 @@ function SectionHeader({
   badge: React.ReactNode;
   title: React.ReactNode;
   excerpt: React.ReactNode;
-  button: React.ReactNode;
+  button?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
@@ -134,10 +138,12 @@ function SectionHeader({
           {excerpt}
         </p>
       </div>
-      <Button variant="link" className="text-lg mt-20">
-        {button}
-        <ArrowRight className="h-5 w-5" />
-      </Button>
+      {button && (
+        <Button variant="link" className="text-lg mt-20">
+          {button}
+          <ArrowRight className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -220,7 +226,14 @@ function SectionA() {
             <circle cx="700" cy="700" r="700" fill="url(#blueCircle)" />
           </svg>
         </div>
-        <Demo1 />
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          className="w-full mx-0 my-40"
+        >
+          <Demo1 />
+        </motion.div>
       </div>
     </section>
   );
@@ -233,7 +246,6 @@ function SectionB() {
         badge={<>Explore</>}
         title={<>Right tools for the right job</>}
         excerpt={<>Explore all features & products.</>}
-        button={"Start CMS"}
       />
       <motion.div
         initial={{ opacity: 0, y: 50 }}
@@ -330,6 +342,67 @@ function SectionC() {
   );
 }
 
+function SectionD() {
+  return (
+    <section className="my-60 relative">
+      <SectionHeader
+        badge={"Customize"}
+        title={
+          <>
+            Built for Hackers,
+            <br />
+            Built for Enterprise
+          </>
+        }
+        excerpt={
+          <>
+            Grida is built to be hackable—designed for extensibility,
+            customization, and performance from the ground up.
+          </>
+        }
+      />
+      <div>
+        <div className="p-4 border">
+          <h6>React Compoents</h6>
+          <p>
+            Use Grida as a React component, or even bring your component into
+            our Canvas.
+          </p>
+        </div>
+        <div className="p-4 border">
+          <h6>Modular SDK</h6>
+          <p>Create your own tool. Build on top of our modular SDK.</p>
+        </div>
+        <div className="p-4 border">
+          <h6>Optimized</h6>
+          <p>
+            Grida is heavily optimized—our compute-intensive modules are powered
+            by Rust and WebGPU for maximum performance.
+          </p>
+        </div>
+        <div className="p-4 border">
+          <h6>Widgets & Templates</h6>
+          <p>AAAAAAAAA</p>
+        </div>
+        <div className="p-4 border">
+          <h6>Scripting Interface</h6>
+          <p>
+            Create design automations & plugins with Runtime scripting interface
+          </p>
+        </div>
+      </div>
+      <div className="border">
+        <h6>Document Cloud for Enterprise</h6>
+        <Button variant="link">Contact us for more</Button>
+        <p>
+          Building something visual? Grida for Enterprise saves you months. Get
+          custom, on-premise solutions tailored to your needs.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function SectionFooterContainer({
   className,
   children,
@@ -360,19 +433,17 @@ function SectionFooterContainer({
 
 function SectionCTA() {
   return (
-    <div className="container py-40 z-10 text-black">
+    <div className="container py-40 z-10">
       <div className="flex flex-col">
-        <h2 className="text-inherit text-left text-5xl lg:text-6xl font-semibold">
-          The Free & Open source Canvas
+        <h2 className="text-left text-5xl lg:text-6xl font-semibold">
+          The Free & Open Canvas
         </h2>
         <div className="flex gap-4 mt-20">
           <Button className="flex gap-2 group">
             <span>Start your project</span>
             <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
           </Button>
-          <Button variant="outline" className="text-foreground">
-            Try the demo
-          </Button>
+          <Button variant="outline">Try the demo</Button>
         </div>
       </div>
     </div>
