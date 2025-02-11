@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 
-const Prompt = dynamic(() => import("@/app/(site)/ai/prompt"), {
+const Prompt = dynamic(() => import("@/app/(www)/(forms)/forms/ai/prompt"), {
   ssr: false,
 });
 

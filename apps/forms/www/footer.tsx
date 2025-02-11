@@ -1,21 +1,147 @@
 import { GridaLogo } from "@/components/grida-logo";
+import {
+  Footer as _Footer,
+  FooterColumn,
+  FooterBottom,
+  FooterContent,
+} from "@/www/ui/footer";
+import { GitHubLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
+
+import Link from "next/link";
+import { sitemap } from "./data/sitemap";
+import { SlackIcon } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="mx-auto mt-32 w-full max-w-container px-4 sm:px-6 lg:px-8">
-      <div className="border-t border-neutral-400 border-opacity-25 py-10">
-        <div className="pt-8 flex flex-col items-center gap-7">
-          <GridaLogo />
+    <div>
+      <footer className="w-full px-4 container mx-auto">
+        <div className="mx-auto max-w-container">
+          <_Footer className="border-t border-black/50 dark:border-white/50 pt-8 bg-transparent">
+            <FooterContent className="sm:grid-cols-2 md:grid-cols-3">
+              <FooterColumn className="col-span-2 flex-row items-center justify-between gap-8 border-b pb-8 md:col-span-1 md:flex-col md:items-start md:justify-start md:border-b-0">
+                <Link href="/">
+                  <div className="flex items-center gap-2">
+                    <GridaLogo />
+                    <h3 className="text-xl font-bold">Grida</h3>
+                  </div>
+                </Link>
+                <div className="ml-2.5 flex gap-4 sm:ml-0">
+                  <Link
+                    href={sitemap.links.github}
+                    className="text-muted-foreground"
+                  >
+                    <span className="sr-only">GitHub</span>
+                    <GitHubLogoIcon className="h-5 w-5" />
+                  </Link>
+                  <Link
+                    href={sitemap.links.x}
+                    className="text-muted-foreground"
+                  >
+                    <span className="sr-only">Twitter</span>
+                    <TwitterLogoIcon className="h-5 w-5" />
+                  </Link>
+                  <Link
+                    href={sitemap.links.slack}
+                    className="text-muted-foreground"
+                  >
+                    <span className="sr-only">Slack Community</span>
+                    <SlackIcon className="h-5 w-5" />
+                  </Link>
+                </div>
+              </FooterColumn>
+              <FooterColumn>
+                <h3 className="text-md pt-1 font-semibold">Product</h3>
+                <Link
+                  href={sitemap.links.changelog}
+                  className="text-sm text-muted-foreground"
+                >
+                  Changelog
+                </Link>
+                <Link
+                  href={sitemap.links.docs}
+                  className="text-sm text-muted-foreground"
+                >
+                  Documentation
+                </Link>
+              </FooterColumn>
+              <FooterColumn>
+                <h3 className="text-md pt-1 font-semibold">Resources</h3>
+                <Link
+                  href={sitemap.links.studio}
+                  className="text-sm text-muted-foreground"
+                >
+                  Grida Studios
+                </Link>
+                <Link
+                  href={sitemap.links.corssh}
+                  className="text-sm text-muted-foreground"
+                >
+                  CORS.SH
+                </Link>
+                <Link
+                  href={sitemap.links.thebundle}
+                  className="text-sm text-muted-foreground"
+                >
+                  The Bundle
+                </Link>
+                <Link
+                  href={sitemap.links.blog}
+                  className="text-sm text-muted-foreground"
+                >
+                  Blog
+                </Link>
+              </FooterColumn>
+              <FooterColumn>
+                <h3 className="text-md pt-1 font-semibold">Contact</h3>
+                <Link
+                  href={sitemap.links.slack}
+                  className="text-sm text-muted-foreground"
+                >
+                  Slack
+                </Link>
+                <Link
+                  href={sitemap.links.x}
+                  className="text-sm text-muted-foreground"
+                >
+                  Twitter
+                </Link>
+                <Link
+                  href={sitemap.links.github}
+                  className="text-sm text-muted-foreground"
+                >
+                  Github
+                </Link>
+              </FooterColumn>
+              <FooterColumn>
+                <h3 className="text-md pt-1 font-semibold">Legal</h3>
+                <Link
+                  href={sitemap.links.privacy}
+                  className="text-sm text-muted-foreground"
+                >
+                  Privacy policy
+                </Link>
+                <Link
+                  href={sitemap.links.toc}
+                  className="text-sm text-muted-foreground"
+                >
+                  Terms of Service
+                </Link>
+                <Link
+                  href={sitemap.links.cookies}
+                  className="text-sm text-muted-foreground"
+                >
+                  Cookie Policy
+                </Link>
+              </FooterColumn>
+            </FooterContent>
+            <FooterBottom className="border-0">
+              <div>
+                © {new Date().getFullYear()} Grida Inc. All rights reserved.
+              </div>
+            </FooterBottom>
+          </_Footer>
         </div>
-      </div>
-      <p className="mt-1 text-center text-sm leading-6 text-current">
-        Grida Inc. All rights reserved.
-      </p>
-      <div className="mt-20 mb-16 flex items-center justify-center text-sm leading-6 text-neutral-500">
-        Privacy policy
-        <div className="h-4 w-px mx-4 bg-neutral-400 opacity-25"></div>
-        <p>Changelog</p>
-      </div>
-    </footer>
+      </footer>
+    </div>
   );
 }

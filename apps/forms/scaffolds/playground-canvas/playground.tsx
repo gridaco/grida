@@ -199,13 +199,6 @@ export default function CanvasPlayground() {
     });
   }, [exampleid]);
 
-  useEffect(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      return "";
-    });
-  }, []);
-
   const onExport = () => {
     const documentData = {
       doctype: "v0_document",

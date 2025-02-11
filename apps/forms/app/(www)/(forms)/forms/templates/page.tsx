@@ -7,7 +7,7 @@ import Link from "next/link";
 //   SelectItem,
 // } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import Header from "@/www/header";
+import Header from "../../header";
 import Footer from "@/www/footer";
 import Image from "next/image";
 import { fetchTemplates } from "./actions";
