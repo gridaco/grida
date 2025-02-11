@@ -18,7 +18,7 @@ export default function Hero() {
       >
         <div className="flex flex-col items-center text-center">
           <h1 className="text-5xl lg:text-6xl font-bold pb-8 text-center">
-            The Free, Open Canvas
+            The Free, <span className="whitespace-nowrap">Open Canvas</span>
           </h1>
           <p className="max-w-md text-base text-muted-foreground text-center">
             Grida is an Open source Canvas where you can design & build web
