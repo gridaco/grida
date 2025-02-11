@@ -99,6 +99,7 @@ export default function Content3() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 50 }}
+      viewport={{ once: true }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 1.0, ease: "easeOut" }}
       className="w-full mx-0"

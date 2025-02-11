@@ -227,6 +227,7 @@ function SectionA() {
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
           transition={{ duration: 1.0, ease: "easeOut" }}
           className="w-full mx-0 my-40"
         >
@@ -247,6 +248,7 @@ function SectionB() {
       />
       <motion.div
         initial={{ opacity: 0, y: 50 }}
+        viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut", delay: 0.2 }}
         className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
@@ -294,7 +296,7 @@ function SectionB() {
           excerpt={"Get user responses, Launch MVP"}
         />
         <SquareCard
-          href={sitemap.links.cms}
+          href={sitemap.links.database}
           background={
             <>
               <Image

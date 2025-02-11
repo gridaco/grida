@@ -11,6 +11,7 @@ export default function Hero() {
     <section className="relative flex flex-col px-4 lg:px-24 h-screen min-h-96 overflow-hidden items-center justify-center">
       <motion.div
         initial={{ opacity: 0, y: 50 }}
+        viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut" }}
         className="text-black dark:text-white"
