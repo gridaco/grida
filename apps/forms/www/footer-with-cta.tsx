@@ -65,7 +65,9 @@ function SectionCTA() {
             </FancyButton>
           </Link>
           <Link href={sitemap.links.canvas}>
-            <Button variant="outline">Try the demo</Button>
+            <Button variant="outline" className=" bg-transparent border-none">
+              Try the demo
+            </Button>
           </Link>
         </div>
       </div>
