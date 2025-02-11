@@ -14,6 +14,8 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils";
 import { Pixelify_Sans } from "next/font/google";
+import Link from "next/link";
+import { sitemap } from "@/www/data/sitemap";
 
 const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
@@ -150,25 +152,20 @@ function SectionHeader({
 }
 
 function SquareCard({
-  // media,
   title,
   background,
   foreground,
+  href,
   excerpt,
 }: {
   background: React.ReactNode;
   foreground: React.ReactNode;
-  // media: {
-  //   src: string;
-  //   alt?: string;
-  //   width?: number;
-  //   height?: number;
-  // };
+  href: string;
   title: string;
   excerpt: string;
 }) {
   return (
-    <div className="w-full flex flex-col gap-3 lg:gap-4 group">
+    <Link href={href} className="w-full flex flex-col gap-3 lg:gap-4 group">
       <div className="relative w-full aspect-square rounded shadow border overflow-hidden">
         <span className="absolute w-full h-full -z-10">{background}</span>
         <span className="absolute z-10">{foreground}</span>
@@ -177,7 +174,7 @@ function SquareCard({
         <p className="text-xl font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{excerpt}</p>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -254,6 +251,7 @@ function SectionB() {
         className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
       >
         <SquareCard
+          href={sitemap.links.canvas}
           background={
             <>
               <Image
@@ -274,6 +272,7 @@ function SectionB() {
           excerpt={"Design Components and Websites"}
         />
         <SquareCard
+          href={sitemap.links.forms}
           background={
             <>
               <Image
@@ -294,6 +293,7 @@ function SectionB() {
           excerpt={"Get user responses, Launch MVP"}
         />
         <SquareCard
+          href={sitemap.links.cms}
           background={
             <>
               <Image
@@ -314,6 +314,7 @@ function SectionB() {
           excerpt={"Manage data, create pipelines & endpoints"}
         />
         <SquareCard
+          href={sitemap.links.thebundle}
           background={
             <>
               <Image
