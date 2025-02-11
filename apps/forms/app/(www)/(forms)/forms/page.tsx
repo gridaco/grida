@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import Header from "../header";
 import Footer from "@/www/footer";
 import { FAQ } from "./.sections/faq";
+import Bento from "./.sections/bento";
 
 export default function Home() {
   return (
