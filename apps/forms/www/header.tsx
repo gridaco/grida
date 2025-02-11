@@ -72,7 +72,7 @@ export default function Header() {
                     Resources
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
+                    <ul className="flex flex-col w-[200px] gap-3 p-4">
                       {resources.map((component) => (
                         <ListItem
                           key={component.title}
