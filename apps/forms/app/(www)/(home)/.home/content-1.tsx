@@ -6,7 +6,28 @@ import { type CarouselApi } from "@/www/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import { cn } from "@/utils";
 import { motion } from "framer-motion";
-import * as k from "./data";
+
+import __src_1 from "@/public/www/.home/pixel-drawing.png";
+import __src_2 from "@/public/www/.home/ux-ui-builder.png";
+import __src_3 from "@/public/www/.home/icon-shape-templates.png";
+import __src_4 from "@/public/www/.home/ai-copywriter.png";
+import __src_5 from "@/public/www/.home/text-editor.png";
+
+const categories = [
+  "Free Pixel drawing",
+  "UI/UX Builder",
+  "Icon & Shape Templates",
+  "AI Copywriter",
+  "Text editor",
+];
+
+const images = {
+  "Free Pixel drawing": __src_1,
+  "UI/UX Builder": __src_2,
+  "Icon & Shape Templates": __src_3,
+  "AI Copywriter": __src_4,
+  "Text editor": __src_5,
+};
 
 export default function Content1() {
   const [api, setApi] = React.useState<CarouselApi>();
@@ -25,6 +46,8 @@ export default function Content1() {
     });
   }, [api]);
 
+  const img = images[categories[index] as keyof typeof images];
+
   return (
     <div className="flex flex-col items-center my-16 gap-10">
       {/* tabs */}
@@ -41,7 +64,7 @@ export default function Content1() {
         className="w-64 overflow-visible"
       >
         <CarouselContent>
-          {k.demo_1_categories.map((item, i) => (
+          {categories.map((item, i) => (
             <CarouselItem
               key={i}
               onClick={() => {
@@ -54,27 +77,27 @@ export default function Content1() {
         </CarouselContent>
       </Carousel>
       {/* body */}
-      <div className="container w-full aspect-video overflow-hidden">
-        <motion.div
-          className="w-full h-full"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
-        >
-          <Image
-            className="w-full h-full object-cover"
-            src={
-              k.imagesDemo1[
-                k.demo_1_categories[index] as keyof typeof k.imagesDemo1
-              ]
-            }
-            alt={k.demo_1_categories[index]}
-            width={1400}
-            height={900}
-          />
-        </motion.div>
+      <div className="min-h-96 max-h-[900px] w-full flex items-center justify-center">
+        <BigImageContainer key={index} {...img} alt={categories[index]} />
       </div>
     </div>
+  );
+}
+
+function BigImageContainer({
+  width,
+  height,
+  ...props
+}: React.ComponentProps<typeof Image>) {
+  return (
+    <motion.div
+      className="rounded-xl border bg-card text-card-foreground shadow overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1 }}
+    >
+      <Image {...props} width={width} height={height} />
+    </motion.div>
   );
 }
 
