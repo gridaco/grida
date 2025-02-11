@@ -150,7 +150,7 @@ function SquareCard({
         <span className="absolute z-10">{foreground}</span>
       </div>
       <div className="flex flex-col">
-        <p className="text-xl font-medium">{title}</p>
+        <p className="text-lg font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{excerpt}</p>
       </div>
     </Link>
@@ -235,7 +235,7 @@ function SectionB() {
         viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut", delay: 0.2 }}
-        className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
+        className="grid grid-cols-2 gap-5 lg:flex lg:flex-row lg:gap-6 items-start justify-center mt-32"
       >
         <SquareCard
           href={sitemap.links.canvas}
@@ -251,7 +251,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6  text-xl md:text-3xl font-semibold text-white/90">
               Canvas
             </div>
           }
@@ -272,7 +272,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl md:text-3xl font-semibold text-white/90">
               Forms
             </div>
           }
@@ -293,7 +293,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl md:text-3xl  font-semibold text-white/90">
               Database
             </div>
           }
@@ -314,7 +314,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl md:text-3xl  font-semibold text-white/90">
               The Bundle
             </div>
           }
