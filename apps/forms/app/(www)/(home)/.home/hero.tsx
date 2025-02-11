@@ -52,7 +52,12 @@ export default function Hero() {
             </Link>
 
             <Link href={sitemap.links.canvas}>
-              <Button variant="outline">Try the demo</Button>
+              <Button
+                variant="outline"
+                className="border-none shadow-none bg-transparent"
+              >
+                Try the demo
+              </Button>
             </Link>
           </motion.div>
         </div>
@@ -63,7 +68,7 @@ export default function Hero() {
 
 function Background() {
   return (
-    <div className="blur-3xl">
+    <div className="blur-3xl opacity-85">
       <svg
         width="1157"
         height="698"
