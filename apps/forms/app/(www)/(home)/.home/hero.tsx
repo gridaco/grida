@@ -29,8 +29,8 @@ export default function Hero() {
             className="flex gap-4 mt-16"
           >
             <Button className="flex gap-2 group">
-              Start your project
-              <ArrowRight className="h-5 w-5" />
+              <span>Start your project</span>
+              <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
             </Button>
 
             <Button variant="outline" className="bg-none">

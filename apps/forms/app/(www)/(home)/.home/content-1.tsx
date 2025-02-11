@@ -38,7 +38,7 @@ export default function Content1() {
             delay: 4000,
           }),
         ]}
-        className="w-full max-w-xs overflow-visible"
+        className="w-full max-w-sm overflow-visible"
       >
         <CarouselContent>
           {k.demo_1_categories.map((item, i) => (
@@ -89,11 +89,13 @@ function Trigger({
     <div
       data-selected={selected}
       className={cn(
-        "rounded bg-background flex p-4 items-center justify-center transition-all ",
-        selected ? "bg-background" : "bg-transparent"
+        "rounded bg-background flex p-4 items-center justify-center transition-all group",
+        selected
+          ? "bg-background dark:text-white text-black border border-slate-100 shadow-lg shadow-slate-300"
+          : "bg-transparent text-muted-foreground"
       )}
     >
-      <span className="w-full text-center">
+      <span className="text-center ">
         {label} {`${selected}`}
       </span>
     </div>
