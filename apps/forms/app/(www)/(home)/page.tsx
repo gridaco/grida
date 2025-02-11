@@ -217,7 +217,12 @@ function SectionB() {
     <section className="my-60">
       <SectionHeader
         badge={<>Explore</>}
-        title={<>Right tools for the right job</>}
+        title={
+          <>
+            Right tools for the{" "}
+            <span className=" whitespace-nowrap">right job</span>
+          </>
+        }
         excerpt={<>Explore all features & products.</>}
       />
       <motion.div
