@@ -4,7 +4,6 @@ import Image from "next/image";
 import Header from "@/www/header";
 import Hero from "@/app/(www)/(home)/.home/hero";
 import Content1 from "./.home/content-1";
-import Content2 from "./.home/content-2";
 import Content3 from "./.home/content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,10 +103,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
-      <Badge
-        variant="secondary"
-        className="text-lg font-medium rounded-full bg-slate-100 text-slate-600"
-      >
+      <Badge variant="secondary" className="text-lg font-medium rounded-full">
         {badge}
       </Badge>
       <div className="flex flex-col">
@@ -118,12 +114,7 @@ function SectionHeader({
           {excerpt}
         </p>
       </div>
-      {button && (
-        <Button variant="link" className="mt-20">
-          {button}
-          <ArrowRightIcon className="h-5 w-5" />
-        </Button>
-      )}
+      {button}
     </div>
   );
 }
@@ -176,7 +167,14 @@ function SectionA() {
         excerpt={
           "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
         }
-        button={"Open your Canvas"}
+        button={
+          <Link href={sitemap.links.canvas}>
+            <Button variant="link" className="mt-20">
+              Open your Canvas
+              <ArrowRightIcon className="h-5 w-5" />
+            </Button>
+          </Link>
+        }
       />
       <div className="relative">
         <div className="absolute inset-0 -z-10 flex justify-center items-center">
@@ -219,7 +217,12 @@ function SectionB() {
     <section className="my-60">
       <SectionHeader
         badge={<>Explore</>}
-        title={<>Right tools for the right job</>}
+        title={
+          <>
+            Right tools for the{" "}
+            <span className=" whitespace-nowrap">right job</span>
+          </>
+        }
         excerpt={<>Explore all features & products.</>}
       />
       <motion.div
@@ -314,24 +317,6 @@ function SectionB() {
           excerpt={"3D Illustrations and more"}
         />
       </motion.div>
-    </section>
-  );
-}
-
-function SectionC() {
-  return (
-    <section className="my-60 relative">
-      <SectionHeader
-        badge={"Forms"}
-        title={"Design editor tool with customizable templates."}
-        excerpt={
-          "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
-        }
-        button={"Open your Canvas"}
-      />
-      <div className="">
-        <Content2 />
-      </div>
     </section>
   );
 }
