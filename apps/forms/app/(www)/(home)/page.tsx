@@ -224,7 +224,7 @@ function SectionB() {
         viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut", delay: 0.2 }}
-        className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
+        className="grid grid-cols-2 lg:flex lg:flex-row gap-5 lg:gap-6 items-start justify-center mt-32"
       >
         <SquareCard
           href={sitemap.links.canvas}
@@ -240,7 +240,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
               Canvas
             </div>
           }
@@ -261,7 +261,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
               Forms
             </div>
           }
@@ -282,7 +282,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
               Database
             </div>
           }
@@ -303,7 +303,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-6 left-6 text-xl sm:text-3xl font-semibold text-white/90">
               The Bundle
             </div>
           }
@@ -337,8 +337,8 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex justify-between items-center">
+      <div className=" flex flex-col border py-10 px-10 gap-6 sm:gap-12 rounded-xl mx-auto w-full md:w-3/4">
+        <div className="flex flex-col sm:flex sm:flex-row justify-between items-start">
           <h6 className=" text-lg font-semibold">
             Document Cloud for Enterprise
           </h6>
