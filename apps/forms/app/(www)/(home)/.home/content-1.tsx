@@ -89,15 +89,13 @@ function Trigger({
     <div
       data-selected={selected}
       className={cn(
-        "rounded bg-background flex p-4 items-center justify-center transition-all group",
+        "rounded bg-background flex py-4 items-center justify-center transition-all group",
         selected
           ? "bg-background dark:text-white text-black border border-slate-100 shadow-lg shadow-slate-300"
           : "bg-transparent text-muted-foreground"
       )}
     >
-      <span className="text-center ">
-        {label} {`${selected}`}
-      </span>
+      <span className="text-center ">{label}</span>
     </div>
   );
 }
