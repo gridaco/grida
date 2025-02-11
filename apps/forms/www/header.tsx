@@ -11,126 +11,168 @@ import {
 import { cn } from "@/utils";
 import React from "react";
 import { GridaLogo } from "@/components/grida-logo";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
+import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import Link from "next/link";
+import { sitemap } from "./data/sitemap";
 
-const features: { title: string; href: string; description: string }[] = [
-  {
-    title: "Canvas",
-    href: "/canvas",
-    description:
-      "A modal dialog that interrupts the user with important content and expects a response.",
-  },
-  {
-    title: "Forms",
-    href: "/forms",
-    description:
-      "For sighted users to preview content available behind a link.",
-  },
-  {
-    title: "CMS",
-    href: "/cms",
-    description:
-      "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
-  },
-  {
-    title: "Figma CI",
-    href: "/figma",
-    description:
-      "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
-  },
+type Item = {
+  title: string;
+  href: string;
+  description?: string;
+};
+
+const features: Item[] = [
+  sitemap.items.canvas,
+  sitemap.items.forms,
+  sitemap.items.cms,
+  sitemap.items.figmaci,
 ];
 
-const resources: { title: string; href: string }[] = [
-  {
-    title: "Docs",
-    href: "/docs",
-  },
-  {
-    title: "The Bundle",
-    href: "/bundle",
-  },
-  {
-    title: "Join Slack",
-    href: "/pricing",
-  },
+const resources: Item[] = [
+  sitemap.items.docs,
+  sitemap.items.joinslack,
+  sitemap.items.thebundle,
 ];
 
 export default function Header() {
   return (
     <div className="absolute top-0 left-0 right-0 z-50">
-      <header className="container mx-auto flex justify-between items-center py-4 px-4 lg:py-8 lg:px-24">
-        <Link href="/" className="flex items-center justify-center gap-2">
-          <GridaLogo className="w-5 h-5" />
-          <span className="text-lg font-bold">Grida</span>
-        </Link>
-        <div className="flex gap-4 lg:gap-12 items-center">
-          <NavigationMenu>
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="font-normal">
-                  Features
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
-                    {features.map((component) => (
-                      <ListItem
-                        key={component.title}
-                        title={component.title}
-                        href={component.href}
-                      >
-                        {component.description}
-                      </ListItem>
+      <header className="py-4 px-4 lg:py-8 lg:px-24">
+        {/* desktop */}
+        <div className="hidden md:flex container mx-auto justify-between items-center">
+          <Link href="/" className="flex items-center justify-center gap-2">
+            <GridaLogo className="w-5 h-5" />
+            <span className="text-lg font-bold">Grida</span>
+          </Link>
+          <div className="flex gap-4 lg:gap-12 items-center">
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="font-normal">
+                    Features
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
+                      {features.map((component) => (
+                        <ListItem
+                          key={component.title}
+                          title={component.title}
+                          href={component.href}
+                        >
+                          {component.description}
+                        </ListItem>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="font-normal">
+                    Resources
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
+                      {resources.map((component) => (
+                        <ListItem
+                          key={component.title}
+                          title={component.title}
+                          href={component.href}
+                        />
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link href={sitemap.links.pricing} legacyBehavior passHref>
+                    <NavigationMenuLink
+                      className={`${navigationMenuTriggerStyle()}`}
+                    >
+                      <p className="font-normal">Pricing </p>
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link href={sitemap.links.github} target="_blank">
+                    <Button variant="ghost" size="icon">
+                      <GitHubLogoIcon className="text-foreground w-5 h-5" />
+                    </Button>
+                  </Link>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+            <div className="flex gap-2">
+              <Link href={sitemap.links.signin} className="hidden md:block">
+                <Button variant="ghost">Sign in</Button>
+              </Link>
+              <Link href={sitemap.links.cta}>
+                <Button className="font-normal">Get Started</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+        {/* mobile */}
+        <div className="md:hidden flex justify-between items-center">
+          <Link href="/" className="flex items-center justify-center gap-2">
+            <GridaLogo className="w-5 h-5" />
+            <span className="text-lg font-bold">Grida</span>
+          </Link>
+          <Drawer>
+            <DrawerTrigger asChild>
+              <Button size="icon" variant="ghost">
+                <HamburgerMenuIcon />
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="min-h-96 flex flex-col justify-between">
+              <div className="w-full px-4 space-y-8 mb-10">
+                <section className="grid gap-2">
+                  <Link href="/">Home</Link>
+                  <Link href={sitemap.links.pricing}>Pricing</Link>
+                  <Link href={sitemap.links.github} target="_blank">
+                    GitHub
+                  </Link>
+                </section>
+                <section className="grid gap-2">
+                  <span>
+                    <span className="font-semibold">Features</span>
+                  </span>
+                  <div className="grid gap-2">
+                    {features.map((component, i) => (
+                      <Link key={i} href={component.href}>
+                        <span className="text-muted-foreground">
+                          {component.title}
+                        </span>
+                      </Link>
                     ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="font-normal">
-                  Resources
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
-                    {resources.map((component) => (
-                      <ListItem
-                        key={component.title}
-                        title={component.title}
-                        href={component.href}
-                      />
+                  </div>
+                </section>
+                <section className="grid gap-2">
+                  <span>
+                    <span className="font-semibold">Resources</span>
+                  </span>
+                  <div className="grid gap-2">
+                    {resources.map((component, i) => (
+                      <Link key={i} href={component.href}>
+                        <span className="text-muted-foreground">
+                          {component.title}
+                        </span>
+                      </Link>
                     ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <Link href="/pricing" legacyBehavior passHref>
-                  <NavigationMenuLink
-                    className={`${navigationMenuTriggerStyle()}`}
-                  >
-                    <p className="font-normal">Pricing </p>
-                  </NavigationMenuLink>
-                </Link>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <Link
-                  href="https://github.com/gridaco/grida/tree/main/apps/forms"
-                  target="_blank"
-                >
-                  <Button variant="ghost" size="icon">
-                    <GitHubLogoIcon className="text-foreground w-5 h-5" />
+                  </div>
+                </section>
+              </div>
+              <div className="w-full px-4 py-4 border-t flex flex-col gap-2">
+                <Link href={sitemap.links.signin} className="w-full">
+                  <Button variant="outline" className="w-full">
+                    Sign in
                   </Button>
                 </Link>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
-          <div className="flex gap-2">
-            <Link href="/sign-in" className="hidden md:block">
-              <Button variant="ghost">Sign in</Button>
-            </Link>
-            <Link href="/dashboard/new?plan=free">
-              <Button className="font-normal">Get Started</Button>
-            </Link>
-          </div>
+                <Link href={sitemap.links.cta} className="w-full">
+                  <Button className="font-normal w-full">Get Started</Button>
+                </Link>
+              </div>
+            </DrawerContent>
+          </Drawer>
         </div>
       </header>
     </div>
