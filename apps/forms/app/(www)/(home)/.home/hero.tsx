@@ -15,13 +15,11 @@ export default function Hero() {
       >
         <div className="flex flex-col items-left text-center">
           <h1 className="text-5xl lg:text-6xl font-bold py-10 text-left">
-            The editor to craft, customize,
-            <br /> and create seamlessly.
+            The Free, Open Canvas
           </h1>
           <p className="max-w-md text-lg text-muted-foreground text-left">
-            Grida combines custom branding, intuitive design, and
-            developer-friendly tools to streamline your workflow. Design
-            smarter, manage seamlessly, and create without limits.
+            Grida is an Open source Canvas where you can design & build web
+            applications with templates
           </p>
           <motion.div
             initial={{ opacity: 0, y: 50 }}

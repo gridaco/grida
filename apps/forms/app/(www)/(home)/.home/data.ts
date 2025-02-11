@@ -7,11 +7,11 @@ export const demo_1_categories = [
 ];
 
 export const imagesDemo1 = {
-  "Free Pixel drawing": "/affiliate/poc/images/pixel-drawing.png",
-  "UI/UX Builder": "/affiliate/poc/images/ux-ui-builder.png",
-  "Icon & Shape Templates": "/affiliate/poc/images/icon-shape-templates.png",
-  "AI Copywriter": "/affiliate/poc/images/ai-copywriter.png",
-  "Text editor": "/affiliate/poc/images/text-editor.png",
+  "Free Pixel drawing": "/www/.home/pixel-drawing.png",
+  "UI/UX Builder": "/www/.home/ux-ui-builder.png",
+  "Icon & Shape Templates": "/www/.home/icon-shape-templates.png",
+  "AI Copywriter": "/www/.home/ai-copywriter.png",
+  "Text editor": "/www/.home/text-editor.png",
 };
 
 export const demo_2_categories = [

@@ -12,19 +12,54 @@ import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils";
+import { Pixelify_Sans } from "next/font/google";
+
+const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
 export default function WWW() {
   return (
-    <main className="container mx-auto">
+    <main>
       <Header />
-      <Hero />
-      <SectionMainDemo />
-      <SectionA />
-      <SectionB />
-      <SectionC />
-      <SectionCTA />
-      <Footer />
+      <Section container>
+        <Hero />
+      </Section>
+      <Section container className="mt-40">
+        <SectionMainDemo />
+      </Section>
+      <Section container className="mt-40">
+        <SectionA />
+      </Section>
+      <Section container className="mt-40">
+        <SectionB />
+      </Section>
+      <Section container className="mt-40">
+        <SectionC />
+      </Section>
+      <SectionFooterContainer>
+        <Section>
+          <SectionCTA />
+        </Section>
+        <Footer />
+      </SectionFooterContainer>
     </main>
+  );
+}
+
+function Section({
+  children,
+  className,
+  container,
+  ...props
+}: React.HtmlHTMLAttributes<HTMLDivElement> & {
+  container?: boolean;
+}) {
+  return (
+    <div
+      {...props}
+      className={cn(container ? "container mx-auto" : "", className)}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -78,10 +113,10 @@ function SectionHeader({
   excerpt,
   button,
 }: {
-  badge: string;
-  title: string;
-  excerpt: string;
-  button: string;
+  badge: React.ReactNode;
+  title: React.ReactNode;
+  excerpt: React.ReactNode;
+  button: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
@@ -107,7 +142,7 @@ function SectionHeader({
   );
 }
 
-function MediaCard({
+function SquareCard({
   media,
   title,
   excerpt,
@@ -123,18 +158,18 @@ function MediaCard({
 }) {
   return (
     <div className="flex flex-col gap-3 lg:gap-4 group">
-      <div className="overflow-hidden rounded-lg shadow-lg border border-slate-200">
+      <div className="aspect-square rounded shadow border overflow-hidden">
         <Image
           src={media.src}
           alt={media.alt ?? "Media content"}
           width={media.width || 1000}
           height={media.height || 1000}
-          className="object-cover w-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+          className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
         />
       </div>
       <div className="flex flex-col">
         <p className="text-lg font-medium">{title}</p>
-        <p className="font-normal opacity-80">{excerpt}</p>
+        <p className="text-xs text-muted-foreground">{excerpt}</p>
       </div>
     </div>
   );
@@ -145,7 +180,19 @@ function SectionA() {
     <section className="my-60 relative">
       <SectionHeader
         badge={"Canvas"}
-        title={"Design editor tool with customizable templates."}
+        title={
+          <>
+            <span>From websites to</span>{" "}
+            <span
+              className={cn(
+                "border border-foreground px-4",
+                pixelify.className
+              )}
+            >
+              Pixel arts
+            </span>
+          </>
+        }
         excerpt={
           "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
         }
@@ -183,11 +230,9 @@ function SectionB() {
   return (
     <section className="my-60">
       <SectionHeader
-        badge={"CMS"}
-        title={"This is CMS."}
-        excerpt={
-          "Grida Canvas offers a versatile editor tool for designing any page with customizable templates and components, featuring AI-powered prompts, seamless file export, and integration with Figma for importing and exporting designs."
-        }
+        badge={<>Explore</>}
+        title={<>Right tools for the right job</>}
+        excerpt={<>Explore all features & products.</>}
         button={"Start CMS"}
       />
       <motion.div
@@ -196,45 +241,45 @@ function SectionB() {
         transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
         className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32"
       >
-        <MediaCard
+        <SquareCard
           media={{
             src: "/assets/placeholder-image.png",
             alt: "card",
             width: 1000,
             height: 800,
           }}
-          title={"Title"}
-          excerpt={"excerpt"}
+          title={"Canvas"}
+          excerpt={"Design Components and Websites"}
         />
-        <MediaCard
+        <SquareCard
           media={{
             src: "/assets/placeholder-image.png",
             alt: "card",
             width: 1000,
             height: 800,
           }}
-          title={"Title"}
-          excerpt={"excerpt"}
+          title={"Forms"}
+          excerpt={"Get user responses, Launch MVP"}
         />
-        <MediaCard
+        <SquareCard
           media={{
             src: "/assets/placeholder-image.png",
             alt: "card",
             width: 1000,
             height: 800,
           }}
-          title={"Title"}
-          excerpt={"excerpt"}
+          title={"Database"}
+          excerpt={"Manage data, create pipelines & endpoints"}
         />
-        <MediaCard
+        <SquareCard
           media={{
             src: "/assets/placeholder-image.png",
             alt: "card",
             width: 1000,
             height: 800,
           }}
-          title={"Title"}
-          excerpt={"excerpt"}
+          title={"The Bundle"}
+          excerpt={"3D Illustrations and more."}
         />
       </motion.div>
     </section>
@@ -285,18 +330,28 @@ function SectionC() {
   );
 }
 
+function SectionFooterContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative w-full h-full min-h-screen rounded-t-3xl md:rounded-t-[50px] overflow-hidden border-t">
+      <div className="absolute inset-0 -z-10 pointer-events-none">
+        <iframe
+          loading="eager"
+          className="w-full h-full"
+          src="https://bg.grida.co/embed/shadergradient/88"
+        />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function SectionCTA() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 50 }}
-      whileInView={{ opacity: 1, y: 50 }}
-      transition={{ duration: 1.5, ease: "easeOut" }}
-      className="container mx-xl flex flex-col-reverse gap-16 md:flex md:flex-row justify-between mt-80 mb-60"
-    >
+    <div className="container py-40 z-10">
       <div className="flex flex-col">
-        <p className="text-left text-5xl lg:text-6xl font-semibold">
-          Design editor tool with customizable templates.
-        </p>
+        <h2 className="text-left text-5xl lg:text-6xl font-semibold">
+          The Free & Open source Canvas
+        </h2>
         <div className="flex gap-4 mt-20">
           <Button className="flex gap-2 group">
             <span>Start your project</span>
@@ -305,13 +360,6 @@ function SectionCTA() {
           <Button variant="outline">Try the demo</Button>
         </div>
       </div>
-      <Image
-        src={"/affiliate/poc/images/db-illust.png"}
-        alt="illust"
-        width={900}
-        height={900}
-        className="max-h-[300px] max-w-[300px] lg:max-h-[500px] lg:max-w-[500px]"
-      />
-    </motion.div>
+    </div>
   );
 }
