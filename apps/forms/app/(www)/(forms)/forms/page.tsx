@@ -1,5 +1,4 @@
 import { GridaLogo } from "@/components/grida-logo";
-import { Pricing } from "@/www/pricing/pricing";
 import {
   AccountTreeIcon,
   ApiIcon,

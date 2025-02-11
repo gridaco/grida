@@ -2,21 +2,21 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Header from "@/www/header";
-import Footer from "@/www/footer";
 import Hero from "@/app/(www)/(home)/.home/hero";
 import Content1 from "./.home/content-1";
 import Content2 from "./.home/content-2";
 import Content3 from "./.home/content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Button as FancyButton } from "@/www/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils";
 import { Pixelify_Sans } from "next/font/google";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
+import FooterWithCTA from "@/www/footer-with-cta";
+import { Section } from "@/www/ui/section";
 
 const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
@@ -42,32 +42,8 @@ export default function WWW() {
       <Section container className="mt-32">
         <SectionB />
       </Section>
-
-      <SectionFooterContainer className="flex flex-col">
-        <Section className="flex-1">
-          <SectionCTA />
-        </Section>
-        <Footer />
-      </SectionFooterContainer>
+      <FooterWithCTA />
     </main>
-  );
-}
-
-function Section({
-  children,
-  className,
-  container,
-  ...props
-}: React.HtmlHTMLAttributes<HTMLDivElement> & {
-  container?: boolean;
-}) {
-  return (
-    <div
-      {...props}
-      className={cn(container ? "container mx-auto" : "", className)}
-    >
-      {children}
-    </div>
   );
 }
 
@@ -145,7 +121,7 @@ function SectionHeader({
       {button && (
         <Button variant="link" className="mt-20">
           {button}
-          <ArrowRight className="h-5 w-5" />
+          <ArrowRightIcon className="h-5 w-5" />
         </Button>
       )}
     </div>
@@ -400,60 +376,5 @@ function SectionD() {
         </p>
       </div>
     </section>
-  );
-}
-
-function SectionFooterContainer({
-  className,
-  children,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "relative w-full h-full min-h-screen rounded-t-3xl md:rounded-t-[50px] overflow-hidden border-t",
-        className
-      )}
-    >
-      <div className="absolute inset-0 -z-10 pointer-events-none">
-        <iframe
-          loading="eager"
-          className="w-full h-full"
-          src="https://bg.grida.co/embed/shadergradient/88"
-        />
-        {/* gradient for footer visibility */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function SectionCTA() {
-  return (
-    <div className="container py-40 z-10">
-      <div className="flex flex-col">
-        <h2 className="text-left text-5xl lg:text-6xl font-semibold">
-          The Free & Open Canvas
-        </h2>
-        <div className="flex gap-4 mt-20">
-          <Link href={sitemap.links.cta}>
-            <FancyButton
-              effect="expandIcon"
-              className="flex gap-2 group"
-              icon={ArrowRight}
-              iconPlacement="right"
-            >
-              <span>Start your project</span>
-            </FancyButton>
-          </Link>
-          <Link href={sitemap.links.canvas}>
-            <Button variant="outline">Try the demo</Button>
-          </Link>
-        </div>
-      </div>
-    </div>
   );
 }
