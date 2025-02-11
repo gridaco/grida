@@ -343,8 +343,8 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex justify-between items-center">
+      <div className=" flex flex-col border py-10 px-10 gap-6 sm:gap-12 rounded-xl mx-auto w-full md:w-3/4">
+        <div className="flex flex-col sm:flex sm:flex-row justify-between items-start">
           <h6 className=" text-lg font-semibold">
             Document Cloud for Enterprise
           </h6>
