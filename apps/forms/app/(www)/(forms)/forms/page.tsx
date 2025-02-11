@@ -7,14 +7,14 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import Hero from "./.sections/hero";
-import Demo from "./.sections/demo";
+import Hero from "./_sections/hero";
+import Demo from "./_sections/demo";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Header from "../header";
 import Footer from "@/www/footer";
-import { FAQ } from "./.sections/faq";
-import Bento from "./.sections/bento";
+import { FAQ } from "./_sections/faq";
+import Bento from "./_sections/bento";
 
 export default function Home() {
   return (
