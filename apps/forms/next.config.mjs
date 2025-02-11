@@ -67,6 +67,51 @@ const nextConfig = withMDX()({
         destination: "https://bg.grida.co/embed/:path*",
         permanent: false,
       },
+      // static pages from docs
+      {
+        source: "/terms",
+        destination: "/docs/support/terms-and-conditions",
+        permanent: true,
+      },
+      {
+        source: "/privacy",
+        destination: "/docs/support/privacy-policy",
+        permanent: true,
+      },
+      {
+        source: "/privacy-policy",
+        destination: "/docs/support/privacy-policy",
+        permanent: false,
+      },
+      {
+        source: "/terms-and-conditions",
+        destination: "/docs/support/terms-and-conditions",
+        permanent: false,
+      },
+      {
+        source: "/cookies-policy",
+        destination: "/docs/support/cookies-policy",
+        permanent: false,
+      },
+      // [Legacy]
+      // code.grida.co
+      {
+        source: "/code",
+        destination: "https://code.grida.co",
+        permanent: false,
+      },
+      // Static redirects
+      {
+        source: "/join-slack",
+        destination:
+          "https://join.slack.com/t/gridaco/shared_invite/zt-nmf59381-prFEqq032K~aWe_zOekUmQ",
+        permanent: true,
+      },
+      {
+        source: "/github",
+        destination: "https://github.com/gridaco",
+        permanent: true,
+      },
     ];
   },
   rewrites: async () => {
