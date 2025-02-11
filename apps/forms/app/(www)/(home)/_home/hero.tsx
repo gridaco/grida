@@ -83,9 +83,13 @@ export function HeroBackground() {
             gradientTransform="translate(579 236) rotate(85) scale(522 865)"
           >
             <stop stopColor="#CDBAFF" />
-            <stop offset="0.36" stopColor="#B9C7FF" />
-            <stop offset="0.61" stopColor="#91E2FF" />
-            <stop offset="1" stopColor="#C2FFF8" />
+            <stop stopColor="#A06EFF" stopOpacity="1" /> {/* 더 진한 보라 */}
+            <stop offset="0.36" stopColor="#8298FF" stopOpacity="1" />{" "}
+            {/* 더 진한 블루 */}
+            <stop offset="0.61" stopColor="#60CFFF" stopOpacity="0.9" />{" "}
+            {/* 더 진한 하늘색 */}
+            <stop offset="1" stopColor="#9EF3E8" stopOpacity="0.8" />{" "}
+            {/* 바깥쪽은 연하게 */}
           </radialGradient>
           <radialGradient
             id="dark"
