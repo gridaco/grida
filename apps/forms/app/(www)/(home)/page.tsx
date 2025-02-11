@@ -24,19 +24,19 @@ export default function WWW() {
       <Section container>
         <Hero />
       </Section>
-      <Section container className="-mt-40">
+      <Section container className="-mt-32">
         <SectionMainDemo />
       </Section>
-      <Section container className="mt-40">
+      {/* <Section container className="mt-40">
         <SectionC />
-      </Section>
-      <Section container className="mt-40">
+      </Section> */}
+      <Section container className="mt-32">
         <SectionA />
       </Section>
-      <Section container className="mt-40">
+      <Section container className="mt-32">
         <SectionD />
       </Section>
-      <Section container className="mt-40">
+      <Section container className="mt-32">
         <SectionB />
       </Section>
 
@@ -131,16 +131,16 @@ function SectionHeader({
       >
         {badge}
       </Badge>
-      <div className="flex flex-col gap-5">
-        <span className="text-5xl lg:text-6xl font-bold py-10 text-center">
+      <div className="flex flex-col">
+        <span className="text-5xl lg:text-6xl font-bold py-10 text-center max-w-3xl">
           {title}
         </span>
-        <p className="max-w-xl mx-auto text-lg text-muted-foreground text-center">
+        <p className="max-w-xl mx-auto text-muted-foreground text-center">
           {excerpt}
         </p>
       </div>
       {button && (
-        <Button variant="link" className="text-lg mt-20">
+        <Button variant="link" className="mt-20">
           {button}
           <ArrowRight className="h-5 w-5" />
         </Button>
@@ -150,33 +150,32 @@ function SectionHeader({
 }
 
 function SquareCard({
-  media,
+  // media,
   title,
+  background,
+  foreground,
   excerpt,
 }: {
-  media: {
-    src: string;
-    alt?: string;
-    width?: number;
-    height?: number;
-  };
+  background: React.ReactNode;
+  foreground: React.ReactNode;
+  // media: {
+  //   src: string;
+  //   alt?: string;
+  //   width?: number;
+  //   height?: number;
+  // };
   title: string;
   excerpt: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 lg:gap-4 group">
-      <div className="aspect-square rounded shadow border overflow-hidden">
-        <Image
-          src={media.src}
-          alt={media.alt ?? "Media content"}
-          width={media.width || 1000}
-          height={media.height || 1000}
-          className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
-        />
+    <div className="w-full flex flex-col gap-3 lg:gap-4 group">
+      <div className="relative w-full aspect-square rounded shadow border overflow-hidden">
+        <span className="absolute w-full h-full -z-10">{background}</span>
+        <span className="absolute z-10">{foreground}</span>
       </div>
       <div className="flex flex-col">
-        <p className="text-lg font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{excerpt}</p>
+        <p className="text-xl font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{excerpt}</p>
       </div>
     </div>
   );
@@ -192,11 +191,11 @@ function SectionA() {
             <span>From websites to</span>{" "}
             <span
               className={cn(
-                "border border-foreground px-4",
+                // "border border-foreground px-4",
                 pixelify.className
               )}
             >
-              Pixel arts
+              <br /> Pixel arts
             </span>
           </>
         }
@@ -252,47 +251,87 @@ function SectionB() {
         initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-        className="flex flex-col gap-5 lg:flex-row lg:gap-10 items-center justify-center mt-32"
+        className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
       >
         <SquareCard
-          media={{
-            src: "/assets/placeholder-image.png",
-            alt: "card",
-            width: 1000,
-            height: 800,
-          }}
+          background={
+            <>
+              <Image
+                src="/www/.home/section-b/canvas-card.png"
+                alt="card"
+                width={1000}
+                height={1000}
+                className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+              />
+            </>
+          }
+          foreground={
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+              Canvas
+            </div>
+          }
           title={"Canvas"}
           excerpt={"Design Components and Websites"}
         />
         <SquareCard
-          media={{
-            src: "/assets/placeholder-image.png",
-            alt: "card",
-            width: 1000,
-            height: 800,
-          }}
+          background={
+            <>
+              <Image
+                src="/www/.home/section-b/forms-card.png"
+                alt="card"
+                width={1000}
+                height={1000}
+                className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+              />
+            </>
+          }
+          foreground={
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+              Forms
+            </div>
+          }
           title={"Forms"}
           excerpt={"Get user responses, Launch MVP"}
         />
         <SquareCard
-          media={{
-            src: "/assets/placeholder-image.png",
-            alt: "card",
-            width: 1000,
-            height: 800,
-          }}
+          background={
+            <>
+              <Image
+                src="/www/.home/section-b/database-card.png"
+                alt="card"
+                width={1000}
+                height={1000}
+                className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+              />
+            </>
+          }
+          foreground={
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+              Database
+            </div>
+          }
           title={"Database"}
           excerpt={"Manage data, create pipelines & endpoints"}
         />
         <SquareCard
-          media={{
-            src: "/assets/placeholder-image.png",
-            alt: "card",
-            width: 1000,
-            height: 800,
-          }}
+          background={
+            <>
+              <Image
+                src="/www/.home/section-b/thebundle-card.png"
+                alt="card"
+                width={1000}
+                height={1000}
+                className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+              />
+            </>
+          }
+          foreground={
+            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+              The Bundle
+            </div>
+          }
           title={"The Bundle"}
-          excerpt={"3D Illustrations and more."}
+          excerpt={"3D Illustrations and more"}
         />
       </motion.div>
     </section>
@@ -311,32 +350,6 @@ function SectionC() {
         button={"Open your Canvas"}
       />
       <div className="">
-        {/* <div className="absolute inset-0 -z-10 flex justify-center items-center">
-        <svg
-          width="1400px"
-          height="1400px"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient
-              id="horizontalGradient"
-              x1="0%"
-              y1="100%"
-              x2="0%"
-              y2="0%"
-            >
-              <stop offset="0%" stopColor="rgba(166, 152, 255, 0.9)" />
-              <stop offset="100%" stopColor="rgba(250, 255, 229, 0)" />
-            </linearGradient>
-          </defs>
-          <rect
-            width="1400"
-            height="1400"
-            fill="url(horizontalGradient)"
-          />
-        </svg>
-      </div> */}
-
         <Content2 />
       </div>
     </section>
@@ -365,12 +378,19 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className="border">
-        <h6>Document Cloud for Enterprise</h6>
-        <Button variant="link">Contact us for more</Button>
-        <p>
-          Building something visual? Grida for Enterprise saves you months. Get
-          custom, on-premise solutions tailored to your needs.
+      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-20">
+        <div className="flex justify-between items-center">
+          <h6 className=" text-2xl font-semibold">
+            Document Cloud for Enterprise
+          </h6>
+          <Button className="p-0 text-md" variant="link">
+            Contact us for more
+          </Button>
+        </div>
+        <p className=" opacity-50">
+          Building something visual? Grida for Enterprise saves you months.{" "}
+          <br />
+          Get custom, on-premise solutions tailored to your needs.
         </p>
       </div>
     </section>

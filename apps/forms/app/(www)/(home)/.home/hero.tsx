@@ -17,7 +17,7 @@ export default function Hero() {
           <h1 className="text-5xl lg:text-6xl font-bold py-10 text-left">
             The Free, Open Canvas
           </h1>
-          <p className="max-w-md text-lg text-muted-foreground text-left">
+          <p className="max-w-md text-base text-muted-foreground text-left">
             Grida is an Open source Canvas where you can design & build web
             applications with templates
           </p>

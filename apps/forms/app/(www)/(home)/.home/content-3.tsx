@@ -2,6 +2,7 @@ import React from "react";
 import { CalendarIcon, FileTextIcon } from "@radix-ui/react-icons";
 import { BellIcon, Share2Icon } from "lucide-react";
 import { BentoGrid, BentoCard } from "@/www/ui/bento-grid";
+import Image from "next/image";
 
 const features = [
   {
@@ -12,7 +13,17 @@ const features = [
     href: "#",
     cta: "Learn more",
     className: "col-span-2",
-    background: <></>,
+    background: (
+      <div className="absolute inset-0">
+        <Image
+          src="/www/.home/3/react-components.png"
+          alt=""
+          width={800}
+          height={400}
+          className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+        />
+      </div>
+    ),
   },
   {
     Icon: BellIcon,
@@ -21,7 +32,17 @@ const features = [
     href: "#",
     cta: "Learn more",
     className: "col-span-2",
-    background: <></>,
+    background: (
+      <div className="absolute inset-0">
+        <Image
+          src="/www/.home/3/modular-sdk.png"
+          alt=""
+          width={800}
+          height={400}
+          className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+        />
+      </div>
+    ),
   },
   {
     Icon: Share2Icon,
@@ -31,7 +52,17 @@ const features = [
     href: "#",
     cta: "Learn more",
     className: "col-span-1",
-    background: <></>,
+    background: (
+      <div className="absolute inset-0">
+        <Image
+          src="/www/.home/3/optimized.png"
+          alt=""
+          width={500}
+          height={500}
+          className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+        />
+      </div>
+    ),
   },
   {
     Icon: CalendarIcon,
@@ -40,7 +71,17 @@ const features = [
     href: "#",
     cta: "Learn more",
     className: "col-span-1",
-    background: <></>,
+    background: (
+      <div className="absolute inset-0">
+        <Image
+          src="/www/.home/3/widgets-templates.png"
+          alt=""
+          width={500}
+          height={500}
+          className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+        />
+      </div>
+    ),
   },
   {
     Icon: CalendarIcon,
@@ -50,7 +91,17 @@ const features = [
     href: "#",
     cta: "Learn more",
     className: "col-span-1",
-    background: <></>,
+    background: (
+      <div className="absolute inset-0">
+        <Image
+          src="/www/.home/3/scripting-interface.png"
+          alt=""
+          width={500}
+          height={500}
+          className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+        />
+      </div>
+    ),
   },
 ];
 

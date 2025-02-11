@@ -38,7 +38,7 @@ export default function Content1() {
           <button
             key={category}
             ref={(el) => (tabsRef.current[index] = el)}
-            className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 text-lg font-normal transition-all ${
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 font-normal transition-all ${
               activeTabIndex === index
                 ? "bg-black text-white dark:invert"
                 : "hover:text-slate-300"
