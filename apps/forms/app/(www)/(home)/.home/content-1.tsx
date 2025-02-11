@@ -1,72 +1,101 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
+import Image from "next/image";
+import { Carousel, CarouselContent, CarouselItem } from "@/www/ui/carousel";
+import { type CarouselApi } from "@/www/ui/carousel";
+import Autoplay from "embla-carousel-autoplay";
+import { cn } from "@/utils";
 import { motion } from "framer-motion";
 import * as k from "./data";
 
 export default function Content1() {
-  const tabsRef = useRef<(HTMLElement | null)[]>([]);
-  const [activeTabIndex, setActiveTabIndex] = useState(0); // Default active tab index
-  const [tabUnderlineWidth, setTabUnderlineWidth] = useState(0);
-  const [tabUnderlineLeft, setTabUnderlineLeft] = useState(0);
+  const [api, setApi] = React.useState<CarouselApi>();
+  const [current, setCurrent] = React.useState(0);
+  const index = current - 1;
 
-  useEffect(() => {
-    const setTabPosition = () => {
-      const currentTab = tabsRef.current[activeTabIndex] as HTMLElement;
-      setTabUnderlineLeft(currentTab?.offsetLeft ?? 0);
-      setTabUnderlineWidth(currentTab?.clientWidth ?? 0);
-    };
+  React.useEffect(() => {
+    if (!api) {
+      return;
+    }
 
-    setTabPosition();
-  }, [activeTabIndex]);
+    setCurrent(api.selectedScrollSnap() + 1);
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap() + 1);
+    });
+  }, [api]);
 
   return (
-    <div className="flex flex-col items-center justify-center my-16 gap-10">
-      {/* Tabs List with Sliding Underline */}
-      <div className="relative flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center text-slate-400">
-        <span
-          className="absolute bottom-0 top-0 -z-10 flex overflow-hidden rounded-full transition-all duration-300"
-          style={{
-            left: tabUnderlineLeft,
-            width: tabUnderlineWidth,
-          }}
-        >
-          <span className="h-full w-full rounded-full bg-black" />
-        </span>
-
-        {/* Tabs */}
-        {k.demo_1_categories.map((category, index) => (
-          <button
-            key={category}
-            ref={(el) => (tabsRef.current[index] = el)}
-            className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 font-normal transition-all ${
-              activeTabIndex === index
-                ? "bg-black text-white dark:invert"
-                : "hover:text-slate-300"
-            }`}
-            onClick={() => setActiveTabIndex(index)}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
-
-      {/* Tabs Content */}
-      <div className="container md:h-[776px] w-full overflow-hidden">
-        <motion.img
-          className="w-full h-full object-cover"
-          src={
-            k.imagesDemo1[
-              k.demo_1_categories[activeTabIndex] as keyof typeof k.imagesDemo1
-            ]
-          }
-          alt={k.demo_1_categories[activeTabIndex]}
-          width={1400}
-          height={776}
+    <div className="flex flex-col items-center my-16 gap-10">
+      {/* tabs */}
+      <Carousel
+        setApi={setApi}
+        opts={{
+          align: "center",
+        }}
+        plugins={[
+          Autoplay({
+            delay: 4000,
+          }),
+        ]}
+        className="w-full max-w-xs overflow-visible"
+      >
+        <CarouselContent>
+          {k.demo_1_categories.map((item, i) => (
+            <CarouselItem
+              key={i}
+              onClick={() => {
+                api?.scrollTo(i, false);
+              }}
+            >
+              <Trigger label={item} selected={index === i} />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+      {/* body */}
+      <div className="container w-full aspect-video overflow-hidden">
+        <motion.div
+          className="w-full h-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1 }}
-        />
+        >
+          <Image
+            className="w-full h-full object-cover"
+            src={
+              k.imagesDemo1[
+                k.demo_1_categories[index] as keyof typeof k.imagesDemo1
+              ]
+            }
+            alt={k.demo_1_categories[index]}
+            width={1400}
+            height={900}
+          />
+        </motion.div>
       </div>
+    </div>
+  );
+}
+
+function Trigger({
+  label,
+  selected,
+}: {
+  label: React.ReactNode;
+  selected?: boolean;
+}) {
+  return (
+    <div
+      data-selected={selected}
+      className={cn(
+        "rounded bg-background flex p-4 items-center justify-center transition-all ",
+        selected ? "bg-background" : "bg-transparent"
+      )}
+    >
+      <span className="w-full text-center">
+        {label} {`${selected}`}
+      </span>
     </div>
   );
 }
