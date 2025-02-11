@@ -97,10 +97,10 @@ function SectionMainDemo() {
         {/* Overlay for lock */}
         {isLocked && (
           <div
-            className="absolute inset-0 bg-white/40 z-20 flex items-center justify-center cursor-pointer"
+            className="absolute inset-0 from-background/80 to-background/20 bg-gradient-to-t z-20 flex items-center justify-center cursor-pointer"
             onClick={unlockDemo}
           >
-            <Button>Click to play</Button>
+            <Button>Try it out</Button>
           </div>
         )}
         <div
@@ -384,9 +384,11 @@ function SectionD() {
           <h6 className=" text-lg font-semibold">
             Document Cloud for Enterprise
           </h6>
-          <Button className="p-0 text-sm" variant="link">
-            Contact us for more
-          </Button>
+          <Link href={sitemap.links.book30} target="_blank">
+            <Button className="p-0 text-sm" variant="link">
+              Contact us for more
+            </Button>
+          </Link>
         </div>
         <p className="text-sm opacity-50">
           Building something visual? Grida for Enterprise saves you months.{" "}
