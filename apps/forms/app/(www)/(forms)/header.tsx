@@ -8,11 +8,11 @@ export default function Header() {
     <header className="absolute top-0 left-0 right-0 py-4 px-4 lg:py-8 lg:px-24 flex justify-between items-center z-50">
       <div className="flex">
         <span className="flex items-center gap-2">
-          <Link href="https://grida.co" target="_blank">
+          <Link href="/">
             <GridaLogo className="w-5 h-5" />
           </Link>
           <SlashIcon width={20} height={20} />
-          <Link href="/">
+          <Link href="/forms">
             <span className="text-xl font-bold">Grida Forms</span>
           </Link>
         </span>

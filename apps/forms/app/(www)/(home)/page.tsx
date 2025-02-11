@@ -23,7 +23,7 @@ export default function WWW() {
       <Section container>
         <Hero />
       </Section>
-      <Section container className="mt-40">
+      <Section container className="-mt-40">
         <SectionMainDemo />
       </Section>
       <Section container className="mt-40">
@@ -35,8 +35,8 @@ export default function WWW() {
       <Section container className="mt-40">
         <SectionC />
       </Section>
-      <SectionFooterContainer>
-        <Section>
+      <SectionFooterContainer className="flex flex-col">
+        <Section className="flex-1">
           <SectionCTA />
         </Section>
         <Footer />
@@ -330,15 +330,28 @@ function SectionC() {
   );
 }
 
-function SectionFooterContainer({ children }: { children: React.ReactNode }) {
+function SectionFooterContainer({
+  className,
+  children,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="relative w-full h-full min-h-screen rounded-t-3xl md:rounded-t-[50px] overflow-hidden border-t">
+    <div
+      className={cn(
+        "relative w-full h-full min-h-screen rounded-t-3xl md:rounded-t-[50px] overflow-hidden border-t",
+        className
+      )}
+    >
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <iframe
           loading="eager"
           className="w-full h-full"
           src="https://bg.grida.co/embed/shadergradient/88"
         />
+        {/* gradient for footer visibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
       </div>
       {children}
     </div>
@@ -347,9 +360,9 @@ function SectionFooterContainer({ children }: { children: React.ReactNode }) {
 
 function SectionCTA() {
   return (
-    <div className="container py-40 z-10">
+    <div className="container py-40 z-10 text-black">
       <div className="flex flex-col">
-        <h2 className="text-left text-5xl lg:text-6xl font-semibold">
+        <h2 className="text-inherit text-left text-5xl lg:text-6xl font-semibold">
           The Free & Open source Canvas
         </h2>
         <div className="flex gap-4 mt-20">
@@ -357,7 +370,9 @@ function SectionCTA() {
             <span>Start your project</span>
             <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
           </Button>
-          <Button variant="outline">Try the demo</Button>
+          <Button variant="outline" className="text-foreground">
+            Try the demo
+          </Button>
         </div>
       </div>
     </div>
