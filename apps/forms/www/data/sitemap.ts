@@ -17,6 +17,10 @@ export namespace sitemap {
     playground: "/playground",
     figma: "/figma", // FIXME: <DEADLINK> no link
     book30: "https://cal.com/universe-from-grida/30min",
+    studio: "https://grida.studio",
+    corssh: "https://cors.sh",
+    blog: "https://blog.grida.co",
+    changelog: "https://x.com/univ___erse",
   };
 
   type Item = { title: string; href: string; description?: string };
@@ -44,6 +48,16 @@ export namespace sitemap {
       title: "Figma CI",
       href: links.figma,
       description: "CI for Figma Designs",
+    } satisfies Item,
+    studio: {
+      title: "Grida Studios",
+      href: links.studio,
+      description: "Team behind Grida",
+    } satisfies Item,
+    cors: {
+      title: "CORS.SH",
+      href: links.corssh,
+      description: "CORS Proxy",
     } satisfies Item,
   };
 }

@@ -9,6 +9,7 @@ import { GitHubLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
 
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
+import { SlackIcon } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -39,13 +40,23 @@ export default function Footer() {
                     <span className="sr-only">Twitter</span>
                     <TwitterLogoIcon className="h-5 w-5" />
                   </Link>
+                  <Link
+                    href={sitemap.links.slack}
+                    className="text-muted-foreground"
+                  >
+                    <span className="sr-only">Slack Community</span>
+                    <SlackIcon className="h-5 w-5" />
+                  </Link>
                 </div>
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Product</h3>
-                <a href="#" className="text-sm text-muted-foreground">
+                <Link
+                  href={sitemap.links.changelog}
+                  className="text-sm text-muted-foreground"
+                >
                   Changelog
-                </a>
+                </Link>
                 <Link
                   href={sitemap.links.docs}
                   className="text-sm text-muted-foreground"
@@ -55,36 +66,51 @@ export default function Footer() {
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Resources</h3>
-                <a href="#" className="text-sm text-muted-foreground">
-                  About
-                </a>
-                <a href="#" className="text-sm text-muted-foreground">
-                  Careers
-                </a>
-                <a href="#" className="text-sm text-muted-foreground">
+                <Link
+                  href={sitemap.links.studio}
+                  className="text-sm text-muted-foreground"
+                >
+                  Grida Studios
+                </Link>
+                <Link
+                  href={sitemap.links.corssh}
+                  className="text-sm text-muted-foreground"
+                >
+                  CORS.SH
+                </Link>
+                <Link
+                  href={sitemap.links.thebundle}
+                  className="text-sm text-muted-foreground"
+                >
+                  The Bundle
+                </Link>
+                <Link
+                  href={sitemap.links.blog}
+                  className="text-sm text-muted-foreground"
+                >
                   Blog
-                </a>
+                </Link>
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Contact</h3>
-                <a
+                <Link
                   href={sitemap.links.slack}
                   className="text-sm text-muted-foreground"
                 >
                   Slack
-                </a>
-                <a
+                </Link>
+                <Link
                   href={sitemap.links.x}
                   className="text-sm text-muted-foreground"
                 >
                   Twitter
-                </a>
-                <a
+                </Link>
+                <Link
                   href={sitemap.links.github}
                   className="text-sm text-muted-foreground"
                 >
                   Github
-                </a>
+                </Link>
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Legal</h3>
