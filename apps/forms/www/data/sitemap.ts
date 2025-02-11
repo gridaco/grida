@@ -5,16 +5,16 @@ export namespace sitemap {
     pricing: "/pricing",
     slack: "/join-slack",
     docs: "/docs",
-    cms: "/cms", // TODO: no link
+    cms: "/cms", // FIXME: <DEADLINK> no link
     privacy: "/privacy",
     toc: "/terms",
     forms: "/forms",
     canvas: "/canvas",
-    cookies: "/cookies",
+    cookies: "/cookies-policy",
     signin: "/signin",
     cta: "/dashboard/new?plan=free",
     thebundle: "/bundle",
-    figma: "/figma",
+    figma: "/figma", // FIXME: <DEADLINK> no link
   };
 
   type Item = { title: string; href: string; description?: string };
