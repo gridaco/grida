@@ -139,7 +139,7 @@ function SquareCard({
         <span className="absolute z-10">{foreground}</span>
       </div>
       <div className="flex flex-col">
-        <p className="text-xl font-medium">{title}</p>
+        <p className="text-lg font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{excerpt}</p>
       </div>
     </Link>
