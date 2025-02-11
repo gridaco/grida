@@ -8,16 +8,7 @@ import {
 import { GitHubLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
 
 import Link from "next/link";
-
-const links = {
-  x: "https://x.com/grida_co",
-  github: "https://github.com/gridaco",
-  slack: "/join-slack",
-  docs: "/docs",
-  privacy: "/privacy",
-  toc: "/terms",
-  cookies: "/cookies",
-};
+import { sitemap } from "./data/sitemap";
 
 export default function Footer() {
   return (
@@ -34,11 +25,17 @@ export default function Footer() {
                   </div>
                 </Link>
                 <div className="ml-2.5 flex gap-4 sm:ml-0">
-                  <Link href={links.github} className="text-muted-foreground">
+                  <Link
+                    href={sitemap.links.github}
+                    className="text-muted-foreground"
+                  >
                     <span className="sr-only">GitHub</span>
                     <GitHubLogoIcon className="h-5 w-5" />
                   </Link>
-                  <Link href={links.x} className="text-muted-foreground">
+                  <Link
+                    href={sitemap.links.x}
+                    className="text-muted-foreground"
+                  >
                     <span className="sr-only">Twitter</span>
                     <TwitterLogoIcon className="h-5 w-5" />
                   </Link>
@@ -50,14 +47,14 @@ export default function Footer() {
                   Changelog
                 </a>
                 <Link
-                  href={links.docs}
+                  href={sitemap.links.docs}
                   className="text-sm text-muted-foreground"
                 >
                   Documentation
                 </Link>
               </FooterColumn>
               <FooterColumn>
-                <h3 className="text-md pt-1 font-semibold">Company</h3>
+                <h3 className="text-md pt-1 font-semibold">Resources</h3>
                 <a href="#" className="text-sm text-muted-foreground">
                   About
                 </a>
@@ -70,14 +67,20 @@ export default function Footer() {
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Contact</h3>
-                <a href={links.slack} className="text-sm text-muted-foreground">
+                <a
+                  href={sitemap.links.slack}
+                  className="text-sm text-muted-foreground"
+                >
                   Slack
                 </a>
-                <a href={links.x} className="text-sm text-muted-foreground">
+                <a
+                  href={sitemap.links.x}
+                  className="text-sm text-muted-foreground"
+                >
                   Twitter
                 </a>
                 <a
-                  href={links.github}
+                  href={sitemap.links.github}
                   className="text-sm text-muted-foreground"
                 >
                   Github
@@ -86,19 +89,19 @@ export default function Footer() {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Legal</h3>
                 <Link
-                  href={links.privacy}
+                  href={sitemap.links.privacy}
                   className="text-sm text-muted-foreground"
                 >
                   Privacy policy
                 </Link>
                 <Link
-                  href={links.toc}
+                  href={sitemap.links.toc}
                   className="text-sm text-muted-foreground"
                 >
                   Terms of Service
                 </Link>
                 <Link
-                  href={links.cookies}
+                  href={sitemap.links.cookies}
                   className="text-sm text-muted-foreground"
                 >
                   Cookie Policy
