@@ -108,7 +108,7 @@ function SectionMainDemo() {
           data-locked={isLocked}
           className="w-full h-full pointer-events-none data-[locked='false']:pointer-events-auto"
         >
-          <iframe src="/canvas" className="w-full h-full" />
+          <iframe src="/www-embed/demo-canvas" className="w-full h-full" />
         </div>
       </Card>
     </motion.div>
@@ -447,7 +447,9 @@ function SectionCTA() {
               <span>Start your project</span>
             </FancyButton>
           </Link>
-          <Button variant="outline">Try the demo</Button>
+          <Link href={sitemap.links.canvas}>
+            <Button variant="outline">Try the demo</Button>
+          </Link>
         </div>
       </div>
     </div>

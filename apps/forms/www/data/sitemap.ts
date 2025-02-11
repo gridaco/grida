@@ -14,6 +14,7 @@ export namespace sitemap {
     signin: "/signin",
     cta: "/dashboard/new?plan=free",
     thebundle: "/bundle",
+    playground: "/playground",
     figma: "/figma", // FIXME: <DEADLINK> no link
     book30: "https://cal.com/universe-from-grida/30min",
   };

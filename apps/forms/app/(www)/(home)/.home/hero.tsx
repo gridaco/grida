@@ -41,9 +41,9 @@ export default function Hero() {
               </FancyButton>
             </Link>
 
-            <Button variant="outline" className="bg-none">
-              Try the demo
-            </Button>
+            <Link href={sitemap.links.canvas}>
+              <Button variant="outline">Try the demo</Button>
+            </Link>
           </motion.div>
         </div>
       </motion.div>
