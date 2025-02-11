@@ -9,6 +9,7 @@ import Content2 from "./.home/content-2";
 import Content3 from "./.home/content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Button as FancyButton } from "@/www/ui/button";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -436,10 +437,16 @@ function SectionCTA() {
           The Free & Open Canvas
         </h2>
         <div className="flex gap-4 mt-20">
-          <Button className="flex gap-2 group">
-            <span>Start your project</span>
-            <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
-          </Button>
+          <Link href={sitemap.links.cta}>
+            <FancyButton
+              effect="expandIcon"
+              className="flex gap-2 group"
+              icon={ArrowRight}
+              iconPlacement="right"
+            >
+              <span>Start your project</span>
+            </FancyButton>
+          </Link>
           <Button variant="outline">Try the demo</Button>
         </div>
       </div>

@@ -1,8 +1,10 @@
-import { Button } from "@/components/ui/button";
 import React from "react";
+import { Button } from "@/components/ui/button";
+import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { sitemap } from "@/www/data/sitemap";
 
 export default function Hero() {
   return (
@@ -28,10 +30,16 @@ export default function Hero() {
             viewport={{ once: true }}
             className="flex gap-4 mt-16"
           >
-            <Button className="flex gap-2 group">
-              <span>Start your project</span>
-              <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
-            </Button>
+            <Link href={sitemap.links.cta}>
+              <FancyButton
+                effect="expandIcon"
+                className="flex gap-2 group"
+                icon={ArrowRight}
+                iconPlacement="right"
+              >
+                <span>Start your project</span>
+              </FancyButton>
+            </Link>
 
             <Button variant="outline" className="bg-none">
               Try the demo
