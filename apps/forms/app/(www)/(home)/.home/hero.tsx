@@ -68,7 +68,7 @@ export default function Hero() {
 
 function Background() {
   return (
-    <div className="blur-3xl opacity-85">
+    <div className="blur-3xl opacity-80">
       <svg
         width="1157"
         height="698"
