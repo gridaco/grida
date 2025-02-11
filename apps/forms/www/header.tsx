@@ -54,7 +54,7 @@ export default function Header() {
                     Features
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[200px] gap-3 p-4 lg:w-[300px] ">
+                    <ul className="flex flex-col w-[300px] p-2 ">
                       {features.map((component) => (
                         <ListItem
                           key={component.title}
@@ -72,7 +72,7 @@ export default function Header() {
                     Resources
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[200px] gap-3 p-4">
+                    <ul className="flex flex-col w-[200px] p-2">
                       {resources.map((component) => (
                         <ListItem
                           key={component.title}
@@ -194,7 +194,7 @@ const ListItem = React.forwardRef<
           )}
           {...props}
         >
-          <span className="leading-none">{title}</span>
+          <span className="text-sm font-medium leading-none">{title}</span>
           <p className="line-clamp-2 leading-snug text-muted-foreground text-xs">
             {children}
           </p>

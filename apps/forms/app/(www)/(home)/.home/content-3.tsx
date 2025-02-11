@@ -6,6 +6,7 @@ import {
   BentoCardCTA,
 } from "@/www/ui/bento-grid";
 import Image from "next/image";
+import { motion } from "framer-motion";
 
 const features = [
   {
@@ -61,7 +62,7 @@ const features = [
   },
   {
     name: "Widgets & Templates",
-    description: "??",
+    description: "Drag and drop widgets and icons to quickly build your UI.",
     className: "col-span-full md:col-span-1",
     background: (
       <div className="absolute inset-0">
@@ -96,7 +97,12 @@ const features = [
 
 export default function Content3() {
   return (
-    <>
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.0, ease: "easeOut" }}
+      className="w-full mx-0"
+    >
       <BentoGrid className="grid-cols-4">
         {features.map((feature, idx) => (
           <BentoCard key={idx} {...feature} backgroundOrder={1}>
@@ -107,6 +113,6 @@ export default function Content3() {
           </BentoCard>
         ))}
       </BentoGrid>
-    </>
+    </motion.div>
   );
 }

@@ -26,7 +26,7 @@ export default function Content2() {
     <motion.div
       initial={{ opacity: 0, y: 50 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.5, ease: "easeOut" }}
+      transition={{ duration: 1.0, ease: "easeOut" }}
       className="w-full mx-0"
     >
       <div className="flex flex-col items-center justify-center my-16 gap-10 py-20">
