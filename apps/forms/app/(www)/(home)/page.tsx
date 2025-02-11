@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Header from "@/www/header";
-import Hero from "@/app/(www)/(home)/_home/hero";
+import Hero, { HeroBackground } from "@/app/(www)/(home)/_home/hero";
 import Content1 from "./_home/content-1";
 import Content3 from "./_home/content-3";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +23,20 @@ export default function WWW() {
   return (
     <main className="overflow-x-hidden">
       <Header />
-      <Section container className="overflow-visible">
-        <Hero />
-      </Section>
+      <div className="w-full relative">
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          viewport={{ once: true }}
+          whileInView={{ opacity: 1, y: 20 }}
+          transition={{ duration: 5, ease: "easeOut" }}
+          className="absolute -z-10 inset-0 flex items-center justify-center"
+        >
+          <HeroBackground />
+        </motion.div>
+        <Section container className="overflow-visible">
+          <Hero />
+        </Section>
+      </div>
       <Section container className="-mt-40">
         <SectionMainDemo />
       </Section>
