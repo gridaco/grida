@@ -37,7 +37,7 @@ export default function WWW() {
           <Hero />
         </Section>
       </div>
-      <Section container className="-mt-40">
+      <Section container className="-mt-48">
         <SectionMainDemo />
       </Section>
       {/* <Section container className="mt-40">
