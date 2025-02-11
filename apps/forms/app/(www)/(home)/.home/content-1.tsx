@@ -38,7 +38,7 @@ export default function Content1() {
             delay: 4000,
           }),
         ]}
-        className="w-full max-w-sm overflow-visible"
+        className="w-72 overflow-visible"
       >
         <CarouselContent>
           {k.demo_1_categories.map((item, i) => (
