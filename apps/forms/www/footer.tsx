@@ -4,7 +4,7 @@ import {
   FooterColumn,
   FooterBottom,
   FooterContent,
-} from "@/components/ui/footer";
+} from "@/www/ui/footer";
 import { GitHubLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
 
 import Link from "next/link";

@@ -6,7 +6,7 @@ import * as k from "./data";
 import clsx from "clsx";
 import bentomainbg from "@/app/(www)/(home)/.home/bento-fullsize-video-card-background.png";
 
-export function Demo2() {
+export default function Content2() {
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [tabUnderlineWidth, setTabUnderlineWidth] = useState(0);

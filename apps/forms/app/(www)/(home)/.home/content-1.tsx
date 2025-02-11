@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import * as k from "./data";
 
-export function Demo1() {
+export default function Content1() {
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0); // Default active tab index
   const [tabUnderlineWidth, setTabUnderlineWidth] = useState(0);

@@ -4,8 +4,9 @@ import Image from "next/image";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Hero from "@/app/(www)/(home)/.home/hero";
-import { Demo1 } from "./.home/demo-1";
-import { Demo2 } from "./.home/demo-2";
+import Content1 from "./.home/content-1";
+import Content2 from "./.home/content-2";
+import Content3 from "./.home/content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -232,7 +233,7 @@ function SectionA() {
           transition={{ duration: 1.5, ease: "easeOut" }}
           className="w-full mx-0 my-40"
         >
-          <Demo1 />
+          <Content1 />
         </motion.div>
       </div>
     </section>
@@ -336,7 +337,7 @@ function SectionC() {
         </svg>
       </div> */}
 
-        <Demo2 />
+        <Content2 />
       </div>
     </section>
   );
@@ -361,35 +362,8 @@ function SectionD() {
           </>
         }
       />
-      <div>
-        <div className="p-4 border">
-          <h6>React Compoents</h6>
-          <p>
-            Use Grida as a React component, or even bring your component into
-            our Canvas.
-          </p>
-        </div>
-        <div className="p-4 border">
-          <h6>Modular SDK</h6>
-          <p>Create your own tool. Build on top of our modular SDK.</p>
-        </div>
-        <div className="p-4 border">
-          <h6>Optimized</h6>
-          <p>
-            Grida is heavily optimized—our compute-intensive modules are powered
-            by Rust and WebGPU for maximum performance.
-          </p>
-        </div>
-        <div className="p-4 border">
-          <h6>Widgets & Templates</h6>
-          <p>AAAAAAAAA</p>
-        </div>
-        <div className="p-4 border">
-          <h6>Scripting Interface</h6>
-          <p>
-            Create design automations & plugins with Runtime scripting interface
-          </p>
-        </div>
+      <div className="my-16">
+        <Content3 />
       </div>
       <div className="border">
         <h6>Document Cloud for Enterprise</h6>
