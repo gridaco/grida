@@ -12,15 +12,6 @@ export default function Hero() {
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         viewport={{ once: true }}
-        whileInView={{ opacity: 1, y: 20 }}
-        transition={{ duration: 5, ease: "easeOut" }}
-        className="absolute -z-10"
-      >
-        <Background />
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut" }}
         className="text-black dark:text-white"
@@ -66,21 +57,21 @@ export default function Hero() {
   );
 }
 
-function Background() {
+export function HeroBackground() {
   const path =
     "M6.1912 307.719C-28.0369 229.284 87.9827 154.311 150.271 126.63C322.143 -54.4597 724.031 9.92764 929.546 16.1469C1135.06 22.3661 990.981 163.214 1119.7 329.304C1248.42 495.394 1006.34 581 960.263 669.898C914.187 758.797 589.093 602.218 494.015 669.898C398.937 737.578 168.555 623.803 171.847 470.517C175.138 317.231 48.9763 405.764 6.1912 307.719Z";
   return (
-    <>
+    <div className="absolute -top-40">
       <svg
-        width="1157"
+        width={"1157"}
         height="698"
         viewBox="0 0 1157 698"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="overflow-visible [--gradient:url(#light)] dark:[--gradient:url(#dark)]"
       >
-        <filter id="blur">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="80" />
+        <filter id="blur" x="-50%" y="-50%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="200" />
         </filter>
         <defs>
           <radialGradient
@@ -112,6 +103,6 @@ function Background() {
         </defs>
         <path d={path} fill="var(--gradient)" filter="url(#blur)" />
       </svg>
-    </>
+    </div>
   );
 }
