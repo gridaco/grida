@@ -12,7 +12,7 @@ const features = [
     name: "React Components",
     description:
       "Use Grida as a React component, or even bring your component into our Canvas.",
-    className: "col-span-2",
+    className: "col-span-full md:col-span-2",
     cta: { label: "test", href: "/" },
     background: (
       <div className="absolute inset-0">
@@ -29,7 +29,7 @@ const features = [
   {
     name: "Modular SDK",
     description: "Create your own tool. Build on top of our modular SDK.",
-    className: "col-span-2",
+    className: "col-span-full md:col-span-2",
     background: (
       <div className="absolute inset-0">
         <Image
@@ -46,7 +46,7 @@ const features = [
     name: "Optimized",
     description:
       "Grida is heavily optimized—our compute-intensive modules are powered by Rust and WebGPU for maximum performance.",
-    className: "col-span-1",
+    className: "col-span-full md:col-span-2",
     background: (
       <div className="absolute inset-0">
         <Image
@@ -62,7 +62,7 @@ const features = [
   {
     name: "Widgets & Templates",
     description: "??",
-    className: "col-span-1",
+    className: "col-span-full md:col-span-1",
     background: (
       <div className="absolute inset-0">
         <Image
@@ -79,7 +79,7 @@ const features = [
     name: "Scripting Interface",
     description:
       "Create design automations & plugins with Runtime scripting interface",
-    className: "col-span-1",
+    className: "col-span-full md:col-span-1",
     background: (
       <div className="absolute inset-0">
         <Image
