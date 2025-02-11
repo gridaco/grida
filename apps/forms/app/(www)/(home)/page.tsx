@@ -24,7 +24,7 @@ export default function WWW() {
       <Section container>
         <Hero />
       </Section>
-      <Section container className="-mt-32">
+      <Section container className="-mt-40">
         <SectionMainDemo />
       </Section>
       {/* <Section container className="mt-40">
@@ -95,7 +95,7 @@ function SectionMainDemo() {
         {/* Overlay for lock */}
         {isLocked && (
           <div
-            className="absolute inset-0 bg-black/20 z-20 flex items-center justify-center cursor-pointer"
+            className="absolute inset-0 bg-white/40 z-20 flex items-center justify-center cursor-pointer"
             onClick={unlockDemo}
           >
             <Button>Click to play</Button>
@@ -378,16 +378,16 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-20">
+      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-40">
         <div className="flex justify-between items-center">
-          <h6 className=" text-2xl font-semibold">
+          <h6 className=" text-lg font-semibold">
             Document Cloud for Enterprise
           </h6>
-          <Button className="p-0 text-md" variant="link">
+          <Button className="p-0 text-sm" variant="link">
             Contact us for more
           </Button>
         </div>
-        <p className=" opacity-50">
+        <p className="text-sm opacity-50">
           Building something visual? Grida for Enterprise saves you months.{" "}
           <br />
           Get custom, on-premise solutions tailored to your needs.
