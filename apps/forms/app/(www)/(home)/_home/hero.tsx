@@ -52,7 +52,12 @@ export default function Hero() {
             </Link>
 
             <Link href={sitemap.links.canvas}>
-              <Button variant="outline">Try the demo</Button>
+              <Button
+                variant="outline"
+                className="border-none shadow-none bg-transparent"
+              >
+                Try the demo
+              </Button>
             </Link>
           </motion.div>
         </div>

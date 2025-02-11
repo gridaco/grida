@@ -50,7 +50,7 @@ export default function Header() {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="font-normal">
+                  <NavigationMenuTrigger className=" bg-transparent font-normal">
                     Features
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
@@ -68,7 +68,7 @@ export default function Header() {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="font-normal">
+                  <NavigationMenuTrigger className="bg-transparent font-normal">
                     Resources
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
@@ -86,7 +86,7 @@ export default function Header() {
                 <NavigationMenuItem>
                   <Link href={sitemap.links.pricing} legacyBehavior passHref>
                     <NavigationMenuLink
-                      className={`${navigationMenuTriggerStyle()}`}
+                      className={`${navigationMenuTriggerStyle()} bg-transparent`}
                     >
                       <p className="font-normal">Pricing </p>
                     </NavigationMenuLink>
