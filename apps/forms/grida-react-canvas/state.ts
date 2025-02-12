@@ -803,7 +803,7 @@ export interface IDocumentEditorInit
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
     grida.program.document.IDocumentDefinition,
-    "nodes" | "root_id"
+    "nodes" | "root_id" | "backgroundColor"
   > &
     Partial<grida.program.document.IDocumentTexturesRepository>;
 }
@@ -827,6 +827,7 @@ export function initDocumentEditorState({
 }): IDocumentEditorState {
   const def: grida.program.document.IDocumentDefinition = {
     textures: {},
+    properties: {},
     ...init.document,
   };
 

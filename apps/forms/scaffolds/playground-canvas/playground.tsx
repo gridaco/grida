@@ -173,7 +173,6 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        properties: {},
         backgroundColor: CANVAS_BG_COLOR,
       },
     })

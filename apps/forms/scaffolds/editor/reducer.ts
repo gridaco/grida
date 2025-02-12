@@ -391,7 +391,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
                     startpage
                   ),
               },
-              properties: {},
             },
             templates: {
               [template_id]: startpage,

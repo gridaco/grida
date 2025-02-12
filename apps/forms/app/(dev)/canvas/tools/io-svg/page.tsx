@@ -64,7 +64,6 @@ export default function IOSVGPage() {
             crossAxisGap: 0,
           },
         },
-        properties: {},
       },
     })
   );
