@@ -77,7 +77,7 @@ export default function Content1() {
         </CarouselContent>
       </Carousel>
       {/* body */}
-      <div className="min-h-96 max-h-[900px] w-full flex items-center justify-center">
+      <div className="min-h-96 h-[300px] sm:h-[400px] md:h-[600px] lg:h-[800px] w-full flex items-center justify-center">
         <BigImageContainer key={index} {...img} alt={categories[index]} />
       </div>
     </div>
