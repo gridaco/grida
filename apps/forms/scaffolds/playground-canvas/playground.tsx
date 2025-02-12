@@ -113,6 +113,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
+import { io } from "@/grida-io-model";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -219,15 +220,19 @@ export default function CanvasPlayground() {
 
   const onExport = () => {
     const documentData = {
-      doctype: "v0_document",
+      version: "2025-02-12",
       document: state.document,
-    } satisfies grida.io.DocumentFileModel;
+    } satisfies io.DocumentFileModel;
 
-    const blob = new Blob([grida.io.stringify(documentData)], {
-      type: "application/json",
+    // const blob = new Blob([io.json.stringify(documentData)], {
+    //   type: "application/json",
+    // });
+
+    const blob = new Blob([io.archive.pack(documentData)], {
+      type: "application/zip",
     });
 
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, `${v4()}.grida.zip`);
   };
 
   return (

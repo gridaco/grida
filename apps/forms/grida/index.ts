@@ -8,53 +8,6 @@ import { cmath } from "@grida/cmath";
 export namespace grida {
   export const mixed: unique symbol = Symbol();
 
-  export namespace io {
-    /**
-     * Grida Document File model
-     * .grida file is a JSON file that contains the document structure and metadata.
-     */
-    export interface DocumentFileModel {
-      doctype: "v0_document";
-      document: grida.program.document.IDocumentDefinition;
-    }
-
-    export function parse(content: string): DocumentFileModel {
-      const json = JSON.parse(content);
-
-      const images = json.document.images ?? {};
-
-      // serialize by type
-      // url    | string
-      // texture | Array => Uint8ClampedArray
-      for (const key of Object.keys(images)) {
-        const entry = images[key];
-        if (entry.type === "texture" && Array.isArray(entry.data)) {
-          entry.data = new Uint8ClampedArray(entry.data);
-        }
-      }
-
-      return {
-        doctype: "v0_document",
-        document: {
-          root_id: json.document.root_id,
-          nodes: json.document.nodes,
-          textures: images,
-          properties: json.document.properties ?? {},
-          backgroundColor: json.document.backgroundColor,
-        },
-      } satisfies DocumentFileModel;
-    }
-
-    export function stringify(model: DocumentFileModel): string {
-      return JSON.stringify(model, (key, value) => {
-        if (value instanceof Uint8ClampedArray) {
-          return Array.from(value);
-        }
-        return value;
-      });
-    }
-  }
-
   export namespace program {
     export namespace schema {
       /**
