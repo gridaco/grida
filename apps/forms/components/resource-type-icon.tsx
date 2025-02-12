@@ -21,6 +21,7 @@ import {
   BarChart3Icon,
   BarChartHorizontalIcon,
   PenToolIcon,
+  FoldersIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -49,6 +50,7 @@ export type ResourceTypeIconName =
   | "i18n"
   | "supabase"
   | "form-x-supabase"
+  | "v0_bucket"
   | "v0_form"
   | "v0_site"
   | "v0_canvas"
@@ -77,6 +79,8 @@ export function ResourceTypeIcon({
       return <FolderDotIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
+    case "v0_bucket":
+      return <FoldersIcon {...props} />;
     case "v0_schema":
     case "database":
       return <DatabaseIcon {...props} />;

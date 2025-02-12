@@ -29,6 +29,7 @@ import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { PictureInPicture } from "@/components/pip";
 import { AudioLinesIcon } from "lucide-react";
 import { ContentAudio } from "./pip-audio-content";
+import { wellkown } from "@/utils/mimetype";
 
 type MediaViewerAcceptedPlayableMimeTypes = "video/*" | "audio/*";
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
@@ -170,7 +171,10 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
                 </Button>
               </DialogClose>
               <div className="w-full h-full p-10">
-                <Content mediaSrc={mediaSrc} contentType={contentType} />
+                <StandaloneMediaView
+                  mediaSrc={mediaSrc}
+                  contentType={contentType}
+                />
               </div>
               <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
                 <Menubar>
@@ -250,7 +254,7 @@ function PipPlayerErrorMessage({ children }: React.PropsWithChildren<{}>) {
   return <span className="text-sm text-muted-foreground">{children}</span>;
 }
 
-function Content({
+export function StandaloneMediaView({
   mediaSrc,
   contentType,
 }: {
@@ -268,59 +272,75 @@ function Content({
     );
   }
 
-  if (contentType?.startsWith("image/")) {
-    return mediaSrc?.srcset ? (
-      <ProgressiveImage
-        smallSrc={mediaSrc.srcset.thumbnail}
-        largeSrc={mediaSrc.srcset.original}
-        alt=""
-      />
-    ) : (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={mediaSrc?.src}
-        alt="Media"
-        className="w-full h-full object-contain"
-      />
-    );
+  if (contentType) {
+    const knwon = wellkown(contentType);
+    switch (knwon) {
+      case "image": {
+        return mediaSrc?.srcset ? (
+          <ProgressiveImage
+            smallSrc={mediaSrc.srcset.thumbnail}
+            largeSrc={mediaSrc.srcset.original}
+            alt=""
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={mediaSrc?.src}
+            alt="Media"
+            className="w-full h-full object-contain"
+          />
+        );
+      }
+      case "video": {
+        return (
+          <video
+            src={mediaSrc?.src}
+            controls
+            className="max-w-full max-h-full aspect-video"
+          >
+            Your browser does not support the video tag.
+          </video>
+        );
+      }
+      case "audio": {
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <Card className="aspect-video">
+              <CardHeader>
+                <CardTitle>
+                  <FileTypeIcon
+                    type="audio"
+                    className="inline mr-2 align-middle w-5 h-5"
+                  />
+                  Audio
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="w-full h-full flex items-center justify-center">
+                <audio src={mediaSrc?.src} controls className="min-w-full">
+                  Your browser does not support the audio tag.
+                </audio>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
+      case "pdf": {
+        return (
+          <object
+            data={mediaSrc?.src}
+            type="application/pdf"
+            className="w-full h-full"
+          />
+        );
+      }
+    }
   }
 
-  if (contentType?.startsWith("video/")) {
-    return (
-      <video
-        src={mediaSrc?.src}
-        controls
-        className="max-w-full max-h-full aspect-video"
-      >
-        Your browser does not support the video tag.
-      </video>
-    );
-  }
-
-  if (contentType?.startsWith("audio/")) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <Card className="aspect-video">
-          <CardHeader>
-            <CardTitle>
-              <FileTypeIcon
-                type="audio"
-                className="inline mr-2 align-middle w-5 h-5"
-              />
-              Audio
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="w-full h-full flex items-center justify-center">
-            <audio src={mediaSrc?.src} controls className="min-w-full">
-              Your browser does not support the audio tag.
-            </audio>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return <div>Preview not available for this file type ({contentType})</div>;
+  return (
+    <div className="text-xs text-muted-foreground">
+      Preview not available for this file type ({contentType})
+    </div>
+  );
 }
 
 const ProgressiveImage = ({

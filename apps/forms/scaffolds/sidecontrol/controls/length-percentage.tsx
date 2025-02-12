@@ -24,10 +24,10 @@ function val(value: TMixed<LengthPercentage | "auto">): {
 }
 
 export function LengthPercentageControl({
-  value,
+  value = "auto",
   onValueChange,
 }: {
-  value: TMixed<LengthPercentage | "auto">;
+  value?: TMixed<LengthPercentage | "auto">;
   onValueChange?: (value: LengthPercentage | "auto") => void;
 }) {
   const mode =

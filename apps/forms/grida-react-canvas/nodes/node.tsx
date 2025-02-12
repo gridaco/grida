@@ -110,11 +110,13 @@ export function NodeElement<P extends Record<string, any>>({
     context: {
       textures: document.document.textures,
     },
+    ...node,
     text: computed.text,
     props: computed.props,
     src: computed.src,
     html: computed.html,
     imageRef: node.imageRef,
+    fill: DEFAULT_FILL ?? computed.fill,
     loop: node.loop,
     muted: node.muted,
     autoplay: node.autoplay,
@@ -127,7 +129,6 @@ export function NodeElement<P extends Record<string, any>>({
     top: DEFAULT_TOP ?? node.top,
     width: DEFAULT_WIDTH ?? node.width,
     height: DEFAULT_HEIGHT ?? node.height,
-    fill: DEFAULT_FILL ?? node.fill,
     fillRule: node.fillRule,
     stroke: node.stroke,
     strokeWidth: node.strokeWidth,
@@ -148,7 +149,7 @@ export function NodeElement<P extends Record<string, any>>({
   } satisfies grida.program.document.IGlobalRenderingContext &
     (
       | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-      | grida.program.nodes.AnyNode
+      | grida.program.nodes.UnknwonComputedNode
     );
 
   if (!node.active) return <></>;
@@ -164,16 +165,19 @@ export function NodeElement<P extends Record<string, any>>({
           ...({
             id: node_id,
             ["data-grida-node-id"]: node_id,
-            ["data-grida-node-locked"]: node.locked,
+            ["data-grida-node-locked"]: node.locked!,
             ["data-grida-node-type"]: node.type,
             ["data-dev-editor-selected"]: selected,
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            ...css.toReactCSSProperties(node, {
-              fill: fillings[node.type],
-              hasTextStyle: node.type === "text",
-            }),
+            ...css.toReactCSSProperties(
+              renderprops as grida.program.nodes.i.IComputedCSSStylable,
+              {
+                fill: fillings[node.type],
+                hasTextStyle: node.type === "text",
+              }
+            ),
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
             // hide this node when in surface edit mode

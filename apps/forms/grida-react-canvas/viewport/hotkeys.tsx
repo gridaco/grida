@@ -535,7 +535,7 @@ export function useEditorHotKeys() {
                 actions.fill({
                   type: "solid",
                   color: rgba,
-                });
+                } satisfies grida.program.cg.SolidPaint);
               }
               // copy to clipboard if no selection
               else {

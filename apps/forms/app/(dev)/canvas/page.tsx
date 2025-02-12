@@ -1,13 +1,5 @@
-// import CanvasPlayground from "@/scaffolds/playground-canvas/playground";
-import dynamic from "next/dynamic";
-import { Metadata } from "next";
-
-const PlaygroundCanvas = dynamic(
-  () => import("@/scaffolds/playground-canvas/playground"),
-  {
-    ssr: false,
-  }
-);
+import type { Metadata } from "next";
+import Editor from "./editor";
 
 export const metadata: Metadata = {
   title: "Canvas Playground",
@@ -15,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CanvasPlaygroundPage() {
-  return <PlaygroundCanvas />;
+  return <Editor />;
 }

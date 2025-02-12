@@ -15,7 +15,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
+import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -105,7 +105,10 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
@@ -115,6 +118,8 @@ type UIConfig = {
   sidebar: "hidden" | "visible";
   toolbar: "hidden" | "visible";
 };
+
+const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -141,6 +146,7 @@ export default function CanvasPlayground() {
       editable: true,
       debug: pref.debug,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -167,7 +173,8 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
+        properties: {},
+        backgroundColor: CANVAS_BG_COLOR,
       },
     })
   );
@@ -210,13 +217,6 @@ export default function CanvasPlayground() {
       });
     });
   }, [exampleid]);
-
-  useEffect(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      return "";
-    });
-  }, []);
 
   const onExport = () => {
     const documentData = {
@@ -306,7 +306,7 @@ export default function CanvasPlayground() {
                     </>
                   ) : (
                     <>
-                      <SidebarRoot>
+                      <SidebarRoot className="hidden sm:block">
                         <SidebarSection className="mt-4">
                           <span className="px-2">
                             <DropdownMenu>
@@ -426,7 +426,7 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                    <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                       <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
                         <AutoInitialFitTransformer>
@@ -446,10 +446,6 @@ export default function CanvasPlayground() {
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
                             </div>
-
-                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                        <KeyboardInputOverlay />
-                      </div> */}
                           </>
                         )}
                         {ui.toolbar === "visible" && (
@@ -467,14 +463,14 @@ export default function CanvasPlayground() {
                           </>
                         )}
                       </ViewportRoot>
-                      <DevtoolsPanel />
-                    </div>
+                      {pref.debug && <DevtoolsPanel />}
+                    </StandaloneDocumentBackground>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
               </EditorSurfaceClipboardSyncProvider>
               {ui.sidebar === "visible" && (
                 <aside className="h-full">
-                  <SidebarRoot side="right">
+                  <SidebarRoot side="right" className="hidden sm:block">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
                         <Zoom
@@ -499,7 +495,13 @@ export default function CanvasPlayground() {
                     <FontFamilyListProvider fonts={fonts}>
                       <Align />
                       <hr />
-                      <Selection empty={<__TMP_ComponentProperties />} />
+                      <Selection
+                        empty={
+                          <div className="mt-4 mb-10">
+                            <DocumentProperties />
+                          </div>
+                        }
+                      />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
@@ -537,6 +539,7 @@ function ExampleSwitch({
     "event-page-01.grida",
     "component-01.grida",
     "layout-01.grida",
+    "globals-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>

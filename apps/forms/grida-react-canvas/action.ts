@@ -34,6 +34,7 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
+  | DocumentBackgroundAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -113,6 +114,11 @@ export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
   state: IDocumentEditorState;
+}
+
+export interface DocumentBackgroundAction {
+  type: "background-color";
+  backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"];
 }
 
 export interface EditorSelectAction {
@@ -571,11 +577,11 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.cg.PaintWithoutID | null;
+  fill: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeAction extends INodeID {
-  stroke: grida.program.cg.PaintWithoutID | null;
+  stroke: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeWidthAction extends INodeID {
@@ -780,24 +786,24 @@ export type SchemaAction =
   | DocumentSchemaUpdatePropertyAction;
 
 export interface DocumentSchemaDefinePropertyAction {
-  type: "document/schema/property/define";
-  name?: string;
+  type: "document/properties/define";
+  key?: string;
   definition?: grida.program.schema.PropertyDefinition;
 }
 
 export interface DocumentSchemaUpdatePropertyAction {
-  type: "document/schema/property/update";
-  name: string;
+  type: "document/properties/update";
+  key: string;
   definition: grida.program.schema.PropertyDefinition;
 }
 
 export interface DocumentSchemaRenamePropertyAction {
-  type: "document/schema/property/rename";
-  name: string;
-  newName: string;
+  type: "document/properties/rename";
+  key: string;
+  newKey: string;
 }
 
 export interface DocumentSchemaDeletePropertyAction {
-  type: "document/schema/property/delete";
-  name: string;
+  type: "document/properties/delete";
+  key: string;
 }

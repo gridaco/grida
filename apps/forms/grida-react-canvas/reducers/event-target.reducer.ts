@@ -165,7 +165,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const parent_rect = cdom.getNodeBoundingRect(parent)!;
 
             try {
-              const _nnode = nnode as grida.program.nodes.AnyNode;
+              const _nnode = nnode as grida.program.nodes.UnknwonNode;
 
               // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
               const center_translate_delta: cmath.Vector2 =

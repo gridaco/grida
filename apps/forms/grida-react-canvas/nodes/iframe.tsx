@@ -8,13 +8,11 @@ export const IFrameWidget = ({
   width,
   height,
   src,
-  srcdoc,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.HTMLIFrameNode>) => {
   return (
     <iframe
       src={src as string}
-      srcDoc={srcdoc as string}
       width={css.toDimension(width)}
       height={css.toDimension(height)}
       {...queryattributes(props)}

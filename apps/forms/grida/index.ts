@@ -39,6 +39,8 @@ export namespace grida {
           root_id: json.document.root_id,
           nodes: json.document.nodes,
           textures: images,
+          properties: json.document.properties ?? {},
+          backgroundColor: json.document.backgroundColor,
         },
       } satisfies DocumentFileModel;
     }
@@ -97,6 +99,8 @@ export namespace grida {
 
       export type Props = { [name: string]: Value };
 
+      export type PropertyDefinitionType = PropertyDefinition["type"];
+
       export type PropertyDefinition =
         | TypeScalarPropertyDefinition
         | TypeArrayPropertyDefinition<any[]>
@@ -154,13 +158,22 @@ export namespace grida {
         youtube: YoutubeVideoSource;
         vimeo: VimeoVideoSource;
         facebook: FacebookVideoSource;
+        rgba: RGBA;
       };
 
-      export type Object = Richtext | Source | VideoPlayerSource;
+      export type Object = Richtext | RGBA | Source | VideoPlayerSource;
 
       export type Richtext = {
         type: "richtext";
         html: string;
+      };
+
+      export type RGBA = {
+        type: "rgba";
+        r: number;
+        g: number;
+        b: number;
+        a: number;
       };
 
       export type Source = ImageSource | VideoSource | AudioSource;
@@ -264,6 +277,25 @@ export namespace grida.program.document {
       }
     >;
   }
+  /**
+   * general purpose cascading document properties for envs, styles, constants, etc.
+   */
+  export interface IDocumentProperties {
+    /**
+     * document level properties / variables
+     */
+    properties: schema.Properties;
+  }
+
+  /**
+   * background color of the document
+   */
+  export interface IDocumentBackground {
+    /**
+     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
+     */
+    backgroundColor?: cg.RGBA8888 | null | undefined | "";
+  }
 
   /**
    * contains all original template definition under this defined document in k:v pair
@@ -351,7 +383,9 @@ export namespace grida.program.document {
    */
   export interface IDocumentDefinition
     extends IDocumentNodesRepository,
-      IDocumentTexturesRepository {
+      IDocumentTexturesRepository,
+      IDocumentProperties,
+      IDocumentBackground {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */
@@ -430,7 +464,7 @@ export namespace grida.program.document {
           ctx.__ctx_nid_to_children_ids[node_id] ?? [];
 
         // If the node has children, map each child to its parent and add to the parent’s child array
-        if (Array.isArray((node as nodes.AnyNode).children)) {
+        if (Array.isArray((node as nodes.UnknwonNode).children)) {
           for (const child_id of (node as nodes.i.IChildrenReference)
             .children) {
             ctx.__ctx_nid_to_parent_id[child_id] = node_id;
@@ -699,6 +733,75 @@ export namespace grida.program.nodes {
     | InstanceNode
     | TemplateInstanceNode;
 
+  export type ComputedNode =
+    | ComputedTextNode
+    | ComputedBitmapNode
+    | ComputedImageNode
+    | ComputedVideoNode
+    | ComputedContainerNode
+    | ComputedHTMLIFrameNode
+    | ComputedHTMLRichTextNode
+    | ComputedVectorNode
+    | ComputedPathNode
+    | ComputedLineNode
+    | ComputedRectangleNode
+    | ComputedEllipseNode
+    | ComputedComponentNode
+    | ComputedInstanceNode
+    | ComputedTemplateInstanceNode;
+
+  /**
+   * Unknwon node utility type - use within the correct context
+   */
+  export type UnknwonComputedNode = Omit<
+    Partial<ComputedTextNode> &
+      Partial<ComputedImageNode> &
+      Partial<ComputedBitmapNode> &
+      Partial<ComputedVideoNode> &
+      Partial<ComputedContainerNode> &
+      Partial<ComputedHTMLIFrameNode> &
+      Partial<ComputedHTMLRichTextNode> &
+      Partial<ComputedVectorNode> &
+      Partial<ComputedPathNode> &
+      Partial<ComputedLineNode> &
+      Partial<ComputedRectangleNode> &
+      Partial<ComputedEllipseNode> &
+      Partial<ComputedComponentNode> &
+      Partial<ComputedInstanceNode> &
+      Partial<ComputedTemplateInstanceNode>,
+    "type"
+  > & {
+    readonly type: NodeType;
+  } & i.IBaseNode &
+    i.ISceneNode;
+
+  /**
+   * Unknwon node utility type - use within the correct context
+   */
+  export type UnknwonNode = Omit<
+    Partial<TextNode> &
+      Partial<BitmapNode> &
+      Partial<ImageNode> &
+      Partial<VideoNode> &
+      Partial<ContainerNode> &
+      Partial<HTMLIFrameNode> &
+      Partial<HTMLRichTextNode> &
+      Partial<VectorNode> &
+      Partial<PathNode> &
+      Partial<LineNode> &
+      Partial<RectangleNode> &
+      Partial<EllipseNode> &
+      Partial<ComponentNode> &
+      Partial<InstanceNode> &
+      Partial<TemplateInstanceNode>,
+    "type"
+  > & {
+    readonly type: NodeType;
+  } & i.IBaseNode &
+    i.ISceneNode;
+
+  export type UnknownNodeProperties = Record<keyof UnknwonNode, unknown>;
+
   /**
    * A virtual, before-instantiation node that only stores the prototype of a node.
    *
@@ -768,30 +871,6 @@ export namespace grida.program.nodes {
    */
   export type NodeChange = Partial<nodes.Node> | undefined;
 
-  /**
-   * Any node utility type - use within the correct context
-   */
-  export type AnyNode = Omit<
-    Partial<TextNode> &
-      Partial<BitmapNode> &
-      Partial<VectorNode> &
-      Partial<PathNode> &
-      Partial<LineNode> &
-      Partial<RectangleNode> &
-      Partial<ImageNode> &
-      Partial<VideoNode> &
-      Partial<HTMLRichTextNode> &
-      Partial<HTMLIFrameNode> &
-      Partial<ContainerNode> &
-      Partial<InstanceNode> &
-      Partial<TemplateInstanceNode>,
-    "type"
-  > & {
-    readonly type: Node["type"];
-  } & i.IBaseNode &
-    i.ISceneNode &
-    i.ICSSStylable;
-
   export namespace i {
     export interface IBaseNode {
       readonly id: NodeID;
@@ -828,6 +907,30 @@ export namespace grida.program.nodes {
        * @internal
        */
       locked: boolean;
+    }
+
+    export namespace props {
+      /**
+       * text value
+       *
+       * - expression - {@link tokens.StringValueExpression} - computed or literal
+       *   - literal - e.g. `"A text value"`
+       *   - property access - {@link tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+       *   - identifier - {@link tokens.Identifier} - computed, e.g. `title`
+       *   - others - all {@link tokens.StringValueExpression} types
+       *
+       * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
+       * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
+       * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
+       */
+      export type PropsTextValue = tokens.StringValueExpression;
+
+      export type SolidPaintToken = tokens.utils.TokenizableExcept<
+        cg.SolidPaint,
+        "type"
+      >;
+
+      export type PropsPaintValue = cg.Paint | SolidPaintToken;
     }
 
     export interface IOpacity {
@@ -982,8 +1085,8 @@ export namespace grida.program.nodes {
     /**
      * Node that can be filled with color - such as rectangle, ellipse, etc.
      */
-    export interface IFill {
-      fill?: cg.Paint;
+    export interface IFill<T> {
+      fill?: T;
     }
 
     /**
@@ -1036,7 +1139,7 @@ export namespace grida.program.nodes {
         IZIndex,
         IPositioning,
         ICSSDimension,
-        IFill,
+        IFill<props.PropsPaintValue>,
         IBoxShadow,
         ICSSBorder {
       /**
@@ -1045,6 +1148,16 @@ export namespace grida.program.nodes {
        */
       style: css.ExplicitlySupportedCSSProperties;
     }
+
+    /**
+     * @deprecated
+     */
+    export interface IComputedCSSStylable
+      extends __ReplaceSubset<
+        ICSSStylable,
+        IFill<props.PropsPaintValue>,
+        { fill: cg.Paint }
+      > {}
 
     export interface IMouseCursor {
       cursor?: cg.SystemMouseCursor;
@@ -1108,7 +1221,9 @@ export namespace grida.program.nodes {
      *
      * a set of properties that can be applied to a text node, but not to a textspan
      */
-    export interface ITextNodeStyle extends ITextStyle {
+    export interface ITextNodeStyle
+      extends ITextStyle,
+        IFill<props.PropsPaintValue> {
       /**
        * @default "left"
        */
@@ -1117,27 +1232,17 @@ export namespace grida.program.nodes {
        * @default "top"
        */
       textAlignVertical: cg.TextAlignVertical;
-
-      fill?: cg.Paint;
     }
 
-    /**
-     * text value
-     *
-     * - expression - {@link tokens.StringValueExpression} - computed or literal
-     *   - literal - e.g. `"A text value"`
-     *   - property access - {@link tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
-     *   - identifier - {@link tokens.Identifier} - computed, e.g. `title`
-     *   - others - all {@link tokens.StringValueExpression} types
-     *
-     * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
-     * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
-     * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
-     */
-    type PropsTextValue = tokens.StringValueExpression;
+    export interface IComputedTextNodeStyle
+      extends __ReplaceSubset<
+        ITextNodeStyle,
+        IFill<props.PropsPaintValue>,
+        { fill: cg.Paint }
+      > {}
 
     export interface ITextValue {
-      text: PropsTextValue | null;
+      text: props.PropsTextValue | null;
 
       /**
        * set max length of the text value
@@ -1150,8 +1255,31 @@ export namespace grida.program.nodes {
       maxLength?: number;
     }
 
+    export interface IComputedTextValue {
+      text: string | null;
+    }
+
+    export interface ISourceValue {
+      /**
+       * **[video / image]**
+       * required - when falsy, the image will not be rendered
+       * @see https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/src
+       *
+       * ---
+       *
+       * **[iframe]**
+       * The URL of the page to embed.
+       *
+       * Note: as we don't support `srcdoc` attribute, the content should be a url to a valid html page.
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#src
+       */
+
+      src?: tokens.StringValueExpression;
+    }
+
     export interface IHTMLRichTextValue {
-      html: PropsTextValue | null;
+      html: props.PropsTextValue | null;
     }
 
     export interface IProperties {
@@ -1170,82 +1298,11 @@ export namespace grida.program.nodes {
     }
   }
 
-  export namespace properties {
-    export const ibase: ReadonlyArray<keyof i.IBaseNode> = ["id", "name"];
-    export const iscene: ReadonlyArray<keyof i.ISceneNode> = [
-      "active",
-      "locked",
-    ];
-    export const iexpandable: ReadonlyArray<keyof i.IExpandable> = ["expanded"];
-    export const iexportable: ReadonlyArray<keyof i.IExportable> = [];
-    export const iopacity: ReadonlyArray<keyof i.IOpacity> = ["opacity"];
-    export const izindex: ReadonlyArray<keyof i.IZIndex> = ["zIndex"];
-    export const ihrefable: ReadonlyArray<keyof i.IHrefable> = [
-      "href",
-      "target",
-    ];
-    export const irectanglecorner: ReadonlyArray<keyof i.IRectangleCorner> = [
-      "cornerRadius",
-    ];
-    export const ifill: ReadonlyArray<keyof i.IFill> = ["fill"];
-    export const ieffects: ReadonlyArray<keyof i.IEffects> = ["effects"];
-    export const icssstylable: ReadonlyArray<keyof i.ICSSStylable> = ["style"];
-
-    // nodes
-    export const image: ReadonlyArray<keyof ImageNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      "src",
-      "alt",
-    ];
-    export const rectangle: ReadonlyArray<keyof RectangleNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...ieffects,
-      ...irectanglecorner,
-      "width",
-      "height",
-    ];
-    export const ellipse: ReadonlyArray<keyof EllipseNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...ieffects,
-      "width",
-      "height",
-    ];
-
-    export const text: ReadonlyArray<keyof TextNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      "text",
-    ];
-
-    export const container: ReadonlyArray<keyof ContainerNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...irectanglecorner,
-    ];
-  }
+  type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
+    T,
+    keyof TSubset
+  > &
+    TNew;
 
   // /**
   //  * @deprecated - not ready - do not use in production
@@ -1270,6 +1327,15 @@ export namespace grida.program.nodes {
     // textAutoResize: "none" | "width" | "height" | "auto";
   }
 
+  export interface ComputedTextNode
+    extends __ReplaceSubset<
+      TextNode,
+      i.ITextValue & i.ITextStyle,
+      i.IComputedTextValue & i.IComputedTextNodeStyle
+    > {
+    readonly type: "text";
+  }
+
   export interface ImageNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -1277,13 +1343,15 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner {
+      i.IRectangleCorner,
+      i.ISourceValue {
     readonly type: "image";
-    /**
-     * required - when falsy, the image will not be rendered
-     */
-    src?: tokens.StringValueExpression;
     alt?: string;
+  }
+
+  export interface ComputedImageNode
+    extends __ReplaceSubset<ImageNode, i.ISourceValue, { src: string }> {
+    readonly type: "image";
   }
 
   /**
@@ -1305,6 +1373,15 @@ export namespace grida.program.nodes {
     readonly type: "richtext";
   }
 
+  export interface ComputedHTMLRichTextNode
+    extends __ReplaceSubset<
+      HTMLRichTextNode,
+      i.IHTMLRichTextValue,
+      { html: string }
+    > {
+    readonly type: "richtext";
+  }
+
   export interface VideoNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -1312,12 +1389,10 @@ export namespace grida.program.nodes {
       i.IBoxFit,
       i.IHrefable,
       i.IMouseCursor,
-      i.IRectangleCorner {
+      i.IRectangleCorner,
+      i.ISourceValue {
     readonly type: "video";
-    /**
-     * required - when falsy, the video will not be rendered
-     */
-    src?: tokens.StringValueExpression;
+
     /**
      * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video#poster
      */
@@ -1325,6 +1400,11 @@ export namespace grida.program.nodes {
     loop: boolean;
     muted: boolean;
     autoplay: boolean;
+  }
+
+  export interface ComputedVideoNode
+    extends __ReplaceSubset<VideoNode, i.ISourceValue, { src: string }> {
+    readonly type: "video";
   }
 
   export interface ContainerNode
@@ -1342,6 +1422,12 @@ export namespace grida.program.nodes {
     //
   }
 
+  export interface ComputedContainerNode
+    extends __ReplaceSubset<ContainerNode, {}, {}> {
+    readonly type: "container";
+    //
+  }
+
   /**
    * <iframe> Node.
    *
@@ -1351,23 +1437,14 @@ export namespace grida.program.nodes {
     extends i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
-      i.IRectangleCorner {
+      i.IRectangleCorner,
+      i.ISourceValue {
     readonly type: "iframe";
-    /**
-     * The URL of the page to embed.
-     *
-     * when `srcdoc` is set, this value is ignored
-     *
-     * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#src
-     */
-    src?: tokens.StringValueExpression;
+  }
 
-    /**
-     * Inline HTML to embed, overriding the src attribute.
-     *
-     * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#srcdoc
-     */
-    srcdoc?: tokens.StringValueExpression;
+  export interface ComputedHTMLIFrameNode
+    extends __ReplaceSubset<HTMLIFrameNode, i.ISourceValue, { src: string }> {
+    readonly type: "iframe";
   }
 
   /**
@@ -1389,10 +1466,12 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation,
-      i.IFill {
+      i.IFill<cg.Paint> {
     readonly type: "bitmap";
     readonly imageRef: string;
   }
+
+  export type ComputedBitmapNode = BitmapNode;
 
   /**
    * @deprecated - not ready - do not use in production
@@ -1408,7 +1487,7 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation,
-      i.IFill {
+      i.IFill<cg.Paint> {
     type: "vector";
 
     /**
@@ -1425,6 +1504,11 @@ export namespace grida.program.nodes {
     })[];
   }
 
+  /**
+   * @deprecated - not ready - do not use in production
+   */
+  export type ComputedVectorNode = VectorNode;
+
   export interface PathNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -1435,9 +1519,9 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation,
-      i.IFill,
+      i.IFill<cg.Paint>,
       i.IStroke {
-    type: "path";
+    readonly type: "path";
 
     /**
      * @deprecated
@@ -1450,6 +1534,11 @@ export namespace grida.program.nodes {
      * @todo
      */
     vectorNetwork: vn.VectorNetwork;
+  }
+
+  export interface ComputedPathNode
+    extends __ReplaceSubset<PathNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+    readonly type: "path";
   }
 
   /**
@@ -1476,8 +1565,12 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation {
-    type: "line";
+    readonly type: "line";
     height: 0;
+  }
+
+  export interface ComputedLineNode extends LineNode {
+    readonly type: "line";
   }
 
   /**
@@ -1503,11 +1596,23 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation,
-      i.IFill,
+      i.IFill<cg.Paint>,
       i.IStroke,
       i.IEffects,
       i.IRectangleCorner {
-    type: "rectangle";
+    readonly type: "rectangle";
+  }
+
+  /**
+   * {@link RectangleNode} with computed properties
+   */
+  export interface ComputedRectangleNode
+    extends __ReplaceSubset<
+      RectangleNode,
+      i.IFill<cg.Paint>,
+      i.IFill<cg.Paint>
+    > {
+    readonly type: "rectangle";
   }
 
   /**
@@ -1527,10 +1632,18 @@ export namespace grida.program.nodes {
       i.IOpacity,
       i.IZIndex,
       i.IRotation,
-      i.IFill,
+      i.IFill<cg.Paint>,
       i.IStroke,
       i.IEffects {
     type: "ellipse";
+  }
+
+  /**
+   * {@link EllipseNode} with computed properties
+   */
+  export interface ComputedEllipseNode
+    extends __ReplaceSubset<EllipseNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+    readonly type: "ellipse";
   }
 
   //
@@ -1549,6 +1662,8 @@ export namespace grida.program.nodes {
     readonly type: "component";
   }
 
+  export type ComputedComponentNode = ComponentNode;
+
   export interface InstanceNode
     extends i.IBaseNode,
       i.ISceneNode,
@@ -1564,6 +1679,8 @@ export namespace grida.program.nodes {
      */
     component_id: NodeID;
   }
+
+  export type ComputedInstanceNode = InstanceNode;
 
   /**
    * [Template Instance Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
@@ -1590,6 +1707,8 @@ export namespace grida.program.nodes {
      */
     template_id: string;
   }
+
+  export type ComputedTemplateInstanceNode = TemplateInstanceNode;
 
   export namespace factory {
     /**
@@ -1673,7 +1792,7 @@ export namespace grida.program.nodes {
             children: [],
             ...prototype,
             id: id,
-          } as AnyNode;
+          } as UnknwonNode;
         }
         // TODO:
         case "bitmap":
@@ -1698,7 +1817,7 @@ export namespace grida.program.nodes {
             position: "absolute",
             ...prototype,
             id: id,
-          } as AnyNode;
+          } as UnknwonNode;
         }
         default:
           throw new Error(`Unsupported node prototype type: ${prototype.type}`);
@@ -1722,6 +1841,7 @@ export namespace grida.program.nodes {
         textures: {},
         nodes: {},
         root_id: "",
+        properties: {},
       };
 
       function processNode(
@@ -2150,6 +2270,16 @@ export namespace grida.program.cg {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 0 },
     };
+
+    export const black: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 0, g: 0, b: 0, a: 1 },
+    };
+
+    export const white: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 255, g: 255, b: 255, a: 1 },
+    };
   }
 
   export type AnyPaint = Omit<
@@ -2311,7 +2441,7 @@ export namespace grida.program.api {
             return Reflect.get(target, prop, receiver);
           },
           set(target, prop, value, receiver) {
-            switch (prop as keyof nodes.AnyNode) {
+            switch (prop as keyof nodes.UnknwonNode) {
               case "width":
                 context.dispatcher({
                   type: "node/change/size",

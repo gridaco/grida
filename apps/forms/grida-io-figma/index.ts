@@ -229,6 +229,7 @@ export namespace iofigma {
           root_id: rootNode.id,
           // TODO:
           textures: {},
+          properties: {},
         };
       }
 
