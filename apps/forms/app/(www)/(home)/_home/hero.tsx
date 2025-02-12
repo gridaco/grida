@@ -17,10 +17,10 @@ export default function Hero() {
         className="text-black dark:text-white"
       >
         <div className="flex flex-col items-center text-center">
-          <h1 className="text-5xl lg:text-6xl font-bold pb-8 text-center">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8 text-center">
             The Free, <span className="whitespace-nowrap">Open Canvas</span>
           </h1>
-          <p className="max-w-md text-base text-muted-foreground text-center">
+          <p className="max-w-md text-sm md:text-base text-muted-foreground text-center">
             Grida is an Open source Canvas where you can design & build web
             applications with templates
           </p>
@@ -83,13 +83,10 @@ export function HeroBackground() {
             gradientTransform="translate(579 236) rotate(85) scale(522 865)"
           >
             <stop stopColor="#CDBAFF" />
-            <stop stopColor="#A06EFF" stopOpacity="1" /> {/* 더 진한 보라 */}
+            <stop stopColor="#A06EFF" stopOpacity="1" />
             <stop offset="0.36" stopColor="#8298FF" stopOpacity="1" />{" "}
-            {/* 더 진한 블루 */}
             <stop offset="0.61" stopColor="#60CFFF" stopOpacity="0.9" />{" "}
-            {/* 더 진한 하늘색 */}
             <stop offset="1" stopColor="#9EF3E8" stopOpacity="0.8" />{" "}
-            {/* 바깥쪽은 연하게 */}
           </radialGradient>
           <radialGradient
             id="dark"

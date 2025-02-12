@@ -49,7 +49,7 @@ export default function Content1() {
   const img = images[categories[index] as keyof typeof images];
 
   return (
-    <div className="flex flex-col items-center my-16 gap-10">
+    <div className="flex flex-col items-center gap-4 md:gap-10">
       {/* tabs */}
       <Carousel
         setApi={setApi}
@@ -61,7 +61,7 @@ export default function Content1() {
             delay: 4000,
           }),
         ]}
-        className="w-64 overflow-visible"
+        className="w-52 md:w-64 overflow-visible"
       >
         <CarouselContent>
           {categories.map((item, i) => (
@@ -112,7 +112,7 @@ function Trigger({
     <div
       data-selected={selected}
       className={cn(
-        " rounded-lg bg-background flex py-4 items-center justify-center transition-all group select-none cursor-pointer",
+        "text-sm md:text-base rounded-lg bg-background flex py-3 md:py-4 items-center justify-center transition-all group select-none cursor-pointer",
         selected
           ? "bg-background dark:text-white text-black border border-slate-100 dark:border-slate-800 shadow-lg shadow-slate-300 dark:shadow-none"
           : "bg-transparent text-muted-foreground"
