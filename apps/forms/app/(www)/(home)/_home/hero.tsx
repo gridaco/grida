@@ -14,7 +14,6 @@ export default function Hero() {
         viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut" }}
-        className="text-black dark:text-white"
       >
         <div className="flex flex-col items-center text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8 text-center">
