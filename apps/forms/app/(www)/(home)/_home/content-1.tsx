@@ -49,7 +49,7 @@ export default function Content1() {
   const img = images[categories[index] as keyof typeof images];
 
   return (
-    <div className="flex flex-col items-center gap-4 md:gap-10">
+    <div className="flex flex-col items-center gap-4 sm:gap-6 md:gap-10">
       {/* tabs */}
       <Carousel
         setApi={setApi}
@@ -77,7 +77,7 @@ export default function Content1() {
         </CarouselContent>
       </Carousel>
       {/* body */}
-      <div className="min-h-96 h-[300px] sm:h-[400px] md:h-[600px] lg:h-[800px] w-full flex items-center justify-center">
+      <div className="min-h-96 h-[300px] sm:h-[400px] md:h-[600px] lg:h-[800px] w-full flex items-start justify-center">
         <BigImageContainer key={index} {...img} alt={categories[index]} />
       </div>
     </div>
@@ -114,7 +114,7 @@ function Trigger({
       className={cn(
         "text-sm md:text-base rounded-lg bg-background flex py-3 md:py-4 items-center justify-center transition-all group select-none cursor-pointer",
         selected
-          ? "bg-background dark:text-white text-black border border-slate-100 dark:border-slate-800 shadow-lg shadow-slate-300 dark:shadow-none"
+          ? "bg-transparent dark:bg-slate-950 dark:text-white text-black border border-slate-100 dark:border-slate-700 shadow-md shadow-slate-200 dark:shadow-none"
           : "bg-transparent text-muted-foreground"
       )}
     >
