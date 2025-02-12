@@ -490,6 +490,11 @@ function __self_update_gesture_transform_scale(
     const initial_rect = initial_rects[i++];
     const is_root = node_id === draft.document.root_id;
 
+    // TODO: scaling for bitmap node is not supported yet.
+    const is_scalable = node.type !== "bitmap";
+
+    if (!is_scalable) continue;
+
     if (is_root) {
       draft.document.nodes[node_id] = nodeTransformReducer(node, {
         type: "scale",

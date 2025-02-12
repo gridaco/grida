@@ -692,6 +692,11 @@ function NodeOverlay({
     height: size[1] * scaleY,
   };
 
+  {
+    /* TODO: resize for bitmap is not supported */
+  }
+  const is_resizable_node = node.type !== "bitmap";
+
   return (
     <>
       <LayerOverlay
@@ -702,21 +707,25 @@ function NodeOverlay({
       >
         {focused && !readonly && (
           <>
-            {node.type === "line" ? (
+            {is_resizable_node && (
               <>
-                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-              </>
-            ) : (
-              <>
-                <LayerOverlayResizeHandle anchor="n" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="s" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                {node.type === "line" ? (
+                  <>
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                  </>
+                ) : (
+                  <>
+                    <LayerOverlayResizeHandle anchor="n" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="s" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                  </>
+                )}
               </>
             )}
             {supports.cornerRadius(node.type) &&
