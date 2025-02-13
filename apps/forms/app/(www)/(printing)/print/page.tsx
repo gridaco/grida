@@ -57,6 +57,15 @@ const marqueeitems = [
   },
 ];
 
+const categories = [
+  { name: "Print", image: "/www/.print/categories/print.png" },
+  { name: "Stationery", image: "/www/.print/categories/stationery.png" },
+  { name: "Packaging", image: "/www/.print/categories/packaging.png" },
+  { name: "Banner", image: "/www/.print/categories/banner.png" },
+  { name: "Photo", image: "/www/.print/categories/photo.png" },
+  { name: "Fashion & Apparel", image: "/www/.print/categories/fashion.png" },
+];
+
 const features = [
   {
     name: "7-Day A-Z Guarantee",
@@ -345,15 +354,23 @@ function SectionExplore() {
         title={<>Explore Materials & Templates</>}
         excerpt={<>Explore all features & products.</>}
       />
-      <div className="grid gap-4 my-16">
-        <label>
-          <span className="text-sm font-medium">Categories</span>
-        </label>
-        <div className="flex items-center gap-4 overflow-x-scroll">
-          {k.categories.map((category) => (
-            <CategoryCard key={category.id} {...category} />
-          ))}
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 my-16">
+        {categories.map((category, index) => (
+          <div key={index} className="flex flex-col items-center text-left">
+            <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden">
+              <Image
+                src={category.image}
+                alt={category.name}
+                width={400}
+                height={300}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <p className="mt-2 text-lg font-medium text-left">
+              {category.name}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
