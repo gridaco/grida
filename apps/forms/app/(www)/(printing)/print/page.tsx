@@ -148,8 +148,7 @@ export default function WWWPrintingHome() {
   return (
     <main className="overflow-x-hidden w-full">
       <div className="min-h-screen relative w-full flex flex-col">
-        <div className="flex-[1]" />
-        <div className="flex-[2] w-full">
+        <div className="w-full flex flex-col gap-12 mt-20">
           <Section container>
             <Hero />
           </Section>
@@ -402,11 +401,11 @@ function SectionCustomOrder() {
   return (
     <div
       className={cn(
-        "group relative flex flex-col justify-between overflow-hidden rounded-xl h-96 p-8"
+        "group relative flex flex-col justify-between overflow-hidden rounded-xl w-4/5 mx-auto h-80 p-8"
       )}
     >
       <div className="z-10">
-        <h6 className="text-4xl font-bold text-black">Make it yours.</h6>
+        <h6 className="text-4xl font-bold text-black">Request a Design</h6>
         <p className="text-sm opacity-50 text-black max-w-xl mt-4">
           From concept to final print, we bring your ideas to life. Whether you
           need a custom design or high-quality printing, we handle it all.
@@ -424,7 +423,10 @@ function SectionCustomOrder() {
         </div>
       </div>
       <Link href={sitemap.print.links.ordercustom} className="z-10">
-        <Button variant="outline" className="rounded-full">
+        <Button
+          variant="outline"
+          className="border border-black bg-transparent rounded-full"
+        >
           Contact us for more
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
