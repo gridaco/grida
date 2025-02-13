@@ -1,5 +1,4 @@
 "use client";
-import Header from "@/www/header";
 import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button as FancyButton } from "@/www/ui/button";
@@ -10,26 +9,15 @@ import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader } from "@/www/ui/section";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
-import FooterWithCTA from "@/www/footer-with-cta";
 import { cn } from "@/utils";
 import { Marquee } from "@/www/ui/marquee";
 import { CalendarIcon } from "@radix-ui/react-icons";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+
+import Footer from "@/www/footer";
 
 export default function WWWPrintingHome() {
   return (
     <main className="overflow-x-hidden">
-      <Header />
       <Section container>
         <Hero />
         <div className="absolute right-0 top-0 w-1/2 h-full -z-10">
@@ -37,9 +25,7 @@ export default function WWWPrintingHome() {
         </div>
       </Section>
       <MarqueeDemo />
-      <Section container className="relative z-10">
-        <SectionMainDemo />
-      </Section>
+
       <Section container className="mt-40">
         <SectionHeader badge={<GridaLogo />} title={"A"} excerpt={"aa"} />
       </Section>
@@ -50,7 +36,7 @@ export default function WWWPrintingHome() {
           excerpt={<>Explore all features & products.</>}
         />
       </Section>
-      <FooterWithCTA />
+      <Footer />
     </main>
   );
 }
@@ -208,58 +194,6 @@ function MarqueeDemo() {
       </Marquee>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background"></div>
       <div className="pointer-events-none absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-background"></div>
-    </div>
-  );
-}
-
-const items = [
-  {
-    title: "Bands",
-    url: "#",
-  },
-  {
-    title: "Stickers",
-    url: "#",
-  },
-  {
-    title: "Business Cards",
-    url: "#",
-  },
-  {
-    title: "Books",
-    url: "#",
-  },
-  {
-    title: "Apparel",
-    url: "#",
-  },
-];
-
-function SectionMainDemo() {
-  const [index, setIndex] = useState<number>(0);
-
-  return (
-    <div>
-      <SidebarProvider>
-        <Sidebar variant="floating" className="absolute h-96">
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupLabel>Application</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <span>{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
-      </SidebarProvider>
     </div>
   );
 }

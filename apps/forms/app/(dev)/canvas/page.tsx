@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function CanvasPlaygroundPage() {
-  return <Editor />;
+  return (
+    <main className="w-screen h-screen overflow-hidden">
+      <Editor />
+    </main>
+  );
 }

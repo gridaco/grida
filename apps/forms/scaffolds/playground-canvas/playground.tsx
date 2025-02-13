@@ -214,7 +214,7 @@ export default function CanvasPlayground() {
 
   return (
     <TooltipProvider>
-      <main className="w-screen h-screen overflow-hidden select-none">
+      <main className="w-full h-full select-none">
         <SettingsDialog
           {...settingsDialog.props}
           preferences={pref}

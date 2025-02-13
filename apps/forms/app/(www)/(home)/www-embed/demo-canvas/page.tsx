@@ -14,5 +14,9 @@ export const metadata: Metadata = {
 };
 
 export default function CanvasPlaygroundPage() {
-  return <PlaygroundCanvas />;
+  return (
+    <main className="w-screen h-screen overflow-hidden">
+      <PlaygroundCanvas />
+    </main>
+  );
 }

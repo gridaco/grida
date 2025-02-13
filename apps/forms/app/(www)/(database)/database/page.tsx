@@ -48,7 +48,7 @@ function Hero() {
             Grida empowers you to build no-code databases as easily as editing a
             spreadsheet. Plug in your own database, choose ours, or integrate
             with Supabase—millions of rows, no problem. Your data. Your rules.
-            You're in control.
+            You&apos;re in control.
           </p>
           <motion.div
             initial={{ opacity: 0, y: 50 }}
