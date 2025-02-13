@@ -445,10 +445,10 @@ const tabs: { name: string; images: string[] }[] = [
   {
     name: "Cigar Band",
     images: [
-      "/www/.print/cigar-band-1.png",
-      "/www/.print/cigar-band-2.png",
-      "/www/.print/cigar-band-3.png",
-      "/www/.print/cigar-band-4.png",
+      "/www/.print/demo/cigar-band-1.png",
+      "/www/.print/demo/cigar-band-2.png",
+      "/www/.print/demo/cigar-band-3.png",
+      "/www/.print/demo/cigar-band-4.png",
     ],
   },
   {
