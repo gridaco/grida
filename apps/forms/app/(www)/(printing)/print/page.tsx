@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sitemap } from "@/www/data/sitemap";
 import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader } from "@/www/ui/section";
@@ -57,7 +59,7 @@ const marqueeitems = [
 
 const features = [
   {
-    name: "14-Day A-Z Guarantee",
+    name: "7-Day A-Z Guarantee",
     description:
       "Every order—from samples to full production—is delivered within 14 days, ensuring both speed and reliability for your business.",
     className: "col-span-full md:col-span-2",
@@ -167,6 +169,9 @@ export default function WWWPrintingHome() {
           </div> */}
       </div>
       <Section container className="mt-80">
+        <SectionMainDemo />
+      </Section>
+      <Section container className="mt-80">
         <SectionFeatures />
       </Section>
       <Section container className="mt-80">
@@ -199,12 +204,12 @@ function Hero() {
             🇳🇮 Available in Nicaragua
           </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8 max-w-2xl">
-            From Design to Print, in Just 14 Days
+            From Design to Print, in Just 7 Days
           </h1>
           <p className="max-w-md text-sm md:text-base text-muted-foreground text-left">
             Fast, hassle-free printing for businesses in Nicaragua. Produced in
-            South Korea, delivered in just 14 days—faster than US or
-            Canada-based services.
+            South Korea, delivered in just 7 days—faster than US or Canada-based
+            services.
           </p>
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -432,6 +437,121 @@ function SectionCustomOrder() {
         </Button>
       </Link>
       <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
+    </div>
+  );
+}
+
+const tabs: { name: string; images: string[] }[] = [
+  {
+    name: "Cigar Band",
+    images: [
+      "/www/.print/cigar-band-1.png",
+      "/www/.print/cigar-band-2.png",
+      "/www/.print/cigar-band-3.png",
+      "/www/.print/cigar-band-4.png",
+      "/www/.print/cigar-band-5.png",
+    ],
+  },
+  {
+    name: "Cigar Tube",
+    images: [
+      "/www/.print/cigar-band-1.png",
+      "/www/.print/cigar-band-2.png",
+      "/www/.print/cigar-band-3.png",
+      "/www/.print/cigar-band-4.png",
+      "/www/.print/cigar-band-5.png",
+    ],
+  },
+  {
+    name: "Cigar Box",
+    images: [
+      "/www/.print/cigar-band-1.png",
+      "/www/.print/cigar-band-2.png",
+      "/www/.print/cigar-band-3.png",
+      "/www/.print/cigar-band-4.png",
+      "/www/.print/cigar-band-5.png",
+    ],
+  },
+  {
+    name: "Cigar Sleeve",
+    images: [
+      "/www/.print/cigar-band-1.png",
+      "/www/.print/cigar-band-2.png",
+      "/www/.print/cigar-band-3.png",
+      "/www/.print/cigar-band-4.png",
+      "/www/.print/cigar-band-5.png",
+    ],
+  },
+];
+
+function SectionMainDemo() {
+  const [index, setIndex] = useState<number>(0);
+  const data = tabs[index];
+
+  return (
+    <div>
+      <SectionHeader
+        oriantation="start"
+        badge={<Badge>Start</Badge>}
+        title={<>Start from here</>}
+        excerpt={
+          <>
+            We print faster and more precisely than any competitor. Even with
+            international shipping, our production in South Korea ensures
+            unmatched quality and speed—faster than US or Canada-based services.
+          </>
+        }
+      />
+
+      {/* 탭 및 이미지 컨테이너 */}
+      <div className="flex flex-col items-start gap-8 my-12">
+        {/* 탭 선택 UI */}
+        <Tabs
+          value={index + ""}
+          onValueChange={(s) => setIndex(parseInt(s))}
+          className="w-fit mt-4"
+        >
+          <TabsList>
+            {tabs.map(({ name }, i) => (
+              <TabsTrigger key={i} value={i + ""}>
+                {name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {/* 이미지 그리드 레이아웃 */}
+        <div className="grid grid-cols-1 items-center justify-center md:grid-cols gap-4 w-3/4">
+          {/* 메인 이미지 (큰 카드) */}
+          <Card className="relative col-span-1 md:col-span-2 aspect-video overflow-hidden rounded md:rounded-lg">
+            <Image
+              src={data.images[0]}
+              alt={`${data.name} Main`}
+              width={1320}
+              height={792}
+              className="w-full h-full object-cover"
+            />
+          </Card>
+
+          {/* 작은 이미지 4개 (1줄에 연속 배치) */}
+          <div className="grid grid-cols-4 w-full gap-2">
+            {data.images.slice(1).map((src, i) => (
+              <Card
+                key={i}
+                className="relative w-full aspect-video overflow-hidden rounded md:rounded-lg"
+              >
+                <Image
+                  src={src}
+                  alt={`${data.name} ${i + 1}`}
+                  width={400}
+                  height={300}
+                  className="w-full h-full object-cover"
+                />
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
