@@ -1,3 +1,4 @@
+import { GridaLogo } from "@/components/grida-logo";
 import {
   SidebarProvider,
   Sidebar,
@@ -8,6 +9,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
+  SidebarHeader,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 
@@ -51,12 +54,29 @@ const items = [
   },
 ];
 
+const contact = {
+  title: "Contact",
+  href: "/print/~/contact",
+};
+
 function AppSidebar() {
   return (
     <Sidebar>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/print">
+                <GridaLogo />
+                <span className="text-lg font-bold">Print</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
       <SidebarContent>
+        <div className="basis-40" />
         <SidebarGroup>
-          <SidebarGroupLabel>Printing</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -72,6 +92,17 @@ function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href={contact.href}>
+                <span>{contact.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

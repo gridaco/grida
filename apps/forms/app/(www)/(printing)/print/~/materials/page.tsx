@@ -8,14 +8,14 @@ const materials = [
     name: "Premium Matte Paper",
     description:
       "Smooth, non-glossy finish ideal for vibrant colors and sharp text.",
-    image: "/images/abstract-placeholder.jpg",
+    image: "/www/.print/materials/a.png",
     properties: ["220 gsm", "Acid-free", "Archival quality"],
   },
   {
     id: 2,
     name: "Glossy Photo Paper",
     description: "High-shine finish for vivid photo reproductions and posters.",
-    image: "/images/abstract-placeholder.jpg",
+    image: "/www/.print/materials/b.png",
     properties: ["260 gsm", "Water-resistant", "Instant dry"],
   },
   {
@@ -23,14 +23,14 @@ const materials = [
     name: "Textured Canvas",
     description:
       "Artist-grade canvas for fine art reproductions and photo prints.",
-    image: "/images/abstract-placeholder.jpg",
+    image: "/www/.print/materials/c.png",
     properties: ["400 gsm", "Acid-free", "Stretchable"],
   },
   {
     id: 4,
     name: "Recycled Kraft Paper",
     description: "Eco-friendly option with a unique, natural texture.",
-    image: "/images/abstract-placeholder.jpg",
+    image: "/www/.print/materials/d.png",
     properties: ["300 gsm", "100% recycled", "Biodegradable"],
   },
 ];
