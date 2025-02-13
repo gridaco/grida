@@ -173,6 +173,9 @@ export default function WWWPrintingHome() {
       <Section container className="mt-80">
         <SectionExplore />
       </Section>
+      <Section container className="mt-80">
+        <SectionCustomOrder />
+      </Section>
       <hr className="my-40" />
       <Section container>
         <SectionFAQ />
@@ -325,43 +328,6 @@ function SectionFeatures() {
           </BentoCard>
         ))}
       </BentoGrid>
-      <CustomDesignCard />
-    </div>
-  );
-}
-
-function CustomDesignCard() {
-  return (
-    <div
-      className={cn(
-        "group relative flex flex-col justify-between overflow-hidden rounded-xl h-96 p-8"
-      )}
-    >
-      <div className="z-10">
-        <h6 className="text-4xl font-bold text-black">Make it yours.</h6>
-        <p className="text-sm opacity-50 text-black max-w-xl mt-4">
-          From concept to final print, we bring your ideas to life. Whether you
-          need a custom design or high-quality printing, we handle it all.
-        </p>
-      </div>
-      <div>
-        <div className="absolute inset-0 bg-background">
-          <Image
-            src="/www/common/custom-card-bg-01.png"
-            alt=""
-            width={1200}
-            height={520}
-            className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
-          />
-        </div>
-      </div>
-      <Link href={sitemap.print.links.ordercustom} className="z-10">
-        <Button variant="outline" className="rounded-full">
-          Contact us for more
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      </Link>
-      <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
     </div>
   );
 }
@@ -428,6 +394,42 @@ function CategoryCard({ name, image }: { name: string; image: string }) {
       <div className="w-full text-ellipsis">
         <p className="mt-2 w-full text-xs font-medium">{name}</p>
       </div>
+    </div>
+  );
+}
+
+function SectionCustomOrder() {
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col justify-between overflow-hidden rounded-xl h-96 p-8"
+      )}
+    >
+      <div className="z-10">
+        <h6 className="text-4xl font-bold text-black">Make it yours.</h6>
+        <p className="text-sm opacity-50 text-black max-w-xl mt-4">
+          From concept to final print, we bring your ideas to life. Whether you
+          need a custom design or high-quality printing, we handle it all.
+        </p>
+      </div>
+      <div>
+        <div className="absolute inset-0 bg-background">
+          <Image
+            src="/www/common/custom-card-bg-01.png"
+            alt=""
+            width={1200}
+            height={520}
+            className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+          />
+        </div>
+      </div>
+      <Link href={sitemap.print.links.ordercustom} className="z-10">
+        <Button variant="outline" className="rounded-full">
+          Contact us for more
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </Link>
+      <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
     </div>
   );
 }
