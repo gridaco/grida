@@ -24,17 +24,17 @@ const featured_works = [
   {
     name: "Branding",
     description: "Create a unique brand identity for your business.",
-    image: "/www/.print/materials/a.png",
+    image: "/www/.print/categories/01.png",
   },
   {
     name: "Packaging",
     description: "Design custom packaging for your products.",
-    image: "/www/.print/materials/b.png",
+    image: "/www/.print/categories/02.png",
   },
   {
     name: "Marketing",
     description: "Promote your brand with custom marketing materials.",
-    image: "/www/.print/materials/c.png",
+    image: "/www/.print/categories/03.png",
   },
 ];
 

@@ -21,25 +21,25 @@ const templates: Template[] = [
   {
     id: 1,
     name: "Business Card",
-    image: "/www/.print/materials/a.png",
+    image: "/www/.print/materials/01.png",
     price: 29.99,
   },
   {
     id: 2,
     name: "Flyer",
-    image: "/www/.print/materials/b.png",
+    image: "/www/.print/materials/02.png",
     price: 39.99,
   },
   {
     id: 3,
     name: "Brochure",
-    image: "/www/.print/materials/c.png",
+    image: "/www/.print/materials/03.png",
     price: 49.99,
   },
   {
     id: 4,
     name: "Poster",
-    image: "/www/.print/materials/d.png",
+    image: "/www/.print/materials/04.png",
     price: 59.99,
   },
 ];

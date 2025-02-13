@@ -30,11 +30,7 @@ export default function WWWPrintingHome() {
         <SectionHeader badge={<GridaLogo />} title={"A"} excerpt={"aa"} />
       </Section>
       <Section container className="mt-40">
-        <SectionHeader
-          badge={<Badge>Explore</Badge>}
-          title={<>Explore Materials & Templates</>}
-          excerpt={<>Explore all features & products.</>}
-        />
+        <SectionExplore />
       </Section>
       <Footer />
     </main>
@@ -102,7 +98,6 @@ function Globe({
       src="https://bg.grida.co/embed/globe"
       className={cn("w-full h-full border-none bg-transparent", className)}
       allowFullScreen
-      allowTransparency={true}
     />
   );
 }
@@ -168,6 +163,18 @@ function MarqueeDemo() {
       </Marquee>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background"></div>
       <div className="pointer-events-none absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-background"></div>
+    </div>
+  );
+}
+
+function SectionExplore() {
+  return (
+    <div>
+      <SectionHeader
+        badge={<Badge>Explore</Badge>}
+        title={<>Explore Materials & Templates</>}
+        excerpt={<>Explore all features & products.</>}
+      />
     </div>
   );
 }
