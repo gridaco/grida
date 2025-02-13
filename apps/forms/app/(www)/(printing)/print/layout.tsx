@@ -12,6 +12,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import { SlashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export default function Layout({
@@ -66,10 +67,15 @@ function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/print">
-                <GridaLogo />
-                <span className="text-lg font-bold">Print</span>
-              </Link>
+              <div>
+                <Link href="/">
+                  <GridaLogo className="w-4 h-4" />
+                </Link>
+                <SlashIcon />
+                <Link href="/print">
+                  <span className="text-lg font-bold">Print</span>
+                </Link>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
