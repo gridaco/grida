@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import { Marquee } from "@/www/ui/marquee";
 import { CalendarIcon } from "@radix-ui/react-icons";
-
+import Image from "next/image";
 import Footer from "@/www/footer";
 
 export default function WWWPrintingHome() {
@@ -65,10 +65,10 @@ function Hero() {
             viewport={{ once: true }}
             className="flex gap-4 mt-16"
           >
-            <Link href={sitemap.links.cta}>
+            <Link href="/print/~/order">
               <FancyButton
                 effect="expandIcon"
-                className="flex gap-2 group"
+                className="flex group"
                 icon={ArrowRight}
                 iconPlacement="right"
               >
@@ -76,7 +76,7 @@ function Hero() {
               </FancyButton>
             </Link>
 
-            <Link href={sitemap.links.database}>
+            <Link href="/print/~/contact">
               <Button
                 variant="outline"
                 className="border-none shadow-none bg-transparent"
@@ -107,79 +107,51 @@ function Globe({
   );
 }
 
-const reviews = [
+const marqueeitems = [
   {
-    name: "Jack",
-    username: "@jack",
-    body: "I've never seen anything like this before. It's amazing. I love it.",
-    img: "https://avatar.vercel.sh/jack",
+    name: "01",
+    img: "/www/.print/categories/01.png",
   },
   {
-    name: "Jill",
-    username: "@jill",
-    body: "I don't know what to say. I'm speechless. This is amazing.",
-    img: "https://avatar.vercel.sh/jill",
+    name: "02",
+    img: "/www/.print/categories/02.png",
   },
   {
-    name: "John",
-    username: "@john",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "https://avatar.vercel.sh/john",
+    name: "03",
+    img: "/www/.print/categories/03.png",
   },
   {
-    name: "Jane",
-    username: "@jane",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "https://avatar.vercel.sh/jane",
+    name: "04",
+    img: "/www/.print/categories/04.png",
   },
   {
-    name: "Jenny",
-    username: "@jenny",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "https://avatar.vercel.sh/jenny",
+    name: "05",
+    img: "/www/.print/categories/05.png",
   },
   {
-    name: "James",
-    username: "@james",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "https://avatar.vercel.sh/james",
+    name: "06",
+    img: "/www/.print/categories/06.png",
   },
 ];
 
-const firstRow = reviews.slice(0, reviews.length / 2);
-const secondRow = reviews.slice(reviews.length / 2);
-
-const ReviewCard = ({
-  img,
-  name,
-  username,
-  body,
-}: {
-  img: string;
-  name: string;
-  username: string;
-  body: string;
-}) => {
+const MarqueeCard = ({ img, name }: { img: string; name: string }) => {
   return (
     <figure
       className={cn(
-        "relative h-full w-64 cursor-pointer overflow-hidden rounded-xl border p-4",
+        "relative w-56 aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border",
         // light styles
         "border-gray-950/[.1] bg-gray-950/[.01] hover:bg-gray-950/[.05]",
         // dark styles
         "dark:border-gray-50/[.1] dark:bg-gray-50/[.10] dark:hover:bg-gray-50/[.15]"
       )}
     >
-      <div className="flex flex-row items-center gap-2">
-        <img className="rounded-full" width="32" height="32" alt="" src={img} />
-        <div className="flex flex-col">
-          <figcaption className="text-sm font-medium dark:text-white">
-            {name}
-          </figcaption>
-          <p className="text-xs font-medium dark:text-white/40">{username}</p>
-        </div>
-      </div>
-      <blockquote className="mt-2 text-sm">{body}</blockquote>
+      <Image
+        className="object-cover"
+        src={img}
+        width={400}
+        height={300}
+        alt={name}
+      />
     </figure>
   );
 };
@@ -188,8 +160,10 @@ function MarqueeDemo() {
   return (
     <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
       <Marquee pauseOnHover className="[--duration:20s]">
-        {firstRow.map((review) => (
-          <ReviewCard key={review.username} {...review} />
+        {marqueeitems.map((item) => (
+          <Link key={item.name} href="/print/~/templates">
+            <MarqueeCard {...item} />
+          </Link>
         ))}
       </Marquee>
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background"></div>
