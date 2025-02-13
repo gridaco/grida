@@ -319,23 +319,28 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border p-6 md:p-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex justify-between items-start">
-          <h6 className=" text-lg font-semibold">
-            Document Cloud for Enterprise
-          </h6>
-          <Link href={sitemap.links.book30} target="_blank">
-            <Button className="p-0 text-sm" variant="link">
-              Contact us for more
-            </Button>
-          </Link>
-        </div>
-        <p className="text-sm opacity-50">
-          Building something visual? Grida for Enterprise saves you months.{" "}
-          <br />
-          Get custom, on-premise solutions tailored to your needs.
-        </p>
-      </div>
+      <DocumentCloudCard />
     </section>
+  );
+}
+
+function DocumentCloudCard() {
+  return (
+    <div className=" flex flex-col border p-6 md:p-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
+      <div className="flex justify-between items-start">
+        <h6 className=" text-lg font-semibold">
+          Document Cloud for Enterprise
+        </h6>
+        <Link href={sitemap.links.book30} target="_blank">
+          <Button className="p-0 text-sm" variant="link">
+            Contact us for more
+          </Button>
+        </Link>
+      </div>
+      <p className="text-sm opacity-50">
+        Building something visual? Grida for Enterprise saves you months. <br />
+        Get custom, on-premise solutions tailored to your needs.
+      </p>
+    </div>
   );
 }

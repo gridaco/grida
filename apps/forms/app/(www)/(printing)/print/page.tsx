@@ -11,7 +11,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import { Marquee } from "@/www/ui/marquee";
-import { CalendarIcon } from "@radix-ui/react-icons";
+import { ArrowRightIcon, CalendarIcon } from "@radix-ui/react-icons";
 import {
   BentoGrid,
   BentoCard,
@@ -173,7 +173,8 @@ export default function WWWPrintingHome() {
       <Section container className="mt-80">
         <SectionExplore />
       </Section>
-      <Section container className="mt-80">
+      <hr className="my-40" />
+      <Section container>
         <SectionFAQ />
       </Section>
       <div className="h-96" />
@@ -184,7 +185,7 @@ export default function WWWPrintingHome() {
 
 function Hero() {
   return (
-    <section className="relative flex flex-col px-4 lg:px-24 min-h-96 items-start justify-center overflow-visible">
+    <section className="relative flex flex-col min-h-96 items-start justify-center overflow-visible z-10">
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         viewport={{ once: true }}
@@ -192,6 +193,9 @@ function Hero() {
         transition={{ duration: 1.0, ease: "easeOut" }}
       >
         <div className="flex flex-col items-start text-left">
+          <Badge variant="outline" className="mb-4">
+            🇳🇮 Available in Nicaragua
+          </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8 max-w-2xl">
             From Design to Print, in Just 14 Days
           </h1>
@@ -270,11 +274,21 @@ const MarqueeCard = ({ img, name }: { img: string; name: string }) => {
   );
 };
 
+const row1 = marqueeitems.slice(0, marqueeitems.length / 2);
+const row2 = marqueeitems.slice(marqueeitems.length / 2);
+
 function MarqueeDemo() {
   return (
     <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
       <Marquee pauseOnHover className="[--duration:20s]">
-        {marqueeitems.map((item) => (
+        {row1.map((item) => (
+          <Link key={item.name} href="/print/~/templates">
+            <MarqueeCard {...item} />
+          </Link>
+        ))}
+      </Marquee>
+      <Marquee pauseOnHover reverse className="[--duration:20s]">
+        {row2.map((item) => (
           <Link key={item.name} href="/print/~/templates">
             <MarqueeCard {...item} />
           </Link>
@@ -290,6 +304,7 @@ function SectionFeatures() {
   return (
     <div>
       <SectionHeader
+        oriantation="start"
         badge={<Badge>Why</Badge>}
         title={<>We’re the fastest</>}
         excerpt={
@@ -300,18 +315,53 @@ function SectionFeatures() {
           </>
         }
       />
-      <div className="mt-20">
-        <BentoGrid className="grid-cols-4">
-          {features.map((feature, idx) => (
-            <BentoCard key={idx} {...feature} backgroundOrder={1}>
-              <BentoCardContent
-                {...feature}
-                className="group-hover:-translate-y-0"
-              />
-            </BentoCard>
-          ))}
-        </BentoGrid>
+      <BentoGrid className="grid-cols-4 my-16">
+        {features.map((feature, idx) => (
+          <BentoCard key={idx} {...feature} backgroundOrder={1}>
+            <BentoCardContent
+              {...feature}
+              className="group-hover:-translate-y-0"
+            />
+          </BentoCard>
+        ))}
+      </BentoGrid>
+      <CustomDesignCard />
+    </div>
+  );
+}
+
+function CustomDesignCard() {
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col justify-between overflow-hidden rounded-xl h-96 p-8"
+      )}
+    >
+      <div className="z-10">
+        <h6 className="text-4xl font-bold text-black">Make it yours.</h6>
+        <p className="text-sm opacity-50 text-black max-w-xl mt-4">
+          From concept to final print, we bring your ideas to life. Whether you
+          need a custom design or high-quality printing, we handle it all.
+        </p>
       </div>
+      <div>
+        <div className="absolute inset-0 bg-background">
+          <Image
+            src="/www/common/custom-card-bg-01.png"
+            alt=""
+            width={1200}
+            height={520}
+            className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+          />
+        </div>
+      </div>
+      <Link href={sitemap.print.links.ordercustom} className="z-10">
+        <Button variant="outline" className="rounded-full">
+          Contact us for more
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </Link>
+      <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
     </div>
   );
 }
@@ -320,11 +370,12 @@ function SectionExplore() {
   return (
     <div>
       <SectionHeader
+        oriantation="start"
         badge={<Badge>Explore</Badge>}
         title={<>Explore Materials & Templates</>}
         excerpt={<>Explore all features & products.</>}
       />
-      <div className="grid gap-4">
+      <div className="grid gap-4 my-16">
         <label>
           <span className="text-sm font-medium">Categories</span>
         </label>
@@ -345,7 +396,11 @@ function SectionFAQ() {
         badge={<Badge>FAQ</Badge>}
         title={<>Frequently Asked Questions</>}
       />
-      <Accordion type="single" collapsible className="w-full max-w-3xl mx-auto">
+      <Accordion
+        type="single"
+        collapsible
+        className="w-full max-w-3xl mx-auto my-16"
+      >
         {k.faqs.map((faq, index) => (
           <AccordionItem key={index} value={`item-${index}`}>
             <AccordionTrigger className="text-left">

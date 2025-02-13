@@ -25,21 +25,29 @@ export function SectionHeader({
   title,
   excerpt,
   button,
+  oriantation = "center",
 }: {
   badge?: React.ReactNode;
   title: React.ReactNode;
   excerpt?: React.ReactNode;
   button?: React.ReactNode;
+  oriantation?: "start" | "center" | "end";
 }) {
   return (
-    <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
+    <div
+      data-orientation={oriantation}
+      className="flex flex-col items-center text-center data-[orientation='start']:text-start data-[orientation='start']:items-start data-[orientation='end']:text-end data-[orientation='end']:items-end"
+    >
       {badge}
       <div className="flex flex-col">
-        <span className="text-4xl md:text-5xl lg:text-6xl font-bold py-10 text-center max-w-3xl">
+        <span className="text-4xl md:text-5xl lg:text-6xl font-bold py-10 max-w-3xl">
           {title}
         </span>
         {excerpt && (
-          <p className=" text-sm md:text-base max-w-xl mx-auto text-muted-foreground text-center">
+          <p
+            data-orientation={oriantation}
+            className="text-sm md:text-base max-w-xl text-muted-foreground data-[orientation='center']:mx-auto"
+          >
             {excerpt}
           </p>
         )}
