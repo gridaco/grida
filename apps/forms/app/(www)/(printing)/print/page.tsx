@@ -449,7 +449,6 @@ const tabs: { name: string; images: string[] }[] = [
       "/www/.print/cigar-band-2.png",
       "/www/.print/cigar-band-3.png",
       "/www/.print/cigar-band-4.png",
-      "/www/.print/cigar-band-5.png",
     ],
   },
   {
@@ -459,7 +458,6 @@ const tabs: { name: string; images: string[] }[] = [
       "/www/.print/cigar-band-2.png",
       "/www/.print/cigar-band-3.png",
       "/www/.print/cigar-band-4.png",
-      "/www/.print/cigar-band-5.png",
     ],
   },
   {
@@ -469,7 +467,6 @@ const tabs: { name: string; images: string[] }[] = [
       "/www/.print/cigar-band-2.png",
       "/www/.print/cigar-band-3.png",
       "/www/.print/cigar-band-4.png",
-      "/www/.print/cigar-band-5.png",
     ],
   },
   {
@@ -479,7 +476,6 @@ const tabs: { name: string; images: string[] }[] = [
       "/www/.print/cigar-band-2.png",
       "/www/.print/cigar-band-3.png",
       "/www/.print/cigar-band-4.png",
-      "/www/.print/cigar-band-5.png",
     ],
   },
 ];
@@ -503,9 +499,7 @@ function SectionMainDemo() {
         }
       />
 
-      {/* 탭 및 이미지 컨테이너 */}
       <div className="flex flex-col items-start gap-8 my-12">
-        {/* 탭 선택 UI */}
         <Tabs
           value={index + ""}
           onValueChange={(s) => setIndex(parseInt(s))}
@@ -520,10 +514,8 @@ function SectionMainDemo() {
           </TabsList>
         </Tabs>
 
-        {/* 이미지 그리드 레이아웃 */}
-        <div className="grid grid-cols-1 items-center justify-center md:grid-cols gap-4 w-3/4">
-          {/* 메인 이미지 (큰 카드) */}
-          <Card className="relative col-span-1 md:col-span-2 aspect-video overflow-hidden rounded md:rounded-lg">
+        <div className="grid grid-cols-3 gap-4 w-full">
+          <Card className="relative col-span-2 w-full h-[300px] md:h-[450px] lg:h-[650px] overflow-hidden rounded md:rounded-lg">
             <Image
               src={data.images[0]}
               alt={`${data.name} Main`}
@@ -533,12 +525,11 @@ function SectionMainDemo() {
             />
           </Card>
 
-          {/* 작은 이미지 4개 (1줄에 연속 배치) */}
-          <div className="grid grid-cols-4 w-full gap-2">
+          <div className="grid grid-rows-3 gap-3 w-full h-[300px] md:h-[450px] lg:h-[650px]">
             {data.images.slice(1).map((src, i) => (
               <Card
                 key={i}
-                className="relative w-full aspect-video overflow-hidden rounded md:rounded-lg"
+                className="relative w-full h-full overflow-hidden rounded md:rounded-lg"
               >
                 <Image
                   src={src}
