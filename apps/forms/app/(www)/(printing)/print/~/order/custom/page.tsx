@@ -10,12 +10,32 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import Link from "next/link";
+import { sitemap } from "@/www/data/sitemap";
 
 const steps = [
   "Project Details",
   "Design Preferences",
   "File Upload",
   "Review & Submit",
+];
+
+const featured_works = [
+  {
+    name: "Branding",
+    description: "Create a unique brand identity for your business.",
+    image: "/www/.print/materials/a.png",
+  },
+  {
+    name: "Packaging",
+    description: "Design custom packaging for your products.",
+    image: "/www/.print/materials/b.png",
+  },
+  {
+    name: "Marketing",
+    description: "Promote your brand with custom marketing materials.",
+    image: "/www/.print/materials/c.png",
+  },
 ];
 
 export default function CustomOrderPage() {
@@ -195,28 +215,37 @@ export default function CustomOrderPage() {
         </Button>
       </div>
 
-      <div className="mt-16">
-        <h2 className="text-2xl font-semibold mb-6">Our Custom Work</h2>
+      <hr className="my-16" />
+      <div>
+        <h2 className="text-lg font-semibold mb-6">Our Latest Work</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-lg overflow-hidden shadow-lg">
-              <Image
-                src={`/placeholder.svg?height=300&width=400`}
-                alt={`Custom work example ${i}`}
-                width={400}
-                height={300}
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="font-semibold">Project Name {i}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Custom{" "}
-                  {i === 1 ? "Branding" : i === 2 ? "Packaging" : "Marketing"}{" "}
-                  Design
-                </p>
+          {featured_works.map((work, i) => (
+            <Link key={i} href={sitemap.links.studio} target="_blank">
+              <div className="rounded-lg overflow-hidden shadow-lg">
+                <Image
+                  src={work.image}
+                  alt={work.description}
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-4">
+                  <h3 className="font-semibold">{work.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {work.description}
+                  </p>
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
+        </div>
+        <div className="mt-4">
+          <Link href={sitemap.links.studio} target="_blank">
+            <Button variant="link" className="p-0">
+              Visit our Studio
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
