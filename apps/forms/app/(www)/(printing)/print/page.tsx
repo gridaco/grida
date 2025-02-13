@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/accordion";
 import Image from "next/image";
 import Footer from "@/www/footer";
+import * as k from "./data";
 
 const marqueeitems = [
   {
@@ -54,55 +55,6 @@ const marqueeitems = [
   },
 ];
 
-const faqs = [
-  {
-    question: "What products can I print with your service?",
-    answer:
-      "We offer high-quality printing for business cards, brochures, flyers, posters, labels, and more. Our printing services are tailored for business owners, including cigar brands in Nicaragua, looking for fast and precise printing. Visit our catalog to see all available products.",
-  },
-  {
-    question: "How fast can I receive my printed products?",
-    answer:
-      "We offer express shipping from South Korea, which is often faster than using US or Canada-based printers. Our estimated delivery times are:\n\n- Express: 5-7 business days (including printing and shipping time)\n- Standard: 10-14 business days\n\nDelivery times may vary based on customs clearance and local logistics.",
-  },
-  {
-    question: "Why do you print in South Korea?",
-    answer:
-      "South Korea offers the fastest and most accurate printing technology, ensuring superior quality and precision. Even with international shipping, our service is often **faster than US or Canada-based printing services**, making it the best option for businesses in Nicaragua.",
-  },
-  {
-    question: "How much does shipping cost?",
-    answer:
-      "We offer competitive shipping rates based on the order size and urgency:\n\n- Express Shipping: Calculated at checkout based on your location\n- Standard Shipping: Free for bulk orders\n\nAll shipping includes tracking so you can monitor your order’s progress.",
-  },
-  {
-    question: "Can I pick up my order locally in Nicaragua?",
-    answer:
-      "Currently, we do not offer local pickup in Nicaragua, as all orders are shipped directly from South Korea. However, our express shipping ensures that you receive your products faster than most local or North American printing services.",
-  },
-  {
-    question:
-      "What file specifications should I follow for the best print quality?",
-    answer:
-      "For the highest print quality, please ensure your files meet these requirements:\n\n- Minimum resolution: **300 DPI**\n- File formats: **PDF, PNG, JPG, or AI**\n- Color mode: **CMYK**\n- Bleed area: **3mm (0.125 inches) on all sides**\n\nWe also offer automated proofing to check your design for any issues before printing.",
-  },
-  {
-    question: "What if there’s an issue with my order?",
-    answer:
-      "We stand by our **quality guarantee**. If there is any defect in your printed product, please contact our support team within **7 days of receiving your order**, and we will reprint or refund your order as needed. Our goal is 100% customer satisfaction.",
-  },
-  {
-    question: "Do you offer custom printing for cigar brands in Nicaragua?",
-    answer:
-      "Yes! We specialize in **custom printing for cigar brands**, offering premium packaging, labels, and promotional materials. Our precise printing ensures that your brand stands out with high-quality finishes.",
-  },
-  {
-    question: "How do I place an order?",
-    answer:
-      "Ordering is simple:\n\n1. Choose a product and upload your design.\n2. Select your preferred material and quantity.\n3. Review your order and confirm shipping details.\n4. Make a payment, and we’ll handle the rest!\n\nYour order will be printed in South Korea and shipped to Nicaragua with tracking.",
-  },
-];
-
 const features = [
   {
     name: "14-Day A-Z Guarantee",
@@ -113,7 +65,7 @@ const features = [
     background: (
       <div className="absolute inset-0">
         <Image
-          src="/www/.home/3/react-components.png"
+          src="/www/.print/features/01.png"
           alt=""
           width={800}
           height={400}
@@ -130,7 +82,7 @@ const features = [
     background: (
       <div className="absolute inset-0">
         <Image
-          src="/www/.home/3/modular-sdk.png"
+          src="/www/.print/features/02.png"
           alt=""
           width={800}
           height={400}
@@ -147,7 +99,7 @@ const features = [
     background: (
       <div className="absolute inset-0">
         <Image
-          src="/www/.home/3/optimized.png"
+          src="/www/.print/features/03.png"
           alt=""
           width={500}
           height={500}
@@ -164,7 +116,7 @@ const features = [
     background: (
       <div className="absolute inset-0">
         <Image
-          src="/www/.home/3/widgets-templates.png"
+          src="/www/.print/features/04.png"
           alt=""
           width={500}
           height={500}
@@ -181,7 +133,7 @@ const features = [
     background: (
       <div className="absolute inset-0">
         <Image
-          src="/www/.home/3/scripting-interface.png"
+          src="/www/.print/features/05.png"
           alt=""
           width={500}
           height={500}
@@ -215,16 +167,13 @@ export default function WWWPrintingHome() {
             <Globe />
           </div> */}
       </div>
-      <Section container className="mt-40">
-        <SectionHeader badge={<GridaLogo />} title={"A"} excerpt={"aa"} />
-      </Section>
-      <Section container className="mt-40">
+      <Section container className="mt-80">
         <SectionFeatures />
       </Section>
-      <Section container className="mt-40">
+      <Section container className="mt-80">
         <SectionExplore />
       </Section>
-      <Section container className="mt-40">
+      <Section container className="mt-80">
         <SectionFAQ />
       </Section>
       <div className="h-96" />
@@ -375,6 +324,16 @@ function SectionExplore() {
         title={<>Explore Materials & Templates</>}
         excerpt={<>Explore all features & products.</>}
       />
+      <div className="grid gap-4">
+        <label>
+          <span className="text-sm font-medium">Categories</span>
+        </label>
+        <div className="flex items-center gap-4 overflow-x-scroll">
+          {k.categories.map((category) => (
+            <CategoryCard key={category.id} {...category} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -387,7 +346,7 @@ function SectionFAQ() {
         title={<>Frequently Asked Questions</>}
       />
       <Accordion type="single" collapsible className="w-full max-w-3xl mx-auto">
-        {faqs.map((faq, index) => (
+        {k.faqs.map((faq, index) => (
           <AccordionItem key={index} value={`item-${index}`}>
             <AccordionTrigger className="text-left">
               {faq.question}
@@ -397,5 +356,23 @@ function SectionFAQ() {
         ))}
       </Accordion>
     </section>
+  );
+}
+
+function CategoryCard({ name, image }: { name: string; image: string }) {
+  return (
+    <div className="flex flex-col">
+      <div className="relative h-20 aspect-video rounded-lg overflow-hidden">
+        <Image
+          src={image || "/placeholder.svg"}
+          alt={name}
+          layout="fill"
+          objectFit="cover"
+        />
+      </div>
+      <div className="w-full text-ellipsis">
+        <p className="mt-2 w-full text-xs font-medium">{name}</p>
+      </div>
+    </div>
   );
 }
