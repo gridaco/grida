@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { Check } from "lucide-react";
 
@@ -9,113 +9,58 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/utils";
+import Link from "next/link";
+import { sitemap } from "@/www/data/sitemap";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
+import { wwwprint } from "../../data";
 
-interface Template {
-  id: number;
-  name: string;
-  image: string;
-  price: number;
-}
-
-const templates: Template[] = [
+const shipping_options = [
   {
-    id: 1,
-    name: "Modern",
-    image: "/www/.print/categories/07.png",
-    price: 29.99,
+    name: "Accurate",
+    description: "7~14 days",
+    price: "Save $50",
   },
+  { name: "Fast", description: "5~7 days", price: "Free" },
   {
-    id: 2,
-    name: "Classic",
-    image: "/www/.print/categories/08.png",
-    price: 39.99,
+    name: "Faster",
+    description: "3~5 days",
+    price: "+ $50",
   },
-  {
-    id: 3,
-    name: "Elegant",
-    image: "/www/.print/categories/09.png",
-    price: 49.99,
-  },
-  {
-    id: 4,
-    name: "Vintage",
-    image: "/www/.print/categories/10.png",
-    price: 59.99,
-  },
-];
-
-const options: Template[] = [
-  {
-    id: 1,
-    name: "A",
-    image: "/www/.print/materials/01.png",
-    price: 29.99,
-  },
-  {
-    id: 2,
-    name: "B",
-    image: "/www/.print/materials/02.png",
-    price: 39.99,
-  },
-  {
-    id: 3,
-    name: "C",
-    image: "/www/.print/materials/03.png",
-    price: 49.99,
-  },
-  {
-    id: 4,
-    name: "D",
-    image: "/www/.print/materials/04.png",
-    price: 59.99,
-  },
+  { name: "Fastest", description: "2~3 days", price: "+ $100" },
 ];
 
 function OptionCard({
   selected,
   onSelect,
-  src,
-  name,
-  description,
-}: {
+  children,
+  className,
+}: React.PropsWithChildren<{
   selected?: boolean;
   onSelect?: () => void;
-  src: string;
-  name: string;
-  description: string;
-}) {
+  className?: string;
+}>) {
   return (
     <Card
-      className={`cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`}
+      className={cn(
+        `relative cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`,
+        className
+      )}
       onClick={onSelect}
     >
-      <CardContent className="p-0 pb-2">
-        <div className="relative aspect-square">
-          <Image
-            src={src || "/placeholder.svg"}
-            alt={name}
-            fill
-            className="object-cover rounded-t-xl"
-          />
-          {selected && (
-            <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-              <Check className="w-4 h-4" />
-            </div>
-          )}
+      {selected && (
+        <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 z-10">
+          <Check className="w-4 h-4" />
         </div>
-        <div className="px-2">
-          <span className="font-semibold mt-2">{name}</span>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-      </CardContent>
+      )}
+      {children}
     </Card>
   );
 }
 
 export default function OrderPage() {
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
-    null
-  );
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<wwwprint.Template | null>(null);
   const [orderDetails, setOrderDetails] = useState({
     name: "",
     email: "",
@@ -149,82 +94,115 @@ export default function OrderPage() {
         <aside className="flex-[4] max-w-4xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/*  */}
-            <section className="mb-8">
+            <section className="my-8">
               <h2 className="text-xl font-semibold mb-4">Product</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                {["01", "02", "03"].map((id) => (
-                  <OptionCard
-                    key={id}
-                    src={`/www/.print/categories/${id}.png`}
-                    name={id}
-                    description={id}
-                  />
-                ))}
-              </div>
-            </section>
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Design</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                {templates.map((template) => (
-                  <OptionCard
-                    onSelect={() => setSelectedTemplate(template)}
-                    key={template.id}
-                    selected={selectedTemplate?.id === template.id}
-                    src={template.image}
-                    name={template.name}
-                    description={"$" + template.price}
-                  />
-                ))}
-              </div>
-              <hr className="my-4" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                {options.map((option) => (
-                  <OptionCard
-                    // selected={selectedTemplate?.id === option.id}
-                    // onSelect={() => setSelectedTemplate(option)}
-                    key={option.id}
-                    src={option.image}
-                    name={option.name}
-                    description={"$" + option.price}
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                {["22", "01", "02"].map((id) => (
+                  <OptionCard key={id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="relative aspect-video">
+                        <Image
+                          src={`/www/.print/categories/${id}.png`}
+                          alt={id}
+                          fill
+                          className="object-cover rounded-t-xl"
+                        />
+                      </div>
+                    </CardContent>
+                  </OptionCard>
                 ))}
               </div>
             </section>
             {/*  */}
-
-            <section>
+            <section className="my-16 space-y-8">
+              <header className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold mb-4">Design</h2>
+                <Link href={sitemap.print.links.templates}>
+                  <Button variant="link">
+                    Browse all templates
+                    <ArrowRightIcon className="inline ms-2" />
+                  </Button>
+                </Link>
+              </header>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+                {wwwprint.templates.map((template) => (
+                  <OptionCard
+                    onSelect={() => setSelectedTemplate(template)}
+                    key={template.id}
+                    selected={selectedTemplate?.id === template.id}
+                  >
+                    <CardContent className="p-0 pb-2">
+                      <div className="relative aspect-square">
+                        <Image
+                          src={template.image}
+                          alt={template.name}
+                          fill
+                          className="object-cover rounded-t-xl"
+                        />
+                      </div>
+                      <div className="px-2">
+                        <span className="font-semibold mt-2">
+                          {template.name}
+                        </span>
+                        <p className="text-sm text-muted-foreground">
+                          ${template.price} / {template.step} units
+                        </p>
+                      </div>
+                    </CardContent>
+                  </OptionCard>
+                ))}
+              </div>
+              <hr className="my-4" />
+              <h2 className="font-semibold mb-4">Properties</h2>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase">Material</label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                  {wwwprint.materials.map((mat) => (
+                    <OptionCard
+                      selected={
+                        selectedTemplate?.properties.material === mat.id
+                      }
+                      // onSelect={() => setSelectedTemplate(option)}
+                      key={mat.id}
+                      className="overflow-hidden"
+                    >
+                      <CardContent className="p-0">
+                        <div className="relative aspect-square">
+                          <Image
+                            src={mat.image}
+                            alt={mat.name}
+                            fill
+                            className="object-cover rounded-t-xl"
+                          />
+                        </div>
+                      </CardContent>
+                    </OptionCard>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase">Size</label>
+                <Input
+                  readOnly
+                  value={`${selectedTemplate?.properties.size.width}x${selectedTemplate?.properties.size.height}mm`}
+                />
+              </div>
+            </section>
+            {/*  */}
+            <section className="my-16">
               <h2 className="text-xl font-semibold mb-4">
                 Enter Order Details
               </h2>
               <div className="grid gap-4">
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={orderDetails.name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={orderDetails.email}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
                 <div>
                   <Label htmlFor="quantity">Quantity</Label>
                   <Input
                     id="quantity"
                     name="quantity"
                     type="number"
-                    min="100"
+                    autoComplete="off"
+                    min={selectedTemplate?.step}
+                    step={selectedTemplate?.step}
                     value={orderDetails.quantity}
                     onChange={handleInputChange}
                     required
@@ -243,16 +221,26 @@ export default function OrderPage() {
               </div>
             </section>
 
-            <section>
+            <section className="my-16">
               <h2 className="text-xl font-semibold mb-4">Shipping</h2>
               <div className="grid gap-4">
-                Accurate
-                <br />
-                Fast
-                <br />
-                Faster
-                <br />
-                Fastest
+                <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                  {shipping_options.map((op) => (
+                    <OptionCard key={op.name}>
+                      <CardContent className="p-0 pb-2">
+                        <div className="px-2 grid gap-1">
+                          <span className="font-semibold mt-2">{op.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {op.description}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {op.price}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </OptionCard>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -284,9 +272,7 @@ export default function OrderPage() {
                 </div>
               )}
               <CardHeader>
-                <CardTitle>
-                  <h3 className="font-semibold mb-2">Order Summary</h3>
-                </CardTitle>
+                <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="text-sm">
                 <p>
@@ -304,7 +290,8 @@ export default function OrderPage() {
                   <strong>Total:</strong> $
                   {selectedTemplate && orderDetails.quantity
                     ? (
-                        selectedTemplate.price * Number(orderDetails.quantity)
+                        (selectedTemplate.price / selectedTemplate.step) *
+                        Number(orderDetails.quantity)
                       ).toFixed(2)
                     : "0.00"}
                 </p>

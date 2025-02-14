@@ -28,43 +28,7 @@ import {
 } from "@/components/ui/accordion";
 import Image from "next/image";
 import Footer from "@/www/footer";
-import * as k from "./data";
-
-const marqueeitems = [
-  {
-    name: "01",
-    img: "/www/.print/categories/01.png",
-  },
-  {
-    name: "02",
-    img: "/www/.print/categories/02.png",
-  },
-  {
-    name: "03",
-    img: "/www/.print/categories/03.png",
-  },
-  {
-    name: "04",
-    img: "/www/.print/categories/04.png",
-  },
-  {
-    name: "05",
-    img: "/www/.print/categories/05.png",
-  },
-  {
-    name: "06",
-    img: "/www/.print/categories/06.png",
-  },
-];
-
-const categories = [
-  { name: "Print", image: "/www/.print/categories/print.png" },
-  { name: "Stationery", image: "/www/.print/categories/stationery.png" },
-  { name: "Packaging", image: "/www/.print/categories/packaging.png" },
-  { name: "Banner", image: "/www/.print/categories/banner.png" },
-  { name: "Photo", image: "/www/.print/categories/photo.png" },
-  { name: "Fashion & Apparel", image: "/www/.print/categories/fashion.png" },
-];
+import { wwwprint } from "./data";
 
 const features = [
   {
@@ -268,7 +232,7 @@ function Globe({
   );
 }
 
-const MarqueeCard = ({ img, name }: { img: string; name: string }) => {
+const MarqueeCard = ({ image, name }: { image: string; name: string }) => {
   return (
     <figure
       className={cn(
@@ -281,7 +245,7 @@ const MarqueeCard = ({ img, name }: { img: string; name: string }) => {
     >
       <Image
         className="object-cover"
-        src={img}
+        src={image}
         width={400}
         height={300}
         alt={name}
@@ -290,8 +254,8 @@ const MarqueeCard = ({ img, name }: { img: string; name: string }) => {
   );
 };
 
-const row1 = marqueeitems.slice(0, marqueeitems.length / 2);
-const row2 = marqueeitems.slice(marqueeitems.length / 2);
+const row1 = wwwprint.categories.slice(0, wwwprint.categories.length / 2);
+const row2 = wwwprint.categories.slice(wwwprint.categories.length / 2);
 
 function MarqueeDemo() {
   return (
@@ -352,10 +316,18 @@ function SectionExplore() {
         oriantation="start"
         badge={<Badge>Explore</Badge>}
         title={<>Explore Materials & Templates</>}
-        excerpt={<>Explore all features & products.</>}
+        excerpt={
+          <>
+            <Link href={sitemap.print.links.templates}>
+              <Button variant="link">
+                Go to Templates <ArrowRightIcon className="ms-2" />
+              </Button>
+            </Link>
+          </>
+        }
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 my-16">
-        {categories.map((category, index) => (
+        {wwwprint.categories.map((category, index) => (
           <div key={index} className="flex flex-col items-center text-left">
             <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden">
               <Image
@@ -388,7 +360,7 @@ function SectionFAQ() {
         collapsible
         className="w-full max-w-3xl mx-auto my-16"
       >
-        {k.faqs.map((faq, index) => (
+        {wwwprint.faqs.map((faq, index) => (
           <AccordionItem key={index} value={`item-${index}`}>
             <AccordionTrigger className="text-left">
               {faq.question}
@@ -398,24 +370,6 @@ function SectionFAQ() {
         ))}
       </Accordion>
     </section>
-  );
-}
-
-function CategoryCard({ name, image }: { name: string; image: string }) {
-  return (
-    <div className="flex flex-col">
-      <div className="relative h-20 aspect-video rounded-lg overflow-hidden">
-        <Image
-          src={image || "/placeholder.svg"}
-          alt={name}
-          layout="fill"
-          objectFit="cover"
-        />
-      </div>
-      <div className="w-full text-ellipsis">
-        <p className="mt-2 w-full text-xs font-medium">{name}</p>
-      </div>
-    </div>
   );
 }
 
@@ -469,7 +423,7 @@ const tabs: { name: string; images: string[] }[] = [
     ],
   },
   {
-    name: "Cigar Tube",
+    name: "Flyer",
     images: [
       "/www/.print/cigar-band-1.png",
       "/www/.print/cigar-band-2.png",
@@ -478,7 +432,7 @@ const tabs: { name: string; images: string[] }[] = [
     ],
   },
   {
-    name: "Cigar Box",
+    name: "Packages",
     images: [
       "/www/.print/cigar-band-1.png",
       "/www/.print/cigar-band-2.png",
@@ -487,7 +441,7 @@ const tabs: { name: string; images: string[] }[] = [
     ],
   },
   {
-    name: "Cigar Sleeve",
+    name: "Poster",
     images: [
       "/www/.print/cigar-band-1.png",
       "/www/.print/cigar-band-2.png",
@@ -505,7 +459,7 @@ function SectionMainDemo() {
     <div>
       <SectionHeader
         oriantation="start"
-        badge={<Badge>Start</Badge>}
+        badge={<Badge>Templates</Badge>}
         title={<>Start from here</>}
         excerpt={
           <>

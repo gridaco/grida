@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import * as k from "../../data";
+import { wwwprint } from "../../data";
 
 export default function TemplatesPage() {
   return (
@@ -20,7 +20,7 @@ export default function TemplatesPage() {
           <span className="text-sm font-medium">Categories</span>
         </label>
         <div className="flex items-center gap-4 overflow-x-scroll">
-          {k.categories.map((category) => (
+          {wwwprint.categories.map((category) => (
             <CategoryCard key={category.id} {...category} />
           ))}
         </div>
@@ -33,7 +33,7 @@ export default function TemplatesPage() {
           <span className="text-sm font-medium">Popular</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {k.templates.map((template) => (
+          {wwwprint.templates.map((template) => (
             <TemplateCard key={template.id} template={template} />
           ))}
         </div>
@@ -60,7 +60,7 @@ function CategoryCard({ name, image }: { name: string; image: string }) {
   );
 }
 
-function TemplateCard({ template }: { template: k.Template }) {
+function TemplateCard({ template }: { template: wwwprint.Template }) {
   return (
     <div className="flex flex-col">
       <div className="bg-background rounded-lg shadow-md overflow-hidden">
