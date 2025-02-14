@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FooterWithCTA from "@/www/footer-with-cta";
 
 export default function A() {
   return (
@@ -24,9 +25,8 @@ export default function A() {
       <Section container className="-mt-28 md:-mt-48 relative z-10">
         <SectionMainDemo />
       </Section>
-      <Section container>
-        <SectionHeader badge={<GridaLogo />} title={"A"} excerpt={"aa"} />
-      </Section>
+      <div className="h-96" />
+      <FooterWithCTA />
     </main>
   );
 }
@@ -41,10 +41,10 @@ function Hero() {
         transition={{ duration: 1.0, ease: "easeOut" }}
       >
         <div className="flex flex-col items-start text-left">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8 text-center">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold pb-8">
             Your visual Data backend
           </h1>
-          <p className="max-w-md text-sm md:text-base text-muted-foreground text-left">
+          <p className="max-w-md text-sm md:text-base text-muted-foreground">
             Grida empowers you to build no-code databases as easily as editing a
             spreadsheet. Plug in your own database, choose ours, or integrate
             with Supabase—millions of rows, no problem. Your data. Your rules.
@@ -85,23 +85,23 @@ function Hero() {
 
 const tabs: { name: string; src: string }[] = [
   {
-    name: "Page 1",
+    name: "Analyze",
     src: "/www/.database/1.png",
   },
   {
-    name: "Page 2",
+    name: "CMS",
     src: "/www/.database/2.png",
   },
   {
-    name: "Page 3",
+    name: "Build",
     src: "/www/.database/3.png",
   },
   {
-    name: "Page 4",
+    name: "Report",
     src: "/www/.database/4.png",
   },
   {
-    name: "Page 5",
+    name: "Filter",
     src: "/www/.database/5.png",
   },
 ];
@@ -114,7 +114,13 @@ function SectionMainDemo() {
   return (
     <div>
       <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
-        <Image src={data.src} alt={data.name} width={1320} height={792} />
+        <Image
+          src={data.src}
+          alt={data.name}
+          width={1320}
+          height={792}
+          className="w-full h-full object-cover object-left-top md:object-top"
+        />
       </Card>
       <Tabs
         value={index + ""}
