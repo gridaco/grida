@@ -139,28 +139,106 @@ export namespace wwwprint {
   export const materials = [
     {
       id: 1,
-      name: "A",
+      name: "Premium Matte Paper",
+      description:
+        "Smooth, non-glossy finish ideal for vibrant colors and sharp text.",
       image: "/www/.print/materials/01.png",
+      properties: ["220 gsm", "Acid-free", "Archival quality"],
     },
     {
       id: 2,
-      name: "B",
+      name: "Glossy Photo Paper",
+      description:
+        "High-shine finish for vivid photo reproductions and posters.",
       image: "/www/.print/materials/02.png",
+      properties: ["260 gsm", "Water-resistant", "Instant dry"],
     },
     {
       id: 3,
-      name: "C",
+      name: "Textured Canvas",
+      description:
+        "Artist-grade canvas for fine art reproductions and photo prints.",
       image: "/www/.print/materials/03.png",
+      properties: ["400 gsm", "Acid-free", "Stretchable"],
     },
     {
       id: 4,
-      name: "D",
+      name: "Recycled Kraft Paper",
+      description: "Eco-friendly option with a unique, natural texture.",
       image: "/www/.print/materials/04.png",
+      properties: ["300 gsm", "100% recycled", "Biodegradable"],
     },
     {
       id: 5,
-      name: "D",
+      name: "Translucent Vellum",
+      description:
+        "Semi-transparent paper for layering and creative print projects.",
       image: "/www/.print/materials/05.png",
+      properties: ["80 gsm", "Acid-free", "Smooth finish"],
+    },
+    {
+      id: 6,
+      name: "Metallic Foil Paper",
+      description:
+        "Shimmering metallic finish for luxury invitations and cards.",
+      image: "/www/.print/materials/06.png",
+      properties: ["120 gsm", "Acid-free", "Metallic finish"],
+    },
+    {
+      id: 7,
+      name: "Adhesive Vinyl",
+      description:
+        "Durable, weatherproof vinyl for stickers, decals, and labels.",
+      image: "/www/.print/materials/07.png",
+      properties: ["100 micron", "Waterproof", "UV-resistant"],
+    },
+    {
+      id: 8,
+      name: "Magnetic Sheet",
+      description:
+        "Flexible magnetic sheet for fridge magnets and promotional items.",
+      image: "/www/.print/materials/08.png",
+      properties: ["0.5 mm", "Magnetic", "Printable"],
+    },
+    {
+      id: 9,
+      name: "Acrylic Plexiglass",
+      description:
+        "Clear, durable plexiglass for signs, displays, and photo mounting.",
+      image: "/www/.print/materials/09.png",
+      properties: ["3 mm", "Lightweight", "Impact-resistant"],
+    },
+    {
+      id: 10,
+      name: "Corrugated Cardboard",
+      description:
+        "Sturdy, lightweight cardboard for packaging and shipping boxes.",
+      image: "/www/.print/materials/10.png",
+      properties: ["3 mm", "Recyclable", "Shock-absorbent"],
+    },
+    {
+      id: 11,
+      name: "Fabric Canvas",
+      description:
+        "Polyester canvas with a fabric texture for banners and displays.",
+      image: "/www/.print/materials/11.png",
+      properties: ["220 gsm", "Waterproof", "Tear-resistant"],
+    },
+    {
+      id: 12,
+      name: "Wooden Board",
+      description:
+        "Natural wood board for rustic signs, decorations, and wall art.",
+      image: "/www/.print/materials/12.png",
+      properties: ["5 mm", "Sustainable", "Eco-friendly"],
+    },
+    {
+      id: 13,
+      name: "Metal Aluminum",
+      description:
+        "Brushed aluminum sheet for industrial signs and outdoor displays.",
+      image: "/www/.print/materials/13.png",
+      properties: ["1 mm", "Weatherproof", "Rust-resistant"],
     },
   ];
 

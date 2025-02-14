@@ -69,7 +69,7 @@ const features = [
   {
     name: "Instant Sample Orders",
     description:
-      "Order samples instantly with our high-performance system powered by Rust and WebGPU, ensuring quick turnaround and exceptional quality.",
+      "Get a real preview of your design instantly! We print samples on the spot with the exact materials and finishes, ensuring quick approvals and confident decisions. 🚀",
     className: "col-span-full md:col-span-2",
     background: (
       <div className="absolute inset-0">
@@ -135,7 +135,7 @@ export default function WWWPrintingHome() {
           transition={{ delay: 0.5, duration: 1.0, ease: "easeOut" }}
           className="absolute left-0 right-0 bottom-10 w-full overflow-hidden"
         >
-          <MarqueeDemo />
+          <MarqueeHero />
         </motion.div>
         {/* <div className="absolute right-0 top-0 w-1/2 h-full -z-10">
             <Globe />
@@ -148,9 +148,18 @@ export default function WWWPrintingHome() {
         <SectionFeatures />
       </Section>
       <Section container className="mt-80">
-        <SectionExplore />
+        <SectionExploreTemplates />
       </Section>
-      <Section container className="mt-80">
+      <div>
+        <Section container className="mt-80 overflow-visible">
+          <SectionExploreMaterials />
+        </Section>
+        <div className="my-16">
+          <MarqueeMaterials />
+        </div>
+      </div>
+      <hr className="my-40" />
+      <Section container>
         <SectionCustomOrder />
       </Section>
       <hr className="my-40" />
@@ -257,19 +266,19 @@ const MarqueeCard = ({ image, name }: { image: string; name: string }) => {
 const row1 = wwwprint.categories.slice(0, wwwprint.categories.length / 2);
 const row2 = wwwprint.categories.slice(wwwprint.categories.length / 2);
 
-function MarqueeDemo() {
+function MarqueeHero() {
   return (
     <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
       <Marquee pauseOnHover className="[--duration:20s]">
         {row1.map((item) => (
-          <Link key={item.name} href="/print/~/templates">
+          <Link key={item.name} href={sitemap.print.links.templates}>
             <MarqueeCard {...item} />
           </Link>
         ))}
       </Marquee>
       <Marquee pauseOnHover reverse className="[--duration:20s]">
         {row2.map((item) => (
-          <Link key={item.name} href="/print/~/templates">
+          <Link key={item.name} href={sitemap.print.links.templates}>
             <MarqueeCard {...item} />
           </Link>
         ))}
@@ -309,41 +318,78 @@ function SectionFeatures() {
   );
 }
 
-function SectionExplore() {
+function SectionExploreTemplates() {
   return (
     <div>
       <SectionHeader
         oriantation="start"
-        badge={<Badge>Explore</Badge>}
         title={<>Explore Materials & Templates</>}
         excerpt={
           <>
             <Link href={sitemap.print.links.templates}>
-              <Button variant="link">
-                Go to Templates <ArrowRightIcon className="ms-2" />
+              <Button className="rounded-full">
+                Explore all Templates <ArrowRightIcon className="ms-2" />
               </Button>
             </Link>
           </>
         }
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 my-16">
-        {wwwprint.categories.map((category, index) => (
-          <div key={index} className="flex flex-col items-center text-left">
-            <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden">
-              <Image
-                src={category.image}
-                alt={category.name}
-                width={400}
-                height={300}
-                className="w-full h-full object-cover"
-              />
+        {wwwprint.categories.slice(0, 6).map((category, index) => (
+          <Link href={sitemap.print.links.templates} key={index}>
+            <div className="flex flex-col items-center text-left">
+              <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden">
+                <Image
+                  src={category.image}
+                  alt={category.name}
+                  width={400}
+                  height={300}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="mt-2 text-lg font-medium text-left">
+                {category.name}
+              </p>
             </div>
-            <p className="mt-2 text-lg font-medium text-left">
-              {category.name}
-            </p>
-          </div>
+          </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SectionExploreMaterials() {
+  return (
+    <div>
+      <SectionHeader
+        oriantation="start"
+        title={<>The Right Paper for Every Design</>}
+        excerpt={
+          <>
+            <Link href={sitemap.print.links.materials}>
+              <Button className="rounded-full">
+                Explore all Materials <ArrowRightIcon className="ms-2" />
+              </Button>
+            </Link>
+          </>
+        }
+      />
+    </div>
+  );
+}
+
+function MarqueeMaterials() {
+  return (
+    <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
+      <Marquee pauseOnHover className="[--duration:20s]">
+        {wwwprint.materials.map((item) => (
+          <Link key={item.name} href={sitemap.print.links.materials}>
+            <MarqueeCard {...item} />
+          </Link>
+        ))}
+      </Marquee>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-background"></div>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-background"></div>
     </div>
   );
 }
@@ -375,108 +421,172 @@ function SectionFAQ() {
 
 function SectionCustomOrder() {
   return (
-    <div
-      className={cn(
-        "group relative flex flex-col justify-between overflow-hidden rounded-xl w-4/5 mx-auto h-80 p-8"
-      )}
-    >
-      <div className="z-10">
-        <h6 className="text-4xl font-bold text-black">Request a Design</h6>
-        <p className="text-sm opacity-50 text-black max-w-xl mt-4">
-          From concept to final print, we bring your ideas to life. Whether you
-          need a custom design or high-quality printing, we handle it all.
-        </p>
-      </div>
-      <div>
-        <div className="absolute inset-0 bg-background">
-          <Image
-            src="/www/common/custom-card-bg-01.png"
-            alt=""
-            width={1200}
-            height={520}
-            className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
-          />
+    <Link href={sitemap.print.links.ordercustom}>
+      <div
+        className={cn(
+          "group relative flex flex-col justify-between overflow-hidden rounded-xl w-4/5 mx-auto h-80 p-8"
+        )}
+      >
+        <div className="z-10">
+          <h6 className="text-4xl font-bold text-black">Request a Design</h6>
+          <p className="text-sm opacity-50 text-black max-w-xl mt-4">
+            From concept to final print, we bring your ideas to life. Whether
+            you need a custom design or high-quality printing, we handle it all.
+          </p>
         </div>
-      </div>
-      <Link href={sitemap.print.links.ordercustom} className="z-10">
+        <div>
+          <div className="absolute inset-0 bg-background">
+            <Image
+              src="/www/common/custom-card-bg-01.png"
+              alt=""
+              width={1200}
+              height={520}
+              className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"
+            />
+          </div>
+        </div>
         <Button
           variant="outline"
-          className="border border-black bg-transparent rounded-full"
+          className="w-min border border-black bg-transparent rounded-full z-10"
         >
           Contact us for more
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
-      </Link>
-      <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
-    </div>
+        <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
+      </div>
+    </Link>
   );
 }
 
-const tabs: { name: string; items: { image: string }[] }[] = [
+const tabs: {
+  name: string;
+  description: string;
+  items: {
+    name: string;
+    description: string;
+    image: string;
+  }[];
+}[] = [
   {
     name: "Flyer",
+    description:
+      "Promote your business with these sleek and professional flyers.",
     items: [
       {
+        name: "Business Promo Flyer",
+        description:
+          "A sleek and professional flyer perfect for promoting your business, services, or special offers.",
         image: "/www/.print/categories/01.png",
       },
       {
+        name: "Event Invitation Flyer",
+        description:
+          "Ideal for parties, concerts, and corporate events, this flyer design grabs attention with bold visuals.",
         image: "/www/.print/categories/02.png",
       },
       {
+        name: "Restaurant Menu Flyer",
+        description:
+          "A stylish, easy-to-read menu flyer for restaurants, cafés, and food trucks to showcase their best dishes.",
         image: "/www/.print/categories/03.png",
       },
       {
+        name: "Real Estate Listing Flyer",
+        description:
+          "Designed for realtors to highlight property listings with stunning images and key details.",
         image: "/www/.print/categories/04.png",
       },
     ],
   },
   {
-    name: "Cigar Band",
+    name: "Cigar Bands",
+    description:
+      "Premium cigar bands designed to elevate your brand with custom logos, foil stamping, and intricate details.",
     items: [
       {
+        name: "Classic Gold Foil Band",
+        description:
+          "A timeless cigar band with elegant gold foil accents for a luxurious touch.",
         image: "/www/.print/demo/cigar-band-1.png",
       },
       {
+        name: "Vintage Style Band",
+        description:
+          "A retro-inspired design with intricate patterns, perfect for traditional cigar brands.",
         image: "/www/.print/demo/cigar-band-2.png",
       },
       {
+        name: "Minimalist Modern Band",
+        description:
+          "A sleek, contemporary band with clean lines and subtle branding.",
         image: "/www/.print/demo/cigar-band-3.png",
       },
       {
+        name: "Custom Embossed Band",
+        description:
+          "A high-end option featuring embossed textures and detailed custom artwork.",
         image: "/www/.print/demo/cigar-band-4.png",
       },
     ],
   },
   {
-    name: "Packages",
+    name: "Packaging",
+    description:
+      "High-quality, custom packaging solutions designed to enhance product presentation and branding.",
     items: [
       {
+        name: "Luxury Gift Box",
+        description:
+          "Premium rigid box with custom printing and high-end finishes.",
         image: "/www/.print/categories/02.png",
       },
       {
+        name: "Branded Shipping Box",
+        description:
+          "Durable, eco-friendly corrugated boxes customized with your logo.",
         image: "/www/.print/categories/09.png",
       },
       {
+        name: "Custom Paper Bag",
+        description:
+          "Elegant paper bags with handles, ideal for retail and boutiques.",
         image: "/www/.print/categories/12.png",
       },
       {
+        name: "Stand-up Pouch",
+        description:
+          "Versatile and resealable pouch packaging for food, coffee, and more.",
         image: "/www/.print/categories/20.png",
       },
     ],
   },
   {
-    name: "Poster",
+    name: "Posters",
+    description:
+      "Vibrant, high-quality posters perfect for advertising, décor, and events.",
     items: [
       {
+        name: "Event Promotion Poster",
+        description:
+          "Eye-catching poster for concerts, festivals, and special events.",
         image: "/www/.print/categories/03.png",
       },
       {
+        name: "Retail Advertising Poster",
+        description:
+          "Bold and engaging poster design for in-store promotions and sales.",
         image: "/www/.print/categories/07.png",
       },
       {
+        name: "Movie & Entertainment Poster",
+        description:
+          "High-resolution posters featuring cinematic or artistic visuals.",
         image: "/www/.print/categories/18.png",
       },
       {
+        name: "Office & Wall Art Poster",
+        description:
+          "Premium-quality posters designed for home and office décor.",
         image: "/www/.print/categories/16.png",
       },
     ],
@@ -518,34 +628,77 @@ function SectionMainDemo() {
         </Tabs>
 
         <div className="grid grid-cols-3 gap-4 w-full">
-          <Card className="relative col-span-2 w-full h-[300px] md:h-[450px] lg:h-[650px] overflow-hidden rounded md:rounded-lg">
-            <Image
-              src={data.items[0].image}
-              alt={`${data.name} Main`}
-              width={1320}
-              height={792}
-              className="w-full h-full object-cover"
-            />
-          </Card>
+          <div className="col-span-2 w-full h-[300px] md:h-[450px] lg:h-[650px]">
+            <Link href={sitemap.print.links.templates}>
+              <PromotedTemplateCard
+                name={data.items[0].name}
+                description={data.items[0].description}
+                image={data.items[0].image}
+                width={1320}
+                height={792}
+              />
+            </Link>
+          </div>
 
           <div className="grid grid-rows-3 gap-3 w-full h-[300px] md:h-[450px] lg:h-[650px]">
-            {data.items.slice(1).map(({ image }, i) => (
-              <Card
-                key={i}
-                className="relative w-full h-full overflow-hidden rounded md:rounded-lg"
-              >
-                <Image
-                  src={image}
-                  alt={`${data.name} ${i + 1}`}
+            {data.items.slice(1).map(({ name, description, image }, i) => (
+              <Link href={sitemap.print.links.templates} key={i}>
+                <PromotedTemplateCard
+                  name={name}
+                  description={description}
+                  image={image}
                   width={400}
                   height={300}
-                  className="w-full h-full object-cover"
                 />
-              </Card>
+              </Link>
             ))}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function PromotedTemplateCard({
+  name,
+  image,
+  description,
+  width,
+  height,
+  className,
+}: {
+  name: string;
+  description: string;
+  image: string;
+  width: number;
+  height: number;
+  className?: string;
+}) {
+  return (
+    <Card
+      className={cn(
+        "group relative w-full h-full overflow-hidden rounded md:rounded-lg",
+        className
+      )}
+    >
+      <div className="absolute inset-0 pointer-events-none">
+        <Image
+          src={image}
+          alt={name}
+          width={width}
+          height={height}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-in-out"
+        />
+      </div>
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute bottom-0 left-0 z-10 grid gap-2 p-4 ">
+          <h2 className="text-lg font-bold">{name}</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            {description}
+          </p>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 h-full bottom-0 w-full bg-gradient-to-t from-background" />
+      </div>
+    </Card>
   );
 }

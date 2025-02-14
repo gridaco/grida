@@ -259,7 +259,7 @@ export default function OrderPage() {
           </form>
         </aside>
         <aside className="flex-[2] max-w-sm">
-          <div>
+          <div className="sticky top-20">
             <Card className="overflow-hidden">
               {selectedTemplate && (
                 <div>
