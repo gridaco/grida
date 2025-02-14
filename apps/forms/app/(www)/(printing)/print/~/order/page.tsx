@@ -126,7 +126,7 @@ export default function OrderPage() {
           <form onSubmit={handleSubmit} className="space-y-40">
             {/*  */}
             <section>
-              <h2 className="text-xl font-semibold mb-4">Product</h2>
+              <h2 className="text-xl font-semibold mb-4">Choose Type</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
                 {["22", "01", "02"].map((id) => (
                   <OptionCard key={id} className="overflow-hidden">
@@ -147,7 +147,7 @@ export default function OrderPage() {
             {/*  */}
             <section className="space-y-8">
               <header className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold mb-4">Design</h2>
+                <h2 className="text-xl font-semibold mb-4">Select Design</h2>
                 <Link href={sitemap.print.links.templates}>
                   <Button variant="link">
                     Browse all templates
@@ -273,7 +273,7 @@ export default function OrderPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-4">Shipping</h2>
+              <h2 className="text-xl font-semibold mb-4">Shipping Options</h2>
               <div className="grid gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-8 gap-2">
                   {shipping_options.map((op) => (
