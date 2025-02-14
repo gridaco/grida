@@ -30,6 +30,37 @@ const shipping_options = [
   { name: "Fastest", description: "2~3 days", price: "+ $100" },
 ];
 
+const pp = [
+  {
+    name: "Coating Glossy",
+    image: "/www/.print/pp/pp-coating-glossy-icon.png",
+  },
+  {
+    name: "Coating Matte",
+    image: "/www/.print/pp/pp-coating-matte-icon.png",
+  },
+  {
+    name: "Foil Stamping",
+    image: "/www/.print/pp/pp-foil-stamping-icon.png",
+  },
+  {
+    name: "Hole Punching",
+    image: "/www/.print/pp/pp-hole-punching-icon.png",
+  },
+  {
+    name: "Shape Cutting",
+    image: "/www/.print/pp/pp-shape-cutting-icon.png",
+  },
+  {
+    name: "Trimming",
+    image: "/www/.print/pp/pp-trimming-icon.png",
+  },
+  {
+    name: "UV Scodix",
+    image: "/www/.print/pp/pp-uv-scodix-icon.png",
+  },
+];
+
 function OptionCard({
   selected,
   onSelect,
@@ -92,9 +123,9 @@ export default function OrderPage() {
       </header>
       <div className="flex justify-between gap-20 mt-20">
         <aside className="flex-[4] max-w-4xl">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-40">
             {/*  */}
-            <section className="my-8">
+            <section>
               <h2 className="text-xl font-semibold mb-4">Product</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
                 {["22", "01", "02"].map((id) => (
@@ -114,7 +145,7 @@ export default function OrderPage() {
               </div>
             </section>
             {/*  */}
-            <section className="my-16 space-y-8">
+            <section className="space-y-8">
               <header className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold mb-4">Design</h2>
                 <Link href={sitemap.print.links.templates}>
@@ -187,9 +218,29 @@ export default function OrderPage() {
                   value={`${selectedTemplate?.properties.size.width}x${selectedTemplate?.properties.size.height}mm`}
                 />
               </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-bold uppercase">
+                  Post Press
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {pp.map((prop) => (
+                    <OptionCard
+                      key={prop.name}
+                      className="w-14 h-14 overflow-hidden rounded"
+                    >
+                      <Image
+                        src={prop.image}
+                        alt={prop.name}
+                        fill
+                        className="object-cover dark:invert"
+                      />
+                    </OptionCard>
+                  ))}
+                </div>
+              </div>
             </section>
             {/*  */}
-            <section className="my-16">
+            <section>
               <h2 className="text-xl font-semibold mb-4">
                 Enter Order Details
               </h2>
@@ -221,7 +272,7 @@ export default function OrderPage() {
               </div>
             </section>
 
-            <section className="my-16">
+            <section>
               <h2 className="text-xl font-semibold mb-4">Shipping</h2>
               <div className="grid gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-8 gap-2">
