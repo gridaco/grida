@@ -349,7 +349,7 @@ export namespace wwwprint {
     // cigars
     {
       id: 9,
-      name: "Cigar Badn 01",
+      name: "Cigar Band 01",
       category: "Cigar Band",
       image: "/www/.print/demo/cigar-band-1.png",
       price: 25,
@@ -361,7 +361,7 @@ export namespace wwwprint {
     },
     {
       id: 10,
-      name: "Cigar Badn 02",
+      name: "Cigar Band 02",
       category: "Cigar Band",
       image: "/www/.print/demo/cigar-band-2.png",
       price: 25,
@@ -373,7 +373,7 @@ export namespace wwwprint {
     },
     {
       id: 11,
-      name: "Cigar Badn 03",
+      name: "Cigar Band 03",
       category: "Cigar Band",
       image: "/www/.print/demo/cigar-band-3.png",
       price: 25,
@@ -385,7 +385,7 @@ export namespace wwwprint {
     },
     {
       id: 12,
-      name: "Cigar Badn 04",
+      name: "Cigar Band 04",
       category: "Cigar Band",
       image: "/www/.print/demo/cigar-band-4.png",
       price: 25,
