@@ -9,6 +9,7 @@ packages:
   - "apps/forms"
   # - "apps/posts"
   - "apps/site"
+  - "apps/blog"
   - "packages/*"
   # - "packages/.legacy/*"
   - "packages/lib/*"

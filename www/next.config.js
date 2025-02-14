@@ -1,6 +1,7 @@
 const { i18n } = require("./next-i18next.config");
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
+const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 
 /**
  * @type {import('next').NextConfig}
@@ -20,6 +21,10 @@ const nextconfig = {
       {
         source: "/docs/:path*",
         destination: `${DOCS_URL}/:path*`,
+      },
+      {
+        source: "/blog/:path*",
+        destination: `${BLOG_URL}/blog/:path*`,
       },
       {
         source: "/lsd",
