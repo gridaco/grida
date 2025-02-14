@@ -60,4 +60,15 @@ export namespace sitemap {
       description: "CORS Proxy",
     } satisfies Item,
   };
+
+  export namespace print {
+    export const links = {
+      contact: "/print/~/contact",
+      order: "/print/~/order",
+      templates: "/print/~/templates",
+      materials: "/print/~/materials",
+      design: "/print/~/design",
+      ordercustom: "/print/~/order/custom",
+    };
+  }
 }

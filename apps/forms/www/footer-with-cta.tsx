@@ -50,7 +50,7 @@ function SectionCTA() {
   return (
     <div className="container py-40 z-10">
       <div className="flex flex-col">
-        <h2 className="text-left text-5xl lg:text-6xl font-semibold">
+        <h2 className="text-left text-4xl md:text-5xl lg:text-6xl font-semibold">
           The Free & Open Canvas
         </h2>
         <div className="flex gap-4 mt-20">

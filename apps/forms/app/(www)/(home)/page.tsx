@@ -15,7 +15,7 @@ import { Pixelify_Sans } from "next/font/google";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 import FooterWithCTA from "@/www/footer-with-cta";
-import { Section } from "@/www/ui/section";
+import { Section, SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
 
 const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
@@ -37,7 +37,7 @@ export default function WWW() {
           <Hero />
         </Section>
       </div>
-      <Section container className="-mt-48">
+      <Section container className="-mt-28 md:-mt-48">
         <SectionMainDemo />
       </Section>
       {/* <Section container className="mt-40">
@@ -101,35 +101,6 @@ function SectionMainDemo() {
   );
 }
 
-function SectionHeader({
-  badge,
-  title,
-  excerpt,
-  button,
-}: {
-  badge: React.ReactNode;
-  title: React.ReactNode;
-  excerpt: React.ReactNode;
-  button?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
-      <Badge variant="secondary" className="text-lg font-medium rounded-full">
-        {badge}
-      </Badge>
-      <div className="flex flex-col">
-        <span className="text-5xl lg:text-6xl font-bold py-10 text-center max-w-3xl">
-          {title}
-        </span>
-        <p className="max-w-xl mx-auto text-muted-foreground text-center">
-          {excerpt}
-        </p>
-      </div>
-      {button}
-    </div>
-  );
-}
-
 function SquareCard({
   title,
   background,
@@ -150,8 +121,8 @@ function SquareCard({
         <span className="absolute z-10">{foreground}</span>
       </div>
       <div className="flex flex-col">
-        <p className="text-xl font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{excerpt}</p>
+        <p className="md:text-lg font-medium">{title}</p>
+        <p className="text-xs md:text-sm text-muted-foreground">{excerpt}</p>
       </div>
     </Link>
   );
@@ -161,7 +132,7 @@ function SectionA() {
   return (
     <section className="my-60 relative">
       <SectionHeader
-        badge={"Canvas"}
+        badge={<SectionHeaderBadge>Canvas</SectionHeaderBadge>}
         title={
           <>
             <span>From websites to</span>{" "}
@@ -209,7 +180,7 @@ function SectionA() {
             <circle cx="700" cy="700" r="700" fill="url(#blueCircle)" />
           </svg>
         </div>
-        <div className="w-full mx-0 my-40">
+        <div className="w-full mx-0 my-10 md:my-40">
           <Content1 />
         </div>
       </div>
@@ -221,7 +192,7 @@ function SectionB() {
   return (
     <section className="my-60">
       <SectionHeader
-        badge={<>Explore</>}
+        badge={<SectionHeaderBadge>Explore</SectionHeaderBadge>}
         title={
           <>
             Right tools for the{" "}
@@ -235,7 +206,7 @@ function SectionB() {
         viewport={{ once: true }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.0, ease: "easeOut", delay: 0.2 }}
-        className="flex flex-col gap-5 lg:flex-row lg:gap-6 items-center justify-center mt-32"
+        className="grid grid-cols-2 gap-5 lg:flex lg:flex-row lg:gap-6 items-start justify-center mt-16 md:mt-32"
       >
         <SquareCard
           href={sitemap.links.canvas}
@@ -251,7 +222,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-3 left-3 md:top-6 md:left-6  text-xl md:text-3xl font-semibold text-white/90">
               Canvas
             </div>
           }
@@ -272,7 +243,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-3 left-3 md:top-6 md:left-6 text-xl md:text-3xl font-semibold text-white/90">
               Forms
             </div>
           }
@@ -293,7 +264,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-3 left-3 md:top-6 md:left-6 text-xl md:text-3xl  font-semibold text-white/90">
               Database
             </div>
           }
@@ -314,7 +285,7 @@ function SectionB() {
             </>
           }
           foreground={
-            <div className="relative top-6 left-6 text-3xl font-semibold text-white/90">
+            <div className="relative top-3 left-3 md:top-6 md:left-6 text-xl md:text-3xl  font-semibold text-white/90">
               The Bundle
             </div>
           }
@@ -330,7 +301,7 @@ function SectionD() {
   return (
     <section className="my-60 relative">
       <SectionHeader
-        badge={"Customize"}
+        badge={<SectionHeaderBadge>Customize</SectionHeaderBadge>}
         title={
           <>
             Built for Hackers,
@@ -348,23 +319,28 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border py-10 px-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex justify-between items-center">
-          <h6 className=" text-lg font-semibold">
-            Document Cloud for Enterprise
-          </h6>
-          <Link href={sitemap.links.book30} target="_blank">
-            <Button className="p-0 text-sm" variant="link">
-              Contact us for more
-            </Button>
-          </Link>
-        </div>
-        <p className="text-sm opacity-50">
-          Building something visual? Grida for Enterprise saves you months.{" "}
-          <br />
-          Get custom, on-premise solutions tailored to your needs.
-        </p>
-      </div>
+      <DocumentCloudCard />
     </section>
+  );
+}
+
+function DocumentCloudCard() {
+  return (
+    <div className=" flex flex-col border p-6 md:p-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
+      <div className="flex justify-between items-start">
+        <h6 className=" text-lg font-semibold">
+          Document Cloud for Enterprise
+        </h6>
+        <Link href={sitemap.links.book30} target="_blank">
+          <Button className="p-0 text-sm" variant="link">
+            Contact us for more
+          </Button>
+        </Link>
+      </div>
+      <p className="text-sm opacity-50">
+        Building something visual? Grida for Enterprise saves you months. <br />
+        Get custom, on-premise solutions tailored to your needs.
+      </p>
+    </div>
   );
 }

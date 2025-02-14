@@ -16,9 +16,9 @@ export default function Footer() {
     <div>
       <footer className="w-full px-4 container mx-auto">
         <div className="mx-auto max-w-container">
-          <_Footer className="border-t border-black/50 dark:border-white/50 pt-8 bg-transparent">
+          <_Footer className="border-t pt-8 bg-transparent">
             <FooterContent className="sm:grid-cols-2 md:grid-cols-3">
-              <FooterColumn className="col-span-2 flex-row items-center justify-between gap-8 border-b pb-8 md:col-span-1 md:flex-col md:items-start md:justify-start md:border-b-0">
+              <FooterColumn className="col-span-2 flex-row items-center justify-between gap-8 pb-8 md:col-span-1 md:flex-col md:items-start md:justify-start">
                 <Link href="/">
                   <div className="flex items-center gap-2">
                     <GridaLogo />
@@ -53,13 +53,13 @@ export default function Footer() {
                 <h3 className="text-md pt-1 font-semibold">Product</h3>
                 <Link
                   href={sitemap.links.changelog}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Changelog
                 </Link>
                 <Link
                   href={sitemap.links.docs}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Documentation
                 </Link>
@@ -68,25 +68,25 @@ export default function Footer() {
                 <h3 className="text-md pt-1 font-semibold">Resources</h3>
                 <Link
                   href={sitemap.links.studio}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Grida Studios
                 </Link>
                 <Link
                   href={sitemap.links.corssh}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   CORS.SH
                 </Link>
                 <Link
                   href={sitemap.links.thebundle}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   The Bundle
                 </Link>
                 <Link
                   href={sitemap.links.blog}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Blog
                 </Link>
@@ -95,19 +95,19 @@ export default function Footer() {
                 <h3 className="text-md pt-1 font-semibold">Contact</h3>
                 <Link
                   href={sitemap.links.slack}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Slack
                 </Link>
                 <Link
                   href={sitemap.links.x}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Twitter
                 </Link>
                 <Link
                   href={sitemap.links.github}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Github
                 </Link>
@@ -116,19 +116,19 @@ export default function Footer() {
                 <h3 className="text-md pt-1 font-semibold">Legal</h3>
                 <Link
                   href={sitemap.links.privacy}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Privacy policy
                 </Link>
                 <Link
                   href={sitemap.links.toc}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Terms of Service
                 </Link>
                 <Link
                   href={sitemap.links.cookies}
-                  className="text-sm text-muted-foreground"
+                  className="text-xs md:text-sm text-muted-foreground"
                 >
                   Cookie Policy
                 </Link>
