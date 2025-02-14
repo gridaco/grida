@@ -346,6 +346,55 @@ export namespace wwwprint {
         size: { width: 3.5, height: 2 },
       },
     },
+    // cigars
+    {
+      id: 9,
+      name: "Cigar Badn 01",
+      category: "Cigar Band",
+      image: "/www/.print/demo/cigar-band-1.png",
+      price: 25,
+      step: 100,
+      properties: {
+        material: 3,
+        size: { width: 334.5, height: 32 },
+      },
+    },
+    {
+      id: 10,
+      name: "Cigar Badn 02",
+      category: "Cigar Band",
+      image: "/www/.print/demo/cigar-band-2.png",
+      price: 25,
+      step: 100,
+      properties: {
+        material: 1,
+        size: { width: 1223.5, height: 234 },
+      },
+    },
+    {
+      id: 11,
+      name: "Cigar Badn 03",
+      category: "Cigar Band",
+      image: "/www/.print/demo/cigar-band-3.png",
+      price: 25,
+      step: 100,
+      properties: {
+        material: 8,
+        size: { width: 125, height: 24 },
+      },
+    },
+    {
+      id: 12,
+      name: "Cigar Badn 04",
+      category: "Cigar Band",
+      image: "/www/.print/demo/cigar-band-4.png",
+      price: 25,
+      step: 1,
+      properties: {
+        material: 3,
+        size: { width: 3.5, height: 2 },
+      },
+    },
   ];
 
   export const faqs = [

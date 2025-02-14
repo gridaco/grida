@@ -15,6 +15,21 @@ import { sitemap } from "@/www/data/sitemap";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { wwwprint } from "../../data";
 
+const types = [
+  {
+    name: "Printing",
+    image: "/www/.print/categories/01.png",
+  },
+  {
+    name: "Cigar Band",
+    image: "/www/.print/categories/22.png",
+  },
+  {
+    name: "Packaging",
+    image: "/www/.print/categories/02.png",
+  },
+];
+
 const shipping_options = [
   {
     name: "Accurate",
@@ -90,6 +105,7 @@ function OptionCard({
 }
 
 export default function OrderPage() {
+  const [type, setType] = useState<string>(types[0].name);
   const [selectedTemplate, setSelectedTemplate] =
     useState<wwwprint.Template | null>(null);
   const [orderDetails, setOrderDetails] = useState({
@@ -128,13 +144,18 @@ export default function OrderPage() {
             <section>
               <h2 className="text-xl font-semibold mb-4">Choose Type</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-                {["22", "01", "02"].map((id) => (
-                  <OptionCard key={id} className="overflow-hidden">
+                {types.map(({ name, image }) => (
+                  <OptionCard
+                    selected={type === name}
+                    onSelect={() => setType(name)}
+                    key={name}
+                    className="overflow-hidden"
+                  >
                     <CardContent className="p-0">
                       <div className="relative aspect-video">
                         <Image
-                          src={`/www/.print/categories/${id}.png`}
-                          alt={id}
+                          src={image}
+                          alt={name}
                           fill
                           className="object-cover rounded-t-xl"
                         />
@@ -156,32 +177,34 @@ export default function OrderPage() {
                 </Link>
               </header>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                {wwwprint.templates.map((template) => (
-                  <OptionCard
-                    onSelect={() => setSelectedTemplate(template)}
-                    key={template.id}
-                    selected={selectedTemplate?.id === template.id}
-                  >
-                    <CardContent className="p-0 pb-2">
-                      <div className="relative aspect-square">
-                        <Image
-                          src={template.image}
-                          alt={template.name}
-                          fill
-                          className="object-cover rounded-t-xl"
-                        />
-                      </div>
-                      <div className="px-2">
-                        <span className="font-semibold mt-2">
-                          {template.name}
-                        </span>
-                        <p className="text-sm text-muted-foreground">
-                          ${template.price} / {template.step} units
-                        </p>
-                      </div>
-                    </CardContent>
-                  </OptionCard>
-                ))}
+                {wwwprint.templates
+                  .filter((d) => d.category === type)
+                  .map((template) => (
+                    <OptionCard
+                      onSelect={() => setSelectedTemplate(template)}
+                      key={template.id}
+                      selected={selectedTemplate?.id === template.id}
+                    >
+                      <CardContent className="p-0 pb-2">
+                        <div className="relative aspect-square">
+                          <Image
+                            src={template.image}
+                            alt={template.name}
+                            fill
+                            className="object-cover rounded-t-xl"
+                          />
+                        </div>
+                        <div className="px-2">
+                          <span className="font-semibold mt-2">
+                            {template.name}
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            ${template.price} / {template.step} units
+                          </p>
+                        </div>
+                      </CardContent>
+                    </OptionCard>
+                  ))}
               </div>
               <hr className="my-4" />
               <h2 className="font-semibold mb-4">Properties</h2>
