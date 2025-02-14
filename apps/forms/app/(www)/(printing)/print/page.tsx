@@ -412,41 +412,73 @@ function SectionCustomOrder() {
   );
 }
 
-const tabs: { name: string; images: string[] }[] = [
+const tabs: { name: string; items: { image: string }[] }[] = [
   {
-    name: "Cigar Band",
-    images: [
-      "/www/.print/demo/cigar-band-1.png",
-      "/www/.print/demo/cigar-band-2.png",
-      "/www/.print/demo/cigar-band-3.png",
-      "/www/.print/demo/cigar-band-4.png",
+    name: "Flyer",
+    items: [
+      {
+        image: "/www/.print/categories/01.png",
+      },
+      {
+        image: "/www/.print/categories/02.png",
+      },
+      {
+        image: "/www/.print/categories/03.png",
+      },
+      {
+        image: "/www/.print/categories/04.png",
+      },
     ],
   },
   {
-    name: "Flyer",
-    images: [
-      "/www/.print/cigar-band-1.png",
-      "/www/.print/cigar-band-2.png",
-      "/www/.print/cigar-band-3.png",
-      "/www/.print/cigar-band-4.png",
+    name: "Cigar Band",
+    items: [
+      {
+        image: "/www/.print/demo/cigar-band-1.png",
+      },
+      {
+        image: "/www/.print/demo/cigar-band-2.png",
+      },
+      {
+        image: "/www/.print/demo/cigar-band-3.png",
+      },
+      {
+        image: "/www/.print/demo/cigar-band-4.png",
+      },
     ],
   },
   {
     name: "Packages",
-    images: [
-      "/www/.print/cigar-band-1.png",
-      "/www/.print/cigar-band-2.png",
-      "/www/.print/cigar-band-3.png",
-      "/www/.print/cigar-band-4.png",
+    items: [
+      {
+        image: "/www/.print/categories/02.png",
+      },
+      {
+        image: "/www/.print/categories/09.png",
+      },
+      {
+        image: "/www/.print/categories/12.png",
+      },
+      {
+        image: "/www/.print/categories/20.png",
+      },
     ],
   },
   {
     name: "Poster",
-    images: [
-      "/www/.print/cigar-band-1.png",
-      "/www/.print/cigar-band-2.png",
-      "/www/.print/cigar-band-3.png",
-      "/www/.print/cigar-band-4.png",
+    items: [
+      {
+        image: "/www/.print/categories/03.png",
+      },
+      {
+        image: "/www/.print/categories/07.png",
+      },
+      {
+        image: "/www/.print/categories/18.png",
+      },
+      {
+        image: "/www/.print/categories/16.png",
+      },
     ],
   },
 ];
@@ -488,7 +520,7 @@ function SectionMainDemo() {
         <div className="grid grid-cols-3 gap-4 w-full">
           <Card className="relative col-span-2 w-full h-[300px] md:h-[450px] lg:h-[650px] overflow-hidden rounded md:rounded-lg">
             <Image
-              src={data.images[0]}
+              src={data.items[0].image}
               alt={`${data.name} Main`}
               width={1320}
               height={792}
@@ -497,13 +529,13 @@ function SectionMainDemo() {
           </Card>
 
           <div className="grid grid-rows-3 gap-3 w-full h-[300px] md:h-[450px] lg:h-[650px]">
-            {data.images.slice(1).map((src, i) => (
+            {data.items.slice(1).map(({ image }, i) => (
               <Card
                 key={i}
                 className="relative w-full h-full overflow-hidden rounded md:rounded-lg"
               >
                 <Image
-                  src={src}
+                  src={image}
                   alt={`${data.name} ${i + 1}`}
                   width={400}
                   height={300}
