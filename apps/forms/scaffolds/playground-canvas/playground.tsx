@@ -214,7 +214,7 @@ export default function CanvasPlayground() {
 
   return (
     <TooltipProvider>
-      <main className="w-screen h-screen overflow-hidden select-none">
+      <main className="w-full h-full select-none">
         <SettingsDialog
           {...settingsDialog.props}
           preferences={pref}
@@ -495,6 +495,20 @@ function Hotkyes() {
   return <></>;
 }
 
+const examples = [
+  "blank.grida",
+  "helloworld.grida",
+  "slide-01.grida",
+  "slide-02.grida",
+  "instagram-post-01.grida",
+  "poster-01.grida",
+  "resume-01.grida",
+  "event-page-01.grida",
+  "component-01.grida",
+  "layout-01.grida",
+  "globals-01.grida",
+];
+
 function ExampleSwitch({
   value,
   onValueChange,
@@ -502,19 +516,6 @@ function ExampleSwitch({
   value?: string;
   onValueChange: (v: string) => void;
 }) {
-  const examples = [
-    "blank.grida",
-    "helloworld.grida",
-    "slide-01.grida",
-    "slide-02.grida",
-    "instagram-post-01.grida",
-    "poster-01.grida",
-    "resume-01.grida",
-    "event-page-01.grida",
-    "component-01.grida",
-    "layout-01.grida",
-    "globals-01.grida",
-  ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>
       <SelectTrigger>

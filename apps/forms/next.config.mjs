@@ -100,6 +100,11 @@ const nextConfig = withMDX()({
         destination: "https://code.grida.co",
         permanent: false,
       },
+      {
+        source: "/figma",
+        destination: "https://grida.co",
+        permanent: false,
+      },
       // Static redirects
       {
         source: "/join-slack",

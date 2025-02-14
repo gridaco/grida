@@ -15,7 +15,7 @@ import { Pixelify_Sans } from "next/font/google";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 import FooterWithCTA from "@/www/footer-with-cta";
-import { Section } from "@/www/ui/section";
+import { Section, SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
 
 const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
@@ -101,38 +101,6 @@ function SectionMainDemo() {
   );
 }
 
-function SectionHeader({
-  badge,
-  title,
-  excerpt,
-  button,
-}: {
-  badge: React.ReactNode;
-  title: React.ReactNode;
-  excerpt: React.ReactNode;
-  button?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col container md:max-w-6xl max-w-lg items-center justify-center">
-      <Badge
-        variant="secondary"
-        className="text-base md:text-lg font-medium rounded-full"
-      >
-        {badge}
-      </Badge>
-      <div className="flex flex-col">
-        <span className="text-4xl md:text-5xl lg:text-6xl font-bold py-10 text-center max-w-3xl">
-          {title}
-        </span>
-        <p className=" text-sm md:text-base max-w-xl mx-auto text-muted-foreground text-center">
-          {excerpt}
-        </p>
-      </div>
-      {button}
-    </div>
-  );
-}
-
 function SquareCard({
   title,
   background,
@@ -164,7 +132,7 @@ function SectionA() {
   return (
     <section className="my-60 relative">
       <SectionHeader
-        badge={"Canvas"}
+        badge={<SectionHeaderBadge>Canvas</SectionHeaderBadge>}
         title={
           <>
             <span>From websites to</span>{" "}
@@ -224,7 +192,7 @@ function SectionB() {
   return (
     <section className="my-60">
       <SectionHeader
-        badge={<>Explore</>}
+        badge={<SectionHeaderBadge>Explore</SectionHeaderBadge>}
         title={
           <>
             Right tools for the{" "}
@@ -333,7 +301,7 @@ function SectionD() {
   return (
     <section className="my-60 relative">
       <SectionHeader
-        badge={"Customize"}
+        badge={<SectionHeaderBadge>Customize</SectionHeaderBadge>}
         title={
           <>
             Built for Hackers,
@@ -351,23 +319,28 @@ function SectionD() {
       <div className="my-16">
         <Content3 />
       </div>
-      <div className=" flex flex-col border p-6 md:p-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
-        <div className="flex justify-between items-start">
-          <h6 className=" text-lg font-semibold">
-            Document Cloud for Enterprise
-          </h6>
-          <Link href={sitemap.links.book30} target="_blank">
-            <Button className="p-0 text-sm" variant="link">
-              Contact us for more
-            </Button>
-          </Link>
-        </div>
-        <p className="text-sm opacity-50">
-          Building something visual? Grida for Enterprise saves you months.{" "}
-          <br />
-          Get custom, on-premise solutions tailored to your needs.
-        </p>
-      </div>
+      <DocumentCloudCard />
     </section>
+  );
+}
+
+function DocumentCloudCard() {
+  return (
+    <div className=" flex flex-col border p-6 md:p-10 gap-12 rounded-xl mx-auto w-full md:w-3/4">
+      <div className="flex justify-between items-start">
+        <h6 className=" text-lg font-semibold">
+          Document Cloud for Enterprise
+        </h6>
+        <Link href={sitemap.links.book30} target="_blank">
+          <Button className="p-0 text-sm" variant="link">
+            Contact us for more
+          </Button>
+        </Link>
+      </div>
+      <p className="text-sm opacity-50">
+        Building something visual? Grida for Enterprise saves you months. <br />
+        Get custom, on-premise solutions tailored to your needs.
+      </p>
+    </div>
   );
 }
