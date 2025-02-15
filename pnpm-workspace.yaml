@@ -1,6 +1,7 @@
 packages:
   # - "web"
   - "www"
+  - "desktop"
   # - "editor"
   # - "editor-packages/*"
   # - "apps/*"
