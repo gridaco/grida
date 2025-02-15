@@ -9,7 +9,7 @@ export default function MaterialsPage() {
     <div className="container mx-auto px-4 py-16">
       <h1 className="text-3xl font-bold mb-8">Materials</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {wwwprint.materials.map((material) => (
           <div key={material.id}>
             <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
@@ -36,9 +36,9 @@ export default function MaterialsPage() {
                   </Badge>
                 ))}
               </div>
-              <Button variant="link" className="p-0">
+              {/* <Button variant="link" className="p-0">
                 View Details
-              </Button>
+              </Button> */}
             </div>
           </div>
         ))}
