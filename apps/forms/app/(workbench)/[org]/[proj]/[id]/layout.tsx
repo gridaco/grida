@@ -344,7 +344,7 @@ export default async function Layout({
           "id",
           data.tables
             .map((t) => t.supabase_connection?.main_supabase_table_id)
-            .filter((x) => x)
+            .filter((x) => x) as number[]
         );
 
       if (xsb_tables_err) {
