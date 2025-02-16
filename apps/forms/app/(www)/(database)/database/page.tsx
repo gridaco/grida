@@ -112,31 +112,47 @@ function SectionMainDemo() {
   const data = tabs[index];
 
   return (
-    <div>
-      <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
-        <Image
-          src={data.src}
-          alt={data.name}
-          width={1320}
-          height={792}
-          className="w-full h-full object-cover object-left-top md:object-top"
-        />
-      </Card>
-      <Tabs
-        value={index + ""}
-        onValueChange={(s) => {
-          setIndex(parseInt(s));
-        }}
-        className="w-min mx-auto mt-4"
-      >
-        <TabsList>
-          {tabs.map(({ name }, i) => (
-            <TabsTrigger key={i} value={i + ""}>
-              {name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      viewport={{ once: true }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.0, ease: "easeOut" }}
+    >
+      <div>
+        <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
+          <motion.div
+            key={data.src} // key 변경 시 새로운 애니메이션 실행
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="w-full h-full"
+          >
+            <Image
+              src={data.src}
+              alt={data.name}
+              width={1320}
+              height={792}
+              className="w-full h-full object-cover object-left-top md:object-top"
+            />
+          </motion.div>
+        </Card>
+        <Tabs
+          value={index + ""}
+          onValueChange={(s) => {
+            setIndex(parseInt(s));
+          }}
+          className="w-min mx-auto mt-4"
+        >
+          <TabsList>
+            {tabs.map(({ name }, i) => (
+              <TabsTrigger key={i} value={i + ""}>
+                {name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+    </motion.div>
   );
 }
