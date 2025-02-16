@@ -11,10 +11,10 @@ dotenv.config();
 
 const config: ForgeConfig = {
   packagerConfig: {
-    extraResource: ["public"],
+    extraResource: ["mac/CFBundleTypeIconFile.icns"],
     name: "Grida",
     asar: true,
-    appBundleId: "co.grida.app",
+    appBundleId: "co.grida.desktop",
     icon: "./images/icon",
     osxSign: {},
     osxNotarize: {
@@ -22,6 +22,7 @@ const config: ForgeConfig = {
       appleIdPassword: process.env.APPLE_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     },
+    extendInfo: "./Info.plist",
   },
   rebuildConfig: {},
   makers: [
