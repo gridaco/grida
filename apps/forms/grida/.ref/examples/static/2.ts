@@ -93,5 +93,6 @@ export default {
       style: {},
     },
   },
-  globals: {},
+  textures: {},
+  properties: {},
 } satisfies grida.program.document.IDocumentDefinition;

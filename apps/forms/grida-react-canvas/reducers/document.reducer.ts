@@ -35,6 +35,7 @@ import nid from "./tools/id";
 import { vn } from "@/grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
+import "core-js/features/object/group-by";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -157,7 +158,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         }
 
         // after
-        draft.cursor_mode = { type: "cursor" };
+        draft.tool = { type: "cursor" };
         self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
@@ -206,7 +207,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         );
 
         // after
-        draft.cursor_mode = { type: "cursor" };
+        draft.tool = { type: "cursor" };
         self_selectNode(draft, "reset", new_top_id);
       });
     }
@@ -643,7 +644,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "surface/pixel-grid":
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/try-exit":
-    case "surface/cursor-mode":
+    case "surface/tool":
+    case "surface/brush":
+    case "surface/brush/size":
+    case "surface/brush/opacity":
     case "surface/gesture/start": {
       return surfaceReducer(state, action);
     }

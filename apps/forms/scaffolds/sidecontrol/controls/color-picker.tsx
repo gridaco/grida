@@ -8,13 +8,25 @@ import { PipetteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEyeDropper } from "./utils/eyedropper";
 import "./color-picker.css";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface IDColor {
+  id: string;
+  color: grida.program.cg.RGBA8888;
+}
 
 export function ColorPicker({
   color,
   onColorChange,
+  options,
 }: {
   color: grida.program.cg.RGBA8888;
   onColorChange?: (color: grida.program.cg.RGBA8888) => void;
+  options?: IDColor[];
 }) {
   const { isSupported, open } = useEyeDropper();
   return (
@@ -67,6 +79,28 @@ export function ColorPicker({
             />
           </div>
         </div>
+        {options && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {options?.map((option) => (
+              <Tooltip key={option.id}>
+                <TooltipTrigger>
+                  <div
+                    className="w-4 h-4"
+                    onClick={() => onColorChange?.(option.color)}
+                  >
+                    <div
+                      className="w-5 h-5 rounded-sm border"
+                      style={{
+                        background: `rgba(${option.color.r}, ${option.color.g}, ${option.color.b}, ${option.color.a})`,
+                      }}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{option.id}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

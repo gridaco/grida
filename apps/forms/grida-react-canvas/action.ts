@@ -1,7 +1,7 @@
 import type { tokens } from "@grida/tokens";
 import type { grida } from "@/grida";
 import type {
-  CursorMode,
+  ToolMode,
   GestureCornerRadius,
   GestureCurve,
   GestureGap,
@@ -15,13 +15,15 @@ import type {
   SurfaceRaycastTargeting,
 } from "./state";
 import { cmath } from "@grida/cmath";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 export type Action =
   | InternalAction
   | EditorCameraAction
   | EditorAction
   | EditorUndoAction
-  | EditorRedoAction;
+  | EditorRedoAction
+  | EditorClipAction;
 
 export type InternalAction = __InternalResetAction;
 
@@ -140,6 +142,14 @@ export type EditorUndoAction = {
 
 export type EditorRedoAction = {
   type: "redo";
+};
+
+/**
+ * set to editor clipbard
+ */
+export type EditorClipAction = {
+  type: "clip/color";
+  color: grida.program.cg.RGBA8888;
 };
 
 // #region copy cut paste
@@ -427,6 +437,9 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 export type SurfaceAction =
   | EditorSurface_RulerAndGuideAction
   | EditorSurface_PixelGridStateAction
+  | EditorSurface_ChangeBrushAction
+  | EditorSurface_ChangeBrushSizeAction
+  | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
@@ -447,6 +460,21 @@ export interface EditorSurface_PixelGridStateAction {
   state: "on" | "off";
 }
 
+export interface EditorSurface_ChangeBrushAction {
+  type: "surface/brush";
+  brush: BitmapEditorBrush;
+}
+
+export interface EditorSurface_ChangeBrushSizeAction {
+  type: "surface/brush/size";
+  size: TChange<number>;
+}
+
+export interface EditorSurface_ChangeBrushOpacityAction {
+  type: "surface/brush/opacity";
+  opacity: TChange<number>;
+}
+
 export interface EditorSurface_DeleteGuideAction {
   type: "surface/guide/delete";
   idx: number;
@@ -461,8 +489,8 @@ export type EditorSurface_ExitContentEditMode = {
 };
 
 export type EditorSurface_CursorMode = {
-  type: "surface/cursor-mode";
-  cursor_mode: CursorMode;
+  type: "surface/tool";
+  tool: ToolMode;
 };
 
 export type EditorSurface_StartGesture = {

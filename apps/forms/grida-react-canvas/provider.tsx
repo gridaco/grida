@@ -14,7 +14,7 @@ import {
   type IDocumentEditorState,
   type IDocumentEditorInit,
   initDocumentEditorState,
-  CursorMode,
+  ToolMode,
   SurfaceRaycastTargeting,
 } from "./state";
 import type { tokens } from "@grida/tokens";
@@ -34,6 +34,7 @@ import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -1498,6 +1499,18 @@ export function useDocument() {
     [dispatch]
   );
 
+  const clipboardColor = state.user_clipboard_color;
+
+  const setClipboardColor = useCallback(
+    (color: grida.program.cg.RGBA8888) => {
+      dispatch({
+        type: "clip/color",
+        color,
+      });
+    },
+    [dispatch]
+  );
+
   const deleteNode = useCallback(
     (target: "selection" | (string & {}) = "selection") => {
       dispatch({
@@ -1898,6 +1911,8 @@ export function useDocument() {
       copy,
       paste,
       duplicate,
+      clipboardColor,
+      setClipboardColor,
       deleteNode,
       nudge,
       nudgeResize,
@@ -1946,6 +1961,8 @@ export function useDocument() {
     copy,
     paste,
     duplicate,
+    clipboardColor,
+    setClipboardColor,
     deleteNode,
     nudge,
     nudgeResize,
@@ -2147,10 +2164,10 @@ function throttle<T extends (...args: any[]) => void>(
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
-  const { cursor_mode } = state;
+  const { tool } = state;
 
   return useMemo(() => {
-    switch (cursor_mode.type) {
+    switch (tool.type) {
       case "cursor":
         return "default";
       case "hand":
@@ -2158,7 +2175,7 @@ export function useEventTargetCSSCursor() {
       case "zoom":
         return "zoom-in";
       case "insert": {
-        switch (cursor_mode.node) {
+        switch (tool.node) {
           case "text":
             return "text";
           case "rectangle":
@@ -2172,8 +2189,12 @@ export function useEventTargetCSSCursor() {
         return "crosshair";
       case "path":
         return "crosshair";
+      case "brush":
+      case "eraser":
+      case "flood-fill":
+        return "cell";
     }
-  }, [cursor_mode]);
+  }, [tool]);
 }
 
 export function useEventTarget() {
@@ -2188,7 +2209,8 @@ export function useEventTarget() {
     dropzone,
     selection,
     content_edit_mode,
-    cursor_mode,
+    tool,
+    brush,
     marquee,
     debug,
     pixelgrid,
@@ -2224,11 +2246,41 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const setCursorMode = useCallback(
-    (cursor_mode: CursorMode) => {
+  const setTool = useCallback(
+    (tool: ToolMode) => {
       dispatch({
-        type: "surface/cursor-mode",
-        cursor_mode,
+        type: "surface/tool",
+        tool: tool,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrush = useCallback(
+    (brush: BitmapEditorBrush) => {
+      dispatch({
+        type: "surface/brush",
+        brush,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrushSize = useCallback(
+    (size: TChange<number>) => {
+      dispatch({
+        type: "surface/brush/size",
+        size,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrushOpacity = useCallback(
+    (opacity: TChange<number>) => {
+      dispatch({
+        type: "surface/brush/opacity",
+        opacity,
       });
     },
     [dispatch]
@@ -2573,8 +2625,12 @@ export function useEventTarget() {
       surface_snapping,
       //
       marquee,
-      cursor_mode,
-      setCursorMode,
+      tool,
+      setTool,
+      brush,
+      changeBrush,
+      changeBrushSize,
+      changeBrushOpacity,
       //
       ruler,
       setRulerState,
@@ -2628,8 +2684,12 @@ export function useEventTarget() {
     surface_snapping,
     //
     marquee,
-    cursor_mode,
-    setCursorMode,
+    tool,
+    setTool,
+    brush,
+    changeBrush,
+    changeBrushSize,
+    changeBrushOpacity,
     //
     ruler,
     setRulerState,
@@ -2935,7 +2995,7 @@ export function useSurfacePathEditor() {
   const [state, dispatch] = __useInternal();
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
-  const { hovered_vertex_idx: hovered_point, cursor_mode } = state;
+  const { hovered_vertex_idx: hovered_point, tool } = state;
   const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
     state.content_edit_mode;
   const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
@@ -2948,7 +3008,7 @@ export function useSurfacePathEditor() {
 
   const selectVertex = useCallback(
     (vertex: number) => {
-      if (cursor_mode.type === "path") {
+      if (tool.type === "path") {
         return;
       }
       dispatch({
@@ -2959,7 +3019,7 @@ export function useSurfacePathEditor() {
         },
       });
     },
-    [cursor_mode.type, dispatch, node_id]
+    [tool.type, dispatch, node_id]
   );
 
   const onVertexHover = useCallback(

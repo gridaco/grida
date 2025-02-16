@@ -73,6 +73,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "image":
       case "video":
       case "text":
+      case "bitmap":
       case "vector":
       case "path":
       case "line":
@@ -106,11 +107,15 @@ export function NodeElement<P extends Record<string, any>>({
   }, [USER_CHILDREN, children]);
 
   const renderprops = {
+    context: {
+      textures: document.document.textures,
+    },
     ...node,
     text: computed.text,
     props: computed.props,
     src: computed.src,
     html: computed.html,
+    imageRef: node.imageRef,
     fill: DEFAULT_FILL ?? computed.fill,
     loop: node.loop,
     muted: node.muted,
@@ -141,9 +146,11 @@ export function NodeElement<P extends Record<string, any>>({
     // height: node.height,
     cornerRadius: node.cornerRadius,
     // @ts-ignore
-  } satisfies
-    | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-    | grida.program.nodes.UnknwonComputedNode;
+  } satisfies grida.program.document.IGlobalRenderingContext &
+    (
+      | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
+      | grida.program.nodes.UnknwonComputedNode
+    );
 
   if (!node.active) return <></>;
 
@@ -203,6 +210,7 @@ const fillings = {
   line: "none",
   path: "none",
   polyline: "none",
+  bitmap: "background",
 } as const;
 
 function HrefWrapper({

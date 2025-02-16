@@ -80,5 +80,6 @@ export default {
       return acc;
     }, {}),
   },
-  globals: {},
+  textures: {},
+  properties: {},
 } satisfies grida.program.document.IDocumentDefinition;

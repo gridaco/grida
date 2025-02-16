@@ -8,17 +8,6 @@ import { cmath } from "@grida/cmath";
 export namespace grida {
   export const mixed: unique symbol = Symbol();
 
-  export namespace io {
-    /**
-     * Grida Document File model
-     * .grida file is a JSON file that contains the document structure and metadata.
-     */
-    export interface DocumentFileModel {
-      doctype: "v0_document";
-      document: grida.program.document.IDocumentDefinition;
-    }
-  }
-
   export namespace program {
     export namespace schema {
       /**
@@ -228,6 +217,20 @@ export namespace grida.program.document {
   }
 
   /**
+   * contains all images (data) under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface IDocumentTexturesRepository {
+    textures: Record<
+      string,
+      cmath.raster.Bitmap & {
+        type: "texture";
+        version: number;
+      }
+    >;
+  }
+  /**
    * general purpose cascading document properties for envs, styles, constants, etc.
    */
   export interface IDocumentProperties {
@@ -333,6 +336,7 @@ export namespace grida.program.document {
    */
   export interface IDocumentDefinition
     extends IDocumentNodesRepository,
+      IDocumentTexturesRepository,
       IDocumentProperties,
       IDocumentBackground {
     /**
@@ -462,14 +466,19 @@ export namespace grida.program.document {
   type INodeWithHtmlDocumentQueryDataAttributes<N extends nodes.Node> =
     INodeHtmlDocumentQueryDataAttributes & N;
 
+  export type IGlobalRenderingContext = {
+    context: IDocumentTexturesRepository;
+  };
+
   /**
    * final props that matches the react rendering signature
    */
   export type IComputedNodeReactRenderProps<N extends nodes.Node> =
-    INodeWithHtmlDocumentQueryDataAttributes<N> & {
-      style: React.CSSProperties;
-      //
-    };
+    IGlobalRenderingContext &
+      INodeWithHtmlDocumentQueryDataAttributes<N> & {
+        style: React.CSSProperties;
+        //
+      };
 
   /**
    * Definition:
@@ -667,6 +676,7 @@ export namespace grida.program.nodes {
     | ContainerNode
     | HTMLIFrameNode
     | HTMLRichTextNode
+    | BitmapNode
     | VectorNode
     | PathNode
     | LineNode
@@ -678,6 +688,7 @@ export namespace grida.program.nodes {
 
   export type ComputedNode =
     | ComputedTextNode
+    | ComputedBitmapNode
     | ComputedImageNode
     | ComputedVideoNode
     | ComputedContainerNode
@@ -698,6 +709,7 @@ export namespace grida.program.nodes {
   export type UnknwonComputedNode = Omit<
     Partial<ComputedTextNode> &
       Partial<ComputedImageNode> &
+      Partial<ComputedBitmapNode> &
       Partial<ComputedVideoNode> &
       Partial<ComputedContainerNode> &
       Partial<ComputedHTMLIFrameNode> &
@@ -721,6 +733,7 @@ export namespace grida.program.nodes {
    */
   export type UnknwonNode = Omit<
     Partial<TextNode> &
+      Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
       Partial<ContainerNode> &
@@ -764,6 +777,7 @@ export namespace grida.program.nodes {
     | __TPrototypeNode<
         Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
       >
+    | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<PathNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<LineNode>, __base_scene_node_properties>>
@@ -1387,6 +1401,32 @@ export namespace grida.program.nodes {
   }
 
   /**
+   * [Bitmap Node]
+   *
+   * Bitmap node is a node that can have a bitmap data as a grid.
+   *
+   * This is used non-performance intensive graphics, e.g. for 255x255 pixel art.
+   *
+   * For loading png, jpg, etc. images, use {@link ImageNode} instead.
+   *
+   * The bitmap data can by found in {@link document.IDocumentTexturesRepository} images[this.id].data
+   */
+  export interface BitmapNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IPositioning,
+      i.IFixedDimension,
+      i.IOpacity,
+      i.IZIndex,
+      i.IRotation,
+      i.IFill<cg.Paint> {
+    readonly type: "bitmap";
+    readonly imageRef: string;
+  }
+
+  export type ComputedBitmapNode = BitmapNode;
+
+  /**
    * @deprecated - not ready - do not use in production
    */
   export interface VectorNode
@@ -1708,6 +1748,7 @@ export namespace grida.program.nodes {
           } as UnknwonNode;
         }
         // TODO:
+        case "bitmap":
         case "ellipse":
         case "iframe":
         case "image":
@@ -1750,8 +1791,9 @@ export namespace grida.program.nodes {
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
     ): document.IDocumentDefinition {
       const document: document.IDocumentDefinition = {
-        root_id: "",
+        textures: {},
         nodes: {},
+        root_id: "",
         properties: {},
       };
 
@@ -1977,6 +2019,10 @@ export namespace grida.program.cg {
       b: color.b,
       a: color.a * alpha,
     };
+  }
+
+  export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
+    return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
   }
 
   /**

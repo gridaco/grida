@@ -37,6 +37,7 @@ export function MapGL({
         id={id}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         interactive={interactive}
+        // @ts-expect-error dynamic
         mapLib={import("mapbox-gl")}
         attributionControl={false}
         initialViewState={initialViewState}

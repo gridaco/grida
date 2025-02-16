@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SlashIcon,
   BoxIcon,
@@ -8,11 +8,11 @@ import {
   HandIcon,
   FrameIcon,
   ImageIcon,
-  MixIcon,
   TextIcon,
   CaretDownIcon,
+  EraserIcon,
 } from "@radix-ui/react-icons";
-import { PenToolIcon } from "lucide-react";
+import { BrushIcon, PenToolIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +106,10 @@ export function ToolIcon({
       return <PenToolIcon {...props} />;
     case "image":
       return <ImageIcon {...props} />;
+    case "brush":
+      return <BrushIcon {...props} />;
+    case "eraser":
+      return <EraserIcon {...props} />;
     default:
       return null;
   }

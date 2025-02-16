@@ -118,7 +118,6 @@ export function BrowseStartPageTemplatesDialog({
                             template
                           ),
                       },
-                      properties: {},
                     },
                   }}
                 >

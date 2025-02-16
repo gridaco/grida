@@ -6,6 +6,7 @@ import { ToasterWithMax } from "@/components/toaster";
 import "../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
+// const inconsolata = Inconsolata({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Grida",

@@ -280,6 +280,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
                   crossAxisGap: 0,
                 },
               },
+              textures: {},
               properties: {},
             },
           },
