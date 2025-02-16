@@ -1,7 +1,8 @@
 {
-  "name": "desktop-electron",
+  "name": "@grida/desktop",
   "productName": "Grida",
-  "version": "1.0.0",
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
   "description": "My Electron application description",
   "main": ".vite/build/main.js",
   "repository": "https://github.com/gridaco/grida",
