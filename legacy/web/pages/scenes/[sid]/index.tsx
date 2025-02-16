@@ -7,7 +7,7 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import { checkFrameSourceMode } from "@base-sdk/base/dist/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/dist/types";
 import Background from "@app/scene-view/components/canves/background";
-import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui-theme";
+import { EditorThemeProvider } from "../../../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "@app/scene-view";
 import { makeService } from "services/scenes-store";

@@ -1,6 +1,6 @@
 packages:
   # - "web"
-  - "www"
+  - "legacy/www"
   - "desktop"
   # - "editor"
   # - "editor-packages/*"

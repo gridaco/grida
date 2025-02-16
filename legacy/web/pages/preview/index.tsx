@@ -14,7 +14,7 @@ import { checkFrameSourceMode } from "@base-sdk/base/dist/frame-embed";
 import { ScenePreviewParams } from "@base-sdk/base/dist/features/scene-preview";
 import { AppFramework, AppLanguage } from "@base-sdk/base/dist/types";
 import Background from "@app/scene-view/components/canves/background";
-import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
+import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui-theme";
 import { IPlayer, TopBar } from "../../../app/components";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
