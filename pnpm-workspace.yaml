@@ -1,9 +1,9 @@
 packages:
-  # - "web"
+  # - "legacy/web"
   - "legacy/www"
   - "desktop"
-  # - "editor"
-  # - "editor-packages/*"
+  # - "legacy/editor"
+  # - "legacy/editor-packages/*"
   # - "apps/*"
   - "apps/backgrounds"
   - "apps/docs"
