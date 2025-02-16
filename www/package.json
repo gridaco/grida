@@ -27,8 +27,6 @@
     "@grida/link-social": "^0.0.2",
     "@next/bundle-analyzer": "^12.3.1",
     "@radix-ui/react-icons": "^1.2.0",
-    "@react-three/drei": "^9.83.9",
-    "@react-three/fiber": "^8.12.0",
     "@typeform/embed-react": "^1.20.0",
     "axios": "^0.21.2",
     "cookie": "^0.6.0",
@@ -51,8 +49,7 @@
     "react-typist": "^2.0.5",
     "recoil": "^0.7.5",
     "styled-system": "^5.1.0",
-    "theme-ui": "^0.16.2",
-    "three": "^0.150.1"
+    "theme-ui": "^0.16.2"
   },
   "devDependencies": {
     "@babel/core": "^7.15.5",
@@ -70,7 +67,6 @@
     "@types/react": "^18.0.19",
     "@types/react-dom": "^18.0.6",
     "@types/react-typist": "^2.0.3",
-    "@types/three": "^0.149.0",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
     "autoprefixer": "^10.4.16",

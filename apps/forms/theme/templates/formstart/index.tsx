@@ -109,7 +109,6 @@ export namespace FormStartPage {
     return (
       <FormCampaignStartPageContextProvider value={meta}>
         <I18nextProvider
-          // @ts-expect-error
           i18n={i18n}
         >
           <StandaloneDocumentContent

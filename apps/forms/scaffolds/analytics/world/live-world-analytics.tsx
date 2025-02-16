@@ -11,7 +11,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { MapProvider, useMap } from "react-map-gl";
 import { useDarkMode } from "usehooks-ts";
 import { useWindowSize } from "@uidotdev/usehooks";
-import type { CircleLayer, MapRef } from "react-map-gl";
+// import type { CircleLayer, MapRef } from "react-map-gl";
+import type {CircleLayerSpecification} from "mapbox-gl";
 import { Source, Layer } from "react-map-gl";
 import type { FeatureCollection } from "geojson";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,9 +26,10 @@ import { serialize } from "../charts/serialize";
 import { format } from "date-fns";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
-const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
+const layerstyles: { light: CircleLayerSpecification; dark: CircleLayerSpecification } = {
   light: {
     id: "point",
+    source:'my-data',
     type: "circle",
     paint: {
       "circle-radius": 10,
@@ -41,6 +43,7 @@ const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
   },
   dark: {
     id: "point",
+    source:'my-data',
     type: "circle",
     paint: {
       "circle-radius": 10,
