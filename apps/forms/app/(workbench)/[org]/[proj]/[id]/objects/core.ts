@@ -580,20 +580,6 @@ function useStorageEditor(): IStorageEditor {
     [api, abspath, __list]
   );
 
-  // #region lifecycle hooks
-  useEffect(
-    () => {
-      // [list & seed]
-      __set_loading(true);
-      list(dir).finally(() => __set_loading(false));
-      // console.log("seed", dir, data, error);
-    },
-    // having list as a dependency will cause infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [__set_loading, dir, refreshkey]
-  );
-  // #endregion
-
   return {
     bucket_id,
     public: _public,
@@ -612,6 +598,18 @@ function useStorageEditor(): IStorageEditor {
     refresh: __refresh,
     list,
   };
+}
+
+export function useSeedList() {
+  const { __set_loading } = __useDispatch();
+  const { loading, list, refreshkey, dir } = useStorageEditor();
+  // #region lifecycle hooks
+  useEffect(() => {
+    // [list & seed]
+    __set_loading(true);
+    list(dir).finally(() => __set_loading(false));
+  }, [list, __set_loading, dir, refreshkey]);
+  // #endregion
 }
 
 function generatePaths(segments: string[]): PathTokens[] {

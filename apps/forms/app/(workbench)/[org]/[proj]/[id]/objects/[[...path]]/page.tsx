@@ -79,6 +79,7 @@ import StorageEditorProvider, {
   StorageEditorDispatcherProvider,
   StorageEditorTask,
   StorageEditorUploadingTask,
+  useSeedList,
   useStorageEditor,
 } from "../core";
 import toast from "react-hot-toast";
@@ -187,6 +188,7 @@ function Folder() {
   const [state] = useEditorState();
   const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
   const storage = useStorageEditor();
+  useSeedList();
 
   const { dir, nodes } = storage;
 
@@ -249,149 +251,151 @@ function Folder() {
 
   return (
     <div className="flex flex-1 h-full">
-      <aside className="relative w-full container mx-auto p-4 overflow-y-scroll">
-        <div className="my-8">
-          <Tools />
-        </div>
-        <div className="flex items-center justify-between">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link
-                      href={editorlink("objects", {
-                        document_id: state.document_id,
-                        basepath: state.basepath,
-                      })}
-                    >
-                      Home{" "}
-                      {storage.public && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-1.5 text-muted-foreground"
-                        >
-                          Public
-                        </Badge>
-                      )}
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {paths.map((path, index) => {
-                  const href = editorlink("objects/[[...path]]", {
-                    path: path,
-                    document_id: state.document_id,
-                    basepath: state.basepath,
-                  });
-                  const label = path[path.length - 1];
-                  return (
-                    <React.Fragment key={index}>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link href={href}>{label}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                    </React.Fragment>
-                  );
-                })}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </nav>
-          <div className="flex space-x-2">
-            <Button
-              disabled={storage.loading}
-              variant="outline"
-              onClick={() => storage.refresh()}
-            >
-              {storage.loading ? (
-                <Spinner className="h-4 w-4 me-2" />
-              ) : (
-                <ReloadIcon className="h-4 w-4 me-2" />
-              )}
-              Reload
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("grid")}
-              className={cn(view === "grid" && "bg-muted")}
-            >
-              <GridIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("list")}
-              className={cn(view === "list" && "bg-muted")}
-            >
-              <ListIcon className="h-4 w-4" />
-            </Button>
+      <aside className="relative w-full h-full">
+        <div className=" w-full h-full container mx-auto p-4 overflow-y-scroll">
+          <div className="my-8">
+            <Tools />
           </div>
-        </div>
-        {storage.public && (
-          <div className="py-4">
-            <Alert>
-              <LockOpen1Icon className="w-4 h-4" />
-              <AlertTitle>Public Bucket</AlertTitle>
-              <AlertDescription>
-                This bucket is public and only meant for serving public files.{" "}
-                <b>DO NOT</b> upload sensitive files here.
-              </AlertDescription>
-            </Alert>
+          <div className="flex items-center justify-between">
+            <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link
+                        href={editorlink("objects", {
+                          document_id: state.document_id,
+                          basepath: state.basepath,
+                        })}
+                      >
+                        Home{" "}
+                        {storage.public && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs px-1.5 text-muted-foreground"
+                          >
+                            Public
+                          </Badge>
+                        )}
+                      </Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  {paths.map((path, index) => {
+                    const href = editorlink("objects/[[...path]]", {
+                      path: path,
+                      document_id: state.document_id,
+                      basepath: state.basepath,
+                    });
+                    const label = path[path.length - 1];
+                    return (
+                      <React.Fragment key={index}>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <Link href={href}>{label}</Link>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    );
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </nav>
+            <div className="flex space-x-2">
+              <Button
+                disabled={storage.loading}
+                variant="outline"
+                onClick={() => storage.refresh()}
+              >
+                {storage.loading ? (
+                  <Spinner className="h-4 w-4 me-2" />
+                ) : (
+                  <ReloadIcon className="h-4 w-4 me-2" />
+                )}
+                Reload
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("grid")}
+                className={cn(view === "grid" && "bg-muted")}
+              >
+                <GridIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("list")}
+                className={cn(view === "list" && "bg-muted")}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        )}
-        <div className="mt-4">
-          {nodes.length === 0 ? (
-            storage.loading ? (
-              <FolderLoadingState />
-            ) : (
-              <FolderEmptyState />
-            )
-          ) : (
-            <>
-              {view === "grid" ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
-                    <span className="w-1/2 text-sm">Name</span>
-                    <span className="w-1/4 text-sm">Size</span>
-                    <span className="w-1/4 text-sm">Modified</span>
-                  </div>
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view ?? "list"}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+          {storage.public && (
+            <div className="py-4">
+              <Alert>
+                <LockOpen1Icon className="w-4 h-4" />
+                <AlertTitle>Public Bucket</AlertTitle>
+                <AlertDescription>
+                  This bucket is public and only meant for serving public files.{" "}
+                  <b>DO NOT</b> upload sensitive files here.
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
+          <div className="mt-4">
+            {nodes.length === 0 ? (
+              storage.loading ? (
+                <FolderLoadingState />
+              ) : (
+                <FolderEmptyState />
+              )
+            ) : (
+              <>
+                {view === "grid" ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
+                      <span className="w-1/2 text-sm">Name</span>
+                      <span className="w-1/4 text-sm">Size</span>
+                      <span className="w-1/4 text-sm">Modified</span>
+                    </div>
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view ?? "list"}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="sticky bottom-4 right-8 pointer-events-none flex items-end justify-end">
+        <div className="absolute bottom-4 right-8 pointer-events-none flex items-end justify-end">
           <UploadsModal />
         </div>
       </aside>
