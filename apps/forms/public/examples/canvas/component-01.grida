@@ -39,8 +39,14 @@
           "454:346"
         ],
         "properties": {
-          "title": {"type": "string", "default": "Hello World !"},
-          "description": {"type": "string", "default": "Welcome to Grida Canvas V0"}
+          "title": {
+            "type": "string",
+            "default": "Hello World !"
+          },
+          "description": {
+            "type": "string",
+            "default": "Welcome to Grida Canvas V0"
+          }
         }
       },
       "title": {
@@ -201,6 +207,12 @@
         "effects": []
       }
     },
-    "root_id": "component"
+    "root_id": "component",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
   }
 }

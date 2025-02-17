@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { useSelectValue, useValue } from "@/program-context/data-context";
+import {
+  useData,
+  useSelectValue,
+  useValue,
+} from "@/program-context/data-context";
 import { TemplateValueProperties } from "../template-builder/with-template";
 import { tokens } from "@grida/tokens";
 
@@ -17,37 +21,42 @@ function extractAccessIdentifiersDependencyArrayFromProps<
 
 // TODO: needs optimization
 export function useComputed<P extends Record<string, any>>(
-  props?: TemplateValueProperties<P, tokens.StringValueExpression>
+  props?: TemplateValueProperties<P, tokens.StringValueExpression>,
+  recursive: boolean = false
 ): P {
-  // list all data keys that are needed for selecting required values
-  const datakeys = useMemo(
-    () => extractAccessIdentifiersDependencyArrayFromProps(props),
-    [props]
-  );
+  // // list all data keys that are needed for selecting required values
+  // const datakeys = useMemo(
+  //   () => extractAccessIdentifiersDependencyArrayFromProps(props),
+  //   [props]
+  // );
 
-  const contextdata = useSelectValue({
-    keys: datakeys,
-  });
+  // const contextdata = useSelectValue({
+  //   keys: datakeys,
+  // });
 
-  const computed = Object.entries(props || {}).reduce(
-    (acc: Record<string, any>, [key, value]) => {
-      if (tokens.is.propertyAccessExpression(value)) {
-        acc[key] = tokens.factory.renderPropertyAccessExpression(
-          value,
-          contextdata
-        );
-      } else if (tokens.is.templateExpression(value)) {
-        acc[key] = tokens.factory.renderTemplateExpression(value, contextdata);
-      } else {
-        acc[key] = value;
-      }
+  // const computed = useMemo(() => {
+  //   return Object.entries(props || {}).reduce(
+  //     (acc: Record<string, any>, [key, value]) => {
+  //       acc[key] = tokens.render.any(value, contextdata, recursive);
+  //       return acc;
+  //     },
+  //     {} as P
+  //   );
+  // }, [props, contextdata, recursive]);
 
-      return acc;
-    },
-    {} as P
-  );
+  // console.log("computed", computed, props, datakeys, contextdata);
+  const data = useData();
 
-  // console.log(computed, contextdata, datakeys, properties);
+  const computed = useMemo(() => {
+    return Object.entries(props || {}).reduce(
+      (acc: Record<string, any>, [key, value]) => {
+        acc[key] = tokens.render.any(value, data, recursive);
+        return acc;
+      },
+      {} as P
+    );
+  }, [props, data, recursive]);
 
+  // console.log("computed", computed, props, data);
   return computed as P;
 }

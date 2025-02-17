@@ -37,6 +37,7 @@ export default function IOSVGPage() {
       editable: true,
       debug: true,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -63,7 +64,6 @@ export default function IOSVGPage() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
       },
     })
   );

@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import {
-  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
   type IDocumentEditorState,
 } from "../../state";
 import { self_insertSubDocument } from "./insert";
@@ -9,7 +9,11 @@ import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../domapi";
-import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
+import {
+  getSnapTargets,
+  snapObjectsTranslation,
+  threshold,
+} from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
@@ -47,6 +51,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "translate-vertex") return;
   if (draft.gesture.type === "curve") return;
   if (draft.gesture.type === "gap") return;
+  if (draft.gesture.type === "brush") return;
 
   switch (draft.gesture.type) {
     case "translate": {
@@ -280,9 +285,12 @@ function __self_update_gesture_transform_translate(
 
   const { translated, snapping } = snapObjectsTranslation(
     initial_rects,
-    snap_target_node_rects,
+    {
+      objects: snap_target_node_rects,
+      guides: draft.ruler === "on" ? draft.guides : undefined,
+    },
     adj_movement,
-    DEFAULT_SNAP_MOVEMNT_THRESHOLD
+    threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
   );
 
   draft.surface_snapping = snapping;
@@ -428,7 +436,7 @@ function __self_update_gesture_transform_scale(
   // get the origin point based on handle
   const origin =
     transform_with_center_origin === "on"
-      ? cmath.rect.center(initial_bounding_rectangle)
+      ? cmath.rect.getCenter(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
           // maps the resize handle (direction) to the transform origin point (inverse)
@@ -481,6 +489,11 @@ function __self_update_gesture_transform_scale(
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
     const is_root = node_id === draft.document.root_id;
+
+    // TODO: scaling for bitmap node is not supported yet.
+    const is_scalable = node.type !== "bitmap";
+
+    if (!is_scalable) continue;
 
     if (is_root) {
       draft.document.nodes[node_id] = nodeTransformReducer(node, {

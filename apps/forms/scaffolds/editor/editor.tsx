@@ -15,6 +15,7 @@ import {
   FormDocumentEditorInit,
   SiteDocumentEditorInit,
   CanvasDocumentEditorInit,
+  BucketDocumentEditorInit,
 } from "./state";
 import { initialEditorState } from "./init";
 import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
@@ -53,6 +54,12 @@ export function EditorProvider({
         <DatabaseDocumentEditorProvider initial={initial}>
           {children}
         </DatabaseDocumentEditorProvider>
+      );
+    case "v0_bucket":
+      return (
+        <BucketDocumentEditorProvider initial={initial}>
+          {children}
+        </BucketDocumentEditorProvider>
       );
     case "v0_canvas": {
       return (
@@ -107,6 +114,26 @@ function DatabaseDocumentEditorProvider({
             <RowEditPanelProvider />
             {children}
           </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
+}
+
+function BucketDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: BucketDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>{children}</MediaViewerProvider>
         </TooltipProvider>
       </Multiplayer>
     </StateProvider>

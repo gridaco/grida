@@ -18,7 +18,7 @@ export const black: grida.program.cg.Paint = {
 
 export default function initialNode(
   type: grida.program.nodes.Node["type"],
-  seed: Partial<Omit<grida.program.nodes.AnyNode, "type">> = {}
+  seed: Partial<Omit<grida.program.nodes.UnknwonNode, "type">> = {}
 ): grida.program.nodes.Node {
   const id = nid();
   const base: grida.program.nodes.i.IBaseNode &
@@ -162,6 +162,7 @@ export default function initialNode(
         effects: [],
         strokeWidth: 0,
         strokeCap: "butt",
+        fill: gray,
         ...seed,
       } satisfies grida.program.nodes.EllipseNode;
     }
@@ -177,6 +178,7 @@ export default function initialNode(
         effects: [],
         strokeWidth: 0,
         strokeCap: "butt",
+        fill: gray,
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }
@@ -196,6 +198,7 @@ export default function initialNode(
     }
     case "vector":
     case "path":
+    case "bitmap":
     case "component":
     case "instance":
     case "template_instance": {

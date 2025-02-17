@@ -10,6 +10,7 @@ import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 import { Align, Selection, Zoom } from "./sidecontrol-node-selection";
+import { DocumentProperties } from "./sidecontrol-document-properties";
 
 export function SideControl() {
   const fonts = useGoogleFontsList();
@@ -35,7 +36,13 @@ export function SideControl() {
               </SidebarSection>
               <Align />
               <hr />
-              <Selection />
+              <Selection
+                empty={
+                  <div className="mt-4 mb-10">
+                    <DocumentProperties />
+                  </div>
+                }
+              />
             </>
           )}
         </SrcUploaderProvider>

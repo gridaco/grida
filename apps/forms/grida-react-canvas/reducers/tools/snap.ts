@@ -1,13 +1,58 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
-import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
+import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
+import { Guide } from "@/grida-react-canvas/state";
 
 const q = 1;
 
+/**
+ *
+ * calculate the final threshold for ux with factor and zoom (transform).
+ *
+ * @example
+ * Perfect fit for the given data—simply ceiling(5 / zoom).
+ * - f(5) = 1
+ * - f(4) = 2
+ * - f(1) = 5
+ * - f(0.5) = 10
+ * - f(0.02) = 250
+ */
+export function threshold(factor: number, t: number | cmath.Transform): number {
+  const zoom = typeof t === "number" ? t : cmath.transform.getScale(t)[0];
+  return cmath.quantize(Math.ceil(factor / zoom), 1) - 0.5;
+}
+
+export function snapGuideTranslation(
+  axis: cmath.Axis,
+  agent: number,
+  anchors: cmath.Rectangle[],
+  movement: number,
+  threshold: number
+): { translated: number } {
+  const anchorPoints = anchors
+    .map((rect) => {
+      rect = cmath.rect.quantize(rect, q);
+      const [a, b] = cmath.range.fromRectangle(rect, axis);
+      const c = cmath.mean(a, b);
+      return [a, b, c];
+    })
+    .flat();
+
+  const v = agent + movement;
+
+  const res = cmath.ext.snap.snap1D([v], anchorPoints, threshold);
+  const delta = res.distance === Infinity ? 0 : res.distance;
+
+  return { translated: v + delta };
+}
+
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
-  anchors: cmath.Rectangle[],
+  anchors: {
+    objects?: cmath.Rectangle[];
+    guides?: Guide[];
+  },
   movement: cmath.ext.movement.Movement,
   threshold: number
 ): {
@@ -15,7 +60,8 @@ export function snapObjectsTranslation(
   snapping: SnapToObjectsResult | undefined;
 } {
   agents = agents.map((r) => cmath.rect.quantize(r, q));
-  anchors = anchors.map((r) => cmath.rect.quantize(r, q));
+  const anchorObjects =
+    anchors.objects?.map((r) => cmath.rect.quantize(r, q)) ?? [];
 
   const bounding_rect = cmath.rect.union(agents);
 
@@ -24,10 +70,14 @@ export function snapObjectsTranslation(
     q
   );
 
-  const result = snapToObjects(_virtually_moved_rect, anchors, {
-    x: movement[0] === null ? false : threshold,
-    y: movement[1] === null ? false : threshold,
-  });
+  const result = snapToCanvasGeometry(
+    _virtually_moved_rect,
+    { objects: anchorObjects, guides: anchors.guides ?? [] },
+    {
+      x: movement[0] === null ? false : threshold,
+      y: movement[1] === null ? false : threshold,
+    }
+  );
 
   const { translated: _translated } = result;
 

@@ -5,7 +5,7 @@ import {
   useTransform,
 } from "@/grida-react-canvas/provider";
 import { useEffect, useRef } from "react";
-import { useNodeSurfaceTransfrom } from "../hooks/transform";
+import { useSingleSelection } from "../surface-hooks";
 import { grida } from "@/grida";
 import { css } from "@/grida/css";
 import { cmath } from "@grida/cmath";
@@ -14,7 +14,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
   const { transform } = useTransform();
-  const { style } = useNodeSurfaceTransfrom(node_id);
+  const data = useSingleSelection(node_id);
   const node = useNode(node_id!);
   const { tryExitContentEditMode } = useEventTarget();
 
@@ -29,6 +29,8 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
     e.stopPropagation();
   };
 
+  if (!data) return <></>;
+
   return (
     <div
       id="richtext-editor-surface"
@@ -37,7 +39,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
       <div
         style={{
           position: "absolute",
-          ...style,
+          ...data.style,
           willChange: "transform",
           overflow: "hidden",
           resize: "none",
@@ -69,7 +71,10 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
             className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-visible resize-none"
             style={{
               // width: "calc(100% + 1px)",
-              ...css.toReactTextStyle(node as grida.program.nodes.TextNode),
+              ...css.toReactTextStyle(
+                // TODO: use computed text node
+                node as grida.program.nodes.TextNode as any as grida.program.nodes.ComputedTextNode
+              ),
               opacity: node.opacity,
             }}
           />

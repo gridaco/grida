@@ -2,6 +2,7 @@ import {
   grida_forms_client,
   grida_canvas_client,
   workspaceclient,
+  grida_storage_client,
 } from "@/lib/supabase/server";
 import type {
   CanvasDocumentSnapshotSchema,
@@ -10,6 +11,8 @@ import type {
 } from "@/types";
 import assert from "assert";
 import {
+  bucket_validation_messages,
+  isValidBucketName,
   isValidSchemaName,
   schemaname_validation_messages,
 } from "../utils/regex";
@@ -137,6 +140,83 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
   }
 }
 
+export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: { name: string; public: boolean }
+  ) {
+    super(project_id, "v0_bucket");
+  }
+
+  private async validateName(): Promise<true | "taken" | "invalid"> {
+    if (!isValidBucketName(this.seed.name)) {
+      return "invalid";
+    }
+
+    // check for duplicate
+    const { error, count } = await grida_storage_client
+      .from("bucket_document")
+      .select("id", { count: "exact" })
+      .eq("name", this.seed.name)
+      .eq("project_id", this.project_id);
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    if (count === null) {
+      throw new Error("Unexpected error");
+    }
+
+    if (count > 0) {
+      return "taken";
+    }
+
+    return true;
+  }
+
+  async createBucketDocument() {
+    const { name, public: is_public } = this.seed;
+
+    // pre-validation
+    const isvalidname = await this.validateName();
+    if (isvalidname !== true) {
+      if (isvalidname === "taken") {
+        throw new Error("Bucket name already exists");
+      } else {
+        throw new Error(bucket_validation_messages.invalid);
+      }
+    }
+
+    const masterdoc_ref = await this.createMasterDocument({
+      title: name,
+    });
+
+    const { data, error } = await grida_storage_client
+      .from("bucket_document")
+      .insert({
+        id: masterdoc_ref.id,
+        name: name,
+        project_id: this.project_id,
+        public: is_public,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      await this.rollback();
+      if (error.code === "23505") {
+        throw new Error("Bucket name already exists");
+      }
+      console.error(error);
+      throw error;
+    }
+
+    return data;
+  }
+}
+
 export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
   constructor(
     readonly project_id: number,
@@ -173,6 +253,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
           __schema_version: "2024-12-31",
           pages: {
             one: {
+              root_id: "root",
               nodes: {
                 root: {
                   id: "root",
@@ -199,7 +280,8 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
                   crossAxisGap: 0,
                 },
               },
-              root_id: "root",
+              textures: {},
+              properties: {},
             },
           },
         } satisfies CanvasDocumentSnapshotSchema as {},

@@ -15,7 +15,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
+import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -45,6 +45,7 @@ import {
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
+  GitHubLogoIcon,
   OpenInNewWindowIcon,
   PlayIcon,
   PlusIcon,
@@ -104,15 +105,31 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
+import { SlackIcon } from "lucide-react";
+import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
+import { io } from "@/grida-io-model";
+
+type UIConfig = {
+  sidebar: "hidden" | "visible";
+  toolbar: "hidden" | "visible";
+};
+
+const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
-  const [uiHidden, setUiHidden] = useState(false);
+  const [ui, setUI] = useState<UIConfig>({
+    sidebar: "visible",
+    toolbar: "visible",
+  });
   const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
@@ -130,6 +147,7 @@ export default function CanvasPlayground() {
       editable: true,
       debug: pref.debug,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -156,13 +174,23 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
+        backgroundColor: CANVAS_BG_COLOR,
       },
     })
   );
 
   useHotkeys("meta+\\, ctrl+\\", () => {
-    setUiHidden((v) => !v);
+    setUI((ui) => ({
+      ...ui,
+      sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
+    }));
+  });
+
+  useHotkeys("meta+shift+\\, ctrl+shift+\\", () => {
+    setUI((ui) => ({
+      ...ui,
+      toolbar: ui.toolbar === "visible" ? "hidden" : "visible",
+    }));
   });
 
   useHotkeys(
@@ -190,29 +218,26 @@ export default function CanvasPlayground() {
     });
   }, [exampleid]);
 
-  useEffect(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      return "";
-    });
-  }, []);
-
   const onExport = () => {
     const documentData = {
-      doctype: "v0_document",
+      version: "2025-02-12",
       document: state.document,
-    } satisfies grida.io.DocumentFileModel;
+    } satisfies io.DocumentFileModel;
 
-    const blob = new Blob([JSON.stringify(documentData, null, 2)], {
-      type: "application/json",
+    // const blob = new Blob([io.json.stringify(documentData)], {
+    //   type: "application/json",
+    // });
+
+    const blob = new Blob([io.archive.pack(documentData)], {
+      type: "application/zip",
     });
 
-    saveAs(blob, `${v4()}.grida`);
+    saveAs(blob, `${v4()}.grida.zip`);
   };
 
   return (
     <TooltipProvider>
-      <main className="w-screen h-screen overflow-hidden select-none">
+      <main className="w-full h-full select-none">
         <SettingsDialog
           {...settingsDialog.props}
           preferences={pref}
@@ -271,7 +296,7 @@ export default function CanvasPlayground() {
           >
             <Hotkyes />
             <div className="flex w-full h-full">
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside>
                   {libraryDialog.open ? (
                     <>
@@ -285,7 +310,7 @@ export default function CanvasPlayground() {
                     </>
                   ) : (
                     <>
-                      <SidebarRoot>
+                      <SidebarRoot className="hidden sm:block">
                         <SidebarSection className="mt-4">
                           <span className="px-2">
                             <DropdownMenu>
@@ -353,6 +378,25 @@ export default function CanvasPlayground() {
                                     </Link>
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
+                                <DropdownMenuSeparator />
+                                <Link
+                                  href="https://github.com/gridaco/grida"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <GitHubLogoIcon className="me-2" />
+                                    GitHub
+                                  </DropdownMenuItem>
+                                </Link>
+                                <Link
+                                  href="https://grida.co/join-slack"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <SlackIcon className="me-2 w-4 h-4" />
+                                    Slack Community
+                                  </DropdownMenuItem>
+                                </Link>
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <span className="font-bold text-xs">
@@ -386,14 +430,14 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                    <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                       <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
                         <AutoInitialFitTransformer>
                           <StandaloneDocumentContent />
                         </AutoInitialFitTransformer>
 
-                        {!uiHidden && (
+                        {ui.sidebar === "visible" && (
                           <>
                             <div className="absolute top-4 left-4 z-50">
                               <Button
@@ -406,28 +450,31 @@ export default function CanvasPlayground() {
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
                             </div>
-
-                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                        <KeyboardInputOverlay />
-                      </div> */}
                           </>
                         )}
-                        {!uiHidden && (
-                          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                            <PlaygroundToolbar
-                              onAddButtonClick={libraryDialog.openDialog}
-                            />
-                          </div>
+                        {ui.toolbar === "visible" && (
+                          <>
+                            <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
+                              <div className="relative left-8">
+                                <BrushToolbar />
+                              </div>
+                            </div>
+                            <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                              <PlaygroundToolbar
+                                onAddButtonClick={libraryDialog.openDialog}
+                              />
+                            </div>
+                          </>
                         )}
                       </ViewportRoot>
-                      <DevtoolsPanel />
-                    </div>
+                      {pref.debug && <DevtoolsPanel />}
+                    </StandaloneDocumentBackground>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
               </EditorSurfaceClipboardSyncProvider>
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside className="h-full">
-                  <SidebarRoot side="right">
+                  <SidebarRoot side="right" className="hidden sm:block">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
                         <Zoom
@@ -452,7 +499,13 @@ export default function CanvasPlayground() {
                     <FontFamilyListProvider fonts={fonts}>
                       <Align />
                       <hr />
-                      <Selection empty={<__TMP_ComponentProperties />} />
+                      <Selection
+                        empty={
+                          <div className="mt-4 mb-10">
+                            <DocumentProperties />
+                          </div>
+                        }
+                      />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
@@ -460,7 +513,7 @@ export default function CanvasPlayground() {
             </div>
           </StandaloneDocumentEditor>
         </ErrorBoundary>
-        {!uiHidden && <HelpFab />}
+        {ui.toolbar === "visible" && <HelpFab />}
       </main>
     </TooltipProvider>
   );
@@ -472,6 +525,20 @@ function Hotkyes() {
   return <></>;
 }
 
+const examples = [
+  "blank.grida",
+  "helloworld.grida",
+  "slide-01.grida",
+  "slide-02.grida",
+  "instagram-post-01.grida",
+  "poster-01.grida",
+  "resume-01.grida",
+  "event-page-01.grida",
+  "component-01.grida",
+  "layout-01.grida",
+  "globals-01.grida",
+];
+
 function ExampleSwitch({
   value,
   onValueChange,
@@ -479,18 +546,6 @@ function ExampleSwitch({
   value?: string;
   onValueChange: (v: string) => void;
 }) {
-  const examples = [
-    "blank.grida",
-    "helloworld.grida",
-    "slide-01.grida",
-    "slide-02.grida",
-    "instagram-post-01.grida",
-    "poster-01.grida",
-    "resume-01.grida",
-    "event-page-01.grida",
-    "component-01.grida",
-    "layout-01.grida",
-  ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>
       <SelectTrigger>

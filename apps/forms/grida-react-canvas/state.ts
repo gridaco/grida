@@ -3,6 +3,7 @@ import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+import type { BitmapLayerEditor, BitmapEditorBrush } from "@grida/bitmap";
 
 // #region config
 
@@ -16,9 +17,18 @@ import type { SnapToObjectsResult } from "@grida/cmath/_snap";
 export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
 /**
- * snap threshold applyed when movement (real gesture) is applied
+ * The base snap threshold (in px) used during a real pointer movement (drag gesture).
+ *
+ * In practice, the final threshold often scales inversely with the current zoom level:
+ *
+ * ```ts
+ * const threshold = Math.ceil(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR / zoom);
+ * ```
+ *
+ * At higher zoom levels, the threshold becomes smaller for more precise snapping;
+ * at lower zoom levels, it grows for a smoother user experience.
  */
-export const DEFAULT_SNAP_MOVEMNT_THRESHOLD = 4;
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
 
 /**
  * snap threshold applyed when nudge (fake gesture) is applied
@@ -35,8 +45,8 @@ const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
 
 export type DocumentDispatcher = (action: Action) => void;
 
-export type CursorModeType = CursorMode["type"];
-export type CursorMode =
+export type ToolModeType = ToolMode["type"];
+export type ToolMode =
   | {
       type: "cursor";
     }
@@ -53,6 +63,9 @@ export type CursorMode =
   | {
       type: "draw";
       tool: "line" | "pencil";
+    }
+  | {
+      type: "brush" | "eraser" | "flood-fill";
     }
   | {
       type: "path";
@@ -127,7 +140,7 @@ export type GestureModifiers = {
   rotate_with_quantize: "off" | number;
 };
 
-interface IDocumentEditorClipboardState {
+export interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
    */
@@ -152,7 +165,10 @@ interface IDocumentEditorClipboardState {
    *
    * @deprecated - not ready
    */
-  last_font_family?: string;
+  next_font_family?: string;
+  next_paint_color?: grida.program.cg.RGBA8888;
+  user_clipboard_color?: grida.program.cg.RGBA8888;
+  brush: BitmapEditorBrush & { opacity: number };
 }
 
 interface IDocumentEditorTransformState {
@@ -166,6 +182,7 @@ interface IDocumentEditorTransformState {
 export type GestureState =
   | GestureIdle
   | GesturePan
+  | GestureGuide
   | GestureVirtualNudge
   | GestureTranslate
   | GestureSort
@@ -174,6 +191,7 @@ export type GestureState =
   | GestureRotate
   | GestureCornerRadius
   | GestureDraw
+  | GestureBrush
   | GestureTranslateVertex
   | GestureCurve
   | GestureCurveA;
@@ -185,6 +203,16 @@ interface IGesture {
    * raw movement - independent of the offset or origin, purely the movement of the mouse.
    */
   movement: cmath.Vector2;
+
+  /**
+   * first movement of the drag
+   */
+  first: cmath.Vector2;
+
+  /**
+   * last movement of the drag
+   */
+  last: cmath.Vector2;
 }
 
 export type GestureIdle = {
@@ -196,6 +224,32 @@ export type GestureIdle = {
  */
 export type GesturePan = IGesture & {
   readonly type: "pan";
+};
+
+/**
+ * Move or draw the guide line
+ */
+export type GestureGuide = IGesture & {
+  readonly type: "guide";
+  /**
+   * the axis of the guide
+   */
+  readonly axis: cmath.Axis;
+
+  /**
+   * the index, id of the guide
+   */
+  readonly idx: number;
+
+  /**
+   * initial offset of the guide
+   */
+  readonly initial_offset: number;
+
+  /**
+   * the current offset of the guide (can be snapped to objects)
+   */
+  offset: number;
 };
 
 /**
@@ -234,6 +288,19 @@ export type GestureTranslate = IGesture & {
  * Contains collection of nodes' bounding rect.
  */
 export interface LayoutSnapshot {
+  /**
+   * the type of the layout
+   */
+  type: "flex" | "group";
+
+  /**
+   * the grouping parent id
+   */
+  group: string;
+
+  /**
+   * relative objects to the parent
+   */
   objects: Array<cmath.Rectangle & { id: string }>;
 }
 
@@ -281,10 +348,11 @@ export type GestureSort = IGesture & {
 export type GestureGap = IGesture & {
   readonly type: "gap";
 
-  axis: "x" | "y";
+  readonly axis: "x" | "y";
 
-  min_gap: number;
-  initial_gap: number;
+  readonly min_gap: number;
+  readonly initial_gap: number;
+
   gap: number;
 
   /**
@@ -332,7 +400,7 @@ export type GestureDraw = IGesture & {
   readonly mode: "line" | "pencil";
 
   /**
-   * origin point - relative to content space
+   * origin point - relative to canvas space
    */
   readonly origin: cmath.Vector2;
 
@@ -341,6 +409,23 @@ export type GestureDraw = IGesture & {
    * the absolute position of the points will be (p + origin)
    */
   points: cmath.Vector2[];
+
+  readonly node_id: string;
+};
+
+export type GestureBrush = IGesture & {
+  readonly type: "brush";
+
+  /**
+   * color to paint
+   */
+  readonly color: cmath.Vector4;
+
+  // /**
+  //  * record of points (movements)
+  //  * the absolute position of the points will be (p + origin)
+  //  */
+  // points: cmath.Vector2[];
 
   readonly node_id: string;
 };
@@ -498,17 +583,22 @@ interface IDocumentEditorEventTargetState {
 
   pointer: {
     position: cmath.Vector2;
+    last: cmath.Vector2;
     // position_snap: cmath.Vector2;
   };
+
+  ruler: "on" | "off";
+
+  pixelgrid: "on" | "off";
 
   /**
    * @private - internal use only
    *
-   * cursor mode
+   * current tool mode
    *
    * @default {type: "cursor"}
    */
-  cursor_mode: CursorMode;
+  tool: ToolMode;
 
   /**
    * target node id to measure distance between the selection
@@ -564,6 +654,10 @@ interface IDocumentGoogleFontsState {
   googlefonts: { family: string }[];
 }
 
+interface IDocumentBrusesState {
+  brushes: BitmapEditorBrush[];
+}
+
 export type HistoryEntry = {
   actionType: EditorAction["type"];
   timestamp: number;
@@ -591,9 +685,19 @@ export type HistoryEntry = {
 //   };
 // }
 
+/**
+ * a global class based editor instances
+ */
+export const __global_editors = {
+  bitmap: null as BitmapLayerEditor | null,
+};
+
+class A {}
+
 type ContentEditModeState =
   | TextContentEditMode
   | PathContentEditMode
+  | BitmapContentEditMode
   | GradientContentEditMode;
 
 type TextContentEditMode = {
@@ -637,6 +741,12 @@ type PathContentEditMode = {
   path_cursor_position: cmath.Vector2;
 };
 
+type BitmapContentEditMode = {
+  type: "bitmap";
+  node_id: string;
+  imageRef: string;
+};
+
 /**
  * @deprecated - WIP
  */
@@ -656,6 +766,11 @@ export interface IMinimalDocumentState {
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
 }
 
+export interface Guide {
+  readonly axis: cmath.Axis;
+  readonly offset: number;
+}
+
 export interface IDocumentState extends IMinimalDocumentState {
   selection: string[];
 
@@ -669,11 +784,11 @@ export interface IDocumentState extends IMinimalDocumentState {
   content_edit_mode?: ContentEditModeState;
 
   /**
-   * @private - internal use only
+   * the ruler guides.
    *
-   * refresh key
+   * objects sanps to this when ruler is on
    */
-  // __r: number;
+  guides: Guide[];
 }
 
 interface __TMP_HistoryExtension {
@@ -686,7 +801,11 @@ interface __TMP_HistoryExtension {
 export interface IDocumentEditorInit
   extends IDocumentEditorConfig,
     grida.program.document.IDocumentTemplatesRepository {
-  document: grida.program.document.IDocumentDefinition;
+  document: Pick<
+    grida.program.document.IDocumentDefinition,
+    "nodes" | "root_id" | "backgroundColor"
+  > &
+    Partial<grida.program.document.IDocumentTexturesRepository>;
 }
 
 export interface IDocumentEditorState
@@ -695,6 +814,7 @@ export interface IDocumentEditorState
     IDocumentEditorTransformState,
     IDocumentEditorEventTargetState,
     IDocumentGoogleFontsState,
+    IDocumentBrusesState,
     grida.program.document.IDocumentTemplatesRepository,
     __TMP_HistoryExtension,
     IDocumentState {}
@@ -705,7 +825,13 @@ export function initDocumentEditorState({
 }: Omit<IDocumentEditorInit, "debug"> & {
   debug?: boolean;
 }): IDocumentEditorState {
-  const s = new document.DocumentState(init.document);
+  const def: grida.program.document.IDocumentDefinition = {
+    textures: {},
+    properties: {},
+    ...init.document,
+  };
+
+  const s = new document.DocumentState(def);
 
   // console.log("i", init["transform"]);
 
@@ -717,6 +843,7 @@ export function initDocumentEditorState({
     hovered_vertex_idx: null,
     pointer: {
       position: cmath.vector2.zero,
+      last: cmath.vector2.zero,
     },
     history: {
       future: [],
@@ -731,15 +858,27 @@ export function initDocumentEditorState({
       transform_with_preserve_aspect_ratio: "off",
       rotate_with_quantize: "off",
     },
+    ruler: "on",
+    pixelgrid: "on",
+    guides: [],
     active_duplication: null,
-    document_ctx: document.Context.from(init.document).snapshot(),
+    document_ctx: document.Context.from(def).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
     surface_measurement_targeting_locked: false,
     surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
-    cursor_mode: { type: "cursor" },
+    brushes: [],
+    tool: { type: "cursor" },
+    brush: {
+      name: "Default",
+      hardness: 1,
+      size: [4, 4],
+      spacing: 0,
+      opacity: 1,
+    },
     ...init,
+    document: def,
   };
 }

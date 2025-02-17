@@ -46,7 +46,12 @@ export function SnapGuide() {
         <Line key={i} {...l} />
       ))}
       {guide.rules.map(([axis, offset], i) => (
-        <Rule key={i} axis={cmath.counterAxis[axis]} offset={offset} />
+        <Rule
+          key={i}
+          axis={cmath.counterAxis(axis)}
+          offset={offset}
+          width={1}
+        />
       ))}
       {guide.points.map((p, i) => {
         return (

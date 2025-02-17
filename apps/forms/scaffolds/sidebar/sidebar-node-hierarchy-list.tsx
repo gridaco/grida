@@ -30,6 +30,7 @@ import {
   ViewVerticalIcon,
   ViewHorizontalIcon,
   Component1Icon,
+  TransparencyGridIcon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React, { useMemo } from "react";
@@ -48,7 +49,7 @@ function NodeHierarchyItemContextMenuWrapper({
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="min-w-52">
         <ContextMenuItem
           onSelect={() => {
             copy(node_id);
@@ -216,6 +217,8 @@ function NodeHierarchyItemIcon({
     case "line":
     case "path":
       return <TransformIcon className={className} />;
+    case "bitmap":
+      return <TransparencyGridIcon className={className} />;
   }
   return <BoxIcon className={className} />;
 }

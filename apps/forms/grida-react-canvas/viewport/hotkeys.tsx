@@ -91,6 +91,16 @@ export const keybindings_sheet = [
     keys: ["backspace", "delete"],
   },
   {
+    name: "Auto-layout",
+    description: "Auto-layout the current selection",
+    keys: ["shift+a"],
+  },
+  {
+    name: "Group with Container",
+    description: "Group the current selection with a container",
+    keys: ["ctrl+alt+g", "meta+alt+g"],
+  },
+  {
     name: "align left",
     description: "Align selection to the left",
     keys: ["alt+a"],
@@ -166,6 +176,16 @@ export const keybindings_sheet = [
     keys: ["["],
   },
   {
+    name: "hide/show ruler",
+    description: "Toggle ruler visibility",
+    keys: ["shift+r"],
+  },
+  {
+    name: "hide/show pixel grid",
+    description: "Toggle pixel grid visibility",
+    keys: ["shift+'"],
+  },
+  {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
     keys: ["i"],
@@ -211,6 +231,11 @@ export const keybindings_sheet = [
     keys: ["l"],
   },
   {
+    name: "container",
+    description: "Container tool",
+    keys: ["a", "f"],
+  },
+  {
     name: "pencil",
     description: "Pencil tool",
     keys: ["shift+p"],
@@ -221,16 +246,84 @@ export const keybindings_sheet = [
     keys: ["p"],
   },
   {
-    name: "container",
-    description: "Container tool",
-    keys: ["a", "f"],
+    name: "brush",
+    description: "Brush tool",
+    keys: ["b"],
+  },
+  {
+    name: "eraser",
+    description: "Eraser tool",
+    keys: ["e"],
+  },
+  {
+    name: "paint bucket",
+    description: "Paint bucket tool",
+    keys: ["g"],
+  },
+  {
+    name: "increase brush size",
+    description: "Increase brush size",
+    keys: ["]"],
+  },
+  {
+    name: "decrease brush size",
+    description: "Decrease brush size",
+    keys: ["["],
+  },
+  {
+    name: "set opacity to 0%",
+    description: "Set opacity to 0%",
+    keys: ["0+0"],
+  },
+  {
+    name: "set opacity to 10%",
+    description: "Set opacity to 10%",
+    keys: ["1"],
+  },
+  {
+    name: "set opacity to 50%",
+    description: "Set opacity to 50%",
+    keys: ["5"],
+  },
+  {
+    name: "set opacity to 100%",
+    description: "Set opacity to 100%",
+    keys: ["0"],
   },
 ];
 
+function useSingleDoublePressHotkey(
+  key: string,
+  cb: (pressType: "single" | "double") => void,
+  options?: Parameters<typeof useHotkeys>[2]
+) {
+  const lastTime = useRef(0);
+
+  useHotkeys(
+    key,
+    () => {
+      const now = Date.now();
+      if (now - lastTime.current < 300) {
+        cb("double");
+      } else {
+        cb("single");
+      }
+      lastTime.current = now;
+    },
+    options
+  );
+}
+
 export function useEditorHotKeys() {
   const {
-    cursor_mode,
-    setCursorMode,
+    content_edit_mode,
+    tool,
+    setTool,
+    ruler,
+    setRulerState,
+    changeBrushSize,
+    pixelgrid,
+    setPixelGridState,
     tryExitContentEditMode,
     tryToggleContentEditMode,
   } = useEventTarget();
@@ -243,12 +336,15 @@ export function useEditorHotKeys() {
     cut,
     copy,
     duplicate,
+    setClipboardColor,
     deleteNode,
     a11yarrow,
     nudgeResize,
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -351,20 +447,17 @@ export function useEditorHotKeys() {
     "space",
     (e) => {
       // cancel if already in hand tool, but not triggered by hotkey
-      if (
-        cursor_mode.type === "hand" &&
-        !__hand_tool_triggered_by_hotkey.current
-      )
+      if (tool.type === "hand" && !__hand_tool_triggered_by_hotkey.current)
         return;
 
       // check if up or down
       switch (e.type) {
         case "keydown":
-          setCursorMode({ type: "hand" });
+          setTool({ type: "hand" });
           __hand_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          setCursorMode({ type: "cursor" });
+          setTool({ type: "cursor" });
           __hand_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -382,20 +475,17 @@ export function useEditorHotKeys() {
     "z",
     (e) => {
       // cancel if already in zoom tool, but not triggered by hotkey
-      if (
-        cursor_mode.type === "zoom" &&
-        !__zoom_tool_triggered_by_hotkey.current
-      )
+      if (tool.type === "zoom" && !__zoom_tool_triggered_by_hotkey.current)
         return;
 
       // check if up or down
       switch (e.type) {
         case "keydown":
-          setCursorMode({ type: "zoom" });
+          setTool({ type: "zoom" });
           __zoom_tool_triggered_by_hotkey.current = true;
           break;
         case "keyup":
-          setCursorMode({ type: "cursor" });
+          setTool({ type: "cursor" });
           __zoom_tool_triggered_by_hotkey.current = false;
           break;
       }
@@ -438,17 +528,20 @@ export function useEditorHotKeys() {
                */
               sRGBHex: string;
             }) => {
+              const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
               // set fill if selection
               if (selection.length > 0) {
                 //
-                const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
                 actions.fill({
                   type: "solid",
                   color: rgba,
-                });
+                } satisfies grida.program.cg.SolidPaint);
               }
               // copy to clipboard if no selection
               else {
+                // editor clipboard
+                setClipboardColor(rgba);
+                // os clipboard
                 window.navigator.clipboard
                   .writeText(result.sRGBHex)
                   .then(() => {
@@ -457,7 +550,6 @@ export function useEditorHotKeys() {
                     );
                   });
               }
-              result.sRGBHex;
             }
           )
           .catch((e: any) => {});
@@ -558,8 +650,15 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+r", () => {
-    // TODO:
-    toast.error("[ruler] is not implemented yet");
+    const next = ruler === "on" ? "off" : "on";
+    setRulerState(next);
+    toast.success(`Ruler ${next}`);
+  });
+
+  useHotkeys("shift+\", shift+'", () => {
+    const next = pixelgrid === "on" ? "off" : "on";
+    setPixelGridState(next);
+    toast.success(`Pixel Grid ${next}`);
   });
 
   useHotkeys(
@@ -671,48 +770,74 @@ export function useEditorHotKeys() {
   // keyup
 
   useHotkeys("v, escape", () => {
-    setCursorMode({ type: "cursor" });
+    setTool({ type: "cursor" });
   });
 
   useHotkeys("h", () => {
-    setCursorMode({ type: "hand" });
+    setTool({ type: "hand" });
   });
 
   useHotkeys("a, f", () => {
-    setCursorMode({ type: "insert", node: "container" });
+    setTool({ type: "insert", node: "container" });
   });
 
   useHotkeys("r", () => {
-    setCursorMode({ type: "insert", node: "rectangle" });
+    setTool({ type: "insert", node: "rectangle" });
   });
 
   useHotkeys("o", () => {
-    setCursorMode({ type: "insert", node: "ellipse" });
+    setTool({ type: "insert", node: "ellipse" });
   });
 
   useHotkeys("t", () => {
-    setCursorMode({ type: "insert", node: "text" });
+    setTool({ type: "insert", node: "text" });
   });
 
   useHotkeys("l", () => {
-    setCursorMode({ type: "draw", tool: "line" });
+    setTool({ type: "draw", tool: "line" });
   });
 
   useHotkeys("p", () => {
-    setCursorMode({ type: "path" });
+    setTool({ type: "path" });
   });
 
   useHotkeys("shift+p", () => {
-    setCursorMode({ type: "draw", tool: "pencil" });
+    setTool({ type: "draw", tool: "pencil" });
   });
 
-  useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
+  useHotkeys("b", () => {
+    setTool({
+      type: "brush",
+    });
+  });
+
+  useHotkeys("e", () => {
+    setTool({
+      type: "eraser",
+    });
+  });
+
+  useHotkeys("g", () => {
+    if (content_edit_mode?.type === "bitmap") {
+      setTool({
+        type: "flood-fill",
+      });
+    }
+  });
+
+  useHotkeys("1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
     if (selection.length) {
       const i = parseInt(e.key);
       const o = i / 10;
       setOpacity("selection", o);
       toast.success(`opacity: ${o}`);
     }
+  });
+
+  useSingleDoublePressHotkey("0", (type) => {
+    const o = type === "single" ? 1 : 0;
+    setOpacity("selection", o);
+    toast.success(`opacity: ${o}`);
   });
 
   useHotkeys("shift+0", (e) => {
@@ -747,11 +872,19 @@ export function useEditorHotKeys() {
   );
 
   useHotkeys("]", (e) => {
-    order("selection", "front");
+    if (tool.type === "brush") {
+      changeBrushSize({ type: "delta", value: 1 });
+    } else {
+      order("selection", "front");
+    }
   });
 
   useHotkeys("[", (e) => {
-    order("selection", "back");
+    if (tool.type === "brush") {
+      changeBrushSize({ type: "delta", value: -1 });
+    } else {
+      order("selection", "back");
+    }
   });
 
   useHotkeys("alt+a", (e) => {
@@ -799,8 +932,22 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+a", (e) => {
-    // TODO:
-    toast.error("[container layout] is not implemented yet");
+    autoLayout("selection");
+  });
+
+  useHotkeys(
+    "ctrl+g, meta+g",
+    () => {
+      // TODO:
+      toast("use ⌥⌘G for grouping");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys("ctrl+alt+g, meta+alt+g", () => {
+    contain("selection");
   });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {

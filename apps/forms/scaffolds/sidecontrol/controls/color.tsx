@@ -14,14 +14,14 @@ type RGBA = { r: number; g: number; b: number; a: number };
 
 export type RGBAColorControlProps = {
   value: RGBA;
-  onValueChange: (value: RGBA) => void;
+  onValueChange?: (value: RGBA) => void;
 };
 
 export function RGBAColorControl({
-  value,
+  value = { r: 0, g: 0, b: 0, a: 0 },
   onValueChange,
 }: {
-  value: RGBA;
+  value?: RGBA;
   onValueChange?: (value: RGBA) => void;
 }) {
   return (
@@ -29,7 +29,7 @@ export function RGBAColorControl({
       <div
         className={cn(
           "flex items-center border cursor-default",
-          WorkbenchUI.inputVariants({ size: "xs" })
+          WorkbenchUI.inputVariants({ size: "xs", variant: "paint-container" })
         )}
       >
         <PopoverTrigger>

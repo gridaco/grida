@@ -16,7 +16,7 @@ import { SideControl } from "@/scaffolds/sidecontrol";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FrameIcon, PlusIcon } from "@radix-ui/react-icons";
 import {
-  cursormode_to_toolbar_value,
+  toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-react-canvas/toolbar";
@@ -25,7 +25,10 @@ import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { CanvasDocumentSnapshotSchema } from "@/types";
 import equal from "deep-equal";
 import { grida } from "@/grida";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import {
   ToolIcon,
   ToolsGroup,
@@ -107,7 +110,7 @@ export default function CanvasPage() {
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
               <EditorSurfaceContextMenu>
-                <div className="w-full h-full flex flex-col relative bg-black/5">
+                <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                   <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                     <EditorSurface />
                     <AutoInitialFitTransformer>
@@ -117,7 +120,7 @@ export default function CanvasPage() {
                       <Toolbar />
                     </div>
                   </ViewportRoot>
-                </div>
+                </StandaloneDocumentBackground>
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>
@@ -137,14 +140,14 @@ function Hotkyes() {
 }
 
 function Toolbar() {
-  const { setCursorMode, cursor_mode } = useEventTarget();
-  const value = cursormode_to_toolbar_value(cursor_mode);
+  const { setTool, tool } = useEventTarget();
+  const value = toolmode_to_toolbar_value(tool);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
       <ToggleGroup
         onValueChange={(v) => {
-          setCursorMode(
+          setTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -161,7 +164,7 @@ function Toolbar() {
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <VerticalDivider />
@@ -180,7 +183,7 @@ function Toolbar() {
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <ToolsGroup
@@ -188,9 +191,11 @@ function Toolbar() {
           options={[
             { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
             { value: "path", label: "Path tool", shortcut: "P" },
+            { value: "brush", label: "Brush tool", shortcut: "B" },
+            { value: "eraser", label: "Eraser tool", shortcut: "E" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
       </ToggleGroup>

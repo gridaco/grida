@@ -11,7 +11,7 @@ import { vector2ToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import assert from "assert";
 
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
-  const { debug, cursor_mode, transform } = useEventTarget();
+  const { debug, tool, transform } = useEventTarget();
   const {
     node_id,
     offset,
@@ -72,7 +72,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
           </svg>
         )}
       </div>
-      {cursor_mode.type === "path" && typeof a_point === "number" && (
+      {tool.type === "path" && typeof a_point === "number" && (
         <>
           {/* next segment */}
           <Extension
@@ -91,7 +91,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
         const ta = s.ta;
         const tb = s.tb;
         const is_neighbouring = a_point === s.a || a_point === s.b;
-        if (!is_neighbouring) return <></>;
+        if (!is_neighbouring) return null;
 
         return (
           <React.Fragment key={i}>

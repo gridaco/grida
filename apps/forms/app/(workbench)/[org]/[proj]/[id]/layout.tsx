@@ -8,6 +8,7 @@ import {
   createServerComponentWorkspaceClient,
   createServerComponentCanvasClient,
   grida_xsupabase_client,
+  createServerComponentStorageClient,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
@@ -343,7 +344,7 @@ export default async function Layout({
           "id",
           data.tables
             .map((t) => t.supabase_connection?.main_supabase_table_id)
-            .filter((x) => x)
+            .filter((x) => x) as number[]
         );
 
       if (xsb_tables_err) {
@@ -418,6 +419,54 @@ export default async function Layout({
         </Html>
       );
     }
+    case "v0_bucket": {
+      const storageclient = createServerComponentStorageClient(cookieStore);
+      const { data, error } = await storageclient
+        .from("bucket_document")
+        .select("*")
+        .eq("id", masterdoc_ref.id)
+        .single();
+
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
+
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_bucket",
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              user_id: user.id,
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {children}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+
+      break;
+    }
     case "v0_canvas": {
       const canvasclient = createServerComponentCanvasClient(cookieStore);
 
@@ -467,6 +516,7 @@ export default async function Layout({
       );
     }
     default: {
+      console.error("unsupported doctype", masterdoc_ref.doctype);
       redirect("/");
     }
   }

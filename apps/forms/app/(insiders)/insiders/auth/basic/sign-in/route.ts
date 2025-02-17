@@ -21,6 +21,7 @@ export async function POST(req: NextRequest, res: NextResponse) {
   });
 
   if (error) {
+    console.error("[INSIDER] Sign in error", error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useRef } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   DropzoneIndication,
   GestureState,
+  type Guide,
   useEventTarget,
 } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
@@ -18,11 +19,14 @@ import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
-import { ViewportSurfaceContext } from "./context";
+import { ViewportSurfaceContext, useViewport } from "./context";
 import {
-  useGroupSurfaceTransform,
-  useNodeSurfaceTransfrom,
-} from "./hooks/transform";
+  SurfaceSelectionGroup,
+  SurfaceSelectionGroupProvider,
+  useSurfaceSelectionGroups,
+  useSelectionGroups,
+  useSingleSelection,
+} from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
@@ -33,12 +37,17 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
-import { RedDotHandle } from "./ui/reddot";
 import {
-  SurfaceSelectionGroupProvider,
-  useSurfaceSelectionGroup,
-} from "./core";
+  vector2ToSurfaceSpace,
+  rectToSurfaceSpace,
+  offsetToSurfaceSpace,
+} from "../utils/transform";
+import { RedDotHandle } from "./ui/reddot";
+import { ObjectsDistributionAnalysis } from "./ui/distribution";
+import { AxisRuler, Tick } from "@grida/ruler";
+import { PixelGrid } from "@grida/pixel-grid";
+import { Rule } from "./ui/rule";
+import type { BitmapEditorBrush } from "@grida/bitmap";
 
 const DRAG_THRESHOLD = 2;
 
@@ -123,11 +132,14 @@ export function EditorSurface() {
     zoom,
     pan,
     pointer,
+    ruler,
+    pixelgrid,
     marquee,
     hovered_node_id,
     dropzone,
     selection,
-    cursor_mode,
+    tool,
+    brush,
     is_node_transforming,
     is_node_translating,
     content_edit_mode,
@@ -270,7 +282,7 @@ export function EditorSurface() {
     }
   );
 
-  const selectiondata = useGroupSurfaceTransform(...selection);
+  const selectiondata = useSelectionGroups(...selection);
 
   return (
     <SurfaceSelectionGroupProvider value={selectiondata}>
@@ -287,12 +299,13 @@ export function EditorSurface() {
           cursor: cursor,
         }}
       >
+        {ruler === "on" && <RulerGuideOverlay />}
+        {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
-        {/* <div className="absolute w-full h-full z-50">
-        {transform[0][0] > 4 && (
-          <PixelGrid zoomLevel={transform[0][0]} cellSize={1} />
+        {(tool?.type === "brush" || tool?.type === "eraser") && (
+          <BrushCursor brush={brush} />
         )}
-      </div> */}
+
         <div
           style={{
             position: "absolute",
@@ -352,9 +365,7 @@ export function EditorSurface() {
           >
             <SurfaceGroup
               hidden={
-                !!marquee ||
-                cursor_mode.type !== "cursor" ||
-                is_node_transforming
+                !!marquee || tool.type !== "cursor" || is_node_transforming
               }
             >
               {hovered_node_id && (
@@ -426,6 +437,45 @@ function FloatingCursorTooltip() {
   }
 }
 
+function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
+  const { transform, scaleX, scaleY } = useTransform();
+  const { pointer } = useEventTarget();
+  const pos = vector2ToSurfaceSpace(
+    // quantize position to canvas space 1.
+    cmath.vector2.quantize(pointer.position, 1),
+    // pointer.position,
+    transform
+  );
+  const { size: _size } = brush;
+  const [width, height] = cmath.vector2.multiply(_size, [scaleX, scaleY]);
+
+  return (
+    <svg
+      className="absolute pointer-events-none transform-gpu"
+      style={{
+        zIndex: 99,
+        top: pos[1],
+        left: pos[0],
+        overflow: "visible",
+        transform: `translate(-50%, -50%)`,
+      }}
+      width={width}
+      height={height}
+    >
+      <rect
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        fill="transparent"
+        stroke="black"
+        strokeWidth={1}
+      />
+      {/* <circle r={size / 2} fill="transparent" stroke="black" strokeWidth={2} /> */}
+    </svg>
+  );
+}
+
 function get_cursor_tooltip_value(gesture: GestureState) {
   switch (gesture.type) {
     case "gap":
@@ -447,63 +497,113 @@ function SelectionOverlay({
   readonly?: boolean;
   selection?: string[];
 }) {
-  const { is_node_translating, gesture } = useEventTarget();
-
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
     return (
-      <SurfaceGroup hidden={is_node_translating}>
-        <NodeOverlay node_id={selection[0]} readonly={readonly} focused />
-      </SurfaceGroup>
+      <SingleSelectionOverlay node_id={selection[0]} readonly={readonly} />
     );
   } else {
-    return (
-      <div className="group">
-        {(gesture.type === "idle" || gesture.type === "gap") && <GapOverlay />}
-        <SurfaceGroup hidden={is_node_translating}>
-          <SortOverlay />
-          <MultipleSelectionOverlay selection={selection} readonly={readonly} />
-        </SurfaceGroup>
-      </div>
-    );
+    return <MultpleSelectionGroupsOverlay readonly={readonly} />;
   }
 }
 
-function MultipleSelectionOverlay({
-  selection,
+function SingleSelectionOverlay({
+  node_id,
   readonly,
 }: {
-  selection: string[];
+  node_id: string;
   readonly?: boolean;
 }) {
-  const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
+  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const data = useSingleSelection(node_id);
+  if (!data) return <></>;
+
+  const { node, distribution, rotation, style, boundingSurfaceRect } = data;
+
+  return (
+    <>
+      <div className="group">
+        {node.meta.is_flex_parent &&
+          distribution &&
+          (gesture.type === "idle" || gesture.type === "gap") &&
+          // TODO: support rotated surface
+          rotation === 0 && (
+            <>
+              <GapOverlay
+                offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                distribution={distribution}
+                style={style}
+                onGapGestureStart={(axis) => {
+                  startGapGesture(node_id, axis);
+                }}
+              />
+            </>
+          )}
+        <SurfaceGroup hidden={is_node_translating}>
+          <NodeOverlay node_id={node_id} readonly={readonly} focused />
+        </SurfaceGroup>
+      </div>
+    </>
+  );
+}
+
+function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
+  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const groups = useSurfaceSelectionGroups();
+
+  return (
+    <>
+      {groups.map((g: SurfaceSelectionGroup) => (
+        <div key={g.group} className="group">
+          {(gesture.type === "idle" || gesture.type === "gap") &&
+            g.distribution && (
+              <GapOverlay
+                offset={[g.boundingSurfaceRect.x, g.boundingSurfaceRect.y]}
+                distribution={g.distribution}
+                style={g.style}
+                onGapGestureStart={(axis) => {
+                  startGapGesture(g.ids, axis);
+                }}
+              />
+            )}
+          <SurfaceGroup hidden={is_node_translating}>
+            <SortOverlay {...g} />
+            <SelectionGroupOverlay {...g} readonly={readonly} />
+          </SurfaceGroup>
+        </div>
+      ))}
+    </>
+  );
+  //
+}
+
+function SelectionGroupOverlay({
+  readonly,
+  ...groupdata
+}: SurfaceSelectionGroup & {
+  readonly?: boolean;
+}) {
+  const { multipleSelectionOverlayClick, tool } = useEventTarget();
 
   const { distributeEvenly } = useDocument();
 
-  const {
-    style,
-    boundingSurfaceRect: boundingRect,
-    size,
-    distribution,
-  } = useSurfaceSelectionGroup();
+  const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
-  const { preferredDistributeEvenlyActionAxis } = distribution;
-
-  const enabled = !readonly && cursor_mode.type === "cursor";
+  const enabled = !readonly && tool.type === "cursor";
 
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
+        if (tool.type !== "insert" && tool.type !== "draw") {
           // otherwise, it should be stopped here
           // prevent default to prevent the master event target from changing the selection
           event.preventDefault();
         }
       },
       onClick: (e) => {
-        multipleSelectionOverlayClick(selection, e.event);
+        multipleSelectionOverlayClick(ids, e.event);
         e.event.stopPropagation();
       },
     },
@@ -517,6 +617,10 @@ function MultipleSelectionOverlay({
     }
   );
 
+  if (!distribution) return <></>;
+
+  const { preferredDistributeEvenlyActionAxis } = distribution;
+
   return (
     <>
       <LayerOverlay
@@ -525,14 +629,14 @@ function MultipleSelectionOverlay({
         transform={style}
         zIndex={10}
       >
-        <LayerOverlayResizeHandle anchor="n" selection={selection} />
-        <LayerOverlayResizeHandle anchor="s" selection={selection} />
-        <LayerOverlayResizeHandle anchor="e" selection={selection} />
-        <LayerOverlayResizeHandle anchor="w" selection={selection} />
-        <LayerOverlayResizeHandle anchor="nw" selection={selection} />
-        <LayerOverlayResizeHandle anchor="ne" selection={selection} />
-        <LayerOverlayResizeHandle anchor="sw" selection={selection} />
-        <LayerOverlayResizeHandle anchor="se" selection={selection} />
+        <LayerOverlayResizeHandle anchor="n" selection={ids} />
+        <LayerOverlayResizeHandle anchor="s" selection={ids} />
+        <LayerOverlayResizeHandle anchor="e" selection={ids} />
+        <LayerOverlayResizeHandle anchor="w" selection={ids} />
+        <LayerOverlayResizeHandle anchor="nw" selection={ids} />
+        <LayerOverlayResizeHandle anchor="ne" selection={ids} />
+        <LayerOverlayResizeHandle anchor="sw" selection={ids} />
+        <LayerOverlayResizeHandle anchor="se" selection={ids} />
         {/*  */}
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
@@ -540,18 +644,18 @@ function MultipleSelectionOverlay({
             distributeEvenly("selection", axis);
           }}
         />
-        {boundingRect && (
+        {boundingSurfaceRect && (
           <SizeMeterLabel
             offset={16}
             size={size}
-            rect={{ ...boundingRect, x: 0, y: 0 }}
+            rect={{ ...boundingSurfaceRect, x: 0, y: 0 }}
             className="bg-workbench-accent-sky text-white"
           />
         )}
       </LayerOverlay>
       {
         // also hightlight the included nodes
-        selection.map((node_id) => (
+        ids.map((node_id) => (
           <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={1} />
         ))
       }
@@ -570,57 +674,80 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const { style, rect, size } = useNodeSurfaceTransfrom(node_id);
-  const node = useNode(node_id);
+  const { scaleX, scaleY } = useTransform();
 
-  const { is_component_consumer } = node.meta;
+  const data = useSingleSelection(node_id);
+
+  if (!data) return <></>;
+
+  const { node, style, size } = data;
+
+  const { is_component_consumer, is_flex_parent } = node.meta;
   readonly = readonly || is_component_consumer;
 
+  const measurement_rect = {
+    x: 0,
+    y: 0,
+    width: size[0] * scaleX,
+    height: size[1] * scaleY,
+  };
+
+  {
+    /* TODO: resize for bitmap is not supported */
+  }
+  const is_resizable_node = node.type !== "bitmap";
+
   return (
-    <LayerOverlay
-      readonly={readonly}
-      transform={style}
-      zIndex={zIndex}
-      isComponentConsumer={is_component_consumer}
-    >
-      {focused && !readonly && (
-        <>
-          {node.type === "line" ? (
-            <>
-              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-            </>
-          ) : (
-            <>
-              <LayerOverlayResizeHandle anchor="n" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="s" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="se" selection={node_id} />
-            </>
-          )}
-          {supports.cornerRadius(node.type) &&
-            !supports.children(node.type) && (
-              <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+    <>
+      <LayerOverlay
+        readonly={readonly}
+        transform={style}
+        zIndex={zIndex}
+        isComponentConsumer={is_component_consumer}
+      >
+        {focused && !readonly && (
+          <>
+            {is_resizable_node && (
+              <>
+                {node.type === "line" ? (
+                  <>
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                  </>
+                ) : (
+                  <>
+                    <LayerOverlayResizeHandle anchor="n" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="s" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                  </>
+                )}
+              </>
             )}
-          <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
-        </>
-      )}
-      {focused && !readonly && rect && (
-        <SizeMeterLabel
-          offset={16}
-          size={size}
-          rect={{ ...rect, x: 0, y: 0 }}
-          className="bg-workbench-accent-sky text-white"
-        />
-      )}
-    </LayerOverlay>
+            {supports.cornerRadius(node.type) &&
+              !supports.children(node.type) && (
+                <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+              )}
+            <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
+          </>
+        )}
+        {focused && !readonly && (
+          <SizeMeterLabel
+            offset={16}
+            size={size}
+            rect={{ ...measurement_rect, x: 0, y: 0 }}
+            className="bg-workbench-accent-sky text-white"
+          />
+        )}
+      </LayerOverlay>
+    </>
   );
 }
 
@@ -752,12 +879,13 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
-function SortOverlay() {
+function SortOverlay(props: SurfaceSelectionGroup) {
   const {
+    ids,
     objects: items,
     boundingSurfaceRect: boundingClientRect,
     style,
-  } = useSurfaceSelectionGroup();
+  } = props;
 
   return (
     <div style={style} className="pointer-events-none z-50">
@@ -777,7 +905,7 @@ function SortOverlay() {
                 boundingClientRect.x,
             }}
           >
-            <RedDotSortHandle node_id={item.id} />
+            <RedDotSortHandle selection={ids} node_id={item.id} />
           </div>
         );
       })}
@@ -785,8 +913,13 @@ function SortOverlay() {
   );
 }
 
-function RedDotSortHandle({ node_id }: { node_id: string }) {
-  const { selection } = useSurfaceSelectionGroup();
+function RedDotSortHandle({
+  selection,
+  node_id,
+}: {
+  node_id: string;
+  selection: string[];
+}) {
   const { startSortGesture } = useEventTarget();
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
@@ -801,38 +934,49 @@ function RedDotSortHandle({ node_id }: { node_id: string }) {
   return <RedDotHandle {...bind()} />;
 }
 
-function GapOverlay() {
-  const {
-    objects: items,
-    boundingSurfaceRect,
-    distribution,
-    style,
-  } = useSurfaceSelectionGroup();
+function GapOverlay({
+  onGapGestureStart,
+  offset,
+  style,
+  distribution,
+}: {
+  distribution: ObjectsDistributionAnalysis;
+  offset?: cmath.Vector2;
+  style?: React.CSSProperties;
+} & {
+  onGapGestureStart?: (axis: cmath.Axis) => void;
+}) {
+  const { transform } = useTransform();
 
-  const { x, y } = distribution;
+  const { x, y, rects: _rects } = distribution;
+
+  // rects in surface space
+  const rects = useMemo(
+    () => _rects.map((r) => rectToSurfaceSpace(r, transform)),
+    [_rects, transform]
+  );
 
   return (
     <div style={style} className="pointer-events-none z-50">
       <div>
-        {items.length >= 2 && (
+        {_rects.length >= 2 && (
           <>
             {x && x.gap !== undefined && (
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
                   const axis = "x";
-                  const x_sorted = items.sort(
-                    (a, b) => a.boundingSurfaceRect.x - b.boundingSurfaceRect.x
-                  );
+                  const x_sorted = rects.sort((a, b) => a.x - b.x);
                   const a = x_sorted[i];
                   const b = x_sorted[i + 1];
 
                   return (
-                    <Gap
+                    <GapWithHandle
                       key={i}
-                      a={a.boundingSurfaceRect}
-                      b={b.boundingSurfaceRect}
+                      a={a}
+                      b={b}
                       axis={axis}
-                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      offset={offset}
+                      onGapGestureStart={onGapGestureStart}
                     />
                   );
                 })}
@@ -842,19 +986,18 @@ function GapOverlay() {
               <>
                 {Array.from({ length: y.gaps.length }).map((_, i) => {
                   const axis = "y";
-                  const y_sorted = items.sort(
-                    (a, b) => a.boundingSurfaceRect.y - b.boundingSurfaceRect.y
-                  );
+                  const y_sorted = rects.sort((a, b) => a.y - b.y);
                   const a = y_sorted[i];
                   const b = y_sorted[i + 1];
 
                   return (
-                    <Gap
+                    <GapWithHandle
                       key={i}
-                      a={a.boundingSurfaceRect}
-                      b={b.boundingSurfaceRect}
+                      a={a}
+                      b={b}
                       axis={axis}
-                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      offset={offset}
+                      onGapGestureStart={onGapGestureStart}
                     />
                   );
                 })}
@@ -867,21 +1010,25 @@ function GapOverlay() {
   );
 }
 
-function Gap({
+function GapWithHandle({
   a,
   b,
   axis,
   offset = cmath.vector2.zero,
+  onGapGestureStart,
 }: {
   a: cmath.Rectangle;
   b: cmath.Rectangle;
   axis: cmath.Axis;
   offset?: cmath.Vector2;
+  onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
   const { gesture } = useEventTarget();
 
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
+
+    if (!intersection) return null;
 
     let rect: cmath.Rectangle;
     if (axis === "x") {
@@ -911,6 +1058,8 @@ function Gap({
 
   const is_gesture = gesture.type === "gap";
 
+  if (!r) return null;
+
   return (
     <>
       <div
@@ -933,24 +1082,27 @@ function Gap({
           }}
           className="opacity-100 data-[is-gesture='true']:opacity-0"
         >
-          <GapHandle axis={axis} />
+          <GapHandle axis={axis} onGapGestureStart={onGapGestureStart} />
         </div>
       </div>
     </>
   );
 }
 
-function GapHandle({ axis }: { axis: cmath.Axis }) {
-  const { selection } = useSurfaceSelectionGroup();
-  const { startGapGesture } = useEventTarget();
-
+function GapHandle({
+  axis,
+  onGapGestureStart,
+}: {
+  axis: cmath.Axis;
+  onGapGestureStart?: (axis: cmath.Axis) => void;
+}) {
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startGapGesture(selection, axis);
+      onGapGestureStart?.(axis);
     },
   });
 
@@ -1001,6 +1153,205 @@ function DistributeButton({
       >
         {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}
       </button>
+    </div>
+  );
+}
+
+function PixelGridOverlay() {
+  const { transform, scaleX } = useTransform();
+  const viewport = useViewport();
+  return (
+    <div className="fixed inset-0">
+      {scaleX > 4 && (
+        <PixelGrid
+          transform={transform}
+          width={viewport?.clientWidth ?? 0}
+          height={viewport?.clientHeight ?? 0}
+        />
+      )}
+    </div>
+  );
+}
+
+function RulerGuideOverlay() {
+  const { guides, startGuideGesture } = useEventTarget();
+  const { scaleX, scaleY, transform } = useTransform();
+  const viewport = useViewport();
+  const d = useSurfaceSelectionGroups();
+
+  const bindX = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      startGuideGesture("y", -1);
+      event.preventDefault();
+    },
+  });
+
+  const bindY = useSurfaceGesture({
+    onDragStart: ({ event }) => {
+      startGuideGesture("x", -1);
+      event.preventDefault();
+    },
+  });
+
+  const ranges = useMemo(() => {
+    const flat = d.flatMap((g) => g.objects);
+    return flat
+      .map(({ boundingRect }) => {
+        const rect = cmath.rect.quantize(boundingRect, 0.01);
+        const x = cmath.range.fromRectangle(rect, "x");
+        const y = cmath.range.fromRectangle(rect, "y");
+        return { x, y };
+      })
+      .reduce(
+        (acc, { x, y }) => {
+          acc.x.push(x);
+          acc.y.push(y);
+          return acc;
+        },
+        { x: [] as cmath.Range[], y: [] as cmath.Range[] }
+      );
+  }, [d]);
+
+  const marks = guides.reduce(
+    (acc, g) => {
+      if (g.axis === "x") {
+        acc.y.push(g.offset);
+      } else {
+        acc.x.push(g.offset);
+      }
+      return acc;
+    },
+    { x: [] as number[], y: [] as number[] }
+  );
+
+  const tx = transform[0][2];
+  const ty = transform[1][2];
+
+  return (
+    <div className="fixed w-full h-full pointer-events-none z-50">
+      <div
+        {...bindX()}
+        className="z-30 fixed top-0 left-0 right-0 border-b bg-background cursor-ns-resize pointer-events-auto touch-none"
+      >
+        <AxisRuler
+          axis="x"
+          width={viewport?.clientWidth ?? 0}
+          height={20}
+          overlapThreshold={80}
+          textSideOffset={10}
+          zoom={scaleX}
+          offset={tx}
+          ranges={ranges.x}
+          marks={marks.y.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "start",
+                textAlignOffset: 8,
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
+                color: "red",
+              }) satisfies Tick
+          )}
+        />
+      </div>
+      <div
+        {...bindY()}
+        className="z-20 fixed top-0 left-0 bottom-0 border-r bg-background cursor-ew-resize pointer-events-auto touch-none"
+      >
+        <AxisRuler
+          axis="y"
+          width={20}
+          height={viewport?.clientHeight ?? 0}
+          overlapThreshold={80}
+          textSideOffset={10}
+          zoom={scaleY}
+          offset={ty}
+          ranges={ranges.y}
+          marks={marks.x.map(
+            (m) =>
+              ({
+                pos: m,
+                text: m.toString(),
+                textAlign: "end",
+                textAlignOffset: 8,
+                strokeColor: "red",
+                strokeWidth: 0.5,
+                strokeHeight: 24,
+                color: "red",
+              }) satisfies Tick
+          )}
+        />
+      </div>
+      {/* Guides */}
+      <div className="z-10">
+        {guides.map((g, i) => {
+          return <Guide key={i} idx={i} axis={g.axis} offset={g.offset} />;
+        })}
+      </div>
+    </div>
+  );
+  //
+}
+
+function Guide({ axis, offset, idx }: Guide & { idx: number }) {
+  const { transform } = useTransform();
+  const { startGuideGesture, deleteGuide } = useEventTarget();
+  const o = offsetToSurfaceSpace(offset, axis, transform);
+  const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  const bind = useSurfaceGesture({
+    onFocus: ({ event }) => {
+      event.stopPropagation();
+      setFocused(true);
+    },
+    onBlur: ({ event }) => {
+      event.stopPropagation();
+      setFocused(false);
+    },
+    onHover: (s) => {
+      if (s.first) setHover(true);
+      if (s.last) setHover(false);
+    },
+    onPointerDown: ({ event }) => {
+      // ensure the div focuses
+      (event.currentTarget as HTMLElement)?.focus();
+      event.preventDefault();
+    },
+    onKeyDown: ({ event }) => {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        deleteGuide(idx);
+      }
+      if (event.key === "Escape") {
+        (event.currentTarget as HTMLElement)?.blur();
+      }
+      event.stopPropagation();
+    },
+    onDragStart: ({ event }) => {
+      startGuideGesture(axis, idx);
+      event.preventDefault();
+    },
+  });
+
+  return (
+    <div
+      role="button"
+      tabIndex={idx}
+      {...bind()}
+      data-axis={axis}
+      className="pointer-events-auto touch-none cursor-pointer data-[axis='x']:cursor-ew-resize data-[axis='y']:cursor-ns-resize"
+    >
+      <Rule
+        width={hover || focused ? 1 : 0.5}
+        axis={cmath.counterAxis(axis)}
+        offset={o}
+        padding={4}
+        data-focus={focused}
+        className="data-[focus='true']:text-workbench-accent-sky"
+      />
     </div>
   );
 }

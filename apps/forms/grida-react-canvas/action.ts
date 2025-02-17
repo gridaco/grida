@@ -1,26 +1,29 @@
 import type { tokens } from "@grida/tokens";
 import type { grida } from "@/grida";
 import type {
-  CursorMode,
+  ToolMode,
   GestureCornerRadius,
   GestureCurve,
   GestureGap,
   GestureRotate,
   GestureScale,
   GestureSort,
+  GestureGuide,
   // GestureTranslate1DArrange,
   GestureTranslateVertex,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
 import { cmath } from "@grida/cmath";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 export type Action =
   | InternalAction
   | EditorCameraAction
   | EditorAction
   | EditorUndoAction
-  | EditorRedoAction;
+  | EditorRedoAction
+  | EditorClipAction;
 
 export type InternalAction = __InternalResetAction;
 
@@ -31,6 +34,7 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
+  | DocumentBackgroundAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -43,6 +47,8 @@ export type DocumentAction =
   | EditorA11yArrowAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
+  | EditorAutoLayoutAction
+  | EditorContainAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -110,6 +116,11 @@ export interface __InternalResetAction {
   state: IDocumentEditorState;
 }
 
+export interface DocumentBackgroundAction {
+  type: "background-color";
+  backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"];
+}
+
 export interface EditorSelectAction {
   type: "select";
   selectors: grida.program.document.Selector[];
@@ -131,6 +142,14 @@ export type EditorUndoAction = {
 
 export type EditorRedoAction = {
   type: "redo";
+};
+
+/**
+ * set to editor clipbard
+ */
+export type EditorClipAction = {
+  type: "clip/color";
+  color: grida.program.cg.RGBA8888;
 };
 
 // #region copy cut paste
@@ -248,6 +267,16 @@ export interface EditorDistributeEvenlyAction {
   type: "distribute-evenly";
   target: NodeID[] | "selection";
   axis: "x" | "y";
+}
+
+export interface EditorAutoLayoutAction {
+  type: "autolayout";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorContainAction {
+  type: "contain";
+  target: NodeID[] | "selection";
 }
 
 export type EditorConfigAction =
@@ -406,11 +435,50 @@ export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
 
 // #region surface action
 export type SurfaceAction =
+  | EditorSurface_RulerAndGuideAction
+  | EditorSurface_PixelGridStateAction
+  | EditorSurface_ChangeBrushAction
+  | EditorSurface_ChangeBrushSizeAction
+  | EditorSurface_ChangeBrushOpacityAction
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode
   | EditorSurface_StartGesture;
+
+type EditorSurface_RulerAndGuideAction =
+  | EditorSurface_RulerStateAction
+  | EditorSurface_DeleteGuideAction;
+
+export interface EditorSurface_RulerStateAction {
+  type: "surface/ruler";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_PixelGridStateAction {
+  type: "surface/pixel-grid";
+  state: "on" | "off";
+}
+
+export interface EditorSurface_ChangeBrushAction {
+  type: "surface/brush";
+  brush: BitmapEditorBrush;
+}
+
+export interface EditorSurface_ChangeBrushSizeAction {
+  type: "surface/brush/size";
+  size: TChange<number>;
+}
+
+export interface EditorSurface_ChangeBrushOpacityAction {
+  type: "surface/brush/opacity";
+  opacity: TChange<number>;
+}
+
+export interface EditorSurface_DeleteGuideAction {
+  type: "surface/guide/delete";
+  idx: number;
+}
 
 export type EditorSurface_EnterContentEditMode = {
   type: "surface/content-edit-mode/try-enter";
@@ -421,17 +489,18 @@ export type EditorSurface_ExitContentEditMode = {
 };
 
 export type EditorSurface_CursorMode = {
-  type: "surface/cursor-mode";
-  cursor_mode: CursorMode;
+  type: "surface/tool";
+  tool: ToolMode;
 };
 
 export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
+    | Pick<GestureGuide, "type" | "axis" | "idx">
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
     | (Pick<GestureSort, "type" | "node_id"> & { selection: string[] })
-    | (Pick<GestureGap, "type" | "axis"> & { selection: string[] })
+    | (Pick<GestureGap, "type" | "axis"> & { selection: string | string[] })
     | Pick<GestureCornerRadius, "type" | "node_id">
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;
@@ -508,11 +577,11 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.cg.PaintWithoutID | null;
+  fill: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeAction extends INodeID {
-  stroke: grida.program.cg.PaintWithoutID | null;
+  stroke: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeWidthAction extends INodeID {
@@ -717,24 +786,24 @@ export type SchemaAction =
   | DocumentSchemaUpdatePropertyAction;
 
 export interface DocumentSchemaDefinePropertyAction {
-  type: "document/schema/property/define";
-  name?: string;
+  type: "document/properties/define";
+  key?: string;
   definition?: grida.program.schema.PropertyDefinition;
 }
 
 export interface DocumentSchemaUpdatePropertyAction {
-  type: "document/schema/property/update";
-  name: string;
+  type: "document/properties/update";
+  key: string;
   definition: grida.program.schema.PropertyDefinition;
 }
 
 export interface DocumentSchemaRenamePropertyAction {
-  type: "document/schema/property/rename";
-  name: string;
-  newName: string;
+  type: "document/properties/rename";
+  key: string;
+  newKey: string;
 }
 
 export interface DocumentSchemaDeletePropertyAction {
-  type: "document/schema/property/delete";
-  name: string;
+  type: "document/properties/delete";
+  key: string;
 }

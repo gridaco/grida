@@ -13,10 +13,12 @@ import type {
   EditorEventTarget_DragEnd,
   //
 } from "../action";
-import type {
-  GestureDraw,
-  IDocumentEditorState,
-  IMinimalDocumentState,
+import {
+  __global_editors,
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+  IDocumentEditorClipboardState,
+  type GestureDraw,
+  type IDocumentEditorState,
 } from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
@@ -38,6 +40,10 @@ import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
+import { snapGuideTranslation, threshold } from "./tools/snap";
+import { BitmapLayerEditor } from "@grida/bitmap";
+
+const black = { r: 0, g: 0, b: 0, a: 1 };
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -80,6 +86,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.pointer = {
           position: canvas_space_pointer_position,
+          last: draft.pointer.position,
         };
 
         if (draft.content_edit_mode?.type === "path") {
@@ -135,7 +142,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { node_ids_from_point } = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor":
           case "hand":
             // ignore
@@ -152,13 +159,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "insert":
             const parent = __get_insert_target(draft);
 
-            const nnode = initialNode(draft.cursor_mode.node);
+            const nnode = initialNode(draft.tool.node);
 
             const cdom = new domapi.CanvasDOM(draft.transform);
             const parent_rect = cdom.getNodeBoundingRect(parent)!;
 
             try {
-              const _nnode = nnode as grida.program.nodes.AnyNode;
+              const _nnode = nnode as grida.program.nodes.UnknwonNode;
 
               // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
               const center_translate_delta: cmath.Vector2 =
@@ -186,7 +193,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             self_insertNode(draft, parent, nnode);
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
 
             // if the node is text, enter content edit mode
@@ -246,7 +253,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
 
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor": {
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
             // ignore if in content edit mode
@@ -338,7 +345,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 height: 0,
                 rotation: 0,
                 zIndex: 0,
-                stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+                stroke: { type: "solid", color: black },
                 strokeCap: "butt",
                 strokeWidth: 1,
                 vectorNetwork: {
@@ -369,6 +376,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             //
             break;
           }
+          case "eraser":
+          case "brush": {
+            self_brush(draft, { is_gesture: false });
+            break;
+          }
+          case "flood-fill": {
+            assert(state.content_edit_mode?.type === "bitmap");
+            self_floodfill(draft, state.content_edit_mode.imageRef);
+            break;
+          }
         }
       });
     }
@@ -390,7 +407,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.dropzone = undefined;
         draft.surface_snapping = undefined;
 
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "cursor": {
             // TODO: improve logic
             if (shiftKey) {
@@ -428,6 +445,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             draft.gesture = {
               type: "pan",
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
             };
             break;
           }
@@ -441,7 +460,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 1,
             };
             //
-            const nnode = initialNode(draft.cursor_mode.node, {
+            const nnode = initialNode(draft.tool.node, {
               left: initial_rect.x,
               top: initial_rect.y,
               width: initial_rect.width,
@@ -449,7 +468,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             });
 
             self_insertNode(draft, parent, nnode);
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
             self_start_gesture_scale_draw_new_node(draft, {
               new_node_id: nnode.id,
@@ -459,7 +478,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "draw": {
-            const tool = draft.cursor_mode.tool;
+            const tool = draft.tool.tool;
 
             let vector:
               | grida.program.nodes.PathNode
@@ -478,7 +497,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 0,
               rotation: 0,
               zIndex: 0,
-              stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+              stroke: { type: "solid", color: black },
               strokeCap: "butt",
             } as const;
 
@@ -530,6 +549,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               mode: tool,
               origin: node_relative_pos,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               points: [cmath.vector2.zero],
               node_id: vector.id,
             };
@@ -570,6 +591,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 control: "ta",
                 initial: cmath.vector2.zero,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
                 invert: false,
               };
             } else if (segments.length === 1) {
@@ -591,6 +614,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             break;
           }
+          case "eraser":
+          case "brush": {
+            self_brush(draft, { is_gesture: true });
+            break;
+          }
         }
       });
     }
@@ -599,10 +627,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        switch (draft.cursor_mode.type) {
+        switch (draft.tool.type) {
           case "draw":
             // keep if pencil mode
-            if (draft.cursor_mode.tool === "pencil") break;
+            if (draft.tool.tool === "pencil") break;
+          case "brush":
+          case "eraser":
+          case "flood-fill":
+            // keep for paint mode
+            break;
           case "path":
           case "hand":
             // keep
@@ -626,7 +659,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
           }
           case "cursor": {
@@ -644,13 +677,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
           }
           case "insert":
           default:
             // cancel to default
-            draft.cursor_mode = { type: "cursor" };
+            draft.tool = { type: "cursor" };
             break;
         }
 
@@ -672,6 +705,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           if (draft.gesture.type === "idle") return;
           if (draft.gesture.type === "nudge") return;
 
+          draft.gesture.last = draft.gesture.movement;
           draft.gesture.movement = movement;
 
           switch (draft.gesture.type) {
@@ -686,6 +720,34 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 draft.transform,
                 original_delta
               );
+              break;
+            }
+            case "guide": {
+              const { axis, idx: index, initial_offset } = draft.gesture;
+
+              const counter = axis === "x" ? 0 : 1;
+              const m = movement[counter];
+
+              const cdom = new domapi.CanvasDOM(state.transform);
+
+              // [snap the guide offset]
+              // 1. to pixel grid (quantize 1)
+              // 2. to objects geometry
+              const { translated } = snapGuideTranslation(
+                axis,
+                initial_offset,
+                [cdom.getNodeBoundingRect(state.document.root_id)!],
+                m,
+                threshold(
+                  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+                  draft.transform
+                )
+              );
+
+              const offset = cmath.quantize(translated, 1);
+
+              draft.gesture.offset = offset;
+              draft.guides[index].offset = offset;
               break;
             }
             // [insertion mode - resize after insertion]
@@ -710,18 +772,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const {
                 gesture_modifiers: { tarnslate_with_axis_lock },
               } = state;
-              const mode = draft.gesture.mode;
-
-              const {
-                origin: origin,
-                points,
-                node_id,
-              } = state.gesture as GestureDraw;
-
-              const node = document.__getNodeById(
-                draft,
-                node_id
-              ) as grida.program.nodes.PathNode;
 
               const adj_movement =
                 tarnslate_with_axis_lock === "on"
@@ -729,6 +779,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   : movement;
 
               const point = cmath.ext.movement.normalize(adj_movement);
+
+              const mode = draft.gesture.mode;
+
+              const { origin, points, node_id } = state.gesture as GestureDraw;
+
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.PathNode;
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),
@@ -748,24 +807,24 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               // get the box of the points
               const bb = vne.getBBox();
+              const raw_offset: cmath.Vector2 = [bb.x, bb.y];
+              // snap/round the offset so it doesn't keep producing sub-pixel re-centers
+              const snapped_offset = cmath.vector2.quantize(raw_offset, 1);
 
-              // delta is the x, y of the new bounding box - as it started from [0, 0]
-              const delta: cmath.Vector2 = [bb.x, bb.y];
+              vne.translate(cmath.vector2.invert(snapped_offset));
 
-              // update the points with the delta (so the most left top point is to be [0, 0])
-              vne.translate(cmath.vector2.invert(delta));
-
-              const new_pos = cmath.vector2.add(origin, delta);
-
-              // update the node position & dimension
+              const new_pos = cmath.vector2.add(origin, snapped_offset);
               node.left = new_pos[0];
               node.top = new_pos[1];
               node.width = bb.width;
               node.height = bb.height;
-
-              // finally, update the node's vector network
               node.vectorNetwork = vne.value;
 
+              break;
+            }
+
+            case "brush": {
+              self_brush(draft, { is_gesture: true });
               break;
             }
             case "curve": {
@@ -923,39 +982,61 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const delta = movement[axis === "x" ? 0 : 1];
               const side: "left" | "top" = axis === "x" ? "left" : "top";
 
-              const sorted = layout.objects
-                .slice()
-                .sort((a, b) => a[axis] - b[axis]);
+              switch (layout.type) {
+                case "group": {
+                  const sorted = layout.objects
+                    .slice()
+                    .sort((a, b) => a[axis] - b[axis]);
 
-              const gap = cmath.quantize(
-                Math.max(initial_gap + delta, min_gap),
-                1
-              );
+                  const gap = cmath.quantize(
+                    Math.max(initial_gap + delta, min_gap),
+                    1
+                  );
 
-              // start from the first sorted object's position.
-              let currentPos = sorted[0][axis];
+                  // start from the first sorted object's position.
+                  let currentPos = sorted[0][axis];
 
-              // Calculate new positions considering each rect's dimension.
-              const transformed = sorted.map((obj) => {
-                const next = { ...obj };
-                next[axis] = cmath.quantize(currentPos, 1);
-                currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
-                return next;
-              });
+                  // Calculate new positions considering each rect's dimension.
+                  const transformed = sorted.map((obj) => {
+                    const next = { ...obj };
+                    next[axis] = cmath.quantize(currentPos, 1);
+                    currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
+                    return next;
+                  });
 
-              // Update layout objects with new positions.
-              draft.gesture.layout.objects = transformed;
-              draft.gesture.gap = gap;
+                  // Update layout objects with new positions.
+                  draft.gesture.layout.objects = transformed;
+                  draft.gesture.gap = gap;
 
-              // Apply transform to the actual nodes.
-              transformed.forEach((obj) => {
-                const node = document.__getNodeById(
-                  draft,
-                  obj.id
-                ) as grida.program.nodes.i.IPositioning;
+                  // Apply transform to the actual nodes.
+                  transformed.forEach((obj) => {
+                    const node = document.__getNodeById(
+                      draft,
+                      obj.id
+                    ) as grida.program.nodes.i.IPositioning;
 
-                node[side] = obj[axis];
-              });
+                    node[side] = obj[axis];
+                  });
+                  break;
+                }
+
+                case "flex": {
+                  const gap = cmath.quantize(
+                    Math.max(initial_gap + delta, min_gap),
+                    1
+                  );
+
+                  const container = document.__getNodeById(draft, layout.group);
+                  draft.document.nodes[layout.group] = nodeReducer(container, {
+                    type: "node/change/gap",
+                    gap: gap,
+                    node_id: container.id,
+                  });
+
+                  draft.gesture.gap = gap;
+                  break;
+                }
+              }
 
               break;
             }
@@ -994,6 +1075,194 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   return state;
 }
 
+function self_prepare_bitmap_node(
+  draft: Draft<IDocumentEditorState>,
+  node_id: string | null
+): Draft<grida.program.nodes.BitmapNode> {
+  if (!node_id) {
+    const new_node_id = nid();
+    const new_bitmap_ref_id = nid(); // TODO: use other id generator
+
+    const cdom = new domapi.CanvasDOM(draft.transform);
+    const parent = __get_insert_target(draft);
+    const parent_rect = cdom.getNodeBoundingRect(parent)!;
+    const node_relative_pos = cmath.vector2.quantize(
+      cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
+      1
+    );
+
+    const width = 0;
+    const height = 0;
+    const x = node_relative_pos[0];
+    const y = node_relative_pos[1];
+
+    const bitmap: grida.program.nodes.BitmapNode = {
+      type: "bitmap",
+      name: "bitmap",
+      id: new_node_id,
+      active: true,
+      locked: false,
+      position: "absolute",
+      opacity: 1,
+      rotation: 0,
+      zIndex: 0,
+      left: x,
+      top: y,
+      width: width,
+      height: height,
+      imageRef: new_bitmap_ref_id,
+    };
+
+    draft.document.textures[new_bitmap_ref_id] = {
+      type: "texture",
+      data: new Uint8ClampedArray(0),
+      width: 0,
+      height: 0,
+      version: 0,
+    };
+
+    self_insertNode(draft, parent, bitmap);
+
+    const node = document.__getNodeById(
+      draft,
+      new_node_id
+    ) as grida.program.nodes.BitmapNode;
+
+    self_clearSelection(draft);
+
+    return node;
+  } else {
+    return document.__getNodeById(
+      draft,
+      node_id
+    ) as grida.program.nodes.BitmapNode;
+  }
+}
+
+function self_brush(
+  draft: Draft<IDocumentEditorState>,
+  {
+    is_gesture,
+  }: {
+    is_gesture: boolean;
+  }
+) {
+  assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
+
+  let node_id =
+    draft.content_edit_mode?.type === "bitmap"
+      ? draft.content_edit_mode.node_id
+      : null;
+
+  let color: cmath.Vector4;
+  if (draft.gesture && draft.gesture.type == "brush") {
+    color = draft.gesture.color;
+  } else {
+    color = get_next_brush_pain_color(draft);
+  }
+
+  const blendmode =
+    draft.tool.type === "brush" ? "source-over" : "destination-out";
+  const brush = draft.brush;
+
+  const node = self_prepare_bitmap_node(draft, node_id);
+
+  const nodepos: cmath.Vector2 = [node.left!, node.top!];
+
+  const image = draft.document.textures[node.imageRef];
+  assert(image.type === "texture");
+
+  // set up the editor from global.
+  let bme: BitmapLayerEditor;
+  if (__global_editors.bitmap && __global_editors.bitmap.id === node.imageRef) {
+    bme = __global_editors.bitmap;
+  } else {
+    bme = new BitmapLayerEditor(
+      node.imageRef,
+      {
+        x: nodepos[0],
+        y: nodepos[1],
+        width: node.width,
+        height: node.height,
+      },
+      image.data,
+      image.version
+    );
+    __global_editors.bitmap = bme;
+  }
+  bme.open();
+
+  const pos: cmath.Vector2 = [...draft.pointer.position];
+
+  // brush
+  bme.brush(
+    // relpos,
+    pos,
+    { color, ...brush },
+    blendmode,
+    blendmode === "source-over" ? "auto" : "clip"
+  );
+
+  // update image
+  draft.document.textures[node.imageRef] = {
+    type: "texture",
+    data: bme.data,
+    version: bme.frame,
+    width: bme.width,
+    height: bme.height,
+  };
+
+  // transform node
+  node.left = bme.x;
+  node.top = bme.y;
+  node.width = bme.width;
+  node.height = bme.height;
+
+  if (is_gesture) {
+    if (draft.gesture.type === "idle") {
+      draft.gesture = {
+        type: "brush",
+        movement: cmath.vector2.zero,
+        first: cmath.vector2.zero,
+        last: cmath.vector2.zero,
+        color: color,
+        node_id: node.id,
+      };
+    }
+  } else {
+    bme.close();
+  }
+
+  draft.content_edit_mode = {
+    type: "bitmap",
+    node_id: node.id,
+    imageRef: node.imageRef,
+  };
+
+  return bme;
+}
+
+function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
+  const color = get_next_brush_pain_color(draft);
+  const bme = __global_editors.bitmap!;
+  bme.floodfill(draft.pointer.position, color);
+  draft.document.textures[imageRef] = {
+    type: "texture",
+    data: bme.data,
+    version: bme.frame,
+    width: bme.width,
+    height: bme.height,
+  };
+}
+
+function get_next_brush_pain_color(
+  state: IDocumentEditorClipboardState
+): cmath.Vector4 {
+  return grida.program.cg.rgba_to_unit8_chunk(
+    state.next_paint_color ?? state.user_clipboard_color ?? black
+  );
+}
+
 function self_start_gesture_scale_draw_new_node(
   draft: Draft<IDocumentEditorState>,
   {
@@ -1009,6 +1278,8 @@ function self_start_gesture_scale_draw_new_node(
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     selection: [new_node_id],
     direction: "se",
   };
@@ -1032,12 +1303,18 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
     initial_rects: rects,
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     is_currently_cloned: false,
   };
 }
 
 function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
   switch (draft.gesture.type) {
+    case "brush": {
+      __global_editors.bitmap?.close();
+      break;
+    }
     case "translate": {
       if (draft.gesture.is_currently_cloned) {
         // update the selection as the cloned nodes

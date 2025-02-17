@@ -19,10 +19,9 @@ export namespace cmath {
    */
   export type Axis = "x" | "y";
 
-  export const counterAxis = {
-    x: "y",
-    y: "x",
-  } as const;
+  export const counterAxis = (axis: Axis) => {
+    return axis === "x" ? "y" : "x";
+  };
 
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
@@ -820,6 +819,12 @@ export namespace cmath.vector2 {
   }
 }
 
+export namespace cmath.vector4 {
+  export function identical(a: Vector4, b: Vector4): boolean {
+    return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+  }
+}
+
 export namespace cmath.compass {
   /**
    * Inverted cardinal directions `nw -> se, ne -> sw` and so on
@@ -1491,16 +1496,16 @@ export namespace cmath.rect {
    *
    * @example
    * const rect = { x: 10, y: 20, width: 30, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [25, 40]
    *
    * @example
    * // Handles rectangles with zero width or height
    * const rect = { x: 10, y: 20, width: 0, height: 40 };
-   * const center = cmath.rect.center(rect);
+   * const center = cmath.rect.getCenter(rect);
    * console.log(center); // [10, 40]
    */
-  export function center(rect: cmath.Rectangle): cmath.Vector2 {
+  export function getCenter(rect: cmath.Rectangle): cmath.Vector2 {
     const centerX = rect.x + rect.width / 2;
     const centerY = rect.y + rect.height / 2;
     return [centerX, centerY];
@@ -1737,7 +1742,7 @@ export namespace cmath.rect {
    * @remarks
    * - The function performs a strict equality check on the `x`, `y`, `width`, and `height` properties.
    */
-  export function identical(
+  export function isIdentical(
     rectA: cmath.Rectangle,
     rectB: cmath.Rectangle
   ): boolean {
@@ -1772,7 +1777,7 @@ export namespace cmath.rect {
 
     const [first, ...rest] = rects;
 
-    return rest.every((rect) => cmath.rect.identical(first, rect));
+    return rest.every((rect) => cmath.rect.isIdentical(first, rect));
   }
 
   /**
@@ -2831,6 +2836,547 @@ export namespace cmath.transform {
   }
 }
 
+/**
+ * Rasterization utilities for drawing lines between points (e.g., "connect the dots")
+ * in integer pixel coordinates, returning the set of covered pixels.
+ */
+export namespace cmath.raster {
+  /**
+   * Returns the fractional part of a number.
+   *
+   * @param x - The input number.
+   * @returns The fractional part of x.
+   *
+   * @example
+   * ```ts
+   * const frac = fract(3.14); // 0.14
+   * ```
+   */
+  export function fract(x: number): number {
+    return x - Math.floor(x);
+  }
+
+  /**
+   * Computes a pseudo-random noise value for the given 2D coordinates.
+   *
+   * This function generates white noise based on the input coordinates by using a simple hash
+   * based on the sine function and a set of pre-determined constants. The constants
+   * `12.9898`, `78.233`, and `43758.5453` are used as "magic numbers" that have been empirically
+   * chosen to produce a good spread of values. They ensure that small differences in input coordinates
+   * yield significant changes in the output, a technique commonly seen in GLSL noise implementations.
+   *
+   * The calculation performed is:
+   *   noise(x, y) = fract(sin(x * 12.9898 + y * 78.233) * 43758.5453)
+   * where `fract` returns the fractional part of a number.
+   *
+   * @param x - The x-coordinate.
+   * @param y - The y-coordinate.
+   * @returns A pseudo-random noise value in the range [0, 1].
+   *
+   * @example
+   * ```ts
+   * const value = cmath.raster.noise(12.34, 56.78);
+   * console.log(value); // e.g., 0.8453
+   * ```
+   *
+   * @remarks
+   * While this method is fast and useful for generating grain or noise patterns in graphics applications,
+   * it is not suitable for high-quality noise generation.
+   */
+  export function noise(x: number, y: number): number {
+    return fract(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453);
+  }
+
+  /**
+   * A Bitmap represents a raw grid of pixels.
+   *
+   * This is a foundational model for 2D raster-based graphics.
+   * It contains the width, height, and a flat array of pixel data (RGBA).
+   *
+   * @example
+   * const bmp: Bitmap = {
+   *   width: 256,
+   *   height: 256,
+   *   data: new Uint8ClampedArray(256 * 256 * 4),
+   * };
+   */
+  export type Bitmap = {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+  };
+
+  /**
+   * Tiles a source bitmap over a specified target area.
+   *
+   * This function creates a new bitmap by repeating (tiling) the source bitmap
+   * to cover the target dimensions. The source image is repeated both horizontally
+   * and vertically using modulo arithmetic.
+   *
+   * @param source - The source bitmap to tile.
+   * @param width - The desired width of the output bitmap.
+   * @param height - The desired height of the output bitmap.
+   * @returns A new Bitmap object with the given target dimensions, filled by tiling the source.
+   *
+   * @example
+   * const sourceBitmap: Bitmap = { width: 100, height: 100, data: sourceData };
+   * const tiledBitmap = cmath.raster.tile(sourceBitmap, 300, 200);
+   * // tiledBitmap now has width 300 and height 200, with the 100x100 source repeated.
+   */
+  export function tile(source: Bitmap, width: number, height: number): Bitmap {
+    const out = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Wrap around source coordinates using modulo arithmetic.
+        const srcX = x % source.width;
+        const srcY = y % source.height;
+        const srcIdx = (srcY * source.width + srcX) * 4;
+        const tgtIdx = (y * width + x) * 4;
+
+        out[tgtIdx] = source.data[srcIdx];
+        out[tgtIdx + 1] = source.data[srcIdx + 1];
+        out[tgtIdx + 2] = source.data[srcIdx + 2];
+        out[tgtIdx + 3] = source.data[srcIdx + 3];
+      }
+    }
+
+    return { width: width, height: height, data: out };
+  }
+
+  /**
+   * Scales a Bitmap by separate factors along the x and y axes.
+   *
+   * This function creates a new Bitmap that is a scaled version of the source Bitmap.
+   * The scaling factors are applied independently to the width and height.
+   *
+   * When scaling up (i.e. when either factor > 1), each destination pixel is mapped
+   * back to a source pixel using a nearest-neighbor approach (via Math.floor). This
+   * means that multiple destination pixels may be filled with the same source pixel's
+   * value, resulting in a blocky, pixelated appearance. No interpolation or smoothing
+   * is performed by this algorithm.
+   *
+   * @param bitmap - The source Bitmap to scale.
+   * @param factor - The scaling factors as a 2D vector [factorX, factorY]. Both values must be positive.
+   * @returns A new Bitmap with its dimensions scaled by the specified factors.
+   *
+   * @example
+   * ```ts
+   * const originalBitmap: Bitmap = { width: 100, height: 100, data: originalData };
+   * const scaledBitmap = cmath.raster.scale(originalBitmap, [2, 1.5]);
+   * // scaledBitmap.width ≈ 200, scaledBitmap.height ≈ 150.
+   * ```
+   *
+   * @remarks
+   * When scaling up, each destination pixel is computed by mapping its coordinate back to
+   * the source image using nearest-neighbor sampling (via Math.floor). This approach replicates
+   * source pixels over multiple destination pixels, which can result in a blocky or pixelated
+   * appearance when the image is enlarged.
+   */
+  export function scale(bitmap: Bitmap, factor: [number, number]): Bitmap {
+    const [factorX, factorY] = factor;
+    if (factorX <= 0 || factorY <= 0) {
+      throw new Error("Scaling factors must be positive.");
+    }
+    const width = Math.max(1, Math.floor(bitmap.width * factorX));
+    const height = Math.max(1, Math.floor(bitmap.height * factorY));
+    const out = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Compute the corresponding source pixel using inverse mapping.
+        const srcX = Math.floor(x / factorX);
+        const srcY = Math.floor(y / factorY);
+        const srcIdx = (srcY * bitmap.width + srcX) * 4;
+        const dstIdx = (y * width + x) * 4;
+
+        out[dstIdx] = bitmap.data[srcIdx];
+        out[dstIdx + 1] = bitmap.data[srcIdx + 1];
+        out[dstIdx + 2] = bitmap.data[srcIdx + 2];
+        out[dstIdx + 3] = bitmap.data[srcIdx + 3];
+      }
+    }
+
+    return { width: width, height: height, data: out };
+  }
+
+  /**
+   * Resizes a bitmap to the specified dimensions using nearest-neighbor scaling.
+   * Internally, this computes scaling factors and delegates to {@link scale}.
+   *
+   * @param bitmap - The source bitmap to resize.
+   * @param dst - The destination dimensions as [width, height].
+   * @returns A new bitmap with the resized dimensions.
+   *
+   * @example
+   * ```ts
+   * const resized = cmath.raster.resize(originalBitmap, [200, 150]);
+   * ```
+   */
+  export function resize(bitmap: Bitmap, dst: cmath.Vector2): Bitmap {
+    const [w2, h2] = dst;
+    const factorX = w2 / bitmap.width;
+    const factorY = h2 / bitmap.height;
+    return scale(bitmap, [factorX, factorY]);
+  }
+
+  /**
+   * Pads a Bitmap to the specified dimensions without scaling the source.
+   * The source image is centered on a new canvas filled with a background color.
+   *
+   * @param bitmap - The source Bitmap.
+   * @param dst - The destination dimensions as [width, height].
+   * @param bg - The background color as an RGBA array. Default is transparent [0, 0, 0, 0].
+   * @returns A new Bitmap with the source image centered on a padded canvas.
+   *
+   * @example
+   * ```ts
+   * const padded = cmath.raster.pad(originalBitmap, [300, 300], [255, 255, 255, 255]);
+   * ```
+   */
+  export function pad(
+    bitmap: Bitmap,
+    dst: cmath.Vector2,
+    bg: cmath.Vector4 = [0, 0, 0, 0]
+  ): Bitmap {
+    const [dstWidth, dstHeight] = dst;
+    const out = new Uint8ClampedArray(dstWidth * dstHeight * 4);
+
+    // Fill the new canvas with the background color.
+    for (let i = 0; i < dstWidth * dstHeight; i++) {
+      const idx = i * 4;
+      out[idx] = bg[0];
+      out[idx + 1] = bg[1];
+      out[idx + 2] = bg[2];
+      out[idx + 3] = bg[3];
+    }
+
+    // Center the source image on the new canvas.
+    const offsetX = Math.floor((dstWidth - bitmap.width) / 2);
+    const offsetY = Math.floor((dstHeight - bitmap.height) / 2);
+
+    for (let y = 0; y < bitmap.height; y++) {
+      for (let x = 0; x < bitmap.width; x++) {
+        const srcIdx = (y * bitmap.width + x) * 4;
+        const dstX = x + offsetX;
+        const dstY = y + offsetY;
+        if (dstX < 0 || dstX >= dstWidth || dstY < 0 || dstY >= dstHeight)
+          continue;
+        const dstIdx = (dstY * dstWidth + dstX) * 4;
+        out[dstIdx] = bitmap.data[srcIdx];
+        out[dstIdx + 1] = bitmap.data[srcIdx + 1];
+        out[dstIdx + 2] = bitmap.data[srcIdx + 2];
+        out[dstIdx + 3] = bitmap.data[srcIdx + 3];
+      }
+    }
+
+    return { width: dstWidth, height: dstHeight, data: out };
+  }
+
+  /**
+   * Computes a Gaussian weight based on a normalized distance.
+   *
+   * This function calculates a weight using a Gaussian function:
+   *
+   *   f(x) = exp(-x² / (2σ²))
+   *
+   * In this implementation, we reformulate it using a parameter `k` (where k = 1/(2σ²)).
+   * The `hardness` parameter, ranging from 0 to 1, interpolates between two preset k values,
+   * controlling the steepness of the falloff:
+   *
+   * - When hardness is 0, a higher k (e.g., 10) is used, resulting in a very steep decay.
+   * - When hardness is 1, a lower k (e.g., 2) is used, producing a gentler decay.
+   *
+   * This mathematical function is useful for simulating gradual transitions.
+   * For example, in a digital painting application, you might use this function to compute
+   * the per-pixel opacity of a painting stroke—pixels near the center of the stroke receive a
+   * higher weight, while those further away fade out rapidly.
+   *
+   * @param normDist - The normalized distance from the center (typically in the range [0, 1]).
+   * @param hardness - A value between 0 and 1 that adjusts the steepness of the falloff.
+   *                   A value of 0 produces a rapid decay (concentrating the effect near the center),
+   *                   whereas 1 produces a gentler decay.
+   * @returns The computed weight.
+   *
+   * @example
+   * // In a digital painting tool, calculate the opacity weight for a pixel:
+   * const normDist = 0.5; // e.g., pixel is halfway from the stroke's center to its edge.
+   * const hardness = 0.0; // soft setting: steep decay
+   * const opacityWeight = gaussian(normDist, hardness);
+   *
+   * // Use `opacityWeight` to modulate the alpha channel when blending the stroke.
+   */
+  export function gaussian(normDist: number, hardness: number): number {
+    const kHard = 2; // Lower k: gentler falloff.
+    const kSoft = 10; // Higher k: steeper falloff.
+    const k = hardness * kHard + (1 - hardness) * kSoft;
+    return Math.exp(-k * normDist * normDist);
+  }
+
+  /**
+   * Generalized smoothstep function.
+   *
+   * This function is analogous to GLSL's built-in smoothstep (and its variant "smootherstep"),
+   * but allows you to specify the order (N) for a customizable falloff curve.
+   *
+   * @param N - The order of the smoothStep (e.g., N=2 corresponds to the common "smootherstep").
+   * @param x - A value in the range [0, 1].
+   * @returns The smoothed value.
+   */
+  export function smoothstep(N: number, x: number): number {
+    x = clamp(x, 0, 1);
+    let result = 0;
+    for (let n = 0; n <= N; ++n) {
+      result +=
+        pascaltriangle(-N - 1, n) *
+        pascaltriangle(2 * N + 1, N - n) *
+        Math.pow(x, N + n + 1);
+    }
+    return result;
+  }
+
+  /**
+   * Computes the binomial coefficient using a generalized formulation of Pascal's Triangle.
+   *
+   * This function calculates the value of the binomial coefficient (often read as "a choose b") without
+   * explicitly using factorials. It supports cases where `a` may be negative by using a generalized
+   * formulation derived from Pascal's Triangle.
+   *
+   * @param a - The upper parameter in the binomial coefficient expression; can be negative.
+   * @param b - The lower parameter (a non-negative integer) representing the number of selections.
+   * @returns The computed binomial coefficient.
+   *
+   * @remarks
+   * The calculation performed is equivalent to:
+   * \[
+   * \binom{a}{b} = \frac{a \cdot (a-1) \cdot \ldots \cdot (a-b+1)}{b!}
+   * \]
+   * This iterative approach avoids direct factorial computation, which allows for handling negative values for `a`.
+   */
+  export function pascaltriangle(a: number, b: number): number {
+    let result = 1;
+    for (let i = 0; i < b; ++i) {
+      result *= (a - i) / (i + 1);
+    }
+    return result;
+  }
+
+  /**
+   * Returns all integer pixel coordinates (x, y) along a straight line
+   * between (x0, y0) and (x1, y1) using Bresenham's algorithm.
+   *
+   * @param a - start point in integer pixel coordinates (x, y).
+   * @param b - end point in integer pixel coordinates (x, y).
+   * @returns An array of {@link cmath.Vector2} objects for each pixel along the line.
+   *
+   * @example
+   * ```ts
+   * const linePixels = cmath.raster.bresenhamLine([10, 10], [15, 20]);
+   * // linePixels => [
+   * //   [10, 10],
+   * //   [10, 11],
+   * //   [10, 12],
+   * //   ...
+   * // ]
+   * ```
+   */
+  export function bresenham(
+    a: cmath.Vector2,
+    b: cmath.Vector2
+  ): Array<Vector2> {
+    let [x0, y0] = a;
+    let [x1, y1] = b;
+    const pixels: Array<cmath.Vector2> = [];
+    let dx = Math.abs(x1 - x0);
+    const sx = x0 < x1 ? 1 : -1;
+    let dy = -Math.abs(y1 - y0);
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+
+    while (true) {
+      pixels.push([x0, y0]);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+    return pixels;
+  }
+
+  /**
+   * Computes all integer pixel coordinates within a circle centered at `center` with radius `radius`.
+   * Optionally, clips the points to the bounding box specified by `clipRect`.
+   *
+   * @param center - The center of the circle `[cx, cy]`.
+   * @param radius - The radius of the circle in pixels.
+   * @param clipRect - An optional `{ x, y, width, height }` rectangle for clipping.
+   *                   If omitted, no clipping is applied.
+   * @returns A list of `[x, y]` pixel coordinates inside the circle.
+   *
+   * @example
+   * // Circle fill with no clipping
+   * const pixels = circle([50, 50], 10);
+   *
+   * @example
+   * // Circle fill, clipped to a rectangle at (40,40) of size 100x100
+   * const clippedPixels = circle([50, 50], 10, { x: 40, y: 40, width: 100, height: 100 });
+   */
+  export function circle(
+    center: cmath.Vector2,
+    radius: number,
+    clipRect?: cmath.Rectangle
+  ): Array<cmath.Vector2> {
+    const [cx, cy] = center;
+    const rSq = radius * radius;
+    const results: Array<cmath.Vector2> = [];
+
+    // If we have a clipRect, define bounds; otherwise, -∞ to +∞
+    const minX = clipRect ? clipRect.x : -Infinity;
+    const minY = clipRect ? clipRect.y : -Infinity;
+    const maxX = clipRect ? clipRect.x + clipRect.width - 1 : Infinity;
+    const maxY = clipRect ? clipRect.y + clipRect.height - 1 : Infinity;
+
+    const yStart = Math.floor(cy - radius);
+    const yEnd = Math.floor(cy + radius);
+
+    for (let y = yStart; y <= yEnd; y++) {
+      const dy = y - cy;
+      const horizontalSpan = Math.sqrt(rSq - dy * dy);
+      if (isNaN(horizontalSpan)) continue; // outside circle
+
+      const left = Math.floor(cx - horizontalSpan);
+      const right = Math.floor(cx + horizontalSpan);
+
+      for (let x = left; x <= right; x++) {
+        // Clip to rectangle if provided
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        results.push([x, y]);
+      }
+    }
+
+    return results;
+  }
+
+  export function ellipse(
+    center: cmath.Vector2,
+    radius: cmath.Vector2
+  ): cmath.Vector2[] {
+    const [cx, cy] = center;
+    const [rx, ry] = radius;
+    const points: cmath.Vector2[] = [];
+    const startX = Math.ceil(cx - rx);
+    const endX = Math.floor(cx + rx);
+    const startY = Math.ceil(cy - ry);
+    const endY = Math.floor(cy + ry);
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1) {
+          points.push([x, y]);
+        }
+      }
+    }
+    return points;
+  }
+
+  /**
+   * Generates an array of integer pixel coordinates within a given rectangle.
+   *
+   * This function returns all pixel coordinates contained within the specified rectangle.
+   * The rectangle is defined by its top-left corner (`x`, `y`) and its dimensions (`width`, `height`).
+   *
+   * @param rect - A rectangle defined by `{ x, y, width, height }`.
+   * @returns An array of `[x, y]` tuples, where each tuple represents an integer pixel coordinate inside the rectangle.
+   *
+   * @example
+   * ```ts
+   * const rect = { x: 40, y: 35, width: 20, height: 30 };
+   * const points = cmath.raster.rectangle(rect);
+   * // points will contain coordinates for pixels within the rectangle spanning:
+   * // x from 40 to 60 and y from 35 to 65.
+   * ```
+   */
+  export function rectangle(rect: cmath.Rectangle): cmath.Vector2[] {
+    const points: cmath.Vector2[] = [];
+    const startX = Math.ceil(rect.x);
+    const endX = Math.floor(rect.x + rect.width);
+    const startY = Math.ceil(rect.y);
+    const endY = Math.floor(rect.y + rect.height);
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        points.push([x, y]);
+      }
+    }
+    return points;
+  }
+
+  /**
+   * Performs a flood fill on a bitmap starting from the given coordinate.
+   *
+   * The algorithm fills contiguous pixels that match the target color (the color at the starting point)
+   * with the provided fillColor using an iterative stack-based approach.
+   *
+   * **Note:** This function modifies the input bitmap's data directly.
+   *
+   * @param bitmap - The bitmap to fill.
+   * @param pos - The x y coordinate to start filling.
+   * @param fill - The color to fill with, as [r, g, b, a].
+   *
+   * @remarks
+   * The function first checks whether the starting pixel's color is already identical to the fillColor.
+   * If they match, it returns immediately without performing any fill operations.
+   */
+  export function floodfill(
+    bitmap: Bitmap,
+    pos: cmath.Vector2,
+    fill: Vector4
+  ): void {
+    const [x, y] = pos;
+    const { width, height, data } = bitmap;
+    const idx = (y * width + x) * 4;
+    const targetColor: Vector4 = [
+      data[idx],
+      data[idx + 1],
+      data[idx + 2],
+      data[idx + 3],
+    ];
+    if (cmath.vector4.identical(targetColor, fill)) return;
+
+    const stack: [number, number][] = [[x, y]];
+
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      const i = (y * width + x) * 4;
+      const currColor: Vector4 = [
+        data[i],
+        data[i + 1],
+        data[i + 2],
+        data[i + 3],
+      ];
+      if (!cmath.vector4.identical(currColor, targetColor)) continue;
+
+      data[i] = fill[0];
+      data[i + 1] = fill[1];
+      data[i + 2] = fill[2];
+      data[i + 3] = fill[3];
+
+      if (x > 0) stack.push([x - 1, y]);
+      if (x < width - 1) stack.push([x + 1, y]);
+      if (y > 0) stack.push([x, y - 1]);
+      if (y < height - 1) stack.push([x, y + 1]);
+    }
+  }
+}
+
 export namespace cmath.range {
   /**
    * Calculates the mean (average center) of multiple numerical ranges.
@@ -2858,6 +3404,15 @@ export namespace cmath.range {
 
   export function length(range: Range): number {
     return range[1] - range[0];
+  }
+
+  /**
+   * returns 3 point chunk, [start, mid, end]
+   * @param range
+   * @returns
+   */
+  export function to3PointsChunk(range: Range): [number, number, number] {
+    return [range[0], (range[0] + range[1]) / 2, range[1]];
   }
 
   /**

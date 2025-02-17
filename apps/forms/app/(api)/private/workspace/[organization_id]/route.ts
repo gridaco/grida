@@ -41,6 +41,10 @@ export async function GET(
     })
     .order("updated_at", { ascending: false });
 
+  if (documents_err) {
+    console.error(documents_err);
+  }
+
   if (!documents) {
     return notFound();
   }

@@ -14,7 +14,7 @@ import {
   type IDocumentEditorState,
   type IDocumentEditorInit,
   initDocumentEditorState,
-  CursorMode,
+  ToolMode,
   SurfaceRaycastTargeting,
 } from "./state";
 import type { tokens } from "@grida/tokens";
@@ -34,6 +34,7 @@ import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
+import { BitmapEditorBrush } from "@grida/bitmap";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -64,7 +65,7 @@ export function StandaloneDocumentEditor({
   }, [editable, dispatch]);
 
   const __dispatch = useMemo(
-    () => (editable ? dispatch ?? __noop : __noop),
+    () => (editable ? (dispatch ?? __noop) : __noop),
     [editable]
   );
 
@@ -73,36 +74,45 @@ export function StandaloneDocumentEditor({
     [initial, editable, debug]
   );
 
-  const rootnode = initial.document.nodes[initial.document.root_id];
-  assert(rootnode, "root node is not found");
-  const shallowRootProps = useMemo(() => {
-    if (rootnode.type === "component") {
-      // transform property definitions to props with default values
-      const virtual_props_from_definition = Object.entries(
-        rootnode.properties
-      ).reduce(
-        (acc, [key, value]) => {
-          acc[key] = value.default;
-          return acc;
-        },
-        {} as Record<string, tokens.StringValueExpression>
-      );
+  // TODO:
+  // const rootnode = initial.document.nodes[initial.document.root_id];
+  // assert(rootnode, "root node is not found");
+  // const shallowRootProps = useMemo(() => {
+  //   if (rootnode.type === "component") {
+  //     // transform property definitions to props with default values
+  //     const virtual_props_from_definition = Object.entries(
+  //       rootnode.properties
+  //     ).reduce(
+  //       (acc, [key, value]) => {
+  //         acc[key] = value.default;
+  //         return acc;
+  //       },
+  //       {} as Record<string, tokens.StringValueExpression>
+  //     );
 
-      return virtual_props_from_definition;
-    }
-    if (rootnode.type === "template_instance") {
-      const defaultProps = initial.templates![rootnode.template_id].default;
-      return Object.assign({}, defaultProps, rootnode.props);
-    } else {
-      return {};
-    }
-  }, [rootnode]);
+  //     return virtual_props_from_definition;
+  //   }
+  //   if (rootnode.type === "template_instance") {
+  //     const defaultProps = initial.templates![rootnode.template_id].default;
+  //     return Object.assign({}, defaultProps, rootnode.props);
+  //   } else {
+  //     return {};
+  //   }
+  // }, [rootnode]);
+
+  const props = Object.entries(state.document.properties ?? {}).reduce(
+    (acc, [key, value]) => {
+      acc[key] = value.default;
+      return acc;
+    },
+    {} as Record<string, tokens.StringValueExpression>
+  );
 
   return (
     <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
-          <DataProvider data={{ props: shallowRootProps }}>
+          <DataProvider data={{ props: props }}>
             <EditorGoogleFontsManager>
               {/*  */}
               {children}
@@ -388,7 +398,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      fill:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
@@ -401,7 +417,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeStroke = useCallback(
-    (node_id: string, stroke: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      stroke:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/stroke",
@@ -875,10 +897,18 @@ export function useNodeAction(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => nodeActions.changeNodeCornerRadius(node_id, value),
-      fill: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeFill(node_id, value),
-      stroke: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeStroke(node_id, value),
+      fill: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeFill(node_id, value),
+      stroke: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeStroke(node_id, value),
       strokeWidth: (change: TChange<number>) =>
         nodeActions.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: grida.program.cg.StrokeCap) =>
@@ -949,7 +979,7 @@ export function useNodeAction(node_id: string | undefined) {
   }, [node_id, nodeActions]);
 }
 
-const compareProperty: PropertyCompareFn<grida.program.nodes.AnyNode> = (
+const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
   key,
   a,
   b
@@ -978,8 +1008,8 @@ export function useSelection() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        nodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        nodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: ["id", "type", "userdata"],
@@ -1026,7 +1056,7 @@ export function useSelection() {
 
   const rotation = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.rotation.ids.forEach((id) => {
+      mixedProperties.rotation?.ids.forEach((id) => {
         __actions.changeNodeRotation(id, change);
       });
     },
@@ -1035,7 +1065,7 @@ export function useSelection() {
 
   const opacity = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.opacity.ids.forEach((id) => {
+      mixedProperties.opacity?.ids.forEach((id) => {
         __actions.changeNodeOpacity(id, change);
       });
     },
@@ -1044,7 +1074,7 @@ export function useSelection() {
 
   const width = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.width.ids.forEach((id) => {
+      mixedProperties.width?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "width", value);
       });
     },
@@ -1053,7 +1083,7 @@ export function useSelection() {
 
   const height = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.height.ids.forEach((id) => {
+      mixedProperties.height?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "height", value);
       });
     },
@@ -1062,7 +1092,7 @@ export function useSelection() {
 
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
-      mixedProperties.position.ids.forEach((id) => {
+      mixedProperties.position?.ids.forEach((id) => {
         __actions.changeNodePositioningMode(id, position);
       });
     },
@@ -1142,7 +1172,12 @@ export function useSelection() {
   );
 
   const fill = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.fill?.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);
       });
@@ -1151,7 +1186,12 @@ export function useSelection() {
   );
 
   const stroke = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.stroke?.ids.forEach((id) => {
         __actions.changeNodeStroke(id, value);
       });
@@ -1327,8 +1367,8 @@ export function useSelectionPaints() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        allnodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        allnodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: (key) => {
@@ -1348,7 +1388,14 @@ export function useSelectionPaints() {
   const paints = mixedProperties.fill?.values ?? [];
 
   const setPaint = useCallback(
-    (index: number, value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      index: number,
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+        | null
+    ) => {
       const group = paints[index];
       group.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);
@@ -1373,6 +1420,19 @@ export function useDocument() {
   const { selection, transform } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
+
+  const backgroundColor = state.document.backgroundColor;
+  const setBackgroundColor = useCallback(
+    (
+      backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"]
+    ) => {
+      dispatch({
+        type: "background-color",
+        backgroundColor,
+      });
+    },
+    [dispatch]
+  );
 
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
@@ -1434,6 +1494,18 @@ export function useDocument() {
       dispatch({
         type: "duplicate",
         target,
+      });
+    },
+    [dispatch]
+  );
+
+  const clipboardColor = state.user_clipboard_color;
+
+  const setClipboardColor = useCallback(
+    (color: grida.program.cg.RGBA8888) => {
+      dispatch({
+        type: "clip/color",
+        color,
       });
     },
     [dispatch]
@@ -1580,6 +1652,26 @@ export function useDocument() {
         type: "distribute-evenly",
         target,
         axis,
+      });
+    },
+    [dispatch]
+  );
+
+  const autoLayout = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "autolayout",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const contain = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "contain",
+        target,
       });
     },
     [dispatch]
@@ -1765,8 +1857,8 @@ export function useDocument() {
   const schemaDefineProperty = useCallback(
     (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/define",
-        name: name,
+        type: "document/properties/define",
+        key: name,
         definition: definition,
       });
     },
@@ -1776,9 +1868,9 @@ export function useDocument() {
   const schemaRenameProperty = useCallback(
     (name: string, newName: string) => {
       dispatch({
-        type: "document/schema/property/rename",
-        name,
-        newName,
+        type: "document/properties/rename",
+        key: name,
+        newKey: newName,
       });
     },
     [dispatch]
@@ -1787,8 +1879,8 @@ export function useDocument() {
   const schemaUpdateProperty = useCallback(
     (name: string, definition: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/update",
-        name: name,
+        type: "document/properties/update",
+        key: name,
         definition: definition,
       });
     },
@@ -1797,7 +1889,7 @@ export function useDocument() {
 
   const schemaDeleteProperty = useCallback(
     (name: string) => {
-      dispatch({ type: "document/schema/property/delete", name: name });
+      dispatch({ type: "document/properties/delete", key: name });
     },
     [dispatch]
   );
@@ -1808,6 +1900,9 @@ export function useDocument() {
       selection,
       transform,
       //
+      background: backgroundColor,
+      setBackground: setBackgroundColor,
+      //
       select,
       blur,
       undo,
@@ -1816,6 +1911,8 @@ export function useDocument() {
       copy,
       paste,
       duplicate,
+      clipboardColor,
+      setClipboardColor,
       deleteNode,
       nudge,
       nudgeResize,
@@ -1823,6 +1920,8 @@ export function useDocument() {
       align,
       order,
       distributeEvenly,
+      autoLayout,
+      contain,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
@@ -1851,6 +1950,9 @@ export function useDocument() {
     selection,
     transform,
     //
+    backgroundColor,
+    setBackgroundColor,
+    //
     select,
     blur,
     undo,
@@ -1859,6 +1961,8 @@ export function useDocument() {
     copy,
     paste,
     duplicate,
+    clipboardColor,
+    setClipboardColor,
     deleteNode,
     nudge,
     nudgeResize,
@@ -1866,6 +1970,8 @@ export function useDocument() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -2022,10 +2128,12 @@ export function useTransform() {
   return useMemo(() => {
     const transform = state.transform;
     const scaleX = transform[0][0];
+    const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
       scaleX,
+      scaleY,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
@@ -2056,10 +2164,10 @@ function throttle<T extends (...args: any[]) => void>(
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
-  const { cursor_mode } = state;
+  const { tool } = state;
 
   return useMemo(() => {
-    switch (cursor_mode.type) {
+    switch (tool.type) {
       case "cursor":
         return "default";
       case "hand":
@@ -2067,7 +2175,7 @@ export function useEventTargetCSSCursor() {
       case "zoom":
         return "zoom-in";
       case "insert": {
-        switch (cursor_mode.node) {
+        switch (tool.node) {
           case "text":
             return "text";
           case "rectangle":
@@ -2081,8 +2189,12 @@ export function useEventTargetCSSCursor() {
         return "crosshair";
       case "path":
         return "crosshair";
+      case "brush":
+      case "eraser":
+      case "flood-fill":
+        return "cell";
     }
-  }, [cursor_mode]);
+  }, [tool]);
 }
 
 export function useEventTarget() {
@@ -2097,9 +2209,13 @@ export function useEventTarget() {
     dropzone,
     selection,
     content_edit_mode,
-    cursor_mode,
+    tool,
+    brush,
     marquee,
     debug,
+    pixelgrid,
+    ruler,
+    guides,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2110,11 +2226,61 @@ export function useEventTarget() {
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
 
-  const setCursorMode = useCallback(
-    (cursor_mode: CursorMode) => {
+  const setRulerState = useCallback(
+    (state: "on" | "off") => {
       dispatch({
-        type: "surface/cursor-mode",
-        cursor_mode,
+        type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const setPixelGridState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/pixel-grid",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const setTool = useCallback(
+    (tool: ToolMode) => {
+      dispatch({
+        type: "surface/tool",
+        tool: tool,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrush = useCallback(
+    (brush: BitmapEditorBrush) => {
+      dispatch({
+        type: "surface/brush",
+        brush,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrushSize = useCallback(
+    (size: TChange<number>) => {
+      dispatch({
+        type: "surface/brush/size",
+        size,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeBrushOpacity = useCallback(
+    (opacity: TChange<number>) => {
+      dispatch({
+        type: "surface/brush/opacity",
+        opacity,
       });
     },
     [dispatch]
@@ -2353,6 +2519,30 @@ export function useEventTarget() {
 
   //
 
+  const startGuideGesture = useCallback(
+    (axis: cmath.Axis, idx: number | -1) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          idx: idx,
+          type: "guide",
+          axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteGuide = useCallback(
+    (idx: number) => {
+      dispatch({
+        type: "surface/guide/delete",
+        idx,
+      });
+    },
+    [dispatch]
+  );
+
   const startScaleGesture = useCallback(
     (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
@@ -2387,7 +2577,7 @@ export function useEventTarget() {
         type: "surface/gesture/start",
         gesture: {
           type: "gap",
-          selection: Array.isArray(selection) ? selection : [selection],
+          selection: selection,
           axis,
         },
       });
@@ -2435,8 +2625,21 @@ export function useEventTarget() {
       surface_snapping,
       //
       marquee,
-      cursor_mode,
-      setCursorMode,
+      tool,
+      setTool,
+      brush,
+      changeBrush,
+      changeBrushSize,
+      changeBrushOpacity,
+      //
+      ruler,
+      setRulerState,
+      guides,
+      startGuideGesture,
+      deleteGuide,
+      //
+      pixelgrid,
+      setPixelGridState,
       //
       hovered_node_id,
       dropzone,
@@ -2446,6 +2649,7 @@ export function useEventTarget() {
       is_node_scaling,
       content_edit_mode,
       //
+
       startScaleGesture,
       startSortGesture,
       startGapGesture,
@@ -2480,8 +2684,21 @@ export function useEventTarget() {
     surface_snapping,
     //
     marquee,
-    cursor_mode,
-    setCursorMode,
+    tool,
+    setTool,
+    brush,
+    changeBrush,
+    changeBrushSize,
+    changeBrushOpacity,
+    //
+    ruler,
+    setRulerState,
+    guides,
+    startGuideGesture,
+    deleteGuide,
+    //
+    pixelgrid,
+    setPixelGridState,
     //
     hovered_node_id,
     dropzone,
@@ -2651,7 +2868,6 @@ export function useDataTransferEventTarget() {
 
   const onpaste = useCallback(
     (event: ClipboardEvent) => {
-      console.log("onpaste", event);
       if (event.defaultPrevented) return;
       // cancel if on contenteditable / form element
       if (
@@ -2779,7 +2995,7 @@ export function useSurfacePathEditor() {
   const [state, dispatch] = __useInternal();
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
-  const { hovered_vertex_idx: hovered_point, cursor_mode } = state;
+  const { hovered_vertex_idx: hovered_point, tool } = state;
   const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
     state.content_edit_mode;
   const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
@@ -2792,7 +3008,7 @@ export function useSurfacePathEditor() {
 
   const selectVertex = useCallback(
     (vertex: number) => {
-      if (cursor_mode.type === "path") {
+      if (tool.type === "path") {
         return;
       }
       dispatch({
@@ -2803,7 +3019,7 @@ export function useSurfacePathEditor() {
         },
       });
     },
-    [cursor_mode.type, dispatch, node_id]
+    [tool.type, dispatch, node_id]
   );
 
   const onVertexHover = useCallback(
@@ -2900,28 +3116,6 @@ export function useSurfacePathEditor() {
 }
 
 /**
- * @deprecated - WIP
- * @returns
- */
-export function useSurfaceGradientEditor() {
-  const [state, dispatch] = __useInternal();
-  assert(
-    state.content_edit_mode && state.content_edit_mode.type === "gradient"
-  );
-
-  const node = state.document.nodes[
-    state.content_edit_mode.node_id
-  ] as grida.program.nodes.i.IFill;
-  const fill = node.fill;
-  assert(fill?.type === "linear_gradient");
-
-  const { transform, stops } = fill;
-
-  //
-  return useMemo(() => ({ transform, stops }), [transform, stops]);
-}
-
-/**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode() {
@@ -2972,11 +3166,14 @@ class EditorConsumerError extends Error {
   }
 }
 
-export function useNode(node_id: string): grida.program.nodes.AnyNode & {
+export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
   meta: {
     is_component_consumer: boolean;
+    is_flex_parent: boolean;
   };
-} {
+};
+
+export function useNode(node_id: string): NodeWithMeta {
   const { state } = useDocument();
 
   const {
@@ -3033,12 +3230,12 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     node_definition = templates[template_id].nodes[node_id];
   }
 
-  const node: grida.program.nodes.AnyNode = useMemo(() => {
+  const node: grida.program.nodes.UnknwonNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
       node_change || {}
-    ) as grida.program.nodes.AnyNode;
+    ) as grida.program.nodes.UnknwonNode;
   }, [node_definition, node_change]);
 
   const is_component_consumer =
@@ -3046,26 +3243,37 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     root.type === "instance" ||
     root.type === "template_instance";
 
+  const is_flex_parent = node.type === "container" && node.layout === "flex";
+
   return {
     ...node,
     meta: {
-      is_component_consumer: is_component_consumer,
+      is_component_consumer,
+      is_flex_parent,
     },
   };
 }
 
-export function useComputedNode(node_id: string) {
+export function useComputedNode(
+  node_id: string
+): grida.program.nodes.UnknwonComputedNode {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, html, src, href } = node;
-  const computed = useComputed({
-    text: text,
-    html: html,
-    src: src,
-    href: href,
-    props: props,
-  });
+  const { active, style, component_id, props, text, html, src, href, fill } =
+    node;
 
-  return computed;
+  const computed = useComputed(
+    {
+      text,
+      html,
+      src,
+      href,
+      props,
+      fill,
+    },
+    true
+  );
+
+  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
 export function useTemplateDefinition(template_id: string) {

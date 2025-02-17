@@ -106,27 +106,7 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Redirect after submit",
-        plans: {
-          free: true,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Window postMessage interface",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Export to .csv .xlsx",
+        title: "Export files & sheets",
         plans: {
           free: true,
           pro: true,
@@ -159,16 +139,6 @@ export const pricing: Pricing = {
         title: "Limit number of responses",
         plans: {
           free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Build forms with AI",
-        plans: {
-          free: true,
           pro: true,
           team: true,
           enterprise: true,

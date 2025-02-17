@@ -14,12 +14,13 @@ import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import { useFilePicker } from "use-file-picker";
 import { Card } from "@/components/ui/card";
+import { io } from "@/grida-io-model";
 
 export function ImportFromGridaFileJsonDialog({
   onImport,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onImport?: (document: grida.io.DocumentFileModel) => void;
+  onImport?: (document: io.DocumentFileModel) => void;
 }) {
   const { openFilePicker, filesContent, loading, plainFiles } = useFilePicker({
     accept: ".grida,.json",
@@ -30,7 +31,7 @@ export function ImportFromGridaFileJsonDialog({
     if (filesContent.length > 0) {
       try {
         const fileContent = filesContent[0].content;
-        const parsedDocument = JSON.parse(fileContent);
+        const parsedDocument = io.json.parse(fileContent);
         onImport?.(parsedDocument);
         toast.success("File successfully imported!");
         props.onOpenChange?.(false); // Close the dialog

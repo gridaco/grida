@@ -227,6 +227,9 @@ export namespace iofigma {
         return {
           nodes,
           root_id: rootNode.id,
+          // TODO:
+          textures: {},
+          properties: {},
         };
       }
 
@@ -332,7 +335,7 @@ export namespace iofigma {
                 paddingTop === paddingRight &&
                 paddingTop === paddingBottom &&
                 paddingTop === paddingLeft
-                  ? paddingTop ?? 0
+                  ? (paddingTop ?? 0)
                   : {
                       paddingTop: paddingTop ?? 0,
                       paddingRight: paddingRight ?? 0,
@@ -471,13 +474,13 @@ export namespace iofigma {
               //
               style: {},
               textAlign: node.style.textAlignHorizontal
-                ? map.textAlignMap[node.style.textAlignHorizontal] ?? "left"
+                ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
                 : "left",
               textAlignVertical: node.style.textAlignVertical
                 ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
               textDecoration: node.style.textDecoration
-                ? map.textDecorationMap[node.style.textDecoration] ?? "none"
+                ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
               lineHeight: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
@@ -570,7 +573,7 @@ export namespace iofigma {
               effects: [], // TODO:
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
-                ? map.strokeCapMap[strokeCap] ?? "butt"
+                ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
               cornerRadius: cornerRadius,
             } satisfies grida.program.nodes.RectangleNode;
@@ -600,7 +603,7 @@ export namespace iofigma {
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
-                ? map.strokeCapMap[strokeCap] ?? "butt"
+                ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
               effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
@@ -626,7 +629,7 @@ export namespace iofigma {
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
               strokeCap: strokeCap
-                ? map.strokeCapMap[strokeCap] ?? "butt"
+                ? (map.strokeCapMap[strokeCap] ?? "butt")
                 : "butt",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],

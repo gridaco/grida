@@ -1,14 +1,8 @@
-import {
-  useEventTarget,
-  useSurfaceGradientEditor,
-} from "@/grida-react-canvas/provider";
-import { useNodeSurfaceTransfrom } from "../hooks/transform";
+import { useSingleSelection } from "../surface-hooks";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
-  const { transform, stops } = useSurfaceGradientEditor();
-  const { style } = useNodeSurfaceTransfrom(node_id);
-  //
-  //
+  const data = useSingleSelection(node_id);
+  if (!data) return <></>;
 
   return (
     <div
@@ -18,15 +12,15 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
       <div
         style={{
           position: "absolute",
-          ...style,
+          ...data.style,
           willChange: "transform",
           overflow: "visible",
           resize: "none",
           zIndex: 1,
         }}
       >
-        <GradientLine
-          transform={transform}
+        {/* <GradientLine
+          // transform={transform}
           // test
           rect={{
             x: 0,
@@ -34,7 +28,7 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
             width: 100,
             height: 100,
           }}
-        />
+        /> */}
       </div>
     </div>
   );
