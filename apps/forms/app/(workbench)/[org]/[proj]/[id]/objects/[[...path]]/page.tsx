@@ -723,12 +723,14 @@ function create_viewer(prev: Viewer, app: Viewer["app"]): Viewer {
           return { ...prev, app };
         }
         case "page-flip": {
+          const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
+          const viewer_object = prev.object.replace(REPLACE, "");
           return {
             app: "page-flip",
             mimetype: prev.mimetype,
             object: prev.object,
             type: prev.type,
-            url: `https://viewer.grida.co/pdf?url=${prev.object}&app=page-flip`,
+            url: `https://viewer.grida.co/pdf?object=${viewer_object}&app=page-flip`,
           };
         }
       }
