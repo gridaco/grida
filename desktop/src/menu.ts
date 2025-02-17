@@ -118,6 +118,8 @@ export function create_default_menu(
       submenu: [
         { role: "minimize", accelerator: "CmdOrCtrl+M" },
         { role: "close", accelerator: "CmdOrCtrl+W" },
+        { type: "separator" },
+        { accelerator: "CmdOrCtrl+Alt+I", role: "toggleDevTools" },
       ],
     },
     {

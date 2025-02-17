@@ -110,7 +110,7 @@ type UIConfig = {
   toolbar: "hidden" | "visible";
 };
 
-const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
+const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
 export default function CanvasPlayground({ src }: { src?: string }) {
   useDisableSwipeBack();
@@ -213,7 +213,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
     const documentData = {
       version: "2025-02-12",
       document: state.document,
-    } satisfies io.DocumentFileModel;
+    } satisfies io.JSONDocumentFileModel;
 
     const blob = new Blob([io.archive.pack(documentData)], {
       type: "application/zip",

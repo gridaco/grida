@@ -221,11 +221,10 @@ export namespace grida.program.document {
    *
    * @see {@link IDocumentDefinition}
    */
-  export interface IDocumentTexturesRepository {
-    textures: Record<
+  export interface IDocumentBitmapsRepository {
+    bitmaps: Record<
       string,
       cmath.raster.Bitmap & {
-        type: "texture";
         version: number;
       }
     >;
@@ -336,7 +335,7 @@ export namespace grida.program.document {
    */
   export interface IDocumentDefinition
     extends IDocumentNodesRepository,
-      IDocumentTexturesRepository,
+      IDocumentBitmapsRepository,
       IDocumentProperties,
       IDocumentBackground {
     /**
@@ -467,7 +466,7 @@ export namespace grida.program.document {
     INodeHtmlDocumentQueryDataAttributes & N;
 
   export type IGlobalRenderingContext = {
-    context: IDocumentTexturesRepository;
+    context: IDocumentBitmapsRepository;
   };
 
   /**
@@ -1409,7 +1408,7 @@ export namespace grida.program.nodes {
    *
    * For loading png, jpg, etc. images, use {@link ImageNode} instead.
    *
-   * The bitmap data can by found in {@link document.IDocumentTexturesRepository} images[this.id].data
+   * The bitmap data can by found in {@link document.IDocumentBitmapsRepository} images[this.id].data
    */
   export interface BitmapNode
     extends i.IBaseNode,
@@ -1791,7 +1790,7 @@ export namespace grida.program.nodes {
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
     ): document.IDocumentDefinition {
       const document: document.IDocumentDefinition = {
-        textures: {},
+        bitmaps: {},
         nodes: {},
         root_id: "",
         properties: {},

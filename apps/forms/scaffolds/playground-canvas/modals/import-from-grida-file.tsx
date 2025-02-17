@@ -1,4 +1,3 @@
-import { grida } from "@/grida";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -20,19 +19,19 @@ export function ImportFromGridaFileJsonDialog({
   onImport,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onImport?: (document: io.DocumentFileModel) => void;
+  onImport?: (document: io.LoadedDocument) => void;
 }) {
-  const { openFilePicker, filesContent, loading, plainFiles } = useFilePicker({
+  const { openFilePicker, loading, plainFiles } = useFilePicker({
     accept: ".grida,.json",
     multiple: false,
   });
 
   const handleFileImport = async () => {
-    if (filesContent.length > 0) {
+    if (plainFiles.length > 0) {
       try {
-        const fileContent = filesContent[0].content;
-        const parsedDocument = io.json.parse(fileContent);
-        onImport?.(parsedDocument);
+        const f = plainFiles[0];
+        const doc = await io.load(f);
+        onImport?.(doc);
         toast.success("File successfully imported!");
         props.onOpenChange?.(false); // Close the dialog
       } catch (error) {
@@ -81,7 +80,7 @@ export function ImportFromGridaFileJsonDialog({
           <Button
             type="button"
             onClick={handleFileImport}
-            disabled={filesContent.length === 0}
+            disabled={plainFiles.length === 0}
           >
             Import
           </Button>

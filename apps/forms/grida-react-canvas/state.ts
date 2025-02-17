@@ -805,7 +805,7 @@ export interface IDocumentEditorInit
     grida.program.document.IDocumentDefinition,
     "nodes" | "root_id" | "backgroundColor"
   > &
-    Partial<grida.program.document.IDocumentTexturesRepository>;
+    Partial<grida.program.document.IDocumentBitmapsRepository>;
 }
 
 export interface IDocumentEditorState
@@ -826,7 +826,7 @@ export function initDocumentEditorState({
   debug?: boolean;
 }): IDocumentEditorState {
   const def: grida.program.document.IDocumentDefinition = {
-    textures: {},
+    bitmaps: {},
     properties: {},
     ...init.document,
   };
