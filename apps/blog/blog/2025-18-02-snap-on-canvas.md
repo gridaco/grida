@@ -11,6 +11,8 @@ hide_table_of_contents: false
 In this article, we will demonstrate how snapping works on Grida Canvas. Snapping the elements on the Grida canvas
 gives you consistency in spacing between elements.
 
+<!-- truncate -->
+
 # Snapping horizontally
 
 To see the horizontal snapping in action, visit https://app.grida.co/canvas and follow the steps below
