@@ -298,32 +298,41 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                   ) : (
                     <>
                       <SidebarRoot className="hidden sm:block">
-                        <SidebarSection className="mt-4">
+                        <SidebarSection className="my-4">
                           <span className="px-2">
                             <DropdownMenu>
-                              <DropdownMenuTrigger>
-                                <GridaLogo className="inline-block w-4 h-4 me-2" />
+                              <DropdownMenuTrigger className="me-2">
+                                <GridaLogo className="inline-block w-4 h-4" />
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuItem
-                                  onClick={importFromFigmaDialog.openDialog}
-                                >
-                                  <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Import from Figma
-                                </DropdownMenuItem>
+                              <DropdownMenuContent
+                                align="start"
+                                className="min-w-52"
+                              >
                                 <DropdownMenuItem
                                   onClick={importFromJson.openDialog}
+                                  className="text-xs"
                                 >
                                   <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Import from .grida
+                                  Open .grida
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onExport}>
+                                <DropdownMenuItem
+                                  onClick={onExport}
+                                  className="text-xs"
+                                >
                                   <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
                                   Save as .grida
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={importFromFigmaDialog.openDialog}
+                                  className="text-xs"
+                                >
+                                  <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                  Import Figma
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={settingsDialog.openDialog}
+                                  className="text-xs"
                                 >
                                   <GearIcon className="me-2" />
                                   Settings
@@ -331,7 +340,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
 
                                 <DropdownMenuSeparator />
                                 <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>
+                                  <DropdownMenuSubTrigger className="text-xs">
                                     <OpenInNewWindowIcon className="me-2" />
                                     Tools
                                   </DropdownMenuSubTrigger>
@@ -340,7 +349,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                       href="/canvas/tools/io-figma"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         IO Figma
                                       </DropdownMenuItem>
@@ -349,7 +358,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                       href="/canvas/tools/io-svg"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         IO SVG
                                       </DropdownMenuItem>
@@ -358,7 +367,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                       href="https://github.com/gridaco/p666"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         P666 Daemon
                                       </DropdownMenuItem>
@@ -366,7 +375,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
                                 <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>
+                                  <DropdownMenuSubTrigger className="text-xs">
                                     <MixIcon className="me-2" />
                                     Examples
                                   </DropdownMenuSubTrigger>
@@ -377,7 +386,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                         href={"/canvas/examples/" + example.id}
                                         target="_blank"
                                       >
-                                        <DropdownMenuItem>
+                                        <DropdownMenuItem className="text-xs">
                                           <OpenInNewWindowIcon className="me-2" />
                                           {example.name}
                                         </DropdownMenuItem>
@@ -390,7 +399,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                   href="https://github.com/gridaco/grida"
                                   target="_blank"
                                 >
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem className="text-xs">
                                     <GitHubLogoIcon className="me-2" />
                                     GitHub
                                   </DropdownMenuItem>
@@ -399,7 +408,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                                   href="https://grida.co/join-slack"
                                   target="_blank"
                                 >
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem className="text-xs">
                                     <SlackIcon className="me-2 w-4 h-4" />
                                     Slack Community
                                   </DropdownMenuItem>
