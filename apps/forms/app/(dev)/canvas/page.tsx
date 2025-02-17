@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Editor from "./editor";
 
 export const metadata: Metadata = {
-  title: "Canvas Playground",
-  description: "Grida Canvas SDK Playground",
+  title: "Grida Canvas",
+  description: "Grida Canvas Playground",
 };
 
 export default function CanvasPlaygroundPage() {

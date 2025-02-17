@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { shortcuts } from "@/scaffolds/playground/k";
+import { forms_ai_shortcuts } from "@/scaffolds/playground/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 import { useMemo, useRef, useState } from "react";
 
@@ -12,14 +12,17 @@ export default function Prompt({ autoFocus }: { autoFocus?: boolean }) {
   const [input, setInput] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const placeholder = useMemo(
-    () => shortcuts[Math.floor(Math.random() * shortcuts.length)][1],
+    () =>
+      forms_ai_shortcuts[
+        Math.floor(Math.random() * forms_ai_shortcuts.length)
+      ][1],
     []
   );
 
   // shortcuts - pick 4 random shortcuts
   const shortcuts4 = useMemo(
     () =>
-      shortcuts
+      forms_ai_shortcuts
         .sort(() => Math.random() - 0.5)
         .slice(0, 4)
         .map(([name, placeholder, content]) => ({

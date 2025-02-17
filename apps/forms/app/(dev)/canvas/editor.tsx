@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "../../desktop.css";
 
 function isElectron(): boolean {
@@ -58,7 +58,9 @@ const PlaygroundCanvas = dynamic(
   }
 );
 
-export default function Editor() {
+export default function Editor(
+  props: React.ComponentProps<typeof PlaygroundCanvas>
+) {
   useEffect(() => {
     addEventListener("beforeunload", (event) => {
       event.preventDefault();
@@ -70,7 +72,7 @@ export default function Editor() {
     <div className="w-full h-full flex flex-col overflow-hidden">
       <DesktopDragArea />
       <div className="flex-1 overflow-hidden">
-        <PlaygroundCanvas />
+        <PlaygroundCanvas {...props} />
       </div>
     </div>
   );

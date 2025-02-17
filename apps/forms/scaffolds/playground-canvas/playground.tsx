@@ -26,26 +26,17 @@ import {
   initDocumentEditorState,
   useDocument,
 } from "@/grida-react-canvas";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
-  CaretDownIcon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
   GitHubLogoIcon,
+  MixIcon,
   OpenInNewWindowIcon,
   PlayIcon,
   PlusIcon,
@@ -55,7 +46,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -68,7 +58,6 @@ import { iofigma } from "@/grida-io-figma";
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "@/scaffolds/playground-canvas/modals/import-from-grida-file";
 import { v4 } from "uuid";
-import { grida } from "@/grida";
 import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
@@ -114,6 +103,7 @@ import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@/grida-io-model";
+import { canvas_examples } from "../playground/k";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -122,7 +112,7 @@ type UIConfig = {
 
 const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
 
-export default function CanvasPlayground() {
+export default function CanvasPlayground({ src }: { src?: string }) {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -130,7 +120,7 @@ export default function CanvasPlayground() {
     sidebar: "visible",
     toolbar: "visible",
   });
-  const [exampleid, setExampleId] = useState<string>("blank.grida");
+  // const [exampleid, setExampleId] = useState<string>("blank");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
@@ -204,11 +194,12 @@ export default function CanvasPlayground() {
   );
 
   useEffect(() => {
-    fetch(`/examples/canvas/${exampleid}`).then((res) => {
+    if (!src) return;
+    fetch(src).then((res) => {
       res.json().then((file) => {
         dispatch({
           type: "__internal/reset",
-          key: exampleid,
+          key: src,
           state: initDocumentEditorState({
             editable: true,
             document: file.document,
@@ -216,7 +207,7 @@ export default function CanvasPlayground() {
         });
       });
     });
-  }, [exampleid]);
+  }, [src]);
 
   const onExport = () => {
     const documentData = {
@@ -374,6 +365,26 @@ export default function CanvasPlayground() {
                                     </Link>
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <MixIcon className="me-2" />
+                                    Examples
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent>
+                                    {canvas_examples.map((example) => (
+                                      <Link
+                                        key={example.id}
+                                        href={"/canvas/examples/" + example.id}
+                                        target="_blank"
+                                      >
+                                        <DropdownMenuItem>
+                                          <OpenInNewWindowIcon className="me-2" />
+                                          {example.name}
+                                        </DropdownMenuItem>
+                                      </Link>
+                                    ))}
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
                                 <DropdownMenuSeparator />
                                 <Link
                                   href="https://github.com/gridaco/grida"
@@ -396,18 +407,12 @@ export default function CanvasPlayground() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <span className="font-bold text-xs">
-                              Canvas Playground
+                              Canvas
                               <Badge variant="outline" className="ms-2 text-xs">
                                 BETA
                               </Badge>
                             </span>
                           </span>
-                        </SidebarSection>
-                        <SidebarSection className="mt-4">
-                          <ExampleSwitch
-                            value={exampleid}
-                            onValueChange={setExampleId}
-                          />
                         </SidebarSection>
                         <hr />
                         <SidebarSection>
@@ -519,48 +524,6 @@ function Hotkyes() {
   useEditorHotKeys();
 
   return <></>;
-}
-
-const examples = [
-  "blank.grida",
-  "helloworld.grida",
-  "slide-01.grida",
-  "slide-02.grida",
-  "instagram-post-01.grida",
-  "poster-01.grida",
-  "resume-01.grida",
-  "event-page-01.grida",
-  "component-01.grida",
-  "layout-01.grida",
-  "globals-01.grida",
-];
-
-function ExampleSwitch({
-  value,
-  onValueChange,
-}: {
-  value?: string;
-  onValueChange: (v: string) => void;
-}) {
-  return (
-    <Select defaultValue={value} onValueChange={onValueChange}>
-      <SelectTrigger>
-        <SelectValue placeholder="Examples" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Examples</SelectLabel>
-          {examples.map((example) => (
-            <SelectItem key={example} value={example}>
-              <span className="capitalize">
-                {example.split(".")[0].split("-").join(" ")}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
-  );
 }
 
 type Preferences = {
