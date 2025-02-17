@@ -391,7 +391,7 @@ function Folder() {
             </>
           )}
         </div>
-        <div className="absolute bottom-4 right-8 ">
+        <div className="sticky bottom-4 right-8 pointer-events-none flex items-end justify-end">
           <UploadsModal />
         </div>
       </aside>
@@ -422,7 +422,7 @@ const EntityNodeItemComponent = ({
   onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
   const commonClasses =
-    "group relative flex items-center rounded-lg p-2 transition-colors select-none cursor-pointer";
+    "group w-full h-full relative rounded-lg p-2 transition-colors select-none cursor-pointer";
 
   return (
     <ContextMenu modal={false}>
@@ -445,7 +445,7 @@ const EntityNodeItemComponent = ({
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium truncate">
+              <span className="w-full mt-2 text-sm font-medium truncate">
                 {node.name}
               </span>
             </div>
@@ -861,7 +861,7 @@ function UploadsModal() {
 
   return (
     <Collapsible
-      className="w-96 border rounded-lg shadow-xl bg-background"
+      className="w-96 border rounded-lg shadow-xl bg-background pointer-events-auto"
       open={open}
       onOpenChange={setOpen}
     >
