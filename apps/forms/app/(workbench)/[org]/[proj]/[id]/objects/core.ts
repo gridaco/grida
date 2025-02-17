@@ -86,6 +86,7 @@ type _BaseFileTask = {
    * 0~1
    */
   progress?: number;
+  reason?: string;
   file: MinimalFile;
 };
 
@@ -212,8 +213,8 @@ function __useDispatch() {
   );
 
   const __task_fail_uploading = useCallback(
-    (id: string) => {
-      dispatch({ type: "tasks/uploading/fail", id });
+    (id: string, reason?: string) => {
+      dispatch({ type: "tasks/uploading/fail", id, reason });
     },
     [dispatch]
   );
@@ -278,7 +279,7 @@ type StorageEditorAction =
   | { type: "remove"; key: string }
   | { type: "tasks/uploading/push"; task: StorageEditorUploadingTask }
   | { type: "tasks/uploading/complete"; id: string }
-  | { type: "tasks/uploading/fail"; id: string }
+  | { type: "tasks/uploading/fail"; id: string; reason?: string }
   | { type: "tasks/deleting/push"; task: StorageEditorDeletingTask }
   | { type: "tasks/deleting/complete"; id: string }
   | { type: "tasks/deleting/fail"; id: string };
@@ -333,6 +334,7 @@ function reducer(
         if (t) {
           t.staus = "failed";
           t.progress = 0;
+          t.reason = action.reason;
         }
         break;
       }
@@ -433,8 +435,7 @@ function useStorageEditor(): IStorageEditor {
 
       const { data, error } = await api.upload(abspath(key), file);
       if (error) {
-        //
-        __task_fail_uploading(key);
+        __task_fail_uploading(key, error.message);
       } else {
         //
         const url = api.getPublicUrl(abspath(key)).data.publicUrl;
@@ -580,12 +581,17 @@ function useStorageEditor(): IStorageEditor {
   );
 
   // #region lifecycle hooks
-  useEffect(() => {
-    // [list & seed]
-    __set_loading(true);
-    list(dir).finally(() => __set_loading(false));
-    // console.log("seed", dir, data, error);
-  }, [__set_loading, dir, list, refreshkey]);
+  useEffect(
+    () => {
+      // [list & seed]
+      __set_loading(true);
+      list(dir).finally(() => __set_loading(false));
+      // console.log("seed", dir, data, error);
+    },
+    // having list as a dependency will cause infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [__set_loading, dir, refreshkey]
+  );
   // #endregion
 
   return {

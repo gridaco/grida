@@ -64,7 +64,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
 import { wellkown } from "@/utils/mimetype";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
@@ -391,7 +391,7 @@ function Folder() {
             </>
           )}
         </div>
-        <div className="absolute bottom-4 right-8 ">
+        <div className="sticky bottom-4 right-8 pointer-events-none flex items-end justify-end">
           <UploadsModal />
         </div>
       </aside>
@@ -422,7 +422,7 @@ const EntityNodeItemComponent = ({
   onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
   const commonClasses =
-    "group relative flex items-center rounded-lg p-2 transition-colors select-none cursor-pointer";
+    "group w-full h-full relative rounded-lg p-2 transition-colors select-none cursor-pointer";
 
   return (
     <ContextMenu modal={false}>
@@ -445,7 +445,7 @@ const EntityNodeItemComponent = ({
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium truncate">
+              <span className="w-full mt-2 text-sm font-medium truncate">
                 {node.name}
               </span>
             </div>
@@ -517,7 +517,9 @@ function FilePreviewSidebar({
   file: FileNode;
   onClose?: () => void;
 }) {
-  const createlinkDialog = useDialogState();
+  const createlinkDialog = useDialogState("create-sharable-link", {
+    refreshkey: true,
+  });
 
   return (
     <>
@@ -567,7 +569,11 @@ function FilePreviewSidebar({
           </div>
         </div>
       </div>
-      <CreateViewerLinkDialog file={file} {...createlinkDialog.props} />
+      <CreateViewerLinkDialog
+        key={createlinkDialog.refreshkey}
+        file={file}
+        {...createlinkDialog.props}
+      />
     </>
   );
 }
@@ -650,44 +656,133 @@ function FolderLoadingState() {
   );
 }
 
-// type Viewer = {
-//   type: "pdf";
-//   app: "page-flip" | "none";
-//   url: string;
-// };
-// const [viewer, setViewer] = useState<Viewer | undefined>(undefined);
+type Viewer =
+  | {
+      type: "pdf";
+      mimetype: string;
+      app: "none" | "page-flip";
+      object: string;
+      url: string;
+    }
+  | {
+      type: "image";
+      mimetype: string;
+      app: "none";
+      object: string;
+      url: string;
+    }
+  | {
+      type: "audio";
+      mimetype: string;
+      app: "none";
+      object: string;
+      url: string;
+    };
+
+const viewer_pdf_options = [
+  { value: "none", label: "Plain" },
+  { value: "page-flip", label: "Book" },
+] as const;
+
+function initial_viewer(file: FileNode): Viewer | undefined {
+  const known = wellkown(file.mimetype);
+  switch (known) {
+    case "pdf":
+      return {
+        type: "pdf",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+    case "image":
+      return {
+        type: "image",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+    case "audio":
+      return {
+        type: "audio",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+  }
+  return undefined;
+}
+
+function create_viewer(prev: Viewer, app: Viewer["app"]): Viewer {
+  switch (prev.type) {
+    case "pdf": {
+      switch (app) {
+        case "none": {
+          return { ...prev, app };
+        }
+        case "page-flip": {
+          const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
+          const viewer_object = prev.object.replace(REPLACE, "");
+          return {
+            app: "page-flip",
+            mimetype: prev.mimetype,
+            object: prev.object,
+            type: prev.type,
+            url: `https://viewer.grida.co/pdf?object=${viewer_object}&app=page-flip`,
+          };
+        }
+      }
+    }
+  }
+  return prev;
+}
+
+function ViewerBody({ viewer }: { viewer: Viewer }) {
+  const is_plain = viewer.app === "none";
+  if (is_plain) {
+    return (
+      <object
+        data={viewer.object}
+        type={viewer.mimetype}
+        width="100%"
+        height="100%"
+      />
+    );
+  } else {
+    return <iframe src={viewer.url} width="100%" height="100%" />;
+  }
+}
 
 function CreateViewerLinkDialog({
   file,
   ...props
 }: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
-  const known = wellkown(file.mimetype);
+  const [viewer, setViewer] = useState<Viewer | undefined>(
+    initial_viewer(file)
+  );
 
   const Body = () => {
-    switch (known) {
+    switch (viewer?.type) {
       case "pdf": {
         return (
           <>
-            <Tabs className="w-full h-full">
+            <Tabs
+              className="w-full h-full"
+              value={viewer.app}
+              onValueChange={(app) => {
+                setViewer((v) => create_viewer(v!, app as any));
+              }}
+            >
               <TabsList>
-                <TabsTrigger value="none">Plain</TabsTrigger>
-                <TabsTrigger value="flipbook">Flip Book</TabsTrigger>
+                {viewer_pdf_options.map((option, index) => (
+                  <TabsTrigger key={option.value} value={option.value}>
+                    {option.label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
-              <TabsContent value="none" className="w-full h-full">
-                <object
-                  data={file.url}
-                  type={file.mimetype}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
-              <TabsContent value="flipbook" className="w-full h-full">
-                <iframe
-                  src={`https://viewer.grida.co/pdf?url=${file.url}&app=page-flip`}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
+              <ViewerBody viewer={viewer} />
             </Tabs>
           </>
         );
@@ -701,7 +796,7 @@ function CreateViewerLinkDialog({
       default: {
         return (
           <div>
-            <p>Viewer not available for {known}</p>
+            <p>Viewer not available for {viewer?.type}</p>
           </div>
         );
       }
@@ -714,7 +809,7 @@ function CreateViewerLinkDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             Create Sharable Viewer Link
-            {known && <Badge className="ms-2">{known}</Badge>}
+            {viewer && <Badge className="ms-2">{viewer.type}</Badge>}
           </DialogTitle>
           <DialogDescription></DialogDescription>
         </DialogHeader>
@@ -725,9 +820,15 @@ function CreateViewerLinkDialog({
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
-          <DialogClose asChild>
-            <Button>Create</Button>
-          </DialogClose>
+          <Button
+            disabled={!viewer}
+            onClick={() => {
+              window.navigator.clipboard.writeText(viewer!.url);
+              toast("Link copied to clipboard");
+            }}
+          >
+            Copy
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -762,7 +863,7 @@ function UploadsModal() {
 
   return (
     <Collapsible
-      className="w-96 border rounded-lg shadow-xl bg-background"
+      className="w-96 border rounded-lg shadow-xl bg-background pointer-events-auto"
       open={open}
       onOpenChange={setOpen}
     >
@@ -802,7 +903,7 @@ function UploadsModal() {
   );
 }
 
-function UploadItem({ file, staus, progress }: StorageEditorTask) {
+function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
   const l_type = file.name.split(".").pop();
   const l_name = file.name.replace(`.${l_type}`, "");
 
@@ -829,6 +930,14 @@ function UploadItem({ file, staus, progress }: StorageEditorTask) {
           </Badge>
           <span className="text-xs">{fmt_bytes(file.size)}</span>
         </div>
+        {reason && (
+          <span
+            data-status={staus}
+            className="text-xs text-muted-foreground data-[status='failed']:text-destructive"
+          >
+            {reason}
+          </span>
+        )}
       </div>
     </div>
   );
