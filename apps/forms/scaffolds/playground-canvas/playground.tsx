@@ -224,15 +224,11 @@ export default function CanvasPlayground() {
       document: state.document,
     } satisfies io.DocumentFileModel;
 
-    // const blob = new Blob([io.json.stringify(documentData)], {
-    //   type: "application/json",
-    // });
-
     const blob = new Blob([io.archive.pack(documentData)], {
       type: "application/zip",
     });
 
-    saveAs(blob, `${v4()}.grida.zip`);
+    saveAs(blob, `${v4()}.grida`);
   };
 
   return (
