@@ -298,15 +298,17 @@ export default function OrderPage() {
             <section>
               <h2 className="text-xl font-semibold mb-4">Shipping Options</h2>
               <div className="grid gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                   {shipping_options.map((op) => (
                     <OptionCard key={op.name}>
                       <CardContent className="p-0 pb-2">
-                        <div className="px-2 grid gap-1">
-                          <span className="font-semibold mt-2">{op.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {op.description}
-                          </span>
+                        <div className="flex flex-col px-3 gap-4">
+                          <div className="flex flex-col">
+                            <span className=" font-medium mt-2">{op.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {op.description}
+                            </span>
+                          </div>
                           <span className="text-sm text-muted-foreground">
                             {op.price}
                           </span>

@@ -337,14 +337,14 @@ function SectionExploreTemplates() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 my-16">
         {wwwprint.categories.slice(0, 6).map((category, index) => (
           <Link href={sitemap.print.links.templates} key={index}>
-            <div className="flex flex-col items-center text-left">
+            <div className="flex flex-col items-start">
               <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden">
                 <Image
                   src={category.image}
                   alt={category.name}
                   width={400}
                   height={300}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover hover:scale-110 transform-gpu transition-all duration-300"
                 />
               </div>
               <p className="mt-2 text-lg font-medium text-left">
