@@ -1,7 +1,7 @@
 import type { grida } from "@/grida";
 import type { cmath } from "@grida/cmath";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
-import { encode, decode, PngDataArray } from "fast-png";
+import { encode, decode, type PngDataArray } from "fast-png";
 
 export namespace io {
   const CURRENT_VERSION = "2025-02-12";
