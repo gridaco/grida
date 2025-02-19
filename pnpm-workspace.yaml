@@ -10,6 +10,7 @@ packages:
   - "apps/forms"
   # - "apps/posts"
   - "apps/site"
+  - "apps/blog"
   - "apps/viewer"
   - "packages/*"
   # - "packages/.legacy/*"
