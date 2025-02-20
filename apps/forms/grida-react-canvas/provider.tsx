@@ -2792,6 +2792,35 @@ export function useDataTransferEventTarget() {
     [insertNode, canvasXY]
   );
 
+  const insertImage = useCallback(
+    (
+      name: string,
+      file: File,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = canvasXY(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const url = URL.createObjectURL(file);
+      const node = {
+        type: "image",
+        name: name,
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        src: url,
+        left: x,
+        top: y,
+      } satisfies grida.program.nodes.NodePrototype;
+      insertNode(node);
+    },
+    [insertNode, canvasXY]
+  );
+
   const insertSVG = useCallback(
     (
       name: string,
@@ -2846,9 +2875,9 @@ export function useDataTransferEventTarget() {
     ) => {
       const type = file.type || file.name.split(".").pop() || file.name;
       const is_svg = type === "image/svg+xml";
-      // const is_png = type === "image/png";
-      // const is_jpg = type === "image/jpeg";
-      // const is_gif = type === "image/gif";
+      const is_png = type === "image/png";
+      const is_jpg = type === "image/jpeg";
+      const is_gif = type === "image/gif";
 
       if (is_svg) {
         const reader = new FileReader();
@@ -2861,9 +2890,15 @@ export function useDataTransferEventTarget() {
         return;
       }
 
-      toast.error(`${type} is not supported`);
+      if (is_png || is_jpg || is_gif) {
+        const name = file.name.split(".")[0];
+        insertImage(name, file, position);
+        return;
+      }
+
+      toast.error(`insertion of file type ${type} is not supported`);
     },
-    [insertNode, insertSVG]
+    [insertImage, insertSVG]
   );
 
   const onpaste = useCallback(

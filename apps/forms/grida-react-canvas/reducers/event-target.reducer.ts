@@ -1113,8 +1113,7 @@ function self_prepare_bitmap_node(
       imageRef: new_bitmap_ref_id,
     };
 
-    draft.document.textures[new_bitmap_ref_id] = {
-      type: "texture",
+    draft.document.bitmaps[new_bitmap_ref_id] = {
       data: new Uint8ClampedArray(0),
       width: 0,
       height: 0,
@@ -1169,8 +1168,7 @@ function self_brush(
 
   const nodepos: cmath.Vector2 = [node.left!, node.top!];
 
-  const image = draft.document.textures[node.imageRef];
-  assert(image.type === "texture");
+  const image = draft.document.bitmaps[node.imageRef];
 
   // set up the editor from global.
   let bme: BitmapLayerEditor;
@@ -1204,8 +1202,7 @@ function self_brush(
   );
 
   // update image
-  draft.document.textures[node.imageRef] = {
-    type: "texture",
+  draft.document.bitmaps[node.imageRef] = {
     data: bme.data,
     version: bme.frame,
     width: bme.width,
@@ -1246,8 +1243,7 @@ function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
   const color = get_next_brush_pain_color(draft);
   const bme = __global_editors.bitmap!;
   bme.floodfill(draft.pointer.position, color);
-  draft.document.textures[imageRef] = {
-    type: "texture",
+  draft.document.bitmaps[imageRef] = {
     data: bme.data,
     version: bme.frame,
     width: bme.width,

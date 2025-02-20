@@ -64,7 +64,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
 import { wellkown } from "@/utils/mimetype";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
@@ -79,6 +79,7 @@ import StorageEditorProvider, {
   StorageEditorDispatcherProvider,
   StorageEditorTask,
   StorageEditorUploadingTask,
+  useSeedList,
   useStorageEditor,
 } from "../core";
 import toast from "react-hot-toast";
@@ -187,6 +188,7 @@ function Folder() {
   const [state] = useEditorState();
   const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
   const storage = useStorageEditor();
+  useSeedList();
 
   const { dir, nodes } = storage;
 
@@ -249,149 +251,151 @@ function Folder() {
 
   return (
     <div className="flex flex-1 h-full">
-      <aside className="relative w-full container mx-auto p-4 overflow-y-scroll">
-        <div className="my-8">
-          <Tools />
-        </div>
-        <div className="flex items-center justify-between">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link
-                      href={editorlink("objects", {
-                        document_id: state.document_id,
-                        basepath: state.basepath,
-                      })}
-                    >
-                      Home{" "}
-                      {storage.public && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-1.5 text-muted-foreground"
-                        >
-                          Public
-                        </Badge>
-                      )}
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {paths.map((path, index) => {
-                  const href = editorlink("objects/[[...path]]", {
-                    path: path,
-                    document_id: state.document_id,
-                    basepath: state.basepath,
-                  });
-                  const label = path[path.length - 1];
-                  return (
-                    <React.Fragment key={index}>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link href={href}>{label}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                    </React.Fragment>
-                  );
-                })}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </nav>
-          <div className="flex space-x-2">
-            <Button
-              disabled={storage.loading}
-              variant="outline"
-              onClick={() => storage.refresh()}
-            >
-              {storage.loading ? (
-                <Spinner className="h-4 w-4 me-2" />
-              ) : (
-                <ReloadIcon className="h-4 w-4 me-2" />
-              )}
-              Reload
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("grid")}
-              className={cn(view === "grid" && "bg-muted")}
-            >
-              <GridIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("list")}
-              className={cn(view === "list" && "bg-muted")}
-            >
-              <ListIcon className="h-4 w-4" />
-            </Button>
+      <aside className="relative w-full h-full">
+        <div className=" w-full h-full container mx-auto p-4 overflow-y-scroll">
+          <div className="my-8">
+            <Tools />
           </div>
-        </div>
-        {storage.public && (
-          <div className="py-4">
-            <Alert>
-              <LockOpen1Icon className="w-4 h-4" />
-              <AlertTitle>Public Bucket</AlertTitle>
-              <AlertDescription>
-                This bucket is public and only meant for serving public files.{" "}
-                <b>DO NOT</b> upload sensitive files here.
-              </AlertDescription>
-            </Alert>
+          <div className="flex items-center justify-between">
+            <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link
+                        href={editorlink("objects", {
+                          document_id: state.document_id,
+                          basepath: state.basepath,
+                        })}
+                      >
+                        Home{" "}
+                        {storage.public && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs px-1.5 text-muted-foreground"
+                          >
+                            Public
+                          </Badge>
+                        )}
+                      </Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  {paths.map((path, index) => {
+                    const href = editorlink("objects/[[...path]]", {
+                      path: path,
+                      document_id: state.document_id,
+                      basepath: state.basepath,
+                    });
+                    const label = path[path.length - 1];
+                    return (
+                      <React.Fragment key={index}>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <Link href={href}>{label}</Link>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    );
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </nav>
+            <div className="flex space-x-2">
+              <Button
+                disabled={storage.loading}
+                variant="outline"
+                onClick={() => storage.refresh()}
+              >
+                {storage.loading ? (
+                  <Spinner className="h-4 w-4 me-2" />
+                ) : (
+                  <ReloadIcon className="h-4 w-4 me-2" />
+                )}
+                Reload
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("grid")}
+                className={cn(view === "grid" && "bg-muted")}
+              >
+                <GridIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("list")}
+                className={cn(view === "list" && "bg-muted")}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        )}
-        <div className="mt-4">
-          {nodes.length === 0 ? (
-            storage.loading ? (
-              <FolderLoadingState />
-            ) : (
-              <FolderEmptyState />
-            )
-          ) : (
-            <>
-              {view === "grid" ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
-                    <span className="w-1/2 text-sm">Name</span>
-                    <span className="w-1/4 text-sm">Size</span>
-                    <span className="w-1/4 text-sm">Modified</span>
-                  </div>
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view ?? "list"}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+          {storage.public && (
+            <div className="py-4">
+              <Alert>
+                <LockOpen1Icon className="w-4 h-4" />
+                <AlertTitle>Public Bucket</AlertTitle>
+                <AlertDescription>
+                  This bucket is public and only meant for serving public files.{" "}
+                  <b>DO NOT</b> upload sensitive files here.
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
+          <div className="mt-4">
+            {nodes.length === 0 ? (
+              storage.loading ? (
+                <FolderLoadingState />
+              ) : (
+                <FolderEmptyState />
+              )
+            ) : (
+              <>
+                {view === "grid" ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
+                      <span className="w-1/2 text-sm">Name</span>
+                      <span className="w-1/4 text-sm">Size</span>
+                      <span className="w-1/4 text-sm">Modified</span>
+                    </div>
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view ?? "list"}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="absolute bottom-4 right-8 ">
+        <div className="absolute bottom-4 right-8 pointer-events-none flex items-end justify-end">
           <UploadsModal />
         </div>
       </aside>
@@ -422,7 +426,7 @@ const EntityNodeItemComponent = ({
   onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
   const commonClasses =
-    "group relative flex items-center rounded-lg p-2 transition-colors select-none cursor-pointer";
+    "group w-full h-full relative rounded-lg p-2 transition-colors select-none cursor-pointer";
 
   return (
     <ContextMenu modal={false}>
@@ -445,7 +449,7 @@ const EntityNodeItemComponent = ({
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium truncate">
+              <span className="w-full mt-2 text-sm font-medium truncate">
                 {node.name}
               </span>
             </div>
@@ -517,7 +521,9 @@ function FilePreviewSidebar({
   file: FileNode;
   onClose?: () => void;
 }) {
-  const createlinkDialog = useDialogState();
+  const createlinkDialog = useDialogState("create-sharable-link", {
+    refreshkey: true,
+  });
 
   return (
     <>
@@ -567,7 +573,11 @@ function FilePreviewSidebar({
           </div>
         </div>
       </div>
-      <CreateViewerLinkDialog file={file} {...createlinkDialog.props} />
+      <CreateViewerLinkDialog
+        key={createlinkDialog.refreshkey}
+        file={file}
+        {...createlinkDialog.props}
+      />
     </>
   );
 }
@@ -650,44 +660,133 @@ function FolderLoadingState() {
   );
 }
 
-// type Viewer = {
-//   type: "pdf";
-//   app: "page-flip" | "none";
-//   url: string;
-// };
-// const [viewer, setViewer] = useState<Viewer | undefined>(undefined);
+type Viewer =
+  | {
+      type: "pdf";
+      mimetype: string;
+      app: "none" | "page-flip";
+      object: string;
+      url: string;
+    }
+  | {
+      type: "image";
+      mimetype: string;
+      app: "none";
+      object: string;
+      url: string;
+    }
+  | {
+      type: "audio";
+      mimetype: string;
+      app: "none";
+      object: string;
+      url: string;
+    };
+
+const viewer_pdf_options = [
+  { value: "none", label: "Plain" },
+  { value: "page-flip", label: "Book" },
+] as const;
+
+function initial_viewer(file: FileNode): Viewer | undefined {
+  const known = wellkown(file.mimetype);
+  switch (known) {
+    case "pdf":
+      return {
+        type: "pdf",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+    case "image":
+      return {
+        type: "image",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+    case "audio":
+      return {
+        type: "audio",
+        mimetype: file.mimetype,
+        app: "none",
+        object: file.url,
+        url: file.url,
+      };
+  }
+  return undefined;
+}
+
+function create_viewer(prev: Viewer, app: Viewer["app"]): Viewer {
+  switch (prev.type) {
+    case "pdf": {
+      switch (app) {
+        case "none": {
+          return { ...prev, app };
+        }
+        case "page-flip": {
+          const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
+          const viewer_object = prev.object.replace(REPLACE, "");
+          return {
+            app: "page-flip",
+            mimetype: prev.mimetype,
+            object: prev.object,
+            type: prev.type,
+            url: `https://viewer.grida.co/pdf?object=${viewer_object}&app=page-flip`,
+          };
+        }
+      }
+    }
+  }
+  return prev;
+}
+
+function ViewerBody({ viewer }: { viewer: Viewer }) {
+  const is_plain = viewer.app === "none";
+  if (is_plain) {
+    return (
+      <object
+        data={viewer.object}
+        type={viewer.mimetype}
+        width="100%"
+        height="100%"
+      />
+    );
+  } else {
+    return <iframe src={viewer.url} width="100%" height="100%" />;
+  }
+}
 
 function CreateViewerLinkDialog({
   file,
   ...props
 }: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
-  const known = wellkown(file.mimetype);
+  const [viewer, setViewer] = useState<Viewer | undefined>(
+    initial_viewer(file)
+  );
 
   const Body = () => {
-    switch (known) {
+    switch (viewer?.type) {
       case "pdf": {
         return (
           <>
-            <Tabs className="w-full h-full">
+            <Tabs
+              className="w-full h-full"
+              value={viewer.app}
+              onValueChange={(app) => {
+                setViewer((v) => create_viewer(v!, app as any));
+              }}
+            >
               <TabsList>
-                <TabsTrigger value="none">Plain</TabsTrigger>
-                <TabsTrigger value="flipbook">Flip Book</TabsTrigger>
+                {viewer_pdf_options.map((option, index) => (
+                  <TabsTrigger key={option.value} value={option.value}>
+                    {option.label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
-              <TabsContent value="none" className="w-full h-full">
-                <object
-                  data={file.url}
-                  type={file.mimetype}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
-              <TabsContent value="flipbook" className="w-full h-full">
-                <iframe
-                  src={`https://viewer.grida.co/pdf?url=${file.url}&app=page-flip`}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
+              <ViewerBody viewer={viewer} />
             </Tabs>
           </>
         );
@@ -701,7 +800,7 @@ function CreateViewerLinkDialog({
       default: {
         return (
           <div>
-            <p>Viewer not available for {known}</p>
+            <p>Viewer not available for {viewer?.type}</p>
           </div>
         );
       }
@@ -714,7 +813,7 @@ function CreateViewerLinkDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             Create Sharable Viewer Link
-            {known && <Badge className="ms-2">{known}</Badge>}
+            {viewer && <Badge className="ms-2">{viewer.type}</Badge>}
           </DialogTitle>
           <DialogDescription></DialogDescription>
         </DialogHeader>
@@ -725,9 +824,15 @@ function CreateViewerLinkDialog({
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
-          <DialogClose asChild>
-            <Button>Create</Button>
-          </DialogClose>
+          <Button
+            disabled={!viewer}
+            onClick={() => {
+              window.navigator.clipboard.writeText(viewer!.url);
+              toast("Link copied to clipboard");
+            }}
+          >
+            Copy
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -762,7 +867,7 @@ function UploadsModal() {
 
   return (
     <Collapsible
-      className="w-96 border rounded-lg shadow-xl bg-background"
+      className="w-96 border rounded-lg shadow-xl bg-background pointer-events-auto"
       open={open}
       onOpenChange={setOpen}
     >
@@ -802,7 +907,7 @@ function UploadsModal() {
   );
 }
 
-function UploadItem({ file, staus, progress }: StorageEditorTask) {
+function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
   const l_type = file.name.split(".").pop();
   const l_name = file.name.replace(`.${l_type}`, "");
 
@@ -829,6 +934,14 @@ function UploadItem({ file, staus, progress }: StorageEditorTask) {
           </Badge>
           <span className="text-xs">{fmt_bytes(file.size)}</span>
         </div>
+        {reason && (
+          <span
+            data-status={staus}
+            className="text-xs text-muted-foreground data-[status='failed']:text-destructive"
+          >
+            {reason}
+          </span>
+        )}
       </div>
     </div>
   );

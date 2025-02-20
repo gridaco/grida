@@ -40,7 +40,7 @@ interface FlipPageProps {
 const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
   return (
     <div
-      className="bg-white shadow-lg rounded overflow-hidden"
+      className="shadow-lg rounded overflow-hidden"
       ref={ref as React.RefObject<HTMLDivElement>}
     >
       {/* <div className="page-content w-full h-full flex items-center justify-center"> */}
@@ -60,13 +60,13 @@ FlipPage.displayName = "FlipPage";
 
 const PDFViewer = ({
   file,
-  title: _title = file,
+  title: _title,
 }: {
   file: string;
   title?: string;
 }) => {
   const [numPages, setNumPages] = useState<number>(0);
-  const [title, setTitle] = useState<string>(_title);
+  const [title, setTitle] = useState<string | undefined>(_title);
   const [currentPage, setCurrentPage] = useState(0);
   const [rawSize, setRawSize] = useState<
     { width: number; height: number } | undefined
@@ -80,14 +80,16 @@ const PDFViewer = ({
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
     document: PDFDocumentProxy
   ) => {
-    document.getMetadata().then(({ info }) => {
-      try {
-        const pdfTitle = (info as any)["Title"];
-        if (pdfTitle) {
-          setTitle(pdfTitle);
-        }
-      } catch (e) {}
-    });
+    if (!title) {
+      document.getMetadata().then(({ info }) => {
+        try {
+          const pdfTitle = (info as any)["Title"];
+          if (pdfTitle) {
+            setTitle(pdfTitle);
+          }
+        } catch (e) {}
+      });
+    }
 
     setNumPages(document.numPages);
     document.getPage(1).then((page) => {
@@ -136,10 +138,12 @@ const PDFViewer = ({
   );
 
   return (
-    <main className="w-full h-full flex flex-col overflow-hidden">
-      <header className="border-b py-2 px-5 z-50">
-        {title && <h1 className="text-sm font-semibold">{title}</h1>}
-      </header>
+    <main className="w-full h-full flex flex-col overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+      {title && (
+        <header className="border-b py-2 px-5 z-50">
+          {title && <h1 className="text-sm font-semibold">{title}</h1>}
+        </header>
+      )}
       <div className="w-full h-full p-20">
         <div
           ref={ref}

@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { createServerComponentClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "../globals.css";
@@ -14,22 +11,11 @@ export const metadata: Metadata = {
   description: "Grida is a Free & Open Canvas",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
-
-  const { data } = await supabase.auth.getUser();
-
-  const isLoggedIn = !!data?.user;
-
-  if (isLoggedIn) {
-    redirect("/dashboard");
-  }
-
   return (
     <html lang="en">
       <body className={inter.className}>
