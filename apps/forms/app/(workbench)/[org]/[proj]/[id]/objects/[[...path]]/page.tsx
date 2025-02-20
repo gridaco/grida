@@ -63,7 +63,6 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
-import { wellkown } from "@/utils/mimetype";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
@@ -81,9 +80,10 @@ import StorageEditorProvider, {
   StorageEditorUploadingTask,
   useSeedList,
   useStorageEditor,
-} from "../core";
+} from "@/scaffolds/storage/core";
 import toast from "react-hot-toast";
 import { useQueryState } from "@/utils/use-query-state";
+import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -660,185 +660,6 @@ function FolderLoadingState() {
   );
 }
 
-type Viewer =
-  | {
-      type: "pdf";
-      mimetype: string;
-      app: "none" | "page-flip";
-      object: string;
-      url: string;
-    }
-  | {
-      type: "image";
-      mimetype: string;
-      app: "none";
-      object: string;
-      url: string;
-    }
-  | {
-      type: "audio";
-      mimetype: string;
-      app: "none";
-      object: string;
-      url: string;
-    };
-
-const viewer_pdf_options = [
-  { value: "none", label: "Plain" },
-  { value: "page-flip", label: "Book" },
-] as const;
-
-function initial_viewer(file: FileNode): Viewer | undefined {
-  const known = wellkown(file.mimetype);
-  switch (known) {
-    case "pdf":
-      return {
-        type: "pdf",
-        mimetype: file.mimetype,
-        app: "none",
-        object: file.url,
-        url: file.url,
-      };
-    case "image":
-      return {
-        type: "image",
-        mimetype: file.mimetype,
-        app: "none",
-        object: file.url,
-        url: file.url,
-      };
-    case "audio":
-      return {
-        type: "audio",
-        mimetype: file.mimetype,
-        app: "none",
-        object: file.url,
-        url: file.url,
-      };
-  }
-  return undefined;
-}
-
-function create_viewer(prev: Viewer, app: Viewer["app"]): Viewer {
-  switch (prev.type) {
-    case "pdf": {
-      switch (app) {
-        case "none": {
-          return { ...prev, app };
-        }
-        case "page-flip": {
-          const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
-          const viewer_object = prev.object.replace(REPLACE, "");
-          return {
-            app: "page-flip",
-            mimetype: prev.mimetype,
-            object: prev.object,
-            type: prev.type,
-            url: `https://viewer.grida.co/pdf?object=${viewer_object}&app=page-flip`,
-          };
-        }
-      }
-    }
-  }
-  return prev;
-}
-
-function ViewerBody({ viewer }: { viewer: Viewer }) {
-  const is_plain = viewer.app === "none";
-  if (is_plain) {
-    return (
-      <object
-        data={viewer.object}
-        type={viewer.mimetype}
-        width="100%"
-        height="100%"
-      />
-    );
-  } else {
-    return <iframe src={viewer.url} width="100%" height="100%" />;
-  }
-}
-
-function CreateViewerLinkDialog({
-  file,
-  ...props
-}: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
-  const [viewer, setViewer] = useState<Viewer | undefined>(
-    initial_viewer(file)
-  );
-
-  const Body = () => {
-    switch (viewer?.type) {
-      case "pdf": {
-        return (
-          <>
-            <Tabs
-              className="w-full h-full"
-              value={viewer.app}
-              onValueChange={(app) => {
-                setViewer((v) => create_viewer(v!, app as any));
-              }}
-            >
-              <TabsList>
-                {viewer_pdf_options.map((option, index) => (
-                  <TabsTrigger key={option.value} value={option.value}>
-                    {option.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              <ViewerBody viewer={viewer} />
-            </Tabs>
-          </>
-        );
-      }
-      case undefined:
-        return (
-          <div>
-            <p>Viewer not available for this file type {file.mimetype}</p>
-          </div>
-        );
-      default: {
-        return (
-          <div>
-            <p>Viewer not available for {viewer?.type}</p>
-          </div>
-        );
-      }
-    }
-  };
-
-  return (
-    <Dialog {...props}>
-      <DialogContent className="flex flex-col max-w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center">
-            Create Sharable Viewer Link
-            {viewer && <Badge className="ms-2">{viewer.type}</Badge>}
-          </DialogTitle>
-          <DialogDescription></DialogDescription>
-        </DialogHeader>
-        <div className="w-full flex-1 overflow-hidden">
-          <Body />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="ghost">Cancel</Button>
-          </DialogClose>
-          <Button
-            disabled={!viewer}
-            onClick={() => {
-              window.navigator.clipboard.writeText(viewer!.url);
-              toast("Link copied to clipboard");
-            }}
-          >
-            Copy
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function UploadsModal() {
   const { tasks } = useStorageEditor();
   const [tab, setTab] = useState<"all" | "completed" | "failed">("all");
@@ -946,13 +767,6 @@ function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
     </div>
   );
 }
-
-const upload_status_text = {
-  idle: "Idle",
-  progress: "Uploading",
-  completed: "Completed",
-  failed: "Failed",
-} as const;
 
 function ConfirmDeleteDialog({
   data,
