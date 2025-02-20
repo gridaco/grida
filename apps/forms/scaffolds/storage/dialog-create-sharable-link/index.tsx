@@ -8,16 +8,68 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-// import { FileNode } from "../core";
 import toast from "react-hot-toast";
 import { wellkown } from "@/utils/mimetype";
-import { FileNode } from "../core";
+import { useStorageEditor } from "../core";
 import { Safari, SafariToolbar } from "@/components/frames/safari";
 import { Label } from "@/components/ui/label";
 import { Cross2Icon, Link2Icon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { BookIcon } from "lucide-react";
+import { FilePicker } from "@/components/picker";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { vfs } from "@/lib/vfs";
+import { useDebounce } from "@uidotdev/usehooks";
+
+function ImageResourcePicker({
+  value,
+  onValueChange,
+}: {
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
+  const { root, list, loading } = useStorageEditor();
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 truncate overflow-hidden">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={value}
+              className="w-5 h-5 rounded-full object-contain"
+              alt=""
+            />
+          ) : (
+            "Select"
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="left"
+        sideOffset={16}
+        className="p-0 w-full border-none"
+      >
+        <FilePicker
+          accept="image/*"
+          list={list}
+          nodes={root}
+          loading={loading}
+          onValueCommit={(files) => {
+            const key = files[0].key;
+            onValueChange?.(key);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type ViewerOptions = {
   mimetype: string;
@@ -48,7 +100,7 @@ const viewer_pdf_options = [
   { value: "page-flip", label: "Book", Icon: BookIcon },
 ] as const;
 
-function initial_viewer(file: FileNode): Viewer | undefined {
+function initial_viewer(file: vfs.FileNode): Viewer | undefined {
   const known = wellkown(file.mimetype);
   switch (known) {
     case "pdf":
@@ -80,7 +132,7 @@ function initial_viewer(file: FileNode): Viewer | undefined {
 }
 
 function create_viewer(prev: Viewer, options: Partial<ViewerOptions>): Viewer {
-  const next = { ...options, ...prev };
+  const next = { ...prev, ...options } as Viewer;
   const url = viewerlink(next);
   return { ...next, url };
 }
@@ -97,19 +149,22 @@ function removeEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
     }, {} as Partial<T>);
 }
 
+function viewerobj(objecturl: string): string {
+  const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
+  const viewer_object = objecturl.replace(REPLACE, "");
+  return viewer_object;
+}
+
 function viewerlink(
   viewer: ViewerOptions,
   // baseUrl = "https://viewer.grida.co"
   baseUrl = "http://localhost:3001"
 ): string {
-  const REPLACE = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/";
-  const viewer_object = viewer.object.replace(REPLACE, "");
-
   const params = {
-    object: viewer_object,
+    object: viewerobj(viewer.object),
+    logo: viewer.logo ? viewerobj(viewer.logo) : undefined,
     app: viewer.app,
     title: viewer.title,
-    logo: viewer.logo,
   };
 
   const qs = new URLSearchParams(removeEmpty(params)).toString();
@@ -135,10 +190,13 @@ function ViewerBody({ viewer }: { viewer: Viewer }) {
 export default function CreateViewerLinkDialog({
   file,
   ...props
-}: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
-  const [viewer, setViewer] = useState<Viewer | undefined>(
+}: React.ComponentProps<typeof Dialog> & { file: vfs.FileNode }) {
+  const { getPublicUrl } = useStorageEditor();
+  const [_viewer, setViewer] = useState<Viewer | undefined>(
     initial_viewer(file)
   );
+
+  const viewer = useDebounce(_viewer, 500);
 
   const Body = () => {
     switch (viewer?.type) {
@@ -211,7 +269,7 @@ export default function CreateViewerLinkDialog({
                 <Label className="text-xs text-muted-foreground">Viewer</Label>
                 <ToggleGroup
                   type="single"
-                  value={viewer?.app}
+                  value={_viewer?.app}
                   className="justify-start"
                   onValueChange={(app) => {
                     setViewer((v) => create_viewer(v!, { app: app as any }));
@@ -226,13 +284,9 @@ export default function CreateViewerLinkDialog({
                 </ToggleGroup>
               </div>
               <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Favicon</Label>
-                <Input placeholder="Favicon Path" />
-              </div>
-              <div className="grid gap-2">
                 <Label className="text-xs text-muted-foreground">Title</Label>
                 <Input
-                  value={viewer?.title}
+                  value={_viewer?.title}
                   onChange={(e) => {
                     const title = e.target.value;
                     setViewer((v) => create_viewer(v!, { title }));
@@ -245,7 +299,13 @@ export default function CreateViewerLinkDialog({
                 <p className="text-xs text-muted-foreground">
                   Logos may not appear in all viewers.
                 </p>
-                <Input placeholder="Logo Path" />
+                <ImageResourcePicker
+                  value={_viewer?.logo}
+                  onValueChange={(logo) => {
+                    const logourl = getPublicUrl(logo);
+                    setViewer((v) => create_viewer(v!, { logo: logourl }));
+                  }}
+                />
               </div>
             </div>
           </aside>

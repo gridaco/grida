@@ -11,16 +11,18 @@ export default function PDFViewer({
   title,
   app,
   file,
+  logo,
 }: {
   app: PdfViewerApp;
   file: string;
   title?: string;
+  logo?: string;
 }) {
   switch (app) {
     case "page-flip":
       return (
         <main className="w-dvw h-dvh">
-          <Viewer file={file} title={title} />
+          <Viewer file={file} title={title} logo={logo} />
         </main>
       );
     default:

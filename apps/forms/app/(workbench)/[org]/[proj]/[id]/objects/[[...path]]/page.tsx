@@ -70,9 +70,6 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { fmt_bytes } from "@/utils/fmt";
 import StorageEditorProvider, {
-  EntityNode,
-  FileNode,
-  generatePaths,
   reducer,
   StorageApi,
   StorageEditorDispatcherProvider,
@@ -84,6 +81,7 @@ import StorageEditorProvider, {
 import toast from "react-hot-toast";
 import { useQueryState } from "@/utils/use-query-state";
 import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
+import { vfs } from "@/lib/vfs";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -186,13 +184,13 @@ type View = "grid" | "list";
 function Folder() {
   const searchParams = useSearchParams();
   const [state] = useEditorState();
-  const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
+  const deleteConfirmDialog = useDialogState<vfs.EntityNode>("confirm-delete");
   const storage = useStorageEditor();
   useSeedList();
 
   const { dir, nodes } = storage;
 
-  const paths = useMemo(() => generatePaths(dir.split("/")), [dir]);
+  const paths = useMemo(() => vfs.generatePaths(dir.split("/")), [dir]);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -212,12 +210,12 @@ function Folder() {
     accepted: ["list", "grid"],
   });
 
-  const onNodeClick = (e: React.MouseEvent, file: EntityNode) => {
+  const onNodeClick = (e: React.MouseEvent, file: vfs.EntityNode) => {
     if (file.type === "folder") return;
     setPreview(file.name);
   };
 
-  const onNodeDoubleClick = (e: React.MouseEvent, file: EntityNode) => {
+  const onNodeDoubleClick = (e: React.MouseEvent, file: vfs.EntityNode) => {
     const handler: (href: string) => void =
       e.metaKey || e.ctrlKey ? (l) => open(l, "_blank") : router.push;
 
@@ -239,11 +237,11 @@ function Folder() {
     }
   };
 
-  const onNodeDelete = (file: EntityNode) => {
+  const onNodeDelete = (file: vfs.EntityNode) => {
     deleteConfirmDialog.openDialog(file);
   };
 
-  const onNodeRename = (file: EntityNode) => {
+  const onNodeRename = (file: vfs.EntityNode) => {
     const newname = prompt("Rename file", file.name);
     if (!newname) return;
     storage.mv(file.name, newname);
@@ -420,7 +418,7 @@ const EntityNodeItemComponent = ({
   className,
   ...props
 }: {
-  node: EntityNode;
+  node: vfs.EntityNode;
   view: View;
   onDeleteClick?: () => void;
   onRenameClick?: () => void;
@@ -518,7 +516,7 @@ function FilePreviewSidebar({
   file,
   onClose,
 }: {
-  file: FileNode;
+  file: vfs.FileNode;
   onClose?: () => void;
 }) {
   const createlinkDialog = useDialogState("create-sharable-link", {
@@ -772,7 +770,7 @@ function ConfirmDeleteDialog({
   data,
   ...props
 }: {
-  data?: EntityNode;
+  data?: vfs.EntityNode;
 } & React.ComponentProps<typeof Dialog>) {
   const storage = useStorageEditor();
 

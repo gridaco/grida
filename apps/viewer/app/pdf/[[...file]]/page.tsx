@@ -24,7 +24,9 @@ type Props = {
   searchParams: _SearchParams;
 };
 
-function get_file_path(params: SearchParams & Params): string | undefined {
+function get_file_path_from_params(
+  params: SearchParams & Params
+): string | undefined {
   const { file: _p_file, url: _q_url, object: _q_object } = params;
 
   if (_q_object) {
@@ -36,6 +38,16 @@ function get_file_path(params: SearchParams & Params): string | undefined {
   }
 
   return _p_file?.[0];
+}
+
+function resolve_resource_url(path: string) {
+  // if url
+  if (path.startsWith("http")) {
+    return path;
+  }
+
+  // if object
+  return `${FIRST_PARTY_BASE_STORAGE_URL}/${path}`;
 }
 
 export async function generateMetadata({
@@ -61,11 +73,12 @@ export default async function PDFViewerPage({ params, searchParams }: Props) {
   };
   const app = p.app || "";
   const title = p.title;
-  const file = get_file_path(p);
+  const logo = p.logo ? resolve_resource_url(p.logo) : undefined;
+  const file = get_file_path_from_params(p);
 
   if (!file) {
     redirect("/");
   }
 
-  return <PDFViewer app={app} file={file} title={title} />;
+  return <PDFViewer app={app} file={file} title={title} logo={logo} />;
 }

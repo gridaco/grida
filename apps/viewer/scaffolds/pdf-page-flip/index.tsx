@@ -61,9 +61,11 @@ FlipPage.displayName = "FlipPage";
 const PDFViewer = ({
   file,
   title: _title,
+  logo,
 }: {
   file: string;
   title?: string;
+  logo?: string;
 }) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [title, setTitle] = useState<string | undefined>(_title);
@@ -192,6 +194,11 @@ const PDFViewer = ({
           </Document>
         </div>
       </div>
+      {logo && (
+        <div className="fixed bottom-4 right-4">
+          <img src={logo} alt="logo" className="w-full h-full max-w-32" />
+        </div>
+      )}
       <div className="absolute bottom-4 w-full flex justify-center">
         <NavigationPageNumberControl
           page={currentPage}
