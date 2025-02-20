@@ -322,7 +322,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       ["site/dev-collection"]: initDocumentEditorState({
         editable: true,
         debug: false,
-        document: { nodes: {}, root_id: "root" },
+        document: { root_id: "root", nodes: {} },
         templates: {
           ["formcollection_sample_001_the_bundle"]: {
             name: "formcollection_sample_001_the_bundle",

@@ -4,7 +4,7 @@ import type { SurfaceAction } from "../action";
 import {
   DEFAULT_GAP_ALIGNMENT_TOLERANCE,
   Guide,
-  type CursorModeType,
+  type ToolModeType,
   type IDocumentEditorState,
   type LayoutSnapshot,
 } from "../state";
@@ -14,7 +14,7 @@ import assert from "assert";
 import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
 import { grida } from "@/grida";
-import { self_selectNode } from "./methods";
+import { self_clearSelection, self_selectNode } from "./methods";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
@@ -82,6 +82,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   }
           //   //
           // }
+          case "bitmap": {
+            const node = document.__getNodeById(
+              draft,
+              node_id
+            ) as grida.program.nodes.BitmapNode;
+            draft.content_edit_mode = {
+              type: "bitmap",
+              node_id: node.id,
+              imageRef: node.imageRef,
+            };
+            draft.tool = {
+              type: "brush",
+            };
+            self_clearSelection(draft);
+            break;
+          }
         }
       });
 
@@ -90,33 +106,90 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/content-edit-mode/try-exit": {
       return produce(state, (draft) => {
         draft.content_edit_mode = undefined;
+        draft.tool = { type: "cursor" };
       });
     }
-    case "surface/cursor-mode": {
-      const { cursor_mode } = action;
-      const path_edit_mode_valid_cursor_modes: CursorModeType[] = [
+    case "surface/tool": {
+      const { tool } = action;
+      const path_edit_mode_valid_tool_modes: ToolModeType[] = [
         "cursor",
         "hand",
         "path",
       ];
-      const text_edit_mode_valid_cursor_modes: CursorModeType[] = ["cursor"];
+      const text_edit_mode_valid_tool_modes: ToolModeType[] = ["cursor"];
+      const bitmap_edit_mode_valid_tool_modes: ToolModeType[] = [
+        "brush",
+        "eraser",
+        "flood-fill",
+      ];
       return produce(state, (draft) => {
         // validate cursor mode
         if (draft.content_edit_mode) {
           switch (draft.content_edit_mode.type) {
             case "path":
-              if (!path_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
-                return;
+              if (!path_edit_mode_valid_tool_modes.includes(tool.type)) return;
               break;
             case "text":
-              if (!text_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
-                return;
+              if (!text_edit_mode_valid_tool_modes.includes(tool.type)) return;
+              break;
+            case "bitmap":
+              if (!bitmap_edit_mode_valid_tool_modes.includes(tool.type)) {
+                draft.content_edit_mode = undefined;
+              }
               break;
           }
         }
 
-        draft.cursor_mode = cursor_mode;
+        draft.tool = tool;
       });
+    }
+    case "surface/brush": {
+      const { brush } = action;
+      return produce(state, (draft) => {
+        if (draft.tool.type === "brush" || draft.tool.type === "eraser") {
+          draft.brush = { opacity: 1, ...brush };
+        }
+      });
+      break;
+    }
+    case "surface/brush/size": {
+      const { size } = action;
+
+      return produce(state, (draft) => {
+        if (!(draft.tool.type === "brush" || draft.tool.type === "eraser"))
+          return;
+        switch (size.type) {
+          case "set":
+            draft.brush.size = [size.value, size.value];
+            break;
+          case "delta":
+            draft.brush.size = cmath.vector2.add(draft.brush.size, [
+              size.value,
+              size.value,
+            ]);
+            break;
+        }
+        draft.brush.size = cmath.vector2.max([1, 1], draft.brush.size);
+      });
+      break;
+    }
+    case "surface/brush/opacity": {
+      const { opacity } = action;
+
+      return produce(state, (draft) => {
+        if (draft.tool.type !== "brush") return;
+        switch (opacity.type) {
+          case "set":
+            draft.brush.opacity = opacity.value;
+            break;
+          case "delta":
+            draft.brush.opacity += opacity.value;
+            break;
+        }
+        draft.brush.opacity = cmath.clamp(draft.brush.opacity, 0, 1);
+      });
+
+      break;
     }
     case "surface/gesture/start": {
       const { gesture } = action;
@@ -150,6 +223,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 offset: next.offset,
                 initial_offset: next.offset,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             } else {
               // existing
@@ -162,6 +237,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 offset: guide.offset,
                 initial_offset: guide.offset,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             }
 
@@ -203,6 +280,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.gesture = {
               type: "corner-radius",
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
               node_id: node_id,
             };
@@ -243,6 +322,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               initial_verticies: verticies,
               vertex: index,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
               initial_position: [node.left!, node.top!],
             };
             break;
@@ -279,6 +360,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               layout: layout,
               placement: initial_placement,
               movement: cmath.vector2.zero,
+              first: cmath.vector2.zero,
+              last: cmath.vector2.zero,
             };
 
             draft.dropzone = {
@@ -336,6 +419,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 initial_gap: gap,
                 gap: gap,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
             } else {
               // assert the selection to be a flex container
@@ -362,6 +447,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 initial_gap: mainAxisGap,
                 gap: mainAxisGap,
                 movement: cmath.vector2.zero,
+                first: cmath.vector2.zero,
+                last: cmath.vector2.zero,
               };
               //
             }
@@ -429,6 +516,8 @@ function self_start_gesture_scale(
     initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: rects,
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     selection: selection,
     direction: direction,
   };
@@ -478,5 +567,7 @@ function self_start_gesture_rotate(
     selection: selection,
     rotation: rotation,
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
   };
 }

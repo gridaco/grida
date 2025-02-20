@@ -1,0 +1,49 @@
+{
+  "name": "@grida/desktop",
+  "productName": "Grida",
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "description": "My Electron application description",
+  "main": ".vite/build/main.js",
+  "repository": "https://github.com/gridaco/grida",
+  "scripts": {
+    "dev": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "eslint --ext .ts,.tsx ."
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.6.1",
+    "@electron-forge/maker-deb": "^7.6.1",
+    "@electron-forge/maker-rpm": "^7.6.1",
+    "@electron-forge/maker-squirrel": "^7.6.1",
+    "@electron-forge/maker-zip": "^7.6.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.6.1",
+    "@electron-forge/plugin-fuses": "^7.6.1",
+    "@electron-forge/plugin-vite": "^7.6.1",
+    "@electron-forge/publisher-github": "^7.6.1",
+    "@electron-forge/shared-types": "^7.6.1",
+    "@electron/fuses": "^1.8.0",
+    "@types/electron-squirrel-startup": "^1.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "dotenv": "^16.4.7",
+    "electron": "34.2.0",
+    "eslint": "^8.0.1",
+    "eslint-plugin-import": "^2.25.0",
+    "ts-node": "^10.0.0",
+    "typescript": "~4.5.4",
+    "vite": "^5.0.12"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Universe",
+    "email": "universe@grida.co"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "update-electron-app": "^3.1.1"
+  }
+}

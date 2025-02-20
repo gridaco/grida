@@ -41,7 +41,7 @@ const footer = {
         },
         {
           label: "Blog",
-          href: "https://blog.grida.co",
+          href: "https://grida.co/blog",
         },
         {
           label: "Slack",
@@ -109,8 +109,7 @@ const config = {
             label: "Together",
           },
           {
-            href:
-              "https://accounts.grida.co/signin?redirect_uri=https://grida.co/docs",
+            href: "https://accounts.grida.co/signin?redirect_uri=https://grida.co/docs",
             position: "left",
             label: "Sign in",
           },

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
@@ -40,10 +40,9 @@ interface FlipPageProps {
 const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
   return (
     <div
-      className="bg-white shadow-lg rounded overflow-hidden"
+      className="shadow-lg rounded overflow-hidden"
       ref={ref as React.RefObject<HTMLDivElement>}
     >
-      {/* <div className="page-content w-full h-full flex items-center justify-center"> */}
       <Page
         pageNumber={props.pageNumber}
         width={props.width}
@@ -51,7 +50,6 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
         renderAnnotationLayer={false}
         renderTextLayer={false}
       />
-      {/* </div> */}
     </div>
   );
 });
@@ -60,48 +58,58 @@ FlipPage.displayName = "FlipPage";
 
 const PDFViewer = ({
   file,
-  title: _title = file,
+  title: _title,
+  logo,
 }: {
   file: string;
   title?: string;
+  logo?: string;
 }) => {
   const [numPages, setNumPages] = useState<number>(0);
-  const [title, setTitle] = useState<string>(_title);
+  const [title, setTitle] = useState<string | undefined>(_title);
   const [currentPage, setCurrentPage] = useState(0);
   const [rawSize, setRawSize] = useState<
     { width: number; height: number } | undefined
   >(undefined);
+  const [cachedDimensions, setCachedDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const book = useRef(null);
 
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
-
   const [ref, { width: _width, height: _height }] = useMeasure();
 
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
     document: PDFDocumentProxy
   ) => {
-    document.getMetadata().then(({ info }) => {
-      try {
-        const pdfTitle = (info as any)["Title"];
-        if (pdfTitle) {
-          setTitle(pdfTitle);
-        }
-      } catch (e) {}
-    });
-
+    if (!title) {
+      document.getMetadata().then(({ info }) => {
+        try {
+          const pdfTitle = (info as any)["Title"];
+          if (pdfTitle) setTitle(pdfTitle);
+        } catch (e) {}
+      });
+    }
     setNumPages(document.numPages);
     document.getPage(1).then((page) => {
-      const [
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _left,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _top,
-        width,
-        height,
-      ] = page.view;
+      const [, , width, height] = page.view;
       setRawSize({ width, height });
     });
   };
+
+  // Cache dimensions once resolved; ignore subsequent resizes.
+  useEffect(() => {
+    if (_width && _height && rawSize && !cachedDimensions) {
+      const computed = scaltToFit(
+        _width / (isPortrait ? 1 : 2),
+        _height,
+        rawSize.width,
+        rawSize.height
+      );
+      setCachedDimensions({ width: computed.width, height: computed.height });
+    }
+  }, [_width, _height, rawSize, isPortrait, cachedDimensions]);
 
   const nextPage = () => {
     if (book.current) {
@@ -118,6 +126,7 @@ const PDFViewer = ({
   };
 
   const setPage = (page: number) => {
+    if (page < 0 || page >= numPages) return;
     if (book.current) {
       // @ts-expect-error legacy
       book.current.pageFlip().flip(page);
@@ -128,79 +137,78 @@ const PDFViewer = ({
     setCurrentPage(e.data);
   };
 
-  const { width, height } = scaltToFit(
-    (_width ?? 0) / 2,
-    _height ?? 0,
-    rawSize?.width ?? 0,
-    rawSize?.height ?? 0
-  );
-
   return (
-    <main className="w-full h-full flex flex-col overflow-hidden">
-      <header className="border-b py-2 px-5 z-50">
-        {title && <h1 className="text-sm font-semibold">{title}</h1>}
-      </header>
-      <div className="w-full h-full p-20">
+    <main className="w-full h-full flex flex-col overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+      {title && (
+        <header className="border-b py-2 px-5 z-50">
+          <h1 className="text-sm font-semibold">{title}</h1>
+        </header>
+      )}
+      <div className="relative w-full h-full p-8 md:p-20 z-10">
         <div
           ref={ref}
           className="w-full h-full flex flex-col justify-center items-center"
         >
           <Document
             file={file}
-            onLoadSuccess={(document) => {
-              onDocumentLoadSuccess(document);
-            }}
+            onLoadSuccess={onDocumentLoadSuccess}
             loading=""
           >
-            {!width || !width ? (
-              <></>
-            ) : (
-              <>
-                {/* @ts-expect-error legacy */}
-                <HTMLFlipBook
-                  width={width}
-                  height={height}
-                  maxShadowOpacity={0.5}
-                  showCover={true}
-                  mobileScrollSupport={true}
-                  onFlip={onFlip}
-                  ref={book}
-                  startPage={0}
-                  showPageCorners={true}
-                  flippingTime={600}
-                  usePortrait={isPortrait}
-                  startZIndex={0}
-                  drawShadow={true}
-                  autoSize
-                >
-                  {Array.from(new Array(numPages), (_, index) => (
-                    <FlipPage
-                      key={index}
-                      width={width}
-                      height={height}
-                      number={index + 1}
-                      pageNumber={index + 1}
-                    />
-                  ))}
-                </HTMLFlipBook>
-              </>
+            {!cachedDimensions ? null : (
+              // @ts-expect-error legacy
+              <HTMLFlipBook
+                width={cachedDimensions.width}
+                height={cachedDimensions.height}
+                maxShadowOpacity={0.5}
+                showCover={true}
+                mobileScrollSupport={true}
+                onFlip={onFlip}
+                ref={book}
+                startPage={0}
+                showPageCorners={true}
+                flippingTime={600}
+                usePortrait={isPortrait}
+                startZIndex={0}
+                drawShadow={true}
+                autoSize={false}
+              >
+                {Array.from(new Array(numPages), (_, index) => (
+                  <FlipPage
+                    key={index}
+                    width={cachedDimensions.width}
+                    height={cachedDimensions.height}
+                    number={index + 1}
+                    pageNumber={index + 1}
+                  />
+                ))}
+              </HTMLFlipBook>
             )}
           </Document>
         </div>
-      </div>
-      <div className="absolute bottom-4 w-full flex justify-center">
-        <NavigationPageNumberControl
-          page={currentPage}
-          numPages={numPages}
-          onPageChange={setPage}
+        <NavigationControlOverlay
+          hasNext={currentPage + 2 < numPages}
+          hasPrev={currentPage > 0}
+          onNext={nextPage}
+          onPrev={prevPage}
         />
+        <div className="absolute bottom-4 left-0 right-0 w-full flex justify-center z-20 pointer-events-none">
+          <NavigationPageNumberControl
+            page={currentPage}
+            numPages={numPages}
+            onPageChange={setPage}
+            isPortrait={isPortrait}
+          />
+        </div>
       </div>
-      <NavigationControlOverlay
-        hasNext={currentPage + 2 < numPages}
-        hasPrev={currentPage > 0}
-        onNext={nextPage}
-        onPrev={prevPage}
-      />
+      {logo && (
+        <div className="fixed bottom-4 right-4 z-0">
+          <img
+            src={logo}
+            alt="logo"
+            className="w-full h-full max-w-32 max-h-24"
+          />
+        </div>
+      )}
     </main>
   );
 };
@@ -217,7 +225,7 @@ function NavigationControlOverlay({
   onNext: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-10 pointer-events-none">
+    <div className="absolute inset-0 z-10 pointer-events-none">
       <button
         disabled={!hasPrev}
         onClick={onPrev}
@@ -239,26 +247,51 @@ function NavigationControlOverlay({
 function NavigationPageNumberControl({
   page,
   numPages,
+  isPortrait,
   onPageChange,
 }: {
   page: number;
   numPages: number;
+  isPortrait: boolean;
   onPageChange?: (page: number) => void;
 }) {
+  const start = page + 1;
+  const end = Math.min(page + 2, numPages);
+  const isStart = start === 1;
+  const isEnd = end === numPages;
+  const [txt, setTxt] = useState<string>(
+    isPortrait || isStart || isEnd ? start.toString() : `${start}-${end}`
+  );
+
+  useEffect(() => {
+    if (isPortrait || isStart || isEnd) {
+      setTxt(start.toString());
+    } else {
+      setTxt(`${start}-${end}`);
+    }
+  }, [start, end, isPortrait, isStart, isEnd]);
+
   return (
-    <div className="mt-4 flex items-center gap-4">
+    <div className="mt-4 flex items-center gap-4 pointer-events-auto">
       <span className="text-sm">
-        {/* <input
-          type="number"
-          className="w-7 rounded border"
-          onChange={(e) => {
-            const value = parseInt(e.target.value);
-            if (value >= 1 && value <= numPages) {
-              onPageChange?.(value - 1);
+        <input
+          type="text"
+          autoComplete="off"
+          className="w-7 rounded border text-center"
+          value={txt}
+          onChange={(e) => setTxt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          onBlur={() => {
+            const page = parseInt(txt);
+            if (page > 0 && page <= numPages) {
+              onPageChange && onPageChange(page - 1);
             }
           }}
-        /> */}
-        {page + 1}-{Math.min(page + 2, numPages)} / {numPages}
+        />
+        <span> / </span>
+        <span>{numPages}</span>
       </span>
     </div>
   );

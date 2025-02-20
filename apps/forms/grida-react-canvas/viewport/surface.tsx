@@ -47,6 +47,7 @@ import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler";
 import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
+import type { BitmapEditorBrush } from "@grida/bitmap";
 
 const DRAG_THRESHOLD = 2;
 
@@ -137,7 +138,8 @@ export function EditorSurface() {
     hovered_node_id,
     dropzone,
     selection,
-    cursor_mode,
+    tool,
+    brush,
     is_node_transforming,
     is_node_translating,
     content_edit_mode,
@@ -300,6 +302,9 @@ export function EditorSurface() {
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
+        {(tool?.type === "brush" || tool?.type === "eraser") && (
+          <BrushCursor brush={brush} />
+        )}
 
         <div
           style={{
@@ -360,9 +365,7 @@ export function EditorSurface() {
           >
             <SurfaceGroup
               hidden={
-                !!marquee ||
-                cursor_mode.type !== "cursor" ||
-                is_node_transforming
+                !!marquee || tool.type !== "cursor" || is_node_transforming
               }
             >
               {hovered_node_id && (
@@ -432,6 +435,45 @@ function FloatingCursorTooltip() {
       </div>
     );
   }
+}
+
+function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
+  const { transform, scaleX, scaleY } = useTransform();
+  const { pointer } = useEventTarget();
+  const pos = vector2ToSurfaceSpace(
+    // quantize position to canvas space 1.
+    cmath.vector2.quantize(pointer.position, 1),
+    // pointer.position,
+    transform
+  );
+  const { size: _size } = brush;
+  const [width, height] = cmath.vector2.multiply(_size, [scaleX, scaleY]);
+
+  return (
+    <svg
+      className="absolute pointer-events-none transform-gpu"
+      style={{
+        zIndex: 99,
+        top: pos[1],
+        left: pos[0],
+        overflow: "visible",
+        transform: `translate(-50%, -50%)`,
+      }}
+      width={width}
+      height={height}
+    >
+      <rect
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        fill="transparent"
+        stroke="black"
+        strokeWidth={1}
+      />
+      {/* <circle r={size / 2} fill="transparent" stroke="black" strokeWidth={2} /> */}
+    </svg>
+  );
 }
 
 function get_cursor_tooltip_value(gesture: GestureState) {
@@ -542,19 +584,19 @@ function SelectionGroupOverlay({
 }: SurfaceSelectionGroup & {
   readonly?: boolean;
 }) {
-  const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
+  const { multipleSelectionOverlayClick, tool } = useEventTarget();
 
   const { distributeEvenly } = useDocument();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
-  const enabled = !readonly && cursor_mode.type === "cursor";
+  const enabled = !readonly && tool.type === "cursor";
 
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
+        if (tool.type !== "insert" && tool.type !== "draw") {
           // otherwise, it should be stopped here
           // prevent default to prevent the master event target from changing the selection
           event.preventDefault();
@@ -650,6 +692,11 @@ function NodeOverlay({
     height: size[1] * scaleY,
   };
 
+  {
+    /* TODO: resize for bitmap is not supported */
+  }
+  const is_resizable_node = node.type !== "bitmap";
+
   return (
     <>
       <LayerOverlay
@@ -660,21 +707,25 @@ function NodeOverlay({
       >
         {focused && !readonly && (
           <>
-            {node.type === "line" ? (
+            {is_resizable_node && (
               <>
-                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-              </>
-            ) : (
-              <>
-                <LayerOverlayResizeHandle anchor="n" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="s" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
-                <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                {node.type === "line" ? (
+                  <>
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                  </>
+                ) : (
+                  <>
+                    <LayerOverlayResizeHandle anchor="n" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="s" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
+                    <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+                  </>
+                )}
               </>
             )}
             {supports.cornerRadius(node.type) &&

@@ -35,6 +35,11 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.transform = prev_state.transform;
       }) as S;
     }
+    case "background-color": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.backgroundColor = action.backgroundColor;
+      });
+    }
     case "transform": {
       return produce(state, (draft: Draft<S>) => {
         draft.transform = action.transform;
@@ -68,6 +73,12 @@ export default function reducer<S extends IDocumentEditorState>(
           }
         });
       }
+    case "clip/color": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.user_clipboard_color = action.color;
+        draft.next_paint_color = action.color;
+      });
+    }
     default:
       return historyExtension(state, action, _reducer(state, action));
   }

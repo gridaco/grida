@@ -51,6 +51,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "translate-vertex") return;
   if (draft.gesture.type === "curve") return;
   if (draft.gesture.type === "gap") return;
+  if (draft.gesture.type === "brush") return;
 
   switch (draft.gesture.type) {
     case "translate": {
@@ -488,6 +489,11 @@ function __self_update_gesture_transform_scale(
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
     const is_root = node_id === draft.document.root_id;
+
+    // TODO: scaling for bitmap node is not supported yet.
+    const is_scalable = node.type !== "bitmap";
+
+    if (!is_scalable) continue;
 
     if (is_root) {
       draft.document.nodes[node_id] = nodeTransformReducer(node, {

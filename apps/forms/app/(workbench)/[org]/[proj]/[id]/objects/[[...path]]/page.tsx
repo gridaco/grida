@@ -63,26 +63,25 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
-import { wellkown } from "@/utils/mimetype";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { fmt_bytes } from "@/utils/fmt";
 import StorageEditorProvider, {
-  EntityNode,
-  FileNode,
-  generatePaths,
   reducer,
   StorageApi,
   StorageEditorDispatcherProvider,
   StorageEditorTask,
   StorageEditorUploadingTask,
+  useSeedList,
   useStorageEditor,
-} from "../core";
+} from "@/scaffolds/storage/core";
 import toast from "react-hot-toast";
 import { useQueryState } from "@/utils/use-query-state";
+import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
+import { vfs } from "@/lib/vfs";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -185,12 +184,13 @@ type View = "grid" | "list";
 function Folder() {
   const searchParams = useSearchParams();
   const [state] = useEditorState();
-  const deleteConfirmDialog = useDialogState<EntityNode>("confirm-delete");
+  const deleteConfirmDialog = useDialogState<vfs.EntityNode>("confirm-delete");
   const storage = useStorageEditor();
+  useSeedList();
 
   const { dir, nodes } = storage;
 
-  const paths = useMemo(() => generatePaths(dir.split("/")), [dir]);
+  const paths = useMemo(() => vfs.generatePaths(dir.split("/")), [dir]);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -210,12 +210,12 @@ function Folder() {
     accepted: ["list", "grid"],
   });
 
-  const onNodeClick = (e: React.MouseEvent, file: EntityNode) => {
+  const onNodeClick = (e: React.MouseEvent, file: vfs.EntityNode) => {
     if (file.type === "folder") return;
     setPreview(file.name);
   };
 
-  const onNodeDoubleClick = (e: React.MouseEvent, file: EntityNode) => {
+  const onNodeDoubleClick = (e: React.MouseEvent, file: vfs.EntityNode) => {
     const handler: (href: string) => void =
       e.metaKey || e.ctrlKey ? (l) => open(l, "_blank") : router.push;
 
@@ -237,11 +237,11 @@ function Folder() {
     }
   };
 
-  const onNodeDelete = (file: EntityNode) => {
+  const onNodeDelete = (file: vfs.EntityNode) => {
     deleteConfirmDialog.openDialog(file);
   };
 
-  const onNodeRename = (file: EntityNode) => {
+  const onNodeRename = (file: vfs.EntityNode) => {
     const newname = prompt("Rename file", file.name);
     if (!newname) return;
     storage.mv(file.name, newname);
@@ -249,149 +249,151 @@ function Folder() {
 
   return (
     <div className="flex flex-1 h-full">
-      <aside className="relative w-full container mx-auto p-4 overflow-y-scroll">
-        <div className="my-8">
-          <Tools />
-        </div>
-        <div className="flex items-center justify-between">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link
-                      href={editorlink("objects", {
-                        document_id: state.document_id,
-                        basepath: state.basepath,
-                      })}
-                    >
-                      Home{" "}
-                      {storage.public && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-1.5 text-muted-foreground"
-                        >
-                          Public
-                        </Badge>
-                      )}
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {paths.map((path, index) => {
-                  const href = editorlink("objects/[[...path]]", {
-                    path: path,
-                    document_id: state.document_id,
-                    basepath: state.basepath,
-                  });
-                  const label = path[path.length - 1];
-                  return (
-                    <React.Fragment key={index}>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link href={href}>{label}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                    </React.Fragment>
-                  );
-                })}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </nav>
-          <div className="flex space-x-2">
-            <Button
-              disabled={storage.loading}
-              variant="outline"
-              onClick={() => storage.refresh()}
-            >
-              {storage.loading ? (
-                <Spinner className="h-4 w-4 me-2" />
-              ) : (
-                <ReloadIcon className="h-4 w-4 me-2" />
-              )}
-              Reload
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("grid")}
-              className={cn(view === "grid" && "bg-muted")}
-            >
-              <GridIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setView("list")}
-              className={cn(view === "list" && "bg-muted")}
-            >
-              <ListIcon className="h-4 w-4" />
-            </Button>
+      <aside className="relative w-full h-full">
+        <div className=" w-full h-full container mx-auto p-4 overflow-y-scroll">
+          <div className="my-8">
+            <Tools />
           </div>
-        </div>
-        {storage.public && (
-          <div className="py-4">
-            <Alert>
-              <LockOpen1Icon className="w-4 h-4" />
-              <AlertTitle>Public Bucket</AlertTitle>
-              <AlertDescription>
-                This bucket is public and only meant for serving public files.{" "}
-                <b>DO NOT</b> upload sensitive files here.
-              </AlertDescription>
-            </Alert>
+          <div className="flex items-center justify-between">
+            <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link
+                        href={editorlink("objects", {
+                          document_id: state.document_id,
+                          basepath: state.basepath,
+                        })}
+                      >
+                        Home{" "}
+                        {storage.public && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs px-1.5 text-muted-foreground"
+                          >
+                            Public
+                          </Badge>
+                        )}
+                      </Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  {paths.map((path, index) => {
+                    const href = editorlink("objects/[[...path]]", {
+                      path: path,
+                      document_id: state.document_id,
+                      basepath: state.basepath,
+                    });
+                    const label = path[path.length - 1];
+                    return (
+                      <React.Fragment key={index}>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbLink asChild>
+                            <Link href={href}>{label}</Link>
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    );
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </nav>
+            <div className="flex space-x-2">
+              <Button
+                disabled={storage.loading}
+                variant="outline"
+                onClick={() => storage.refresh()}
+              >
+                {storage.loading ? (
+                  <Spinner className="h-4 w-4 me-2" />
+                ) : (
+                  <ReloadIcon className="h-4 w-4 me-2" />
+                )}
+                Reload
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("grid")}
+                className={cn(view === "grid" && "bg-muted")}
+              >
+                <GridIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setView("list")}
+                className={cn(view === "list" && "bg-muted")}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        )}
-        <div className="mt-4">
-          {nodes.length === 0 ? (
-            storage.loading ? (
-              <FolderLoadingState />
-            ) : (
-              <FolderEmptyState />
-            )
-          ) : (
-            <>
-              {view === "grid" ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
-                    <span className="w-1/2 text-sm">Name</span>
-                    <span className="w-1/4 text-sm">Size</span>
-                    <span className="w-1/4 text-sm">Modified</span>
-                  </div>
-                  {nodes.map((file, index) => (
-                    <EntityNodeItemComponent
-                      key={index}
-                      node={file}
-                      view={view ?? "list"}
-                      onClick={(e) => onNodeClick(e, file)}
-                      onDoubleClick={(e) => {
-                        onNodeDoubleClick(e, file);
-                      }}
-                      onDeleteClick={() => onNodeDelete(file)}
-                      onRenameClick={() => onNodeRename(file)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+          {storage.public && (
+            <div className="py-4">
+              <Alert>
+                <LockOpen1Icon className="w-4 h-4" />
+                <AlertTitle>Public Bucket</AlertTitle>
+                <AlertDescription>
+                  This bucket is public and only meant for serving public files.{" "}
+                  <b>DO NOT</b> upload sensitive files here.
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
+          <div className="mt-4">
+            {nodes.length === 0 ? (
+              storage.loading ? (
+                <FolderLoadingState />
+              ) : (
+                <FolderEmptyState />
+              )
+            ) : (
+              <>
+                {view === "grid" ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1 font-medium text-muted-foreground">
+                      <span className="w-1/2 text-sm">Name</span>
+                      <span className="w-1/4 text-sm">Size</span>
+                      <span className="w-1/4 text-sm">Modified</span>
+                    </div>
+                    {nodes.map((file, index) => (
+                      <EntityNodeItemComponent
+                        key={index}
+                        node={file}
+                        view={view ?? "list"}
+                        onClick={(e) => onNodeClick(e, file)}
+                        onDoubleClick={(e) => {
+                          onNodeDoubleClick(e, file);
+                        }}
+                        onDeleteClick={() => onNodeDelete(file)}
+                        onRenameClick={() => onNodeRename(file)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="absolute bottom-4 right-8 ">
+        <div className="absolute bottom-4 right-8 pointer-events-none flex items-end justify-end">
           <UploadsModal />
         </div>
       </aside>
@@ -416,13 +418,13 @@ const EntityNodeItemComponent = ({
   className,
   ...props
 }: {
-  node: EntityNode;
+  node: vfs.EntityNode;
   view: View;
   onDeleteClick?: () => void;
   onRenameClick?: () => void;
 } & React.HtmlHTMLAttributes<HTMLDivElement>) => {
   const commonClasses =
-    "group relative flex items-center rounded-lg p-2 transition-colors select-none cursor-pointer";
+    "group w-full h-full relative rounded-lg p-2 transition-colors select-none cursor-pointer";
 
   return (
     <ContextMenu modal={false}>
@@ -445,7 +447,7 @@ const EntityNodeItemComponent = ({
                   className="w-6 h-6"
                 />
               </div>
-              <span className="mt-2 text-sm font-medium truncate">
+              <span className="w-full mt-2 text-sm font-medium truncate">
                 {node.name}
               </span>
             </div>
@@ -514,10 +516,12 @@ function FilePreviewSidebar({
   file,
   onClose,
 }: {
-  file: FileNode;
+  file: vfs.FileNode;
   onClose?: () => void;
 }) {
-  const createlinkDialog = useDialogState();
+  const createlinkDialog = useDialogState("create-sharable-link", {
+    refreshkey: true,
+  });
 
   return (
     <>
@@ -567,7 +571,11 @@ function FilePreviewSidebar({
           </div>
         </div>
       </div>
-      <CreateViewerLinkDialog file={file} {...createlinkDialog.props} />
+      <CreateViewerLinkDialog
+        key={createlinkDialog.refreshkey}
+        file={file}
+        {...createlinkDialog.props}
+      />
     </>
   );
 }
@@ -650,90 +658,6 @@ function FolderLoadingState() {
   );
 }
 
-// type Viewer = {
-//   type: "pdf";
-//   app: "page-flip" | "none";
-//   url: string;
-// };
-// const [viewer, setViewer] = useState<Viewer | undefined>(undefined);
-
-function CreateViewerLinkDialog({
-  file,
-  ...props
-}: React.ComponentProps<typeof Dialog> & { file: FileNode }) {
-  const known = wellkown(file.mimetype);
-
-  const Body = () => {
-    switch (known) {
-      case "pdf": {
-        return (
-          <>
-            <Tabs className="w-full h-full">
-              <TabsList>
-                <TabsTrigger value="none">Plain</TabsTrigger>
-                <TabsTrigger value="flipbook">Flip Book</TabsTrigger>
-              </TabsList>
-              <TabsContent value="none" className="w-full h-full">
-                <object
-                  data={file.url}
-                  type={file.mimetype}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
-              <TabsContent value="flipbook" className="w-full h-full">
-                <iframe
-                  src={`https://viewer.grida.co/pdf?url=${file.url}&app=page-flip`}
-                  width="100%"
-                  height="100%"
-                />
-              </TabsContent>
-            </Tabs>
-          </>
-        );
-      }
-      case undefined:
-        return (
-          <div>
-            <p>Viewer not available for this file type {file.mimetype}</p>
-          </div>
-        );
-      default: {
-        return (
-          <div>
-            <p>Viewer not available for {known}</p>
-          </div>
-        );
-      }
-    }
-  };
-
-  return (
-    <Dialog {...props}>
-      <DialogContent className="flex flex-col max-w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center">
-            Create Sharable Viewer Link
-            {known && <Badge className="ms-2">{known}</Badge>}
-          </DialogTitle>
-          <DialogDescription></DialogDescription>
-        </DialogHeader>
-        <div className="w-full flex-1 overflow-hidden">
-          <Body />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="ghost">Cancel</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button>Create</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function UploadsModal() {
   const { tasks } = useStorageEditor();
   const [tab, setTab] = useState<"all" | "completed" | "failed">("all");
@@ -762,7 +686,7 @@ function UploadsModal() {
 
   return (
     <Collapsible
-      className="w-96 border rounded-lg shadow-xl bg-background"
+      className="w-96 border rounded-lg shadow-xl bg-background pointer-events-auto"
       open={open}
       onOpenChange={setOpen}
     >
@@ -802,7 +726,7 @@ function UploadsModal() {
   );
 }
 
-function UploadItem({ file, staus, progress }: StorageEditorTask) {
+function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
   const l_type = file.name.split(".").pop();
   const l_name = file.name.replace(`.${l_type}`, "");
 
@@ -829,23 +753,24 @@ function UploadItem({ file, staus, progress }: StorageEditorTask) {
           </Badge>
           <span className="text-xs">{fmt_bytes(file.size)}</span>
         </div>
+        {reason && (
+          <span
+            data-status={staus}
+            className="text-xs text-muted-foreground data-[status='failed']:text-destructive"
+          >
+            {reason}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-const upload_status_text = {
-  idle: "Idle",
-  progress: "Uploading",
-  completed: "Completed",
-  failed: "Failed",
-} as const;
-
 function ConfirmDeleteDialog({
   data,
   ...props
 }: {
-  data?: EntityNode;
+  data?: vfs.EntityNode;
 } & React.ComponentProps<typeof Dialog>) {
   const storage = useStorageEditor();
 

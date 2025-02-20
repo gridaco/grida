@@ -8,7 +8,7 @@ import { cmath } from "@grida/cmath";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { grida } from "@/grida";
 import { NodeWithMeta } from "../provider";
-
+import "core-js/features/object/group-by";
 export interface SurfaceNodeObject {
   id: string;
   boundingRect: cmath.Rectangle;
@@ -391,7 +391,7 @@ export function useSingleSelection(
       boundingSurfaceRect: boundingSurfaceRect,
       distribution: distribution,
       node: {
-        ...(node as grida.program.nodes.AnyNode),
+        ...(node as grida.program.nodes.UnknwonNode),
         meta: {
           is_flex_parent,
           // TODO:

@@ -20,7 +20,7 @@ import {
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { examples } from "./k";
+import { forms_examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
@@ -65,7 +65,7 @@ export function Playground({
 
   // const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
-    initial ? undefined : defaultExample ?? examples[0].id
+    initial ? undefined : (defaultExample ?? forms_examples[0].id)
   );
   // const [data, setData] = useState<JSONForm | undefined>();
   const [__schema_txt, __set_schema_txt] = useState<string | null>(
@@ -133,7 +133,7 @@ export function Playground({
   useEffect(() => {
     if (exampleId) {
       // fetch and set the example schema
-      fetch(examples.find((e) => e.id === exampleId)!.template.schema.src)
+      fetch(forms_examples.find((e) => e.id === exampleId)!.template.schema.src)
         .then((res) => res.text())
         .then((schema) => {
           __set_schema_txt(schema);
@@ -182,7 +182,7 @@ export function Playground({
           </div>
         )} */}
         <div className="flex-1  flex gap-1 items-center">
-          <Link href="/ai">
+          <Link href="/forms/ai">
             <button className="text-md font-black text-start flex items-center gap-2">
               <GridaLogo />
               <span className="flex flex-col">
@@ -204,7 +204,7 @@ export function Playground({
                 <SelectValue placeholder="Examples" />
               </SelectTrigger>
               <SelectContent>
-                {examples.map((example) => (
+                {forms_examples.map((example) => (
                   <SelectItem key={example.id} value={example.id}>
                     {example.name}
                   </SelectItem>

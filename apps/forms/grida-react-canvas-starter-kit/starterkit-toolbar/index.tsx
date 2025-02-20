@@ -10,8 +10,9 @@ import {
   ImageIcon,
   TextIcon,
   CaretDownIcon,
+  EraserIcon,
 } from "@radix-ui/react-icons";
-import { PenToolIcon } from "lucide-react";
+import { BrushIcon, PenToolIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  cursormode_to_toolbar_value,
+  toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-react-canvas/toolbar";
@@ -28,14 +29,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEventTarget } from "@/grida-react-canvas/provider";
 
 export default function Toolbar() {
-  const { setCursorMode, cursor_mode } = useEventTarget();
-  const value = cursormode_to_toolbar_value(cursor_mode);
+  const { setTool, tool } = useEventTarget();
+  const value = toolmode_to_toolbar_value(tool);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
       <ToggleGroup
         onValueChange={(v) => {
-          setCursorMode(
+          setTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -52,12 +53,12 @@ export default function Toolbar() {
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <VerticalDivider />
         <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
-          <ToolIcon type="container" />
+          <FrameIcon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
           <ToolIcon type="text" />
@@ -71,7 +72,7 @@ export default function Toolbar() {
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <ToolsGroup
@@ -79,15 +80,18 @@ export default function Toolbar() {
           options={[
             { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
             { value: "path", label: "Path tool", shortcut: "P" },
+            { value: "brush", label: "Brush tool", shortcut: "B" },
+            { value: "eraser", label: "Eraser tool", shortcut: "E" },
           ]}
           onValueChange={(v) => {
-            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
       </ToggleGroup>
     </div>
   );
 }
+
 const VerticalDivider = () => <div className="w-1 h-4 border-r" />;
 
 export function ToolsGroup({
@@ -173,6 +177,10 @@ export function ToolIcon({
       return <PenToolIcon {...props} />;
     case "image":
       return <ImageIcon {...props} />;
+    case "brush":
+      return <BrushIcon {...props} />;
+    case "eraser":
+      return <EraserIcon {...props} />;
     default:
       return null;
   }

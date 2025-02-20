@@ -36,6 +36,8 @@ export function getInitialCurveGesture(
     initial: tangent,
     control: control,
     movement: cmath.vector2.zero,
+    first: cmath.vector2.zero,
+    last: cmath.vector2.zero,
     invert,
   };
 }

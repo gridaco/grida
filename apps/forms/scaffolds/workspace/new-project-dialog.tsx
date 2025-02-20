@@ -40,7 +40,7 @@ export function CreateNewProjectDialog({
   const [ok, setOK] = useState(false);
   const [error, setError] = useState(false);
   const [message, setMessage] = useState(
-    `Your project url will be https://app.grida.co/${org}/project-name`
+    `Your project url will be https://grida.co/${org}/project-name`
   );
   const [pending, setPending] = useState(false);
   const [busy, setBusy] = useState(false);

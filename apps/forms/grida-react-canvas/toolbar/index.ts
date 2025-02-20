@@ -1,4 +1,4 @@
-import type { CursorMode } from "../state";
+import type { ToolMode } from "../state";
 
 export type ToolbarToolType =
   | "cursor"
@@ -10,9 +10,12 @@ export type ToolbarToolType =
   | "image"
   | "line"
   | "pencil"
+  | "brush"
+  | "eraser"
+  | "flood-fill"
   | "path";
 
-export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
+export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
   switch (cm.type) {
     case "cursor":
     case "zoom":
@@ -25,10 +28,16 @@ export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
       return cm.tool;
     case "path":
       return "path";
+    case "brush":
+      return "brush";
+    case "eraser":
+      return "eraser";
+    case "flood-fill":
+      return "flood-fill";
   }
 }
 
-export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
+export function toolbar_value_to_cursormode(tt: ToolbarToolType): ToolMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
@@ -45,6 +54,12 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
       return { type: "draw", tool: tt };
     case "path":
       return { type: "path" };
+    case "brush":
+      return { type: "brush" };
+    case "eraser":
+      return { type: "eraser" };
+    case "flood-fill":
+      return { type: "flood-fill" };
     default:
       return { type: "cursor" };
   }

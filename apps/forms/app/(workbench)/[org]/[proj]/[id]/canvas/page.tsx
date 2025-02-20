@@ -17,11 +17,14 @@ import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { CanvasDocumentSnapshotSchema } from "@/types";
 import equal from "deep-equal";
 import { grida } from "@/grida";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
-import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 function useSync(
   document: grida.program.document.IDocumentDefinition | undefined
@@ -96,7 +99,7 @@ export default function CanvasPage() {
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
               <EditorSurfaceContextMenu>
-                <div className="w-full h-full flex flex-col relative bg-black/5">
+                <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                   <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                     <EditorSurface />
                     <AutoInitialFitTransformer>
@@ -106,7 +109,7 @@ export default function CanvasPage() {
                       <Toolbar />
                     </div>
                   </ViewportRoot>
-                </div>
+                </StandaloneDocumentBackground>
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>

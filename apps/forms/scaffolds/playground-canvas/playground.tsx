@@ -15,7 +15,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
+import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -26,26 +26,17 @@ import {
   initDocumentEditorState,
   useDocument,
 } from "@/grida-react-canvas";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
-  CaretDownIcon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
   GitHubLogoIcon,
+  MixIcon,
   OpenInNewWindowIcon,
   PlayIcon,
   PlusIcon,
@@ -55,7 +46,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -68,7 +58,6 @@ import { iofigma } from "@/grida-io-figma";
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "@/scaffolds/playground-canvas/modals/import-from-grida-file";
 import { v4 } from "uuid";
-import { grida } from "@/grida";
 import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
@@ -105,17 +94,33 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  AutoInitialFitTransformer,
+  StandaloneDocumentBackground,
+} from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { SlackIcon } from "lucide-react";
+import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
+import { io } from "@/grida-io-model";
+import { canvas_examples } from "../playground/k";
 
-export default function CanvasPlayground() {
+type UIConfig = {
+  sidebar: "hidden" | "visible";
+  toolbar: "hidden" | "visible";
+};
+
+const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
+
+export default function CanvasPlayground({ src }: { src?: string }) {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
-  const [uiHidden, setUiHidden] = useState(false);
-  const [exampleid, setExampleId] = useState<string>("blank.grida");
+  const [ui, setUI] = useState<UIConfig>({
+    sidebar: "visible",
+    toolbar: "visible",
+  });
+  // const [exampleid, setExampleId] = useState<string>("blank");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
@@ -132,6 +137,7 @@ export default function CanvasPlayground() {
       editable: true,
       debug: pref.debug,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -158,13 +164,23 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
+        backgroundColor: CANVAS_BG_COLOR,
       },
     })
   );
 
   useHotkeys("meta+\\, ctrl+\\", () => {
-    setUiHidden((v) => !v);
+    setUI((ui) => ({
+      ...ui,
+      sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
+    }));
+  });
+
+  useHotkeys("meta+shift+\\, ctrl+shift+\\", () => {
+    setUI((ui) => ({
+      ...ui,
+      toolbar: ui.toolbar === "visible" ? "hidden" : "visible",
+    }));
   });
 
   useHotkeys(
@@ -178,11 +194,12 @@ export default function CanvasPlayground() {
   );
 
   useEffect(() => {
-    fetch(`/examples/canvas/${exampleid}`).then((res) => {
+    if (!src) return;
+    fetch(src).then((res) => {
       res.json().then((file) => {
         dispatch({
           type: "__internal/reset",
-          key: exampleid,
+          key: src,
           state: initDocumentEditorState({
             editable: true,
             document: file.document,
@@ -190,23 +207,16 @@ export default function CanvasPlayground() {
         });
       });
     });
-  }, [exampleid]);
-
-  useEffect(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      return "";
-    });
-  }, []);
+  }, [src]);
 
   const onExport = () => {
     const documentData = {
-      doctype: "v0_document",
+      version: "2025-02-12",
       document: state.document,
-    } satisfies grida.io.DocumentFileModel;
+    } satisfies io.JSONDocumentFileModel;
 
-    const blob = new Blob([JSON.stringify(documentData, null, 2)], {
-      type: "application/json",
+    const blob = new Blob([io.archive.pack(documentData)], {
+      type: "application/zip",
     });
 
     saveAs(blob, `${v4()}.grida`);
@@ -214,7 +224,7 @@ export default function CanvasPlayground() {
 
   return (
     <TooltipProvider>
-      <main className="w-screen h-screen overflow-hidden select-none">
+      <main className="w-full h-full select-none">
         <SettingsDialog
           {...settingsDialog.props}
           preferences={pref}
@@ -273,7 +283,7 @@ export default function CanvasPlayground() {
           >
             <Hotkyes />
             <div className="flex w-full h-full">
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside>
                   {libraryDialog.open ? (
                     <>
@@ -287,33 +297,42 @@ export default function CanvasPlayground() {
                     </>
                   ) : (
                     <>
-                      <SidebarRoot>
-                        <SidebarSection className="mt-4">
+                      <SidebarRoot className="hidden sm:block">
+                        <SidebarSection className="my-4">
                           <span className="px-2">
                             <DropdownMenu>
-                              <DropdownMenuTrigger>
-                                <GridaLogo className="inline-block w-4 h-4 me-2" />
+                              <DropdownMenuTrigger className="me-2">
+                                <GridaLogo className="inline-block w-4 h-4" />
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuItem
-                                  onClick={importFromFigmaDialog.openDialog}
-                                >
-                                  <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Import from Figma
-                                </DropdownMenuItem>
+                              <DropdownMenuContent
+                                align="start"
+                                className="min-w-52"
+                              >
                                 <DropdownMenuItem
                                   onClick={importFromJson.openDialog}
+                                  className="text-xs"
                                 >
                                   <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Import from .grida
+                                  Open .grida
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onExport}>
+                                <DropdownMenuItem
+                                  onClick={onExport}
+                                  className="text-xs"
+                                >
                                   <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
                                   Save as .grida
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={importFromFigmaDialog.openDialog}
+                                  className="text-xs"
+                                >
+                                  <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                  Import Figma
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={settingsDialog.openDialog}
+                                  className="text-xs"
                                 >
                                   <GearIcon className="me-2" />
                                   Settings
@@ -321,7 +340,7 @@ export default function CanvasPlayground() {
 
                                 <DropdownMenuSeparator />
                                 <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>
+                                  <DropdownMenuSubTrigger className="text-xs">
                                     <OpenInNewWindowIcon className="me-2" />
                                     Tools
                                   </DropdownMenuSubTrigger>
@@ -330,7 +349,7 @@ export default function CanvasPlayground() {
                                       href="/canvas/tools/io-figma"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         IO Figma
                                       </DropdownMenuItem>
@@ -339,7 +358,7 @@ export default function CanvasPlayground() {
                                       href="/canvas/tools/io-svg"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         IO SVG
                                       </DropdownMenuItem>
@@ -348,11 +367,31 @@ export default function CanvasPlayground() {
                                       href="https://github.com/gridaco/p666"
                                       target="_blank"
                                     >
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
                                         P666 Daemon
                                       </DropdownMenuItem>
                                     </Link>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger className="text-xs">
+                                    <MixIcon className="me-2" />
+                                    Examples
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent>
+                                    {canvas_examples.map((example) => (
+                                      <Link
+                                        key={example.id}
+                                        href={"/canvas/examples/" + example.id}
+                                        target="_blank"
+                                      >
+                                        <DropdownMenuItem className="text-xs">
+                                          <OpenInNewWindowIcon className="me-2" />
+                                          {example.name}
+                                        </DropdownMenuItem>
+                                      </Link>
+                                    ))}
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
                                 <DropdownMenuSeparator />
@@ -360,7 +399,7 @@ export default function CanvasPlayground() {
                                   href="https://github.com/gridaco/grida"
                                   target="_blank"
                                 >
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem className="text-xs">
                                     <GitHubLogoIcon className="me-2" />
                                     GitHub
                                   </DropdownMenuItem>
@@ -369,7 +408,7 @@ export default function CanvasPlayground() {
                                   href="https://grida.co/join-slack"
                                   target="_blank"
                                 >
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem className="text-xs">
                                     <SlackIcon className="me-2 w-4 h-4" />
                                     Slack Community
                                   </DropdownMenuItem>
@@ -377,18 +416,12 @@ export default function CanvasPlayground() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <span className="font-bold text-xs">
-                              Canvas Playground
+                              Canvas
                               <Badge variant="outline" className="ms-2 text-xs">
                                 BETA
                               </Badge>
                             </span>
                           </span>
-                        </SidebarSection>
-                        <SidebarSection className="mt-4">
-                          <ExampleSwitch
-                            value={exampleid}
-                            onValueChange={setExampleId}
-                          />
                         </SidebarSection>
                         <hr />
                         <SidebarSection>
@@ -407,14 +440,14 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                    <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
                       <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
                         <AutoInitialFitTransformer>
                           <StandaloneDocumentContent />
                         </AutoInitialFitTransformer>
 
-                        {!uiHidden && (
+                        {ui.sidebar === "visible" && (
                           <>
                             <div className="absolute top-4 left-4 z-50">
                               <Button
@@ -427,28 +460,31 @@ export default function CanvasPlayground() {
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
                             </div>
-
-                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                        <KeyboardInputOverlay />
-                      </div> */}
                           </>
                         )}
-                        {!uiHidden && (
-                          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                            <PlaygroundToolbar
-                              onAddButtonClick={libraryDialog.openDialog}
-                            />
-                          </div>
+                        {ui.toolbar === "visible" && (
+                          <>
+                            <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
+                              <div className="relative left-8">
+                                <BrushToolbar />
+                              </div>
+                            </div>
+                            <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                              <PlaygroundToolbar
+                                onAddButtonClick={libraryDialog.openDialog}
+                              />
+                            </div>
+                          </>
                         )}
                       </ViewportRoot>
-                      <DevtoolsPanel />
-                    </div>
+                      {pref.debug && <DevtoolsPanel />}
+                    </StandaloneDocumentBackground>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
               </EditorSurfaceClipboardSyncProvider>
-              {!uiHidden && (
+              {ui.sidebar === "visible" && (
                 <aside className="h-full">
-                  <SidebarRoot side="right">
+                  <SidebarRoot side="right" className="hidden sm:block">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
                         <Zoom
@@ -473,7 +509,13 @@ export default function CanvasPlayground() {
                     <FontFamilyListProvider fonts={fonts}>
                       <Align />
                       <hr />
-                      <Selection empty={<__TMP_ComponentProperties />} />
+                      <Selection
+                        empty={
+                          <div className="mt-4 mb-10">
+                            <DocumentProperties />
+                          </div>
+                        }
+                      />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
@@ -481,7 +523,7 @@ export default function CanvasPlayground() {
             </div>
           </StandaloneDocumentEditor>
         </ErrorBoundary>
-        {!uiHidden && <HelpFab />}
+        {ui.toolbar === "visible" && <HelpFab />}
       </main>
     </TooltipProvider>
   );
@@ -491,46 +533,6 @@ function Hotkyes() {
   useEditorHotKeys();
 
   return <></>;
-}
-
-function ExampleSwitch({
-  value,
-  onValueChange,
-}: {
-  value?: string;
-  onValueChange: (v: string) => void;
-}) {
-  const examples = [
-    "blank.grida",
-    "helloworld.grida",
-    "slide-01.grida",
-    "slide-02.grida",
-    "instagram-post-01.grida",
-    "poster-01.grida",
-    "resume-01.grida",
-    "event-page-01.grida",
-    "component-01.grida",
-    "layout-01.grida",
-  ];
-  return (
-    <Select defaultValue={value} onValueChange={onValueChange}>
-      <SelectTrigger>
-        <SelectValue placeholder="Examples" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Examples</SelectLabel>
-          {examples.map((example) => (
-            <SelectItem key={example} value={example}>
-              <span className="capitalize">
-                {example.split(".")[0].split("-").join(" ")}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
-  );
 }
 
 type Preferences = {

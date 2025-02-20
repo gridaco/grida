@@ -39,8 +39,14 @@
           "454:346"
         ],
         "properties": {
-          "title": {"type": "string", "default": "Hello World !"},
-          "description": {"type": "string", "default": "Welcome to Grida Canvas V0"}
+          "title": {
+            "type": "string",
+            "default": "Hello World !"
+          },
+          "description": {
+            "type": "string",
+            "default": "Welcome to Grida Canvas V0"
+          }
         }
       },
       "title": {
@@ -56,8 +62,6 @@
         "position": "absolute",
         "left": 59,
         "top": 251,
-        "right": 714,
-        "bottom": 251,
         "width": "auto",
         "height": "auto",
         "fill": {
@@ -92,8 +96,6 @@
         "position": "absolute",
         "left": 59,
         "top": 305,
-        "right": 693,
-        "bottom": 216,
         "width": "auto",
         "height": "auto",
         "fill": {
@@ -201,6 +203,12 @@
         "effects": []
       }
     },
-    "root_id": "component"
+    "root_id": "component",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
   }
 }
