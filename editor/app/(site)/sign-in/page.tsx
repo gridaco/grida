@@ -1,15 +1,23 @@
 import Image from "next/image";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
 import { GridaLogo } from "@/components/grida-logo";
 import { ContinueWithGoogleButton } from "@/scaffolds/auth/continue-with-google-button";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
 
-export default function SigninPage() {
+export default function SigninPage({
+  searchParams,
+}: {
+  searchParams: {
+    redirect_uri?: string;
+    next?: string;
+  };
+}) {
   if (process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1") {
-    return redirect("/insiders/auth/basic");
+    const q = new URLSearchParams(searchParams).toString();
+    return redirect("/insiders/auth/basic" + (q ? "?" + q : ""));
   }
   return (
     <div className="min-h-screen flex flex-col">
@@ -52,7 +60,10 @@ export default function SigninPage() {
               </div>
               <div className="flex flex-col gap-5">
                 <Suspense>
-                  <ContinueWithGoogleButton />
+                  <ContinueWithGoogleButton
+                    next={searchParams.next}
+                    redirect_uri={searchParams.redirect_uri}
+                  />
                 </Suspense>
               </div>
             </div>

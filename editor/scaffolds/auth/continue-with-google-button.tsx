@@ -2,17 +2,24 @@
 
 import { Env } from "@/env";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useSearchParams } from "next/navigation";
 
-export function ContinueWithGoogleButton() {
+export function ContinueWithGoogleButton({
+  next,
+  redirect_uri,
+}: {
+  next?: string;
+  redirect_uri?: string;
+}) {
   const supabase = createClientComponentClient();
-  const search = useSearchParams();
-  const next = search.get("next");
 
   const url = new URL(`${Env.web.HOST}/auth/callback`);
 
   if (next) {
     url.searchParams.set("next", next);
+  }
+
+  if (redirect_uri) {
+    url.searchParams.set("redirect_uri", redirect_uri);
   }
 
   return (

@@ -16,7 +16,16 @@ export const metadata: Metadata = {
   description: "Basic sign in for local development",
 };
 
-export default function InsidersBasicAuthPage() {
+type SerachParams = {
+  redirect_uri?: string;
+  next?: string;
+};
+
+export default function InsidersBasicAuthPage({
+  searchParams,
+}: {
+  searchParams: SerachParams;
+}) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -26,13 +35,13 @@ export default function InsidersBasicAuthPage() {
           </div>
           Grida
         </a>
-        <Form />
+        <Form searchParams={searchParams} />
       </div>
     </div>
   );
 }
 
-function Form() {
+function Form({ searchParams }: { searchParams: SerachParams }) {
   return (
     <div>
       <Card>
@@ -44,6 +53,12 @@ function Form() {
         </CardHeader>
         <CardContent>
           <form method="post" action="/insiders/auth/basic/sign-in">
+            <input
+              type="hidden"
+              name="redirect_uri"
+              value={searchParams.redirect_uri}
+            />
+            <input type="hidden" name="next" value={searchParams.next} />
             <div className="grid gap-6">
               <div className="grid gap-6">
                 <div className="grid gap-2">
