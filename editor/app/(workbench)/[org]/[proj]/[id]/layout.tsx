@@ -44,6 +44,7 @@ import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
+import { DesktopDragArea } from "@/components/desktop-drag-area";
 
 export const revalidate = 0;
 
@@ -561,64 +562,47 @@ function BaseLayout({
         disableTransitionOnChange
         storageKey={`theme-workbench-${docid}`}
       >
-        <Header
-          org={org}
-          proj={proj}
-          document={{
-            id: docid,
-            title: doctitle,
-          }}
-        />
         <div className="flex flex-1 overflow-y-auto">
           <div className="h-full flex flex-1 w-full">
             {/* side */}
-            <aside className="hidden lg:flex h-full">
-              <Sidebar />
+            <aside className="hidden lg:flex h-full flex-col border-r">
+              <DesktopDragArea className="bg-workbench-panel" />
+              <header className="px-4 h-11 min-h-11 min-w-60 w-min flex items-center border-b bg-workbench-panel">
+                <Link href={`/${org}/${proj}`} prefetch={false}>
+                  <span className="flex items-center gap-2 text-md font-black select-none">
+                    <GridaLogo size={15} />
+                  </span>
+                </Link>
+                <SlashIcon
+                  className="min-w-[20px] ms-2"
+                  width={15}
+                  height={15}
+                />
+                <EditableDocumentTitle id={docid} defaultValue={doctitle} />
+              </header>
+              <div className="h-full overflow-y-auto">
+                <Sidebar />
+              </div>
             </aside>
-            <div className="w-full h-full overflow-x-hidden">{children}</div>
+            <div className="flex flex-col overflow-hidden w-full h-full">
+              <header className="px-2 h-11 min-h-11 flex items-center justify-between border-b bg-workbench-panel desktop-drag-area">
+                <div className="ms-2 flex items-center gap-4">
+                  <Breadcrumbs />
+                  <SavingIndicator />
+                </div>
+                <div className="flex gap-4 items-center">
+                  <Players />
+                  <PlayActions />
+                </div>
+              </header>
+              <div className="w-full h-full overflow-x-hidden">{children}</div>
+            </div>
           </div>
         </div>
         <EditorHelpFab />
         <ToasterWithMax position="bottom-center" max={5} />
       </ThemeProvider>
     </div>
-  );
-}
-
-function Header({
-  org,
-  proj,
-  document: { id, title },
-}: {
-  org: string;
-  proj: string;
-  document: {
-    id: string;
-    title: string;
-  };
-}) {
-  return (
-    <header className="flex w-full gap-4 border-b z-10 h-12 bg-workbench-panel desktop-drag-area">
-      <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
-        <Link href={`/${org}/${proj}`} prefetch={false}>
-          <span className="flex items-center gap-2 text-md font-black select-none">
-            <GridaLogo size={15} />
-          </span>
-        </Link>
-        <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
-        <EditableDocumentTitle id={id} defaultValue={title} />
-      </div>
-      <div className="flex-1 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Breadcrumbs />
-          <SavingIndicator />
-        </div>
-        <div className="flex gap-4 items-center">
-          <Players />
-          <PlayActions />
-        </div>
-      </div>
-    </header>
   );
 }
 

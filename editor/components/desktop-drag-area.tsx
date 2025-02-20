@@ -54,7 +54,7 @@ export function DesktopDragArea({
   return (
     <div
       {...props}
-      className={cn("w-full min-h-9 h-9 desktop-drag-area", className)}
+      className={cn("w-full min-h-11 h-11 desktop-drag-area", className)}
     >
       {children}
     </div>

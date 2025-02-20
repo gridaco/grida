@@ -13,7 +13,7 @@ export function PlayActions() {
   const [state] = useEditorState();
   const { doctype } = state;
   return (
-    <div className="px-2 flex gap-4 items-center justify-end">
+    <div className="flex gap-4 items-center justify-end">
       {doctype === "v0_form" && <PreviewButton />}
       {doctype === "v0_site" && (
         <>

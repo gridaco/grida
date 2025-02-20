@@ -56,6 +56,7 @@ export function EditableDocumentTitle({
         placeholder="Document title"
         value={value}
         onChange={onChange}
+        className="h-7 px-2"
       />
     </>
   );

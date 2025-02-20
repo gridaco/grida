@@ -1,15 +1,17 @@
 import { BrowserWindow } from "electron";
 import path from "node:path";
 
+const trafficLightPosition = {
+  x: 14,
+  y: 14,
+} as const;
+
 export default function create_window() {
   // Create the browser window.
   const window = new BrowserWindow({
     title: "Grida",
     titleBarStyle: "hidden",
-    trafficLightPosition: {
-      x: 10,
-      y: 10,
-    },
+    trafficLightPosition,
     width: 1440,
     height: 960,
     minWidth: 384,
@@ -22,7 +24,8 @@ export default function create_window() {
   if (process.env.NODE_ENV === "development") {
     window.loadURL("http://localhost:3000/dashboard");
   } else {
-    window.loadURL("https://app.grida.co/dashboard");
+    // window.loadURL("https://app.grida.co/dashboard");
+    window.loadURL("http://localhost:3000/dashboard");
   }
 
   window.webContents.on("will-prevent-unload", (event) => {
@@ -35,10 +38,7 @@ export function create_login_window() {
   const window = new BrowserWindow({
     title: "Grida",
     titleBarStyle: "hidden",
-    trafficLightPosition: {
-      x: 10,
-      y: 10,
-    },
+    trafficLightPosition,
     width: 292,
     height: 438,
     backgroundColor: "#171717", // bg-neutral-900

@@ -11,7 +11,7 @@ dotenv.config();
 
 const config: ForgeConfig = {
   packagerConfig: {
-    extraResource: ["mac/CFBundleTypeIconFile.icns"],
+    extraResource: ["mac/dotgrida.icns"],
     name: "Grida",
     asar: true,
     appBundleId: "co.grida.desktop",

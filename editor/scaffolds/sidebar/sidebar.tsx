@@ -58,7 +58,7 @@ export function Sidebar() {
   }
 
   return (
-    <SidebarRoot>
+    <SidebarRoot className="border-none">
       <Tabs value={state.sidebar.mode} onValueChange={onSidebarModeChange}>
         <SidebarHeader className="h-12 py-0 flex justify-center items-center">
           <TabsList className="w-full max-w-full">
