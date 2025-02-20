@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
@@ -122,6 +122,9 @@ const PDFViewer = ({
   };
 
   const setPage = (page: number) => {
+    if (page < 0 || page >= numPages) {
+      return;
+    }
     if (book.current) {
       // @ts-expect-error legacy
       book.current.pageFlip().flip(page);
@@ -133,7 +136,7 @@ const PDFViewer = ({
   };
 
   const { width, height } = scaltToFit(
-    (_width ?? 0) / 2,
+    (_width ?? 0) / (isPortrait ? 1 : 2),
     _height ?? 0,
     rawSize?.width ?? 0,
     rawSize?.height ?? 0
@@ -146,7 +149,7 @@ const PDFViewer = ({
           {title && <h1 className="text-sm font-semibold">{title}</h1>}
         </header>
       )}
-      <div className="w-full h-full p-20 z-10">
+      <div className="relative w-full h-full p-8 md:p-20 z-10">
         <div
           ref={ref}
           className="w-full h-full flex flex-col justify-center items-center"
@@ -193,6 +196,20 @@ const PDFViewer = ({
             )}
           </Document>
         </div>
+        <NavigationControlOverlay
+          hasNext={currentPage + 2 < numPages}
+          hasPrev={currentPage > 0}
+          onNext={nextPage}
+          onPrev={prevPage}
+        />
+        <div className="absolute bottom-4 left-0 right-0 w-full flex justify-center z-20 pointer-events-none">
+          <NavigationPageNumberControl
+            page={currentPage}
+            numPages={numPages}
+            onPageChange={setPage}
+            isPortrait={isPortrait}
+          />
+        </div>
       </div>
       {logo && (
         <div className="fixed bottom-4 right-4 z-0">
@@ -203,19 +220,6 @@ const PDFViewer = ({
           />
         </div>
       )}
-      <div className="absolute bottom-4 w-full flex justify-center">
-        <NavigationPageNumberControl
-          page={currentPage}
-          numPages={numPages}
-          onPageChange={setPage}
-        />
-      </div>
-      <NavigationControlOverlay
-        hasNext={currentPage + 2 < numPages}
-        hasPrev={currentPage > 0}
-        onNext={nextPage}
-        onPrev={prevPage}
-      />
     </main>
   );
 };
@@ -232,7 +236,7 @@ function NavigationControlOverlay({
   onNext: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-10 pointer-events-none">
+    <div className="absolute inset-0 z-10 pointer-events-none">
       <button
         disabled={!hasPrev}
         onClick={onPrev}
@@ -254,26 +258,57 @@ function NavigationControlOverlay({
 function NavigationPageNumberControl({
   page,
   numPages,
+  isPortrait,
   onPageChange,
 }: {
   page: number;
   numPages: number;
+  isPortrait: boolean;
   onPageChange?: (page: number) => void;
 }) {
+  const start = page + 1;
+  const end = Math.min(page + 2, numPages);
+  const isStart = start === 1;
+  const isEnd = end === numPages;
+
+  const [txt, setTxt] = useState<string>(
+    isPortrait || isStart || isEnd ? start.toString() : `${start}-${end}`
+  );
+
+  useEffect(() => {
+    if (isPortrait || isStart || isEnd) {
+      setTxt(start.toString());
+    } else {
+      setTxt(`${start}-${end}`);
+    }
+  }, [start, end, isPortrait, isStart, isEnd]);
+
   return (
-    <div className="mt-4 flex items-center gap-4">
+    <div className="mt-4 flex items-center gap-4 pointer-events-auto">
       <span className="text-sm">
-        {/* <input
-          type="number"
-          className="w-7 rounded border"
+        <input
+          type="text"
+          autoComplete="off"
+          className="w-7 rounded border text-center"
+          value={txt}
           onChange={(e) => {
-            const value = parseInt(e.target.value);
-            if (value >= 1 && value <= numPages) {
-              onPageChange?.(value - 1);
+            setTxt(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              // blur
+              e.currentTarget.blur();
             }
           }}
-        /> */}
-        {page + 1}-{Math.min(page + 2, numPages)} / {numPages}
+          onBlur={() => {
+            const page = parseInt(txt);
+            if (page > 0 && page <= numPages) {
+              onPageChange && onPageChange(page - 1);
+            }
+          }}
+        />
+        <span> / </span>
+        <span>{numPages}</span>
       </span>
     </div>
   );
