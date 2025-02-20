@@ -157,8 +157,8 @@ function viewerobj(objecturl: string): string {
 
 function viewerlink(
   viewer: ViewerOptions,
-  baseUrl = "https://viewer.grida.co"
-  // baseUrl = "http://localhost:3001"
+  baseUrl = "https://viewer.grida.co/v1"
+  // baseUrl = "http://localhost:3001/v1"
 ): string {
   const params = {
     object: viewerobj(viewer.object),
