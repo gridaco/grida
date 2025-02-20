@@ -212,8 +212,8 @@ export function PlaygroundToolbar({
           />
           <VerticalDivider />
           <ClipboardColor />
-          <VerticalDivider />
-          <Popover>
+          {/* <VerticalDivider /> */}
+          {/* <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" className="px-3">
                 <OpenAILogo className="w-4 h-4" />
@@ -227,10 +227,10 @@ export function PlaygroundToolbar({
             >
               <Generate />
             </PopoverContent>
-          </Popover>
-          <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
+          </Popover> */}
+          {/* <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
             <MixIcon />
-          </Button>
+          </Button> */}
         </ToggleGroup>
       </div>
     </div>

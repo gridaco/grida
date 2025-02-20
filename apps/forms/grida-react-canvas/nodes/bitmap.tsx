@@ -13,8 +13,7 @@ export const BitmapWidget = ({
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.BitmapNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
 
-  const imagedata = context.textures[imageRef];
-  assert(imagedata.type === "texture");
+  const imagedata = context.bitmaps[imageRef];
 
   return (
     <div

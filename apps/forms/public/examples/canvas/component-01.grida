@@ -62,8 +62,6 @@
         "position": "absolute",
         "left": 59,
         "top": 251,
-        "right": 714,
-        "bottom": 251,
         "width": "auto",
         "height": "auto",
         "fill": {
@@ -98,8 +96,6 @@
         "position": "absolute",
         "left": 59,
         "top": 305,
-        "right": 693,
-        "bottom": 216,
         "width": "auto",
         "height": "auto",
         "fill": {

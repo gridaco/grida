@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useContext, useLayoutEffect, useMemo, useRef } from "react";
 import { useDocument, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
@@ -14,7 +8,6 @@ import { cmath } from "@grida/cmath";
 import { css } from "@/grida/css";
 import { TransparencyGrid } from "@grida/transparency-grid";
 import { useMeasure } from "@uidotdev/usehooks";
-// import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
   Record<string, CustomReactRenderer>
@@ -59,9 +52,11 @@ export function StandaloneDocumentBackground({
 }: React.HTMLAttributes<HTMLDivElement>) {
   const { background, transform } = useDocument();
 
-  const backgroundColor = useMemo(() => {
-    if (!background) return undefined;
-    return "#" + css.rgbaToHex(background);
+  const [backgroundColor, opacity] = useMemo(() => {
+    if (!background) return [undefined, 1] as const;
+    const hex = "#" + css.rgbaToHex(background);
+    const opacity = background.a;
+    return [hex, opacity] as const;
   }, [background]);
 
   const [visiblearea, { width, height }] = useMeasure();
@@ -73,11 +68,13 @@ export function StandaloneDocumentBackground({
         className="absolute inset-0 pointer-events-none overflow-hidden -z-10"
       >
         {/* root bg - transparency grid */}
-        <TransparencyGrid
-          transform={transform}
-          width={width ?? 0}
-          height={height ?? 0}
-        />
+        {opacity < 1 && (
+          <TransparencyGrid
+            transform={transform}
+            width={width ?? 0}
+            height={height ?? 0}
+          />
+        )}
         {/* background color */}
         <div
           className="absolute inset-0 overflow-hidden"
