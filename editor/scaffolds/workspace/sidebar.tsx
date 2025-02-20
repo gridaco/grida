@@ -53,6 +53,7 @@ import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { usePathname } from "next/navigation";
+import { DesktopDragArea } from "@/components/desktop-drag-area";
 
 function SidebarMenuLinkButton({
   href,
@@ -154,6 +155,7 @@ export default function WorkspaceSidebar({
 
   return (
     <Sidebar className="border-r-0" {...props}>
+      <DesktopDragArea />
       <SidebarHeader className="border-b">
         <OrganizationSwitcher
           organization={organization}

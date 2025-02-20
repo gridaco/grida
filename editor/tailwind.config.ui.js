@@ -65,7 +65,7 @@ module.exports = {
 
         // custom extended
         "workbench-panel": {
-          DEFAULT: "hsl(var(--secondary) / 10%)",
+          DEFAULT: "hsl(var(--sidebar-background))",
         },
         "workbench-accent-sky": {
           DEFAULT: colors.sky[500],
