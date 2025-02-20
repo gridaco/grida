@@ -1,194 +1,443 @@
-import React, { useCallback } from "react";
-import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+"use client";
+
+import React, { useCallback, useMemo } from "react";
+import { StateProvider } from "./provider";
 import {
-  WorkspaceContentPanel,
-  WorkspaceContentPanelGridLayout,
-} from "layouts/panel";
-import { EditorSidebar } from "components/editor";
-import { EditorState, useEditorState } from "core/states";
-import { EditorCraftCanvas, EditorFigmaCanvas } from "scaffolds/canvas";
-import { Inspector } from "scaffolds/inspector";
-import { EditorHome } from "@code-editor/dashboard";
-import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
-import { EditorSkeleton } from "./skeleton";
-import { colors } from "theme";
-import { useEditorSetupContext } from "./setup";
-import { Dialog } from "@mui/material";
-import { FullScreenPreview } from "scaffolds/preview-full-screen";
-import { useDispatch } from "core/dispatch";
-import { Code } from "scaffolds/code";
-import { CraftInspector } from "scaffolds/inspector/inspector-craft";
+  useEditorState,
+  useFormFields,
+  useDatabaseTableId,
+  useDatagridTable,
+} from "./use";
+import { reducer } from "./reducer";
+import {
+  SchemaDocumentEditorInit,
+  EditorInit,
+  FormDocumentEditorInit,
+  SiteDocumentEditorInit,
+  CanvasDocumentEditorInit,
+  BucketDocumentEditorInit,
+} from "./state";
+import { initialEditorState } from "./init";
+import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
+import { FormFieldDefinition } from "@/types";
+import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
+import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { RowEditPanel } from "../panels/row-edit-panel";
+import { CustomerEditPanel } from "../panels/customer-panel";
+import { MediaViewerProvider } from "@/components/mediaviewer";
+import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
+import toast from "react-hot-toast";
+import { EditorSymbols } from "./symbols";
+import { fmt_local_index } from "@/utils/fmt";
+import Multiplayer from "./multiplayer";
+import { FormAgentThemeSyncProvider } from "./sync";
 
-export function Editor() {
-  const [state] = useEditorState();
-  const { loading, progress } = useEditorSetupContext();
-
-  const initiallyLoaded = progress > 0;
-  // this key is used for force re-rendering canvas after the whole file is fetched.
-  const _refreshkey = loading || !initiallyLoaded ? "1" : "0";
-
-  return (
-    <>
-      {(loading || !initiallyLoaded) && (
-        <EditorSkeleton percent={progress * 100} />
-      )}
-
-      <DefaultEditorWorkspaceLayout
-        backgroundColor={colors.color_editor_bg_on_dark}
-        // appbar={<EditorAppbar />}
-        leftbar={{
-          _type: "resizable",
-          minWidth: 240,
-          maxWidth: 600,
-          children: <EditorSidebar />,
-        }}
-      >
-        <WorkspaceContentPanelGridLayout>
-          <WorkspaceContentPanel flex={6}>
-            <PageView key={_refreshkey} />
-          </WorkspaceContentPanel>
-          {/* <SideRightPanel /> */}
-          <WorkspaceContentPanel
-            overflow="hidden"
-            flex={1}
-            resize={{
-              left: true,
-            }}
-            minWidth={300}
-            zIndex={1}
-            hidden={
-              state.mode.value !== "design" && state.mode.value !== "craft"
-            }
-            backgroundColor={colors.color_editor_bg_on_dark}
-          >
-            <SideRightPanel />
-          </WorkspaceContentPanel>
-          {/* {wstate.preferences.debug_mode && (
-            <WorkspaceBottomPanelDockLayout resizable>
-              <WorkspaceContentPanel disableBorder>
-                <Debugger
-                  id={root?.id}
-                  file={state?.design?.key}
-                  type={root?.entry?.origin}
-                  entry={root?.entry}
-                  widget={result?.widget}
-                  controls={
-                    <>
-                     <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
-                      <br />
-                      {(type === "INSTANCE" || type === "COMPONENT") && (
-                        <Link
-                          href={{
-                            pathname: "/figma/inspect-component",
-                            query: {
-                              // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
-                              design: `https://www.figma.com/file/${file}/?node-id=${id}`,
-                            },
-                          }}
-                        >
-                          inspect component
-                        </Link>
-                      )}
-                    </>
-                  }
-                />
-              </WorkspaceContentPanel>
-            </WorkspaceBottomPanelDockLayout>
-          )} */}
-        </WorkspaceContentPanelGridLayout>
-      </DefaultEditorWorkspaceLayout>
-    </>
-  );
-}
-
-function ModeDesign() {
-  const [state] = useEditorState();
-  const { selectedPage, isolation } = state;
-  const { isolated } = isolation;
-
-  if (isolated) {
-    return <ModeIsolateDesign />;
-  }
-
-  switch (selectedPage) {
-    case "home":
-      return <EditorHome />;
+export function EditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: EditorInit }>) {
+  switch (initial.doctype) {
+    case "v0_form":
+      return (
+        <FormDocumentEditorProvider initial={initial}>
+          {children}
+        </FormDocumentEditorProvider>
+      );
+    case "v0_site":
+      return (
+        <SiteDocumentEditorProvider initial={initial}>
+          {children}
+        </SiteDocumentEditorProvider>
+      );
+    case "v0_schema":
+      return (
+        <DatabaseDocumentEditorProvider initial={initial}>
+          {children}
+        </DatabaseDocumentEditorProvider>
+      );
+    case "v0_bucket":
+      return (
+        <BucketDocumentEditorProvider initial={initial}>
+          {children}
+        </BucketDocumentEditorProvider>
+      );
+    case "v0_canvas": {
+      return (
+        <CanvasDocumentEditorProvider initial={initial}>
+          {children}
+        </CanvasDocumentEditorProvider>
+      );
+    }
     default:
-      return <EditorFigmaCanvas />;
+      throw new Error("unsupported doctype");
   }
 }
 
-function ModeCraft() {
-  const [state] = useEditorState();
-
-  return <EditorCraftCanvas />;
+function CanvasDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <MediaViewerProvider>
+            {/*  */}
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
 }
 
-function ModeCode() {
-  return <Code />;
+function DatabaseDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: SchemaDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>
+            {/*  */}
+            <FormFieldEditPanelProvider />
+            <RowEditPanelProvider />
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
 }
 
-function ModeIsolateDesign() {
-  return <EditorIsolatedInspection />;
+function BucketDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: BucketDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>{children}</MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
 }
 
-function SideRightPanel() {
-  const [state] = useEditorState();
-
-  switch (state.mode.value) {
-    case "code":
-      return <></>;
-    case "design":
-      return <Inspector />;
-    case "craft":
-      return <CraftInspector />;
-  }
+function SiteDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: SiteDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>
+            {/*  */}
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
 }
 
-function PageView() {
-  const [state] = useEditorState();
-  const { mode } = state;
-
-  const _Body = useCallback(
-    ({ mode }: { mode: EditorState["mode"]["value"] }) => {
-      switch (mode) {
-        case "code": {
-          return <ModeCode />;
-        }
-        case "design": {
-          return <ModeDesign />;
-        }
-        case "craft": {
-          return <ModeCraft />;
-        }
-      }
-    },
-    [mode.value]
+export function FormDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: FormDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
   );
 
   return (
-    <>
-      <ModeRunnerOverlay />
-      <_Body mode={mode.value !== "run" ? mode.value : mode.last ?? "design"} />
-    </>
+    <StateProvider state={state} dispatch={dispatch}>
+      <FormAgentThemeSyncProvider>
+        <Multiplayer>
+          <TooltipProvider>
+            <AssetsBackgroundsResolver />
+            <MediaViewerProvider>
+              <FormFieldEditPanelProvider />
+              <RowEditPanelProvider />
+              <CustomerPanelProvider />
+              {children}
+            </MediaViewerProvider>
+          </TooltipProvider>
+        </Multiplayer>
+      </FormAgentThemeSyncProvider>
+    </StateProvider>
   );
 }
 
-function ModeRunnerOverlay() {
-  const dispatch = useDispatch();
+function useAttributes() {
   const [state] = useEditorState();
-  const exitSession = useCallback(
-    () =>
+  switch (state.doctype) {
+    case "v0_form":
+      return state.form.fields;
+    case "v0_schema": {
+      const tb = state.tables.find((t) => t.id === state.datagrid_table_id);
+      if (!tb) return [];
+      if ("attributes" in tb) {
+        return tb.attributes;
+      }
+    }
+    default: {
+      return [];
+    }
+  }
+}
+
+function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const attributes = useAttributes();
+
+  const db_table_id = useDatabaseTableId();
+
+  const field = useMemo(() => {
+    const focusfound = attributes?.find((f) => f.id === state.field_editor.id);
+    if (focusfound) return focusfound;
+    return state.field_editor.data?.draft;
+  }, [state.field_editor.id, attributes, state.field_editor.data?.draft]);
+
+  const closeFieldPanel = useCallback(
+    (options: { refresh: boolean }) => {
       dispatch({
-        type: "mode",
-        mode: "goback",
-      }),
+        type: "editor/panels/field-edit",
+        open: false,
+        refresh: options.refresh,
+      });
+    },
     [dispatch]
   );
 
+  const onSaveField = useCallback(
+    (init: FieldSave) => {
+      if (!db_table_id) return;
+      const data: FormFieldUpsert = {
+        ...init,
+        //
+        options: init.options?.length ? init.options : undefined,
+        optgroups: init.optgroups?.length ? init.optgroups : undefined,
+        //
+        id: state.field_editor.id ?? undefined,
+        form_id: db_table_id,
+        data: init.data,
+      };
+
+      process.env.NODE_ENV === "development" &&
+        console.log("[EDITOR] saving..", data);
+
+      const promise = fetch(`/private/editor/${db_table_id}/fields`, {
+        body: JSON.stringify(data),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            throw new Error("Failed to save field");
+          }
+
+          const { data } =
+            (await res.json()) as EditorApiResponse<FormFieldDefinition>;
+
+          if (data) {
+            // else save the field
+            dispatch({
+              type: "editor/table/attribute/change",
+              table_id: db_table_id,
+              field_id: data.id,
+              data: data,
+            });
+
+            // only close when successful
+            closeFieldPanel({ refresh: true });
+          }
+        })
+        .finally(() => {
+          //
+        });
+
+      toast.promise(promise, {
+        loading: "Saving field...",
+        success: "Field saved",
+        error: "Failed to save field",
+      });
+    },
+    [closeFieldPanel, db_table_id, state.field_editor.id, dispatch]
+  );
+
+  const is_existing_field = !!field?.id;
+
+  if (!db_table_id) return <></>;
+
   return (
-    <Dialog fullScreen onClose={exitSession} open={state.mode.value == "run"}>
-      <FullScreenPreview onClose={exitSession} />
-    </Dialog>
+    <>
+      <FieldEditPanel
+        db_table_id={db_table_id}
+        key={field?.name || state.field_editor.refreshkey}
+        open={state.field_editor.open}
+        title={is_existing_field ? "Edit Field" : "New Field"}
+        enableAI={!is_existing_field}
+        mode={is_existing_field ? "edit" : "new"}
+        formResetKey={state.field_editor.refreshkey}
+        init={
+          field
+            ? {
+                id: field.id,
+                name: field.name,
+                type: field.type,
+                label: field.label ?? "",
+                help_text: field.help_text ?? "",
+                placeholder: field.placeholder ?? "",
+                required: field.required,
+                readonly: field.readonly,
+                pattern: field.pattern,
+                step: field.step ?? undefined,
+                min: field.min ?? undefined,
+                max: field.max ?? undefined,
+                autocomplete: field.autocomplete,
+                data: field.data,
+                accept: field.accept,
+                multiple: field.multiple ?? undefined,
+                options: field.options,
+                optgroups: field.optgroups,
+                storage: field.storage,
+                reference: field.reference,
+                v_value: field.v_value,
+                // TODO: add inventory support
+                // options_inventory: undefined,
+              }
+            : undefined
+        }
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/panels/field-edit", open });
+        }}
+        onSave={onSaveField}
+      />
+
+      {children}
+    </>
+  );
+}
+
+/**
+ * @deprecated MIGRATE
+ * @returns
+ */
+function useRowEditorRow() {
+  const [state, dispatch] = useEditorState();
+
+  const row = useMemo(() => {
+    switch (state.doctype) {
+      case "v0_form":
+        const response_stream =
+          state.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          ].stream;
+
+        return response_stream?.find((r) => r.id === state.row_editor.id);
+      default:
+        return undefined;
+    }
+  }, [state.doctype, state.tablespace, state.row_editor.id]);
+
+  // const focusxsupabasemaintablerow = useMemo(() => {
+  //   const pk = state.x_supabase_main_table?.pk;
+  //   if (!pk) return;
+  //   return state.x_supabase_main_table?.rows?.find(
+  //     (r) => r[pk] === state.row_editor.id // TODO: - pk
+  //   );
+  // }, [
+  //   state.x_supabase_main_table?.rows,
+  //   state.x_supabase_main_table?.pk,
+  //   state.row_editor.id,
+  // ]);
+
+  return row;
+}
+
+function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const attributes = useAttributes();
+
+  const row = useRowEditorRow();
+
+  const tb = useDatagridTable();
+  const table_id = useDatabaseTableId();
+
+  if (!tb || !table_id) return <></>;
+
+  const mode = tb.readonly
+    ? ("read" as const)
+    : row
+      ? ("update" as const)
+      : ("create" as const);
+
+  return (
+    <>
+      <RowEditPanel
+        key={row?.id || state.row_editor.refreshkey}
+        table_id={table_id}
+        mode={mode}
+        open={state.row_editor.open}
+        title={
+          row
+            ? `Response ${row.meta.local_index ? fmt_local_index(row.meta.local_index) : ""}`
+            : "New"
+        }
+        attributes={attributes}
+        init={{
+          row: row,
+        }}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/panels/record-edit", open });
+        }}
+      />
+      {children}
+    </>
+  );
+}
+
+function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <>
+      <CustomerEditPanel
+        key={state.customer_editor.id}
+        customer_id={state.customer_editor.id}
+        open={state.customer_editor.open}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/panels/customer-details", open });
+        }}
+      />
+      {children}
+    </>
   );
 }
