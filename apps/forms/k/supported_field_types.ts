@@ -75,6 +75,7 @@ if (process.env.NODE_ENV === "development") {
     "payment",
     "toggle",
     "json",
+    "canvas",
   ] as const;
   supported_field_types.push(...dev);
 }

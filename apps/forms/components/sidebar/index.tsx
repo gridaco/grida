@@ -18,7 +18,7 @@ export function SidebarRoot({
   className?: string;
 }>) {
   return (
-    <nav
+    <aside
       className={cn(
         "relative w-60 h-full shrink-0 overflow-y-scroll",
         // apply slightly dimmed background for main content
@@ -28,7 +28,7 @@ export function SidebarRoot({
       )}
     >
       {children}
-    </nav>
+    </aside>
   );
 }
 
