@@ -43,7 +43,6 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
       className="shadow-lg rounded overflow-hidden"
       ref={ref as React.RefObject<HTMLDivElement>}
     >
-      {/* <div className="page-content w-full h-full flex items-center justify-center"> */}
       <Page
         pageNumber={props.pageNumber}
         width={props.width}
@@ -51,7 +50,6 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
         renderAnnotationLayer={false}
         renderTextLayer={false}
       />
-      {/* </div> */}
     </div>
   );
 });
@@ -73,10 +71,13 @@ const PDFViewer = ({
   const [rawSize, setRawSize] = useState<
     { width: number; height: number } | undefined
   >(undefined);
+  const [cachedDimensions, setCachedDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const book = useRef(null);
 
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
-
   const [ref, { width: _width, height: _height }] = useMeasure();
 
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
@@ -86,26 +87,29 @@ const PDFViewer = ({
       document.getMetadata().then(({ info }) => {
         try {
           const pdfTitle = (info as any)["Title"];
-          if (pdfTitle) {
-            setTitle(pdfTitle);
-          }
+          if (pdfTitle) setTitle(pdfTitle);
         } catch (e) {}
       });
     }
-
     setNumPages(document.numPages);
     document.getPage(1).then((page) => {
-      const [
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _left,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _top,
-        width,
-        height,
-      ] = page.view;
+      const [, , width, height] = page.view;
       setRawSize({ width, height });
     });
   };
+
+  // Cache dimensions once resolved; ignore subsequent resizes.
+  useEffect(() => {
+    if (_width && _height && rawSize && !cachedDimensions) {
+      const computed = scaltToFit(
+        _width / (isPortrait ? 1 : 2),
+        _height,
+        rawSize.width,
+        rawSize.height
+      );
+      setCachedDimensions({ width: computed.width, height: computed.height });
+    }
+  }, [_width, _height, rawSize, isPortrait, cachedDimensions]);
 
   const nextPage = () => {
     if (book.current) {
@@ -122,9 +126,7 @@ const PDFViewer = ({
   };
 
   const setPage = (page: number) => {
-    if (page < 0 || page >= numPages) {
-      return;
-    }
+    if (page < 0 || page >= numPages) return;
     if (book.current) {
       // @ts-expect-error legacy
       book.current.pageFlip().flip(page);
@@ -135,18 +137,11 @@ const PDFViewer = ({
     setCurrentPage(e.data);
   };
 
-  const { width, height } = scaltToFit(
-    (_width ?? 0) / (isPortrait ? 1 : 2),
-    _height ?? 0,
-    rawSize?.width ?? 0,
-    rawSize?.height ?? 0
-  );
-
   return (
     <main className="w-full h-full flex flex-col overflow-hidden bg-neutral-100 dark:bg-neutral-800">
       {title && (
         <header className="border-b py-2 px-5 z-50">
-          {title && <h1 className="text-sm font-semibold">{title}</h1>}
+          <h1 className="text-sm font-semibold">{title}</h1>
         </header>
       )}
       <div className="relative w-full h-full p-8 md:p-20 z-10">
@@ -156,43 +151,37 @@ const PDFViewer = ({
         >
           <Document
             file={file}
-            onLoadSuccess={(document) => {
-              onDocumentLoadSuccess(document);
-            }}
+            onLoadSuccess={onDocumentLoadSuccess}
             loading=""
           >
-            {!width || !width ? (
-              <></>
-            ) : (
-              <>
-                {/* @ts-expect-error legacy */}
-                <HTMLFlipBook
-                  width={width}
-                  height={height}
-                  maxShadowOpacity={0.5}
-                  showCover={true}
-                  mobileScrollSupport={true}
-                  onFlip={onFlip}
-                  ref={book}
-                  startPage={0}
-                  showPageCorners={true}
-                  flippingTime={600}
-                  usePortrait={isPortrait}
-                  startZIndex={0}
-                  drawShadow={true}
-                  autoSize
-                >
-                  {Array.from(new Array(numPages), (_, index) => (
-                    <FlipPage
-                      key={index}
-                      width={width}
-                      height={height}
-                      number={index + 1}
-                      pageNumber={index + 1}
-                    />
-                  ))}
-                </HTMLFlipBook>
-              </>
+            {!cachedDimensions ? null : (
+              // @ts-expect-error legacy
+              <HTMLFlipBook
+                width={cachedDimensions.width}
+                height={cachedDimensions.height}
+                maxShadowOpacity={0.5}
+                showCover={true}
+                mobileScrollSupport={true}
+                onFlip={onFlip}
+                ref={book}
+                startPage={0}
+                showPageCorners={true}
+                flippingTime={600}
+                usePortrait={isPortrait}
+                startZIndex={0}
+                drawShadow={true}
+                autoSize={false}
+              >
+                {Array.from(new Array(numPages), (_, index) => (
+                  <FlipPage
+                    key={index}
+                    width={cachedDimensions.width}
+                    height={cachedDimensions.height}
+                    number={index + 1}
+                    pageNumber={index + 1}
+                  />
+                ))}
+              </HTMLFlipBook>
             )}
           </Document>
         </div>
@@ -270,7 +259,6 @@ function NavigationPageNumberControl({
   const end = Math.min(page + 2, numPages);
   const isStart = start === 1;
   const isEnd = end === numPages;
-
   const [txt, setTxt] = useState<string>(
     isPortrait || isStart || isEnd ? start.toString() : `${start}-${end}`
   );
@@ -291,14 +279,9 @@ function NavigationPageNumberControl({
           autoComplete="off"
           className="w-7 rounded border text-center"
           value={txt}
-          onChange={(e) => {
-            setTxt(e.target.value);
-          }}
+          onChange={(e) => setTxt(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              // blur
-              e.currentTarget.blur();
-            }
+            if (e.key === "Enter") e.currentTarget.blur();
           }}
           onBlur={() => {
             const page = parseInt(txt);
