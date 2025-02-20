@@ -24,8 +24,8 @@ export default function create_window() {
   if (process.env.NODE_ENV === "development") {
     window.loadURL("http://localhost:3000/dashboard");
   } else {
-    // window.loadURL("https://app.grida.co/dashboard");
-    window.loadURL("http://localhost:3000/dashboard");
+    window.loadURL("https://app.grida.co/dashboard");
+    // window.loadURL("http://localhost:3000/dashboard");
   }
 
   window.webContents.on("will-prevent-unload", (event) => {

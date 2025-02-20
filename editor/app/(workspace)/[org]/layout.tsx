@@ -6,6 +6,8 @@ import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default async function Layout({
   params,
@@ -36,9 +38,12 @@ export default async function Layout({
   }
 
   return (
-    <Workspace organization={organization}>
-      <EditorHelpFab />
-      {children}
-    </Workspace>
+    <SidebarProvider>
+      <Workspace organization={organization}>
+        <EditorHelpFab />
+        <WorkspaceSidebar />
+        {children}
+      </Workspace>
+    </SidebarProvider>
   );
 }
