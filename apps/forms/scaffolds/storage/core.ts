@@ -3,81 +3,15 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import type StorageFileApi from "@supabase/storage-js/dist/module/packages/StorageFileApi";
 import { produce } from "immer";
+import { vfs } from "@/lib/vfs";
 
 const EMPTY_FOLDER_PLACEHOLDER_FILE = ".emptyFolderPlaceholder";
-
-function tree(
-  objects: Record<string, FileNode>
-): Array<EntityNode & { children?: Array<EntityNode & { children?: any[] }> }> {
-  const result: any[] = [];
-
-  const getFolder = (nodes: any[], name: string, tokens: string[]): any => {
-    let folder = nodes.find((n) => n.type === "folder" && n.name === name);
-    if (!folder) {
-      folder = {
-        type: "folder",
-        name,
-        key: tokens.join("/"),
-        path_tokens: tokens,
-        children: [],
-      };
-      nodes.push(folder);
-    }
-    return folder;
-  };
-
-  for (const file of Object.values(objects)) {
-    const tokens = file.path_tokens;
-    if (tokens.length === 0) continue;
-    let current = result;
-    // Walk through each token in the path
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      if (i === tokens.length - 1) {
-        // Last token: add file node (skip placeholder file)
-        if (file.name === ".emptyFolderPlaceholder") break;
-        current.push(file);
-      } else {
-        // Folder token: get or create folder node
-        const folder = getFolder(current, token, tokens.slice(0, i + 1));
-        current = folder.children;
-      }
-    }
-  }
-
-  return result;
-}
-
-type PathTokens = string[];
 
 type MinimalFile = {
   name: string;
   size: number;
   type: string;
 };
-
-type FileNode = {
-  type: "file";
-  name: string;
-  key: string;
-  path_tokens: PathTokens;
-  mimetype: string;
-  size: number;
-  modified?: string;
-  url: string;
-  thumbnail?: string;
-};
-
-type FolderNode = {
-  type: "folder";
-  name: string;
-  key: string;
-  path_tokens: PathTokens;
-  size?: number;
-  modified?: string;
-};
-
-type EntityNode = FileNode | FolderNode;
 
 type _BaseFileTask = {
   id: string;
@@ -137,7 +71,7 @@ interface StorageEditorState {
   absdir: string;
 
   tasks: StorageEditorTask[];
-  objects: Record<string, FileNode>;
+  objects: Record<string, vfs.FileNode>;
   api: StorageApi;
 }
 
@@ -164,8 +98,8 @@ function __useDispatch() {
   );
 
   const __list = useCallback(
-    async (dir: string, objects: Record<string, FileNode>) => {
-      dispatch({ type: "list", dir, objects });
+    async (dir: string | string[], objects: Record<string, vfs.FileNode>) => {
+      dispatch({ type: "list", dir: vfs.pathstr(dir), objects });
     },
     [dispatch]
   );
@@ -182,7 +116,7 @@ function __useDispatch() {
   }, [dispatch]);
 
   const __add = useCallback(
-    (key: string, object: FileNode) => {
+    (key: string, object: vfs.FileNode) => {
       dispatch({ type: "add", key, object });
     },
     [dispatch]
@@ -272,10 +206,10 @@ function __useStorageEditorState() {
 
 type StorageEditorAction =
   | { type: "loading"; loading: boolean }
-  | { type: "list"; dir: string; objects: Record<string, FileNode> }
+  | { type: "list"; dir: string; objects: Record<string, vfs.FileNode> }
   | { type: "cd"; dir: string }
   | { type: "refresh" }
-  | { type: "add"; key: string; object: FileNode }
+  | { type: "add"; key: string; object: vfs.FileNode }
   | { type: "remove"; key: string }
   | { type: "tasks/uploading/push"; task: StorageEditorUploadingTask }
   | { type: "tasks/uploading/complete"; id: string }
@@ -363,15 +297,17 @@ function reducer(
 }
 
 interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
-  nodes: EntityNode[];
+  root: vfs.EntityNode[];
+  nodes: vfs.EntityNode[];
   upload: (file: File) => Promise<any>;
   mkdir: (name: string) => Promise<any>;
   cd: (dir: string) => void;
   mv: (path: string, newPath: string) => Promise<any>;
   // download: (path: string) => Promise<any>;
-  list: (path: string) => Promise<any>;
+  list: (path: string | string[]) => Promise<any>;
   refresh: () => void;
   rm: (path: string, recursive?: boolean) => Promise<any>;
+  getPublicUrl: (path: string) => string;
 }
 
 function useStorageEditor(): IStorageEditor {
@@ -402,14 +338,14 @@ function useStorageEditor(): IStorageEditor {
     __task_fail_deleting,
   } = __useDispatch();
 
-  const root = useMemo(() => tree(__all_nodes), [__all_nodes]);
+  const root = useMemo(() => vfs.tree(__all_nodes), [__all_nodes]);
 
   const absdir = useMemo(
     () => [basepath, dir].filter(Boolean).join("/"),
     [basepath, dir]
   );
 
-  const current_dir_nodes: EntityNode[] = useMemo(() => {
+  const current_dir_nodes: vfs.EntityNode[] = useMemo(() => {
     if (!dir) return root;
     const tokens = dir.split("/").filter(Boolean);
     let current = root;
@@ -424,7 +360,8 @@ function useStorageEditor(): IStorageEditor {
   }, [dir, root]);
 
   const abspath = useCallback(
-    (path: string) => [basepath, path].filter(Boolean).join("/"),
+    (path: string | string[]) =>
+      [basepath, vfs.pathstr(path)].filter(Boolean).join("/"),
     [basepath]
   );
 
@@ -442,7 +379,7 @@ function useStorageEditor(): IStorageEditor {
 
         // await __mock_elay();
         // const url = URL.createObjectURL(file);
-        const newFile: EntityNode = {
+        const newFile: vfs.EntityNode = {
           type: "file",
           name: file.name,
           key: key,
@@ -525,7 +462,7 @@ function useStorageEditor(): IStorageEditor {
   );
 
   const list = useCallback(
-    async (path: string) => {
+    async (path: string | string[]) => {
       const { data, error } = await api.list(abspath(path));
       if (error) {
         console.error("[error while list]", error);
@@ -572,7 +509,7 @@ function useStorageEditor(): IStorageEditor {
           };
           return acc;
         },
-        {} as Record<string, FileNode>
+        {} as Record<string, vfs.FileNode>
       );
 
       __list(path, objects);
@@ -590,6 +527,7 @@ function useStorageEditor(): IStorageEditor {
     absdir,
     tasks,
     nodes: current_dir_nodes,
+    root,
     upload,
     mkdir,
     cd: __cd,
@@ -597,6 +535,10 @@ function useStorageEditor(): IStorageEditor {
     rm,
     refresh: __refresh,
     list,
+    getPublicUrl: (p) => {
+      const path = abspath(p);
+      return api.getPublicUrl(path).data.publicUrl;
+    },
   };
 }
 
@@ -612,23 +554,12 @@ export function useSeedList() {
   // #endregion
 }
 
-function generatePaths(segments: string[]): PathTokens[] {
-  return segments.map((_, i) => segments.slice(0, i + 1));
-}
-
 export {
   reducer,
-  generatePaths,
   StorageEditorProvider,
   StorageEditorDispatcherProvider,
   useStorageEditor,
   StorageEditorProvider as default,
 };
 
-export type {
-  FileNode,
-  StorageApi,
-  StorageEditorTask,
-  StorageEditorUploadingTask,
-  EntityNode,
-};
+export type { StorageApi, StorageEditorTask, StorageEditorUploadingTask };
