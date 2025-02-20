@@ -19,7 +19,7 @@ export namespace sitemap {
     book30: "https://cal.com/universe-from-grida/30min",
     studio: "https://grida.studio",
     corssh: "https://cors.sh",
-    blog: "https://blog.grida.co",
+    blog: "/blog",
     changelog: "https://x.com/univ___erse",
   };
 
