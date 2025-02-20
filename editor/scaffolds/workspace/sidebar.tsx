@@ -25,6 +25,7 @@ import {
   SidebarMenuItemLabel,
   SidebarHeader,
   SidebarMenuLink,
+  SidebarDesktopHeader,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
@@ -39,6 +40,7 @@ export function WorkspaceSidebar() {
 
   return (
     <SidebarRoot>
+      <SidebarDesktopHeader />
       <SidebarHeader className="pt-4">
         <WorkspaceMenu current={organization.id}>
           <SidebarMenuItem className="py-2">

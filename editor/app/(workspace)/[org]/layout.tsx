@@ -21,7 +21,7 @@ export default async function Layout({
   const { data: auth } = await supabase.auth.getUser();
 
   if (!auth.user) {
-    return redirect("/sign-in");
+    return redirect("/sign-in?next=/" + encodeURIComponent(params.org));
   }
 
   const { data: organization, error: err } = await wsclient

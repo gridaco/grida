@@ -598,7 +598,7 @@ function Header({
   };
 }) {
   return (
-    <header className="flex w-full gap-4 border-b z-10 h-12 bg-workbench-panel">
+    <header className="flex w-full gap-4 border-b z-10 h-12 bg-workbench-panel desktop-drag-area">
       <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
         <Link href={`/${org}/${proj}`} prefetch={false}>
           <span className="flex items-center gap-2 text-md font-black select-none">

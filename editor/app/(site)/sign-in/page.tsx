@@ -70,19 +70,21 @@ export default function SigninPage({
             <div className="sm:text-center">
               <p className="text-xs text-foreground-lighter sm:mx-auto sm:max-w-sm">
                 By continuing, you agree to Grida&apos;s{" "}
-                <a
+                <Link
                   className="underline hover:text-foreground-light"
-                  href="https://grida.co/docs/support/terms-and-conditions"
+                  href="/terms-and-conditions"
+                  target="_blank"
                 >
                   Terms of Service
-                </a>{" "}
+                </Link>{" "}
                 and{" "}
-                <a
+                <Link
                   className="underline hover:text-foreground-light"
-                  href="https://grida.co/docs/support/privacy-policy"
+                  href="/privacy-policy"
+                  target="_blank"
                 >
                   Privacy Policy
-                </a>
+                </Link>
                 , and to receive periodic emails with updates.
               </p>
             </div>
