@@ -146,7 +146,7 @@ const PDFViewer = ({
           {title && <h1 className="text-sm font-semibold">{title}</h1>}
         </header>
       )}
-      <div className="w-full h-full p-20">
+      <div className="w-full h-full p-20 z-10">
         <div
           ref={ref}
           className="w-full h-full flex flex-col justify-center items-center"
@@ -195,8 +195,12 @@ const PDFViewer = ({
         </div>
       </div>
       {logo && (
-        <div className="fixed bottom-4 right-4">
-          <img src={logo} alt="logo" className="w-full h-full max-w-32" />
+        <div className="fixed bottom-4 right-4 z-0">
+          <img
+            src={logo}
+            alt="logo"
+            className="w-full h-full max-w-32 max-h-24"
+          />
         </div>
       )}
       <div className="absolute bottom-4 w-full flex justify-center">

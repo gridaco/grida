@@ -157,8 +157,8 @@ function viewerobj(objecturl: string): string {
 
 function viewerlink(
   viewer: ViewerOptions,
-  // baseUrl = "https://viewer.grida.co"
-  baseUrl = "http://localhost:3001"
+  baseUrl = "https://viewer.grida.co"
+  // baseUrl = "http://localhost:3001"
 ): string {
   const params = {
     object: viewerobj(viewer.object),
@@ -248,11 +248,13 @@ export default function CreateViewerLinkDialog({
             </Button>
           </div>
         </DialogHeader>
-        <div className="w-full flex-1 flex gap-4">
+        <div className="w-full flex-1 flex gap-5">
           <aside className="flex-1">
-            <Safari className="shadow-xl">
+            <Safari className="shadow-xl flex flex-col">
               <SafariToolbar mode="simple" url={viewer?.url} />
-              <Body />
+              <div className="flex-1 overflow-auto">
+                <Body />
+              </div>
             </Safari>
           </aside>
           <aside className="w-64 grid gap-2 h-min">
