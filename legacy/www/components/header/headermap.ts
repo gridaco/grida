@@ -112,13 +112,6 @@ const Frameworks: Sitemap = [
         icon: "/module-icons/svelte",
         layout: "module-item",
       },
-      {
-        type: "link",
-        label: "SolidJS",
-        href: "/docs/with-solid-js",
-        icon: "/module-icons/solid-js",
-        layout: "module-item",
-      },
     ],
   },
 
@@ -230,13 +223,6 @@ const Frameworks: Sitemap = [
         label: "Headless UI",
         href: "/docs/with-headless-ui",
         icon: "/module-icons/headless-ui",
-        layout: "module-item",
-      },
-      {
-        type: "link",
-        label: "Scss",
-        href: "/docs/with-scss",
-        icon: "/module-icons/sass",
         layout: "module-item",
       },
       {
