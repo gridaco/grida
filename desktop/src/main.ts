@@ -25,13 +25,13 @@ Menu.setApplicationMenu(menu);
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", async () => {
-  const token = await keytar.getPassword(SERVICE, ACCOUNT);
-
-  if (!token) {
-    create_login_window();
-  } else {
-    create_window();
-  }
+  // const token = await keytar.getPassword(SERVICE, ACCOUNT);
+  // if (!token) {
+  //   create_login_window();
+  // } else {
+  //   create_window();
+  // }
+  create_window();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

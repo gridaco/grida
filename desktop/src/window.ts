@@ -20,9 +20,9 @@ export default function create_window() {
   });
 
   if (process.env.NODE_ENV === "development") {
-    window.loadURL("http://localhost:3000");
+    window.loadURL("http://localhost:3000/dashboard");
   } else {
-    window.loadURL("https://app.grida.co");
+    window.loadURL("https://app.grida.co/dashboard");
   }
 
   window.webContents.on("will-prevent-unload", (event) => {
@@ -41,6 +41,7 @@ export function create_login_window() {
     },
     width: 292,
     height: 438,
+    backgroundColor: "#171717", // bg-neutral-900
     resizable: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
