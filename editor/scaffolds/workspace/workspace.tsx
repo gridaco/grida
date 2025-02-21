@@ -8,7 +8,7 @@ import { PublicUrls } from "@/services/public-urls";
 import useSWR from "swr";
 import { EditorApiResponse } from "@/types/private/api";
 
-type OrganizationWithAvatar = Organization & {
+export type OrganizationWithAvatar = Organization & {
   avatar_url: string | null;
 };
 

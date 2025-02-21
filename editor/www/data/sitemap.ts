@@ -2,6 +2,8 @@ export namespace sitemap {
   export const links = {
     x: "https://x.com/grida_co",
     github: "https://github.com/gridaco",
+    downlaods: "/downloads",
+    releases_latest: "https://github.com/gridaco/grida/releases/latest",
     pricing: "/pricing",
     slack: "/join-slack",
     docs: "/docs",
@@ -26,6 +28,7 @@ export namespace sitemap {
   type Item = { title: string; href: string; description?: string };
 
   export const items = {
+    downloads: { title: "Downloads", href: links.downlaods } satisfies Item,
     docs: { title: "Docs", href: links.docs } satisfies Item,
     thebundle: { title: "The Bundle", href: links.thebundle } satisfies Item,
     joinslack: { title: "Join Slack", href: links.slack } satisfies Item,

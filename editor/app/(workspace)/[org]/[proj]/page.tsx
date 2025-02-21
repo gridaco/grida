@@ -2,18 +2,24 @@
 
 import React from "react";
 import Link from "next/link";
-import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  PlusIcon,
+  ViewGridIcon,
+  ViewHorizontalIcon,
+} from "@radix-ui/react-icons";
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
-import { Form, GDocument } from "@/types";
+import { GDocument } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { WorkspaceSidebar } from "@/scaffolds/workspace/sidebar";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
+import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { Button } from "@/components/ui/button";
 
 export default function FormsDashboardPage({
   params,
@@ -47,60 +53,70 @@ export default function FormsDashboardPage({
           {organization_name}/{project_name} | Grida Forms
         </title>
       </Head>
-      <WorkspaceSidebar />
-      <main className="w-full h-full overflow-y-scroll">
-        <div className="container mx-auto">
-          <header className="py-10 flex justify-between">
-            <div>
-              <span className="flex items-center gap-2 text-2xl font-black select-none">
-                {project_name}
-              </span>
-              <span className="font-mono opacity-50">{organization_name}</span>
-            </div>
-            {project && (
+      <div className="flex flex-col overflow-hidden w-full h-full">
+        <DesktopDragArea className="border-b" />
+        <main className="w-full h-full overflow-y-scroll">
+          <div className="container mx-auto">
+            <header className="py-10 flex justify-between">
               <div>
-                <CreateNewDocumentButton
+                <span className="flex items-center gap-2 text-2xl font-black select-none">
+                  {project_name}
+                </span>
+                <span className="font-mono opacity-50">
+                  {organization_name}
+                </span>
+              </div>
+              {project && (
+                <div>
+                  <CreateNewDocumentButton
+                    project_name={project_name}
+                    project_id={project.id}
+                  >
+                    <Button className="gap-1">
+                      <PlusIcon />
+                      Create New
+                      <ChevronDownIcon />
+                    </Button>
+                  </CreateNewDocumentButton>
+                </div>
+              )}
+            </header>
+            {loading ? (
+              <>
+                <div>
+                  <Skeleton className="w-full h-32 rounded" />
+                </div>
+              </>
+            ) : (
+              <div>
+                <section>
+                  <ProjectStats project_ids={[project!.id]} />
+                </section>
+                <section className="w-full flex justify-end gap-2 mt-10">
+                  <Link href="?layout=grid" replace>
+                    <ViewGridIcon />
+                  </Link>
+                  <Link href="?layout=list" replace>
+                    <ViewHorizontalIcon />
+                  </Link>
+                </section>
+                <hr className="mb-10 mt-5 dark:border-neutral-700" />
+                <DocumentsGrid
+                  organization_name={organization_name}
                   project_name={project_name}
-                  project_id={project.id}
+                  documents={documents.filter(
+                    (doc) => doc.project_id === project!.id
+                  )}
+                  layout={layout}
                 />
+                <footer className="mt-10 mb-5">
+                  <PoweredByGridaFooter />
+                </footer>
               </div>
             )}
-          </header>
-          {loading ? (
-            <>
-              <div>
-                <Skeleton className="w-full h-32 rounded" />
-              </div>
-            </>
-          ) : (
-            <div>
-              <section>
-                <ProjectStats project_ids={[project!.id]} />
-              </section>
-              <section className="w-full flex justify-end gap-2 mt-10">
-                <Link href="?layout=grid" replace>
-                  <ViewGridIcon />
-                </Link>
-                <Link href="?layout=list" replace>
-                  <ViewHorizontalIcon />
-                </Link>
-              </section>
-              <hr className="mb-10 mt-5 dark:border-neutral-700" />
-              <DocumentsGrid
-                organization_name={organization_name}
-                project_name={project_name}
-                documents={documents.filter(
-                  (doc) => doc.project_id === project!.id
-                )}
-                layout={layout}
-              />
-              <footer className="mt-10 mb-5">
-                <PoweredByGridaFooter />
-              </footer>
-            </div>
-          )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

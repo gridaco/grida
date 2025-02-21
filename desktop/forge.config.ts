@@ -11,7 +11,7 @@ dotenv.config();
 
 const config: ForgeConfig = {
   packagerConfig: {
-    extraResource: ["mac/CFBundleTypeIconFile.icns"],
+    extraResource: ["mac/dotgrida.icns"],
     name: "Grida",
     asar: true,
     appBundleId: "co.grida.desktop",
@@ -51,7 +51,7 @@ const config: ForgeConfig = {
       renderer: [
         {
           name: "main_window",
-          config: "vite.renderer.config.ts",
+          config: "vite.renderer.config.mjs",
         },
       ],
     }),
@@ -70,6 +70,7 @@ const config: ForgeConfig = {
   publishers: [
     {
       name: "@electron-forge/publisher-github",
+      platforms: ["darwin", "win32", "linux"],
       config: {
         repository: {
           owner: "gridaco",

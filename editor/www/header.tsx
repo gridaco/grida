@@ -32,6 +32,7 @@ const features: Item[] = [
 
 const resources: Item[] = [
   sitemap.items.docs,
+  sitemap.items.downloads,
   sitemap.items.joinslack,
   sitemap.items.thebundle,
 ];

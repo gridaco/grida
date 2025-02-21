@@ -8,6 +8,12 @@
       <string>Grida</string>
       <key>CFBundleIdentifier</key>
       <string>co.grida.desktop</string>
+      <key>CFBundleURLName</key>
+      <string>co.grida.desktop</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+         <string>grida</string>
+      </array>
       <key>CFBundleDocumentTypes</key>
       <array>
          <dict>
@@ -22,7 +28,7 @@
             <key>LSHandlerRank</key>
             <string>Owner</string>
             <key>CFBundleTypeIconFile</key>
-            <string>CFBundleTypeIconFile.icns</string>
+            <string>dotgrida.icns</string>
          </dict>
       </array>
    </dict>

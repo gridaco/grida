@@ -61,10 +61,11 @@ async function create_new_document(
 export function CreateNewDocumentButton({
   project_name,
   project_id,
-}: {
+  children,
+}: React.PropsWithChildren<{
   project_name: string;
   project_id: number;
-}) {
+}>) {
   const {
     state: {
       organization: { name: organization_name },
@@ -175,13 +176,7 @@ export function CreateNewDocumentButton({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="gap-1">
-            <PlusIcon />
-            Create New
-            <ChevronDownIcon />
-          </Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={8}>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Forms</DropdownMenuLabel>
@@ -203,7 +198,7 @@ export function CreateNewDocumentButton({
               />
               Blank Headless Form
             </DropdownMenuItem>
-            <Link href="/forms/ai">
+            <Link href="/forms/ai" target="_blank">
               <DropdownMenuItem>
                 <ResourceTypeIcon
                   type="ai"

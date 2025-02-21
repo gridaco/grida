@@ -25,7 +25,7 @@ export function PreviewButton() {
         <button
           type="button"
           className={clsx(
-            "inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
+            "h-7 inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
             "gap-2"
           )}
           title="Preview"
@@ -38,7 +38,7 @@ export function PreviewButton() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium border-t border-b border-r rounded-e-lg focus:z-10 focus:ring-2"
+            className="h-7 inline-flex items-center px-2 py-2 text-sm font-medium border-t border-b border-r rounded-e-lg focus:z-10 focus:ring-2"
           >
             <ChevronDownIcon />
           </button>

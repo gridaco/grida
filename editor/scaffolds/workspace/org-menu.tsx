@@ -34,7 +34,7 @@ export function WorkspaceMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild className="cursor-pointer">
+      <DropdownMenuTrigger asChild className="cursor-pointer select-none">
         <div>{children}</div>
       </DropdownMenuTrigger>
 
@@ -71,6 +71,7 @@ export function WorkspaceMenu({
             New organization
           </DropdownMenuItem>
         </Link>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogoutClick}>Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

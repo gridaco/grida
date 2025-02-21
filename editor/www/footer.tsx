@@ -67,6 +67,12 @@ export default function Footer() {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Resources</h3>
                 <Link
+                  href={sitemap.links.downlaods}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Downloads
+                </Link>
+                <Link
                   href={sitemap.links.studio}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
