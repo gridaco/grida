@@ -1,4 +1,8 @@
-import { BrowserWindow, shell } from "electron";
+import {
+  BrowserWindow,
+  shell,
+  type BaseWindowConstructorOptions,
+} from "electron";
 import path from "node:path";
 
 const trafficLightPosition = {
@@ -6,28 +10,21 @@ const trafficLightPosition = {
   y: 14,
 } as const;
 
-export default function create_window() {
-  // Create the browser window.
-  const window = new BrowserWindow({
-    title: "Grida",
-    titleBarStyle: "hidden",
-    trafficLightPosition,
-    width: 1440,
-    height: 960,
-    minWidth: 384,
-    minHeight: 384,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-    },
-  });
+const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
+  titleBarStyle: "hidden",
+  trafficLightPosition,
+  width: 1440,
+  height: 960,
+  minWidth: 384,
+  minHeight: 384,
+};
 
-  if (process.env.NODE_ENV === "development") {
-    window.loadURL("http://localhost:3000/dashboard");
-  } else {
-    window.loadURL("https://app.grida.co/dashboard");
-    // window.loadURL("http://localhost:3000/dashboard");
-  }
+const EDITOR_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://app.grida.co";
 
+function register_window_hooks(window: BrowserWindow) {
   window.webContents.on("will-prevent-unload", (event) => {
     // Allow the window to close even if the page tries to block it.
     event.preventDefault();
@@ -46,6 +43,38 @@ export default function create_window() {
       shell.openExternal(url);
     }
   });
+}
+
+export default function create_main_window() {
+  const window = new BrowserWindow({
+    ...DEFAILT_WINDOW_CONFIG,
+    title: "Grida",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+
+  window.loadURL(`${EDITOR_BASE_URL}/dashboard`);
+
+  register_window_hooks(window);
+
+  return window;
+}
+
+export function create_canvas_playground_window() {
+  const window = new BrowserWindow({
+    title: "Playground",
+    ...DEFAILT_WINDOW_CONFIG,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+
+  window.loadURL(`${EDITOR_BASE_URL}/canvas`);
+
+  register_window_hooks(window);
+
+  return window;
 }
 
 export function create_login_window() {
