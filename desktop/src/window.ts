@@ -40,7 +40,8 @@ export default function create_window() {
   });
 
   window.webContents.on("will-navigate", (event, url) => {
-    if (shouldOpenExternally(url)) {
+    const origin = window.webContents.getURL();
+    if (shouldOpenExternally(origin, url)) {
       event.preventDefault();
       shell.openExternal(url);
     }
@@ -73,12 +74,16 @@ export function create_login_window() {
   return window;
 }
 
-function shouldOpenExternally(url: string) {
+function shouldOpenExternally(origin: string, target: string) {
+  // if the redirect is triggered by the sign-in page, allow it
+  if (origin.includes("/sign-in")) return false;
+
+  // deny all others
   if (
     !(
-      url.startsWith("https://app.grida.co") ||
+      target.startsWith("https://app.grida.co") ||
       (process.env.NODE_ENV === "development" &&
-        url.startsWith("http://localhost:3000"))
+        target.startsWith("http://localhost:3000"))
     )
   ) {
     return true;

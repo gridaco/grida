@@ -70,6 +70,7 @@ const config: ForgeConfig = {
   publishers: [
     {
       name: "@electron-forge/publisher-github",
+      platforms: ["darwin", "win32", "linux"],
       config: {
         repository: {
           owner: "gridaco",
