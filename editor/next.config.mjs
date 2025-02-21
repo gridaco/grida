@@ -118,6 +118,11 @@ const nextConfig = withMDX()({
         destination: "https://github.com/gridaco",
         permanent: true,
       },
+      {
+        source: "/download",
+        destination: "/downloads",
+        permanent: true,
+      },
     ];
   },
   rewrites: async () => {
