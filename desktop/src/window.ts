@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, shell } from "electron";
 import path from "node:path";
 
 const trafficLightPosition = {
@@ -32,6 +32,19 @@ export default function create_window() {
     // Allow the window to close even if the page tries to block it.
     event.preventDefault();
   });
+
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    // open all target="_blank" links in the user's default browser
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    if (shouldOpenExternally(url)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
 }
 
 export function create_login_window() {
@@ -58,4 +71,16 @@ export function create_login_window() {
   }
 
   return window;
+}
+
+function shouldOpenExternally(url: string) {
+  if (
+    !(
+      url.startsWith("https://app.grida.co") ||
+      (process.env.NODE_ENV === "development" &&
+        url.startsWith("http://localhost:3000"))
+    )
+  ) {
+    return true;
+  }
 }
