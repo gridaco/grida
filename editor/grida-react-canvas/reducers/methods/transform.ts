@@ -108,9 +108,9 @@ function __self_update_gesture_transform_translate(
         const initial_parent_id = document.getParentId(
           initial_snapshot.document_ctx,
           original_id
-        )!;
+        );
 
-        const parent_id = initial_parent_id ?? draft.document.root_id;
+        const parent_id = initial_parent_id;
 
         const prototype =
           grida.program.nodes.factory.createPrototypeFromSnapshot(
@@ -227,7 +227,7 @@ function __self_update_gesture_transform_translate(
       });
 
       const new_parent_id = possible_parents[0];
-      if (!new_parent_id) break; // this is when outside the canvas (this might need to change if we support infinite canvas)
+      // if (!new_parent_id) break; // this is when outside the canvas (this might need to change if we support infinite canvas)
 
       // TODO: room for improvement - do a selection - parent comparison and handle at once (currently doing each comparison for each node) (this is redundant as if dropzone has changed, it will be changed for all selection)
       let is_parent_changed = false;
@@ -237,24 +237,36 @@ function __self_update_gesture_transform_translate(
         const prev_parent_id = document.getParentId(
           draft.document_ctx,
           node_id
-        )!;
+        );
         if (prev_parent_id === new_parent_id) return;
 
         is_parent_changed = true;
 
         // unregister the node from the previous parent
-        const parent = document.__getNodeById(
-          draft,
-          prev_parent_id
-        ) as grida.program.nodes.i.IChildrenReference;
-        parent.children = parent.children.filter((id) => id !== node_id);
+        if (prev_parent_id) {
+          const parent = document.__getNodeById(
+            draft,
+            prev_parent_id
+          ) as grida.program.nodes.i.IChildrenReference;
+          parent.children = parent.children.filter((id) => id !== node_id);
+        } else {
+          // root
+          draft.document.children = draft.document.children.filter(
+            (id) => id !== node_id
+          );
+        }
 
         // register the node to the new parent
-        const new_parent = document.__getNodeById(
-          draft,
-          new_parent_id
-        ) as grida.program.nodes.i.IChildrenReference;
-        new_parent.children.push(node_id);
+        if (new_parent_id) {
+          const new_parent = document.__getNodeById(
+            draft,
+            new_parent_id
+          ) as grida.program.nodes.i.IChildrenReference;
+          new_parent.children.push(node_id);
+        } else {
+          // root
+          draft.document.children.push(node_id);
+        }
 
         // update the context
         draft.document_ctx = document.Context.from(draft.document).snapshot();
@@ -302,30 +314,38 @@ function __self_update_gesture_transform_translate(
       const node = document.__getNodeById(draft, node_id);
       const r = translated[i++];
 
-      const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+      const parent_id = document.getParentId(draft.document_ctx, node_id);
 
-      if (!parent_rect) {
-        console.error("below error is caused by");
-        console.error(
-          JSON.parse(
-            JSON.stringify({
-              document_ctx: draft.document_ctx,
-              document: draft.document,
-            })
-          )
-        );
-        throw new Error(
-          `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
-        );
+      let relative_position: cmath.Vector2;
+      if (parent_id) {
+        // sub node
+        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+
+        if (!parent_rect) {
+          console.error("below error is caused by");
+          console.error(
+            JSON.parse(
+              JSON.stringify({
+                document_ctx: draft.document_ctx,
+                document: draft.document,
+              })
+            )
+          );
+          throw new Error(
+            `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
+          );
+        }
+
+        // the r position is relative to the canvas, we need to convert it to the node's local position
+        // absolute to relative => accumulated parent's position
+        relative_position = cmath.vector2.sub(r.position, [
+          parent_rect.x,
+          parent_rect.y,
+        ]);
+      } else {
+        // top node
+        relative_position = r.position;
       }
-
-      // the r position is relative to the canvas, we need to convert it to the node's local position
-      // absolute to relative => accumulated parent's position
-      const relative_position = cmath.vector2.sub(r.position, [
-        parent_rect.x,
-        parent_rect.y,
-      ]);
 
       draft.document.nodes[node_id] = nodeTransformReducer(node, {
         type: "position",
@@ -488,11 +508,10 @@ function __self_update_gesture_transform_scale(
   for (const node_id of selection) {
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = node_id === draft.document.root_id;
+    const is_root = draft.document.children.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = node.type !== "bitmap";
-
     if (!is_scalable) continue;
 
     if (is_root) {

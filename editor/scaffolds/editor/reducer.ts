@@ -383,7 +383,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
             editable: true,
             debug: false,
             document: {
-              root_id: "page",
+              children: ["page"],
               nodes: {
                 ["page"]:
                   grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(

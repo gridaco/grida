@@ -62,6 +62,7 @@ import {
   useNodeAction,
   useSelection,
   useSelectionPaints,
+  useTopNode,
 } from "@/grida-react-canvas/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -128,7 +129,7 @@ function SelectionMixedProperties() {
   const { state: document } = useDocument();
 
   const {
-    document: { root_id },
+    document: { children },
   } = document;
 
   const { selection: ids, nodes, properties, actions: change } = useSelection();
@@ -185,7 +186,7 @@ function SelectionMixedProperties() {
   } = properties;
 
   const sid = ids.join(",");
-  const is_root = ids[0] === root_id; // assuming when root is selected, only root is selected
+  const is_root = ids.length === 0 && children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
@@ -231,7 +232,7 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={is_root} className="border-b pb-4">
+        <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -605,18 +606,14 @@ function SelectedNodeProperties() {
   const { state } = useDocument();
 
   // - color - variables
-  const {
-    selection,
-    document: { root_id },
-    debug,
-  } = state;
+  const { selection, debug } = state;
 
   assert(selection.length === 1);
   const node_id = selection[0];
   const actions = useNodeAction(node_id)!;
 
   const node = useNode(node_id);
-  const root = useNode(root_id);
+  const root = useTopNode(node_id);
   const computed = useComputedNode(node_id);
   const {
     id,
@@ -683,7 +680,7 @@ function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_root = node_id === root_id;
+  const is_root = node_id === root.id;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
@@ -732,7 +729,7 @@ function SelectedNodeProperties() {
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={is_root} className="border-b pb-4">
+        <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>

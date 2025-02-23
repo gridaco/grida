@@ -226,7 +226,7 @@ export namespace iofigma {
 
         return {
           nodes,
-          root_id: rootNode.id,
+          children: [rootNode.id],
           // TODO:
           bitmaps: {},
           properties: {},

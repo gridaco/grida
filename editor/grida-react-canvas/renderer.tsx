@@ -32,15 +32,17 @@ export function StandaloneDocumentContent({
 }: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
-    state: { document, pointer },
+    state: { document },
   } = useDocument();
-  const { root_id } = document;
+  const { children } = document;
 
   return (
     <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
       {/* <DebugPointer position={pointer.position} /> */}
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
-        <NodeElement node_id={root_id} />
+        {children.map((id) => (
+          <NodeElement key={id} node_id={id} />
+        ))}
       </UserDocumentCustomRendererContext.Provider>
     </div>
   );
@@ -106,7 +108,7 @@ export function AutoInitialFitTransformer({
 }: React.PropsWithChildren<{}>) {
   const {
     state: {
-      document: { root_id },
+      document: { children: top_children },
       document_key,
     },
   } = useDocument();
@@ -117,8 +119,12 @@ export function AutoInitialFitTransformer({
     if (applied_initial_transform_key.current === document_key) return;
 
     const retransform = () => {
+      if (top_children.length === 0) return;
       const cdom = new domapi.CanvasDOM(transform);
-      const rect = cdom.getNodeBoundingRect(root_id);
+      const rect = cmath.rect.union(
+        top_children.map((id) => cdom.getNodeBoundingRect(id)!)
+      );
+      // const rect = cdom.getNodeBoundingRect(root_id);
       const _vrect = domapi.get_viewport_rect();
       const vrect = {
         x: 0,
@@ -132,7 +138,7 @@ export function AutoInitialFitTransformer({
 
     retransform();
     applied_initial_transform_key.current = document_key;
-  }, [document_key, root_id]);
+  }, [document_key, top_children]);
 
   return (
     <div

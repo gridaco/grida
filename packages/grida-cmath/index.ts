@@ -3664,7 +3664,13 @@ export namespace cmath.ext.snap {
     tolerance = 0
   ): Sanp2DAxisAlignedResult {
     assert(agents.length > 0, "Agents must contain at least one point.");
-    assert(anchors.length > 0, "Anchors must contain at least one point.");
+
+    if (anchors.length === 0) {
+      return {
+        x: null,
+        y: null,
+      };
+    }
 
     // Separate the scalar points for each axis
     const x_agent_points = agents.map(([x]) => x);

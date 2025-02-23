@@ -2094,7 +2094,7 @@ export function useTransform() {
       dispatch,
       state.transform,
       state.document_ctx,
-      state.document.root_id,
+      state.document.children,
       state.selection,
     ]
   );
@@ -3153,12 +3153,12 @@ export function useSurfacePathEditor() {
 /**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
-export function useRootTemplateInstanceNode() {
+export function useRootTemplateInstanceNode(root_id: string) {
   const { state, changeNodeProps } = useDocument();
 
   const { document, templates } = state;
 
-  const rootnode = document.nodes[document.root_id];
+  const rootnode = document.nodes[root_id];
 
   assert(rootnode.type === "template_instance", "root node must be template");
   assert(templates && templates[rootnode.template_id], "template not found");
@@ -3169,9 +3169,9 @@ export function useRootTemplateInstanceNode() {
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
-      changeNodeProps(state.document.root_id, key, value);
+      changeNodeProps(root_id, key, value);
     },
-    [changeNodeProps, state.document.root_id]
+    [changeNodeProps, root_id]
   );
 
   return useMemo(
@@ -3209,14 +3209,21 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
 };
 
 export function useNode(node_id: string): NodeWithMeta {
+  assert(node_id, "node_id is required");
   const { state } = useDocument();
 
   const {
-    document: { nodes, root_id },
+    document: { nodes },
     templates,
   } = state;
 
-  const root = nodes[root_id];
+  // TODO:
+  const is_component_consumer = false;
+  // const root = nodes[root_id];
+  // const is_component_consumer =
+  // root.type === "component" ||
+  // root.type === "instance" ||
+  // root.type === "template_instance";
 
   let node_definition: grida.program.nodes.Node | undefined = undefined;
   let node_change: grida.program.nodes.NodeChange = undefined;
@@ -3273,11 +3280,6 @@ export function useNode(node_id: string): NodeWithMeta {
     ) as grida.program.nodes.UnknwonNode;
   }, [node_definition, node_change]);
 
-  const is_component_consumer =
-    root.type === "component" ||
-    root.type === "instance" ||
-    root.type === "template_instance";
-
   const is_flex_parent = node.type === "container" && node.layout === "flex";
 
   return {
@@ -3287,6 +3289,15 @@ export function useNode(node_id: string): NodeWithMeta {
       is_flex_parent,
     },
   };
+}
+
+/**
+ * @param node_id self or child node id
+ */
+export function useTopNode(node_id: string) {
+  const { state } = useDocument();
+  const top_id = document.getTopId(state.document_ctx, node_id)!;
+  return useNode(top_id);
 }
 
 export function useComputedNode(

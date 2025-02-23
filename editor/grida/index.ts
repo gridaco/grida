@@ -341,7 +341,7 @@ export namespace grida.program.document {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */
-    root_id: string;
+    children: string[];
   }
 
   export namespace internal {
@@ -380,7 +380,10 @@ export namespace grida.program.document {
       /**
        * Maps each node ID to its respective parent node ID, facilitating upward traversal.
        */
-      readonly __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
+      readonly __ctx_nid_to_parent_id: Record<
+        nodes.NodeID,
+        nodes.NodeID | null
+      >;
 
       /**
        * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
@@ -668,6 +671,7 @@ export namespace grida.program.css {
 export namespace grida.program.nodes {
   export type NodeID = string;
   export type NodeType = Node["type"];
+
   export type Node =
     | TextNode
     | ImageNode
@@ -1792,7 +1796,7 @@ export namespace grida.program.nodes {
       const document: document.IDocumentDefinition = {
         bitmaps: {},
         nodes: {},
-        root_id: "",
+        children: [],
         properties: {},
       };
 
@@ -1818,7 +1822,7 @@ export namespace grida.program.nodes {
       }
 
       const rootNode = processNode(prototype, nid);
-      document.root_id = rootNode.id;
+      document.children = [rootNode.id];
 
       return document;
     }

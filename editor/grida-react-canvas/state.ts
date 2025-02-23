@@ -37,7 +37,7 @@ export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
-  ignores_root: true,
+  ignores_root: false,
   ignores_locked: true,
 };
 
@@ -287,22 +287,31 @@ export type GestureTranslate = IGesture & {
  *
  * Contains collection of nodes' bounding rect.
  */
-export interface LayoutSnapshot {
-  /**
-   * the type of the layout
-   */
-  type: "flex" | "group";
-
-  /**
-   * the grouping parent id
-   */
-  group: string;
-
+export type LayoutSnapshot = {
   /**
    * relative objects to the parent
    */
   objects: Array<cmath.Rectangle & { id: string }>;
-}
+} & (
+  | {
+      /**
+       * the type of the layout
+       */
+      type: "flex";
+
+      /**
+       * the grouping parent id
+       */
+      group: string;
+    }
+  | {
+      type: "group";
+      /**
+       * the grouping parent id (null if document root)
+       */
+      group: string | null;
+    }
+);
 
 /**
  * Sort the node within the layout (re-order)
@@ -803,7 +812,7 @@ export interface IDocumentEditorInit
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
     grida.program.document.IDocumentDefinition,
-    "nodes" | "root_id" | "backgroundColor"
+    "nodes" | "children" | "backgroundColor"
   > &
     Partial<grida.program.document.IDocumentBitmapsRepository>;
 }

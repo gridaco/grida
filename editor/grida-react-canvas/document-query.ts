@@ -193,11 +193,13 @@ export namespace document {
     node: NodeID
   ): boolean {
     const { __ctx_nid_to_parent_id } = context;
-    let current = node;
+    let current: string | null = node;
 
     let i = 0;
     while (current) {
-      const parent = __ctx_nid_to_parent_id[current];
+      const parent: string | null = current
+        ? __ctx_nid_to_parent_id[current]
+        : null;
       if (parent === ancestor) return true; // Ancestor found
       current = parent;
       if (i++ > HARD_MAX_WHILE_LOOP) {
@@ -375,6 +377,19 @@ export namespace document {
     return context.__ctx_nid_to_parent_id[node_id] ?? null;
   }
 
+  export function getTopId(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): NodeID | null {
+    // veryfi if exists
+    if (context.__ctx_nids.includes(node_id)) {
+      const ancestors = getAncestors(context, node_id);
+      return ancestors[0] ?? node_id;
+    } else {
+      return null;
+    }
+  }
+
   /**
    * @internal
    * @param state - state or draft
@@ -443,11 +458,10 @@ export namespace document {
 
   export class Context
     implements
-      grida.program.document.internal
-        .IDocumentDefinitionRuntimeHierarchyContext
+      grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
   {
     readonly __ctx_nids: string[] = [];
-    readonly __ctx_nid_to_parent_id: Record<string, string> = {};
+    readonly __ctx_nid_to_parent_id: Record<string, string | null> = {};
     readonly __ctx_nid_to_children_ids: Record<string, string[]> = {};
     constructor(
       init?: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
@@ -465,16 +479,23 @@ export namespace document {
       return new Context(ctx);
     }
 
-    insert(node_id: NodeID, parent_id: NodeID) {
+    insert(node_id: NodeID, parent_id: NodeID | null) {
       assert(this.__ctx_nids.indexOf(node_id) === -1, "node_id already exists");
-      this.__ctx_nids.push(node_id);
-      this.__ctx_nid_to_parent_id[node_id] = parent_id;
 
-      if (!this.__ctx_nid_to_children_ids[parent_id]) {
-        this.__ctx_nid_to_children_ids[parent_id] = [];
+      if (parent_id) {
+        this.__ctx_nids.push(node_id);
+        this.__ctx_nid_to_parent_id[node_id] = parent_id;
+
+        if (!this.__ctx_nid_to_children_ids[parent_id]) {
+          this.__ctx_nid_to_children_ids[parent_id] = [];
+        }
+
+        this.__ctx_nid_to_children_ids[parent_id].push(node_id);
+      } else {
+        // register to the document. done.
+        this.__ctx_nids.push(node_id);
+        this.__ctx_nid_to_parent_id[node_id] = null;
       }
-
-      this.__ctx_nid_to_children_ids[parent_id].push(node_id);
     }
 
     /**
@@ -486,12 +507,18 @@ export namespace document {
      * @param node_id
      * @param parent_id
      */
-    blindlymove(node_id: NodeID, parent_id: NodeID) {
+    blindlymove(node_id: NodeID, parent_id: NodeID | null) {
       this.__ctx_nid_to_parent_id[node_id] = parent_id;
-      if (!this.__ctx_nid_to_children_ids[parent_id]) {
-        this.__ctx_nid_to_children_ids[parent_id] = [];
+
+      if (parent_id) {
+        if (!this.__ctx_nid_to_children_ids[parent_id]) {
+          this.__ctx_nid_to_children_ids[parent_id] = [];
+        }
+        this.__ctx_nid_to_children_ids[parent_id].push(node_id);
+      } else {
+        // register to the document. done.
+        this.__ctx_nids.push(node_id);
       }
-      this.__ctx_nid_to_children_ids[parent_id].push(node_id);
     }
 
     snapshot(): grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext {

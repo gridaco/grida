@@ -156,12 +156,9 @@ export function SideControlGlobal() {
 }
 
 function FormStartPageControl() {
-  const {
-    state: { document },
-    changeNodeProps,
-  } = useDocument();
+  const { changeNodeProps } = useDocument();
 
-  const { props, template_id, properties } = useNode(document.root_id);
+  const { props, template_id, properties } = useNode("root");
   const { default: defaultProps } = useTemplateDefinition(template_id!);
 
   const shallowProps = useMemo(
@@ -188,7 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              changeNodeProps(document.root_id, k, v);
+              changeNodeProps("root", k, v);
             }}
           />
         </SidebarMenuSectionContent>
@@ -309,7 +306,7 @@ function useThemeColorScheme(appearance: Appearance): "light" | "dark" {
 
   const safeSystemTheme =
     // system theme is typed light | dark, but it sometimes gives "system"
-    (systemTheme as any) === "system" ? "light" : systemTheme ?? "light";
+    (systemTheme as any) === "system" ? "light" : (systemTheme ?? "light");
 
   const colorscheme: "light" | "dark" =
     (appearance === "system" ? safeSystemTheme : appearance) ?? "light";

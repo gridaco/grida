@@ -44,33 +44,8 @@ export function GridaCanvasFormField() {
     initDocumentEditorState({
       editable: true,
       document: {
-        nodes: {
-          root: {
-            id: "root",
-            name: "root",
-            active: true,
-            locked: false,
-            type: "container",
-            children: [],
-            width: 800,
-            height: 600,
-            position: "relative",
-            style: {},
-            opacity: 1,
-            zIndex: 0,
-            rotation: 0,
-            expanded: false,
-            cornerRadius: 0,
-            padding: 0,
-            layout: "flow",
-            direction: "horizontal",
-            mainAxisAlignment: "start",
-            crossAxisAlignment: "start",
-            mainAxisGap: 0,
-            crossAxisGap: 0,
-          },
-        },
-        root_id: "root",
+        nodes: {},
+        children: [],
       },
     })
   );

@@ -103,10 +103,10 @@ export function snapToCanvasGeometry(
   tolerance = 0
 ): SnapToObjectsResult {
   assert(agent, "Agent must be a valid rectangle.");
-  assert(
-    anchors.objects.length > 0 || anchors.guides.length > 0,
-    "Anchors must contain at least one rectangle or guide."
-  );
+  // assert(
+  //   anchors.objects.length > 0 || anchors.guides.length > 0,
+  //   "Anchors must contain at least one rectangle or guide."
+  // );
 
   const { objects: anchorObjects, guides: anchorGuides } = anchors;
 

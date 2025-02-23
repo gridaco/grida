@@ -7,10 +7,10 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ): boolean {
-  // do not allow deletion of the root node
-  if (node_id === draft.document.root_id) {
-    return false;
-  }
+  // // do not allow deletion of the root node
+  // if (node_id === draft.document.children) {
+  //   return false;
+  // }
 
   // how delete works.
   // 1. retrieve the hierarchy of the node recursively
@@ -24,7 +24,14 @@ export function self_deleteNode<S extends IDocumentEditorState>(
 
   // [2]
   for (const entry of list) {
+    // delete from nodes registry
     delete draft.document.nodes[entry.id];
+
+    // delete from top children reference (only applies when it's a top node)
+    const i = draft.document.children.indexOf(entry.id);
+    if (i >= 0) {
+      draft.document.children.splice(i, 1);
+    }
   }
 
   // [3]

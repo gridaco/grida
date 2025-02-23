@@ -136,9 +136,9 @@ function devdata_hierarchy_only(
   document: grida.program.document.IDocumentDefinition,
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
 ) {
-  const { root_id, nodes } = document;
+  const { children, nodes } = document;
   return {
-    root_id: root_id,
+    children,
     document_ctx,
     nodes: Object.entries(nodes).reduce((acc: any, [id, node]) => {
       acc[id] = {

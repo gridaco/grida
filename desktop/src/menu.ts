@@ -7,7 +7,7 @@ import {
   MenuItem,
   dialog,
 } from "electron";
-import create_window from "./window";
+import create_main_window, { create_canvas_playground_window } from "./window";
 
 /**
  * Recursively merges two menu templates.
@@ -97,7 +97,7 @@ export function create_default_menu(
       submenu: [
         {
           label: "Reload",
-          accelerator: "CmdOrCtrl+R",
+          accelerator: "CmdOrCtrl+Shift+Alt+R",
           click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
             if (focusedWindow) focusedWindow.reload();
           },
@@ -206,7 +206,13 @@ export default function create_menu(app: App, shell: Shell) {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => {
-            create_window();
+            create_main_window();
+          },
+        },
+        {
+          label: "New Canvas Playground",
+          click: () => {
+            create_canvas_playground_window();
           },
         },
         { type: "separator" },

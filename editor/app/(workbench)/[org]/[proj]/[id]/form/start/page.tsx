@@ -221,19 +221,18 @@ function StartPageEditor({ template_id }: { template_id: string }) {
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProps, rootProperties, rootProps } =
-    useRootTemplateInstanceNode();
+    useRootTemplateInstanceNode("root");
   const [state, dispatch] = useEditorState();
 
-  const { uploadPublic } = useDocumentAssetUpload();
-
-  const debouncedRichTextHtmlChange = useDebounceCallback(
-    (editor: BlockNoteEditor<any>, content: Block[]) => {
-      editor.blocksToHTMLLossy(content).then((html) => {
-        changeRootProps("body_html", html);
-      });
-    },
-    300
-  );
+  // const { uploadPublic } = useDocumentAssetUpload();
+  // const debouncedRichTextHtmlChange = useDebounceCallback(
+  //   (editor: BlockNoteEditor<any>, content: Block[]) => {
+  //     editor.blocksToHTMLLossy(content).then((html) => {
+  //       changeRootProps("body_html", html);
+  //     });
+  //   },
+  //   300
+  // );
 
   const {
     form: { campaign },

@@ -6,17 +6,30 @@ import assert from "assert";
 
 export function self_insertSubDocument<S extends IDocumentEditorState>(
   draft: Draft<S>,
-  parent_id: string,
+  parent_id: string | null,
   sub: grida.program.document.IDocumentDefinition
 ) {
-  // Ensure the parent exists in the document
-  const parent_node = draft.document.nodes[parent_id];
-  assert(parent_node, `Parent node not found with id: "${parent_id}"`);
-  assert("children" in parent_node, "Parent must be a container node");
-
   const sub_state = new document.DocumentState(sub);
   const sub_ctx = document.Context.from(sub);
   const sub_fonts = sub_state.fonts();
+
+  if (parent_id) {
+    // Ensure the parent exists in the document
+    const parent_node = draft.document.nodes[parent_id];
+    assert(parent_node, `Parent node not found with id: "${parent_id}"`);
+    assert(
+      "children" in parent_node,
+      `Parent must be a container node: "${parent_id}"`
+    );
+
+    // Add the child to the parent's children array (if not already added)
+    const __parent_children_set = new Set(parent_node.children);
+    // TODO: doing so will loose the children index info
+    sub.children.forEach(__parent_children_set.add, __parent_children_set);
+    parent_node.children = Array.from(__parent_children_set);
+  } else {
+    draft.document.children.push(...sub.children);
+  }
 
   draft.document.nodes = {
     ...draft.document.nodes,
@@ -42,39 +55,52 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
     new Set([...draft.googlefonts.map((g) => g.family), ...sub_fonts])
   ).map((family) => ({ family }));
 
-  // Update the runtime context with parent-child relationships
+  // Update the hierarchy with parent-child relationships
   const context = new document.Context(draft.document_ctx);
-  context.blindlymove(sub.root_id, parent_id);
+  sub.children.forEach((c) => {
+    context.blindlymove(c, parent_id);
+  });
+
+  // Update the runtime context
   draft.document_ctx = context.snapshot();
 
-  // Add the child to the parent's children array (if not already added)
-  if (!parent_node.children.includes(sub.root_id)) {
-    parent_node.children.push(sub.root_id);
-  }
-
-  return sub.root_id;
+  return sub.children;
 }
 
 export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
-  parent_id: string,
+  parent_id: string | null,
   node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
   const node_id = node.id;
 
-  // Ensure the parent exists in the document
-  const parent_node = draft.document.nodes[parent_id];
-  assert(parent_node, `Parent node not found with id: "${parent_id}"`);
+  if (parent_id) {
+    // Ensure the parent exists in the document
+    const parent_node = draft.document.nodes[parent_id];
+    assert(parent_node, `Parent node not found with id: "${parent_id}"`);
 
-  // TODO: this part shall be removed and ensured with data strictness
-  // Initialize the parent's children array if it doesn't exist
-  if (!("children" in parent_node) || !parent_node.children) {
-    assert(parent_node.type === "container", "Parent must be a container node");
-    parent_node.children = [];
+    // TODO: this part shall be removed and ensured with data strictness
+    // Initialize the parent's children array if it doesn't exist
+    if (!("children" in parent_node) || !parent_node.children) {
+      assert(
+        parent_node.type === "container",
+        "Parent must be a container node"
+      );
+      parent_node.children = [];
+    }
+
+    // Add the child to the parent's children array (if not already added)
+    if (!parent_node.children.includes(node_id)) {
+      parent_node.children.push(node_id);
+    }
+
+    // Add the node to the document
+    draft.document.nodes[node_id] = node;
+  } else {
+    // Add the node to the document
+    draft.document.nodes[node_id] = node;
+    draft.document.children.push(node.id);
   }
-
-  // Add the node to the document
-  draft.document.nodes[node_id] = node;
 
   // Update the document's font registry
   const s = new document.DocumentState(draft.document);
@@ -84,11 +110,6 @@ export function self_insertNode<S extends IDocumentEditorState>(
   const context = new document.Context(draft.document_ctx);
   context.insert(node_id, parent_id);
   draft.document_ctx = context.snapshot();
-
-  // Add the child to the parent's children array (if not already added)
-  if (!parent_node.children.includes(node_id)) {
-    parent_node.children.push(node_id);
-  }
 
   return node_id;
 }
