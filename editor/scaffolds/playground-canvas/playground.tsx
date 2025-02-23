@@ -223,18 +223,14 @@ export default function CanvasPlayground({ src }: { src?: string }) {
           {...importFromFigmaDialog.props}
           onImport={(res) => {
             dispatch({
-              type: "__internal/reset",
-              key: res.document.id,
-              state: initDocumentEditorState({
-                editable: true,
-                document: iofigma.restful.factory.document(
-                  res.document as any,
-                  res.images,
-                  {
-                    gradient_id_generator: () => v4(),
-                  }
-                ),
-              }),
+              type: "insert",
+              document: iofigma.restful.factory.document(
+                res.document as any,
+                res.images,
+                {
+                  gradient_id_generator: () => v4(),
+                }
+              ),
             });
           }}
         />

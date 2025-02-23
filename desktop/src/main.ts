@@ -3,11 +3,30 @@ import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import path from "node:path";
 import create_menu from "./menu";
-import keytar from "keytar";
 import create_main_window, { create_login_window } from "./window";
 
-const SERVICE = "GridaDesktop";
-const ACCOUNT = "userToken";
+// #region chrome flags
+
+// Enable GPU optimization
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("enable-native-gpu-memory-buffers");
+
+// Optimize rendering & DOM handling
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("disable-low-res-tiling");
+app.commandLine.appendSwitch("disable-partial-raster");
+app.commandLine.appendSwitch("enable-quic");
+
+// Reduce CPU impact from timers
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-best-effort-tasks");
+app.commandLine.appendSwitch("disable-async-dns");
+
+// Improve garbage collection & memory handling
+app.commandLine.appendSwitch("js-flags", "--expose-gc");
+// #endregion chrome flags
 
 updateElectronApp();
 

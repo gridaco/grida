@@ -187,15 +187,22 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
     }
     case "insert": {
-      const { prototype } = action;
-
-      return produce(state, (draft) => {
-        const sub =
+      let sub: grida.program.document.IDocumentDefinition;
+      if ("prototype" in action) {
+        sub =
           grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
-            prototype,
+            action.prototype,
             nid
           );
+      } else if ("document" in action) {
+        sub = action.document;
+      } else {
+        throw new Error(
+          "Invalid action - prototype or document is required for `insert()`"
+        );
+      }
 
+      return produce(state, (draft) => {
         const new_top_ids = self_insertSubDocument(
           draft,
           // TODO: get the correct insert target

@@ -97,7 +97,7 @@ export function create_default_menu(
       submenu: [
         {
           label: "Reload",
-          accelerator: "CmdOrCtrl+R",
+          accelerator: "CmdOrCtrl+Shift+Alt+R",
           click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
             if (focusedWindow) focusedWindow.reload();
           },

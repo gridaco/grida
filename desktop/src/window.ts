@@ -50,6 +50,7 @@ export default function create_main_window() {
     ...DEFAILT_WINDOW_CONFIG,
     title: "Grida",
     webPreferences: {
+      nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -66,6 +67,7 @@ export function create_canvas_playground_window() {
     title: "Playground",
     ...DEFAILT_WINDOW_CONFIG,
     webPreferences: {
+      nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
