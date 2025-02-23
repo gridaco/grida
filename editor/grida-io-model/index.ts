@@ -157,7 +157,7 @@ export namespace io {
       return {
         version: json.version,
         document: {
-          root_id: json.document.root_id,
+          children: json.document.children,
           nodes: json.document.nodes,
           bitmaps: bitmaps,
           properties: json.document.properties ?? {},

@@ -392,7 +392,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 return;
               }
 
-              const layout = createLayoutSnapshot(state, parent_id!, selection);
+              const layout = createLayoutSnapshot(state, parent_id, selection);
               layout.objects.sort((a, b) => a[axis] - b[axis]);
 
               const [gap] = cmath.rect.getUniformGap(
@@ -466,19 +466,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
 function createLayoutSnapshot(
   state: IDocumentEditorState,
-  group: string,
+  group: string | null,
   items: string[]
 ): LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
-  const parent = document.__getNodeById(state, group);
-  const parent_rect = cdom.getNodeBoundingRect(group)!;
+  let reldelta: cmath.Vector2 = [0, 0];
+  let parent: grida.program.nodes.Node | null = null;
+  if (group) {
+    parent = document.__getNodeById(state, group);
+    const parent_rect = cdom.getNodeBoundingRect(group)!;
+    reldelta = [-parent_rect.x, -parent_rect.y];
+  }
+
   const objects: LayoutSnapshot["objects"] = items.map((node_id) => {
     const abs_rect = cdom.getNodeBoundingRect(node_id)!;
-    const rel_rect = cmath.rect.translate(abs_rect, [
-      -parent_rect.x,
-      -parent_rect.y,
-    ]);
+    const rel_rect = cmath.rect.translate(abs_rect, reldelta);
 
     return {
       ...rel_rect,
@@ -487,13 +490,21 @@ function createLayoutSnapshot(
   });
 
   const is_group_flex_container =
-    parent.type === "container" && parent.layout === "flex";
+    parent && parent.type === "container" && parent.layout === "flex";
 
-  return {
-    type: is_group_flex_container ? "flex" : "group",
-    group,
-    objects,
-  };
+  if (is_group_flex_container) {
+    return {
+      type: "flex",
+      group: parent!.id,
+      objects,
+    };
+  } else {
+    return {
+      type: "group",
+      group,
+      objects,
+    };
+  }
 }
 
 function self_start_gesture_scale(

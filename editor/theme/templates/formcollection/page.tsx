@@ -27,7 +27,7 @@ export default function FormCollectionPage() {
     state: { document, templates },
   } = useDocument();
 
-  const root = document.nodes[document.root_id];
+  const root = document.nodes["root"];
   assert(root.type === "template_instance");
   const { props: props } = root;
 

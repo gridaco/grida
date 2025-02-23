@@ -104,6 +104,7 @@ import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@/grida-io-model";
 import { canvas_examples } from "../playground/k";
+import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -137,33 +138,8 @@ export default function CanvasPlayground({ src }: { src?: string }) {
       editable: true,
       debug: pref.debug,
       document: {
-        root_id: "root",
-        nodes: {
-          root: {
-            id: "root",
-            name: "root",
-            active: true,
-            locked: false,
-            type: "container",
-            children: [],
-            width: 800,
-            height: 600,
-            position: "relative",
-            style: {},
-            opacity: 1,
-            zIndex: 0,
-            rotation: 0,
-            expanded: false,
-            cornerRadius: 0,
-            padding: 0,
-            layout: "flow",
-            direction: "horizontal",
-            mainAxisAlignment: "start",
-            crossAxisAlignment: "start",
-            mainAxisGap: 0,
-            crossAxisGap: 0,
-          },
-        },
+        children: [],
+        nodes: {},
         backgroundColor: CANVAS_BG_COLOR,
       },
     })
@@ -236,7 +212,6 @@ export default function CanvasPlayground({ src }: { src?: string }) {
           onImport={(file) => {
             dispatch({
               type: "__internal/reset",
-              key: file.document.root_id,
               state: initDocumentEditorState({
                 editable: true,
                 document: file.document,
@@ -507,15 +482,30 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                     </div>
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
-                      <Align />
-                      <hr />
-                      <Selection
-                        empty={
-                          <div className="mt-4 mb-10">
-                            <DocumentProperties />
-                          </div>
-                        }
-                      />
+                      {state.tool.type === "insert" &&
+                      state.tool.node === "container" ? (
+                        <>
+                          <DialogPrimitive.Root open>
+                            <DialogPrimitive.Content className="h-full">
+                              <SidebarRoot>
+                                <ArtboardsList />
+                              </SidebarRoot>
+                            </DialogPrimitive.Content>
+                          </DialogPrimitive.Root>
+                        </>
+                      ) : (
+                        <>
+                          <Align />
+                          <hr />
+                          <Selection
+                            empty={
+                              <div className="mt-4 mb-10">
+                                <DocumentProperties />
+                              </div>
+                            }
+                          />
+                        </>
+                      )}
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>

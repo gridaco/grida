@@ -5,31 +5,9 @@
       "root": {
         "id": "root",
         "name": "root",
+        "type": "scene",
         "active": true,
         "locked": false,
-        "rotation": 0,
-        "opacity": 1,
-        "zIndex": 0,
-        "type": "container",
-        "expanded": false,
-        "position": "relative",
-        "left": 0,
-        "top": 0,
-        "width": 500,
-        "height": 500,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 255,
-            "a": 1
-          }
-        },
-        "style": {
-          "overflow": "clip"
-        },
-        "cornerRadius": 0,
         "children": []
       }
     },

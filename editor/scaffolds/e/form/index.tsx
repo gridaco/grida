@@ -147,13 +147,11 @@ function FormStartPage({
         document: start_page,
         templates: {
           [(
-            start_page.nodes[
-              start_page.root_id
-            ] as grida.program.nodes.TemplateInstanceNode
+            start_page.nodes["root"] as grida.program.nodes.TemplateInstanceNode
           ).template_id]: FormStartPageRenderer.getTemplate(
             (
               start_page.nodes[
-                start_page.root_id
+                "root"
               ] as grida.program.nodes.TemplateInstanceNode
             ).template_id
           ),
@@ -167,7 +165,7 @@ function FormStartPage({
             name={
               (
                 start_page.nodes[
-                  start_page.root_id
+                  "root"
                 ] as grida.program.nodes.TemplateInstanceNode
               ).template_id
             }

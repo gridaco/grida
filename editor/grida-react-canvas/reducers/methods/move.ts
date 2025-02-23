@@ -7,12 +7,12 @@ export function self_moveNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string,
   target_id: string,
-  order?: number,
+  order?: number
 ): boolean {
-  const parent_id = document.getParentId(draft.document_ctx, node_id)!;
+  const parent_id = document.getParentId(draft.document_ctx, node_id);
 
   // do not allow move on the root node
-  if (node_id === draft.document.root_id || parent_id === null) {
+  if (draft.document.children.includes(node_id) || parent_id === null) {
     return false;
   }
 
@@ -32,7 +32,6 @@ export function self_moveNode<S extends IDocumentEditorState>(
   if (document.getAncestors(draft.document_ctx, target_id).includes(node_id)) {
     return false;
   }
-
 
   // how move works.
   // 1. unlink the node from the parent
@@ -55,7 +54,6 @@ export function self_moveNode<S extends IDocumentEditorState>(
   // [3]
   const context = document.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
-
 
   return true;
 }

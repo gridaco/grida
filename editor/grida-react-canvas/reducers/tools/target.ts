@@ -4,7 +4,7 @@ import type {
 } from "@/grida-react-canvas/state";
 import { document } from "../../document-query";
 
-export function getSurfaceRayTarget(
+export function getRayTarget(
   hits: string[],
   {
     config,
@@ -17,13 +17,14 @@ export function getSurfaceRayTarget(
 ): string | null {
   const {
     selection,
-    document: { root_id, nodes },
+    document: { nodes },
   } = context;
 
   // Filter the nodes based on the configuration
   const filtered = hits
     .filter((node_id) => {
-      if (config.ignores_root && node_id === root_id) {
+      const top_id = document.getTopId(context.document_ctx, node_id);
+      if (config.ignores_root && node_id === top_id) {
         return false; // Ignore the root node if configured
       }
 
@@ -94,27 +95,34 @@ export function getMarqueeSelection(
   state: IDocumentEditorState,
   hits: string[]
 ): string[] {
-  const {
-    document: { root_id },
-    document_ctx,
-  } = state;
+  const { document_ctx } = state;
 
   // [marquee selection target]
   // 1. shall not be a root node
   // 2. shall not be a locked node
   // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
+    const root_id = document.getTopId(document_ctx, hit_id)!;
+
     // (1) shall not be a root node
-    if (hit_id === root_id) return false;
+    if (state.surface_raycast_targeting.ignores_root && hit_id === root_id)
+      return false;
 
     // (2) shall not be a locked node
     const hit = document.__getNodeById(state, hit_id);
     if (!hit) return false;
     if (hit.locked) return false;
 
+    // (3). the parent of this node shall also be hit by the marquee (unless it's the root node)
     const parent_id = document.getParentId(document_ctx, hit_id)!;
-    if (parent_id === root_id) return true;
-    if (!hits.includes(parent_id)) return false;
+
+    // root node
+    if (parent_id === null) {
+      return true;
+    } else {
+      if (parent_id === root_id) return true;
+      if (!hits.includes(parent_id)) return false;
+    }
 
     const parent = document.__getNodeById(state, parent_id!);
     if (!parent) return false;

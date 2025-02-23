@@ -35,7 +35,7 @@ import {
 import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
 import nid from "./tools/id";
-import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
+import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
@@ -161,8 +161,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const nnode = initialNode(draft.tool.node);
 
-            const cdom = new domapi.CanvasDOM(draft.transform);
-            const parent_rect = cdom.getNodeBoundingRect(parent)!;
+            let relpos: cmath.Vector2;
+            if (parent) {
+              const cdom = new domapi.CanvasDOM(draft.transform);
+              const parent_rect = cdom.getNodeBoundingRect(parent)!;
+              const p: cmath.Vector2 = [parent_rect.x, parent_rect.y];
+              relpos = cmath.vector2.sub(state.pointer.position, p);
+            } else {
+              relpos = state.pointer.position;
+            }
 
             try {
               const _nnode = nnode as grida.program.nodes.UnknwonNode;
@@ -176,12 +183,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   : [0, 0];
 
               const nnode_relative_position = cmath.vector2.quantize(
-                cmath.vector2.sub(
-                  state.pointer.position,
-                  // parent position relative to content space
-                  [parent_rect.x, parent_rect.y],
-                  center_translate_delta
-                ),
+                cmath.vector2.sub(relpos, center_translate_delta),
                 1
               );
 
@@ -229,7 +231,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
 
         // find the next descendant node (deepest first) relative to the selection
-        const next = getSurfaceRayTarget(
+        const next = getRayTarget(
           surface_raycast_detected_node_ids,
           {
             context: state,
@@ -535,12 +537,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             self_insertNode(draft, parent, vector);
 
             const cdom = new domapi.CanvasDOM(draft.transform);
+
             // position relative to the parent
-            const parent_rect = cdom.getNodeBoundingRect(parent)!;
-            const node_relative_pos = cmath.vector2.sub(
-              state.pointer.position,
-              [parent_rect.x, parent_rect.y]
-            );
+            let node_relative_pos = state.pointer.position;
+            if (parent) {
+              const parent_rect = cdom.getNodeBoundingRect(parent)!;
+              node_relative_pos = cmath.vector2.sub(state.pointer.position, [
+                parent_rect.x,
+                parent_rect.y,
+              ]);
+            }
+
             vector.left = node_relative_pos[0];
             vector.top = node_relative_pos[1];
 
@@ -736,7 +743,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { translated } = snapGuideTranslation(
                 axis,
                 initial_offset,
-                [cdom.getNodeBoundingRect(state.document.root_id)!],
+                state.document.children.map(
+                  (id) => cdom.getNodeBoundingRect(id)!
+                ),
                 m,
                 threshold(
                   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
@@ -1085,6 +1094,7 @@ function self_prepare_bitmap_node(
 
     const cdom = new domapi.CanvasDOM(draft.transform);
     const parent = __get_insert_target(draft);
+    if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion
     const parent_rect = cdom.getNodeBoundingRect(parent)!;
     const node_relative_pos = cmath.vector2.quantize(
       cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
@@ -1340,13 +1350,13 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
  *
  * this relies on `surface_raycast_detected_node_ids`, make sure it's updated before calling this function
  *
- * @returns the parent node id
+ * @returns the parent node id or `null` if no desired target
  */
-function __get_insert_target(state: IDocumentEditorState): string {
+function __get_insert_target(state: IDocumentEditorState): string | null {
   const hits = state.surface_raycast_detected_node_ids.slice();
   for (const hit of hits) {
     const node = document.__getNodeById(state, hit);
     if (node.type === "container") return hit;
   }
-  return state.document.root_id;
+  return null;
 }

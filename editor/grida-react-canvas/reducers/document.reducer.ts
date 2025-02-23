@@ -121,7 +121,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // const clipboard_node_ids = clipboard_nodes.map((node) => node.id);
 
       return produce(state, (draft) => {
-        const new_top_ids = [];
+        const new_top_ids: string[] = [];
 
         const valid_target_selection =
           // 1. the target shall not be an original node
@@ -133,13 +133,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
               return node.type === "container";
             });
 
-        const targets =
-          valid_target_selection.length > 0
-            ? valid_target_selection
-            : [state.document.root_id]; // default to root
+        const targets: string[] | null =
+          valid_target_selection.length > 0 ? valid_target_selection : null; // default to root
 
         // the target (parent) node that will be pasted under
-        for (const target of targets) {
+        for (const target of targets ?? [null]) {
           // to be pasted
           for (const prototype of prototypes) {
             const sub =
@@ -148,8 +146,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
                 nid
               );
 
-            const top_id = self_insertSubDocument(draft, target, sub);
-            new_top_ids.push(top_id);
+            const top_ids = self_insertSubDocument(draft, target, sub);
+            new_top_ids.push(...top_ids);
 
             // const offset = 10; // Offset to avoid overlapping
             // if (newNode.left !== undefined) newNode.left += offset;
@@ -180,9 +178,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         for (const node_id of target_node_ids) {
           if (
             // the deleting node cannot be..
-            // 1. a root node
-            node_id !== draft.document.root_id &&
-            // 2. in content edit mode
+            // - in content edit mode
             node_id !== state.content_edit_mode?.node_id
           ) {
             self_deleteNode(draft, node_id);
@@ -200,15 +196,16 @@ export default function documentReducer<S extends IDocumentEditorState>(
             nid
           );
 
-        const new_top_id = self_insertSubDocument(
+        const new_top_ids = self_insertSubDocument(
           draft,
-          draft.document.root_id,
+          // TODO: get the correct insert target
+          null,
           sub
         );
 
         // after
         draft.tool = { type: "cursor" };
-        self_selectNode(draft, "reset", new_top_id);
+        self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
     case "order": {
@@ -319,7 +316,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // if a single node is selected, align it with its container. (if not root)
         // TODO: Knwon issue: this does not work accurately if the node overflows the container
         const node_id = target_node_ids[0];
-        if (state.document.root_id !== node_id) {
+        const top_id = document.getTopId(state.document_ctx, node_id);
+        if (node_id !== top_id) {
           // get container (parent)
           const parent_node_id = document.getParentId(
             state.document_ctx,
@@ -408,7 +406,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter((id) => id !== state.document.root_id),
+        target_node_ids.filter((id) => !state.document.children.includes(id)),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -469,7 +467,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
               container_prototype,
               nid
             )
-          );
+          )[0];
 
           // [move children to container]
           children = layout.orders.map((i) => children[i]);
@@ -507,7 +505,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter((id) => id !== state.document.root_id),
+        target_node_ids.filter((id) => !state.document.children.includes(id)),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -551,7 +549,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
               container_prototype,
               nid
             )
-          );
+          )[0];
 
           // [move children to container]
           g.forEach((id) => {
@@ -657,7 +655,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const root_template_instance = document.__getNodeById(
           draft,
-          draft.document.root_id!
+          // TODO: update api interface
+          draft.document.children[0]
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
@@ -838,17 +837,21 @@ function self_order(
   order: "back" | "front" | "backward" | "forward" | number
 ) {
   const parent_id = document.getParentId(draft.document_ctx, node_id);
-  if (!parent_id) return; // root node case
-  const parent_node: Draft<grida.program.nodes.i.IChildrenReference> =
-    document.__getNodeById(
+  // if (!parent_id) return; // root node case
+  let ichildren: grida.program.nodes.i.IChildrenReference;
+  if (parent_id) {
+    ichildren = document.__getNodeById(
       draft,
       parent_id
     ) as grida.program.nodes.i.IChildrenReference;
+  } else {
+    ichildren = draft.document;
+  }
 
-  const childIndex = parent_node.children.indexOf(node_id);
+  const childIndex = ichildren.children.indexOf(node_id);
   assert(childIndex !== -1, "node not found in children");
 
-  const before = [...parent_node.children];
+  const before = [...ichildren.children];
   const reordered = [...before];
   switch (order) {
     case "back": {
@@ -872,7 +875,7 @@ function self_order(
     }
     case "forward": {
       // change the children id order - move the node_id to the next
-      if (childIndex === parent_node.children.length - 1) return;
+      if (childIndex === ichildren.children.length - 1) return;
       reordered.splice(childIndex, 1);
       reordered.splice(childIndex + 1, 0, node_id);
       break;
@@ -884,8 +887,8 @@ function self_order(
     }
   }
 
-  parent_node.children = reordered;
-  draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
+  ichildren.children = reordered;
+  // draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered; // TODO: remove me verified not required
 }
 
 function self_nudge(
