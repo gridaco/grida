@@ -11,6 +11,7 @@ import {
   useDocument,
   useSelection,
 } from "../provider";
+import toast from "react-hot-toast";
 
 export function EditorSurfaceContextMenu({
   children,
@@ -139,6 +140,20 @@ export function EditorSurfaceContextMenu({
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem> */}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="py-1"
+          onSelect={() => {
+            // copy id
+            navigator.clipboard.writeText(selection.join(", ")).then(() => {
+              toast.success("Copied ID to clipboard");
+            });
+          }}
+        >
+          <span className="font-mono text-[9px] text-muted-foreground">
+            ID: {selection.join(", ")}
+          </span>
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
