@@ -21,7 +21,7 @@ export function CountdownTimer() {
   });
 
   return (
-    <div className="text-orange-500 flex flex-col justify-center space-y-4 w-full text-center">
+    <div className="text-orange-500 flex flex-col justify-center space-y-4 w-[200px] text-center">
       <hr className="border-orange-500" />
       <div className="text-2xl font-medium">
         {hours}h : {minutes}m : {seconds}s
