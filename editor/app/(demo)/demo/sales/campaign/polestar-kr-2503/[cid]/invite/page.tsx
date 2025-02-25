@@ -180,7 +180,7 @@ function AccordionDemo() {
   );
 }
 
-export function PolestarLocation() {
+function PolestarLocation() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 p-4 w-[250px] border border-slate-300 rounded-md">

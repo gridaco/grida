@@ -198,7 +198,7 @@ function Main() {
   );
 }
 
-export function AccordionDemo() {
+function AccordionDemo() {
   return (
     <Accordion type="single" collapsible className="w-full">
       <AccordionItem value="item-1">
@@ -229,7 +229,7 @@ export function AccordionDemo() {
   );
 }
 
-export function PolestarLocation() {
+function PolestarLocation() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 p-4 w-[250px] border border-slate-300 rounded-md">
