@@ -119,7 +119,7 @@ function Main() {
           className="object-cover aspect-square select-none pointer-events-none"
         />
         <div className="absolute bottom-8 left-8">
-          <h2 className="text-2xl font-medium text-white">
+          <h2 className="text-2xl text-white">
             Polestar 4<br />
             시승 초대하고 경품을 받아보세요
           </h2>
