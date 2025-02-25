@@ -1,0 +1,134 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Data Transform",
+  "name": "Data Transform",
+  "description": "merge fields to construct a json data",
+  "method": "post",
+  "fields": [
+    {
+      "name": "data.$.preference.language",
+      "label": "Language (preference.language)",
+      "placeholder": "Your language",
+      "required": true,
+      "type": "select",
+      "options": [
+        {
+          "label": "🇺🇸 English",
+          "value": "en"
+        },
+        {
+          "label": "🇯🇵 Japanese",
+          "value": "ja"
+        },
+        {
+          "label": "🇪🇸 Spanish",
+          "value": "es"
+        },
+        {
+          "label": "🇫🇷 French",
+          "value": "fr"
+        },
+        {
+          "label": "🇰🇷 Korean",
+          "value": "ko"
+        },
+        {
+          "label": "🇩🇪 German",
+          "value": "de"
+        },
+        {
+          "label": "🇮🇹 Italian",
+          "value": "it"
+        },
+        {
+          "label": "🇷🇺 Russian",
+          "value": "ru"
+        },
+        {
+          "label": "🇵🇹 Portuguese",
+          "value": "pt"
+        },
+        {
+          "label": "🇳🇱 Dutch",
+          "value": "nl"
+        },
+        {
+          "label": "🇹🇷 Turkish",
+          "value": "tr"
+        },
+        {
+          "label": "🇸🇪 Swedish",
+          "value": "sv"
+        },
+        {
+          "label": "🇩🇰 Danish",
+          "value": "da"
+        },
+        {
+          "label": "🇫🇮 Finnish",
+          "value": "fi"
+        },
+        {
+          "label": "🇳🇴 Norwegian",
+          "value": "no"
+        },
+        {
+          "label": "🇮🇩 Indonesian",
+          "value": "id"
+        },
+        {
+          "label": "🇲🇾 Malay",
+          "value": "ms"
+        },
+        {
+          "label": "🇵🇭 Filipino",
+          "value": "fil"
+        },
+        {
+          "label": "🇻🇳 Vietnamese",
+          "value": "vi"
+        },
+        {
+          "label": "🇹🇭 Thai",
+          "value": "th"
+        }
+      ]
+    },
+    {
+      "name": "data.$.user.name",
+      "label": "Name (user.name)",
+      "placeholder": "Your name",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "name": "data.$.user.age",
+      "label": "Age (user.age)",
+      "placeholder": "Your age",
+      "required": true,
+      "type": "range"
+    },
+    {
+      "name": "data.$.user.tags",
+      "label": "Tags (user.tags)",
+      "placeholder": "Your tags",
+      "required": true,
+      "type": "toggle-group",
+      "multiple": true,
+      "options": [
+        {
+          "label": "🍔",
+          "value": "burger"
+        },
+        {
+          "label": "🍟",
+          "value": "fries"
+        },
+        {
+          "label": "🍦",
+          "value": "ice-cream"
+        }
+      ]
+    }
+  ]
+}

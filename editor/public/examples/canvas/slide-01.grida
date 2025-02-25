@@ -1,0 +1,760 @@
+{
+  "doctype": "v0_document",
+  "document": {
+    "nodes": {
+      "422:1966": {
+        "id": "422:1966",
+        "name": "root",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "relative",
+        "left": 0,
+        "top": 0,
+        "width": 960,
+        "height": 540,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 249,
+            "b": 231,
+            "a": 1
+          }
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "422:1967",
+          "422:1968",
+          "422:1969",
+          "422:1970",
+          "422:1972",
+          "422:1973",
+          "422:1974",
+          "422:1978",
+          "422:1982",
+          "422:1984"
+        ]
+      },
+      "422:1967": {
+        "id": "422:1967",
+        "name": "texture",
+        "active": true,
+        "locked": true,
+        "rotation": 0,
+        "opacity": 0.20000000298023224,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/7126/029c/b3aaa2ad36f9ef2ed47a54094e63527a?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=nvkC4xwQX1KZyTw1NH1hLrWkLi5fCbadEtJdK~Zw4L141iq0bH03PbglaOnYpGOMHmhKjag4IsTD2AXJezHzLiYrx1avcmUKhE7DcflBQCglmyPcqiShrtJciyfz5ps6H8l3Srd3lk4kEwixDG76yAREoTe4LJ4dNhS1Faw8A9pO2ZepfXMeL9~yzy~ijeYdeMF9pYG-fZDB9bc4CZYtSDJ6CgY1mTnu3Pcl~3h6WJvugQFXrC7qKVfUvr9NzZx6cTU-Vy3dsKDFT8XpBEYg-jgODsJn5SGBrBUbjUh7w1wHwz3Gw2607DfmD5O3ZqEEUvBgCg3PUtig96YoUSYQAA__",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 960,
+        "height": 540,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "422:1968": {
+        "id": "422:1968",
+        "name": "title",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "XYZ 스타트업 \n제품 론칭 디지털 캠페인",
+        "position": "absolute",
+        "left": 137,
+        "top": 40,
+        "right": 635,
+        "bottom": 450,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 127,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.25,
+        "letterSpacing": 0,
+        "fontSize": 20,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1969": {
+        "id": "422:1969",
+        "name": "date",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "2022.01 - 2022.06",
+        "position": "absolute",
+        "left": 137,
+        "top": 97.5,
+        "right": 737,
+        "bottom": 426.5,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 0.5
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.6059999084472656,
+        "letterSpacing": 0,
+        "fontSize": 10,
+        "fontFamily": "Pretendard",
+        "fontWeight": 500
+      },
+      "422:1970": {
+        "id": "422:1970",
+        "name": "badge",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 50,
+        "top": 40,
+        "width": 54,
+        "height": 16,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "1px 6px 1px 6px"
+        },
+        "cornerRadius": 499.5,
+        "children": [
+          "422:1971"
+        ]
+      },
+      "422:1971": {
+        "id": "422:1971",
+        "name": "label",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "CASE 2",
+        "position": "absolute",
+        "left": 6,
+        "top": 1,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 249,
+            "b": 231,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1972": {
+        "id": "422:1972",
+        "name": "header-description",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "XYZ 스타트업은 신제품인 기능성 음료를 출시하며 초기 고객층 확보를 목표로 디지털 캠페인을 기획했습니다. 기존 브랜드 인지도가 낮아 초기 고객 유치가 중요한 과제였으며, 제품의 기능성 및 트렌디함을 강조해야 했습니다.",
+        "position": "absolute",
+        "top": 40,
+        "right": 50,
+        "width": 280.5,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 0.8999999761581421
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.65,
+        "letterSpacing": 0.1,
+        "fontSize": 10,
+        "fontFamily": "Pretendard",
+        "fontWeight": 500
+      },
+      "422:1973": {
+        "id": "422:1973",
+        "name": "picture",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "top": 166,
+        "width": 280.5,
+        "height": 324,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "422:2015"
+        ],
+        "right": 50.8046875
+      },
+      "422:2015": {
+        "id": "422:2015",
+        "name": "img",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/579e/a586/638fcd3addb03e7c0eeed0bd1293d302?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=nEtYEaifvPkisDLEtjNr4DGZrfsMthK-MJRtEpM6Dhdra84kN0aSj0ppj7YyE~qXSChXbJFvYPp2k4iJp7NEleF4WHfn0I-ZZ5bKsQC0FHeFKZVv5Hqvl-it6kocqILyoj9t8OH77acB3lHthGTQzertJaTr2zuPN5LTZgnyJ3FnOnMfShmzucqjRiKajjTGTebCILFKN6LwB4QSeY~aLpBtKbGNFhwDEVhNkozFVdT~mbwvJ2R-8jbQQtxaabOk4qZrgcqj6qX-5soAFCn7mcnD4Hts6uAcqfowyr14KEtBqqwfRXtnqbEQMYT4xKVzOQp5GWWCItbBoHRZjUJm7w__",
+        "position": "absolute",
+        "left": 0.5,
+        "top": -13,
+        "width": 280,
+        "height": 350,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "422:1974": {
+        "id": "422:1974",
+        "name": "card-1",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 56,
+        "top": 166,
+        "width": 236,
+        "height": 132,
+        "border": {
+          "borderWidth": 1,
+          "borderColor": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "borderStyle": "dashed"
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 20,
+        "children": [
+          "422:1975",
+          "422:1976"
+        ]
+      },
+      "422:1975": {
+        "id": "422:1975",
+        "name": "content",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "트렌드 분석과 주요 경쟁사 분석을 통해 젊은 소비자들이 어떤 브랜드 이미지를 선호하는지 파악했습니다. 설문조사와 포커스 그룹 인터뷰를 통해 타겟 고객의 니즈를 확인했습니다.",
+        "position": "absolute",
+        "left": 19,
+        "top": 46,
+        "right": 19,
+        "bottom": 20,
+        "width": 198,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.5,
+        "letterSpacing": 0.11,
+        "fontSize": 11,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1976": {
+        "id": "422:1976",
+        "name": "badge",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 77,
+        "top": 12.5,
+        "width": 82,
+        "height": 16,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "1px 6px 1px 6px"
+        },
+        "cornerRadius": 499.5,
+        "children": [
+          "422:1977"
+        ]
+      },
+      "422:1977": {
+        "id": "422:1977",
+        "name": "label",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "STRATEGY 1",
+        "position": "absolute",
+        "left": 6,
+        "top": 1,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 249,
+            "b": 231,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1978": {
+        "id": "422:1978",
+        "name": "card-2",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 313,
+        "top": 166,
+        "width": 236,
+        "height": 132,
+        "border": {
+          "borderWidth": 1,
+          "borderColor": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "borderStyle": "dashed"
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 20,
+        "children": [
+          "422:1979",
+          "422:1980"
+        ]
+      },
+      "422:1979": {
+        "id": "422:1979",
+        "name": "content",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "로고 및 패키지 디자인을 현대적이고 미니멀한 스타일로 재구성하여 트렌디한 이미지로 변화시키고, 이를 SNS에 노출했습니다.",
+        "position": "absolute",
+        "left": 19,
+        "top": 62.5,
+        "right": 19,
+        "bottom": 19.5,
+        "width": 198,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.5,
+        "letterSpacing": 0.11,
+        "fontSize": 11,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1980": {
+        "id": "422:1980",
+        "name": "badge",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 76.5,
+        "top": 12.5,
+        "width": 83,
+        "height": 16,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "1px 6px 1px 6px"
+        },
+        "cornerRadius": 499.5,
+        "children": [
+          "422:1981"
+        ]
+      },
+      "422:1981": {
+        "id": "422:1981",
+        "name": "label",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "STRATEGY 2",
+        "position": "absolute",
+        "left": 6,
+        "top": 1,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 249,
+            "b": 231,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1982": {
+        "id": "422:1982",
+        "name": "icon",
+        "active": true,
+        "locked": false,
+        "rotation": 1.5707963705062848,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 310.66650390625,
+        "top": 318,
+        "width": 16.66666603088379,
+        "height": 16.66666603088379,
+        "style": {},
+        "cornerRadius": 0,
+        "children": [
+          "422:1983"
+        ]
+      },
+      "422:1983": {
+        "id": "422:1983",
+        "name": "Vector",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 16.66666603088379,
+        "height": 16.66666603088379,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "paths": [
+          {
+            "d": "M16.6667 8.33333C16.6667 3.73333 12.9333 0 8.33333 0C3.73333 0 0 3.73333 0 8.33333C0 12.9333 3.73333 16.6667 8.33333 16.6667C12.9333 16.6667 16.6667 12.9333 16.6667 8.33333ZM8.33333 9.16667L5 9.16667L5 7.5L8.33333 7.5L8.33333 5L11.6667 8.33333L8.33333 11.6667L8.33333 9.16667Z",
+            "fillRile": "nonzero"
+          }
+        ]
+      },
+      "422:1984": {
+        "id": "422:1984",
+        "name": "card-3",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 149,
+        "top": 358,
+        "width": 307,
+        "height": 132,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 20,
+        "children": [
+          "422:1985",
+          "422:1986"
+        ]
+      },
+      "422:1985": {
+        "id": "422:1985",
+        "name": "content",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "리브랜딩 방향을 설정하고, 데이터 기반의 시장 조사를 통해 핵심 메시지를 도출했습니다. 인스타그램 광고 캠페인을 설계하여 광고의 타겟팅과 고객 도달율을 최적화하는 역할을 맡았습니다. ",
+        "position": "absolute",
+        "left": 29,
+        "top": 45,
+        "right": 29,
+        "bottom": 21,
+        "width": 249,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 0.8999999761581421
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.5,
+        "letterSpacing": 0.11,
+        "fontSize": 11,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "422:1986": {
+        "id": "422:1986",
+        "name": "badge",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 103.5,
+        "top": 12.5,
+        "width": 100,
+        "height": 16,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 249,
+            "b": 231,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "1px 6px 1px 6px"
+        },
+        "cornerRadius": 499.5,
+        "children": [
+          "422:1987"
+        ]
+      },
+      "422:1987": {
+        "id": "422:1987",
+        "name": "label",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "PERFORMANCE",
+        "position": "absolute",
+        "left": 6,
+        "top": 1,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 45,
+            "g": 45,
+            "b": 45,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      }
+    },
+    "root_id": "422:1966",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
+  }
+}

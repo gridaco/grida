@@ -1,0 +1,23 @@
+/* 
+- https://www.blocknotejs.org/docs/styling-theming/themes
+*/
+
+/* Base theme */
+.bn-container[data-theming-ui-css-variables][data-color-scheme] {
+  --bn-colors-editor-text: hsl(var(--foreground));
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: hsl(var(--popover-foreground));
+  --bn-colors-menu-background: hsl(var(--popover));
+  --bn-colors-tooltip-text: hsl(var(--foreground));
+  --bn-colors-tooltip-background: hsl(var(--background));
+  --bn-colors-hovered-text: hsl(var(--accent-foreground));
+  --bn-colors-hovered-background: hsl(var(--accent));
+  --bn-colors-selected-text: hsl(var(--foreground));
+  --bn-colors-selected-background: hsl(var(--accent));
+  --bn-colors-disabled-text: hsl(var(--muted-foreground));
+  --bn-colors-disabled-background: hsl(var(--muted));
+  --bn-colors-shadow: rgba(0, 0, 0, 0.04);
+  --bn-colors-border: hsl(var(--border));
+  --bn-colors-side-menu: hsl(var(--muted-foreground));
+  --bn-border-radius: var(--radius);
+}

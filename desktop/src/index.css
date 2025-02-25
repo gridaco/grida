@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+
+.draggable{
+  app-region: drag;
+}

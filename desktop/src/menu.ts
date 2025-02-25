@@ -1,288 +1,252 @@
 import {
-  app,
-  Menu,
-  shell,
+  App,
+  Shell,
   BrowserWindow,
   MenuItemConstructorOptions,
-} from 'electron';
+  Menu,
+  MenuItem,
+  dialog,
+} from "electron";
+import create_window from "./window";
 
-interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
-  selector?: string;
-  submenu?: DarwinMenuItemConstructorOptions[] | Menu;
+/**
+ * Recursively merges two menu templates.
+ * For items with the same label, properties from the later template override those in the earlier one.
+ * If both items have submenus (arrays), they are merged recursively.
+ *
+ * This helper merges two arrays.
+ */
+function merge_two_templates(
+  a: MenuItemConstructorOptions[],
+  b: MenuItemConstructorOptions[]
+): MenuItemConstructorOptions[] {
+  const merged = [...a];
+  b.forEach((customItem) => {
+    // Try to find a matching default item by label.
+    const idx = merged.findIndex(
+      (defaultItem) => defaultItem.label === customItem.label
+    );
+    if (idx !== -1) {
+      // Found an item with the same label, merge properties.
+      const defaultItem = merged[idx];
+      const mergedItem: MenuItemConstructorOptions = {
+        ...defaultItem,
+        ...customItem,
+      };
+
+      // If both have submenus, merge them recursively.
+      if (
+        Array.isArray(defaultItem.submenu) &&
+        Array.isArray(customItem.submenu)
+      ) {
+        mergedItem.submenu = merge_templates(
+          defaultItem.submenu as MenuItemConstructorOptions[],
+          customItem.submenu as MenuItemConstructorOptions[]
+        );
+      }
+      merged[idx] = mergedItem;
+    } else {
+      // Not found in default, so add the custom item.
+      merged.push(customItem);
+    }
+  });
+  return merged;
 }
 
-export default class MenuBuilder {
-  mainWindow: BrowserWindow;
-
-  constructor(mainWindow: BrowserWindow) {
-    this.mainWindow = mainWindow;
+/**
+ * Recursively merges multiple menu templates.
+ *
+ * @param templates - A rest parameter of menu template arrays.
+ * @returns The merged menu template.
+ */
+export function merge_templates(
+  ...templates: MenuItemConstructorOptions[][]
+): MenuItemConstructorOptions[] {
+  if (templates.length === 0) return [];
+  // Start with the first template.
+  let merged = templates[0];
+  // Merge each subsequent template into the merged result.
+  for (let i = 1; i < templates.length; i++) {
+    merged = merge_two_templates(merged, templates[i]);
   }
+  return merged;
+}
 
-  buildMenu(): Menu {
-    if (
-      process.env.NODE_ENV === 'development' ||
-      process.env.DEBUG_PROD === 'true'
-    ) {
-      this.setupDevelopmentEnvironment();
-    }
-
-    const template =
-      process.platform === 'darwin'
-        ? this.buildDarwinTemplate()
-        : this.buildDefaultTemplate();
-
-    const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
-
-    return menu;
-  }
-
-  setupDevelopmentEnvironment(): void {
-    this.mainWindow.webContents.on('context-menu', (_, props) => {
-      const { x, y } = props;
-
-      Menu.buildFromTemplate([
+export function create_default_menu(
+  app: App,
+  shell: Shell
+): MenuItemConstructorOptions[] {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: "File",
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo", accelerator: "CmdOrCtrl+Z" },
+        { role: "redo", accelerator: "Shift+CmdOrCtrl+Z" },
+        { type: "separator" },
+        { role: "cut", accelerator: "CmdOrCtrl+X" },
+        { role: "copy", accelerator: "CmdOrCtrl+C" },
+        { role: "paste", accelerator: "CmdOrCtrl+V" },
+        { role: "selectAll", accelerator: "CmdOrCtrl+A" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
         {
-          label: 'Inspect element',
-          click: () => {
-            this.mainWindow.webContents.inspectElement(x, y);
+          label: "Reload",
+          accelerator: "CmdOrCtrl+R",
+          click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
+            if (focusedWindow) focusedWindow.reload();
           },
         },
-      ]).popup({ window: this.mainWindow });
+        {
+          label: "Toggle Full Screen",
+          accelerator: process.platform === "darwin" ? "Ctrl+Command+F" : "F11",
+          click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
+            if (focusedWindow)
+              focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
+          },
+        },
+      ],
+    },
+    {
+      label: "Window",
+      role: "window",
+      submenu: [
+        { role: "minimize", accelerator: "CmdOrCtrl+M" },
+        { role: "close", accelerator: "CmdOrCtrl+W" },
+        { type: "separator" },
+        { accelerator: "CmdOrCtrl+Alt+I", role: "toggleDevTools" },
+      ],
+    },
+    {
+      label: "Help",
+      role: "help",
+      submenu: [
+        {
+          label: "Slack Community",
+          click: () => shell.openExternal("https://grida.co/join-slack"),
+        },
+        {
+          label: "Open an Issue",
+          click: () =>
+            shell.openExternal("http://github.com/gridaco/grida/issues"),
+        },
+        {
+          label: "Discussions",
+          click: () =>
+            shell.openExternal("https://github.com/orgs/gridaco/discussions"),
+        },
+      ],
+    },
+  ];
+
+  // macOS specific adjustments
+  if (process.platform === "darwin") {
+    const appName: string = app.name || "Application";
+    template.unshift({
+      label: appName,
+      submenu: [
+        { role: "about", label: "About " + appName },
+        { type: "separator" },
+        { role: "services", label: "Services", submenu: [] },
+        { type: "separator" },
+        {
+          role: "hide",
+          label: "Hide " + appName,
+          accelerator: "Command+H",
+        },
+        {
+          role: "unhide",
+          label: "Show All",
+        },
+        { type: "separator" },
+        {
+          role: "quit",
+          label: "Quit " + appName,
+          accelerator: "Command+Q",
+          click: () => app.quit(),
+        },
+      ],
     });
+
+    // Add "Bring All to Front" to the Window menu
+    const windowMenu = template.find((m) => m.role === "window") as
+      | MenuItemConstructorOptions
+      | undefined;
+    if (windowMenu && Array.isArray(windowMenu.submenu)) {
+      (windowMenu.submenu as MenuItemConstructorOptions[]).push(
+        { type: "separator" },
+        { role: "front", label: "Bring All to Front" }
+      );
+    }
   }
 
-  buildDarwinTemplate(): MenuItemConstructorOptions[] {
-    const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'Grida',
-      submenu: [
-        {
-          label: 'About Grida',
-          selector: 'orderFrontStandardAboutPanel:',
-        },
-        { type: 'separator' },
-        { label: 'Services', submenu: [] },
-        { type: 'separator' },
-        {
-          label: 'Hide Grida',
-          accelerator: 'Command+H',
-          selector: 'hide:',
-        },
-        {
-          label: 'Hide Others',
-          accelerator: 'Command+Shift+H',
-          selector: 'hideOtherApplications:',
-        },
-        { label: 'Show All', selector: 'unhideAllApplications:' },
-        { type: 'separator' },
-        {
-          label: 'Quit',
-          accelerator: 'Command+Q',
-          click: () => {
-            app.quit();
-          },
-        },
-      ],
-    };
-    const subMenuEdit: DarwinMenuItemConstructorOptions = {
-      label: 'Edit',
-      submenu: [
-        { label: 'Undo', accelerator: 'Command+Z', selector: 'undo:' },
-        { label: 'Redo', accelerator: 'Shift+Command+Z', selector: 'redo:' },
-        { type: 'separator' },
-        { label: 'Cut', accelerator: 'Command+X', selector: 'cut:' },
-        { label: 'Copy', accelerator: 'Command+C', selector: 'copy:' },
-        { label: 'Paste', accelerator: 'Command+V', selector: 'paste:' },
-        {
-          label: 'Select All',
-          accelerator: 'Command+A',
-          selector: 'selectAll:',
-        },
-      ],
-    };
-    const subMenuViewDev: MenuItemConstructorOptions = {
-      label: 'View',
-      submenu: [
-        {
-          label: 'Reload',
-          accelerator: 'Command+R',
-          click: () => {
-            this.mainWindow.webContents.reload();
-          },
-        },
-        {
-          label: 'Toggle Full Screen',
-          accelerator: 'Ctrl+Command+F',
-          click: () => {
-            this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
-          },
-        },
-        {
-          label: 'Toggle Developer Tools',
-          accelerator: 'Alt+Command+I',
-          click: () => {
-            this.mainWindow.webContents.toggleDevTools();
-          },
-        },
-      ],
-    };
-    const subMenuViewProd: MenuItemConstructorOptions = {
-      label: 'View',
-      submenu: [
-        {
-          label: 'Toggle Full Screen',
-          accelerator: 'Ctrl+Command+F',
-          click: () => {
-            this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
-          },
-        },
-      ],
-    };
-    const subMenuWindow: DarwinMenuItemConstructorOptions = {
-      label: 'Window',
-      submenu: [
-        {
-          label: 'Minimize',
-          accelerator: 'Command+M',
-          selector: 'performMiniaturize:',
-        },
-        { label: 'Close', accelerator: 'Command+W', selector: 'performClose:' },
-        { type: 'separator' },
-        { label: 'Bring All to Front', selector: 'arrangeInFront:' },
-      ],
-    };
-    const subMenuHelp: MenuItemConstructorOptions = {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'Learn More',
-          click() {
-            shell.openExternal('https://grida.co');
-          },
-        },
-        {
-          label: 'Documentation',
-          click() {
-            shell.openExternal('https://grida.co/docs');
-          },
-        },
-        {
-          label: 'Community Discussions',
-          click() {
-            shell.openExternal('https://github.com/gridaco/grida');
-          },
-        },
-        {
-          label: 'Search Issues',
-          click() {
-            shell.openExternal('https://github.com/gridaco/grida/issues');
-          },
-        },
-      ],
-    };
+  return template;
+}
 
-    const subMenuView =
-      process.env.NODE_ENV === 'development' ||
-      process.env.DEBUG_PROD === 'true'
-        ? subMenuViewDev
-        : subMenuViewProd;
+export default function create_menu(app: App, shell: Shell) {
+  const default_menu = create_default_menu(app, shell);
+  const doctype_canvas_menus: MenuItemConstructorOptions[] = [
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New File",
+          accelerator: "CmdOrCtrl+N",
+          click: () => {
+            // TODO:
+            console.log("New File clicked");
+          },
+        },
+        {
+          label: "New Window",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => {
+            create_window();
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Open...",
+          accelerator: "CmdOrCtrl+O",
+          click: () => {
+            // TODO:
+            dialog.showOpenDialog({
+              properties: ["openFile"],
+              filters: [{ name: "Grida Files", extensions: ["grida"] }],
+            });
+          },
+        },
+        {
+          label: "Save",
+          accelerator: "CmdOrCtrl+S",
+          click: () => {
+            // TODO:
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send("app:save");
+            }
+          },
+        },
+        {
+          label: "Save As...",
+          accelerator: "CmdOrCtrl+Shift+S",
+          click: () => {
+            // TODO:
+            dialog.showSaveDialog({
+              filters: [{ name: "Grida Files", extensions: ["grida"] }],
+            });
+          },
+        },
+      ],
+    },
+  ];
 
-    return [subMenuAbout, subMenuEdit, subMenuView, subMenuWindow, subMenuHelp];
-  }
-
-  buildDefaultTemplate() {
-    const templateDefault = [
-      {
-        label: '&File',
-        submenu: [
-          {
-            label: '&Open',
-            accelerator: 'Ctrl+O',
-          },
-          {
-            label: '&Close',
-            accelerator: 'Ctrl+W',
-            click: () => {
-              this.mainWindow.close();
-            },
-          },
-        ],
-      },
-      {
-        label: '&View',
-        submenu:
-          process.env.NODE_ENV === 'development' ||
-          process.env.DEBUG_PROD === 'true'
-            ? [
-                {
-                  label: '&Reload',
-                  accelerator: 'Ctrl+R',
-                  click: () => {
-                    this.mainWindow.webContents.reload();
-                  },
-                },
-                {
-                  label: 'Toggle &Full Screen',
-                  accelerator: 'F11',
-                  click: () => {
-                    this.mainWindow.setFullScreen(
-                      !this.mainWindow.isFullScreen()
-                    );
-                  },
-                },
-                {
-                  label: 'Toggle &Developer Tools',
-                  accelerator: 'Alt+Ctrl+I',
-                  click: () => {
-                    this.mainWindow.webContents.toggleDevTools();
-                  },
-                },
-              ]
-            : [
-                {
-                  label: 'Toggle &Full Screen',
-                  accelerator: 'F11',
-                  click: () => {
-                    this.mainWindow.setFullScreen(
-                      !this.mainWindow.isFullScreen()
-                    );
-                  },
-                },
-              ],
-      },
-      {
-        label: 'Help',
-        submenu: [
-          {
-            label: 'Learn More',
-            click() {
-              shell.openExternal('https://grida.co');
-            },
-          },
-          {
-            label: 'Documentation',
-            click() {
-              shell.openExternal('https://grida.co/docs');
-            },
-          },
-          {
-            label: 'Community Discussions',
-            click() {
-              shell.openExternal('https://github.com/gridaco/grida');
-            },
-          },
-          {
-            label: 'Search Issues',
-            click() {
-              shell.openExternal(
-                'https://github.com/gridaco/grida/issues'
-              );
-            },
-          },
-        ],
-      },
-    ];
-
-    return templateDefault;
-  }
+  return Menu.buildFromTemplate(
+    merge_templates(default_menu, doctype_canvas_menus)
+  );
 }

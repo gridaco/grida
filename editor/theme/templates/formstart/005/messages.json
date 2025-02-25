@@ -1,0 +1,312 @@
+{
+  "en": {
+    "translation": {
+      "title": "Your Campaign Title Goes Here.",
+      "media": [
+        { "publicUrl": "/templates/sample-brand-seoul-tech-week/cover.png" },
+        {
+          "publicUrl": "https://images.unsplash.com/photo-1556505622-49ea9f8eaf76?q=80&w=3688&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+        },
+        {
+          "publicUrl": "https://images.unsplash.com/photo-1586274677440-231405a4c74c?q=80&w=3456&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+        }
+      ],
+      "body_html": "We are thrilled to announce the upcoming [Event Name], happening on [Date]. This is your chance to be part of an exclusive gathering of professionals, enthusiasts, and innovators in the [Industry/Field]. Whether you're looking to expand your network, gain valuable insights from industry leaders, or discover the latest trends and tools, [Event Name] offers something for everyone.<br/><br/>Over the course of [Number of Days] days, you will have the opportunity to attend workshops, keynotes, and panel discussions led by experts from around the world. Our carefully curated sessions will cover a wide range of topics, from [Topic 1] to [Topic 2], ensuring that there is something to match your interests and needs.<br/><br/><img src='https://images.unsplash.com/photo-1556505622-49ea9f8eaf76?q=80&w=3688&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' alt='Event Image'/><br/>Don’t miss out on this unique opportunity to grow your skills, connect with peers, and take your career to the next level. Reserve your spot today!",
+      "button": "Register",
+      "registration_banner": {
+        "before_open": "Registration opens at {{date}}",
+        "after_open_before_close": "Registration close at {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "Registration is closed"
+      },
+      "registration_footer": {
+        "before_open": "Open in",
+        "after_open_before_close": "Closing in",
+        "after_close": "Registration is closed"
+      },
+      "date": {
+        "d": "{{d}}d",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "ko": {
+    "translation": {
+      "title": "이곳에 캠페인 제목을 입력하세요.",
+      "body_html": "다가오는 [이벤트 이름]이 [날짜]에 개최된다는 소식을 전하게 되어 매우 기쁩니다. 이 행사는 [산업/분야]의 전문가, 열정가, 혁신가들이 모이는 독점적인 기회입니다. 네트워크를 확장하고, 업계 리더로부터 귀중한 통찰을 얻으며, 최신 트렌드와 도구를 발견하고자 하는 분들께 [이벤트 이름]은 모두에게 알맞은 기회를 제공합니다.<br/><br/>[일수]일 동안 전 세계의 전문가들이 이끄는 워크숍, 기조연설, 패널 토론에 참석할 수 있습니다. 우리의 신중하게 선정된 세션은 [주제 1]에서 [주제 2]에 이르기까지 다양한 주제를 다루며, 여러분의 관심사와 요구에 맞는 프로그램을 제공합니다.<br/><br/><img src='https://images.unsplash.com/photo-1556505622-49ea9f8eaf76?q=80&w=3688&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' alt='Event Image'/><br/>이번 특별한 기회를 놓치지 마세요. 스킬을 향상시키고, 동료들과 연결하며, 경력을 한 단계 업그레이드할 수 있는 절호의 기회를 잡으세요. 지금 자리 예약을 하세요!",
+      "button": "신청하기",
+      "registration_banner": {
+        "before_open": "{{date}} 에 모집이 시작됩니다.",
+        "after_open_before_close": "{{date}} 에 모집이 종료됩니다.",
+        "after_open_before_close_alt": "",
+        "after_close": "모집이 종료되었습니다."
+      },
+      "registration_footer": {
+        "before_open": "모집 오픈까지",
+        "after_open_before_close": "모집 종료까지",
+        "after_close": "모집이 종료되었습니다."
+      },
+      "date": {
+        "d": "{{d}}일",
+        "h": "{{h}}시간",
+        "m": "{{m}}분",
+        "s": "{{s}}초"
+      }
+    }
+  },
+  "es": {
+    "translation": {
+      "title": "El título de su campaña va aquí.",
+      "button": "Registrarse",
+      "registration_banner": {
+        "before_open": "La inscripción abre el {{date}}",
+        "after_open_before_close": "La inscripción cierra el {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "La inscripción está cerrada"
+      },
+      "registration_footer": {
+        "before_open": "Abre en",
+        "after_open_before_close": "Cierra en",
+        "after_close": "La inscripción está cerrada"
+      },
+      "date": {
+        "d": "{{d}}d",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "de": {
+    "translation": {
+      "title": "Ihr Kampagnentitel kommt hier hin.",
+      "button": "Registrieren",
+      "registration_banner": {
+        "before_open": "Die Registrierung öffnet am {{date}}",
+        "after_open_before_close": "Die Registrierung schließt am {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "Die Registrierung ist geschlossen"
+      },
+      "registration_footer": {
+        "before_open": "Öffnet in",
+        "after_open_before_close": "Schließt in",
+        "after_close": "Die Registrierung ist geschlossen"
+      },
+      "date": {
+        "d": "{{d}}T",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "ja": {
+    "translation": {
+      "title": "キャンペーンタイトルをここに入力してください。",
+      "button": "登録",
+      "registration_banner": {
+        "before_open": "{{date}}に登録が開始されます。",
+        "after_open_before_close": "{{date}}に登録が締め切られます。",
+        "after_open_before_close_alt": "",
+        "after_close": "登録は締め切られました。"
+      },
+      "registration_footer": {
+        "before_open": "開始まで",
+        "after_open_before_close": "終了まで",
+        "after_close": "登録は締め切られました。"
+      },
+      "date": {
+        "d": "{{d}}日",
+        "h": "{{h}}時間",
+        "m": "{{m}}分",
+        "s": "{{s}}秒"
+      }
+    }
+  },
+  "fr": {
+    "translation": {
+      "title": "Le titre de votre campagne va ici.",
+      "button": "S'inscrire",
+      "registration_banner": {
+        "before_open": "L'inscription ouvre le {{date}}",
+        "after_open_before_close": "L'inscription ferme le {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "L'inscription est fermée"
+      },
+      "registration_footer": {
+        "before_open": "Ouvre dans",
+        "after_open_before_close": "Ferme dans",
+        "after_close": "L'inscription est fermée"
+      },
+      "date": {
+        "d": "{{d}}j",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "pt": {
+    "translation": {
+      "title": "O título da sua campanha vai aqui.",
+      "button": "Registrar",
+      "registration_banner": {
+        "before_open": "O registro abre em {{date}}",
+        "after_open_before_close": "O registro fecha em {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "O registro está encerrado"
+      },
+      "registration_footer": {
+        "before_open": "Abre em",
+        "after_open_before_close": "Fecha em",
+        "after_close": "O registro está encerrado"
+      },
+      "date": {
+        "d": "{{d}}d",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "it": {
+    "translation": {
+      "title": "Il titolo della tua campagna va qui.",
+      "button": "Registrati",
+      "registration_banner": {
+        "before_open": "La registrazione apre il {{date}}",
+        "after_open_before_close": "La registrazione chiude il {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "La registrazione è chiusa"
+      },
+      "registration_footer": {
+        "before_open": "Apre in",
+        "after_open_before_close": "Chiude in",
+        "after_close": "La registrazione è chiusa"
+      },
+      "date": {
+        "d": "{{d}}g",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  },
+  "ru": {
+    "translation": {
+      "title": "Ваш заголовок кампании здесь.",
+      "button": "Зарегистрироваться",
+      "registration_banner": {
+        "before_open": "Регистрация откроется {{date}}",
+        "after_open_before_close": "Регистрация закроется {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "Регистрация закрыта"
+      },
+      "registration_footer": {
+        "before_open": "Откроется через",
+        "after_open_before_close": "Закроется через",
+        "after_close": "Регистрация закрыта"
+      },
+      "date": {
+        "d": "{{d}}д",
+        "h": "{{h}}ч",
+        "m": "{{m}}м",
+        "s": "{{s}}с"
+      }
+    }
+  },
+  "zh": {
+    "translation": {
+      "title": "您的活动标题在此。",
+      "button": "注册",
+      "registration_banner": {
+        "before_open": "注册将在 {{date}} 开始",
+        "after_open_before_close": "注册将在 {{date}} 结束",
+        "after_open_before_close_alt": "",
+        "after_close": "注册已关闭"
+      },
+      "registration_footer": {
+        "before_open": "将于",
+        "after_open_before_close": "将于",
+        "after_close": "注册已关闭"
+      },
+      "date": {
+        "d": "{{d}}天",
+        "h": "{{h}}小时",
+        "m": "{{m}}分钟",
+        "s": "{{s}}秒"
+      }
+    }
+  },
+  "ar": {
+    "translation": {
+      "title": "عنوان الحملة الخاص بك هنا.",
+      "button": "سجل",
+      "registration_banner": {
+        "before_open": "التسجيل يفتح في {{date}}",
+        "after_open_before_close": "التسجيل يغلق في {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "التسجيل مغلق"
+      },
+      "registration_footer": {
+        "before_open": "يفتح في",
+        "after_open_before_close": "يغلق في",
+        "after_close": "التسجيل مغلق"
+      },
+      "date": {
+        "d": "{{d}}يوم",
+        "h": "{{h}}ساعة",
+        "m": "{{m}}دقيقة",
+        "s": "{{s}}ثانية"
+      }
+    }
+  },
+  "hi": {
+    "translation": {
+      "title": "आपका अभियान शीर्षक यहाँ है।",
+      "button": "पंजीकरण करें",
+      "registration_banner": {
+        "before_open": "{{date}} को पंजीकरण खुलेगा।",
+        "after_open_before_close": "{{date}} को पंजीकरण बंद होगा।",
+        "after_open_before_close_alt": "",
+        "after_close": "पंजीकरण बंद हो गया है"
+      },
+      "registration_footer": {
+        "before_open": "खुलेगा",
+        "after_open_before_close": "बंद होगा",
+        "after_close": "पंजीकरण बंद हो गया है"
+      },
+      "date": {
+        "d": "{{d}}दिन",
+        "h": "{{h}}घंटे",
+        "m": "{{m}}मिनट",
+        "s": "{{s}}सेकंड"
+      }
+    }
+  },
+  "nl": {
+    "translation": {
+      "title": "De titel van uw campagne gaat hier.",
+      "button": "Registreren",
+      "registration_banner": {
+        "before_open": "Registratie opent op {{date}}",
+        "after_open_before_close": "Registratie sluit op {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "Registratie is gesloten"
+      },
+      "registration_footer": {
+        "before_open": "Opent in",
+        "after_open_before_close": "Sluit in",
+        "after_close": "Registratie is gesloten"
+      },
+      "date": {
+        "d": "{{d}}d",
+        "h": "{{h}}u",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
+  }
+}

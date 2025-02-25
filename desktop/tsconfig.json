@@ -10,7 +10,7 @@
     "baseUrl": ".",
     "outDir": "dist",
     "moduleResolution": "node",
-    "resolveJsonModule": true
-  },
-  "include": ["src"]
+    "resolveJsonModule": true,
+    "jsx": "react-jsx"
+  }
 }

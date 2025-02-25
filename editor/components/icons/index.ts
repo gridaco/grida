@@ -1,1 +1,2 @@
-export * from "./file-module-icon";
+export * from "./pause-filled";
+export * from "./play-filled";

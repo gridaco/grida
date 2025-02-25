@@ -1,0 +1,906 @@
+{
+  "doctype": "v0_document",
+  "document": {
+    "nodes": {
+      "102:2": {
+        "id": "102:2",
+        "name": "How I Met Your Mother",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "relative",
+        "left": 0,
+        "top": 0,
+        "width": 450,
+        "height": 675,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 237,
+            "g": 234,
+            "b": 224,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:3",
+          "102:41"
+        ]
+      },
+      "102:3": {
+        "id": "102:3",
+        "name": "Auto Layout",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 450,
+        "height": 675,
+        "style": {
+          "padding": "29.999998092651367px 29.999998092651367px 29.999998092651367px 29.999998092651367px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:4",
+          "102:25",
+          "102:35"
+        ]
+      },
+      "102:4": {
+        "id": "102:4",
+        "name": "Top",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 30,
+        "top": 30,
+        "width": 390,
+        "height": 130.375,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:5",
+          "102:24"
+        ]
+      },
+      "102:5": {
+        "id": "102:5",
+        "name": "Heading",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 390,
+        "height": 37.5,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:6"
+        ]
+      },
+      "102:6": {
+        "id": "102:6",
+        "name": "Left",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 109.625,
+        "height": 37.5,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:7",
+          "102:11"
+        ]
+      },
+      "102:7": {
+        "id": "102:7",
+        "name": "Palette",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 90,
+        "height": 7.5,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:8",
+          "102:9",
+          "102:10"
+        ]
+      },
+      "102:8": {
+        "id": "102:8",
+        "name": "Palette 3",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 30,
+        "height": 7.5,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 1,
+            "g": 83,
+            "b": 166,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:9": {
+        "id": "102:9",
+        "name": "Palette 2",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 30,
+        "top": 0,
+        "width": 30,
+        "height": 7.5,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 126,
+            "g": 165,
+            "b": 156,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:10": {
+        "id": "102:10",
+        "name": "Palette 1",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 60,
+        "top": 0,
+        "width": 30,
+        "height": 7.5,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 247,
+            "g": 230,
+            "b": 65,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:11": {
+        "id": "102:11",
+        "name": "Created by: Carter Bays and Craig Thomas",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Created by:\nCarter Bays and Craig Thomas",
+        "position": "absolute",
+        "left": 0,
+        "top": 19.75,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "center",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 7.499999523162842,
+        "fontFamily": "Sequel Sans",
+        "fontWeight": 400
+      },
+      "102:24": {
+        "id": "102:24",
+        "name": "How I Met Your Mother",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "How I Met\nYour Mother",
+        "position": "absolute",
+        "left": 0,
+        "top": 52.5,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "center",
+        "textDecoration": "none",
+        "lineHeight": 0.865,
+        "letterSpacing": 0,
+        "fontSize": 45,
+        "fontFamily": "Sequel Sans",
+        "fontWeight": 400
+      },
+      "102:25": {
+        "id": "102:25",
+        "name": "Middle",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 30,
+        "top": 175.375,
+        "width": 390,
+        "height": 428,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 223,
+            "g": 221,
+            "b": 208,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:26",
+          "102:30",
+          "102:31"
+        ]
+      },
+      "102:26": {
+        "id": "102:26",
+        "name": "Frame 1",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 390,
+        "height": 196.1875,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:43",
+          "102:28",
+          "102:42",
+          "102:44",
+          "102:27",
+          "102:29"
+        ]
+      },
+      "102:43": {
+        "id": "102:43",
+        "name": "Palette 4",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 130,
+        "top": 0.125,
+        "width": 130,
+        "height": 196,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 126,
+            "g": 165,
+            "b": 156,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:28": {
+        "id": "102:28",
+        "name": "Ted",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/a438/1671/506145ee19e37af334eb14291afcac9d?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=iG-4OpAh8XBrsu7lEs2g3gHCMZAvBigSuv6JtubwX5uBO3pFZAqBPOiys0SRFAhN30jOJ5DqhTm7z3Vd6dbPWHTEPjNjBeFNfiWsDVoS2NrfVTyYDf-JA-IX0wedd-f0OUCkqFwHdGfCzKR0RfYuwKzHfMbCjruUW18lpBFd6bvv8CXReCde0MU3KrjmFCs0v-TDhJEtMy4mjTTXpwDzkqWRY4E1Hpni8Eu6Xe5lYgjvNCz6g6kgmJuvCXTatqrfBDXo4DXCGjrDIrZzBZGPbxl90n2uGVL60HHiNlrF0F6wFNmUxZzLv3QvT33hUkaPCoUt9k-c4uaBUXovQZEzKw__",
+        "position": "absolute",
+        "left": 130,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:42": {
+        "id": "102:42",
+        "name": "Palette 3",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 0,
+        "top": 0.125,
+        "width": 130,
+        "height": 196,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 1,
+            "g": 83,
+            "b": 166,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:44": {
+        "id": "102:44",
+        "name": "Palette 5",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 260,
+        "top": 0.125,
+        "width": 130,
+        "height": 196,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 247,
+            "g": 230,
+            "b": 65,
+            "a": 1
+          }
+        },
+        "effects": [],
+        "cornerRadius": 0
+      },
+      "102:27": {
+        "id": "102:27",
+        "name": "Robin",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/e1c6/b3a5/e0b8d210cb2b113ef4955fdd0af64d80?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=YDl1Zyz3aYFQR5UuWSYUIsHWrpzlPVhUyTNRmqlf1muC8V9VhxnDRxqcYqGy4P-rA8k3aWIhgIIeThOZSFDVExsauXj60r-MhChaKCZ2KzN-hoe4Iu~HlsagYOLN9SKbeZu5OmK7f75Ftr-ELF2aPo~8fOPSTzIEI8fF~ML2rhpN2aSoD9Nu8cWlA~pWMvs~~-7w1dvwdrIq~N4aby6QOWOfTdyoqGdgMUg5UXXEn7u5hDga3fIpntBffgpGksXrXsSLP9H06sN7IFPvJQ8jXieJKK9vG8BuRXXfov9IcqrJW8ILgo65apAri7Qq5s~d8~3D-AmENy1XvAiGscqTQw__",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:29": {
+        "id": "102:29",
+        "name": "Tracy",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/a82b/c5c0/15f6fb4736a5624f41932c24add65849?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=DwKgvG6svIBm4YCQBptYBxIGkG84~dso4JS7yNnkFyYaRZPkErOX9pZIHBXAGmQ~tJnhDMei6DD7uS5mEf1x~PfEx2hu21yv4vXa0j-HoLUxlnDwrwJvWIImf0au~8bIAStQQsnR1sJ6aE0jStSDBAa8iOC1knz7hGHP4aKvy9TmiXB9vcEFTAyfHW2muT6rOX2E4iLwrgWmN2GxJCda1ke4wM95kFzgGRHYHGZWG2QNzojcGmXUMAXKWYyG4mKqHWLjqMzp9Eaz7DmHuXw-ZQxtCv2LJFU232wn03PMtz85yGBaZ9KM3M3A5aHmcpqrD~lNyEe730OcU-E2iSbGwA__",
+        "position": "absolute",
+        "left": 260,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:30": {
+        "id": "102:30",
+        "name": "Frame 2",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 196.1875,
+        "width": 390,
+        "height": 35.625,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 237,
+            "g": 234,
+            "b": 224,
+            "a": 1
+          }
+        },
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0
+      },
+      "102:31": {
+        "id": "102:31",
+        "name": "Frame 1",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 231.8125,
+        "width": 390,
+        "height": 196.1875,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:32",
+          "102:33",
+          "102:34"
+        ]
+      },
+      "102:32": {
+        "id": "102:32",
+        "name": "Barney",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/a295/a83f/7be2c86791ac2916907f77026689eab8?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=mLU0LAuYes3uRKBKranP~tXUfqyzRZiBVQpg2QHEZTzK1QfRTeaX2mwJEKgnZGW1-T7p4lRSTgoD81cTmgjWnQCro0A2riyjq4EHk0m396iK6031dJ31bQUEXPa8xgMM8SfAzLqzzDDXEnW12HTmKPwaimswza6DbjmQg5y4TK3BGeQIfdbJvQlvYX3~mAPH5qlkTT5GIX8G5iaItiISWDz1qdgisU3m9I3g5d-mwK5M20YrH13BfnSEXihhV1YcIco~J~9Ku~VsEmaC8jVUStmEowfqTfha2A-dAxbaOxb9xbxJ~A2tgrDJOopeaVZqRAJTTtTXGhd5-AO~O96YBQ__",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:33": {
+        "id": "102:33",
+        "name": "Lily",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/c0c2/bf35/baacaabc4aa7b6aa2229211655b5b40e?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=I5Y6ojI7--TnD8y~ohV85DWAwZnBSq1iw6eafaimNc1o48ngbj~3mgWitl1XSc~ljnbTNI0mprMPIDfp1bnwmbVb5oQKPTLJh5PYOrCFZmif0KPpzpBXGt7USMPc2WGTvar0CXGv4Cc4Q3zEBZe7HwyYNrmXtbFj5Lu1x~rZSey0nlbpA-UZJHFWMzl9y4~axXf~kB9Nwf4kMvDa7WZOx1qLSNdqmvWIYW7fgBw-LxFCzkiuN6~wLrdVUW82~fIYT10Y1dV8AFzY0dFbKxLeLuMcbU~2n~6KHO2Xa6zLamR3LmGTV5RNeiPmFikckSnD~w7vpBiYCLhE7tSXFoMOMA__",
+        "position": "absolute",
+        "left": 130,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:34": {
+        "id": "102:34",
+        "name": "Marshall",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/1a1f/2e12/9bb844a5e4f6fded25c7a5a9af512de2?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=Khqz4ZsVA4oA0FCqUxJmFtU2w~HcV2ygx30qHwY~LuxdJj-ytWFqbFAdrpys-Q6Vgo~xfOQ6c82k4IoHHU-PEn4uxtmFeqhQIcUja5Kca30x3JTln0CITmDZDsrZfvwroHnrlizO5YrVRVO-IixD1VJkBOJCVnAV39EkpgqAoSJf5Gf0koDdKvVCuv1GqCjdG74a6dkemPZ8dP3nW0pXowZi-d8gF85SV245z3G3lorHyiLVipFrMyJLlKFeaSn6waQVwRApnDhNwi3H41bwZ~dW899IM8uVVmP-CluWO-4MUUneYlItzWcRQEzXUGNTmfSPQeTrBcjT3Qe-mUUHXA__",
+        "position": "absolute",
+        "left": 260,
+        "top": 0,
+        "width": 130,
+        "height": 196.1875,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:35": {
+        "id": "102:35",
+        "name": "Bottom",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 30,
+        "top": 618.375,
+        "width": 390,
+        "height": 26.625,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:36",
+          "102:37"
+        ]
+      },
+      "102:36": {
+        "id": "102:36",
+        "name": "CBS",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/c582/fe08/0d04bb98a11a500a0c0b2824df87c1d6?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=k~RY725MTo9uIYJFH3Pii1Wfi~XUQF2GT4thkOe0R6uNwRdq7CfEsZiGVhqn6HkglbAXdyJfggJn60-w0it1PIePwZoXEox4~w0og2w-MNrv2CujRbyv-nzSJqQOrUpf5AgbfcM4-vPqkUj4R1KFrkvkSAHeUgmqRW77teU9xTlWvJyvUJedFjeS1pSY6wXmhCkRMpLoFi~pMSncqW1qIrf6umLeyuXbZTDHtELDwoK1wZYkKYLLyRefQ6se4Z~LoxVexAfvlhP8nYv3x2PzT7piTo-x-qdMMjzyT5b4X2mJGGBu9VAHhtVGp8yDQStUnVNZM5SlAhprX-h-yTTrhw__",
+        "position": "absolute",
+        "left": 0,
+        "top": 3.9375,
+        "width": 61.25,
+        "height": 18.75,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "102:37": {
+        "id": "102:37",
+        "name": "Cast",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 183.125,
+        "top": 0,
+        "width": 206.875,
+        "height": 26.625,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "102:38",
+          "102:39",
+          "102:40"
+        ]
+      },
+      "102:38": {
+        "id": "102:38",
+        "name": "Josh Radnor Neil Patrick Harris Jason Segel",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Josh Radnor\nNeil Patrick Harris\nJason Segel",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "center",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 7.499999523162842,
+        "fontFamily": "Sequel Sans",
+        "fontWeight": 400
+      },
+      "102:39": {
+        "id": "102:39",
+        "name": "Cobie Smulders Alyson Hannigan Cristin Milioti",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Cobie Smulders\nAlyson Hannigan\nCristin Milioti",
+        "position": "absolute",
+        "left": 74.6875,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "center",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 7.499999523162842,
+        "fontFamily": "Sequel Sans",
+        "fontWeight": 400
+      },
+      "102:40": {
+        "id": "102:40",
+        "name": "Lyndsy Fonseca David Henrie Marshall Manesh",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Lyndsy Fonseca\nDavid Henrie\nMarshall Manesh",
+        "position": "absolute",
+        "left": 144.5625,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "center",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 7.499999523162842,
+        "fontFamily": "Sequel Sans",
+        "fontWeight": 400
+      },
+      "102:41": {
+        "id": "102:41",
+        "name": "Love is the best thing we do",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 30,
+        "top": 385.3125,
+        "width": 390,
+        "height": 27.813730239868164,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 223,
+            "g": 221,
+            "b": 208,
+            "a": 1
+          }
+        },
+        "paths": [
+          {
+            "d": "M0 21.8644L16.2685 21.8644L16.2685 17.6063L5.13106 17.6063L5.13106 0.301995L0 0.301995L0 21.8644Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M25.8065 5.49631C20.5547 5.49631 17.4157 8.69745 17.4157 13.8918C17.4157 19.0559 20.5547 22.257 25.8065 22.257C31.0281 22.257 34.1671 19.0559 34.1671 13.8918C34.1671 8.69745 31.0281 5.49631 25.8065 5.49631ZM25.8065 18.7539C23.6635 18.7539 22.3053 17.2439 22.3053 13.8918C22.3053 10.5396 23.6635 8.99945 25.8065 8.99945C27.9494 8.99945 29.3076 10.5396 29.3076 13.8918C29.3076 17.2439 27.9494 18.7539 25.8065 18.7539Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M45.4993 21.8644L51.2642 5.8587L46.1935 5.8587L42.7526 16.6701L42.6319 16.6701L39.2213 5.8587L34.0298 5.8587L39.7947 21.8644L45.4993 21.8644Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M62.4997 16.7607C62.228 17.7573 61.4433 19.0257 59.3607 19.0257C57.3384 19.0257 56.0406 17.3949 56.0104 14.8581L67.5402 14.8581C67.9326 8.72765 64.5521 5.49631 59.3305 5.49631C54.1391 5.49631 51.0906 8.72765 51.0906 13.8918C51.0906 19.0559 54.2296 22.257 59.3607 22.257C64.5823 22.257 66.8158 19.3277 67.3893 17.0929L62.4997 16.7607ZM59.3305 8.63705C61.3829 8.63705 62.5299 10.0866 62.6506 11.959L56.0406 11.959C56.1613 10.0866 57.3082 8.63705 59.3305 8.63705Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M75.5497 0L75.5497 3.77494L80.3487 3.77494L80.3487 0L75.5497 0ZM75.5497 5.8587L75.5497 21.8644L80.3487 21.8644L80.3487 5.8587L75.5497 5.8587Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M96.637 10.2376C96.0937 7.24788 93.166 5.49631 89.3328 5.49631C85.56 5.49631 82.2097 7.24788 82.2097 10.449C82.2097 13.9522 84.9563 14.8883 87.552 15.2809L89.3932 15.5829C91.1136 15.8547 92.2303 16.3077 92.2303 17.3043C92.2303 18.4821 91.174 19.2069 89.5139 19.2069C87.6728 19.2069 86.4654 18.3915 86.1334 16.6701L81.6362 17.2137C82.1795 20.4451 85.228 22.257 89.4837 22.257C93.7999 22.257 97.1199 20.6866 97.1199 17.0929C97.1199 13.4388 94.2526 12.563 91.3249 12.0798L89.6346 11.808C88.035 11.5664 86.9786 11.2342 86.9786 10.2074C86.9786 9.12025 87.9746 8.51626 89.363 8.51626C90.8118 8.51626 91.9285 9.33164 92.2002 10.751L96.637 10.2376Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M113.349 18.2707C111.99 18.2707 111.447 18.1197 111.447 16.7003L111.447 8.96925L114.707 8.96925L114.707 5.8587L111.447 5.8587L111.447 1.41938L106.648 1.41938L106.648 5.8587L104.143 5.8587L104.143 8.96925L106.648 8.96925L106.648 17.8781C106.648 21.2 108.097 21.9248 111.598 21.9248C112.775 21.9248 114.164 21.9248 114.616 21.8644L114.616 18.2405C114.254 18.2707 113.832 18.2707 113.349 18.2707Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M121.141 8.00286L121.141 0L116.342 0L116.342 21.8644L121.141 21.8644L121.141 13.3482C121.141 10.6906 122.65 9.33164 124.249 9.33164C126 9.33164 126.966 10.1772 126.966 12.5328L126.966 21.8644L131.765 21.8644L131.765 11.3852C131.765 7.30828 129.32 5.49631 126.242 5.49631C123.887 5.49631 122.288 6.58349 121.261 8.03306L121.141 8.00286Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M144.933 16.7607C144.661 17.7573 143.876 19.0257 141.794 19.0257C139.771 19.0257 138.474 17.3949 138.443 14.8581L149.973 14.8581C150.366 8.72765 146.985 5.49631 141.763 5.49631C136.572 5.49631 133.524 8.72765 133.524 13.8918C133.524 19.0559 136.663 22.257 141.794 22.257C147.015 22.257 149.249 19.3277 149.822 17.0929L144.933 16.7607ZM141.763 8.63705C143.816 8.63705 144.963 10.0866 145.084 11.959L138.474 11.959C138.594 10.0866 139.741 8.63705 141.763 8.63705Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M167.671 5.49631C165.408 5.49631 163.778 6.34189 162.872 7.76127L162.752 7.76127L162.752 0.0301991L157.952 0.0301991L157.952 21.8946L162.54 21.8946L162.54 19.7505L162.661 19.7505C163.687 21.5624 165.559 22.257 167.551 22.257C171.535 22.257 174.462 19.0559 174.462 13.8918C174.462 8.69745 171.535 5.49631 167.671 5.49631ZM166.041 18.6633C163.898 18.6633 162.51 17.1231 162.51 13.8918C162.51 10.6302 163.898 9.09005 166.041 9.09005C168.184 9.09005 169.573 10.6302 169.573 13.8918C169.573 17.1231 168.184 18.6633 166.041 18.6633Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M187.339 16.7607C187.068 17.7573 186.283 19.0257 184.2 19.0257C182.178 19.0257 180.88 17.3949 180.85 14.8581L192.38 14.8581C192.772 8.72765 189.392 5.49631 184.17 5.49631C178.979 5.49631 175.93 8.72765 175.93 13.8918C175.93 19.0559 179.069 22.257 184.2 22.257C189.422 22.257 191.656 19.3277 192.229 17.0929L187.339 16.7607ZM184.17 8.63705C186.223 8.63705 187.37 10.0866 187.49 11.959L180.88 11.959C181.001 10.0866 182.148 8.63705 184.17 8.63705Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M208.405 10.2376C207.862 7.24788 204.934 5.49631 201.101 5.49631C197.328 5.49631 193.978 7.24788 193.978 10.449C193.978 13.9522 196.724 14.8883 199.32 15.2809L201.161 15.5829C202.882 15.8547 203.998 16.3077 203.998 17.3043C203.998 18.4821 202.942 19.2069 201.282 19.2069C199.441 19.2069 198.233 18.3915 197.901 16.6701L193.404 17.2137C193.947 20.4451 196.996 22.257 201.252 22.257C205.568 22.257 208.888 20.6866 208.888 17.0929C208.888 13.4388 206.021 12.563 203.093 12.0798L201.403 11.808C199.803 11.5664 198.747 11.2342 198.747 10.2074C198.747 9.12025 199.743 8.51626 201.131 8.51626C202.58 8.51626 203.697 9.33164 203.968 10.751L208.405 10.2376Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M218.654 18.2707C217.296 18.2707 216.753 18.1197 216.753 16.7003L216.753 8.96925L220.013 8.96925L220.013 5.8587L216.753 5.8587L216.753 1.41938L211.954 1.41938L211.954 5.8587L209.449 5.8587L209.449 8.96925L211.954 8.96925L211.954 17.8781C211.954 21.2 213.403 21.9248 216.904 21.9248C218.081 21.9248 219.469 21.9248 219.922 21.8644L219.922 18.2405C219.56 18.2707 219.137 18.2707 218.654 18.2707Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M236.118 18.2707C234.76 18.2707 234.216 18.1197 234.216 16.7003L234.216 8.96925L237.476 8.96925L237.476 5.8587L234.216 5.8587L234.216 1.41938L229.417 1.41938L229.417 5.8587L226.912 5.8587L226.912 8.96925L229.417 8.96925L229.417 17.8781C229.417 21.2 230.866 21.9248 234.367 21.9248C235.544 21.9248 236.933 21.9248 237.386 21.8644L237.386 18.2405C237.023 18.2707 236.601 18.2707 236.118 18.2707Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M243.91 8.00286L243.91 0L239.111 0L239.111 21.8644L243.91 21.8644L243.91 13.3482C243.91 10.6906 245.419 9.33164 247.019 9.33164C248.769 9.33164 249.735 10.1772 249.735 12.5328L249.735 21.8644L254.534 21.8644L254.534 11.3852C254.534 7.30828 252.09 5.49631 249.011 5.49631C246.657 5.49631 245.057 6.58349 244.031 8.03306L243.91 8.00286Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M256.716 0L256.716 3.77494L261.515 3.77494L261.515 0L256.716 0ZM256.716 5.8587L256.716 21.8644L261.515 21.8644L261.515 5.8587L256.716 5.8587Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M268.295 8.00286L268.295 5.8587L263.708 5.8587L263.708 21.8644L268.507 21.8644L268.507 13.1972C268.507 10.5698 269.986 9.33164 271.615 9.33164C273.366 9.33164 274.332 10.1772 274.332 12.5328L274.332 21.8644L279.131 21.8644L279.131 11.3852C279.131 7.30828 276.686 5.49631 273.517 5.49631C271.042 5.49631 269.412 6.58349 268.416 8.03306L268.295 8.00286Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M297.309 5.8587L292.721 5.8587L292.721 7.82167L292.6 7.82167C291.574 6.1003 289.763 5.49631 287.771 5.49631C283.847 5.49631 280.92 8.45586 280.92 13.2576C280.92 18.0895 283.847 21.049 287.65 21.049C289.914 21.049 291.453 20.3243 292.389 18.9955L292.51 18.9955L292.51 20.5357C292.51 23.314 291.121 24.3408 289.099 24.3408C287.349 24.3408 286.262 23.6764 285.779 22.0456L281.01 22.4986C282.006 26.3038 285.175 27.8137 289.099 27.8137C293.687 27.8137 297.309 26.0018 297.309 20.6263L297.309 5.8587ZM289.28 17.5157C287.168 17.5157 285.809 15.8849 285.809 13.2576C285.809 10.6906 287.168 9.09005 289.28 9.09005C291.363 9.09005 292.751 10.6906 292.751 13.2576C292.751 15.8849 291.363 17.5157 289.28 17.5157Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M331.12 5.8587L326.05 5.8587L323.243 16.5493L323.122 16.5493L320.466 5.8587L315.214 5.8587L312.558 16.5493L312.437 16.5493L309.63 5.8587L304.379 5.8587L309.57 21.8644L314.822 21.8644L317.629 11.355L317.749 11.355L320.587 21.8644L325.929 21.8644L331.12 5.8587Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M342.369 16.7607C342.097 17.7573 341.312 19.0257 339.23 19.0257C337.208 19.0257 335.91 17.3949 335.88 14.8581L347.409 14.8581C347.802 8.72765 344.421 5.49631 339.2 5.49631C334.008 5.49631 330.96 8.72765 330.96 13.8918C330.96 19.0559 334.099 22.257 339.23 22.257C344.451 22.257 346.685 19.3277 347.258 17.0929L342.369 16.7607ZM339.2 8.63705C341.252 8.63705 342.399 10.0866 342.52 11.959L335.91 11.959C336.03 10.0866 337.177 8.63705 339.2 8.63705Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M361.818 5.49631C357.924 5.49631 354.996 8.69745 354.996 13.8918C354.996 19.0559 357.924 22.257 361.908 22.257C363.93 22.257 365.772 21.5624 366.798 19.7505L366.919 19.7505L366.919 21.8644L371.506 21.8644L371.506 0L366.737 0L366.737 7.76127L366.617 7.76127C365.681 6.34189 364.081 5.49631 361.818 5.49631ZM363.447 18.6633C361.274 18.6633 359.886 17.1231 359.886 13.8918C359.886 10.6302 361.274 9.09005 363.447 9.09005C365.56 9.09005 366.979 10.6302 366.979 13.8918C366.979 17.1231 365.56 18.6633 363.447 18.6633Z",
+            "fillRile": "nonzero"
+          },
+          {
+            "d": "M381.639 5.49631C376.388 5.49631 373.249 8.69745 373.249 13.8918C373.249 19.0559 376.388 22.257 381.639 22.257C386.861 22.257 390 19.0559 390 13.8918C390 8.69745 386.861 5.49631 381.639 5.49631ZM381.639 18.7539C379.496 18.7539 378.138 17.2439 378.138 13.8918C378.138 10.5396 379.496 8.99945 381.639 8.99945C383.782 8.99945 385.141 10.5396 385.141 13.8918C385.141 17.2439 383.782 18.7539 381.639 18.7539Z",
+            "fillRile": "nonzero"
+          }
+        ]
+      }
+    },
+    "root_id": "102:2",
+    "backgroundColor": {
+      "r": 245,
+      "g": 245,
+      "b": 245,
+      "a": 1
+    }
+  }
+}

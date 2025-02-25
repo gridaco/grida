@@ -3,9 +3,9 @@
   "private": true,
   "license": "Apache 2.0",
   "scripts": {
-    "clean": "rimraf node_modules pnpm-lock.yaml",
-    "clean:install": "pnpm run clean && pnpm install"
+    "test": "pnpm -r --filter 'packages/*' run test"
   },
+  "packageManager": "pnpm@9.15.4",
   "resolutions": {
     "@design-sdk/figma-node": "0.0.25",
     "@design-sdk/figma-core": "0.0.53",
@@ -16,9 +16,13 @@
     "@types/react-dom": "18.2.19",
     "typescript": "^5",
     "csstype": "3.1.0",
-    "axios": "1.6.7"
+    "axios": "1.6.7",
+    "prosemirror-model": "1.23.0",
+    "prosemirror-view": "1.36.0"
   },
   "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
     "typescript": "^5.3.3"
   }
 }

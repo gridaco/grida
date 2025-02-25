@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+   <dict>
+      <key>CFBundleName</key>
+      <string>Grida</string>
+      <key>CFBundleDisplayName</key>
+      <string>Grida</string>
+      <key>CFBundleIdentifier</key>
+      <string>co.grida.desktop</string>
+      <key>CFBundleURLName</key>
+      <string>co.grida.desktop</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+         <string>grida</string>
+      </array>
+      <key>CFBundleDocumentTypes</key>
+      <array>
+         <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+               <string>grida</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>Grida Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>CFBundleTypeIconFile</key>
+            <string>dotgrida.icns</string>
+         </dict>
+      </array>
+   </dict>
+</plist>

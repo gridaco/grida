@@ -1,0 +1,13 @@
+@import "./ui.css";
+
+.desktop-drag-area{
+  -webkit-app-region: drag;
+}
+
+.no-drag{
+  -webkit-app-region: drag;
+}
+
+body, a, button, input, textarea, select {
+  -webkit-app-region: no-drag;
+}

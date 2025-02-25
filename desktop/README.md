@@ -1,12 +1,8 @@
-# Grida Desktop
+# Grida Desktop App
 
-Grida Desltop built with [Electron](https://www.electronjs.org/)
+https://github.com/gridaco/grida/releases/latest
 
-## Running
 
-```bash
-yarn
-yarn start
-```
+# Building locally
 
-Currently the desktop project is just a wrapper of the web app, and we will keep it that way for a while due to limited resources.
+See the [CONTRIBUTING.md](CONTRIBUTING.md) file for instructions on how to build and run the project locally.

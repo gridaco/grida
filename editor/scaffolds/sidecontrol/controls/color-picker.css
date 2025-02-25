@@ -1,0 +1,25 @@
+.cusom .react-colorful {
+  border-radius: 0px;
+}
+
+.cusom .react-colorful__saturation {
+  border-radius: 0;
+  border-bottom: none;
+}
+
+.cusom .react-colorful__hue {
+  order: 0;
+}
+
+.cusom .react-colorful__hue,
+.cusom .react-colorful__alpha {
+  height: 20px;
+  border-radius: 0;
+}
+
+.cusom .react-colorful__hue-pointer,
+.cusom .react-colorful__saturation-pointer,
+.cusom .react-colorful__alpha-pointer {
+  width: 20px;
+  height: 20px;
+}

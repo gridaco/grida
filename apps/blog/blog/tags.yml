@@ -1,0 +1,14 @@
+canvas:
+  label: Canvas
+  permalink: /canvas
+  description: canvas tag description
+
+snap:
+  label: Snap
+  permalink: /snap
+  description: Snap tag description
+
+threshold:
+  label: Threshold
+  permalink: /threshold
+  description: Threshold tag description
