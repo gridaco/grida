@@ -124,7 +124,7 @@ function Main() {
         <div className="absolute bottom-8 left-8">
           <h2 className="text-2xl text-white">
             Polestar 4<br />
-            시승 초대하고 경품을 받아보세요
+            시승 신청하고 경품을 받아보세요
           </h2>
         </div>
       </div>
