@@ -52,7 +52,7 @@ export default async function OrganizationsSettingsProfilePage({
     return notFound();
   }
 
-  const isowner = data.owner_id === auth.user.id;
+  const iamowner = data.owner_id === auth.user.id;
 
   return (
     <main className="container mx-auto max-w-screen-md mt-20 mb-40 grid gap-40">
@@ -119,6 +119,19 @@ export default async function OrganizationsSettingsProfilePage({
           <Button form="profile">Save</Button>
         </CardFooter>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href={`/organizations/${organization_name}/people`}
+            className="underline"
+          >
+            Manage members
+          </Link>
+        </CardContent>
+      </Card>
       <Card className="border-destructive">
         <CardHeader>
           <CardTitle className="text-destructive">Danger Zone</CardTitle>
@@ -137,7 +150,7 @@ export default async function OrganizationsSettingsProfilePage({
               </span>
             </div>
             <DeleteOrganizationConfirm org={organization_name}>
-              <Button disabled={!isowner} variant="destructive">
+              <Button disabled={!iamowner} variant="destructive">
                 Delete this organization
               </Button>
             </DeleteOrganizationConfirm>

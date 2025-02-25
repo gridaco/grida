@@ -2331,6 +2331,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "organization_member_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile"
+            referencedColumns: ["uid"]
+          },
+          {
             foreignKeyName: "public_organization_member_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -2455,27 +2462,7 @@ export type Database = {
       }
     }
     Views: {
-      dummy_with_user: {
-        Row: {
-          created_at: string | null
-          data: Json | null
-          email: string | null
-          enum: Database["grida_commerce"]["Enums"]["currency"] | null
-          float4: number | null
-          float8: number | null
-          id: number | null
-          int2: number | null
-          int4: number | null
-          jsonb: Json | null
-          numeric: number | null
-          richtext: Json | null
-          text: string | null
-          timestamptz: string | null
-          user_id: string | null
-          varchar: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       generate_combinations:
@@ -2675,4 +2662,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
