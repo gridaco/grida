@@ -20,6 +20,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { motion } from "framer-motion";
+import { PolestarTypeLogo } from "@/components/logos";
 
 const EXT_FORM_LINK =
   "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
@@ -57,19 +59,20 @@ function Hero({ data, onNext }: { data: CampaignData; onNext?: () => void }) {
     <div className="relative min-h-screen w-full">
       {/* Background Image */}
       <ScreenBackground>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <motion.img
           src="https://www.polestar.com/dato-assets/11286/1717404259-12-polestar-4-overview-interior-end-kr-d.png?q=80&dpr=2&w=1920"
           alt="Polestar 4"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+          initial={{ opacity: 0.5, scale: 1.05 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 3.5, ease: "easeOut" }}
         />
       </ScreenBackground>
 
       {/* Content Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent">
         <div className="container mx-auto px-4 pt-8">
-          {/* Logo */}
-          <h1 className="text-2xl text-white mb-auto">Polestar</h1>
+          <PolestarTypeLogo className="text-white" />
 
           {/* Hero Content */}
           <div className="mt-[20vh] max-w-xl space-y-4">
@@ -106,8 +109,8 @@ function Main() {
   return (
     <div>
       {/* Header */}
-      <header className="py-4">
-        <h1 className="text-3xl font-light text-center">Polestar</h1>
+      <header className="py-4 flex items-center justify-center">
+        <PolestarTypeLogo className="text-black" />
       </header>
 
       {/* Hero Section */}
@@ -132,18 +135,22 @@ function Main() {
       </div>
 
       {/* Stats Grid */}
-      <Card className="mx-4 py-4 px-6 grid grid-cols-3 gap-4">
+      <Card className="mx-4 py-4 px-6 grid grid-cols-3">
         <div className="text-center it">
-          <p className="text-xl font-semibold">1명</p>
-          <p className="text-sm mt-2 text-muted-foreground">Polestar 4</p>
+          <p className="text-xl font-medium">1명</p>
+          <p className="text-sm font-light mt-2 text-muted-foreground">
+            Polestar 4
+          </p>
         </div>
         <div className="text-center">
-          <p className="text-xl font-semibold">20명</p>
-          <p className="text-sm mt-2 text-muted-foreground">iPad Air 11</p>
+          <p className="text-xl font-medium">20명</p>
+          <p className="text-sm font-light mt-2 text-muted-foreground">
+            iPad Air 11
+          </p>
         </div>
         <div className="text-center">
-          <p className="text-xl font-semibold">100%</p>
-          <p className="text-sm mt-2 text-muted-foreground">
+          <p className="text-xl font-medium">100%</p>
+          <p className="text-sm font-light mt-2 text-muted-foreground">
             스타벅스 아메리카노
           </p>
         </div>
@@ -181,7 +188,7 @@ function Main() {
           onClick={() => {
             window.open(EXT_FORM_LINK, "_blank");
           }}
-          className="w-full bg-black text-white hover:bg-gray-800"
+          className="w-full bg-black text-white hover:bg-gray-800 rounded-none py-6"
           size="lg"
         >
           시승 신청하기
