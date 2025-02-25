@@ -9,7 +9,6 @@ import {
   ScreenRoot,
   ScreenScrollable,
   ScreenWindowRoot,
-  Timer,
 } from "@/theme/templates/kit/components";
 import { CampaignData, mock } from "../../data";
 import { CountdownTimer } from "../../timer";
@@ -18,8 +17,10 @@ const mkshare = (d: CampaignData) => {
   return {
     title: "Polestar 2",
     text: `${d.user.name}님의 Polestar 2 시승 초대 이벤트`,
-    // url: `https://demo.grida.co/${d.cid}`,
-    url: `http://localhost:3000/demo/sales/campaign/polestar-kr-2503/${d.cid}/join`,
+    url:
+      process.env.NODE_ENV === "production"
+        ? `https://demo.grida.co/demo/sales/campaign/polestar-kr-2503/${d.cid}/join`
+        : `http://localhost:3000/demo/sales/campaign/polestar-kr-2503/${d.cid}/join`,
   };
 };
 
