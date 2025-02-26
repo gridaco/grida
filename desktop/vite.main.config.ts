@@ -8,4 +8,7 @@ export default defineConfig({
       external: [...builtinModules, "keytar"],
     },
   },
+  define: {
+    INSIDERS: process.env.INSIDERS || 0,
+  },
 });

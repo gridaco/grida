@@ -23,7 +23,7 @@ export default function WelcomeContent() {
         </CardHeader>
         <CardContent className="min-w-96">
           <div className="grid gap-2">
-            <Link href="/" className="w-full justify-start">
+            <Link href="/dashboard" className="w-full justify-start">
               <Button variant="outline" className="w-full">
                 <HomeIcon className="mr-2 h-4 w-4" />
                 Home

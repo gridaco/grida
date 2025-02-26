@@ -5,6 +5,12 @@ import {
 } from "electron";
 import path from "node:path";
 
+const IS_INSIDERS = INSIDERS === 1;
+const IS_DEV = process.env.NODE_ENV === "development";
+
+const EDITOR_BASE_URL =
+  IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://app.grida.co";
+
 const trafficLightPosition = {
   x: 14,
   y: 14,
@@ -18,11 +24,6 @@ const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
   minWidth: 384,
   minHeight: 384,
 };
-
-const EDITOR_BASE_URL =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:3000"
-    : "https://app.grida.co";
 
 function register_window_hooks(window: BrowserWindow) {
   window.webContents.on("will-prevent-unload", (event) => {
@@ -108,15 +109,12 @@ export function create_login_window() {
 function shouldOpenExternally(origin: string, target: string) {
   // if the redirect is triggered by the sign-in page, allow it
   if (origin.includes("/sign-in")) return false;
+  if (origin.includes("/insiders/auth")) return false;
 
-  // deny all others
-  if (
-    !(
-      target.startsWith("https://app.grida.co") ||
-      (process.env.NODE_ENV === "development" &&
-        target.startsWith("http://localhost:3000"))
-    )
-  ) {
-    return true;
+  // need some more handling
+  if (target.startsWith(EDITOR_BASE_URL)) {
+    return false;
   }
+
+  return true;
 }

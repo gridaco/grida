@@ -6,6 +6,7 @@ Thank you for your interest in contributing to Grida Desktop! We appreciate your
 - [Prerequisites](#prerequisites)
 - [Setting Up Your Environment](#setting-up-your-environment)
 - [Development Workflow](#development-workflow)
+- [Making Icons](#misc-making-icons)
 
 ## Prerequisites
 
@@ -96,3 +97,37 @@ If you're on macOS and want to build Linux packages for Grida Desktop, you can u
    Use an image that matches your build environment, for example, Node 18 on Debian Bullseye.
    ```sh
    docker pull node:22-bullseye
+
+
+
+
+## Misc: Making Icons
+
+
+### macOS Icon (.icns)
+
+- prepare a 1024x1024 PNG image named `icon.png`
+
+```bash
+mkdir icon.iconset
+sips -z 16 16     icon.png --out icon.iconset/icon_16x16.png
+sips -z 32 32     icon.png --out icon.iconset/icon_16x16@2x.png
+sips -z 32 32     icon.png --out icon.iconset/icon_32x32.png
+sips -z 64 64     icon.png --out icon.iconset/icon_32x32@2x.png
+sips -z 128 128   icon.png --out icon.iconset/icon_128x128.png
+sips -z 256 256   icon.png --out icon.iconset/icon_128x128@2x.png
+sips -z 256 256   icon.png --out icon.iconset/icon_256x256.png
+sips -z 512 512   icon.png --out icon.iconset/icon_256x256@2x.png
+sips -z 512 512   icon.png --out icon.iconset/icon_512x512.png
+cp icon.png icon.iconset/icon_512x512@2x.png
+iconutil -c icns icon.iconset
+rm -r icon.iconset
+```
+
+### Windows Icon (.ico)
+
+- imagemagick is required
+
+```bash
+convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+```

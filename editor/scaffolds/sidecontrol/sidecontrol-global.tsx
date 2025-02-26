@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   SidebarMenuSectionContent,
-  SidebarRoot,
   SidebarSection,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,

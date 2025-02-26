@@ -12,7 +12,7 @@ export type OrganizationWithAvatar = Organization & {
   avatar_url: string | null;
 };
 
-interface WorkspaceState {
+export interface WorkspaceState {
   loading: boolean;
   organization: OrganizationWithAvatar;
   organizations: OrganizationWithAvatar[];

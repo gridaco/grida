@@ -25,8 +25,9 @@ import type {
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
 import type { IDocumentEditorState } from "@/grida-react-canvas/state";
+import type { grida } from "@/grida";
+import type { MenuGroup, MenuItem } from "./menu";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { grida } from "@/grida";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -218,16 +219,17 @@ export type TableXSBMainTableConnection = {
   sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
 };
 
-export type MenuItem<ID, T = {}> = {
-  section: string;
-  id: ID;
-  level?: number;
-  label: string;
-  icon: ResourceTypeIconName;
-  href?: string;
-  layout?: boolean;
-  data: T;
+export type TableMenuItemData = {
+  readonly: boolean;
+  rules: {
+    delete_restricted: boolean;
+  };
 };
+
+export type TableMenuItem = MenuItem<{
+  id: GDocTableID;
+  data: TableMenuItemData;
+}>;
 
 export type TableType =
   | "response"
@@ -343,16 +345,6 @@ interface IEditorDateContextState {
   datetz: typeof SYM_LOCALTZ | string;
 }
 
-export type TableMenuItem = MenuItem<
-  GDocTableID,
-  {
-    readonly: boolean;
-    rules: {
-      delete_restricted: boolean;
-    };
-  }
->;
-
 interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
@@ -362,7 +354,7 @@ interface IEditorSidebarState {
     mode_data: {
       disabled: boolean;
       tables?: TableMenuItem[];
-      menus?: MenuItem<GDocTableID>[];
+      menus?: MenuGroup<{ id: string }>[];
     };
     mode_connect: {
       disabled: boolean;
@@ -392,7 +384,7 @@ interface IInsertionMenuState {
 export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
 interface IEditorPagesState {
-  pages: MenuItem<string>[];
+  pages: MenuGroup<{ id: string }>[];
   selected_page_id?:
     | "form"
     | "form/startpage"

@@ -6,7 +6,6 @@ import type {
   EditorInit,
   FormDocumentEditorInit,
   EditorState,
-  MenuItem,
   SiteDocumentEditorInit,
   IDataGridState,
   GDocTableID,
@@ -25,9 +24,10 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
-import * as samples from "@/theme/templates/formcollection/samples";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { initDocumentEditorState } from "@/grida-react-canvas";
+import type { MenuGroup } from "./menu";
+// import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -151,12 +151,13 @@ export function table_to_sidebar_table_menu(
   }
 ): TableMenuItem {
   return {
-    section: "Tables",
+    type: "item",
     id: tb.id,
     label: tb.name,
     icon: tb.x_sb_main_table_connection ? "supabase" : "table",
-    href: tablehref(basepath, document_id, tb),
-    layout: true,
+    link: {
+      href: tablehref(basepath, document_id, tb),
+    },
     data: {
       readonly: tb.x_sb_main_table_connection
         ? SupabasePostgRESTOpenApi.table_methods_is_get_only(
@@ -225,16 +226,19 @@ function initialDatabaseEditorState(
             should_add_sb_auth_users
               ? [
                   {
+                    type: "item",
                     id: EditorSymbols.Table
                       .SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
-                    href: tablehref(
-                      base.basepath,
-                      base.document_id,
-                      sb_auth_users
-                    ),
+                    link: {
+                      href: tablehref(
+                        base.basepath,
+                        base.document_id,
+                        sb_auth_users
+                      ),
+                    },
                     label: "auth.users",
                     icon: "supabase",
-                    section: "Tables",
+                    // section: "Tables",
                     data: {
                       readonly: true,
                       rules: {
@@ -281,10 +285,7 @@ function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
   // @ts-ignore
   return {
     ...base,
-    pages: sitedocumentpagesinit({
-      basepath: base.basepath,
-      document_id: init.document_id,
-    }),
+    pages: [],
     selected_page_id: "files",
     documents: {},
     sidebar: {
@@ -471,17 +472,20 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
   const tablemenus = init.connections?.supabase?.main_supabase_table
     ? [
         {
+          type: "item",
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
-          href: tablehref(
-            basepath,
-            document_id,
-            (tables as any)[
-              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-            ]
-          ),
+          link: {
+            href: tablehref(
+              basepath,
+              document_id,
+              (tables as any)[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+              ]
+            ),
+          },
           label: "Responses",
           icon: "supabase",
-          section: "Tables",
+          // section: "Tables",
           data: {
             readonly: false,
             rules: {
@@ -492,17 +496,20 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       ]
     : [
         {
+          type: "item",
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-          href: tablehref(
-            basepath,
-            document_id,
-            (tables as any)[
-              EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-            ]
-          ),
+          link: {
+            href: tablehref(
+              basepath,
+              document_id,
+              (tables as any)[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              ]
+            ),
+          },
           label: "Responses",
           icon: "table",
-          section: "Tables",
+          // section: "Tables",
           data: {
             readonly: false,
             rules: {
@@ -511,17 +518,20 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           },
         } satisfies TableMenuItem,
         {
+          type: "item",
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
-          href: tablehref(
-            basepath,
-            document_id,
-            (tables as any)[
-              EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
-            ]
-          ),
+          link: {
+            href: tablehref(
+              basepath,
+              document_id,
+              (tables as any)[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+              ]
+            ),
+          },
           label: "Sessions",
           icon: "table",
-          section: "Tables",
+          // section: "Tables",
           data: {
             readonly: true,
             rules: {
@@ -530,15 +540,18 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           },
         } satisfies TableMenuItem,
         {
+          type: "item",
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
-          href: tablehref(
-            basepath,
-            document_id,
-            (tables as any)[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]
-          ),
+          link: {
+            href: tablehref(
+              basepath,
+              document_id,
+              (tables as any)[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]
+            ),
+          },
           label: "Customers",
           icon: "user",
-          section: "Tables",
+          // section: "Tables",
           data: {
             readonly: true,
             rules: {
@@ -566,12 +579,19 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         tables: tablemenus,
         menus: [
           {
-            id: `/${basepath}/${document_id}/data/analytics`,
-            section: "Analytics",
-            href: `/${basepath}/${document_id}/data/analytics`,
-            icon: "chart",
-            label: "Realtime",
-            data: {},
+            type: "group",
+            label: "Analytics",
+            children: [
+              {
+                type: "item",
+                id: `/${basepath}/${document_id}/data/analytics`,
+                link: {
+                  href: `/${basepath}/${document_id}/data/analytics`,
+                },
+                icon: "chart",
+                label: "Realtime",
+              },
+            ],
           },
         ],
       },
@@ -659,15 +679,69 @@ function sitedocumentpagesinit({
 }: {
   basepath: string;
   document_id: string;
-}): MenuItem<string>[] {
+}): MenuGroup<{ id: string }>[] {
+  // {
+  //   id: "site/dev-collection",
+  //   label: "home",
+  //   link: {
+  //     href: `/${basepath}/${document_id}/design`,
+  //   },
+  // },
   return [
     {
-      section: "Pages",
-      id: "site/dev-collection",
-      label: "home",
-      href: `/${basepath}/${document_id}/design`,
-      icon: "file",
-      data: {},
+      type: "group",
+      label: "Pages",
+      children: [
+        {
+          type: "item",
+          id: "home",
+          label: "home",
+          link: {
+            href: `/${basepath}/${document_id}/design`,
+          },
+          icon: "home",
+        },
+        {
+          type: "folder",
+          id: "/blog",
+          label: "/blog",
+          link: {
+            href: `#`,
+          },
+          icon: "folder",
+          children: [
+            {
+              type: "item",
+              id: "/blog/page",
+              label: "page",
+              link: {
+                href: `#`,
+              },
+              icon: "file",
+            },
+            {
+              type: "folder",
+              id: "/blog/[slug]",
+              label: "/[slug]",
+              link: {
+                href: `#`,
+              },
+              icon: "folder",
+              children: [
+                {
+                  type: "item",
+                  id: "/blog/[slug]/page",
+                  label: "page",
+                  link: {
+                    href: `#`,
+                  },
+                  icon: "file",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     },
   ];
 }
@@ -678,60 +752,75 @@ function formdocumentpagesinit({
 }: {
   basepath: string;
   document_id: string;
-}): MenuItem<string>[] {
+}): MenuGroup<{ id: string }>[] {
   return [
     {
-      section: "Design",
-      id: "campaign",
-      label: "Campaign",
-      href: `/${basepath}/${document_id}/form`,
-      icon: "folder",
-      data: {},
+      type: "group",
+      label: "Design",
+      children: [
+        {
+          type: "folder",
+          id: "campaign",
+          label: "Campaign",
+          link: {
+            href: `/${basepath}/${document_id}/form`,
+          },
+          icon: "folder",
+          children: [
+            // TODO: not ready
+            {
+              type: "item",
+              id: "form/startpage",
+              label: "Cover",
+              link: {
+                href: `/${basepath}/${document_id}/form/start`,
+              },
+              icon: "file",
+            },
+            {
+              type: "item",
+              id: "form",
+              label: "Main",
+              link: {
+                href: `/${basepath}/${document_id}/form/edit`,
+              },
+              icon: "file",
+            },
+            {
+              type: "item",
+              id: "ending",
+              label: "Ending",
+              link: {
+                href: `/${basepath}/${document_id}/form/end`,
+              },
+              icon: "file",
+            },
+          ],
+        },
+      ],
     },
-    // TODO: not ready
     {
-      section: "Design",
-      id: "form/startpage",
-      label: "Cover",
-      href: `/${basepath}/${document_id}/form/start`,
-      icon: "file",
-      level: 1,
-      data: {},
-    },
-    {
-      section: "Design",
-      id: "form",
-      label: "Main",
-      href: `/${basepath}/${document_id}/form/edit`,
-      icon: "file",
-      level: 1,
-      data: {},
-    },
-    {
-      section: "Design",
-      id: "ending",
-      label: "Ending",
-      href: `/${basepath}/${document_id}/form/end`,
-      icon: "file",
-      level: 1,
-      data: {},
-    },
-    {
-      section: "Results",
-      id: "results",
-      label: "Results",
-      href: `/${basepath}/${document_id}/data/responses`,
-      icon: "folder",
-      data: {},
-    },
-    {
-      section: "Results",
-      id: "responses",
-      label: "Responses",
-      href: `/${basepath}/${document_id}/data/responses`,
-      icon: "table",
-      level: 1,
-      data: {},
+      type: "group",
+      label: "Data",
+      children: [
+        {
+          type: "folder",
+          id: "results",
+          label: "Results",
+          icon: "folder",
+          children: [
+            {
+              type: "item",
+              id: "responses",
+              label: "Responses",
+              link: {
+                href: `/${basepath}/${document_id}/data/responses`,
+              },
+              icon: "table",
+            },
+          ],
+        },
+      ],
     },
   ];
 }
