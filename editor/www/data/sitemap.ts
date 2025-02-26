@@ -5,6 +5,7 @@ export namespace sitemap {
     pricing: "/pricing",
     slack: "/join-slack",
     docs: "/docs",
+    contact: "/contact",
     database: "/database", // FIXME: <DEADLINK> no link
     privacy: "/privacy",
     toc: "/terms",
@@ -29,6 +30,7 @@ export namespace sitemap {
     docs: { title: "Docs", href: links.docs } satisfies Item,
     thebundle: { title: "The Bundle", href: links.thebundle } satisfies Item,
     joinslack: { title: "Join Slack", href: links.slack } satisfies Item,
+    contact: { title: "Contact", href: links.contact } satisfies Item,
     database: {
       title: "Database",
       href: links.database,

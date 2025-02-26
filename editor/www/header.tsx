@@ -34,6 +34,7 @@ const resources: Item[] = [
   sitemap.items.docs,
   sitemap.items.joinslack,
   sitemap.items.thebundle,
+  sitemap.items.contact,
 ];
 
 export default function Header() {
