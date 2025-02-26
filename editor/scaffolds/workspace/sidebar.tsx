@@ -47,7 +47,7 @@ import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { usePathname } from "next/navigation";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { sitemap } from "@/www/data/sitemap";
 import "core-js/features/object/group-by";
 

@@ -1,3 +1,5 @@
+import { getPlatform } from "@/host/platform";
+import PlatformProvider from "@/host/platform-provider";
 import {
   createServerComponentClient,
   createServerComponentWorkspaceClient,
@@ -19,6 +21,8 @@ export default async function Layout({
   if (org === "_vercel") return notFound();
 
   const cookieStore = cookies();
+  const platform = await getPlatform(cookieStore);
+
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 
@@ -39,5 +43,9 @@ export default async function Layout({
     return notFound();
   }
 
-  return <Workspace organization={organization}>{children}</Workspace>;
+  return (
+    <PlatformProvider {...platform}>
+      <Workspace organization={organization}>{children}</Workspace>
+    </PlatformProvider>
+  );
 }

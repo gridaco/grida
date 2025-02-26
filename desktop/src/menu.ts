@@ -7,7 +7,8 @@ import {
   MenuItem,
   dialog,
 } from "electron";
-import create_window from "./window";
+import create_main_window, { create_canvas_playground_window } from "./window";
+import { EDITOR_BASE_URL } from "./env";
 
 /**
  * Recursively merges two menu templates.
@@ -97,7 +98,7 @@ export function create_default_menu(
       submenu: [
         {
           label: "Reload",
-          accelerator: "CmdOrCtrl+R",
+          accelerator: "CmdOrCtrl+Shift+Alt+R",
           click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
             if (focusedWindow) focusedWindow.reload();
           },
@@ -194,54 +195,60 @@ export default function create_menu(app: App, shell: Shell) {
     {
       label: "File",
       submenu: [
-        {
-          label: "New File",
-          accelerator: "CmdOrCtrl+N",
-          click: () => {
-            // TODO:
-            console.log("New File clicked");
-          },
-        },
+        //     // TODO:
+        // {
+        //   label: "New File",
+        //   accelerator: "CmdOrCtrl+N",
+        //   click: () => {
+        //     console.log("New File clicked");
+        //   },
+        // },
         {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => {
-            create_window();
+            create_main_window({ baseUrl: EDITOR_BASE_URL });
+          },
+        },
+        {
+          label: "New Canvas Playground",
+          click: () => {
+            create_canvas_playground_window({ baseUrl: EDITOR_BASE_URL });
           },
         },
         { type: "separator" },
-        {
-          label: "Open...",
-          accelerator: "CmdOrCtrl+O",
-          click: () => {
-            // TODO:
-            dialog.showOpenDialog({
-              properties: ["openFile"],
-              filters: [{ name: "Grida Files", extensions: ["grida"] }],
-            });
-          },
-        },
-        {
-          label: "Save",
-          accelerator: "CmdOrCtrl+S",
-          click: () => {
-            // TODO:
-            const focusedWindow = BrowserWindow.getFocusedWindow();
-            if (focusedWindow) {
-              focusedWindow.webContents.send("app:save");
-            }
-          },
-        },
-        {
-          label: "Save As...",
-          accelerator: "CmdOrCtrl+Shift+S",
-          click: () => {
-            // TODO:
-            dialog.showSaveDialog({
-              filters: [{ name: "Grida Files", extensions: ["grida"] }],
-            });
-          },
-        },
+        // {
+        //   label: "Open...",
+        //   accelerator: "CmdOrCtrl+O",
+        //   click: () => {
+        //     // TODO:
+        //     dialog.showOpenDialog({
+        //       properties: ["openFile"],
+        //       filters: [{ name: "Grida Files", extensions: ["grida"] }],
+        //     });
+        //   },
+        // },
+        // {
+        //   label: "Save",
+        //   accelerator: "CmdOrCtrl+S",
+        //   click: () => {
+        //     // TODO:
+        //     const focusedWindow = BrowserWindow.getFocusedWindow();
+        //     if (focusedWindow) {
+        //       focusedWindow.webContents.send("app:save");
+        //     }
+        //   },
+        // },
+        // {
+        //   label: "Save As...",
+        //   accelerator: "CmdOrCtrl+Shift+S",
+        //   click: () => {
+        //     // TODO:
+        //     dialog.showSaveDialog({
+        //       filters: [{ name: "Grida Files", extensions: ["grida"] }],
+        //     });
+        //   },
+        // },
       ],
     },
   ];
