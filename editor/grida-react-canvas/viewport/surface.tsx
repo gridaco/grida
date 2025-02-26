@@ -448,26 +448,20 @@ function NodeTitleBar({
   state: "idle" | "hover" | "active";
 }) {
   const { select, hoverEnterNode, changeNodeName } = useDocument();
-  const { dragStart } = useEventTarget();
 
+  // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
   const bind = useSurfaceGesture(
     {
-      onPointerMove: () => {
+      onPointerMove: ({ event }) => {
         hoverEnterNode(node.id);
       },
       onDoubleClick: ({ event }) => {
         const name = prompt("rename", node.name);
-        if (name) {
-          changeNodeName(node.id, name);
-        }
+        if (name) changeNodeName(node.id, name);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
         select([node.id]);
-      },
-      onDragStart: ({ event }) => {
-        event.preventDefault();
-        dragStart(event as PointerEvent);
       },
     },
     {
