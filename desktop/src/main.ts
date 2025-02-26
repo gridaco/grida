@@ -4,12 +4,7 @@ import started from "electron-squirrel-startup";
 import path from "node:path";
 import create_menu from "./menu";
 import create_main_window, { create_login_window } from "./window";
-
-const IS_INSIDERS = INSIDERS === 1;
-const IS_DEV = process.env.NODE_ENV === "development";
-
-const EDITOR_BASE_URL =
-  IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://app.grida.co";
+import { EDITOR_BASE_URL } from "./env";
 
 // #region chrome flags
 
