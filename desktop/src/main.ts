@@ -3,11 +3,30 @@ import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import path from "node:path";
 import create_menu from "./menu";
-import keytar from "keytar";
-import create_window, { create_login_window } from "./window";
+import create_main_window, { create_login_window } from "./window";
 
-const SERVICE = "GridaDesktop";
-const ACCOUNT = "userToken";
+// #region chrome flags
+
+// Enable GPU optimization
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("enable-native-gpu-memory-buffers");
+
+// Optimize rendering & DOM handling
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("disable-low-res-tiling");
+app.commandLine.appendSwitch("disable-partial-raster");
+app.commandLine.appendSwitch("enable-quic");
+
+// Reduce CPU impact from timers
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-best-effort-tasks");
+app.commandLine.appendSwitch("disable-async-dns");
+
+// Improve garbage collection & memory handling
+app.commandLine.appendSwitch("js-flags", "--expose-gc");
+// #endregion chrome flags
 
 updateElectronApp();
 
@@ -31,7 +50,7 @@ app.on("ready", async () => {
   // } else {
   //   create_window();
   // }
-  create_window();
+  create_main_window();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -47,7 +66,7 @@ app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    create_window();
+    create_main_window();
   }
 });
 
