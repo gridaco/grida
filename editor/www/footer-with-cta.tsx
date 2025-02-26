@@ -2,10 +2,10 @@ import React from "react";
 import Footer from "./footer";
 import { Button, Button as FancyButton } from "@/www/ui/button";
 import { sitemap } from "./data/sitemap";
-import Link from "next/link";
-import { cn } from "@/utils";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { Section } from "./ui/section";
+import { cn } from "@/utils/cn";
+import Link from "next/link";
 
 export default function FooterWithCTA() {
   return (
