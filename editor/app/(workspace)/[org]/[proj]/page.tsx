@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { Button } from "@/components/ui/button";
 
 export default function FormsDashboardPage({

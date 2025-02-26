@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { editorlink } from "@/lib/forms/url";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default function DashboardProjectsPage({

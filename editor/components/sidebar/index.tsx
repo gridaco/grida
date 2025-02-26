@@ -8,7 +8,7 @@ import Link from "next/link";
 import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";
 import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
 import { useMeasure } from "@uidotdev/usehooks";
-import { DesktopDragArea } from "../desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 
 export function SidebarRoot({
   side = "left",

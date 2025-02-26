@@ -206,8 +206,6 @@ export function ModeData() {
     );
   }
 
-  console.log("state.sidebar.mode_data.menus", state.sidebar.mode_data.menus);
-
   return (
     <>
       <DeleteConfirmationAlertDialog

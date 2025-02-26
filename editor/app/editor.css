@@ -2,6 +2,7 @@
 
 .desktop-drag-area{
   -webkit-app-region: drag;
+  height: 44px;
 }
 
 .no-drag{

@@ -1,9 +1,15 @@
-import { app, shell, BrowserWindow, Menu } from "electron";
+import { app, shell, BrowserWindow, Menu, session } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import path from "node:path";
 import create_menu from "./menu";
 import create_main_window, { create_login_window } from "./window";
+
+const IS_INSIDERS = INSIDERS === 1;
+const IS_DEV = process.env.NODE_ENV === "development";
+
+const EDITOR_BASE_URL =
+  IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://app.grida.co";
 
 // #region chrome flags
 
@@ -50,7 +56,14 @@ app.on("ready", async () => {
   // } else {
   //   create_window();
   // }
-  create_main_window();
+
+  await session.defaultSession.cookies.set({
+    name: "grida-desktop-version",
+    value: app.getVersion(),
+    url: EDITOR_BASE_URL,
+  });
+
+  create_main_window({ baseUrl: EDITOR_BASE_URL });
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -66,7 +79,7 @@ app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    create_main_window();
+    create_main_window({ baseUrl: EDITOR_BASE_URL });
   }
 });
 

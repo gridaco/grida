@@ -13,7 +13,7 @@ import { ModeData } from "./sidebar-mode-data";
 import { ModeConnect } from "./sidebar-mode-connect";
 import { ModeProject } from "./sidebar-mode-project";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { GridaLogo } from "@/components/grida-logo";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
