@@ -18,14 +18,15 @@ import {
 } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuLink,
-  SidebarMenuList,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
+  SidebarMenu,
+} from "@/components/ui/sidebar";
 import { editorlink } from "@/lib/forms/url";
+import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
 
 export function ModeConnect() {
   const [state] = useEditorState();
@@ -47,156 +48,173 @@ function DoctypeForms() {
 
   return (
     <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Share</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/share", {
-              document_id: form_document_id,
-              basepath,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <Link2Icon className="inline align-middle w-4 h-4 me-2" />
+      <SidebarGroup>
+        <SidebarGroupLabel>
+          <span>Share</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: editorlink("connect/share", {
+                  document_id: form_document_id,
+                  basepath,
+                }),
+              }}
+            >
+              <Link2Icon className="size-4" />
               Share
+            </SidebarMenuLinkButton>
+            <SidebarMenuItem>
+              {/* <Link href={`connect/domain`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <GlobeIcon className="size-4" />
+                Domain
+                <Badge variant="outline" className="ms-auto">
+                  enterprise
+                </Badge>
+              </SidebarMenuButton>
+              {/* </Link> */}
             </SidebarMenuItem>
-          </SidebarMenuLink>
-          {/* <Link href={`connect/domain`}> */}
-          <SidebarMenuItem disabled>
-            <GlobeIcon className="inline align-middle w-4 h-4 me-2" />
-            Domain
-            <Badge variant="outline" className="ms-auto">
-              enterprise
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Customer</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/channels", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <EnvelopeClosedIcon className="inline align-middle w-4 h-4 me-2" />
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+      <SidebarGroup>
+        <SidebarGroupLabel>
+          <span>Customer</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: editorlink("connect/channels", {
+                  basepath,
+                  document_id: form_document_id,
+                }),
+              }}
+            >
+              <EnvelopeClosedIcon className="size-4" />
               Channels
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-          <SidebarMenuLink
-            href={editorlink("connect/customer", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
+            </SidebarMenuLinkButton>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: editorlink("connect/customer", {
+                  basepath,
+                  document_id: form_document_id,
+                }),
+              }}
+            >
+              <AvatarIcon className="size-4" />
               Customer Identity
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Commerce</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/store", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
+            </SidebarMenuLinkButton>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+      <SidebarGroup>
+        <SidebarGroupLabel>
+          <span>Commerce</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: editorlink("connect/store", {
+                  basepath,
+                  document_id: form_document_id,
+                }),
+              }}
+            >
+              <ArchiveIcon className="size-4" />
               Store
               <Badge variant="outline" className="ms-auto">
                 alpha
               </Badge>
-            </SidebarMenuItem>
-          </SidebarMenuLink>
+            </SidebarMenuLinkButton>
 
-          {/* <Link href={`connect/pg/stripe`}> */}
-          <SidebarMenuItem disabled>
-            <StripeLogo1 className="inline align-middle w-4 h-4 me-2" />
-            Stripe
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/pg/tosspayments`}> */}
-          <SidebarMenuItem disabled>
-            <TossLogo className="inline align-middle w-4 h-4 me-2" />
-            Toss
-            <Badge variant="outline" className="ms-auto">
-              enterprise
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SectionXDatabase />
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Developer</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/parameters", {
-              document_id: form_document_id,
-              basepath: basepath,
-            })}
-          >
             <SidebarMenuItem>
-              <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-              URL parameters
+              {/* <Link href={`connect/pg/stripe`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <StripeLogo1 className="size-4" />
+                Stripe
+                <Badge variant="outline" className="ms-auto">
+                  soon
+                </Badge>
+              </SidebarMenuButton>
+              {/* </Link> */}
             </SidebarMenuItem>
-          </SidebarMenuLink>
-          {/* <Link href={`connect/webhooks`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Webhooks
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/integrations`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Integrations
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/import`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Import Data
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
+            <SidebarMenuItem>
+              {/* <Link href={`connect/pg/tosspayments`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <TossLogo className="size-4" />
+                Toss
+                <Badge variant="outline" className="ms-auto">
+                  enterprise
+                </Badge>
+              </SidebarMenuButton>
+              {/* </Link> */}
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+      <SectionXDatabase />
+      <SidebarGroup>
+        <SidebarGroupLabel>
+          <span>Developer</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuLinkButton
+              size="sm"
+              link={{
+                href: editorlink("connect/parameters", {
+                  document_id: form_document_id,
+                  basepath: basepath,
+                }),
+              }}
+            >
+              <CodeIcon className="size-4" />
+              URL parameters
+            </SidebarMenuLinkButton>
+            <SidebarMenuItem>
+              {/* <Link href={`connect/webhooks`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <CodeIcon className="size-4" />
+                Webhooks
+                <Badge variant="outline" className="ms-auto">
+                  soon
+                </Badge>{" "}
+              </SidebarMenuButton>
+              {/* </Link> */}
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              {/* <Link href={`connect/integrations`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <CodeIcon className="w-4 h-4" />
+                Integrations
+                <Badge variant="outline" className="ms-auto">
+                  soon
+                </Badge>
+              </SidebarMenuButton>
+              {/* </Link> */}
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              {/* <Link href={`connect/import`}> */}
+              <SidebarMenuButton disabled size="sm">
+                <CodeIcon className="size-4" />
+                Import Data
+                <Badge variant="outline" className="ms-auto">
+                  soon
+                </Badge>
+              </SidebarMenuButton>
+              {/* </Link> */}
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
     </>
   );
 }
@@ -214,35 +232,38 @@ function SectionXDatabase() {
   const { document_id, basepath } = state;
 
   return (
-    <SidebarSection>
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>
-          <span>Database</span>
-        </SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuList>
-        <SidebarMenuLink
-          href={editorlink("connect/database/supabase", {
-            basepath,
-            document_id,
-          })}
-        >
-          <SidebarMenuItem muted>
-            <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+    <SidebarGroup>
+      <SidebarGroupLabel>
+        <span>Database</span>
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuLinkButton
+            size="sm"
+            link={{
+              href: editorlink("connect/database/supabase", {
+                basepath,
+                document_id,
+              }),
+            }}
+          >
+            <SupabaseLogo className="size-4" />
             Supabase
             <Badge variant="outline" className="ms-auto">
               beta
             </Badge>
+          </SidebarMenuLinkButton>
+          <SidebarMenuItem>
+            <SidebarMenuButton disabled size="sm">
+              <PostgreSQL className="size-4" />
+              PostgreSQL
+              <Badge variant="outline" className="ms-auto">
+                soon
+              </Badge>
+            </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenuLink>
-        <SidebarMenuItem muted disabled>
-          <PostgreSQL className="inline align-middle w-4 h-4 me-2" />
-          PostgreSQL
-          <Badge variant="outline" className="ms-auto">
-            soon
-          </Badge>
-        </SidebarMenuItem>
-      </SidebarMenuList>
-    </SidebarSection>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

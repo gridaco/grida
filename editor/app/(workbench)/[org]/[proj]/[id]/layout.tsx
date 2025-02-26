@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
@@ -10,9 +8,7 @@ import {
   grida_xsupabase_client,
   createServerComponentStorageClient,
 } from "@/lib/supabase/server";
-import { GridaLogo } from "@/components/grida-logo";
-import { SlashIcon } from "@radix-ui/react-icons";
-import { Sidebar } from "@/scaffolds/sidebar/sidebar";
+import { EditorSidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type {
@@ -44,7 +40,7 @@ import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 
 export const revalidate = 0;
 
@@ -251,15 +247,7 @@ export default async function Layout({
               } satisfies FormDocumentEditorInit
             }
           >
-            <BaseLayout
-              docid={masterdoc_ref.id}
-              doctitle={masterdoc_ref.title}
-              appearance={appearance}
-              org={org}
-              proj={proj}
-            >
-              {children}
-            </BaseLayout>
+            <BaseLayout docid={masterdoc_ref.id}>{children}</BaseLayout>
           </FormDocumentEditorProvider>
         </Html>
       );
@@ -286,12 +274,7 @@ export default async function Layout({
               },
             }}
           >
-            <BaseLayout
-              docid={masterdoc_ref.id}
-              doctitle={masterdoc_ref.title}
-              org={org}
-              proj={proj}
-            >
+            <BaseLayout docid={masterdoc_ref.id}>
               {/* <p>
                 This document is a site document. Site documents are not
                 supported yet.
@@ -408,14 +391,7 @@ export default async function Layout({
               },
             }}
           >
-            <BaseLayout
-              docid={masterdoc_ref.id}
-              doctitle={masterdoc_ref.title}
-              org={org}
-              proj={proj}
-            >
-              {children}
-            </BaseLayout>
+            <BaseLayout docid={masterdoc_ref.id}>{children}</BaseLayout>
           </EditorProvider>
         </Html>
       );
@@ -454,14 +430,7 @@ export default async function Layout({
               },
             }}
           >
-            <BaseLayout
-              docid={masterdoc_ref.id}
-              doctitle={masterdoc_ref.title}
-              org={org}
-              proj={proj}
-            >
-              {children}
-            </BaseLayout>
+            <BaseLayout docid={masterdoc_ref.id}>{children}</BaseLayout>
           </EditorProvider>
         </Html>
       );
@@ -504,14 +473,7 @@ export default async function Layout({
               canvas_one: data.data as unknown as CanvasDocumentSnapshotSchema,
             }}
           >
-            <BaseLayout
-              docid={masterdoc_ref.id}
-              doctitle={masterdoc_ref.title}
-              org={org}
-              proj={proj}
-            >
-              {children}
-            </BaseLayout>
+            <BaseLayout docid={masterdoc_ref.id}>{children}</BaseLayout>
           </EditorProvider>
         </Html>
       );
@@ -541,17 +503,11 @@ function Html({ children }: React.PropsWithChildren<{}>) {
 
 function BaseLayout({
   docid,
-  doctitle,
-  org,
-  proj,
   appearance,
   children,
 }: React.PropsWithChildren<{
   docid: string;
-  doctitle: string;
   appearance?: string;
-  org: string;
-  proj: string;
 }>) {
   return (
     <div className="h-screen flex flex-col">
@@ -562,45 +518,34 @@ function BaseLayout({
         disableTransitionOnChange
         storageKey={`theme-workbench-${docid}`}
       >
-        <div className="flex flex-1 overflow-y-auto">
-          <div className="h-full flex flex-1 w-full">
-            {/* side */}
-            <aside className="hidden lg:flex h-full flex-col border-r">
-              <DesktopDragArea className="bg-workbench-panel" />
-              <header className="px-4 h-11 min-h-11 min-w-60 w-min flex items-center border-b bg-workbench-panel">
-                <Link href={`/${org}/${proj}`} prefetch={false}>
-                  <span className="flex items-center gap-2 text-md font-black select-none">
-                    <GridaLogo size={15} />
-                  </span>
-                </Link>
-                <SlashIcon
-                  className="min-w-[20px] ms-2"
-                  width={15}
-                  height={15}
-                />
-                <EditableDocumentTitle id={docid} defaultValue={doctitle} />
-              </header>
-              <div className="h-full overflow-y-auto">
-                <Sidebar />
+        <SidebarProvider>
+          <div className="flex flex-1 overflow-y-auto">
+            <div className="h-full flex flex-1 w-full">
+              {/* side */}
+              <Sidebar>
+                <EditorSidebar />
+              </Sidebar>
+              <div className="flex flex-col overflow-hidden w-full h-full">
+                <header className="px-2 h-11 min-h-11 flex items-center justify-between border-b bg-workbench-panel desktop-drag-area">
+                  <div className="ms-2 flex items-center gap-4">
+                    <Breadcrumbs />
+                    <SavingIndicator />
+                  </div>
+                  <div className="flex gap-4 items-center">
+                    <Players />
+                    <PlayActions />
+                  </div>
+                </header>
+                {/* main */}
+                <div className="w-full h-full overflow-x-hidden">
+                  {children}
+                </div>
               </div>
-            </aside>
-            <div className="flex flex-col overflow-hidden w-full h-full">
-              <header className="px-2 h-11 min-h-11 flex items-center justify-between border-b bg-workbench-panel desktop-drag-area">
-                <div className="ms-2 flex items-center gap-4">
-                  <Breadcrumbs />
-                  <SavingIndicator />
-                </div>
-                <div className="flex gap-4 items-center">
-                  <Players />
-                  <PlayActions />
-                </div>
-              </header>
-              <div className="w-full h-full overflow-x-hidden">{children}</div>
             </div>
           </div>
-        </div>
-        <EditorHelpFab />
-        <ToasterWithMax position="bottom-center" max={5} />
+          <EditorHelpFab />
+          <ToasterWithMax position="bottom-center" max={5} />
+        </SidebarProvider>
       </ThemeProvider>
     </div>
   );

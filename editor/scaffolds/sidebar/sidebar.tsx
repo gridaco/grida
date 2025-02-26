@@ -1,33 +1,25 @@
 "use client";
 
 import React from "react";
-import { CodeIcon } from "@radix-ui/react-icons";
-import Link from "next/link";
 import { useEditorState } from "../editor";
-import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import {
-  SidebarHeader,
-  SidebarMenuItem,
-  SidebarMenuItemLabel,
-  SidebarMenuList,
-  SidebarRoot,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
-import { ModeDesign } from "./sidebar-mode-design";
-import { editorlink } from "@/lib/forms/url";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useWorkspace } from "../workspace";
-import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import * as Dialog from "@radix-ui/react-dialog";
+import { SidebarRoot } from "@/components/sidebar";
+import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { ModeInsertBlocks } from "./sidebar-mode-insert";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ModeDesign } from "./sidebar-mode-design";
 import { ModeData } from "./sidebar-mode-data";
 import { ModeConnect } from "./sidebar-mode-connect";
+import { ModeProject } from "./sidebar-mode-project";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { GridaLogo } from "@/components/grida-logo";
+import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SlashIcon } from "@radix-ui/react-icons";
+import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import Link from "next/link";
 
-export function Sidebar() {
+export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
   const { insertmenu } = state;
 
@@ -58,10 +50,30 @@ export function Sidebar() {
   }
 
   return (
-    <SidebarRoot className="border-none">
-      <Tabs value={state.sidebar.mode} onValueChange={onSidebarModeChange}>
-        <SidebarHeader className="h-12 py-0 flex justify-center items-center">
-          <TabsList className="w-full max-w-full">
+    <>
+      <SidebarHeader className="min-w-60 w-min p-0 gap-0">
+        <DesktopDragArea className="bg-workbench-panel" />
+        <header className="h-11 min-h-11 flex items-center px-4 border-b">
+          <Link
+            href={`/${state.organization.name}/${state.project.name}`}
+            prefetch={false}
+          >
+            <span className="flex items-center gap-2 text-md font-black select-none">
+              <GridaLogo size={15} />
+            </span>
+          </Link>
+          <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
+          <EditableDocumentTitle
+            id={state.document_id}
+            defaultValue={state.document_title}
+          />
+        </header>
+        <Tabs
+          value={state.sidebar.mode}
+          onValueChange={onSidebarModeChange}
+          className="py-1 px-2"
+        >
+          <TabsList className="w-full max-w-full bg-sidebar-accent">
             <TabsTrigger value="project">
               <ResourceTypeIcon type="project" className="w-4 h-4" />
             </TabsTrigger>
@@ -84,122 +96,24 @@ export function Sidebar() {
               <PlugIcon className="w-4 h-4" />
             </TabsTrigger>
           </TabsList>
-        </SidebarHeader>
-        <TabsContent value="project">
-          <ModeProjectHiearchy />
-        </TabsContent>
-        <TabsContent value="build">
-          <ModeDesign />
-        </TabsContent>
-        <TabsContent value="data">
-          <ModeData />
-        </TabsContent>
-        <TabsContent value="connect">
-          <ModeConnect />
-        </TabsContent>
-      </Tabs>
-    </SidebarRoot>
-  );
-}
-
-function ModeProjectHiearchy() {
-  const { state: workspace } = useWorkspace();
-  const { documents, loading } = workspace;
-  const [state] = useEditorState();
-  const { basepath, project } = state;
-  const current_project_documents = documents.filter(
-    (d) => d.project_id === project.id
-  );
-
-  return (
-    <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>{project.name}</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          {loading ? (
-            <>
-              <div className="w-full grid gap-2">
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-full h-5" />
-              </div>
-            </>
-          ) : (
-            <>
-              {current_project_documents.map((d) => (
-                <Link
-                  key={d.id}
-                  href={editorlink(".", {
-                    document_id: d.id,
-                    basepath,
-                  })}
-                >
-                  <SidebarMenuItem muted selected={d.id === state.document_id}>
-                    <ResourceTypeIcon
-                      type={d.doctype}
-                      className="inline align-middle min-w-4 w-4 h-4 me-2"
-                    />
-                    <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
-                  </SidebarMenuItem>
-                </Link>
-              ))}
-            </>
-          )}
-        </SidebarMenuList>
-      </SidebarSection>
-    </>
-  );
-}
-
-function ModeSettings() {
-  const [state] = useEditorState();
-  // const { form, organization, project } = state;
-  return (
-    <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Settings</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          {/* <Link
-            href={editorlink("settings/general", {
-              proj: project.name,
-              org: organization.name,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem>
-              <GearIcon className="inline align-middle w-4 h-4 me-2" />
-              General
-            </SidebarMenuItem>
-          </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Developers</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          {/* <Link href={`settings/api`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            API Keys
-            <Badge variant="outline" className="ms-auto">
-              enterprise
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
+        </Tabs>
+      </SidebarHeader>
+      <SidebarContent>
+        <Tabs value={state.sidebar.mode}>
+          <TabsContent value="project">
+            <ModeProject />
+          </TabsContent>
+          <TabsContent value="build">
+            <ModeDesign />
+          </TabsContent>
+          <TabsContent value="data">
+            <ModeData />
+          </TabsContent>
+          <TabsContent value="connect">
+            <ModeConnect />
+          </TabsContent>
+        </Tabs>
+      </SidebarContent>
     </>
   );
 }

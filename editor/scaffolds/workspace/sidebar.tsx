@@ -20,7 +20,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarMenuBadge,
-  SidebarRail,
   SidebarGroupAction,
 } from "@/components/ui/sidebar";
 import { Home, Settings2, ChevronRight, ChevronDown } from "lucide-react";
@@ -33,7 +32,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { OrganizationWithAvatar, useWorkspace } from "@/scaffolds/workspace";
+import {
+  OrganizationWithAvatar,
+  useWorkspace,
+  WorkspaceState,
+} from "@/scaffolds/workspace";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import Link from "next/link";
@@ -95,6 +98,36 @@ const menu = {
   ],
 };
 
+export function projectstree(
+  state: WorkspaceState,
+  { pathName, currentOnly }: { pathName?: string; currentOnly?: boolean }
+) {
+  const { organization, projects, documents } = state;
+  const groups = Object.groupBy(documents, (d) => d.project_id);
+  const tree = projects.map((project) => {
+    const path = `/${organization.name}/${project.name}`;
+    return {
+      ...project,
+      url: path,
+      selected: pathName?.startsWith(path),
+      children: (groups[project.id] || []).map((doc) => ({
+        ...doc,
+        url: editorlink(".", {
+          org: organization.name,
+          proj: project.name,
+          document_id: doc.id,
+        }),
+      })),
+    };
+  });
+
+  if (currentOnly) {
+    return tree.filter((project) => project.selected);
+  }
+
+  return tree;
+}
+
 export default function WorkspaceSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
@@ -103,24 +136,8 @@ export default function WorkspaceSidebar({
 
   const pathName = usePathname();
 
-  const projectstree = useMemo(() => {
-    const groups = Object.groupBy(documents, (d) => d.project_id);
-    return projects.map((project) => {
-      const path = `/${organization.name}/${project.name}`;
-      return {
-        ...project,
-        url: path,
-        selected: pathName.startsWith(path),
-        children: (groups[project.id] || []).map((doc) => ({
-          ...doc,
-          url: editorlink(".", {
-            org: organization.name,
-            proj: project.name,
-            document_id: doc.id,
-          }),
-        })),
-      };
-    });
+  const tree = useMemo(() => {
+    return projectstree(state, { pathName });
   }, [documents, projects, organization.name, pathName]);
 
   const settings = {
@@ -156,7 +173,7 @@ export default function WorkspaceSidebar({
         <NavMain items={menu.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        <NavProjects orgname={organization.name} projects={projectstree} />
+        <NavProjects orgname={organization.name} projects={tree} allowNew />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       {/* <SidebarRail /> */}
@@ -164,11 +181,14 @@ export default function WorkspaceSidebar({
   );
 }
 
-function NavProjects({
+export function NavProjects({
   orgname,
   projects,
+  label = "Projects",
+  allowNew,
 }: {
   orgname: string;
+  label?: string;
   projects: {
     url: string;
     id: number;
@@ -176,15 +196,18 @@ function NavProjects({
     selected?: boolean;
     children: (GDocument & { url: string })[];
   }[];
+  allowNew?: boolean;
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
-      <CreateNewProjectDialog org={orgname}>
-        <SidebarGroupAction>
-          <PlusIcon className="w-4 h-4" />
-        </SidebarGroupAction>
-      </CreateNewProjectDialog>
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      {allowNew && (
+        <CreateNewProjectDialog org={orgname}>
+          <SidebarGroupAction>
+            <PlusIcon className="w-4 h-4" />
+          </SidebarGroupAction>
+        </CreateNewProjectDialog>
+      )}
       <SidebarGroupContent>
         <SidebarMenu>
           {projects.map((project) => (
@@ -193,7 +216,11 @@ function NavProjects({
               open={project.selected || projects.length === 1 || undefined}
             >
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={project.selected}>
+                <SidebarMenuButton
+                  size="sm"
+                  asChild
+                  isActive={project.selected}
+                >
                   <Link href={project.url}>
                     <ResourceTypeIcon
                       type="project"
@@ -222,7 +249,7 @@ function NavProjects({
                   <SidebarMenuSub>
                     {project.children.map((page) => (
                       <SidebarMenuSubItem key={page.id}>
-                        <SidebarMenuSubButton asChild>
+                        <SidebarMenuSubButton size="sm" asChild>
                           <Link href={page.url}>
                             <ResourceTypeIcon
                               type={page.doctype}
@@ -340,7 +367,7 @@ export function NavMain({
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild isActive={item.isActive}>
+          <SidebarMenuButton size="sm" asChild isActive={item.isActive}>
             <a href={item.url}>
               <item.icon />
               <span>{item.title}</span>
@@ -370,7 +397,7 @@ function NavSecondary({
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton size="sm" asChild>
                 <Link href={item.url} target={item.target}>
                   <item.icon />
                   <span>{item.title}</span>

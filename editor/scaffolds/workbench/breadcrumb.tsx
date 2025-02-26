@@ -33,7 +33,7 @@ export function Breadcrumbs() {
           <BreadcrumbItem>
             <BreadcrumbLink
               href={`/${org}/${proj}`}
-              className="text-ellipsis overflow-hidden whitespace-nowrap w-full"
+              className="text-sm text-ellipsis overflow-hidden whitespace-nowrap w-full"
             >
               {proj}
             </BreadcrumbLink>
@@ -43,12 +43,12 @@ export function Breadcrumbs() {
           <BreadcrumbSeparator />
         </div>
         <BreadcrumbItem>
+          <ResourceTypeIcon
+            type={doctype}
+            className="inline me-2 align-middle size-3.5 min-w-3.5"
+          />
           <BreadcrumbPage className="max-w-[160px] text-ellipsis overflow-hidden whitespace-nowrap w-full">
-            <ResourceTypeIcon
-              type={doctype}
-              className="inline w-4 h-4 me-2 align-middle"
-            />
-            <span className="text-ellipsis overflow-hidden">
+            <span className="text-sm text-ellipsis overflow-hidden">
               {document_title}
             </span>
           </BreadcrumbPage>
@@ -59,7 +59,7 @@ export function Breadcrumbs() {
             <React.Fragment key={i}>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>{path}</BreadcrumbPage>
+                <BreadcrumbPage className="text-sm">{path}</BreadcrumbPage>
               </BreadcrumbItem>
             </React.Fragment>
           ))}
