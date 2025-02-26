@@ -522,9 +522,7 @@ function BaseLayout({
           <div className="flex flex-1 overflow-y-auto">
             <div className="h-full flex flex-1 w-full">
               {/* side */}
-              <Sidebar>
-                <EditorSidebar />
-              </Sidebar>
+              <EditorSidebar />
               <div className="flex flex-col overflow-hidden w-full h-full">
                 <header className="px-2 h-11 min-h-11 flex items-center justify-between border-b bg-workbench-panel desktop-drag-area">
                   <div className="ms-2 flex items-center gap-4">

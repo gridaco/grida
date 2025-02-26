@@ -2,8 +2,11 @@
 
 import React from "react";
 import { useEditorState } from "../editor";
-import { SidebarRoot } from "@/components/sidebar";
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 import { ModeInsertBlocks } from "./sidebar-mode-insert";
 import { ModeDesign } from "./sidebar-mode-design";
 import { ModeData } from "./sidebar-mode-data";
@@ -41,16 +44,21 @@ export function EditorSidebar() {
     return (
       <Dialog.Root open={insertmenu.open} onOpenChange={onInsertMenuOpenChange}>
         <Dialog.Content>
-          <SidebarRoot>
+          <Dialog.Title className="sr-only">Insert Block</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            Select a block to insert into the canvas
+          </Dialog.Description>
+          <Sidebar>
+            <DesktopDragArea className="bg-workbench-panel" />
             <ModeInsertBlocks />
-          </SidebarRoot>
+          </Sidebar>
         </Dialog.Content>
       </Dialog.Root>
     );
   }
 
   return (
-    <>
+    <Sidebar>
       <SidebarHeader className="min-w-60 w-min p-0 gap-0">
         <DesktopDragArea className="bg-workbench-panel" />
         <header className="h-11 min-h-11 flex items-center px-4 border-b">
@@ -114,6 +122,6 @@ export function EditorSidebar() {
           </TabsContent>
         </Tabs>
       </SidebarContent>
-    </>
+    </Sidebar>
   );
 }

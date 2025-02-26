@@ -3,13 +3,7 @@
 import React, { useCallback, useMemo } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "@/scaffolds/editor";
-import {
-  SidebarMenuGrid,
-  SidebarMenuGridItem,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
+import { SidebarMenuGrid, SidebarMenuGridItem } from "@/components/sidebar";
 import { fieldlabels, supported_field_types } from "@/k/supported_field_types";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
@@ -25,6 +19,13 @@ import type { FormBlockType, FormInputType } from "@/types";
 import { SearchInput } from "@/components/extension/search-input";
 import { DummyFormAgentStateProvider } from "@/lib/formstate";
 import Fuse from "fuse.js";
+import {
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 
 export function ModeInsertBlocks() {
   const [search, setSearch] = React.useState("");
@@ -96,38 +97,39 @@ export function ModeInsertBlocks() {
 
   return (
     <>
-      <SidebarSection className="mt-2">
+      <SidebarHeader className="border-b">
         <SearchInput
           autoFocus
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          className="h-7"
         />
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>
             <span>Blocks ({filtered_block_types.length})</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuGrid>
-          {filtered_block_types.map((block_type) => (
-            <HoverCard key={block_type} openDelay={100} closeDelay={100}>
-              <HoverCardTrigger>
-                <SidebarMenuGridItem
-                  onClick={addBlock.bind(null, block_type)}
-                  key={block_type}
-                  className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground bg-background"
-                >
-                  <BlockTypeIcon
-                    type={block_type}
-                    className="p-2 w-8 h-8 rounded"
-                  />
-                  <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
-                    {blocklabels[block_type]}
-                  </div>
-                </SidebarMenuGridItem>
-              </HoverCardTrigger>
-              {/* <HoverCardContent
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenuGrid>
+              {filtered_block_types.map((block_type) => (
+                <HoverCard key={block_type} openDelay={100} closeDelay={100}>
+                  <HoverCardTrigger>
+                    <SidebarMenuGridItem
+                      onClick={addBlock.bind(null, block_type)}
+                      key={block_type}
+                      className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground bg-background"
+                    >
+                      <BlockTypeIcon
+                        type={block_type}
+                        className="p-2 w-8 h-8 rounded"
+                      />
+                      <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
+                        {blocklabels[block_type]}
+                      </div>
+                    </SidebarMenuGridItem>
+                  </HoverCardTrigger>
+                  {/* <HoverCardContent
                 className="max-w-none w-fit min-w-80"
                 side="right"
                 align="start"
@@ -143,81 +145,83 @@ export function ModeInsertBlocks() {
                   <hr className="my-4" />
                 </div>
               </HoverCardContent> */}
-            </HoverCard>
-          ))}
-        </SidebarMenuGrid>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
+                </HoverCard>
+              ))}
+            </SidebarMenuGrid>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>
             <span>Fields ({filtered_field_types.length})</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuGrid>
-          {filtered_field_types.map((field_type) => (
-            <HoverCard key={field_type} openDelay={100} closeDelay={100}>
-              <HoverCardTrigger>
-                <SidebarMenuGridItem
-                  onClick={addFieldBlock.bind(null, field_type)}
-                  key={field_type}
-                  className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground bg-background"
-                >
-                  <FormFieldTypeIcon
-                    type={field_type}
-                    className="p-2 w-8 h-8 rounded"
-                  />
-                  <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
-                    {fieldlabels[field_type]}
-                  </div>
-                </SidebarMenuGridItem>
-              </HoverCardTrigger>
-              <HoverCardContent
-                className="max-w-none w-fit min-w-80"
-                side="right"
-                align="start"
-              >
-                <div className="relative">
-                  <div className="flex justify-between items-center">
-                    <div>
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenuGrid>
+              {filtered_field_types.map((field_type) => (
+                <HoverCard key={field_type} openDelay={100} closeDelay={100}>
+                  <HoverCardTrigger>
+                    <SidebarMenuGridItem
+                      onClick={addFieldBlock.bind(null, field_type)}
+                      key={field_type}
+                      className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground bg-background"
+                    >
                       <FormFieldTypeIcon
                         type={field_type}
-                        className="inline align-middle me-2 w-8 h-8 p-2 border rounded shadow-sm"
+                        className="p-2 w-8 h-8 rounded"
                       />
-                      <span className="font-bold">
+                      <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
                         {fieldlabels[field_type]}
-                      </span>
+                      </div>
+                    </SidebarMenuGridItem>
+                  </HoverCardTrigger>
+                  <HoverCardContent
+                    className="max-w-none w-fit min-w-80"
+                    side="right"
+                    align="start"
+                  >
+                    <div className="relative">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <FormFieldTypeIcon
+                            type={field_type}
+                            className="inline align-middle me-2 w-8 h-8 p-2 border rounded shadow-sm"
+                          />
+                          <span className="font-bold">
+                            {fieldlabels[field_type]}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={addFieldBlock.bind(null, field_type)}
+                        >
+                          <PlusIcon className="inline align-middle me-2 w-4 h-4" />
+                          Add
+                        </Button>
+                      </div>
+                      <hr className="my-4" />
+                      <DummyFormAgentStateProvider>
+                        <FormField
+                          type={field_type}
+                          name={"example"}
+                          label={fieldlabels[field_type] + " Example"}
+                          placeholder="Example"
+                          helpText="This is an example field"
+                          options={[
+                            { id: "1", label: "Option 1", value: "option1" },
+                            { id: "2", label: "Option 2", value: "option2" },
+                            { id: "3", label: "Option 3", value: "option3" },
+                          ]}
+                          preview
+                        />
+                      </DummyFormAgentStateProvider>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={addFieldBlock.bind(null, field_type)}
-                    >
-                      <PlusIcon className="inline align-middle me-2 w-4 h-4" />
-                      Add
-                    </Button>
-                  </div>
-                  <hr className="my-4" />
-                  <DummyFormAgentStateProvider>
-                    <FormField
-                      type={field_type}
-                      name={"example"}
-                      label={fieldlabels[field_type] + " Example"}
-                      placeholder="Example"
-                      helpText="This is an example field"
-                      options={[
-                        { id: "1", label: "Option 1", value: "option1" },
-                        { id: "2", label: "Option 2", value: "option2" },
-                        { id: "3", label: "Option 3", value: "option3" },
-                      ]}
-                      preview
-                    />
-                  </DummyFormAgentStateProvider>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          ))}
-        </SidebarMenuGrid>
-      </SidebarSection>
+                  </HoverCardContent>
+                </HoverCard>
+              ))}
+            </SidebarMenuGrid>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
     </>
   );
 }
