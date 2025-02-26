@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   SidebarMenuSectionContent,
-  SidebarRoot,
   SidebarSection,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
@@ -309,7 +308,7 @@ function useThemeColorScheme(appearance: Appearance): "light" | "dark" {
 
   const safeSystemTheme =
     // system theme is typed light | dark, but it sometimes gives "system"
-    (systemTheme as any) === "system" ? "light" : systemTheme ?? "light";
+    (systemTheme as any) === "system" ? "light" : (systemTheme ?? "light");
 
   const colorscheme: "light" | "dark" =
     (appearance === "system" ? safeSystemTheme : appearance) ?? "light";

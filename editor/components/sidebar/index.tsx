@@ -231,13 +231,13 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       data-selected={selected}
       className={cn(
         "flex items-center",
-        "relative group",
+        "relative group/menu-item",
         "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
-        "hover:bg-accent hover:text-accent-foreground data-[hovered='true']:bg-accent data-[hovered='true']:text-accent-foreground",
+        "hover:bg-sidebar-accent hover:text-accent-foreground data-[hovered='true']:bg-sidebar-accent data-[hovered='true']:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
-        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40 data-[disabled='true']:bg-background",
-        "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
+        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40",
+        "data-[selected='true']:bg-sidebar-accent data-[selected='true']:text-accent-foreground",
         className
       )}
       style={{
@@ -250,7 +250,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
           {expandable && (
             <button
               type="button"
-              className="absolute z-10 w-4 h-4 me-2 opacity-0 group-hover:opacity-100"
+              className="absolute z-10 w-4 h-4 me-2 opacity-0 group-hover/menu-item:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpandChange?.(!expanded);
@@ -263,7 +263,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
             {icon && (
               <div
                 data-expandable={expandable}
-                className="w-4 h-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover:opacity-0"
+                className="w-4 h-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover/menu-item:opacity-0"
               >
                 {icon}
               </div>
@@ -372,7 +372,7 @@ export function SidebarMenuItemActions({
     <div
       {...props}
       className={cn(
-        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded",
+        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-sidebar opacity-0 group-hover/menu-item:opacity-100 group-hover/menu-item:bg-sidebar-accent transition-opacity rounded",
         className
       )}
     >

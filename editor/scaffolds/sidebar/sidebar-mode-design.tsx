@@ -2,25 +2,10 @@
 
 import React, { useCallback } from "react";
 import { useEditorState, useFormFields } from "../editor";
-import {
-  SidebarMenuItem,
-  SidebarMenuItemActions,
-  SidebarMenuList,
-  SidebarSection,
-  SidebarMenuItemAction,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-  SidebarMenuItemLabel,
-} from "@/components/sidebar";
-import { EditorFlatFormBlock, MenuItem } from "../editor/state";
+import { EditorFlatFormBlock } from "../editor/state";
 import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -28,16 +13,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
-import { renderMenuItems } from "./render";
 import {
   StandaloneDocumentEditor,
   type CanvasAction,
 } from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "../editor/action";
 import { NodeHierarchyList } from "./sidebar-node-hierarchy-list";
+import { SidebarMenuGroup } from "./sidebar-menu-group";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuAction,
+} from "@/components/ui/sidebar";
 
 export function ModeDesign() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const { pages } = state;
 
@@ -49,29 +43,26 @@ export function ModeDesign() {
     );
 
   return (
-    <>
-      {renderMenuItems(pages, {
-        onSelect: (page) => {
-          dispatch({
-            type: "editor/select-page",
-            page_id: page.id,
-          });
-        },
-      })}
-
-      {show_hierarchy && (
-        <>
-          <hr />
-          <HierarchyView />
-        </>
+    <div className="divide-y">
+      {pages.length > 0 && (
+        <div>
+          {pages.map((g, i) => (
+            <SidebarMenuGroup key={i} menu={g} />
+          ))}
+        </div>
       )}
-    </>
+      {show_hierarchy && (
+        <div>
+          <HierarchyView />
+        </div>
+      )}
+    </div>
   );
 }
 
 function HierarchyView() {
   const [state, dispatch] = useEditorState();
-  const { doctype, selected_page_id, documents } = state;
+  const { selected_page_id, documents } = state;
 
   const documentDispatch = useCallback(
     (action: CanvasAction) => {
@@ -90,92 +81,76 @@ function HierarchyView() {
   const document = documents[selected_page_id];
 
   return (
-    <Collapsible defaultOpen>
-      <SidebarSection>
-        <CollapsibleTrigger className="w-full">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>Layers</span>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuList>
-            {selected_page_id === "form" && <FormBlockHierarchyList />}
-            {(selected_page_id === "form/startpage" ||
-              selected_page_id === "site/dev-collection" ||
-              "canvas/one") &&
-              document && (
-                <StandaloneDocumentEditor
-                  editable
-                  initial={document}
-                  dispatch={documentDispatch}
-                >
-                  <NodeHierarchyList />
-                </StandaloneDocumentEditor>
-              )}
-          </SidebarMenuList>
-        </CollapsibleContent>
-      </SidebarSection>
-    </Collapsible>
+    <SidebarGroup>
+      <SidebarGroupLabel>
+        <span>Layers</span>
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        {selected_page_id === "form" && <FormBlockHierarchyList />}
+        {(selected_page_id === "form/startpage" ||
+          selected_page_id === "site/dev-collection" ||
+          "canvas/one") &&
+          document && (
+            // FIXME: redundant
+            <StandaloneDocumentEditor
+              editable
+              initial={document}
+              dispatch={documentDispatch}
+            >
+              <NodeHierarchyList />
+            </StandaloneDocumentEditor>
+          )}
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 
 function FormBlockHierarchyList() {
   const [state, dispatch] = useEditorState();
   const fields = useFormFields();
-  // const [expands, setExpands] = useState<Record<string, boolean>>({});
   const { focus_block_id } = state;
 
   return (
-    <>
+    <SidebarMenu>
       {state.blocks.map((b) => {
         const selected = focus_block_id === b.id;
         const { label, icon } = blocklabel(b, {
           fields,
         });
         return (
-          <SidebarMenuItem
-            key={b.id}
-            muted
-            // expandable={b.type === "section"}
-            // expanded={expands[b.id]}
-            // onExpandChange={(expanded) => {
-            //   setExpands((expands) => ({
-            //     ...expands,
-            //     [b.id]: expanded,
-            //   }));
-            // }}
-            level={b.parent_id ? 1 : 0}
-            selected={selected}
-            onSelect={() => {
-              dispatch({
-                type: "blocks/focus",
-                block_id: b.id,
-              });
-            }}
-            icon={<FormHierarchyItemIcon icon={icon} className="w-4 h-4" />}
-          >
-            {label}
-            <SidebarMenuItemActions>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuItemAction>
-                    <DotsHorizontalIcon />
-                  </SidebarMenuItemAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <FormFieldBlockMenuItems
-                    block_id={b.id}
-                    form_field_id={b.form_field_id}
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItemActions>
+          <SidebarMenuItem key={b.id}>
+            <SidebarMenuButton
+              size="sm"
+              isActive={selected}
+              onClick={() => {
+                dispatch({
+                  type: "blocks/focus",
+                  block_id: b.id,
+                });
+              }}
+              data-level={b.parent_id ? 1 : 0}
+              className="data-[level=1]:!ps-4"
+            >
+              <FormHierarchyItemIcon icon={icon} className="size-4" />
+              {label}
+            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuAction showOnHover>
+                  <DotsHorizontalIcon />
+                </SidebarMenuAction>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <FormFieldBlockMenuItems
+                  block_id={b.id}
+                  form_field_id={b.form_field_id}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         );
       })}
-    </>
+    </SidebarMenu>
   );
 }
 

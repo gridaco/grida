@@ -19,7 +19,7 @@ export function DataQueryTextSearch({
         <SearchInput
           placeholder="Search locally"
           onChange={(e) => onValueChange?.(e.target.value)}
-          className="max-w-sm"
+          className="max-w-sm h-7"
           variant="icon"
         />
       </TooltipTrigger>

@@ -1,12 +1,13 @@
 import {
   AvatarIcon,
-  FileIcon,
   GridIcon,
   ListBulletIcon,
   HomeIcon,
 } from "@radix-ui/react-icons";
 import {
   FolderDotIcon,
+  FolderIcon,
+  FileIcon,
   PanelsTopLeftIcon,
   FileBarChart2,
   SettingsIcon,
@@ -75,8 +76,9 @@ export function ResourceTypeIcon({
     case "home":
       return <HomeIcon {...props} />;
     case "project":
-    case "folder":
       return <FolderDotIcon {...props} />;
+    case "folder":
+      return <FolderIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
     case "v0_bucket":

@@ -11,17 +11,6 @@ import {
 } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
-import {
-  SidebarMenuItem,
-  SidebarMenuItemAction,
-  SidebarMenuItemActions,
-  SidebarMenuItemLabel,
-  SidebarMenuLink,
-  SidebarMenuList,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import {
   DropdownMenu,
@@ -62,7 +51,7 @@ import { useForm, Controller } from "react-hook-form";
 import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { useRouter } from "next/navigation";
-import { renderMenuItems } from "./render";
+import { renderMenuGroup } from "./render";
 import Link from "next/link";
 import { editorlink } from "@/lib/forms/url";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -82,6 +71,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { xsb_table_conn_init } from "../editor/init";
+import {
+  SidebarGroupAction,
+  SidebarGroupLabel,
+  SidebarMenuAction,
+} from "@/components/ui/sidebar";
+import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
+import { GDocTableID, TableMenuItemData } from "../editor/state";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -108,9 +104,9 @@ export function ModeData() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuItemAction>
+          <SidebarGroupAction>
             <PlusIcon />
-          </SidebarMenuItemAction>
+          </SidebarGroupAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="start">
           <DropdownMenuGroup>
@@ -201,18 +197,16 @@ export function ModeData() {
 
   function Header() {
     return (
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>
+      <>
+        <SidebarGroupLabel>
           <span>Tables</span>
-        </SidebarSectionHeaderLabel>
-        {state.doctype == "v0_schema" && (
-          <SidebarMenuItemActions>
-            <AddActionDropdownMenu />
-          </SidebarMenuItemActions>
-        )}
-      </SidebarSectionHeaderItem>
+        </SidebarGroupLabel>
+        {state.doctype == "v0_schema" && <AddActionDropdownMenu />}
+      </>
     );
   }
+
+  console.log("state.sidebar.mode_data.menus", state.sidebar.mode_data.menus);
 
   return (
     <>
@@ -271,40 +265,41 @@ export function ModeData() {
         {...newTableDialog.props}
         key={newTableDialog.refreshkey}
       />
-      {renderMenuItems(state.sidebar.mode_data.tables ?? [], {
-        renderEmptyState: () => <EmptyState />,
-        renderFallback: () => {
-          return (
-            <SidebarSection>
-              <Header />
-              <SidebarMenuList>
-                <EmptyState />
-              </SidebarMenuList>
-            </SidebarSection>
-          );
+      {renderMenuGroup<{
+        id: GDocTableID;
+        data: TableMenuItemData;
+      }>(
+        {
+          type: "group",
+          label: "Tables",
+          children: state.sidebar.mode_data.tables ?? [],
         },
-        renderSectionHeader: Header,
-        renderMenuItem: ({ item, onSelect }) => (
-          <SidebarMenuItem muted level={item.level} onSelect={onSelect}>
-            <ResourceTypeIcon
-              type={item.icon}
-              className="w-4 h-4 min-w-4 me-2 inline"
-            />
-            <SidebarMenuItemLabel>{item.label}</SidebarMenuItemLabel>
-            {item.data.readonly && (
-              <Tooltip>
-                <TooltipTrigger>
-                  <EyeOpenIcon className="min-w-3 w-3 h-3 ms-1 inline text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>Readonly VIEW</TooltipContent>
-              </Tooltip>
-            )}
-            <SidebarMenuItemActions>
+        {
+          renderEmptyState: () => <EmptyState />,
+          renderGroupHeader: Header,
+          renderMenuItem: ({ item, onSelect }) => (
+            <SidebarMenuLinkButton
+              size="sm"
+              onSelect={onSelect}
+              link={item.link}
+            >
+              {item.icon && (
+                <ResourceTypeIcon type={item.icon} className="size-4" />
+              )}
+              <span>{item.label}</span>
+              {item.data.readonly && (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <EyeOpenIcon className="min-w-3 w-3 h-3 ms-1 inline text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>Readonly VIEW</TooltipContent>
+                </Tooltip>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuItemAction>
+                  <SidebarMenuAction showOnHover>
                     <DotsHorizontalIcon />
-                  </SidebarMenuItemAction>
+                  </SidebarMenuAction>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="end">
                   <DropdownMenuItem disabled>
@@ -327,11 +322,11 @@ export function ModeData() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </SidebarMenuItemActions>
-          </SidebarMenuItem>
-        ),
-      })}
-      {renderMenuItems(state.sidebar.mode_data.menus ?? [])}
+            </SidebarMenuLinkButton>
+          ),
+        }
+      )}
+      {state.sidebar.mode_data.menus?.map((g) => renderMenuGroup(g))}
     </>
   );
 }
