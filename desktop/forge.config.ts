@@ -7,15 +7,29 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
+
+// cli flags
+const IS_INSIDERS = process.argv.includes("--insiders");
+if (IS_INSIDERS) {
+  console.log("=== INSIDERS BUILD ===");
+  process.env.INSIDERS = "1";
+}
+
+// .env
 dotenv.config();
+
+// variable build config
+const name = IS_INSIDERS ? "Grida Insiders" : "Grida";
+const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
+const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
 
 const config: ForgeConfig = {
   packagerConfig: {
     extraResource: ["mac/dotgrida.icns"],
-    name: "Grida",
+    name: name,
     asar: true,
-    appBundleId: "co.grida.desktop",
-    icon: "./images/icon",
+    appBundleId: appBundleId,
+    icon: icon,
     osxSign: {},
     osxNotarize: {
       appleId: process.env.APPLE_ID,
@@ -37,7 +51,6 @@ const config: ForgeConfig = {
       // If you are familiar with Vite configuration, it will look really familiar.
       build: [
         {
-          // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
           entry: "src/main.ts",
           config: "vite.main.config.ts",
           target: "main",

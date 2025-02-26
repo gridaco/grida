@@ -1,6 +1,12 @@
 import { BrowserWindow, shell } from "electron";
 import path from "node:path";
 
+const IS_INSIDERS = INSIDERS === 1;
+const IS_DEV = process.env.NODE_ENV === "development";
+
+const EDITOR_BASE_URL =
+  IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://app.grida.co";
+
 const trafficLightPosition = {
   x: 14,
   y: 14,
@@ -21,12 +27,7 @@ export default function create_window() {
     },
   });
 
-  if (process.env.NODE_ENV === "development") {
-    window.loadURL("http://localhost:3000/dashboard");
-  } else {
-    window.loadURL("https://app.grida.co/dashboard");
-    // window.loadURL("http://localhost:3000/dashboard");
-  }
+  window.loadURL(`${EDITOR_BASE_URL}/dashboard`);
 
   window.webContents.on("will-prevent-unload", (event) => {
     // Allow the window to close even if the page tries to block it.
@@ -79,14 +80,10 @@ function shouldOpenExternally(origin: string, target: string) {
   if (origin.includes("/sign-in")) return false;
   if (origin.includes("/insiders/auth")) return false;
 
-  // deny all others
-  if (
-    !(
-      target.startsWith("https://app.grida.co") ||
-      (process.env.NODE_ENV === "development" &&
-        target.startsWith("http://localhost:3000"))
-    )
-  ) {
-    return true;
+  // need some more handling
+  if (target.startsWith(EDITOR_BASE_URL)) {
+    return false;
   }
+
+  return true;
 }
