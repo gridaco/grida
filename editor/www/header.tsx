@@ -8,7 +8,7 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { cn } from "@/utils";
+import { cn } from "@/utils/cn";
 import React from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
@@ -35,6 +35,7 @@ const resources: Item[] = [
   sitemap.items.downloads,
   sitemap.items.joinslack,
   sitemap.items.thebundle,
+  sitemap.items.contact,
 ];
 
 export default function Header() {

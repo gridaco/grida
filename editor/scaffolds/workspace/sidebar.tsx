@@ -23,16 +23,7 @@ import {
   SidebarRail,
   SidebarGroupAction,
 } from "@/components/ui/sidebar";
-import {
-  Blocks,
-  Home,
-  MessageCircleQuestion,
-  Search,
-  Settings2,
-  ChevronRight,
-  ChevronDown,
-  Clock,
-} from "lucide-react";
+import { Home, Settings2, ChevronRight, ChevronDown } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import {
   DropdownMenu,
@@ -54,6 +45,7 @@ import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { usePathname } from "next/navigation";
 import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { sitemap } from "@/www/data/sitemap";
 
 function SidebarMenuLinkButton({
   href,
@@ -167,7 +159,7 @@ export default function WorkspaceSidebar({
         <NavProjects orgname={organization.name} projects={projectstree} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
-      <SidebarRail />
+      {/* <SidebarRail /> */}
     </Sidebar>
   );
 }
@@ -278,7 +270,7 @@ function OrganizationSwitcher({
                 alt={organization.display_name}
               />
               <span className="truncate font-semibold">
-                {organization.name}
+                {organization.display_name}
               </span>
               <ChevronDown className="opacity-50" />
             </SidebarMenuButton>
@@ -300,7 +292,7 @@ function OrganizationSwitcher({
                     avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />
-                  {org.name}
+                  {org.display_name}
                 </DropdownMenuItem>
               </Link>
             ))}
@@ -319,6 +311,14 @@ function OrganizationSwitcher({
             <DropdownMenuItem onSelect={onLogoutClick}>
               <div className="text-xs text-muted-foreground">Log out</div>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <Link href={sitemap.links.downlaods} target="_blank">
+              <DropdownMenuItem>
+                <div className="text-xs text-muted-foreground">
+                  Get Desktop App
+                </div>
+              </DropdownMenuItem>
+            </Link>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

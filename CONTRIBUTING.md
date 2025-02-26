@@ -50,6 +50,23 @@ npx supabase gen types typescript --local \
   > database.types.ts
 ```
 
+or (if you are a tier 1 contributor)
+
+```bash
+npx supabase gen types typescript \
+  --project-id "mozagqllybnbytfcmvdh" \
+  --schema public \
+  --schema grida_g11n \
+  --schema grida_x_supabase \
+  --schema grida_sites \
+  --schema grida_canvas \
+  --schema grida_commerce \
+  --schema grida_forms_secure \
+  --schema grida_forms \
+  --schema grida_storage \
+  > database.types.ts
+```
+
 ## Support
 
 If you have any problem running the project locally or for any further information, please contact us via Slack.
