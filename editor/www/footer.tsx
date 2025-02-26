@@ -100,6 +100,12 @@ export default function Footer() {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Contact</h3>
                 <Link
+                  href={sitemap.links.contact}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Contact us
+                </Link>
+                <Link
                   href={sitemap.links.slack}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
