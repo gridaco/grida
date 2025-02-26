@@ -49,6 +49,7 @@ import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { usePathname } from "next/navigation";
 import { DesktopDragArea } from "@/components/desktop-drag-area";
 import { sitemap } from "@/www/data/sitemap";
+import "core-js/features/object/group-by";
 
 function SidebarMenuLinkButton({
   href,
