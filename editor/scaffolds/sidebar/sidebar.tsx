@@ -49,7 +49,7 @@ export function EditorSidebar() {
             Select a block to insert into the canvas
           </Dialog.Description>
           <Sidebar>
-            <DesktopDragArea className="bg-workbench-panel" />
+            <DesktopDragArea />
             <ModeInsertBlocks />
           </Sidebar>
         </Dialog.Content>
@@ -60,7 +60,7 @@ export function EditorSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="min-w-60 w-min p-0 gap-0">
-        <DesktopDragArea className="bg-workbench-panel" />
+        <DesktopDragArea />
         <header className="h-11 min-h-11 flex items-center px-4 border-b">
           <Link
             href={`/${state.organization.name}/${state.project.name}`}

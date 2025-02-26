@@ -2,7 +2,7 @@
 import { SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/utils";
 
@@ -17,7 +17,7 @@ export function SearchInput({
 
   return (
     <div className="relative flex-1 md:grow-0">
-      <SearchIcon className="absolute left-2.5 inset-y-0 my-auto h-4 w-4 text-muted-foreground pointer-events-none" />
+      <SearchIcon className="absolute left-2.5 inset-y-0 my-auto size-4 text-muted-foreground pointer-events-none" />
       <Input
         type="search"
         placeholder="Search"
@@ -86,7 +86,7 @@ function ExpandableSearchInput({
   return (
     <motion.div
       ref={rootRef}
-      className="relative ml-auto flex-1 md:grow-0 h-9"
+      className="relative ml-auto flex-1 md:grow-0"
       animate={{ width: isExpanded ? 200 : 36 }}
       initial={{ width: 36 }}
       transition={{ duration: 0.15 }}
@@ -95,7 +95,7 @@ function ExpandableSearchInput({
     >
       <div
         className={cn(
-          "absolute left-0",
+          "absolute left-0 inset-y-0 my-auto",
           buttonVariants({
             variant: "ghost",
             size: "icon",
@@ -103,18 +103,16 @@ function ExpandableSearchInput({
           isExpanded && "pointer-events-none"
         )}
       >
-        <SearchIcon className="h-4 w-4 text-muted-foreground" />
+        <SearchIcon className="size-4 text-muted-foreground" />
       </div>
       <Input
         type="search"
         ref={inputRef}
         placeholder="Search"
-        className={cn("pl-8", className)}
+        data-expanded={isExpanded}
+        className={cn("pl-8 invisible data-[expanded=true]:visible", className)}
         {...props}
         onBlur={onInputBlur}
-        style={{
-          display: isExpanded ? "block" : "none",
-        }}
       />
     </motion.div>
   );
