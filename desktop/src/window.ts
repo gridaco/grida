@@ -77,6 +77,7 @@ export function create_login_window() {
 function shouldOpenExternally(origin: string, target: string) {
   // if the redirect is triggered by the sign-in page, allow it
   if (origin.includes("/sign-in")) return false;
+  if (origin.includes("/insiders/auth")) return false;
 
   // deny all others
   if (
