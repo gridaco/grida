@@ -79,6 +79,15 @@ softwareupdate --install-rosetta
 ```
 
 
+## Linux Build on macOS
+
+```bash
+brew install rpm
+brew install fakeroot
+brew install dpkg
+```
+
+
 ## Linux Build on macOS using Docker
 
 If you're on macOS and want to build Linux packages for Grida Desktop, you can use Docker to simulate a Linux environment.
@@ -97,6 +106,7 @@ If you're on macOS and want to build Linux packages for Grida Desktop, you can u
    Use an image that matches your build environment, for example, Node 18 on Debian Bullseye.
    ```sh
    docker pull node:22-bullseye
+
 
 
 
@@ -131,3 +141,27 @@ rm -r icon.iconset
 ```bash
 convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
 ```
+
+
+
+## Building for each platform
+
+
+**Mac** (runs only on mac device)
+
+```bash
+pnpm make --arch="x64,arm64,universal"
+```
+
+**Windows** (recommeded to run windows device)
+
+```bash
+pnpm make --arch="x64,arm64"
+```
+
+**Linux**
+
+```bash
+pnpm make --platform=linux --arch="x64,arm64"
+```
+

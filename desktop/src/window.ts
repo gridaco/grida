@@ -10,6 +10,19 @@ const trafficLightPosition = {
   y: 14,
 } as const;
 
+const WINDOW_ICON: { [key: string]: string | null } = {
+  aix: null,
+  android: null,
+  darwin: null,
+  freebsd: null,
+  haiku: null,
+  linux: path.join(__dirname, "../images/icon.png"),
+  openbsd: null,
+  win32: path.join(__dirname, "../images/icon.ico"),
+  cygwin: null,
+  netbsd: null,
+};
+
 const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
   titleBarStyle: "hidden",
   trafficLightPosition,
@@ -17,6 +30,7 @@ const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
   height: 960,
   minWidth: 384,
   minHeight: 384,
+  icon: WINDOW_ICON[process.platform] ?? undefined,
 };
 
 function register_window_hooks(

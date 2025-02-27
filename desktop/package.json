@@ -1,11 +1,12 @@
 {
-  "name": "@grida/desktop",
-  "productName": "Grida",
+  "name": "desktop",
   "version": "0.0.1",
-  "packageManager": "pnpm@9.15.4",
-  "description": "My Electron application description",
-  "main": ".vite/build/main.js",
+  "description": "Grida Desktop App",
+  "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
+  "private": true,
+  "main": ".vite/build/main.js",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "electron-forge start",
     "package": "electron-forge package",

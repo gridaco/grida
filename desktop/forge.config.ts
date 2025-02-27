@@ -19,14 +19,18 @@ if (IS_INSIDERS) {
 dotenv.config();
 
 // variable build config
-const name = IS_INSIDERS ? "Grida Insiders" : "Grida";
+const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    extraResource: ["mac/dotgrida.icns"],
-    name: name,
+    extraResource: [
+      // .grida file preview icon for macOS
+      "mac/dotgrida.icns",
+    ],
+    name: productName,
+    executableName: "desktop",
     asar: true,
     appBundleId: appBundleId,
     icon: icon,
@@ -37,13 +41,28 @@ const config: ForgeConfig = {
       teamId: process.env.APPLE_TEAM_ID,
     },
     extendInfo: "./Info.plist",
+    appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      loadingGif: "",
+    }),
     new MakerZIP({}, ["darwin"]),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        // name: executableName,
+        productName: productName,
+        icon: "./images/icon.png",
+      },
+    }),
+    new MakerDeb({
+      options: {
+        // name: executableName,
+        productName: productName,
+        icon: "./images/icon.png",
+      },
+    }),
   ],
   plugins: [
     new VitePlugin({
@@ -85,6 +104,7 @@ const config: ForgeConfig = {
       name: "@electron-forge/publisher-github",
       platforms: ["darwin", "win32", "linux"],
       config: {
+        force: true,
         repository: {
           owner: "gridaco",
           name: "grida",
