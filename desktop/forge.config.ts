@@ -1,7 +1,7 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import {
   MakerSquirrel,
-  MakerSquirrelConfig,
+  type MakerSquirrelConfig,
 } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { MakerDMG } from "@electron-forge/maker-dmg";
@@ -52,16 +52,17 @@ const config: ForgeConfig = {
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
       return {
-        exe: `${productName}-${version}.${arch}.exe`,
+        setupExe: `${productName}-${version}.${arch}.exe`,
         name: appBundleId,
         title: productName,
         iconUrl: "https://app.grida.co/favicon.ico",
         loadingGif: "./images/loadingGif.gif",
         setupIcon: "./images/icon.ico",
-      };
+      } satisfies MakerSquirrelConfig;
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerDMG({
+      overwrite: true,
       icon: icon + ".icns",
       title: productName,
       background: "./images/dmg-background.png",
