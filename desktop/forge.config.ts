@@ -46,21 +46,23 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
+      name: appBundleId,
+      title: productName,
       loadingGif: "./images/loadingGif.gif",
       setupIcon: "./images/icon.ico",
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({
       options: {
-        // name: executableName,
         productName: productName,
+        name: productName,
         icon: "./images/icon.png",
       },
     }),
     new MakerDeb({
       options: {
-        // name: executableName,
         productName: productName,
+        name: productName,
         icon: "./images/icon.png",
       },
     }),

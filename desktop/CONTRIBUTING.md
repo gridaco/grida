@@ -160,7 +160,7 @@ pnpm forge:publish --arch="x64,arm64,universal"
 ```bash
 pnpm make --arch="x64,arm64"
 # or (for publishing)
-pnpm forge:publish --arch="x64,arm64"
+pnpm forge:publish --platform=win32 --arch="x64,arm64"
 ```
 
 **Linux**
