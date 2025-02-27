@@ -39,8 +39,8 @@ jobs:
       - name: Install Snapcraft (Ubuntu only)
         if: ${{ matrix.os.name == 'linux' }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y snapcraft
+          sudo apt update
+          sudo apt install snapd
 
       - name: Publish App
         env:
