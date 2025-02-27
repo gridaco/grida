@@ -41,6 +41,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install snapd
+          sudo snap install snapcraft --classic
 
       - name: Publish App
         env:
