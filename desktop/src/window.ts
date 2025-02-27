@@ -5,6 +5,8 @@ import {
 } from "electron";
 import path from "node:path";
 
+const TITLE_BAR_HEIGHT = 44;
+
 const trafficLightPosition = {
   x: 14,
   y: 14,
@@ -41,12 +43,22 @@ function get_window_constructor_options(): BaseWindowConstructorOptions {
       };
     }
     case "linux":
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: TITLE_BAR_HEIGHT - 1,
+          // linux does not support transparent title bars
+          color: "#ffff",
+        },
+        ...size,
+      };
     case "win32": {
       return {
         icon,
         titleBarStyle: "hidden",
         titleBarOverlay: {
-          height: 44,
+          height: TITLE_BAR_HEIGHT,
           color: "#00000000",
         },
         ...size,
