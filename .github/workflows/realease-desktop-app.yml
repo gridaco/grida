@@ -35,6 +35,12 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+      
+      - name: Install Snapcraft (Ubuntu only)
+        if: ${{ matrix.os.name == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y snapcraft
 
       - name: Publish App
         env:
