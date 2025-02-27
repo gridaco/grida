@@ -19,6 +19,10 @@ jobs:
         working-directory: ./desktop
 
     steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Install Snapcraft (Ubuntu only)
         if: ${{ matrix.os.name == 'linux' }}
         run: |
@@ -26,9 +30,6 @@ jobs:
           sudo apt install snapd
           sudo snap install snapcraft --classic
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
