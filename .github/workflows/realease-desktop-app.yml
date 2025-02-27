@@ -19,6 +19,13 @@ jobs:
         working-directory: ./desktop
 
     steps:
+      - name: Install Snapcraft (Ubuntu only)
+        if: ${{ matrix.os.name == 'linux' }}
+        run: |
+          sudo apt update
+          sudo apt install snapd
+          sudo snap install snapcraft --classic
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         
@@ -36,13 +43,6 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Install Snapcraft (Ubuntu only)
-        if: ${{ matrix.os.name == 'linux' }}
-        run: |
-          sudo apt update
-          sudo apt install snapd
-          sudo snap install snapcraft --classic
-
       - name: Publish App
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}

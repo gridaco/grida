@@ -112,7 +112,7 @@ const config: ForgeConfig = {
         ],
       },
     }),
-    new MakerSnap({}),
+    // new MakerSnap({}),
   ],
   plugins: [
     new VitePlugin({
