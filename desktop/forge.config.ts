@@ -1,5 +1,8 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
-import { MakerSquirrel } from "@electron-forge/maker-squirrel";
+import {
+  MakerSquirrel,
+  MakerSquirrelConfig,
+} from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerDeb } from "@electron-forge/maker-deb";
@@ -46,12 +49,16 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({
-      name: appBundleId,
-      title: productName,
-      iconUrl: "https://app.grida.co/favicon.ico",
-      loadingGif: "./images/loadingGif.gif",
-      setupIcon: "./images/icon.ico",
+    new MakerSquirrel((arch) => {
+      const version = process.env.npm_package_version;
+      return {
+        exe: `${productName}-${version}.${arch}.exe`,
+        name: appBundleId,
+        title: productName,
+        iconUrl: "https://app.grida.co/favicon.ico",
+        loadingGif: "./images/loadingGif.gif",
+        setupIcon: "./images/icon.ico",
+      };
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerDMG({
@@ -111,6 +118,7 @@ const config: ForgeConfig = {
   ],
   publishers: [
     {
+      // https://js.electronforge.io/interfaces/_electron_forge_publisher_github.PublisherGitHubConfig.html
       name: "@electron-forge/publisher-github",
       platforms: ["darwin", "win32", "linux"],
       config: {
