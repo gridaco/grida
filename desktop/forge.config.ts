@@ -72,7 +72,7 @@ const config: ForgeConfig = {
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
       return {
-        setupExe: `${productName}-${version}.${arch}.exe`,
+        setupExe: `${productName} Setup ${version} ${arch}.exe`,
         name: appBundleId + `.${arch}`,
         title: productName,
         iconUrl: "https://app.grida.co/favicon.ico",
