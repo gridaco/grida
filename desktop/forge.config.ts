@@ -10,6 +10,7 @@ import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import fs from "fs";
 import * as dotenv from "dotenv";
 
 // cli flags
@@ -48,6 +49,20 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
+  hooks: {
+    postMake: async (config, results) => {
+      for (const result of results) {
+        if (result.platform === "win32") {
+          // remove .nupkg and RELEASES file
+          result.artifacts.forEach((artifact) => {
+            if (artifact.endsWith(".nupkg") || artifact.endsWith("RELEASES")) {
+              fs.unlinkSync(artifact);
+            }
+          });
+        }
+      }
+    },
+  },
   makers: [
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
@@ -61,12 +76,15 @@ const config: ForgeConfig = {
       } satisfies MakerSquirrelConfig;
     }),
     new MakerZIP({}, ["darwin"]),
-    new MakerDMG({
-      overwrite: true,
-      icon: icon + ".icns",
-      title: productName,
-      background: "./images/dmg-background.png",
-    }),
+    new MakerDMG(
+      {
+        overwrite: true,
+        icon: icon + ".icns",
+        title: productName,
+        background: "./images/dmg-background.png",
+      },
+      ["darwin"]
+    ),
     new MakerRpm({
       options: {
         productName: productName,
