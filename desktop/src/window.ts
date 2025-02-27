@@ -34,25 +34,29 @@ function get_window_constructor_options(): BaseWindowConstructorOptions {
   switch (process.platform) {
     case "darwin": {
       return {
+        icon,
         titleBarStyle: "hidden",
         trafficLightPosition,
         ...size,
-        icon,
       };
     }
     case "linux":
     case "win32": {
       return {
-        titleBarStyle: "default",
-        ...size,
         icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: 44,
+          color: "#00000000",
+        },
+        ...size,
       };
     }
     default: {
       return {
+        icon,
         titleBarStyle: "default",
         ...size,
-        icon,
       };
     }
   }
