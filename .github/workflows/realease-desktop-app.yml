@@ -21,8 +21,9 @@ jobs:
             image: ubuntu-latest
           - name: windows
             image: windows-latest
-          # - name: macos
-          #   image: macos-latest
+          
+          # - name: macos-apple-silicon
+          #   image: macos-15
     runs-on: ${{ matrix.os.image }}
     defaults:
       run:
@@ -53,6 +54,15 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-      
-      - name: Publish App
+
+      - name: Publish App (Windows)
+        if: ${{ matrix.os.name == 'windows' }}
         run: pnpm run publish:prerelease --arch="x64"
+
+      - name: Publish App (Linux)
+        if: ${{ matrix.os.name == 'linux' }}
+        run: pnpm run publish:prerelease --arch="x64,arm64"
+
+      - name: Publish App (MacOS)
+        if: ${{ matrix.os.name == 'macos-apple-silicon' }}
+        run: pnpm run publish:prerelease --arch="x64,arm64"
