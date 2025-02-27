@@ -11,7 +11,7 @@
     "dev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "forge:publish": "electron-forge publish",
+    "publish:prerelease": "electron-forge publish --arch='x64,arm64'",
     "lint": "eslint --ext .ts,.tsx ."
   },
   "devDependencies": {
@@ -19,6 +19,7 @@
     "@electron-forge/maker-deb": "^7.6.1",
     "@electron-forge/maker-dmg": "^7.7.0",
     "@electron-forge/maker-rpm": "^7.6.1",
+    "@electron-forge/maker-snap": "^7.7.0",
     "@electron-forge/maker-squirrel": "^7.6.1",
     "@electron-forge/maker-zip": "^7.6.1",
     "@electron-forge/plugin-auto-unpack-natives": "^7.6.1",

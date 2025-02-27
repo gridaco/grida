@@ -325,6 +325,9 @@ importers:
       '@electron-forge/maker-rpm':
         specifier: ^7.6.1
         version: 7.6.1
+      '@electron-forge/maker-snap':
+        specifier: ^7.7.0
+        version: 7.7.0
       '@electron-forge/maker-squirrel':
         specifier: ^7.6.1
         version: 7.6.1
@@ -3489,6 +3492,10 @@ packages:
 
   '@electron-forge/maker-rpm@7.6.1':
     resolution: {integrity: sha512-BShfmto+XTSA01pkZp10r2ktyruVfI24sGC+y4az1vbqkmX2qN9j0Xr+G/ZMHsm76XHju0N/e1Y2pqqu2JM8/A==}
+    engines: {node: '>= 16.4.0'}
+
+  '@electron-forge/maker-snap@7.7.0':
+    resolution: {integrity: sha512-WeK8beies2QNLbYxAH7rgM5HIdWvknbeg6W4NUfZfFCzI3KsL19QgMsnCsnQCS60lzhiqKZCBXP9JejLb0oXLg==}
     engines: {node: '>= 16.4.0'}
 
   '@electron-forge/maker-squirrel@7.6.1':
@@ -10914,6 +10921,11 @@ packages:
     resolution: {integrity: sha512-gEISr3U32Sgtj+fjxUAlSDo3wyGGq6OBx7rF5UdpIgbnpUvMN4W5uYb0ThpnAZ42VEJh/3aODQXHbFS4f5J3Iw==}
     engines: {node: '>= 10.0.0'}
     os: [darwin, linux]
+    hasBin: true
+
+  electron-installer-snap@5.2.0:
+    resolution: {integrity: sha512-SRm7pCpNHMXV545JjScV8fLC9NhFli5r8L8Ju4EHdXwRh76+mwrJoUEDLItixBudZ5Mcgz1SJcDPJfWpEQWX7Q==}
+    engines: {node: '>= 10.0'}
     hasBin: true
 
   electron-squirrel-startup@1.0.1:
@@ -23600,6 +23612,16 @@ snapshots:
       - bluebird
       - supports-color
 
+  '@electron-forge/maker-snap@7.7.0':
+    dependencies:
+      '@electron-forge/maker-base': 7.7.0
+      '@electron-forge/shared-types': 7.7.0
+    optionalDependencies:
+      electron-installer-snap: 5.2.0
+    transitivePeerDependencies:
+      - bluebird
+      - supports-color
+
   '@electron-forge/maker-squirrel@7.6.1':
     dependencies:
       '@electron-forge/maker-base': 7.6.1
@@ -33643,6 +33665,22 @@ snapshots:
       fs-extra: 9.1.0
       lodash: 4.17.21
       word-wrap: 1.2.5
+      yargs: 16.2.0
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
+  electron-installer-snap@5.2.0:
+    dependencies:
+      '@malept/cross-spawn-promise': 1.1.1
+      debug: 4.4.0
+      electron-installer-common: 0.10.4
+      fs-extra: 9.1.0
+      js-yaml: 3.14.1
+      lodash: 4.17.21
+      semver: 7.7.1
+      tmp-promise: 3.0.3
+      which: 2.0.2
       yargs: 16.2.0
     transitivePeerDependencies:
       - supports-color

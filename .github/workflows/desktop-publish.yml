@@ -1,0 +1,39 @@
+name: Publish Desktop App
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - name: linux
+            image: ubuntu-latest
+          - name: windows
+            image: windows-latest
+          - name: macos
+            image: macos-latest
+    runs-on: ${{ matrix.os.image }}
+    defaults:
+      run:
+        working-directory: ./desktop
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish App
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm run publish:prerelease
