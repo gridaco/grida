@@ -10,7 +10,6 @@ import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
-import fs from "fs";
 import * as dotenv from "dotenv";
 
 // cli flags
@@ -45,6 +44,12 @@ const config: ForgeConfig = {
       appleIdPassword: process.env.APPLE_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     },
+    protocols: [
+      {
+        name: "Grida",
+        schemes: ["grida"],
+      },
+    ],
     extendInfo: "./Info.plist",
     appCategoryType: "public.app-category.developer-tools",
   },
@@ -53,11 +58,11 @@ const config: ForgeConfig = {
     postMake: async (config, results) => {
       for (const result of results) {
         if (result.platform === "win32") {
-          // remove .nupkg and RELEASES file
-          result.artifacts.forEach((artifact) => {
-            if (artifact.endsWith(".nupkg") || artifact.endsWith("RELEASES")) {
-              fs.unlinkSync(artifact);
-            }
+          // remove .nupkg and RELEASES file from the upload artifacts
+          result.artifacts = result.artifacts.filter((artifact) => {
+            if (artifact.endsWith(".nupkg")) return false;
+            if (artifact.endsWith("RELEASES")) return false;
+            return true;
           });
         }
       }
@@ -68,7 +73,7 @@ const config: ForgeConfig = {
       const version = process.env.npm_package_version;
       return {
         setupExe: `${productName}-${version}.${arch}.exe`,
-        name: appBundleId,
+        name: appBundleId + `.${arch}`,
         title: productName,
         iconUrl: "https://app.grida.co/favicon.ico",
         loadingGif: "./images/loadingGif.gif",
@@ -76,20 +81,23 @@ const config: ForgeConfig = {
       } satisfies MakerSquirrelConfig;
     }),
     new MakerZIP({}, ["darwin"]),
-    new MakerDMG(
-      {
+    new MakerDMG(() => {
+      return {
         overwrite: true,
         icon: icon + ".icns",
         title: productName,
         background: "./images/dmg-background.png",
-      },
-      ["darwin"]
-    ),
+      };
+    }, ["darwin"]),
     new MakerRpm({
       options: {
         productName: productName,
         name: productName,
         icon: "./images/icon.png",
+        mimeType: [
+          // grida:// deep linking
+          "x-scheme-handler/grida",
+        ],
       },
     }),
     new MakerDeb({
@@ -97,6 +105,10 @@ const config: ForgeConfig = {
         productName: productName,
         name: productName,
         icon: "./images/icon.png",
+        mimeType: [
+          // grida:// deep linking
+          "x-scheme-handler/grida",
+        ],
       },
     }),
   ],

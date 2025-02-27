@@ -125,6 +125,8 @@ function shouldOpenExternally(baseUrl: string, origin: string, target: string) {
   // if the redirect is triggered by the sign-in page, allow it
   if (origin.includes("/sign-in")) return false;
   if (origin.includes("/insiders/auth")) return false;
+  // remove me when auth deeplinking is implemented
+  if (target.includes("accounts.google.com")) return false;
 
   // need some more handling
   if (target.startsWith(baseUrl)) {
