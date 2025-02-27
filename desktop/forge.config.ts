@@ -46,7 +46,8 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      loadingGif: "",
+      loadingGif: "./images/loadingGif.gif",
+      setupIcon: "./images/icon.ico",
     }),
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({

@@ -151,17 +151,23 @@ convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
 
 ```bash
 pnpm make --arch="x64,arm64,universal"
+# or (for publishing)
+pnpm forge:publish --arch="x64,arm64,universal"
 ```
 
 **Windows** (recommeded to run windows device)
 
 ```bash
 pnpm make --arch="x64,arm64"
+# or (for publishing)
+pnpm forge:publish --arch="x64,arm64"
 ```
 
 **Linux**
 
 ```bash
 pnpm make --platform=linux --arch="x64,arm64"
+# or (for publishing)
+pnpm forge:publish --platform=linux --arch="x64,arm64"
 ```
 
