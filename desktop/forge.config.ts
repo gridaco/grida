@@ -55,20 +55,7 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
-  hooks: {
-    postMake: async (config, results) => {
-      for (const result of results) {
-        if (result.platform === "win32") {
-          // remove .nupkg and RELEASES file from the upload artifacts
-          result.artifacts = result.artifacts.filter((artifact) => {
-            if (artifact.endsWith(".nupkg")) return false;
-            if (artifact.endsWith("RELEASES")) return false;
-            return true;
-          });
-        }
-      }
-    },
-  },
+  hooks: {},
   makers: [
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
