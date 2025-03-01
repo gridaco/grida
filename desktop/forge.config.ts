@@ -45,6 +45,9 @@ const config: ForgeConfig = {
       appleIdPassword: process.env.APPLE_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     },
+    win32metadata: {
+      CompanyName: "Grida Inc.",
+    },
     protocols: [
       {
         name: "Grida",
