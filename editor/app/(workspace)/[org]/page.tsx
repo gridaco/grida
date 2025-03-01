@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { editorlink } from "@/lib/forms/url";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default function DashboardProjectsPage({
@@ -49,7 +49,7 @@ export default function DashboardProjectsPage({
     <SidebarProvider>
       <div className="h-full flex flex-1 w-full">
         <div className="flex flex-col overflow-hidden w-full h-full">
-          <DesktopDragArea className="border-b" />
+          <DesktopDragArea className="desktop-title-bar-height border-b bg-sidebar" />
           <main className="w-full h-full overflow-y-scroll">
             <div className="container mx-auto">
               <header className="py-10">

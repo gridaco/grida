@@ -5,27 +5,79 @@ import {
 } from "electron";
 import path from "node:path";
 
-const IS_INSIDERS = INSIDERS === 1;
-const IS_DEV = process.env.NODE_ENV === "development";
-
-const EDITOR_BASE_URL =
-  IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://app.grida.co";
+const TITLE_BAR_HEIGHT = 44;
 
 const trafficLightPosition = {
   x: 14,
   y: 14,
 } as const;
 
-const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
-  titleBarStyle: "hidden",
-  trafficLightPosition,
-  width: 1440,
-  height: 960,
-  minWidth: 384,
-  minHeight: 384,
+const WINDOW_ICON: { [key: string]: string | null } = {
+  aix: null,
+  android: null,
+  darwin: null,
+  freebsd: null,
+  haiku: null,
+  linux: path.join(__dirname, "../images/icon.png"),
+  openbsd: null,
+  win32: path.join(__dirname, "../images/icon.ico"),
+  cygwin: null,
+  netbsd: null,
 };
 
-function register_window_hooks(window: BrowserWindow) {
+function get_window_constructor_options(): BaseWindowConstructorOptions {
+  const icon = WINDOW_ICON[process.platform];
+  const size = {
+    width: 1440,
+    height: 960,
+    minWidth: 384,
+    minHeight: 384,
+  };
+  switch (process.platform) {
+    case "darwin": {
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        trafficLightPosition,
+        ...size,
+      };
+    }
+    case "linux":
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: TITLE_BAR_HEIGHT - 1,
+          // linux does not support transparent title bars
+          color: "#ffff",
+        },
+        ...size,
+      };
+    case "win32": {
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: TITLE_BAR_HEIGHT,
+          color: "#00000000",
+        },
+        ...size,
+      };
+    }
+    default: {
+      return {
+        icon,
+        titleBarStyle: "default",
+        ...size,
+      };
+    }
+  }
+}
+
+function register_window_hooks(
+  window: BrowserWindow,
+  { baseUrl }: { baseUrl: string }
+) {
   window.webContents.on("will-prevent-unload", (event) => {
     // Allow the window to close even if the page tries to block it.
     event.preventDefault();
@@ -39,16 +91,16 @@ function register_window_hooks(window: BrowserWindow) {
 
   window.webContents.on("will-navigate", (event, url) => {
     const origin = window.webContents.getURL();
-    if (shouldOpenExternally(origin, url)) {
+    if (shouldOpenExternally(baseUrl, origin, url)) {
       event.preventDefault();
       shell.openExternal(url);
     }
   });
 }
 
-export default function create_main_window() {
+export default function create_main_window({ baseUrl }: { baseUrl: string }) {
   const window = new BrowserWindow({
-    ...DEFAILT_WINDOW_CONFIG,
+    ...get_window_constructor_options(),
     title: "Grida",
     webPreferences: {
       nodeIntegration: false,
@@ -56,26 +108,30 @@ export default function create_main_window() {
     },
   });
 
-  window.loadURL(`${EDITOR_BASE_URL}/dashboard`);
+  window.loadURL(`${baseUrl}/dashboard`);
 
-  register_window_hooks(window);
+  register_window_hooks(window, { baseUrl });
 
   return window;
 }
 
-export function create_canvas_playground_window() {
+export function create_canvas_playground_window({
+  baseUrl,
+}: {
+  baseUrl: string;
+}) {
   const window = new BrowserWindow({
+    ...get_window_constructor_options(),
     title: "Playground",
-    ...DEFAILT_WINDOW_CONFIG,
     webPreferences: {
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
 
-  window.loadURL(`${EDITOR_BASE_URL}/canvas`);
+  window.loadURL(`${baseUrl}/canvas`);
 
-  register_window_hooks(window);
+  register_window_hooks(window, { baseUrl });
 
   return window;
 }
@@ -106,13 +162,15 @@ export function create_login_window() {
   return window;
 }
 
-function shouldOpenExternally(origin: string, target: string) {
+function shouldOpenExternally(baseUrl: string, origin: string, target: string) {
   // if the redirect is triggered by the sign-in page, allow it
   if (origin.includes("/sign-in")) return false;
   if (origin.includes("/insiders/auth")) return false;
+  // remove me when auth deeplinking is implemented
+  if (target.includes("accounts.google.com")) return false;
 
   // need some more handling
-  if (target.startsWith(EDITOR_BASE_URL)) {
+  if (target.startsWith(baseUrl)) {
     return false;
   }
 

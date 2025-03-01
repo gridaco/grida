@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
-import { DesktopDragArea } from "@/components/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { Button } from "@/components/ui/button";
 
 export default function FormsDashboardPage({
@@ -50,11 +50,11 @@ export default function FormsDashboardPage({
     <div className="h-full flex flex-1 w-full">
       <Head>
         <title>
-          {organization_name}/{project_name} | Grida Forms
+          {organization_name}/{project_name} | Grida
         </title>
       </Head>
       <div className="flex flex-col overflow-hidden w-full h-full">
-        <DesktopDragArea className="border-b" />
+        <DesktopDragArea className="desktop-title-bar-height border-b bg-sidebar" />
         <main className="w-full h-full overflow-y-scroll">
           <div className="container mx-auto">
             <header className="py-10 flex justify-between">

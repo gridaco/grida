@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ComponentType, useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import { usePathname } from "next/navigation";
@@ -8,7 +8,6 @@ import Link from "next/link";
 import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";
 import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
 import { useMeasure } from "@uidotdev/usehooks";
-import { DesktopDragArea } from "../desktop-drag-area";
 
 export function SidebarRoot({
   side = "left",
@@ -31,10 +30,6 @@ export function SidebarRoot({
       {children}
     </aside>
   );
-}
-
-export function SidebarDesktopHeader() {
-  return <DesktopDragArea className="border-b" />;
 }
 
 export function SidebarHeader({
