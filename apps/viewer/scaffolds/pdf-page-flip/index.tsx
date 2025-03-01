@@ -68,19 +68,49 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
 
 FlipPage.displayName = "FlipPage";
 
-type Annotations = Record<string, { page: number; annotation: any }>;
-async function buildAnnotationMap(pdf: PDFDocumentProxy): Promise<Annotations> {
-  const annotationMap: Annotations = {};
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
+/**
+ * Finds the page number targeted by a link annotation based on its annotation ID.
+ *
+ * @param pdfDoc - The PDF document proxy object from PDF.js.
+ * @param annotationId - The unique identifier of the annotation to locate.
+ * @returns The 1-based page number the annotation links to, or `null` if not found.
+ */
+async function findPageNumberByAnnotationId(
+  pdfDoc: PDFDocumentProxy,
+  annotationId: string
+): Promise<number | null> {
+  const numPages = pdfDoc.numPages;
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDoc.getPage(pageNum);
     const annotations = await page.getAnnotations();
-    annotations.forEach((annotation) => {
-      if (annotation.id) {
-        annotationMap[annotation.id] = { page: pageNum, annotation };
+
+    for (const annotation of annotations) {
+      // Match the annotation ID (usually stored in annotation.id or annotation.ref)
+      if (
+        annotation.id === annotationId ||
+        (annotation.ref && annotation.ref.toString() === annotationId)
+      ) {
+        // For link annotations, destination contains the target page information
+        if (annotation.dest) {
+          const dest = annotation.dest;
+          const targetPageIndex = await pdfDoc.getPageIndex(dest[0]);
+          return targetPageIndex + 1; // pageIndex is 0-based, add 1 for the correct page number
+        } else if (
+          annotation.action === "GoTo" &&
+          annotation.unsafeUrl === undefined
+        ) {
+          const dest = annotation.dest || annotation.newWindow;
+          if (dest) {
+            const targetPageIndex = await pdfDoc.getPageIndex(dest[0]);
+            return targetPageIndex + 1;
+          }
+        }
       }
-    });
+    }
   }
-  return annotationMap;
+
+  return null; // Annotation not found
 }
 
 const PDFViewer = ({
@@ -103,15 +133,15 @@ const PDFViewer = ({
     height: number;
   } | null>(null);
   const book = useRef(null);
-
+  const doc = useRef<PDFDocumentProxy | null>(null);
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
   const [ref, { width: _width, height: _height }] = useMeasure();
-
-  const [annotations, setAnnotations] = useState<Annotations>();
 
   const onDocumentLoadSuccess: OnDocumentLoadSuccess = async (
     document: PDFDocumentProxy
   ) => {
+    doc.current = document;
+
     if (!title) {
       document.getMetadata().then(({ info }) => {
         try {
@@ -125,9 +155,6 @@ const PDFViewer = ({
       const [, , width, height] = page.view;
       setRawSize({ width, height });
     });
-    const annotationMap = await buildAnnotationMap(document);
-    setAnnotations(annotationMap);
-    // console.log("annotationMap", annotationMap);
   };
 
   // Cache dimensions once resolved; ignore subsequent resizes.
@@ -218,14 +245,13 @@ const PDFViewer = ({
                         const id = anchor.dataset.elementId;
                         if (id) {
                           e.preventDefault();
-                          if (annotations) {
-                            const annotation = annotations[id];
-                            if (annotation) {
-                              const pagenum = annotation.page;
-                              setPage(pagenum);
-                              console.log("annotation", annotation);
+                          findPageNumberByAnnotationId(doc.current!, id).then(
+                            (pagenum) => {
+                              if (pagenum) {
+                                setPage(pagenum);
+                              }
                             }
-                          }
+                          );
                         }
                       }
                     }}
