@@ -54,7 +54,7 @@ export default function FormsDashboardPage({
         </title>
       </Head>
       <div className="flex flex-col overflow-hidden w-full h-full">
-        <DesktopDragArea className="desktop-title-bar-height border-b" />
+        <DesktopDragArea className="desktop-title-bar-height border-b bg-sidebar" />
         <main className="w-full h-full overflow-y-scroll">
           <div className="container mx-auto">
             <header className="py-10 flex justify-between">

@@ -19,8 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { DarwinSidebarHeaderDragArea } from "../desktop";
 import Link from "next/link";
-import { DesktopSidebarHeaderDragArea } from "../desktop";
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
@@ -49,7 +49,7 @@ export function EditorSidebar() {
             Select a block to insert into the canvas
           </Dialog.Description>
           <Sidebar>
-            <DesktopSidebarHeaderDragArea />
+            <DarwinSidebarHeaderDragArea />
             <ModeInsertBlocks />
           </Sidebar>
         </Dialog.Content>
@@ -60,8 +60,8 @@ export function EditorSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="min-w-60 w-min p-0 gap-0">
-        <DesktopSidebarHeaderDragArea />
-        <header className="h-11 min-h-11 flex items-center px-4 border-b">
+        <DarwinSidebarHeaderDragArea />
+        <header className="desktop-drag-area h-11 min-h-11 flex items-center px-4 border-b">
           <Link
             href={`/${state.organization.name}/${state.project.name}`}
             prefetch={false}

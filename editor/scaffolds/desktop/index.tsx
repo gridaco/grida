@@ -3,7 +3,10 @@ import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { usePlatform } from "@/host/platform-provider";
 import * as k from "./k";
 
-export function DesktopSidebarHeaderDragArea() {
+/**
+ * Sidebar header for darwin (macOS) platform.
+ */
+export function DarwinSidebarHeaderDragArea() {
   const platform = usePlatform();
   if (platform.desktop_app_platform === "darwin") {
     return <DesktopDragArea className="desktop-title-bar-height" />;
