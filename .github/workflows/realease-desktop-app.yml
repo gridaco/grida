@@ -1,36 +1,68 @@
-name: Release Desktop app
+permissions:
+  contents: write
+
+name: Publish Desktop App
+
 on:
   workflow_dispatch:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  APPLE_ID: ${{ secrets.APPLE_ID }}
+  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
 jobs:
   build:
     strategy:
       matrix:
         os:
-          [
-            { name: "linux", image: "ubuntu-latest" },
-            { name: "windows", image: "windows-latest" },
-            { name: "macos", image: "macos-latest" },
-          ]
+          - name: linux
+            image: ubuntu-latest
+          - name: windows
+            image: windows-latest
+          
+          # - name: macos-apple-silicon
+          #   image: macos-15
     runs-on: ${{ matrix.os.image }}
-
     defaults:
       run:
         working-directory: ./desktop
 
     steps:
-      - name: Github checkout
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Install Snapcraft (Ubuntu only)
+        if: ${{ matrix.os.name == 'linux' }}
+        run: |
+          sudo apt update
+          sudo apt install snapd
+          sudo snap install snapcraft --classic
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "yarn" # This will automatically install and cache Yarn
+          node-version: 22
+          cache: pnpm
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile # (npm ci)
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Publish app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: yarn run publish
+      - name: Publish App (Windows)
+        if: ${{ matrix.os.name == 'windows' }}
+        run: pnpm run publish:prerelease --arch="x64"
+
+      - name: Publish App (Linux)
+        if: ${{ matrix.os.name == 'linux' }}
+        run: pnpm run publish:prerelease --arch="x64,arm64"
+
+      - name: Publish App (MacOS)
+        if: ${{ matrix.os.name == 'macos-apple-silicon' }}
+        run: pnpm run publish:prerelease --arch="x64,arm64"

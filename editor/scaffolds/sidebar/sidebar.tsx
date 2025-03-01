@@ -13,7 +13,6 @@ import { ModeData } from "./sidebar-mode-data";
 import { ModeConnect } from "./sidebar-mode-connect";
 import { ModeProject } from "./sidebar-mode-project";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { GridaLogo } from "@/components/grida-logo";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +20,7 @@ import { SlashIcon } from "@radix-ui/react-icons";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
+import { DesktopSidebarHeaderDragArea } from "../desktop";
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
@@ -49,7 +49,7 @@ export function EditorSidebar() {
             Select a block to insert into the canvas
           </Dialog.Description>
           <Sidebar>
-            <DesktopDragArea />
+            <DesktopSidebarHeaderDragArea />
             <ModeInsertBlocks />
           </Sidebar>
         </Dialog.Content>
@@ -60,7 +60,7 @@ export function EditorSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="min-w-60 w-min p-0 gap-0">
-        <DesktopDragArea />
+        <DesktopSidebarHeaderDragArea />
         <header className="h-11 min-h-11 flex items-center px-4 border-b">
           <Link
             href={`/${state.organization.name}/${state.project.name}`}
