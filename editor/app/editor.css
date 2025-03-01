@@ -2,6 +2,9 @@
 
 .desktop-drag-area{
   -webkit-app-region: drag;
+}
+
+.desktop-title-bar-height{
   height: 44px;
   min-height: 44px;
 }

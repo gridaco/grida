@@ -58,6 +58,12 @@ app.on("ready", async () => {
     url: EDITOR_BASE_URL,
   });
 
+  await session.defaultSession.cookies.set({
+    name: "grida-desktop-platform",
+    value: process.platform,
+    url: EDITOR_BASE_URL,
+  });
+
   mainwindow = create_main_window({ baseUrl: EDITOR_BASE_URL });
 });
 

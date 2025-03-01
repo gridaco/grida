@@ -9,10 +9,16 @@ export function DesktopDragArea({
   ...props
 }: React.HtmlHTMLAttributes<HTMLDivElement>) {
   const platform = usePlatform();
-  if (!platform.is_desktop_app) return null;
 
   return (
-    <div {...props} className={cn("w-full desktop-drag-area", className)}>
+    <div
+      {...props}
+      className={cn(
+        "w-full",
+        platform.is_desktop_app ? "desktop-drag-area" : "",
+        className
+      )}
+    >
       {children}
     </div>
   );

@@ -50,11 +50,11 @@ export default function FormsDashboardPage({
     <div className="h-full flex flex-1 w-full">
       <Head>
         <title>
-          {organization_name}/{project_name} | Grida Forms
+          {organization_name}/{project_name} | Grida
         </title>
       </Head>
       <div className="flex flex-col overflow-hidden w-full h-full">
-        <DesktopDragArea className="border-b" />
+        <DesktopDragArea className="desktop-title-bar-height border-b" />
         <main className="w-full h-full overflow-y-scroll">
           <div className="container mx-auto">
             <header className="py-10 flex justify-between">
