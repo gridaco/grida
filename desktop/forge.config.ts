@@ -1,6 +1,11 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
-import { MakerSquirrel } from "@electron-forge/maker-squirrel";
+import {
+  MakerSquirrel,
+  type MakerSquirrelConfig,
+} from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
+import { MakerDMG } from "@electron-forge/maker-dmg";
+// import { MakerSnap } from "@electron-forge/maker-snap";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
@@ -19,14 +24,18 @@ if (IS_INSIDERS) {
 dotenv.config();
 
 // variable build config
-const name = IS_INSIDERS ? "Grida Insiders" : "Grida";
+const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    extraResource: ["mac/dotgrida.icns"],
-    name: name,
+    extraResource: [
+      // .grida file preview icon for macOS
+      "mac/dotgrida.icns",
+    ],
+    name: productName,
+    executableName: "desktop",
     asar: true,
     appBundleId: appBundleId,
     icon: icon,
@@ -36,14 +45,64 @@ const config: ForgeConfig = {
       appleIdPassword: process.env.APPLE_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID,
     },
+    win32metadata: {
+      CompanyName: "Grida Inc.",
+    },
+    protocols: [
+      {
+        name: "Grida",
+        schemes: ["grida"],
+      },
+    ],
     extendInfo: "./Info.plist",
+    appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
+  hooks: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel((arch) => {
+      const version = process.env.npm_package_version;
+      return {
+        setupExe: `${productName} Setup ${version} ${arch}.exe`,
+        name: appBundleId + `.${arch}`,
+        title: productName,
+        iconUrl: "https://app.grida.co/favicon.ico",
+        loadingGif: "./images/loadingGif.gif",
+        setupIcon: "./images/icon.ico",
+      } satisfies MakerSquirrelConfig;
+    }),
     new MakerZIP({}, ["darwin"]),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerDMG(() => {
+      return {
+        overwrite: true,
+        icon: icon + ".icns",
+        title: productName,
+        background: "./images/dmg-background.png",
+      };
+    }, ["darwin"]),
+    new MakerRpm({
+      options: {
+        productName: productName,
+        name: productName,
+        icon: "./images/icon.png",
+        mimeType: [
+          // grida:// deep linking
+          "x-scheme-handler/grida",
+        ],
+      },
+    }),
+    new MakerDeb({
+      options: {
+        productName: productName,
+        name: productName,
+        icon: "./images/icon.png",
+        mimeType: [
+          // grida:// deep linking
+          "x-scheme-handler/grida",
+        ],
+      },
+    }),
+    // new MakerSnap({}),
   ],
   plugins: [
     new VitePlugin({
@@ -82,9 +141,11 @@ const config: ForgeConfig = {
   ],
   publishers: [
     {
+      // https://js.electronforge.io/interfaces/_electron_forge_publisher_github.PublisherGitHubConfig.html
       name: "@electron-forge/publisher-github",
       platforms: ["darwin", "win32", "linux"],
       config: {
+        force: true,
         repository: {
           owner: "gridaco",
           name: "grida",

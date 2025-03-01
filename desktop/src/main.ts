@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, Menu, session } from "electron";
+import { app, shell, BrowserWindow, Menu, session, dialog } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import path from "node:path";
@@ -31,7 +31,6 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 
 updateElectronApp();
 
-app.setAsDefaultProtocolClient("grida");
 app.setName("Grida");
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -44,6 +43,7 @@ Menu.setApplicationMenu(menu);
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
+let mainwindow: BrowserWindow | null = null;
 app.on("ready", async () => {
   // const token = await keytar.getPassword(SERVICE, ACCOUNT);
   // if (!token) {
@@ -58,8 +58,41 @@ app.on("ready", async () => {
     url: EDITOR_BASE_URL,
   });
 
-  create_main_window({ baseUrl: EDITOR_BASE_URL });
+  await session.defaultSession.cookies.set({
+    name: "grida-desktop-platform",
+    value: process.platform,
+    url: EDITOR_BASE_URL,
+  });
+
+  mainwindow = create_main_window({ baseUrl: EDITOR_BASE_URL });
 });
+
+// #region deep linking
+app.setAsDefaultProtocolClient("grida");
+
+// macOS
+app.on("open-url", (event, url) => {
+  dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`);
+});
+
+// Windows / Linux
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainwindow) {
+      if (mainwindow.isMinimized()) mainwindow.restore();
+      mainwindow.focus();
+    }
+    // the commandLine is array of strings in which last element is deep link url
+    dialog.showErrorBox(
+      "Welcome Back",
+      `You arrived from: ${commandLine.pop()}`
+    );
+  });
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

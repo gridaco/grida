@@ -40,7 +40,8 @@ import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
-import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { Win32LinuxWindowSafeArea } from "@/scaffolds/desktop";
 
 export const revalidate = 0;
 
@@ -524,8 +525,9 @@ function BaseLayout({
               {/* side */}
               <EditorSidebar />
               <div className="flex flex-col overflow-hidden w-full h-full">
-                <header className="px-2 h-11 min-h-11 flex items-center justify-between border-b bg-workbench-panel desktop-drag-area">
-                  <div className="ms-2 flex items-center gap-4">
+                {/* top */}
+                <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area">
+                  <div className="ms-2 flex items-center gap-4 flex-1">
                     <Breadcrumbs />
                     <SavingIndicator />
                   </div>
@@ -533,6 +535,7 @@ function BaseLayout({
                     <Players />
                     <PlayActions />
                   </div>
+                  <Win32LinuxWindowSafeArea />
                 </header>
                 {/* main */}
                 <div className="w-full h-full overflow-x-hidden">
