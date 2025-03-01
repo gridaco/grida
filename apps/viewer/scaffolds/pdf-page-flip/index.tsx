@@ -3,11 +3,13 @@ import React, { useState, useRef, useEffect } from "react";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import { pdfjs } from "react-pdf";
 import { useMeasure, useMediaQuery } from "@uidotdev/usehooks";
 import { PDFDocumentProxy } from "pdfjs-dist";
+// import { PDFLinkService } from "pdfjs-dist/web/pdf_viewer";
+
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 type OnDocumentLoadSuccess = (document: PDFDocumentProxy) => void;
 
@@ -35,26 +37,51 @@ interface FlipPageProps {
   width: number;
   height: number;
   pageNumber: number;
+  onLinkClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
-  return (
-    <div
-      className="shadow-lg rounded overflow-hidden"
-      ref={ref as React.RefObject<HTMLDivElement>}
-    >
-      <Page
-        pageNumber={props.pageNumber}
-        width={props.width}
-        height={props.height}
-        renderAnnotationLayer={false}
-        renderTextLayer={false}
-      />
-    </div>
-  );
-});
+const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
+  ({ onLinkClick, pageNumber, width, height, ...props }, ref) => {
+    return (
+      <div
+        className="shadow-lg rounded overflow-hidden"
+        ref={ref as React.RefObject<HTMLDivElement>}
+      >
+        <Page
+          pageNumber={pageNumber}
+          width={width}
+          height={height}
+          renderAnnotationLayer={true}
+          renderTextLayer={true}
+          onClick={(e) => {
+            const anchor = (e.target as HTMLElement).closest("a");
+            if (anchor) {
+              onLinkClick?.(e);
+            }
+            //
+          }}
+        />
+      </div>
+    );
+  }
+);
 
 FlipPage.displayName = "FlipPage";
+
+type Annotations = Record<string, { page: number; annotation: any }>;
+async function buildAnnotationMap(pdf: PDFDocumentProxy): Promise<Annotations> {
+  const annotationMap: Annotations = {};
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const annotations = await page.getAnnotations();
+    annotations.forEach((annotation) => {
+      if (annotation.id) {
+        annotationMap[annotation.id] = { page: pageNum, annotation };
+      }
+    });
+  }
+  return annotationMap;
+}
 
 const PDFViewer = ({
   file,
@@ -80,7 +107,9 @@ const PDFViewer = ({
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
   const [ref, { width: _width, height: _height }] = useMeasure();
 
-  const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
+  const [annotations, setAnnotations] = useState<Annotations>();
+
+  const onDocumentLoadSuccess: OnDocumentLoadSuccess = async (
     document: PDFDocumentProxy
   ) => {
     if (!title) {
@@ -96,6 +125,9 @@ const PDFViewer = ({
       const [, , width, height] = page.view;
       setRawSize({ width, height });
     });
+    const annotationMap = await buildAnnotationMap(document);
+    setAnnotations(annotationMap);
+    // console.log("annotationMap", annotationMap);
   };
 
   // Cache dimensions once resolved; ignore subsequent resizes.
@@ -179,6 +211,24 @@ const PDFViewer = ({
                     height={cachedDimensions.height}
                     number={index + 1}
                     pageNumber={index + 1}
+                    onLinkClick={(e) => {
+                      const anchor = (e.target as HTMLElement).closest("a")!;
+                      const href = anchor.getAttribute("href");
+                      if (!href || href === "#") {
+                        const id = anchor.dataset.elementId;
+                        if (id) {
+                          e.preventDefault();
+                          if (annotations) {
+                            const annotation = annotations[id];
+                            if (annotation) {
+                              const pagenum = annotation.page;
+                              setPage(pagenum);
+                              console.log("annotation", annotation);
+                            }
+                          }
+                        }
+                      }
+                    }}
                   />
                 ))}
               </HTMLFlipBook>
