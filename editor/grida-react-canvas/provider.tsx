@@ -35,6 +35,7 @@ import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
 import { BitmapEditorBrush } from "@grida/bitmap";
+import { is_direct_component_consumer } from "@/grida/utils/supports";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -3219,14 +3220,6 @@ export function useNode(node_id: string): NodeWithMeta {
     templates,
   } = state;
 
-  // TODO:
-  const is_component_consumer = false;
-  // const root = nodes[root_id];
-  // const is_component_consumer =
-  // root.type === "component" ||
-  // root.type === "instance" ||
-  // root.type === "template_instance";
-
   let node_definition: grida.program.nodes.Node | undefined = undefined;
   let node_change: grida.program.nodes.NodeChange = undefined;
 
@@ -3283,6 +3276,9 @@ export function useNode(node_id: string): NodeWithMeta {
   }, [node_definition, node_change]);
 
   const is_flex_parent = node.type === "container" && node.layout === "flex";
+
+  // TODO: also check the ancestor nodes
+  const is_component_consumer = is_direct_component_consumer(node.type);
 
   return {
     ...node,

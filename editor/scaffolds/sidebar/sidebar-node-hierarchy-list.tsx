@@ -31,6 +31,9 @@ import {
   ViewHorizontalIcon,
   Component1Icon,
   TransparencyGridIcon,
+  MixIcon,
+  VideoIcon,
+  GlobeIcon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React, { useMemo } from "react";
@@ -193,6 +196,14 @@ function NodeHierarchyItemIcon({
   className?: string;
 }) {
   switch (node.type) {
+    case "iframe":
+      return <GlobeIcon className={className} />;
+    case "richtext":
+      return <TextIcon className={className} />;
+    case "video":
+      return <VideoIcon className={className} />;
+    case "template_instance":
+      return <MixIcon className={className} />;
     case "container":
       if (node.layout === "flex") {
         switch (node.direction) {

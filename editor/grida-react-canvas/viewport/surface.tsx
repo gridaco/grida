@@ -16,7 +16,7 @@ import {
   useTransform,
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
-import { supports } from "@/grida/utils/supports";
+import { is_direct_component_consumer, supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";
@@ -415,7 +415,13 @@ function RootFramesBarOverlay() {
     const children = state.document.scene.children.map(
       (id) => state.document.nodes[id]
     );
-    return children.filter((n) => n.type === "container");
+    return children.filter(
+      (n) =>
+        n.type === "container" ||
+        n.type === "template_instance" ||
+        n.type === "component" ||
+        n.type === "instance"
+    );
   }, [state.document.scene.children, state.document.nodes]);
 
   if (state.document.scene.constraints.children === "single") {
@@ -494,7 +500,12 @@ function NodeTitleBar({
   );
 
   return (
-    <FloatingBar node_id={node_id} state={state} sideOffset={sideOffset}>
+    <FloatingBar
+      node_id={node_id}
+      state={state}
+      sideOffset={sideOffset}
+      isComponentConsumer={is_direct_component_consumer(node.type)}
+    >
       <div {...bind()} style={{ touchAction: "none" }}>
         {children}
       </div>

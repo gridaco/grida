@@ -802,13 +802,19 @@ function SelectedNodeProperties() {
             <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
 
-          {properties && (
+          {properties && Object.keys(properties).length ? (
             <SidebarMenuSectionContent className="space-y-2">
               <PropsControl
                 properties={properties}
                 props={computed.props || {}}
                 onValueChange={actions.value}
               />
+            </SidebarMenuSectionContent>
+          ) : (
+            <SidebarMenuSectionContent className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                No properties defined
+              </p>
             </SidebarMenuSectionContent>
           )}
         </SidebarSection>

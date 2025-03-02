@@ -70,7 +70,7 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   return sub.scene.children;
 }
 
-export function self_insertNode<S extends IDocumentEditorState>(
+export function self_try_insert_node<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
   node: grida.program.nodes.Node // TODO: NodePrototype

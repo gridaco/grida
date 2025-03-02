@@ -552,7 +552,7 @@ function self_start_gesture_scale(
       direction === "sw"
     ) {
       if (typeof _node.width !== "number") {
-        _node.width = rect.width;
+        _node.width = cmath.quantize(rect.width, 1);
       }
     }
 
@@ -569,7 +569,7 @@ function self_start_gesture_scale(
         if (node.type === "line") {
           _node.height = 0;
         } else {
-          _node.height = rect.height;
+          _node.height = cmath.quantize(rect.height, 1);
         }
       }
     }

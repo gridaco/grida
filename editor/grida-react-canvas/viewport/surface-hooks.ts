@@ -9,6 +9,7 @@ import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { grida } from "@/grida";
 import { NodeWithMeta } from "../provider";
 import "core-js/features/object/group-by";
+import { is_direct_component_consumer } from "@/grida/utils/supports";
 export interface SurfaceNodeObject {
   id: string;
   boundingRect: cmath.Rectangle;
@@ -381,6 +382,8 @@ export function useSingleSelection(
       };
     }
 
+    const is_component_consumer = is_direct_component_consumer(node.type);
+
     setData({
       type: "single",
       id: node_id,
@@ -394,8 +397,7 @@ export function useSingleSelection(
         ...(node as grida.program.nodes.UnknwonNode),
         meta: {
           is_flex_parent,
-          // TODO:
-          is_component_consumer: false,
+          is_component_consumer,
         },
       },
     });

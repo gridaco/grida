@@ -25,6 +25,7 @@ import {
   standaloneDocumentReducer,
   initDocumentEditorState,
   useDocument,
+  type IDocumentEditorInit,
 } from "@/grida-react-canvas";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
@@ -97,6 +98,7 @@ import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable
 import {
   AutoInitialFitTransformer,
   StandaloneDocumentBackground,
+  StandaloneDocumentContentProps,
 } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
@@ -116,9 +118,29 @@ const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
 export type CanvasPlaygroundProps = {
   src?: string;
-};
+  document?: IDocumentEditorInit;
+} & Partial<StandaloneDocumentContentProps>;
 
-export default function CanvasPlayground({ src }: CanvasPlaygroundProps) {
+export default function CanvasPlayground({
+  document = {
+    editable: true,
+    debug: false,
+    document: {
+      nodes: {},
+      scene: {
+        type: "scene",
+        children: [],
+        guides: [],
+        constraints: {
+          children: "multiple",
+        },
+        backgroundColor: CANVAS_BG_COLOR,
+      },
+    },
+  },
+  templates,
+  src,
+}: CanvasPlaygroundProps) {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -139,22 +161,7 @@ export default function CanvasPlayground({ src }: CanvasPlaygroundProps) {
   const fonts = useGoogleFontsList();
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState({
-      editable: true,
-      debug: pref.debug,
-      document: {
-        nodes: {},
-        scene: {
-          type: "scene",
-          children: [],
-          guides: [],
-          constraints: {
-            children: "multiple",
-          },
-          backgroundColor: CANVAS_BG_COLOR,
-        },
-      },
-    })
+    initDocumentEditorState(document)
   );
 
   useHotkeys("meta+\\, ctrl+\\", () => {
@@ -251,7 +258,7 @@ export default function CanvasPlayground({ src }: CanvasPlaygroundProps) {
             <StandaloneDocumentEditor editable={false} initial={state}>
               <div className="w-full h-full flex items-center justify-center overflow-hidden">
                 <div className="rounded shadow-lg border overflow-hidden select-none">
-                  <StandaloneDocumentContent />
+                  <StandaloneDocumentContent templates={templates} />
                 </div>
               </div>
             </StandaloneDocumentEditor>
@@ -428,7 +435,7 @@ export default function CanvasPlayground({ src }: CanvasPlaygroundProps) {
                       <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
                         <AutoInitialFitTransformer>
-                          <StandaloneDocumentContent />
+                          <StandaloneDocumentContent templates={templates} />
                         </AutoInitialFitTransformer>
 
                         {ui.sidebar === "visible" && (

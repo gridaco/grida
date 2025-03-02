@@ -7,6 +7,7 @@ interface BarProps {
   state: "idle" | "hover" | "active";
   side?: "top" | "bottom" | "left" | "right";
   sideOffset?: number;
+  isComponentConsumer?: boolean;
 }
 
 export function FloatingBar({
@@ -15,6 +16,7 @@ export function FloatingBar({
   side = "top",
   sideOffset = 4,
   state,
+  isComponentConsumer,
   ...porps
 }: React.HtmlHTMLAttributes<HTMLDivElement> & BarProps) {
   const data = useSingleSelection(porps.node_id);
@@ -23,6 +25,7 @@ export function FloatingBar({
     <div
       className="group relative pointer-events-none"
       data-state={state}
+      data-is-component-consumer={isComponentConsumer}
       style={data?.style}
     >
       {/* Title bar positioned above the parent using a percentage transform */}
@@ -47,7 +50,7 @@ export function FloatingBarContent({
     <div
       {...props}
       className={cn(
-        "max-w-full flex items-center gap-2 pointer-events-auto cursor-pointer rounded-lg py-2 px-2.5 truncate bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent",
+        "max-w-full flex items-center gap-2 pointer-events-auto cursor-pointer rounded-lg py-2 px-2.5 truncate bg-background/80 group-data-[is-component-consumer=true]:bg-workbench-accent-violet/50 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent",
         className
       )}
     >
@@ -65,7 +68,7 @@ export function FloatingBarTitle({
     <div
       {...props}
       className={cn(
-        "max-w-full w-min pointer-events-auto text-xs truncate text-muted-foreground/65 group-data-[state=hover]:text-workbench-accent-sky group-data-[state=active]:text-workbench-accent-sky",
+        "max-w-full w-min pointer-events-auto text-xs truncate text-muted-foreground/65 group-data-[is-component-consumer=true]:text-workbench-accent-violet group-data-[state=hover]:text-workbench-accent-sky group-data-[state=active]:text-workbench-accent-sky",
         className
       )}
     >

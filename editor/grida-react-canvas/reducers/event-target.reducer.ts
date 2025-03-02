@@ -27,7 +27,7 @@ import initialNode from "./tools/initial-node";
 import assert from "assert";
 import {
   self_clearSelection,
-  self_insertNode,
+  self_try_insert_node,
   self_selectNode,
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
@@ -194,7 +194,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               reportError(e);
             }
 
-            self_insertNode(draft, parent, nnode);
+            self_try_insert_node(draft, parent, nnode);
             draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
 
@@ -362,7 +362,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               vector.top = pos[1];
 
               const parent = __get_insertion_target(draft);
-              self_insertNode(draft, parent, vector);
+              self_try_insert_node(draft, parent, vector);
               self_selectNode(draft, "reset", vector.id);
 
               draft.content_edit_mode = {
@@ -469,7 +469,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: initial_rect.height as 0, // casting for line node
             });
 
-            self_insertNode(draft, parent, nnode);
+            self_try_insert_node(draft, parent, nnode);
             draft.tool = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
             self_start_gesture_scale_draw_new_node(draft, {
@@ -534,7 +534,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // insert a new vector node
             const parent = __get_insertion_target(draft);
-            self_insertNode(draft, parent, vector);
+            self_try_insert_node(draft, parent, vector);
 
             const cdom = new domapi.CanvasDOM(draft.transform);
 
@@ -1130,7 +1130,7 @@ function self_prepare_bitmap_node(
       version: 0,
     };
 
-    self_insertNode(draft, parent, bitmap);
+    self_try_insert_node(draft, parent, bitmap);
 
     const node = document.__getNodeById(
       draft,

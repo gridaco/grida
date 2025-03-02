@@ -19,7 +19,7 @@ export function useUserDocumentCustomRenderer() {
 
 type CustomReactRenderer = React.ComponentType<any>;
 
-interface DocumentContentViewProps {
+export interface StandaloneDocumentContentProps {
   /**
    * custom templates to render
    */
@@ -29,7 +29,7 @@ interface DocumentContentViewProps {
 export function StandaloneDocumentContent({
   templates,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
+}: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
     state: { document },
@@ -121,10 +121,15 @@ export function AutoInitialFitTransformer({
     const retransform = () => {
       if (scene.children.length === 0) return;
       const cdom = new domapi.CanvasDOM(transform);
-      const rect = cmath.rect.union(
-        scene.children.map((id) => cdom.getNodeBoundingRect(id)!)
-      );
-      // const rect = cdom.getNodeBoundingRect(root_id);
+      const root_rects = scene.children
+        .map((id) => cdom.getNodeBoundingRect(id))
+        .filter(Boolean) as cmath.Rectangle[];
+
+      const rect: cmath.Rectangle =
+        root_rects.length > 0
+          ? cmath.rect.union(root_rects)
+          : { x: 0, y: 0, width: 0, height: 0 };
+
       const _vrect = domapi.get_viewport_rect();
       const vrect = {
         x: 0,
