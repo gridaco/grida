@@ -541,14 +541,36 @@ function self_start_gesture_scale(
     // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
     // need to assign a fixed size if width or height is a variable length
     const _node = node as grida.program.nodes.i.ICSSDimension;
-    if (typeof _node.width !== "number") {
-      _node.width = rect.width;
+
+    // needs to set width
+    if (
+      direction === "e" ||
+      direction === "w" ||
+      direction === "ne" ||
+      direction === "se" ||
+      direction === "nw" ||
+      direction === "sw"
+    ) {
+      if (typeof _node.width !== "number") {
+        _node.width = rect.width;
+      }
     }
-    if (typeof _node.height !== "number") {
-      if (node.type === "line") {
-        _node.height = 0;
-      } else {
-        _node.height = rect.height;
+
+    // needs to set height
+    if (
+      direction === "n" ||
+      direction === "s" ||
+      direction === "ne" ||
+      direction === "nw" ||
+      direction === "se" ||
+      direction === "sw"
+    ) {
+      if (typeof _node.height !== "number") {
+        if (node.type === "line") {
+          _node.height = 0;
+        } else {
+          _node.height = rect.height;
+        }
       }
     }
   }
