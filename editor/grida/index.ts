@@ -778,22 +778,43 @@ export namespace grida.program.nodes {
 
   export type UnknownNodeProperties = Record<keyof UnknwonNode, unknown>;
 
+  // #region node prototypes
+  export type TextNodePrototype = __TPrototypeNode<
+    Omit<Partial<TextNode>, __base_scene_node_properties>
+  >;
+  export type ImageNodePrototype = __TPrototypeNode<
+    Omit<Partial<ImageNode>, __base_scene_node_properties>
+  >;
+  export type VideoNodePrototype = __TPrototypeNode<
+    Omit<Partial<VideoNode>, __base_scene_node_properties>
+  >;
+  export type ContainerNodePrototype = __TPrototypeNode<
+    Omit<Partial<ContainerNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
+  export type PathNodePrototype = __TPrototypeNode<
+    Omit<Partial<PathNode>, __base_scene_node_properties>
+  >;
+  export type LineNodePrototype = __TPrototypeNode<
+    Omit<Partial<LineNode>, __base_scene_node_properties>
+  >;
+  export type RectangleNodePrototype = __TPrototypeNode<
+    Omit<Partial<RectangleNode>, __base_scene_node_properties>
+  >;
+  export type EllipseNodePrototype = __TPrototypeNode<
+    Omit<Partial<EllipseNode>, __base_scene_node_properties>
+  >;
+
   /**
    * A virtual, before-instantiation node that only stores the prototype of a node.
    *
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
-    | __TPrototypeNode<Omit<Partial<TextNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<ImageNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<VideoNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<
-        Omit<
-          Partial<ContainerNode>,
-          __base_scene_node_properties | "children"
-        > &
-          __IPrototypeNodeChildren
-      >
+    | TextNodePrototype
+    | ImageNodePrototype
+    | VideoNodePrototype
+    | ContainerNodePrototype
     | __TPrototypeNode<
         Omit<Partial<HTMLIFrameNode>, __base_scene_node_properties>
       >
@@ -802,12 +823,10 @@ export namespace grida.program.nodes {
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<PathNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<LineNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<
-        Omit<Partial<RectangleNode>, __base_scene_node_properties>
-      >
-    | __TPrototypeNode<Omit<Partial<EllipseNode>, __base_scene_node_properties>>
+    | PathNodePrototype
+    | LineNodePrototype
+    | RectangleNodePrototype
+    | EllipseNodePrototype
     | __TPrototypeNode<
         Omit<
           Partial<ComponentNode>,
@@ -841,6 +860,8 @@ export namespace grida.program.nodes {
   type __IPrototypeNodeChildren = {
     children: NodePrototype[];
   };
+
+  // #endregion node prototypes
 
   /**
    * Type for containing instance's node changes data relative to master node
@@ -1681,6 +1702,7 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.ISceneNode,
+      i.IPositioning,
       i.IProperties,
       i.IProps,
       // TODO: migration required - remove me - use global override table instead
@@ -1712,6 +1734,7 @@ export namespace grida.program.nodes {
         type: "template_instance",
         active: true,
         locked: false,
+        position: "relative",
         properties,
         props: {},
         userdata: {},
