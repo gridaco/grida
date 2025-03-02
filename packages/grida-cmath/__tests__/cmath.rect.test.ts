@@ -663,3 +663,55 @@ describe("cmath.rect", () => {
     });
   });
 });
+
+describe("cmath.rect.boolean", () => {
+  describe("subtract", () => {
+    test("returns original rectangle when no intersection", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 50, y: 50, width: 10, height: 10 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
+    });
+
+    test("returns empty array when b fully covers a", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 5, y: 5, width: 40, height: 40 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([]);
+    });
+
+    test("returns four subregions for full inner intersection", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 20, y: 20, width: 10, height: 10 };
+      const expected = [
+        { x: 10, y: 10, width: 30, height: 10 }, // top region
+        { x: 10, y: 30, width: 30, height: 10 }, // bottom region
+        { x: 10, y: 20, width: 10, height: 10 }, // left region
+        { x: 30, y: 20, width: 10, height: 10 }, // right region
+      ];
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual(expected);
+    });
+
+    test("returns two subregions for partial overlap from one side", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      // b overlaps a from above such that the intersection is { x: 25, y: 10, width: 15, height: 15 }
+      const b = { x: 25, y: 5, width: 20, height: 20 };
+      const expected = [
+        { x: 10, y: 25, width: 30, height: 15 }, // bottom region
+        { x: 10, y: 10, width: 15, height: 15 }, // left region
+      ];
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual(expected);
+    });
+
+    test("returns original rectangle when b has zero area", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 20, y: 20, width: 0, height: 0 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
+    });
+
+    test("returns original rectangle when rectangles only touch edges", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      // b touches a's right edge (x:40) exactly
+      const b = { x: 40, y: 10, width: 20, height: 30 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
+    });
+  });
+});

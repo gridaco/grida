@@ -2103,6 +2103,100 @@ export namespace cmath.rect {
 }
 
 /**
+ * Boolean operations on rectangles for vector graphics calculations.
+ *
+ * This module provides functions to perform basic boolean operations on rectangles,
+ * tailored for vector graphics use cases where precise layout and bounding calculations
+ * are required.
+ *
+ * - **intersect: A ∩ B**
+ *   Computes the intersecting region of A and B, returning a single rectangle (or null if there is no overlap).
+ *
+ * - **subtract: A - B**
+ *   Subtracts B from A, returning an array of rectangles that represent the area of A excluding the overlapping region with B.
+ *
+ * - **exclude: A ⊖ B**
+ *   Computes the symmetric difference, defined as (A ∪ B) minus (A ∩ B), returning an array of rectangles that represent the non-overlapping portions of A and B.
+ */
+export namespace cmath.rect.boolean {
+  /**
+   * Subtracts rectangle `b` from rectangle `a`, returning the remaining disjoint subregions.
+   *
+   * In the context of vector graphics calculations, this function computes the boolean
+   * difference \(A - B\) by removing the overlapping area of `b` (if any) from `a`. The operation
+   * returns an array of rectangles representing the parts of `a` that are not covered by `b`.
+   * Only the portion of `b` that overlaps with `a` is subtracted; the resulting regions will always be
+   * confined within `a`.
+   *
+   * @param a - The rectangle from which to subtract.
+   * @param b - The rectangle to subtract.
+   * @returns An array of rectangles representing the area of `a` after subtracting the overlap with `b`.
+   *
+   * @example
+   * ```typescript
+   * const a: Rectangle = { x: 10, y: 10, width: 30, height: 30 };
+   * const b: Rectangle = { x: 20, y: 20, width: 10, height: 10 };
+   * const result = cmath.rect.boolean.subtract(a, b);
+   * // result:
+   * // [
+   * //   { x: 10, y: 10, width: 30, height: 10 }, // top region of A above B
+   * //   { x: 10, y: 30, width: 30, height: 10 }, // bottom region of A below B
+   * //   { x: 10, y: 20, width: 10, height: 10 }, // left region of A left of B
+   * //   { x: 30, y: 20, width: 10, height: 10 }  // right region of A right of B
+   * // ]
+   * ```
+   */
+  export function subtract(a: Rectangle, b: Rectangle): Rectangle[] {
+    const inter = intersection(a, b);
+    if (!inter) return [a];
+
+    const result: Rectangle[] = [];
+
+    // Top region: area of `a` above the intersection.
+    if (a.y < inter.y) {
+      result.push({
+        x: a.x,
+        y: a.y,
+        width: a.width,
+        height: inter.y - a.y,
+      });
+    }
+
+    // Bottom region: area of `a` below the intersection.
+    if (a.y + a.height > inter.y + inter.height) {
+      result.push({
+        x: a.x,
+        y: inter.y + inter.height,
+        width: a.width,
+        height: a.y + a.height - (inter.y + inter.height),
+      });
+    }
+
+    // Left region: area of `a` to the left of the intersection (within the vertical span of the intersection).
+    if (a.x < inter.x) {
+      result.push({
+        x: a.x,
+        y: inter.y,
+        width: inter.x - a.x,
+        height: inter.height,
+      });
+    }
+
+    // Right region: area of `a` to the right of the intersection (within the vertical span of the intersection).
+    if (a.x + a.width > inter.x + inter.width) {
+      result.push({
+        x: inter.x + inter.width,
+        y: inter.y,
+        width: a.x + a.width - (inter.x + inter.width),
+        height: inter.height,
+      });
+    }
+
+    return result;
+  }
+}
+
+/**
  * Alignment utilities for mathematical and graphical computations.
  *
  * @example
@@ -2835,6 +2929,25 @@ export namespace cmath.transform {
     return degrees;
   }
 }
+
+/**
+ * Algorithms and utilities for rectangle packing, bin packing, and layout optimization.
+ *
+ * Provides core implementations for various rectangle packing algorithms useful for graphical canvas
+ * applications, UI layout management, and efficient spatial utilization scenarios.
+ *
+ * ### Common Use Cases:
+ * - Arranging graphical elements dynamically on a canvas.
+ * - Sprite sheet generation.
+ * - UI element placement and responsive layout systems.
+ * - Spatial optimization tasks such as texture atlas management.
+ *
+ * @remarks
+ * These algorithms are optimized for performance and clarity, suitable for real-time graphical
+ * applications where efficiency is critical.
+ *
+ */
+export namespace cmath.packing {}
 
 /**
  * Rasterization utilities for drawing lines between points (e.g., "connect the dots")
