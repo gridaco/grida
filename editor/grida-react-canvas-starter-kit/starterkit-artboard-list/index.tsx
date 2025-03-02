@@ -29,6 +29,7 @@ const ArtboardList = () => {
     });
   };
 
+  // TODO: have a session storage to store the last opened state
   return (
     <div className="w-full divide-y overflow-hidden">
       {Object.entries(artboardData).map(([categoryName, items], index) => (

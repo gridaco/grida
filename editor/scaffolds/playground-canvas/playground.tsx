@@ -105,6 +105,7 @@ import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/br
 import { io } from "@/grida-io-model";
 import { canvas_examples } from "../playground/k";
 import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
+import { DarwinSidebarHeaderDragArea } from "../desktop";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -269,6 +270,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                   ) : (
                     <>
                       <SidebarRoot className="hidden sm:block">
+                        <DarwinSidebarHeaderDragArea />
                         <SidebarSection className="my-4">
                           <span className="px-2">
                             <DropdownMenu>
