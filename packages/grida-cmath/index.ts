@@ -3071,7 +3071,7 @@ export namespace cmath.packing {
    * 2. For each a ∈ A, replace each r ∈ F with r \ a.
    * 3. Select a candidate r ∈ F such that r.width ≥ w and r.height ≥ h, using a lexicographical minimality criterion.
    */
-  export function next_placement(
+  export function fit(
     view: Rectangle,
     agent: { width: number; height: number },
     anchors: Rectangle[]
@@ -3096,6 +3096,77 @@ export namespace cmath.packing {
       width: agent.width,
       height: agent.height,
     };
+  }
+}
+
+export namespace cmath.packing.ext {
+  /**
+   * TODO: can be optimized
+   * Attempts to find a valid placement for the agent by "walking" outward from the view,
+   * expanding the search towards the right and down directions. This function is used when
+   * a fit within the initial view cannot be found.
+   *
+   * The algorithm iteratively expands the search region (starting at the view's top-left corner)
+   * and tests candidate placements on a grid. The first candidate that does not overlap any anchor
+   * is returned. The search is performed only in the positive (right and down) directions.
+   *
+   * @param view - The original view rectangle.
+   * @param agent - The dimensions of the agent rectangle (width and height).
+   * @param anchors - An array of rectangles representing occupied regions.
+   * @returns A rectangle representing the placement of the agent that does not overlap any anchor.
+   *
+   * @example
+   * ```typescript
+   * const view = { x: 0, y: 0, width: 100, height: 100 };
+   * const agent = { width: 50, height: 50 };
+   * const anchors = [{ x: 0, y: 0, width: 100, height: 100 }];
+   * // Since no fit is found within view, walk_to_fit searches outward.
+   * const placement = cmath.packing.walk_to_fit(view, agent, anchors);
+   * // placement might be something like { x: 100, y: 0, width: 50, height: 50 }.
+   * ```
+   */
+  export function walk_to_fit(
+    view: Rectangle,
+    agent: { width: number; height: number },
+    anchors: Rectangle[]
+  ): Rectangle {
+    // First, try to fit within the original view.
+    const fits = cmath.packing.fit(view, agent, anchors);
+    if (fits) return fits;
+
+    // Define a step size (use half the smaller dimension of the agent, but at least 1).
+    const step = Math.max(
+      1,
+      Math.floor(Math.min(agent.width, agent.height) / 2)
+    );
+    // We'll search in an expanding square region starting at view.x, view.y.
+    let searchRadius = step;
+
+    while (true) {
+      // Iterate over candidate positions within [view.x, view.x + searchRadius] and [view.y, view.y + searchRadius].
+      for (let dy = 0; dy <= searchRadius; dy += step) {
+        for (let dx = 0; dx <= searchRadius; dx += step) {
+          // We only search in the right/down direction.
+          const candidateX = view.x + dx;
+          const candidateY = view.y + dy;
+          const candidateRect: Rectangle = {
+            x: candidateX,
+            y: candidateY,
+            width: agent.width,
+            height: agent.height,
+          };
+          // Check if candidate overlaps any anchor.
+          if (
+            !anchors.some((anchor) =>
+              cmath.rect.intersects(candidateRect, anchor)
+            )
+          ) {
+            return candidateRect;
+          }
+        }
+      }
+      searchRadius += step;
+    }
   }
 }
 
