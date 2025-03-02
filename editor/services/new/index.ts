@@ -250,11 +250,18 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
       .insert({
         id: masterdoc_ref.id,
         data: {
-          __schema_version: "2024-12-31",
+          __schema_version: "2025-03-03",
           pages: {
             one: {
-              children: [],
               nodes: {},
+              scene: {
+                type: "scene",
+                children: [],
+                guides: [],
+                constraints: {
+                  children: "multiple",
+                },
+              },
               bitmaps: {},
               properties: {},
             },

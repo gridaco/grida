@@ -37,7 +37,7 @@ export default function reducer<S extends IDocumentEditorState>(
     }
     case "background-color": {
       return produce(state, (draft: Draft<S>) => {
-        draft.document.backgroundColor = action.backgroundColor;
+        draft.document.scene.backgroundColor = action.backgroundColor;
       });
     }
     case "transform": {

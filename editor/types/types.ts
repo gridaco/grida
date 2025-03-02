@@ -424,7 +424,7 @@ export type FormStartPageSchema = grida.program.document.IDocumentDefinition & {
 };
 
 export type CanvasDocumentSnapshotSchema = {
-  __schema_version: "2024-12-31";
+  __schema_version: typeof grida.program.document.SCHEMA_VERSION;
   pages: {
     one: grida.program.document.IDocumentDefinition;
   };

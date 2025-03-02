@@ -4,7 +4,7 @@ import {
   type IDocumentEditorState,
 } from "../../state";
 import { self_insertSubDocument } from "./insert";
-import { self_deleteNode } from "./delete";
+import { self_try_remove_node } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
@@ -161,7 +161,7 @@ function __self_update_gesture_transform_translate(
 
       try {
         initial_clone_ids.forEach((clone) => {
-          self_deleteNode(draft, clone);
+          self_try_remove_node(draft, clone);
         });
       } catch (e) {}
 
@@ -251,7 +251,7 @@ function __self_update_gesture_transform_translate(
           parent.children = parent.children.filter((id) => id !== node_id);
         } else {
           // root
-          draft.document.children = draft.document.children.filter(
+          draft.document.scene.children = draft.document.scene.children.filter(
             (id) => id !== node_id
           );
         }
@@ -265,7 +265,7 @@ function __self_update_gesture_transform_translate(
           new_parent.children.push(node_id);
         } else {
           // root
-          draft.document.children.push(node_id);
+          draft.document.scene.children.push(node_id);
         }
 
         // update the context
@@ -299,7 +299,7 @@ function __self_update_gesture_transform_translate(
     initial_rects,
     {
       objects: snap_target_node_rects,
-      guides: draft.ruler === "on" ? draft.guides : undefined,
+      guides: draft.ruler === "on" ? draft.document.scene.guides : undefined,
     },
     adj_movement,
     threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
@@ -508,7 +508,7 @@ function __self_update_gesture_transform_scale(
   for (const node_id of selection) {
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = draft.document.children.includes(node_id);
+    const is_root = draft.document.scene.children.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = node.type !== "bitmap";

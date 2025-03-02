@@ -1421,10 +1421,10 @@ export function useDocument() {
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
-  const backgroundColor = state.document.backgroundColor;
+  const backgroundColor = state.document.scene.backgroundColor;
   const setBackgroundColor = useCallback(
     (
-      backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"]
+      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
     ) => {
       dispatch({
         type: "background-color",
@@ -2094,7 +2094,7 @@ export function useTransform() {
       dispatch,
       state.transform,
       state.document_ctx,
-      state.document.children,
+      state.document.scene.children,
       state.selection,
     ]
   );
@@ -2215,7 +2215,9 @@ export function useEventTarget() {
     debug,
     pixelgrid,
     ruler,
-    guides,
+    document: {
+      scene: { guides },
+    },
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";

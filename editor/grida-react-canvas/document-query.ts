@@ -423,7 +423,7 @@ export namespace document {
    * @returns
    */
   function __getSubNodeById(
-    repositories: grida.program.document.IDocumentNodesRepository[],
+    repositories: grida.program.document.INodesRepository[],
     node_id: string
   ): grida.program.nodes.Node {
     const repo = repositories.find((repo) => repo.nodes[node_id]);
@@ -583,7 +583,7 @@ export namespace document {
       private readonly document: grida.program.document.IDocumentDefinition
     ) {}
 
-    private get nodes(): grida.program.document.IDocumentNodesRepository["nodes"] {
+    private get nodes(): grida.program.document.INodesRepository["nodes"] {
       return this.document.nodes;
     }
 

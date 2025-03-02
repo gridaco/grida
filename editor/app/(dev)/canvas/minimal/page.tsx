@@ -29,10 +29,10 @@ import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 export default function CanvasPlayground() {
@@ -44,7 +44,14 @@ export default function CanvasPlayground() {
       editable: true,
       document: {
         nodes: {},
-        children: [],
+        scene: {
+          type: "scene",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "multiple",
+          },
+        },
       },
     })
   );

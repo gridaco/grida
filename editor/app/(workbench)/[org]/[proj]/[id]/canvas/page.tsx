@@ -48,7 +48,7 @@ function useSync(
         .update({
           data: debounced
             ? ({
-                __schema_version: "2024-12-31",
+                __schema_version: "2025-03-03",
                 pages: {
                   one: {
                     ...debounced,

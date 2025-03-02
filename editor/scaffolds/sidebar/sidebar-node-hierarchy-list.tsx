@@ -121,10 +121,10 @@ export function NodeHierarchyList() {
   // TODO: need nested nodes for templates
 
   const list = useMemo(() => {
-    return document.children
+    return document.scene.children
       .map((top) => dq.hierarchy(top, document_ctx))
       .flat();
-  }, [document.children, document_ctx]);
+  }, [document.scene.children, document_ctx]);
 
   // const ids = Object.keys(document.nodes);
 

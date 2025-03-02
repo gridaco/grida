@@ -34,7 +34,7 @@ export function StandaloneDocumentContent({
   const {
     state: { document },
   } = useDocument();
-  const { children } = document;
+  const { children } = document.scene;
 
   return (
     <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
@@ -108,7 +108,7 @@ export function AutoInitialFitTransformer({
 }: React.PropsWithChildren<{}>) {
   const {
     state: {
-      document: { children: top_children },
+      document: { scene },
       document_key,
     },
   } = useDocument();
@@ -119,10 +119,10 @@ export function AutoInitialFitTransformer({
     if (applied_initial_transform_key.current === document_key) return;
 
     const retransform = () => {
-      if (top_children.length === 0) return;
+      if (scene.children.length === 0) return;
       const cdom = new domapi.CanvasDOM(transform);
       const rect = cmath.rect.union(
-        top_children.map((id) => cdom.getNodeBoundingRect(id)!)
+        scene.children.map((id) => cdom.getNodeBoundingRect(id)!)
       );
       // const rect = cdom.getNodeBoundingRect(root_id);
       const _vrect = domapi.get_viewport_rect();
@@ -138,7 +138,7 @@ export function AutoInitialFitTransformer({
 
     retransform();
     applied_initial_transform_key.current = document_key;
-  }, [document_key, top_children]);
+  }, [document_key, scene.children]);
 
   return (
     <div

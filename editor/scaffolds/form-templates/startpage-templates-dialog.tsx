@@ -110,13 +110,20 @@ export function BrowseStartPageTemplatesDialog({
                       [template.name]: FormStartPage.getTemplate(template.name),
                     },
                     document: {
-                      children: ["preview"],
                       nodes: {
                         preview:
                           grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
                             "preview",
                             template
                           ),
+                      },
+                      scene: {
+                        type: "scene",
+                        children: ["preview"],
+                        guides: [],
+                        constraints: {
+                          children: "single",
+                        },
                       },
                     },
                   }}

@@ -157,7 +157,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             );
             break;
           case "insert":
-            const parent = __get_insert_target(draft);
+            const parent = __get_insertion_target(draft);
 
             const nnode = initialNode(draft.tool.node);
 
@@ -361,7 +361,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               vector.left = pos[0];
               vector.top = pos[1];
 
-              const parent = __get_insert_target(draft);
+              const parent = __get_insertion_target(draft);
               self_insertNode(draft, parent, vector);
               self_selectNode(draft, "reset", vector.id);
 
@@ -453,7 +453,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "insert": {
-            const parent = __get_insert_target(draft);
+            const parent = __get_insertion_target(draft);
 
             const initial_rect = {
               x: state.pointer.position[0],
@@ -533,7 +533,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // insert a new vector node
-            const parent = __get_insert_target(draft);
+            const parent = __get_insertion_target(draft);
             self_insertNode(draft, parent, vector);
 
             const cdom = new domapi.CanvasDOM(draft.transform);
@@ -743,7 +743,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { translated } = snapGuideTranslation(
                 axis,
                 initial_offset,
-                state.document.children.map(
+                state.document.scene.children.map(
                   (id) => cdom.getNodeBoundingRect(id)!
                 ),
                 m,
@@ -756,7 +756,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const offset = cmath.quantize(translated, 1);
 
               draft.gesture.offset = offset;
-              draft.guides[index].offset = offset;
+              draft.document.scene.guides[index].offset = offset;
               break;
             }
             // [insertion mode - resize after insertion]
@@ -1093,7 +1093,7 @@ function self_prepare_bitmap_node(
     const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
     const cdom = new domapi.CanvasDOM(draft.transform);
-    const parent = __get_insert_target(draft);
+    const parent = __get_insertion_target(draft);
     if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion
     const parent_rect = cdom.getNodeBoundingRect(parent)!;
     const node_relative_pos = cmath.vector2.quantize(
@@ -1352,7 +1352,11 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
  *
  * @returns the parent node id or `null` if no desired target
  */
-function __get_insert_target(state: IDocumentEditorState): string | null {
+function __get_insertion_target(state: IDocumentEditorState): string | null {
+  if (state.document.scene.constraints.children === "single") {
+    return state.document.scene.children[0];
+  }
+
   const hits = state.surface_raycast_detected_node_ids.slice();
   for (const hit of hits) {
     const node = document.__getNodeById(state, hit);

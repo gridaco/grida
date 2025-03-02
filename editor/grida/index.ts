@@ -170,6 +170,8 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
+  export const SCHEMA_VERSION = "2025-03-03";
+
   /**
    * Simple Node Selector
    *
@@ -208,28 +210,6 @@ export namespace grida.program.document {
   }
 
   /**
-   * contains all nodes under this defined document in k:v pair
-   *
-   * @see {@link IDocumentDefinition}
-   */
-  export interface IDocumentNodesRepository {
-    nodes: Record<nodes.NodeID, nodes.Node>;
-  }
-
-  /**
-   * contains all images (data) under this defined document in k:v pair
-   *
-   * @see {@link IDocumentDefinition}
-   */
-  export interface IDocumentBitmapsRepository {
-    bitmaps: Record<
-      string,
-      cmath.raster.Bitmap & {
-        version: number;
-      }
-    >;
-  }
-  /**
    * general purpose cascading document properties for envs, styles, constants, etc.
    */
   export interface IDocumentProperties {
@@ -237,16 +217,6 @@ export namespace grida.program.document {
      * document level properties / variables
      */
     properties: schema.Properties;
-  }
-
-  /**
-   * background color of the document
-   */
-  export interface IDocumentBackground {
-    /**
-     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
-     */
-    backgroundColor?: cg.RGBA8888 | null | undefined | "";
   }
 
   /**
@@ -259,11 +229,53 @@ export namespace grida.program.document {
     templates?: Record<string, template.TemplateDocumentDefinition>;
   }
 
-  export interface IDocumentOverridesRepository {
+  export interface IOverridesRepository {
     /**
      * instance's exposed child node overrides
      */
     overrides: Record<nodes.NodeID, nodes.NodeChange>;
+  }
+
+  /**
+   * contains all nodes under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface INodesRepository {
+    nodes: Record<nodes.NodeID, nodes.Node>;
+  }
+
+  /**
+   * contains all images (data) under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface IBitmapsRepository {
+    bitmaps: Record<
+      string,
+      cmath.raster.Bitmap & {
+        version: number;
+      }
+    >;
+  }
+
+  /**
+   * background color of the scene
+   */
+  export interface ISceneBackground {
+    /**
+     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
+     */
+    backgroundColor?: cg.RGBA8888 | null | undefined | "";
+  }
+
+  export interface Guide2D {
+    readonly axis: cmath.Axis;
+    readonly offset: number;
+  }
+
+  export interface I2DGuides {
+    guides: Array<Guide2D>;
   }
 
   /**
@@ -334,14 +346,11 @@ export namespace grida.program.document {
    * ```
    */
   export interface IDocumentDefinition
-    extends IDocumentNodesRepository,
-      IDocumentBitmapsRepository,
-      IDocumentProperties,
-      IDocumentBackground {
-    /**
-     * root node id. must be defined in {@link IDocumentDefinition.nodes}
-     */
-    children: string[];
+    extends IBitmapsRepository,
+      document.INodesRepository,
+      IDocumentProperties {
+    // children: [];
+    scene: nodes.RootSceneNode;
   }
 
   export namespace internal {
@@ -469,7 +478,7 @@ export namespace grida.program.document {
     INodeHtmlDocumentQueryDataAttributes & N;
 
   export type IGlobalRenderingContext = {
-    context: IDocumentBitmapsRepository;
+    context: IBitmapsRepository;
   };
 
   /**
@@ -506,7 +515,7 @@ export namespace grida.program.document {
 
     export interface TemplateDocumentDefinition<
       P extends schema.Properties = schema.Properties,
-    > extends IDocumentNodesRepository {
+    > extends INodesRepository {
       /**
        * @deprecated - rename to template_id
        */
@@ -668,9 +677,20 @@ export namespace grida.program.css {
     //
   >;
 }
+
 export namespace grida.program.nodes {
   export type NodeID = string;
   export type NodeType = Node["type"];
+
+  export interface RootSceneNode
+    extends document.ISceneBackground,
+      document.I2DGuides {
+    type: "scene";
+    children: nodes.NodeID[];
+    constraints: {
+      children: "single" | "multiple";
+    };
+  }
 
   export type Node =
     | TextNode
@@ -863,6 +883,15 @@ export namespace grida.program.nodes {
        * @internal
        */
       locked: boolean;
+
+      /**
+       * whether this node is removable (if not remove action will trigger active=false)
+       *
+       * currently, this will only be prevented when the node is a root-level node, and the delete is directly triggered to it.
+       *
+       * @default false
+       */
+      removable?: boolean;
     }
 
     export namespace props {
@@ -1412,7 +1441,7 @@ export namespace grida.program.nodes {
    *
    * For loading png, jpg, etc. images, use {@link ImageNode} instead.
    *
-   * The bitmap data can by found in {@link document.IDocumentBitmapsRepository} images[this.id].data
+   * The bitmap data can by found in {@link document.IBitmapsRepository} images[this.id].data
    */
   export interface BitmapNode
     extends i.IBaseNode,
@@ -1655,7 +1684,7 @@ export namespace grida.program.nodes {
       i.IProperties,
       i.IProps,
       // TODO: migration required - remove me - use global override table instead
-      document.IDocumentOverridesRepository {
+      document.IOverridesRepository {
     readonly type: "template_instance";
 
     /**
@@ -1796,7 +1825,14 @@ export namespace grida.program.nodes {
       const document: document.IDocumentDefinition = {
         bitmaps: {},
         nodes: {},
-        children: [],
+        scene: {
+          type: "scene",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "multiple",
+          },
+        },
         properties: {},
       };
 
@@ -1822,7 +1858,7 @@ export namespace grida.program.nodes {
       }
 
       const rootNode = processNode(prototype, nid);
-      document.children = [rootNode.id];
+      document.scene.children = [rootNode.id];
 
       return document;
     }

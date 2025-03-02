@@ -47,7 +47,7 @@ export function FloatingBarContent({
     <div
       {...props}
       className={cn(
-        "max-w-full flex items-center gap-2 pointer-events-auto cursor-pointer rounded-lg py-1 px-2 truncate bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent",
+        "max-w-full flex items-center gap-2 pointer-events-auto cursor-pointer rounded-lg py-2 px-2.5 truncate bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent",
         className
       )}
     >

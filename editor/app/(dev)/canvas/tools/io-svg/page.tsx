@@ -37,8 +37,15 @@ export default function IOSVGPage() {
       editable: true,
       debug: true,
       document: {
-        children: [],
         nodes: {},
+        scene: {
+          type: "scene",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "single",
+          },
+        },
       },
     })
   );

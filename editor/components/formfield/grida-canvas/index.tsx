@@ -45,7 +45,14 @@ export function GridaCanvasFormField() {
       editable: true,
       document: {
         nodes: {},
-        children: [],
+        scene: {
+          type: "scene",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "multiple",
+          },
+        },
       },
     })
   );

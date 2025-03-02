@@ -12,7 +12,6 @@ export namespace history {
     draft.document_ctx = snapshot.document_ctx;
     draft.content_edit_mode = snapshot.content_edit_mode;
     draft.document_key = snapshot.document_key;
-    draft.guides = snapshot.guides;
     //
 
     // hover state should be cleared to prevent errors
@@ -28,7 +27,6 @@ export namespace history {
       document_ctx: state.document_ctx,
       content_edit_mode: state.content_edit_mode,
       document_key: state.document_key,
-      guides: state.guides,
     };
   }
 

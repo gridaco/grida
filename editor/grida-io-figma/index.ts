@@ -226,7 +226,14 @@ export namespace iofigma {
 
         return {
           nodes,
-          children: [rootNode.id],
+          scene: {
+            type: "scene",
+            children: [rootNode.id],
+            guides: [],
+            constraints: {
+              children: "multiple",
+            },
+          },
           // TODO:
           bitmaps: {},
           properties: {},

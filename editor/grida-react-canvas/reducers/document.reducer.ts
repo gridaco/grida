@@ -22,7 +22,7 @@ import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
 import {
   self_clearSelection,
-  self_deleteNode,
+  self_try_remove_node,
   self_duplicateNode,
   self_insertSubDocument,
   self_selectNode,
@@ -122,7 +122,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
         if (action.type === "cut") {
           target_node_ids.forEach((node_id) => {
-            self_deleteNode(draft, node_id);
+            self_try_remove_node(draft, node_id);
           });
         }
       });
@@ -196,7 +196,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
             // - in content edit mode
             node_id !== state.content_edit_mode?.node_id
           ) {
-            self_deleteNode(draft, node_id);
+            self_try_remove_node(draft, node_id);
           }
         }
       });
@@ -218,7 +218,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       }
 
       // calculate sub document's bounding box (we won't be using x, y - set as 0 for fallback)
-      const box = sub.children.reduce(
+      const box = sub.scene.children.reduce(
         (bb, node_id) => {
           const node = sub.nodes[node_id];
 
@@ -265,7 +265,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       );
       const cdom = new domapi.CanvasDOM(state.transform);
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
-      const siblings = state.document.children;
+      const siblings = state.document.scene.children;
       const anchors = siblings
         .map((node_id) => {
           const r = cdom.getNodeBoundingRect(node_id);
@@ -286,7 +286,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       assert(placement); // placement is always expected since allowOverflow is true
 
       // TODO: make it clean and reusable
-      sub.children.forEach((node_id) => {
+      sub.scene.children.forEach((node_id) => {
         const node = sub.nodes[node_id];
         if ("position" in node && node.position === "absolute") {
           node.left = (node.left ?? 0) + placement.x;
@@ -505,7 +505,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter((id) => !state.document.children.includes(id)),
+        target_node_ids.filter(
+          (id) => !state.document.scene.children.includes(id)
+        ),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -604,7 +606,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter((id) => !state.document.children.includes(id)),
+        target_node_ids.filter(
+          (id) => !state.document.scene.children.includes(id)
+        ),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -755,7 +759,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const root_template_instance = document.__getNodeById(
           draft,
           // TODO: update api interface
-          draft.document.children[0]
+          draft.document.scene.children[0]
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
@@ -944,7 +948,7 @@ function self_order(
       parent_id
     ) as grida.program.nodes.i.IChildrenReference;
   } else {
-    ichildren = draft.document;
+    ichildren = draft.document.scene;
   }
 
   const childIndex = ichildren.children.indexOf(node_id);

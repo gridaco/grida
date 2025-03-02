@@ -67,7 +67,7 @@ export function DocumentProperties({ className }: { className?: string }) {
     <div className={className}>
       <SidebarSection className="pb-2">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Document</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Scene</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
           <DocumentBackgroundPropertyLine />

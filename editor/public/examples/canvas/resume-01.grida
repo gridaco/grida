@@ -2140,12 +2140,20 @@
         "fontWeight": 400
       }
     },
-    "root_id": "1:475",
-    "backgroundColor": {
-      "r": 50,
-      "g": 50,
-      "b": 50,
-      "a": 1
+    "scene": {
+      "type": "scene",
+      "children": [
+        "1:475"
+      ],
+      "constraints": {
+        "children": "single"
+      },
+      "backgroundColor": {
+        "r": 50,
+        "g": 50,
+        "b": 50,
+        "a": 1
+      }
     }
   }
 }

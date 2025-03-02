@@ -12,7 +12,7 @@ export function self_moveNode<S extends IDocumentEditorState>(
   const parent_id = document.getParentId(draft.document_ctx, node_id);
 
   // do not allow move on the root node
-  if (draft.document.children.includes(node_id) || parent_id === null) {
+  if (draft.document.scene.children.includes(node_id) || parent_id === null) {
     return false;
   }
 

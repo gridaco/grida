@@ -383,13 +383,20 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
             editable: true,
             debug: false,
             document: {
-              children: ["page"],
               nodes: {
                 ["page"]:
                   grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
                     "page",
                     startpage
                   ),
+              },
+              scene: {
+                type: "scene",
+                children: ["page"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
               },
             },
             templates: {

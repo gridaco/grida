@@ -4,10 +4,8 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
 
 export namespace io {
-  const CURRENT_VERSION = "2025-02-12";
-
   export interface LoadedDocument {
-    version: typeof CURRENT_VERSION;
+    version: typeof grida.program.document.SCHEMA_VERSION;
     document: grida.program.document.IDocumentDefinition;
   }
 
@@ -18,7 +16,7 @@ export namespace io {
    * used for web usage
    */
   export interface JSONDocumentFileModel {
-    version: typeof CURRENT_VERSION;
+    version: typeof grida.program.document.SCHEMA_VERSION;
     document: grida.program.document.IDocumentDefinition;
   }
 
@@ -29,7 +27,7 @@ export namespace io {
    * used for archives & desktop usage
    */
   export interface ArchiveFileModel {
-    version: typeof CURRENT_VERSION;
+    version: typeof grida.program.document.SCHEMA_VERSION;
     document: JSONDocumentFileModel;
 
     /**
@@ -157,11 +155,10 @@ export namespace io {
       return {
         version: json.version,
         document: {
-          children: json.document.children,
           nodes: json.document.nodes,
+          scene: json.document.scene,
           bitmaps: bitmaps,
           properties: json.document.properties ?? {},
-          backgroundColor: json.document.backgroundColor,
         },
       } satisfies JSONDocumentFileModel;
     }

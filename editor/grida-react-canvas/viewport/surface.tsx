@@ -412,11 +412,28 @@ function DropzoneOverlay(props: DropzoneIndication) {
 function RootFramesBarOverlay() {
   const { state } = useDocument();
   const rootframes = useMemo(() => {
-    const children = state.document.children.map(
+    const children = state.document.scene.children.map(
       (id) => state.document.nodes[id]
     );
     return children.filter((n) => n.type === "container");
-  }, [state.document.children, state.document.nodes]);
+  }, [state.document.scene.children, state.document.nodes]);
+
+  if (state.document.scene.constraints.children === "single") {
+    const rootframe = rootframes[0];
+    if (!rootframe) return null;
+    return (
+      <NodeTitleBar
+        node={rootframe}
+        node_id={rootframe.id}
+        state={"active"}
+        sideOffset={8}
+      >
+        <FloatingBarContent>
+          <FloatingBarTitle>{rootframe.name} (single mode)</FloatingBarTitle>
+        </FloatingBarContent>
+      </NodeTitleBar>
+    );
+  }
 
   return (
     <>
@@ -432,7 +449,9 @@ function RootFramesBarOverlay() {
                 ? "hover"
                 : "idle"
           }
-        />
+        >
+          <FloatingBarTitle>{node.name}</FloatingBarTitle>
+        </NodeTitleBar>
       ))}
     </>
   );
@@ -442,11 +461,14 @@ function NodeTitleBar({
   node,
   node_id,
   state,
-}: {
+  sideOffset,
+  children,
+}: React.PropsWithChildren<{
   node: grida.program.nodes.Node;
+  sideOffset?: number;
   node_id: string;
   state: "idle" | "hover" | "active";
-}) {
+}>) {
   const { select, hoverEnterNode, changeNodeName } = useDocument();
 
   // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
@@ -472,10 +494,10 @@ function NodeTitleBar({
   );
 
   return (
-    <FloatingBar node_id={node_id} state={state}>
-      <FloatingBarTitle {...bind()} style={{ touchAction: "none" }}>
-        {node.name}
-      </FloatingBarTitle>
+    <FloatingBar node_id={node_id} state={state} sideOffset={sideOffset}>
+      <div {...bind()} style={{ touchAction: "none" }}>
+        {children}
+      </div>
     </FloatingBar>
   );
 }

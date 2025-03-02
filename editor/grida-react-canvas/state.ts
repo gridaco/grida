@@ -590,6 +590,16 @@ interface IDocumentEditorEventTargetState {
    */
   surface_raycast_detected_node_ids: string[];
 
+  /**
+   * when user tries to remove a node that is not removable (removable=false) or tries to remove root node that is required by constraints, this is the behavior
+   *
+   * - `ignore` - ignore the action
+   * - `deactivate` - deactivate the node (set active=false)
+   * - `force` - force remove the node (even if it's not removable) (this may cause unexpected behavior or cause system to crash)
+   * - `throw` - throw an error
+   */
+  when_not_removable: "ignore" | "deactivate" | "force" | "throw";
+
   pointer: {
     position: cmath.Vector2;
     last: cmath.Vector2;
@@ -791,13 +801,6 @@ export interface IDocumentState extends IMinimalDocumentState {
    * @default false
    */
   content_edit_mode?: ContentEditModeState;
-
-  /**
-   * the ruler guides.
-   *
-   * objects sanps to this when ruler is on
-   */
-  guides: Guide[];
 }
 
 interface __TMP_HistoryExtension {
@@ -812,9 +815,9 @@ export interface IDocumentEditorInit
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
     grida.program.document.IDocumentDefinition,
-    "nodes" | "children" | "backgroundColor"
+    "nodes" | "scene"
   > &
-    Partial<grida.program.document.IDocumentBitmapsRepository>;
+    Partial<grida.program.document.IBitmapsRepository>;
 }
 
 export interface IDocumentEditorState
@@ -838,6 +841,14 @@ export function initDocumentEditorState({
     bitmaps: {},
     properties: {},
     ...init.document,
+    scene: {
+      // default values
+      type: "scene",
+      guides: [],
+      constraints: { children: "multiple" },
+      children: [],
+      ...(init.document.scene as Partial<grida.program.nodes.RootSceneNode>),
+    } as grida.program.nodes.RootSceneNode,
   };
 
   const s = new document.DocumentState(def);
@@ -869,8 +880,8 @@ export function initDocumentEditorState({
     },
     ruler: "on",
     pixelgrid: "on",
-    guides: [],
     active_duplication: null,
+    when_not_removable: "ignore",
     document_ctx: document.Context.from(def).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,

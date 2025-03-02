@@ -129,7 +129,7 @@ function SelectionMixedProperties() {
   const { state: document } = useDocument();
 
   const {
-    document: { children },
+    document: { scene },
   } = document;
 
   const { selection: ids, nodes, properties, actions: change } = useSelection();
@@ -186,7 +186,7 @@ function SelectionMixedProperties() {
   } = properties;
 
   const sid = ids.join(",");
-  const is_root = ids.length === 0 && children.includes(ids[0]); // assuming when root is selected, only root is selected
+  const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
@@ -606,7 +606,7 @@ function SelectedNodeProperties() {
   const { state } = useDocument();
 
   // - color - variables
-  const { selection, debug } = state;
+  const { selection, debug, document } = state;
 
   assert(selection.length === 1);
   const node_id = selection[0];
@@ -681,6 +681,8 @@ function SelectedNodeProperties() {
   const is_image = type === "image";
   const is_container = type === "container";
   const is_root = node_id === root.id;
+  const is_single_mode_root =
+    document.scene.constraints.children === "single" && is_root;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
@@ -729,7 +731,7 @@ function SelectedNodeProperties() {
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>

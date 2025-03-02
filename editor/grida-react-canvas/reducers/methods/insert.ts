@@ -25,10 +25,13 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
     // Add the child to the parent's children array (if not already added)
     const __parent_children_set = new Set(parent_node.children);
     // TODO: doing so will loose the children index info
-    sub.children.forEach(__parent_children_set.add, __parent_children_set);
+    sub.scene.children.forEach(
+      __parent_children_set.add,
+      __parent_children_set
+    );
     parent_node.children = Array.from(__parent_children_set);
   } else {
-    draft.document.children.push(...sub.children);
+    draft.document.scene.children.push(...sub.scene.children);
   }
 
   draft.document.nodes = {
@@ -57,14 +60,14 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
 
   // Update the hierarchy with parent-child relationships
   const context = new document.Context(draft.document_ctx);
-  sub.children.forEach((c) => {
+  sub.scene.children.forEach((c) => {
     context.blindlymove(c, parent_id);
   });
 
   // Update the runtime context
   draft.document_ctx = context.snapshot();
 
-  return sub.children;
+  return sub.scene.children;
 }
 
 export function self_insertNode<S extends IDocumentEditorState>(
@@ -99,7 +102,7 @@ export function self_insertNode<S extends IDocumentEditorState>(
   } else {
     // Add the node to the document
     draft.document.nodes[node_id] = node;
-    draft.document.children.push(node.id);
+    draft.document.scene.children.push(node.id);
   }
 
   // Update the document's font registry

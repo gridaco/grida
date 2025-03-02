@@ -114,7 +114,11 @@ type UIConfig = {
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
-export default function CanvasPlayground({ src }: { src?: string }) {
+export type CanvasPlaygroundProps = {
+  src?: string;
+};
+
+export default function CanvasPlayground({ src }: CanvasPlaygroundProps) {
   useDisableSwipeBack();
 
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -139,9 +143,16 @@ export default function CanvasPlayground({ src }: { src?: string }) {
       editable: true,
       debug: pref.debug,
       document: {
-        children: [],
         nodes: {},
-        backgroundColor: CANVAS_BG_COLOR,
+        scene: {
+          type: "scene",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "multiple",
+          },
+          backgroundColor: CANVAS_BG_COLOR,
+        },
       },
     })
   );
@@ -188,7 +199,7 @@ export default function CanvasPlayground({ src }: { src?: string }) {
 
   const onExport = () => {
     const documentData = {
-      version: "2025-02-12",
+      version: "2025-03-03",
       document: state.document,
     } satisfies io.JSONDocumentFileModel;
 
@@ -481,7 +492,9 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
                       {state.tool.type === "insert" &&
-                      state.tool.node === "container" ? (
+                      state.tool.node === "container" &&
+                      state.document.scene.constraints.children ===
+                        "multiple" ? (
                         <>
                           <DialogPrimitive.Root open>
                             <DialogPrimitive.Content className="h-full">

@@ -1,22 +1,19 @@
 {
   "doctype": "v0_document",
   "document": {
-    "nodes": {
-      "root": {
-        "id": "root",
-        "name": "root",
-        "type": "scene",
-        "active": true,
-        "locked": false,
-        "children": []
+    "nodes": {},
+    "scene": {
+      "type": "scene",
+      "children": [],
+      "constraints": {
+        "children": "multiple"
+      },
+      "backgroundColor": {
+        "r": 245,
+        "g": 245,
+        "b": 245,
+        "a": 1
       }
-    },
-    "root_id": "root",
-    "backgroundColor": {
-      "r": 245,
-      "g": 245,
-      "b": 245,
-      "a": 1
     }
   }
 }
