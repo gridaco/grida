@@ -483,6 +483,12 @@ export default function CanvasPlayground({ src }: { src?: string }) {
                         <>
                           <DialogPrimitive.Root open>
                             <DialogPrimitive.Content className="h-full">
+                              <DialogPrimitive.Title className="sr-only">
+                                Artboards
+                              </DialogPrimitive.Title>
+                              <DialogPrimitive.Description className="sr-only">
+                                Select an artboard to insert
+                              </DialogPrimitive.Description>
                               <SidebarRoot>
                                 <ArtboardsList />
                               </SidebarRoot>
