@@ -36,6 +36,21 @@ import { vn } from "@/grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import "core-js/features/object/group-by";
+import { surfaceRectToCanvasSpace } from "../utils/transform";
+
+/**
+ * the padding applied to the anchors (siblings) for dynamic next placement
+ *
+ * commonly known as 'minimal space between artboards'
+ */
+const PLACEMENT_ANCHORS_PADDING = 40;
+
+/**
+ * the inset applied to the viewport for dynamic placement
+ *
+ * the inset is inteded to be applied **before** being converted to canvas space (for better visual consistency)
+ */
+const PLACEMENT_VIEWPORT_INSET = 40;
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -201,6 +216,83 @@ export default function documentReducer<S extends IDocumentEditorState>(
           "Invalid action - prototype or document is required for `insert()`"
         );
       }
+
+      // calculate sub document's bounding box (we won't be using x, y - set as 0 for fallback)
+      const box = sub.children.reduce(
+        (bb, node_id) => {
+          const node = sub.nodes[node_id];
+
+          return cmath.rect.union([
+            bb,
+            {
+              x: "left" in node ? (node.left ?? 0) : 0,
+              y: "top" in node ? (node.top ?? 0) : 0,
+              width:
+                "width" in node
+                  ? typeof node.width === "number"
+                    ? node.width
+                    : 0
+                  : 0,
+              height:
+                "height" in node
+                  ? typeof node.height === "number"
+                    ? node.height
+                    : 0
+                  : 0,
+            },
+          ]);
+        },
+        { x: 0, y: 0, width: 0, height: 0 }
+      );
+
+      // [root rect for calculating next placement]
+      // if the insertion parent is null (root), use viewport rect (canvas space)
+      // otherwise, use the parent's bounding rect (canvas space) (TODO:)
+      const _viewport_rect = domapi.get_viewport_rect();
+      const viewport_rect = surfaceRectToCanvasSpace(
+        // apply the inset before convering to canvas space
+        cmath.rect.inset(
+          {
+            x: 0,
+            y: 0,
+            width: _viewport_rect.width,
+            height: _viewport_rect.height,
+          },
+          PLACEMENT_VIEWPORT_INSET
+        ),
+
+        state.transform
+      );
+      const cdom = new domapi.CanvasDOM(state.transform);
+      // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
+      const siblings = state.document.children;
+      const anchors = siblings
+        .map((node_id) => {
+          const r = cdom.getNodeBoundingRect(node_id);
+          if (!r) return null;
+          return cmath.rect.pad(
+            { x: r.x, y: r.y, width: r.width, height: r.height },
+            PLACEMENT_ANCHORS_PADDING
+          );
+        })
+        .filter((r) => r !== null) as cmath.Rectangle[];
+
+      const placement = cmath.packing.ext.walk_to_fit(
+        viewport_rect,
+        box,
+        anchors
+      );
+
+      assert(placement); // placement is always expected since allowOverflow is true
+
+      // TODO: make it clean and reusable
+      sub.children.forEach((node_id) => {
+        const node = sub.nodes[node_id];
+        if ("position" in node && node.position === "absolute") {
+          node.left = (node.left ?? 0) + placement.x;
+          node.top = (node.top ?? 0) + placement.y;
+        }
+      });
 
       return produce(state, (draft) => {
         const new_top_ids = self_insertSubDocument(

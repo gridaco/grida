@@ -650,12 +650,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "zoom": {
             if (state.marquee) {
               // update zoom
-              const _vrect = domapi.get_viewport_rect();
+              const _viewport_rect = domapi.get_viewport_rect();
               const vrect = {
                 x: 0,
                 y: 0,
-                width: _vrect.width,
-                height: _vrect.height,
+                width: _viewport_rect.width,
+                height: _viewport_rect.height,
               };
               const mrect = cmath.rect.fromPoints([
                 state.marquee.a,

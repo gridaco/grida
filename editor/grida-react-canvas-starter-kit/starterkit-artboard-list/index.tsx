@@ -20,6 +20,7 @@ const ArtboardList = () => {
   const onClickItem = (item: ArtboardData) => {
     insertNode({
       type: "container",
+      position: "absolute",
       name: item.name,
       width: item.width,
       height: item.height,
@@ -31,7 +32,7 @@ const ArtboardList = () => {
   return (
     <div className="w-full divide-y overflow-hidden">
       {Object.entries(artboardData).map(([categoryName, items], index) => (
-        <Collapsible key={index}>
+        <Collapsible key={index} defaultOpen={index === 0}>
           <CollapsibleTrigger className="p-2 my-1 focus:outline-none">
             <div className="flex items-center justify-between cursor-pointer">
               <ChevronDown size={16} className="text-muted-foreground me-2" />
