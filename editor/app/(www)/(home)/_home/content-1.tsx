@@ -87,6 +87,7 @@ export default function Content1() {
 function BigImageContainer({
   width,
   height,
+  alt = "",
   ...props
 }: React.ComponentProps<typeof Image>) {
   return (
@@ -96,7 +97,7 @@ function BigImageContainer({
       animate={{ opacity: 1 }}
       transition={{ duration: 1 }}
     >
-      <Image {...props} width={width} height={height} />
+      <Image {...props} width={width} height={height} alt={alt} />
     </motion.div>
   );
 }
