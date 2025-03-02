@@ -8,6 +8,7 @@ import { notFound, redirect } from "next/navigation";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import Header from "./header";
 
 export default async function Layout({
   params,
@@ -42,7 +43,12 @@ export default async function Layout({
       <Workspace organization={organization}>
         <EditorHelpFab />
         <WorkspaceSidebar />
-        {children}
+        <div className="h-full flex flex-1 w-full">
+          <div className="flex flex-col overflow-hidden w-full h-full">
+            <Header />
+            {children}
+          </div>
+        </div>
       </Workspace>
     </SidebarProvider>
   );
