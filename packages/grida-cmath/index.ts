@@ -1824,6 +1824,57 @@ export namespace cmath.rect {
   }
 
   /**
+   * Applies padding to a rectangle, expanding it while preserving its center.
+   *
+   * The padding can be specified as a uniform number (applied to all sides) or as an object with optional
+   * properties: `top`, `right`, `bottom`, and `left`. The resulting rectangle has its center unchanged,
+   * with its width increased by the sum of the left and right paddings, and its height increased by the sum
+   * of the top and bottom paddings.
+   *
+   * @param rect - The original rectangle.
+   * @param padding - A uniform padding number or an object specifying padding for each side.
+   * @returns A new rectangle with the padding applied and the same center as the original.
+   *
+   * @example
+   * // Uniform padding of 10 on all sides:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const padded = cmath.rect.pad(rect, 10);
+   * // Result: { x: 40, y: 40, width: 120, height: 100 }
+   *
+   * @example
+   * // Different padding for each side:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const padded = cmath.rect.pad(rect, { top: 5, right: 15, bottom: 10, left: 20 });
+   * // The center of `padded` is the same as the center of `rect`.
+   */
+  export function pad(
+    rect: Rectangle,
+    padding:
+      | number
+      | { top?: number; right?: number; bottom?: number; left?: number }
+  ): Rectangle {
+    let top: number, right: number, bottom: number, left: number;
+    if (typeof padding === "number") {
+      top = right = bottom = left = padding;
+    } else {
+      top = padding.top ?? 0;
+      right = padding.right ?? 0;
+      bottom = padding.bottom ?? 0;
+      left = padding.left ?? 0;
+    }
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    const newWidth = rect.width + left + right;
+    const newHeight = rect.height + top + bottom;
+    return {
+      x: centerX - newWidth / 2,
+      y: centerY - newHeight / 2,
+      width: newWidth,
+      height: newHeight,
+    };
+  }
+
+  /**
    * Aligns an array of rectangles along a specified axis and alignment type.
    *
    * @param rectangles - An array of rectangles to align.
@@ -2147,7 +2198,7 @@ export namespace cmath.rect.boolean {
    * ```
    */
   export function subtract(a: Rectangle, b: Rectangle): Rectangle[] {
-    const inter = intersection(a, b);
+    const inter = cmath.rect.intersection(a, b);
     if (!inter) return [a];
 
     const result: Rectangle[] = [];
@@ -2947,7 +2998,51 @@ export namespace cmath.transform {
  * applications where efficiency is critical.
  *
  */
-export namespace cmath.packing {}
+export namespace cmath.packing {
+  /**
+   * Calculates the next viable placement for a rectangular agent within a bounded domain.
+   *
+   * Given a rectangular domain V, an agent of dimensions (w, h), and a set of occupied regions A,
+   * this function computes a candidate placement R ⊆ V such that R ∩ a = ∅ for every a ∈ A.
+   *
+   * @param view - The domain rectangle V defined by (x, y, width, height).
+   * @param agent - An object with dimensions {width: number, height: number} for the agent.
+   * @param anchors - An array of rectangles representing occupied regions A (which may extend beyond V).
+   * @returns A rectangle R = (x, y, w, h) representing the placement of the agent, or null if none exists.
+   *
+   * @remarks
+   * This function implements a foundational variation of the MaxRects algorithm:
+   * 1. Initialize F = {V}.
+   * 2. For each a ∈ A, replace each r ∈ F with r \ a.
+   * 3. Select a candidate r ∈ F such that r.width ≥ w and r.height ≥ h, using a lexicographical minimality criterion.
+   */
+  export function next_placement(
+    view: Rectangle,
+    agent: { width: number; height: number },
+    anchors: Rectangle[]
+  ): Rectangle | null {
+    let freeRegions: Rectangle[] = [view];
+    for (const anchor of anchors) {
+      let updatedRegions: Rectangle[] = [];
+      for (const region of freeRegions) {
+        updatedRegions.push(...cmath.rect.boolean.subtract(region, anchor));
+      }
+      freeRegions = updatedRegions;
+    }
+    const candidates = freeRegions.filter(
+      (r) => r.width >= agent.width && r.height >= agent.height
+    );
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => a.y - b.y || a.x - b.x);
+    const chosen = candidates[0];
+    return {
+      x: chosen.x,
+      y: chosen.y,
+      width: agent.width,
+      height: agent.height,
+    };
+  }
+}
 
 /**
  * Rasterization utilities for drawing lines between points (e.g., "connect the dots")

@@ -244,6 +244,37 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("pad", () => {
+    test("applies uniform padding", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const padded = cmath.rect.pad(rect, 10);
+      // Original center: (50 + 100/2, 50 + 80/2) = (100, 90)
+      // New dimensions: width = 100 + 10 + 10 = 120, height = 80 + 10 + 10 = 100
+      // New x = 100 - 120/2 = 40, New y = 90 - 100/2 = 40
+      expect(padded).toEqual({ x: 40, y: 40, width: 120, height: 100 });
+    });
+
+    test("applies non-uniform padding", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const padded = cmath.rect.pad(rect, {
+        top: 5,
+        right: 15,
+        bottom: 10,
+        left: 20,
+      });
+      // Original center: (100, 90)
+      // New width = 100 + 20 + 15 = 135, New height = 80 + 5 + 10 = 95
+      // New x = 100 - 135/2 = 32.5, New y = 90 - 95/2 = 42.5
+      expect(padded).toEqual({ x: 32.5, y: 42.5, width: 135, height: 95 });
+    });
+
+    test("returns same rectangle when padding is 0", () => {
+      const rect = { x: 10, y: 20, width: 50, height: 60 };
+      const padded = cmath.rect.pad(rect, 0);
+      expect(padded).toEqual(rect);
+    });
+  });
+
   describe("align", () => {
     it("should align rectangles to the left", () => {
       const rectangles: cmath.Rectangle[] = [
