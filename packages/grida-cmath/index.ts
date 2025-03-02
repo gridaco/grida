@@ -1875,6 +1875,61 @@ export namespace cmath.rect {
   }
 
   /**
+   * Insets (shrinks) a rectangle by the given margin(s) while preserving its center.
+   *
+   * The margin can be specified as a uniform number (applied to all sides) or as an object with optional
+   * properties: `top`, `right`, `bottom`, and `left`. The resulting rectangle's width and height are clamped
+   * to be non-negative.
+   *
+   * @param rect - The original rectangle.
+   * @param margin - A uniform margin number or an object specifying margins for each side.
+   * @returns A new rectangle with the margin applied inward and the same center as the original.
+   *
+   * @example
+   * // Uniform inset of 10 on all sides:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const insetRect = cmath.rect.inset(rect, 10);
+   * // New dimensions: width = 100 - 20 = 80, height = 80 - 20 = 60, center remains at (100, 90)
+   * // Result: { x: 100 - 40, y: 90 - 30, width: 80, height: 60 } → { x: 60, y: 60, width: 80, height: 60 }
+   *
+   * @example
+   * // Non-uniform inset:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const insetRect = cmath.rect.inset(rect, { top: 5, right: 15, bottom: 10, left: 20 });
+   * // New width = 100 - (20+15) = 65, new height = 80 - (5+10) = 65,
+   * // Center remains at (100, 90), so new x = 100 - 65/2 = 67.5, new y = 90 - 65/2 = 57.5
+   * // Result: { x: 67.5, y: 57.5, width: 65, height: 65 }
+   */
+  export function inset(
+    rect: Rectangle,
+    margin:
+      | number
+      | { top?: number; right?: number; bottom?: number; left?: number }
+  ): Rectangle {
+    let top: number, right: number, bottom: number, left: number;
+    if (typeof margin === "number") {
+      top = right = bottom = left = margin;
+    } else {
+      top = margin.top ?? 0;
+      right = margin.right ?? 0;
+      bottom = margin.bottom ?? 0;
+      left = margin.left ?? 0;
+    }
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    let newWidth = rect.width - (left + right);
+    let newHeight = rect.height - (top + bottom);
+    newWidth = newWidth < 0 ? 0 : newWidth;
+    newHeight = newHeight < 0 ? 0 : newHeight;
+    return {
+      x: centerX - newWidth / 2,
+      y: centerY - newHeight / 2,
+      width: newWidth,
+      height: newHeight,
+    };
+  }
+
+  /**
    * Aligns an array of rectangles along a specified axis and alignment type.
    *
    * @param rectangles - An array of rectangles to align.

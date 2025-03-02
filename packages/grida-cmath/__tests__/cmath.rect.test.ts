@@ -275,6 +275,60 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("inset", () => {
+    test("applies uniform inset", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const insetRect = cmath.rect.inset(rect, 10);
+      // Original center: (50+50, 50+40) = (100, 90)
+      // New width = 100 - 20 = 80, New height = 80 - 20 = 60
+      // New x = 100 - 80/2 = 60, New y = 90 - 60/2 = 60
+      expect(insetRect).toEqual({ x: 60, y: 60, width: 80, height: 60 });
+    });
+
+    test("applies non-uniform inset", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const insetRect = cmath.rect.inset(rect, {
+        top: 5,
+        right: 15,
+        bottom: 10,
+        left: 20,
+      });
+      // Original center: (100, 90)
+      // New width = 100 - (20+15) = 65, New height = 80 - (5+10) = 65
+      // New x = 100 - 65/2 = 67.5, New y = 90 - 65/2 = 57.5
+      expect(insetRect).toEqual({ x: 67.5, y: 57.5, width: 65, height: 65 });
+    });
+
+    test("returns same rectangle when inset is 0", () => {
+      const rect = { x: 10, y: 20, width: 50, height: 60 };
+      const insetRect = cmath.rect.inset(rect, 0);
+      expect(insetRect).toEqual(rect);
+    });
+
+    test("clamps dimensions to non-negative when inset is too large (uniform)", () => {
+      const rect = { x: 50, y: 50, width: 30, height: 30 };
+      // Uniform inset of 20 leads to new width = 30 - 40 = -10 and height = -10, so clamped to 0.
+      // Center: (65, 65)
+      const insetRect = cmath.rect.inset(rect, 20);
+      expect(insetRect).toEqual({ x: 65, y: 65, width: 0, height: 0 });
+    });
+
+    test("clamps width to non-negative when inset is too large in one dimension", () => {
+      const rect = { x: 10, y: 10, width: 100, height: 50 };
+      // Apply non-uniform inset: left=60, right=60, top=5, bottom=5.
+      // New width = 100 - (60+60) = -20 (clamped to 0), new height = 50 - (5+5) = 40.
+      // Center remains at (10+50, 10+25) = (60, 35)
+      // New rect: x = 60 - 0/2 = 60, y = 35 - 40/2 = 15
+      const insetRect = cmath.rect.inset(rect, {
+        left: 60,
+        right: 60,
+        top: 5,
+        bottom: 5,
+      });
+      expect(insetRect).toEqual({ x: 60, y: 15, width: 0, height: 40 });
+    });
+  });
+
   describe("align", () => {
     it("should align rectangles to the left", () => {
       const rectangles: cmath.Rectangle[] = [
