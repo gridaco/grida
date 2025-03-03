@@ -40,6 +40,8 @@ export default function IOSVGPage() {
         nodes: {},
         scene: {
           type: "scene",
+          id: "iosvg",
+          name: "iosvg",
           children: [],
           guides: [],
           constraints: {

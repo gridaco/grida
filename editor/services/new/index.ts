@@ -256,6 +256,8 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
               nodes: {},
               scene: {
                 type: "scene",
+                id: "0",
+                name: "main",
                 children: [],
                 guides: [],
                 constraints: {

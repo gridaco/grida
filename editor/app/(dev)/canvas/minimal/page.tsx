@@ -46,6 +46,8 @@ export default function CanvasPlayground() {
         nodes: {},
         scene: {
           type: "scene",
+          id: "main",
+          name: "main",
           children: [],
           guides: [],
           constraints: {

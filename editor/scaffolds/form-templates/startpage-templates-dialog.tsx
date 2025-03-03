@@ -119,6 +119,8 @@ export function BrowseStartPageTemplatesDialog({
                       },
                       scene: {
                         type: "scene",
+                        id: "preview",
+                        name: "preview",
                         children: ["preview"],
                         guides: [],
                         constraints: {

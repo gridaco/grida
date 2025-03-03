@@ -47,6 +47,8 @@ export function GridaCanvasFormField() {
         nodes: {},
         scene: {
           type: "scene",
+          id: "main",
+          name: "main",
           children: [],
           guides: [],
           constraints: {

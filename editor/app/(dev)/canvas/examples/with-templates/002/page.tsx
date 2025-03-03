@@ -61,6 +61,8 @@ const document: IDocumentEditorInit = {
     },
     scene: {
       type: "scene",
+      id: "main",
+      name: "main",
       children: ["page"],
       guides: [],
       constraints: {

@@ -228,6 +228,8 @@ export namespace iofigma {
           nodes,
           scene: {
             type: "scene",
+            id: "scene-" + rootNode.id,
+            name: rootNode.name,
             children: [rootNode.id],
             guides: [],
             constraints: {

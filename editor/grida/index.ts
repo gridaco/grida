@@ -349,7 +349,6 @@ export namespace grida.program.document {
     extends IBitmapsRepository,
       document.INodesRepository,
       IDocumentProperties {
-    // children: [];
     scene: nodes.RootSceneNode;
   }
 
@@ -682,10 +681,19 @@ export namespace grida.program.nodes {
   export type NodeID = string;
   export type NodeType = Node["type"];
 
+  /**
+   * The root scene node. this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
+   */
   export interface RootSceneNode
-    extends document.ISceneBackground,
+    extends i.IBaseNode,
+      document.ISceneBackground,
       document.I2DGuides {
     type: "scene";
+    /**
+     * the scene identifier - the id is only required to be unique across the current document scenes.
+     * (it is not required to be globally unique within the nodes)
+     */
+    readonly id: NodeID;
     children: nodes.NodeID[];
     constraints: {
       children: "single" | "multiple";
@@ -1850,6 +1858,8 @@ export namespace grida.program.nodes {
         nodes: {},
         scene: {
           type: "scene",
+          id: "tmp",
+          name: "tmp",
           children: [],
           guides: [],
           constraints: {
