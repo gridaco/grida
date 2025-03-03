@@ -1,24 +1,50 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 
 import {
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { FileIcon } from "lucide-react";
 import { useDocument } from "@/grida-react-canvas";
+import { PlusIcon } from "@radix-ui/react-icons";
 
-function SceneItem() {
-  return <></>;
+export function ScenesGroup() {
+  const { createScene } = useDocument();
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>
+        Scenes
+        <SidebarGroupAction onClick={() => createScene()}>
+          <PlusIcon />
+          <span className="sr-only">New Scene</span>
+        </SidebarGroupAction>
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <ScenesList />
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
 }
 
 export function ScenesList() {
-  const { scenes, scene_id, loadScene } = useDocument();
+  const { scenes: scenesmap, scene_id, loadScene } = useDocument();
+
+  const scenes = useMemo(() => {
+    return Object.values(scenesmap).sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    );
+  }, [scenesmap]);
 
   return (
     <SidebarMenu>
-      {Object.values(scenes).map((scene) => {
+      {scenes.map((scene) => {
         const isActive = scene.id === scene_id;
         return (
           <SidebarMenuItem key={scene.id}>

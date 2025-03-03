@@ -9,6 +9,8 @@ import { history } from "./history";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import equal from "deep-equal";
+import { grida } from "@/grida";
+import nid from "./tools/id";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -43,9 +45,52 @@ export default function reducer<S extends IDocumentEditorState>(
         return state;
       }
 
+      // check if already loaded
+      if (state.scene_id === scene) {
+        return state;
+      }
+
       return produce(state, (draft: Draft<S>) => {
         // 1. change the scene_id
         draft.scene_id = scene;
+        // 2. clear scene-specific state
+        // TODO: move the related properties under scene state object.
+        draft.selection = [];
+        draft.hovered_node_id = null;
+        draft.hovered_vertex_idx = null;
+        draft.dropzone = undefined;
+        draft.gesture = { type: "idle" };
+        draft.surface_measurement_target = undefined;
+        draft.content_edit_mode = undefined;
+        draft.marquee = undefined;
+        draft.surface_snapping = undefined;
+        draft.surface_measurement_target = undefined;
+        draft.surface_raycast_detected_node_ids = [];
+      });
+    }
+    case "new": {
+      const { scene } = action;
+      const new_scene = grida.program.document.init_scene(
+        scene ?? {
+          id: nid(), // TODO: use other than nid
+          name: `Scene ${Object.keys(state.document.scenes).length + 1}`,
+          order: Object.keys(state.document.scenes).length,
+        }
+      );
+
+      const scene_id = new_scene.id;
+      // check if the scene id does not conflict
+      if (state.document.scenes[scene_id]) {
+        console.error(`Scene id ${scene_id} already exists`);
+        return state;
+      }
+
+      return produce(state, (draft: Draft<S>) => {
+        // 0. add the new scene
+        draft.document.scenes[new_scene.id] = new_scene;
+        // 1. change the scene_id
+        draft.scene_id = new_scene.id;
+
         // 2. clear scene-specific state
         // TODO: move the related properties under scene state object.
         draft.selection = [];

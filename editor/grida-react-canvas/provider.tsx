@@ -1437,6 +1437,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const createScene = useCallback(
+    (scene?: grida.program.document.SceneInit) => {
+      dispatch({
+        type: "new",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
       dispatch({
@@ -1906,6 +1916,7 @@ export function useDocument() {
       scenes,
       scene_id,
       loadScene,
+      createScene,
       //
       select,
       blur,
@@ -1957,6 +1968,7 @@ export function useDocument() {
     scenes,
     scene_id,
     loadScene,
+    createScene,
     //
     select,
     blur,

@@ -17,7 +17,10 @@ import {
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
-import { ScenesList } from "@/scaffolds/sidebar/sidebar-scenes-list";
+import {
+  ScenesGroup,
+  ScenesList,
+} from "@/scaffolds/sidebar/sidebar-scenes-list";
 import {
   StandaloneDocumentEditor,
   StandaloneDocumentContent,
@@ -113,6 +116,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -435,12 +439,7 @@ export default function CanvasPlayground({
                             </header>
                           </SidebarHeader>
                           <SidebarContent>
-                            <SidebarGroup>
-                              <SidebarGroupLabel>Scenes</SidebarGroupLabel>
-                              <SidebarGroupContent>
-                                <ScenesList />
-                              </SidebarGroupContent>
-                            </SidebarGroup>
+                            <ScenesGroup />
                             <hr />
                             <SidebarGroup>
                               <SidebarGroupLabel>Layers</SidebarGroupLabel>

@@ -35,6 +35,7 @@ export type EditorAction =
 
 export type DocumentAction =
   | LoadSceneAction
+  | NewSceneAction
   | SceneBackgroundAction
   | EditorSelectAction
   | EditorHoverAction
@@ -120,6 +121,11 @@ export interface __InternalResetAction {
 export interface LoadSceneAction {
   type: "load";
   scene: string;
+}
+
+export interface NewSceneAction {
+  type: "new";
+  scene?: grida.program.document.SceneInit;
 }
 
 export interface SceneBackgroundAction {

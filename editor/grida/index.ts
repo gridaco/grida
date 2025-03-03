@@ -395,6 +395,11 @@ export namespace grida.program.document {
     constraints: {
       children: "single" | "multiple";
     };
+
+    /**
+     * optional order of the scene
+     */
+    order?: number;
   }
 
   /**
