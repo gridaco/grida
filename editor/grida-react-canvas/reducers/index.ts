@@ -128,8 +128,9 @@ function _reducer<S extends IDocumentEditorState>(
         if (config.ignores_locked)
           draft.surface_raycast_targeting.ignores_locked =
             config.ignores_locked;
-        if (config.ignores_root)
-          draft.surface_raycast_targeting.ignores_root = config.ignores_root;
+        if (config.ignores_root_with_children)
+          draft.surface_raycast_targeting.ignores_root_with_children =
+            config.ignores_root_with_children;
         self_updateSurfaceHoverState(draft);
       });
     }

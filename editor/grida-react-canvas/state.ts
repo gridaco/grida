@@ -37,7 +37,7 @@ export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
-  ignores_root: false,
+  ignores_root_with_children: true,
   ignores_locked: true,
 };
 
@@ -93,10 +93,10 @@ export type SurfaceRaycastTargeting = {
   target: "auto" | "deepest" | "shallowest";
 
   /**
-   * ignores the root node from the targeting
+   * ignores the root node from the targeting (if not empty)
    * @default true
    */
-  ignores_root: boolean;
+  ignores_root_with_children: boolean;
 
   /**
    * ignores the locked node from the targeting

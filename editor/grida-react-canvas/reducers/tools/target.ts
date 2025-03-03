@@ -23,12 +23,17 @@ export function getRayTarget(
   // Filter the nodes based on the configuration
   const filtered = hits
     .filter((node_id) => {
+      const node = nodes[node_id];
       const top_id = document.getTopId(context.document_ctx, node_id);
-      if (config.ignores_root && node_id === top_id) {
+      const maybeichildren = ichildren(node);
+      if (
+        maybeichildren &&
+        maybeichildren.length > 0 &&
+        config.ignores_root_with_children &&
+        node_id === top_id
+      ) {
         return false; // Ignore the root node if configured
       }
-
-      const node = nodes[node_id];
 
       if (!node) {
         // ensure target exists in current document (this can happen since the hover is triggered from the event target, where the new document state is not applied yet)
@@ -103,13 +108,20 @@ export function getMarqueeSelection(
   // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
     const root_id = document.getTopId(document_ctx, hit_id)!;
+    const hit = document.__getNodeById(state, hit_id);
 
-    // (1) shall not be a root node
-    if (state.surface_raycast_targeting.ignores_root && hit_id === root_id)
+    // (1) shall not be a root node (if configured)
+    const maybeichildren = ichildren(hit);
+    if (
+      maybeichildren &&
+      maybeichildren.length > 0 &&
+      state.surface_raycast_targeting.ignores_root_with_children &&
+      hit_id === root_id
+    )
       return false;
 
     // (2) shall not be a locked node
-    const hit = document.__getNodeById(state, hit_id);
+
     if (!hit) return false;
     if (hit.locked) return false;
 
@@ -132,4 +144,12 @@ export function getMarqueeSelection(
   });
 
   return target_node_ids;
+}
+
+function ichildren(node: any): Array<any> | undefined {
+  if (!node) return undefined;
+  if ("children" in node && Array.isArray(node.children)) {
+    return node.children;
+  }
+  return undefined;
 }
