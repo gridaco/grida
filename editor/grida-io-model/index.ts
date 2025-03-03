@@ -6,7 +6,7 @@ import { encode, decode, type PngDataArray } from "fast-png";
 export namespace io {
   export interface LoadedDocument {
     version: typeof grida.program.document.SCHEMA_VERSION;
-    document: grida.program.document.IDocumentDefinition;
+    document: grida.program.document.Document;
   }
 
   /**
@@ -17,7 +17,7 @@ export namespace io {
    */
   export interface JSONDocumentFileModel {
     version: typeof grida.program.document.SCHEMA_VERSION;
-    document: grida.program.document.IDocumentDefinition;
+    document: grida.program.document.Document;
   }
 
   /**
@@ -156,7 +156,7 @@ export namespace io {
         version: json.version,
         document: {
           nodes: json.document.nodes,
-          scene: json.document.scene,
+          scenes: json.document.scenes,
           bitmaps: bitmaps,
           properties: json.document.properties ?? {},
         },

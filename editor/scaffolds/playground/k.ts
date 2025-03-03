@@ -12,14 +12,9 @@ export const canvas_examples = [
     url: `/examples/canvas/helloworld.grida`,
   },
   {
-    id: "slide-01",
+    id: "slides-01",
     name: "Slide 01",
-    url: `/examples/canvas/slide-01.grida`,
-  },
-  {
-    id: "slide-02",
-    name: "Slide 02",
-    url: `/examples/canvas/slide-02.grida`,
+    url: `/examples/canvas/slides-01.grida`,
   },
   {
     id: "instagram-post-01",

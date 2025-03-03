@@ -34,7 +34,8 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
-  | DocumentBackgroundAction
+  | LoadSceneAction
+  | SceneBackgroundAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -116,8 +117,14 @@ export interface __InternalResetAction {
   state: IDocumentEditorState;
 }
 
-export interface DocumentBackgroundAction {
+export interface LoadSceneAction {
+  type: "load";
+  scene: string;
+}
+
+export interface SceneBackgroundAction {
   type: "background-color";
+  scene: string;
   backgroundColor: grida.program.document.ISceneBackground["backgroundColor"];
 }
 
@@ -515,7 +522,7 @@ export type DocumentEditorInsertNodeAction = {
       prototype: grida.program.nodes.NodePrototype;
     }
   | {
-      document: grida.program.document.IDocumentDefinition;
+      document: grida.program.document.IPackedSceneDocument;
     }
 );
 

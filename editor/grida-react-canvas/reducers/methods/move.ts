@@ -2,6 +2,7 @@ import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
 import type { grida } from "@/grida";
 import { document } from "@/grida-react-canvas/document-query";
+import assert from "assert";
 
 export function self_moveNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
@@ -9,10 +10,12 @@ export function self_moveNode<S extends IDocumentEditorState>(
   target_id: string,
   order?: number
 ): boolean {
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
   const parent_id = document.getParentId(draft.document_ctx, node_id);
 
   // do not allow move on the root node
-  if (draft.document.scene.children.includes(node_id) || parent_id === null) {
+  if (scene.children.includes(node_id) || parent_id === null) {
     return false;
   }
 

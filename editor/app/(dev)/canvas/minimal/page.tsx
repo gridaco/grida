@@ -44,14 +44,16 @@ export default function CanvasPlayground() {
       editable: true,
       document: {
         nodes: {},
-        scene: {
-          type: "scene",
-          id: "main",
-          name: "main",
-          children: [],
-          guides: [],
-          constraints: {
-            children: "multiple",
+        scenes: {
+          main: {
+            type: "scene",
+            id: "main",
+            name: "main",
+            children: [],
+            guides: [],
+            constraints: {
+              children: "multiple",
+            },
           },
         },
       },

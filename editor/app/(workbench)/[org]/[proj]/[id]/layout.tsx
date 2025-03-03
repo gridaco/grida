@@ -471,7 +471,7 @@ export default async function Layout({
                 lang: "en",
                 is_powered_by_branding_enabled: true,
               },
-              canvas_one: data.data as unknown as CanvasDocumentSnapshotSchema,
+              document: data.data as unknown as CanvasDocumentSnapshotSchema,
             }}
           >
             <BaseLayout docid={masterdoc_ref.id}>{children}</BaseLayout>

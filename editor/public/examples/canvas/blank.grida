@@ -2,17 +2,20 @@
   "doctype": "v0_document",
   "document": {
     "nodes": {},
-    "scene": {
-      "type": "scene",
-      "children": [],
-      "constraints": {
-        "children": "multiple"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "blank": {
+        "id": "blank",
+        "type": "scene",
+        "children": [],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }

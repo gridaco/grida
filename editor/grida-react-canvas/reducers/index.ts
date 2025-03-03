@@ -35,9 +35,36 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.transform = prev_state.transform;
       }) as S;
     }
-    case "background-color": {
+    case "load": {
+      const { scene } = action;
+
+      // check if the scene exists
+      if (!state.document.scenes[scene]) {
+        return state;
+      }
+
       return produce(state, (draft: Draft<S>) => {
-        draft.document.scene.backgroundColor = action.backgroundColor;
+        // 1. change the scene_id
+        draft.scene_id = scene;
+        // 2. clear scene-specific state
+        // TODO: move the related properties under scene state object.
+        draft.selection = [];
+        draft.hovered_node_id = null;
+        draft.hovered_vertex_idx = null;
+        draft.dropzone = undefined;
+        draft.gesture = { type: "idle" };
+        draft.surface_measurement_target = undefined;
+        draft.content_edit_mode = undefined;
+        draft.marquee = undefined;
+        draft.surface_snapping = undefined;
+        draft.surface_measurement_target = undefined;
+        draft.surface_raycast_detected_node_ids = [];
+      });
+    }
+    case "background-color": {
+      const { scene } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.scenes[scene].backgroundColor = action.backgroundColor;
       });
     }
     case "transform": {

@@ -77,6 +77,8 @@ function __self_update_gesture_transform_translate(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(draft.gesture.type === "translate", "Gesture type must be translate");
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
   const {
     movement: _movement,
     initial_selection,
@@ -119,7 +121,7 @@ function __self_update_gesture_transform_translate(
           );
 
         const sub =
-          grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+          grida.program.nodes.factory.create_packed_scene_document_from_prototype(
             prototype,
             (_, depth) => {
               // the root shall be assigned to reserved id
@@ -227,7 +229,7 @@ function __self_update_gesture_transform_translate(
       });
 
       const new_parent_id = possible_parents[0];
-      // if (!new_parent_id) break; // this is when outside the canvas (this might need to change if we support infinite canvas)
+      if (!new_parent_id) break; // this is when outside the canvas (this might need to change if we support infinite canvas)
 
       // TODO: room for improvement - do a selection - parent comparison and handle at once (currently doing each comparison for each node) (this is redundant as if dropzone has changed, it will be changed for all selection)
       let is_parent_changed = false;
@@ -251,9 +253,8 @@ function __self_update_gesture_transform_translate(
           parent.children = parent.children.filter((id) => id !== node_id);
         } else {
           // root
-          draft.document.scene.children = draft.document.scene.children.filter(
-            (id) => id !== node_id
-          );
+          // FIXME: do not directly modify scene children here.
+          scene.children = scene.children.filter((id) => id !== node_id);
         }
 
         // register the node to the new parent
@@ -265,7 +266,8 @@ function __self_update_gesture_transform_translate(
           new_parent.children.push(node_id);
         } else {
           // root
-          draft.document.scene.children.push(node_id);
+          // FIXME: do not directly modify scene children here.
+          scene.children.push(node_id);
         }
 
         // update the context
@@ -299,7 +301,7 @@ function __self_update_gesture_transform_translate(
     initial_rects,
     {
       objects: snap_target_node_rects,
-      guides: draft.ruler === "on" ? draft.document.scene.guides : undefined,
+      guides: draft.ruler === "on" ? scene.guides : undefined,
     },
     adj_movement,
     threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
@@ -440,6 +442,8 @@ function __self_update_gesture_transform_scale(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(draft.gesture.type === "scale", "Gesture type must be scale");
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.gesture_modifiers;
 
@@ -508,7 +512,7 @@ function __self_update_gesture_transform_scale(
   for (const node_id of selection) {
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = draft.document.scene.children.includes(node_id);
+    const is_root = scene.children.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = node.type !== "bitmap";

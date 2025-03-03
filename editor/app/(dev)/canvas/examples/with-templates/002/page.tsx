@@ -1,9 +1,8 @@
 "use client";
 
-import type { Metadata } from "next";
 import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import Editor from "../../../editor";
-import React, { useEffect } from "react";
+import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import _002 from "@/theme/templates/formstart/002/page";
 
@@ -59,14 +58,16 @@ const document: IDocumentEditorInit = {
         overrides: {},
       },
     },
-    scene: {
-      type: "scene",
-      id: "main",
-      name: "main",
-      children: ["page"],
-      guides: [],
-      constraints: {
-        children: "single",
+    scenes: {
+      "page-1": {
+        type: "scene",
+        id: "page-1",
+        name: "main",
+        children: ["page"],
+        guides: [],
+        constraints: {
+          children: "single",
+        },
       },
     },
   },

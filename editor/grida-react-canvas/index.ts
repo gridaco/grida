@@ -7,7 +7,7 @@ export {
   useRootTemplateInstanceNode,
   useTemplateDefinition,
 } from "./provider";
-export { StandaloneDocumentContent } from "./renderer";
+export { StandaloneSceneContent as StandaloneDocumentContent } from "./renderer";
 export * from "./state";
 export * from "./viewport";
 export { default as standaloneDocumentReducer } from "./reducers";

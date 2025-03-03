@@ -775,14 +775,14 @@ type GradientContentEditMode = {
 };
 
 export interface IMinimalDocumentState {
-  document: grida.program.document.IDocumentDefinition;
+  document: grida.program.document.Document;
   /**
    * the document key set by user. user can update this to tell it's entirely replaced
    *
    * Optional, but recommended to set for better tracking and debugging.
    */
   document_key?: string;
-  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+  document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
 }
 
 export interface Guide {
@@ -801,6 +801,11 @@ export interface IDocumentState extends IMinimalDocumentState {
    * @default false
    */
   content_edit_mode?: ContentEditModeState;
+
+  /**
+   * current scene id
+   */
+  scene_id?: string;
 }
 
 interface __TMP_HistoryExtension {
@@ -814,8 +819,8 @@ export interface IDocumentEditorInit
   extends IDocumentEditorConfig,
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
-    grida.program.document.IDocumentDefinition,
-    "nodes" | "scene"
+    grida.program.document.Document,
+    "nodes" | "scenes" | "entry_scene_id"
   > &
     Partial<grida.program.document.IBitmapsRepository>;
 }
@@ -837,21 +842,21 @@ export function initDocumentEditorState({
 }: Omit<IDocumentEditorInit, "debug"> & {
   debug?: boolean;
 }): IDocumentEditorState {
-  const def: grida.program.document.IDocumentDefinition = {
+  const doc: grida.program.document.Document = {
     bitmaps: {},
     properties: {},
     ...init.document,
-    scene: {
-      // default values
-      type: "scene",
-      guides: [],
-      constraints: { children: "multiple" },
-      children: [],
-      ...(init.document.scene as Partial<grida.program.nodes.RootSceneNode>),
-    } as grida.program.nodes.RootSceneNode,
+    scenes: Object.entries(init.document.scenes).reduce(
+      (acc, [key, scene]) => {
+        acc[key] = grida.program.document.init_scene(scene);
+        return acc;
+      },
+      {} as grida.program.document.Document["scenes"]
+    ),
+    //  ,
   };
 
-  const s = new document.DocumentState(def);
+  const s = new document.DocumentState(doc);
 
   // console.log("i", init["transform"]);
 
@@ -882,7 +887,7 @@ export function initDocumentEditorState({
     pixelgrid: "on",
     active_duplication: null,
     when_not_removable: "ignore",
-    document_ctx: document.Context.from(def).snapshot(),
+    document_ctx: document.Context.from(doc).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
@@ -898,7 +903,8 @@ export function initDocumentEditorState({
       spacing: 0,
       opacity: 1,
     },
+    scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
     ...init,
-    document: def,
+    document: doc,
   };
 }

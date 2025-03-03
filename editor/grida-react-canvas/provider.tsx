@@ -1418,18 +1418,20 @@ export function useSelectionPaints() {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selection, transform } = state;
+  const {
+    selection,
+    transform,
+    scene_id,
+    document: { scenes },
+  } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
-  const backgroundColor = state.document.scene.backgroundColor;
-  const setBackgroundColor = useCallback(
-    (
-      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
-    ) => {
+  const loadScene = useCallback(
+    (scene: string) => {
       dispatch({
-        type: "background-color",
-        backgroundColor,
+        type: "load",
+        scene,
       });
     },
     [dispatch]
@@ -1901,8 +1903,9 @@ export function useDocument() {
       selection,
       transform,
       //
-      background: backgroundColor,
-      setBackground: setBackgroundColor,
+      scenes,
+      scene_id,
+      loadScene,
       //
       select,
       blur,
@@ -1951,8 +1954,9 @@ export function useDocument() {
     selection,
     transform,
     //
-    backgroundColor,
-    setBackgroundColor,
+    scenes,
+    scene_id,
+    loadScene,
     //
     select,
     blur,
@@ -1998,10 +2002,64 @@ export function useDocument() {
   ]);
 }
 
-export function useTransform() {
+type UseScene = grida.program.document.Scene & {
+  selection: IDocumentEditorState["selection"];
+  transform: IDocumentEditorState["transform"];
+  hovered_node_id: IDocumentEditorState["hovered_node_id"];
+  hovered_vertex_idx: IDocumentEditorState["hovered_vertex_idx"];
+  document_ctx: IDocumentEditorState["document_ctx"];
+  setBackgroundColor: (
+    backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+  ) => void;
+};
+
+export function useScene(scene_id: string): UseScene {
   const [state, dispatch] = __useInternal();
 
-  const { transform } = state;
+  const {
+    selection,
+    transform,
+    hovered_node_id,
+    hovered_vertex_idx,
+    document_ctx,
+  } = state;
+
+  const setBackgroundColor = useCallback(
+    (
+      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    ) => {
+      if (!scene_id) return;
+      dispatch({
+        type: "background-color",
+        scene: scene_id,
+        backgroundColor,
+      });
+    },
+    [dispatch, scene_id]
+  );
+
+  const scene = state.document.scenes[scene_id];
+  return {
+    selection,
+    transform,
+    hovered_node_id,
+    hovered_vertex_idx,
+    document_ctx,
+    ...scene,
+    setBackgroundColor,
+  };
+}
+
+export function useCurrentScene(): UseScene {
+  const [state] = __useInternal();
+  return useScene(state.scene_id!);
+}
+
+export function useTransform() {
+  const [_, dispatch] = __useInternal();
+  const scene = useCurrentScene();
+
+  const { transform } = scene;
 
   const scale = useCallback(
     (
@@ -2064,8 +2122,8 @@ export function useTransform() {
       margin: number | [number, number, number, number] = 64
     ) => {
       const ids = document.querySelector(
-        state.document_ctx,
-        state.selection,
+        scene.document_ctx,
+        scene.selection,
         selector
       );
 
@@ -2073,7 +2131,7 @@ export function useTransform() {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.CanvasDOM(scene.transform);
 
       const area = cmath.rect.union(
         ids
@@ -2093,10 +2151,10 @@ export function useTransform() {
     },
     [
       dispatch,
-      state.transform,
-      state.document_ctx,
-      state.document.scene.children,
-      state.selection,
+      scene.document_ctx,
+      scene.transform,
+      scene.selection,
+      scene.children,
     ]
   );
 
@@ -2127,7 +2185,7 @@ export function useTransform() {
   );
 
   return useMemo(() => {
-    const transform = state.transform;
+    const transform = scene.transform;
     const scaleX = transform[0][0];
     const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
@@ -2200,6 +2258,9 @@ export function useEventTargetCSSCursor() {
 
 export function useEventTarget() {
   const [state, dispatch] = __useInternal();
+  const scene = useCurrentScene();
+
+  const { guides } = scene;
 
   const {
     pointer,
@@ -2216,9 +2277,6 @@ export function useEventTarget() {
     debug,
     pixelgrid,
     ruler,
-    document: {
-      scene: { guides },
-    },
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";

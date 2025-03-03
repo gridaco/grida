@@ -102,7 +102,7 @@ export function getSnapTargets(
   {
     document_ctx,
   }: {
-    document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+    document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
   }
 ): string[] {
   // set of each sibling and parent of selection

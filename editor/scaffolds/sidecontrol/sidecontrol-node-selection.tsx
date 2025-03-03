@@ -59,6 +59,7 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
 import {
+  useCurrentScene,
   useNodeAction,
   useSelection,
   useSelectionPaints,
@@ -126,11 +127,7 @@ export function Selection({ empty }: { empty?: React.ReactNode }) {
 }
 
 function SelectionMixedProperties() {
-  const { state: document } = useDocument();
-
-  const {
-    document: { scene },
-  } = document;
+  const scene = useCurrentScene();
 
   const { selection: ids, nodes, properties, actions: change } = useSelection();
   const {
@@ -604,6 +601,7 @@ function SelectionMixedProperties() {
 
 function SelectedNodeProperties() {
   const { state } = useDocument();
+  const scene = useCurrentScene();
 
   // - color - variables
   const { selection, debug, document } = state;
@@ -682,7 +680,7 @@ function SelectedNodeProperties() {
   const is_container = type === "container";
   const is_root = node_id === root.id;
   const is_single_mode_root =
-    document.scene.constraints.children === "single" && is_root;
+    scene.constraints.children === "single" && is_root;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 

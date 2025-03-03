@@ -251,23 +251,21 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
         id: masterdoc_ref.id,
         data: {
           __schema_version: "2025-03-03",
-          pages: {
-            one: {
-              nodes: {},
-              scene: {
-                type: "scene",
-                id: "0",
-                name: "main",
-                children: [],
-                guides: [],
-                constraints: {
-                  children: "multiple",
-                },
+          nodes: {},
+          scenes: {
+            "0": {
+              type: "scene",
+              id: "0",
+              name: "main",
+              children: [],
+              guides: [],
+              constraints: {
+                children: "multiple",
               },
-              bitmaps: {},
-              properties: {},
             },
           },
+          bitmaps: {},
+          properties: {},
         } satisfies CanvasDocumentSnapshotSchema as {},
       })
       .select()

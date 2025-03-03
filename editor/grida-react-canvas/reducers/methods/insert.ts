@@ -7,8 +7,11 @@ import assert from "assert";
 export function self_insertSubDocument<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
-  sub: grida.program.document.IDocumentDefinition
+  sub: grida.program.document.IPackedSceneDocument
 ) {
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
+
   const sub_state = new document.DocumentState(sub);
   const sub_ctx = document.Context.from(sub);
   const sub_fonts = sub_state.fonts();
@@ -31,7 +34,11 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
     );
     parent_node.children = Array.from(__parent_children_set);
   } else {
-    draft.document.scene.children.push(...sub.scene.children);
+    assert(
+      scene.constraints.children !== "single",
+      "This scene cannot have multiple children"
+    );
+    scene.children.push(...sub.scene.children);
   }
 
   draft.document.nodes = {
@@ -75,6 +82,9 @@ export function self_try_insert_node<S extends IDocumentEditorState>(
   parent_id: string | null,
   node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
+
   const node_id = node.id;
 
   if (parent_id) {
@@ -100,9 +110,13 @@ export function self_try_insert_node<S extends IDocumentEditorState>(
     // Add the node to the document
     draft.document.nodes[node_id] = node;
   } else {
+    assert(
+      scene.constraints.children !== "single",
+      "This scene cannot have multiple children"
+    );
     // Add the node to the document
     draft.document.nodes[node_id] = node;
-    draft.document.scene.children.push(node.id);
+    scene.children.push(node.id);
   }
 
   // Update the document's font registry

@@ -57,6 +57,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
   action: DocumentAction
 ): S {
   if (!state.editable) return state;
+
+  assert(state.scene_id, "scene_id is required for autolayout");
+  const scene = state.document.scenes[state.scene_id];
+
   switch (action.type) {
     case "select": {
       const { document_ctx, selection } = state;
@@ -156,7 +160,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           // to be pasted
           for (const prototype of prototypes) {
             const sub =
-              grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
                 prototype,
                 nid
               );
@@ -202,10 +206,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
     }
     case "insert": {
-      let sub: grida.program.document.IDocumentDefinition;
+      let sub: grida.program.document.IPackedSceneDocument;
       if ("prototype" in action) {
         sub =
-          grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+          grida.program.nodes.factory.create_packed_scene_document_from_prototype(
             action.prototype,
             nid
           );
@@ -265,7 +269,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       );
       const cdom = new domapi.CanvasDOM(state.transform);
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
-      const siblings = state.document.scene.children;
+      assert(state.scene_id, "scene_id is required for insertion");
+      const scene = state.document.scenes[state.scene_id];
+      const siblings = scene.children;
       const anchors = siblings
         .map((node_id) => {
           const r = cdom.getNodeBoundingRect(node_id);
@@ -505,9 +511,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter(
-          (id) => !state.document.scene.children.includes(id)
-        ),
+        target_node_ids.filter((id) => !scene.children.includes(id)),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -564,7 +568,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const container_id = self_insertSubDocument(
             draft,
             parent,
-            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               container_prototype,
               nid
             )
@@ -606,9 +610,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       // group by parent
       const groups = Object.groupBy(
         // omit root node
-        target_node_ids.filter(
-          (id) => !state.document.scene.children.includes(id)
-        ),
+        target_node_ids.filter((id) => !scene.children.includes(id)),
         (node_id) => {
           return document.getParentId(state.document_ctx, node_id)!;
         }
@@ -648,7 +650,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const container_id = self_insertSubDocument(
             draft,
             parent_id,
-            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               container_prototype,
               nid
             )
@@ -758,8 +760,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const root_template_instance = document.__getNodeById(
           draft,
-          // TODO: update api interface
-          draft.document.scene.children[0]
+          // FIXME: update api interface
+          scene.children[0]
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
@@ -939,6 +941,9 @@ function self_order(
   node_id: string,
   order: "back" | "front" | "backward" | "forward" | number
 ) {
+  assert(draft.scene_id, "scene_id is required for order");
+  const scene = draft.document.scenes[draft.scene_id];
+
   const parent_id = document.getParentId(draft.document_ctx, node_id);
   // if (!parent_id) return; // root node case
   let ichildren: grida.program.nodes.i.IChildrenReference;
@@ -948,7 +953,7 @@ function self_order(
       parent_id
     ) as grida.program.nodes.i.IChildrenReference;
   } else {
-    ichildren = draft.document.scene;
+    ichildren = scene;
   }
 
   const childIndex = ichildren.children.indexOf(node_id);

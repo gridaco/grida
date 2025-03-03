@@ -390,14 +390,16 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
                     startpage
                   ),
               },
-              scene: {
-                type: "scene",
-                id: "startpage",
-                name: "Start",
-                children: ["page"],
-                guides: [],
-                constraints: {
-                  children: "single",
+              scenes: {
+                startpage: {
+                  type: "scene",
+                  id: "startpage",
+                  name: "Start",
+                  children: ["page"],
+                  guides: [],
+                  constraints: {
+                    children: "single",
+                  },
                 },
               },
             },

@@ -19,16 +19,14 @@ import equal from "deep-equal";
 import { grida } from "@/grida";
 import {
   AutoInitialFitTransformer,
-  StandaloneDocumentBackground,
+  StandaloneSceneBackground,
 } from "@/grida-react-canvas/renderer";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
-function useSync(
-  document: grida.program.document.IDocumentDefinition | undefined
-) {
+function useSync(document: grida.program.document.Document | undefined) {
   const [{ document_id }, dispatch] = useEditorState();
   const debounced = useDebounce(document, 1000);
   const prev = usePrevious(debounced);
@@ -49,11 +47,7 @@ function useSync(
           data: debounced
             ? ({
                 __schema_version: "2025-03-03",
-                pages: {
-                  one: {
-                    ...debounced,
-                  },
-                },
+                ...debounced,
               } satisfies CanvasDocumentSnapshotSchema as {})
             : null,
         })
@@ -99,7 +93,7 @@ export default function CanvasPage() {
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
               <EditorSurfaceContextMenu>
-                <StandaloneDocumentBackground className="w-full h-full flex flex-col relative ">
+                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
                   <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                     <EditorSurface />
                     <AutoInitialFitTransformer>
@@ -109,7 +103,7 @@ export default function CanvasPage() {
                       <Toolbar />
                     </div>
                   </ViewportRoot>
-                </StandaloneDocumentBackground>
+                </StandaloneSceneBackground>
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>

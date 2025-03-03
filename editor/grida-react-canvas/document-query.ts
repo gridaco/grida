@@ -60,7 +60,7 @@ export namespace document {
    * console.log(currentSelection); // ["node4"]
    */
   export function querySelector(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     selection: NodeID[],
     selector: grida.program.document.Selector
   ): NodeID[] {
@@ -126,7 +126,7 @@ export namespace document {
    * - output: [a, b, c, d.0, z.9.9.9]
    */
   export function pruneNestedNodes(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     selection: NodeID[]
   ): NodeID[] {
     const prunedSelection: Set<NodeID> = new Set();
@@ -188,7 +188,7 @@ export namespace document {
    * console.log(result); // false
    */
   function isAncestor(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     ancestor: NodeID,
     node: NodeID
   ): boolean {
@@ -242,7 +242,7 @@ export namespace document {
    * // - "node3" is the parent of "node4".
    */
   export function getAncestors(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID[] {
     const { __ctx_nid_to_parent_id } = context;
@@ -267,7 +267,7 @@ export namespace document {
   }
 
   export function getDepth(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): number {
     return getAncestors(context, node_id).length;
@@ -301,7 +301,7 @@ export namespace document {
    * console.log(siblings); // []
    */
   export function getSiblings(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID[] {
     const parent_id = getParentId(context, node_id);
@@ -350,7 +350,7 @@ export namespace document {
    * console.log(children); // []
    */
   export function getChildren(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string,
     recursive = false
   ): NodeID[] {
@@ -371,14 +371,14 @@ export namespace document {
   }
 
   export function getParentId(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID | null {
     return context.__ctx_nid_to_parent_id[node_id] ?? null;
   }
 
   export function getTopId(
-    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID | null {
     // veryfi if exists
@@ -434,7 +434,7 @@ export namespace document {
   //
   export function hierarchy(
     node_id: string,
-    ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+    ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
   ): { id: string; depth: number }[] {
     const collectNodeIds = (
       nodeId: string,
@@ -458,13 +458,13 @@ export namespace document {
 
   export class Context
     implements
-      grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+      grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
   {
     readonly __ctx_nids: string[] = [];
     readonly __ctx_nid_to_parent_id: Record<string, string | null> = {};
     readonly __ctx_nid_to_children_ids: Record<string, string[]> = {};
     constructor(
-      init?: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+      init?: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
     ) {
       if (init) {
         Object.assign(this, init);
@@ -473,7 +473,7 @@ export namespace document {
 
     static from(document: grida.program.document.IDocumentDefinition) {
       const ctx =
-        grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
+        grida.program.document.internal.create_nodes_repository_runtime_hierarchy_context(
           document
         );
       return new Context(ctx);
@@ -521,7 +521,7 @@ export namespace document {
       }
     }
 
-    snapshot(): grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext {
+    snapshot(): grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext {
       return {
         __ctx_nids: this.__ctx_nids.slice(),
         __ctx_nid_to_parent_id: { ...this.__ctx_nid_to_parent_id },

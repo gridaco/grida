@@ -349,7 +349,75 @@ export namespace grida.program.document {
     extends IBitmapsRepository,
       document.INodesRepository,
       IDocumentProperties {
-    scene: nodes.RootSceneNode;
+    // scene: Scene;
+  }
+
+  /**
+   * [Grida Document Model]
+   *
+   * Grida document contains all nodes, properties, and embedded data required to render a complete document.
+   */
+  export interface Document extends IDocumentDefinition {
+    scenes: Record<string, Scene>;
+    entry_scene_id?: string;
+  }
+
+  /**
+   * [Packed Scene Document] A.K.A single scene document
+   *
+   * this is a portable document model with primary scene, used for in-memory operations. like import, copy-paste, drag-drop, etc.
+   */
+  export interface IPackedSceneDocument extends IDocumentDefinition {
+    scene: Scene;
+  }
+
+  /**
+   * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
+   */
+  export interface Scene extends document.ISceneBackground, document.I2DGuides {
+    type: "scene";
+
+    /**
+     * the scene identifier - the id is only required to be unique across the current document scenes.
+     * (it is not required to be globally unique within the nodes)
+     */
+    readonly id: string;
+
+    /**
+     * the user-friendly name of the scene
+     */
+    name: string;
+
+    /**
+     * the children of the scene. each children must be registreed in the node repository under the document where this scene is defined.
+     */
+    children: nodes.NodeID[];
+    constraints: {
+      children: "single" | "multiple";
+    };
+  }
+
+  /**
+   * Minimal Scene Definition for API usage (and for older versions)
+   *
+   * will follow the default values of {@link Scene} for missing properties.
+   */
+  export type SceneInit = Partial<Scene> & Pick<Scene, "id">;
+
+  /**
+   * initializes a minimal scene definition
+   * @param init minimal scene definition
+   * @returns a compatible scene definition
+   */
+  export function init_scene(init: SceneInit): grida.program.document.Scene {
+    return {
+      // default, fallback values
+      type: "scene",
+      guides: [],
+      constraints: { children: "multiple" },
+      children: [],
+      ...init,
+    } as grida.program.document.Scene;
   }
 
   export namespace internal {
@@ -379,7 +447,7 @@ export namespace grida.program.document {
      *   current relationships.
      *
      */
-    export interface IDocumentDefinitionRuntimeHierarchyContext {
+    export interface INodesRepositoryRuntimeHierarchyContext {
       /**
        * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
        */
@@ -405,15 +473,15 @@ export namespace grida.program.document {
      * Builds the runtime context for document hierarchy, providing mappings for
      * parent-child relationships without modifying core node structure.
      *
-     * @param document - The document definition containing all nodes.
-     * @returns {grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
+     * @param repository - The document definition containing all nodes.
+     * @returns {grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext} The hierarchy context,
      * containing mappings of each node's parent and children.
      */
-    export function createDocumentDefinitionRuntimeHierarchyContext(
-      document: IDocumentDefinition
-    ): IDocumentDefinitionRuntimeHierarchyContext {
-      const { nodes } = document;
-      const ctx: IDocumentDefinitionRuntimeHierarchyContext = {
+    export function create_nodes_repository_runtime_hierarchy_context(
+      repository: INodesRepository
+    ): INodesRepositoryRuntimeHierarchyContext {
+      const { nodes } = repository;
+      const ctx: INodesRepositoryRuntimeHierarchyContext = {
         __ctx_nids: Object.keys(nodes),
         __ctx_nid_to_parent_id: {},
         __ctx_nid_to_children_ids: {},
@@ -680,25 +748,6 @@ export namespace grida.program.css {
 export namespace grida.program.nodes {
   export type NodeID = string;
   export type NodeType = Node["type"];
-
-  /**
-   * The root scene node. this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
-   */
-  export interface RootSceneNode
-    extends i.IBaseNode,
-      document.ISceneBackground,
-      document.I2DGuides {
-    type: "scene";
-    /**
-     * the scene identifier - the id is only required to be unique across the current document scenes.
-     * (it is not required to be globally unique within the nodes)
-     */
-    readonly id: NodeID;
-    children: nodes.NodeID[];
-    constraints: {
-      children: "single" | "multiple";
-    };
-  }
 
   export type Node =
     | TextNode
@@ -1843,17 +1892,17 @@ export namespace grida.program.nodes {
     type FactoryNodeIdGenerator<D> = (data: D, depth: number) => NodeID;
 
     /**
-     * Creates a sub document {@link document.IDocumentDefinition} from a prototype input.
+     * Creates a sub document {@link document.IPackedSceneDocument} from a prototype input.
      *
      * When injecting this to the master document, simply merge this to the master document, and add the root as a children of certain node.
      */
-    export function createSubDocumentDefinitionFromPrototype<
+    export function create_packed_scene_document_from_prototype<
       D extends Partial<NodePrototype>,
     >(
       prototype: D,
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
-    ): document.IDocumentDefinition {
-      const document: document.IDocumentDefinition = {
+    ): document.IPackedSceneDocument {
+      const document: document.IPackedSceneDocument = {
         bitmaps: {},
         nodes: {},
         scene: {
@@ -1894,6 +1943,18 @@ export namespace grida.program.nodes {
       document.scene.children = [rootNode.id];
 
       return document;
+    }
+
+    export function packed_scene_document_to_full_document(
+      packed: document.IPackedSceneDocument
+    ): document.Document {
+      const { scene, ...defs } = packed;
+      return {
+        ...defs,
+        scenes: {
+          [scene.id]: scene,
+        },
+      };
     }
 
     /**

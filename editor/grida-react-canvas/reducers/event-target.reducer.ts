@@ -69,6 +69,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     };
   }
 
+  assert(state.scene_id, "scene_id is not set");
+  const scene = state.document.scenes[state.scene_id];
+
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
@@ -743,9 +746,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { translated } = snapGuideTranslation(
                 axis,
                 initial_offset,
-                state.document.scene.children.map(
-                  (id) => cdom.getNodeBoundingRect(id)!
-                ),
+                scene.children.map((id) => cdom.getNodeBoundingRect(id)!),
                 m,
                 threshold(
                   DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
@@ -756,7 +757,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const offset = cmath.quantize(translated, 1);
 
               draft.gesture.offset = offset;
-              draft.document.scene.guides[index].offset = offset;
+              draft.document.scenes[state.scene_id!].guides[index].offset =
+                offset;
               break;
             }
             // [insertion mode - resize after insertion]
@@ -1353,8 +1355,10 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
  * @returns the parent node id or `null` if no desired target
  */
 function __get_insertion_target(state: IDocumentEditorState): string | null {
-  if (state.document.scene.constraints.children === "single") {
-    return state.document.scene.children[0];
+  assert(state.scene_id, "scene_id is not set");
+  const scene = state.document.scenes[state.scene_id];
+  if (scene.constraints.children === "single") {
+    return scene.children[0];
   }
 
   const hits = state.surface_raycast_detected_node_ids.slice();

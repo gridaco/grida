@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useLayoutEffect, useMemo, useRef } from "react";
-import { useDocument, useTransform } from "./provider";
+import { useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
@@ -26,15 +26,12 @@ export interface StandaloneDocumentContentProps {
   templates?: Record<string, CustomReactRenderer>;
 }
 
-export function StandaloneDocumentContent({
+export function StandaloneSceneContent({
   templates,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const {
-    state: { document },
-  } = useDocument();
-  const { children } = document.scene;
+  const { children } = useCurrentScene();
 
   return (
     <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
@@ -48,18 +45,18 @@ export function StandaloneDocumentContent({
   );
 }
 
-export function StandaloneDocumentBackground({
+export function StandaloneSceneBackground({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { background, transform } = useDocument();
+  const { backgroundColor, transform } = useCurrentScene();
 
-  const [backgroundColor, opacity] = useMemo(() => {
-    if (!background) return [undefined, 1] as const;
-    const hex = "#" + css.rgbaToHex(background);
-    const opacity = background.a;
+  const [cssBackgroundColor, opacity] = useMemo(() => {
+    if (!backgroundColor) return [undefined, 1] as const;
+    const hex = "#" + css.rgbaToHex(backgroundColor);
+    const opacity = backgroundColor.a;
     return [hex, opacity] as const;
-  }, [background]);
+  }, [backgroundColor]);
 
   const [visiblearea, { width, height }] = useMeasure();
 
@@ -80,7 +77,7 @@ export function StandaloneDocumentBackground({
         {/* background color */}
         <div
           className="absolute inset-0 overflow-hidden"
-          style={{ backgroundColor: backgroundColor }}
+          style={{ backgroundColor: cssBackgroundColor }}
         />
       </div>
       {children}
@@ -106,17 +103,12 @@ export function Transformer({ children }: React.PropsWithChildren<{}>) {
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {
-  const {
-    state: {
-      document: { scene },
-      document_key,
-    },
-  } = useDocument();
+  const scene = useCurrentScene();
   const { transform, style, setTransform } = useTransform();
 
   const applied_initial_transform_key = useRef<string | undefined>("__noop__");
   useLayoutEffect(() => {
-    if (applied_initial_transform_key.current === document_key) return;
+    if (applied_initial_transform_key.current === scene.id) return;
 
     const retransform = () => {
       if (scene.children.length === 0) return;
@@ -142,8 +134,8 @@ export function AutoInitialFitTransformer({
     };
 
     retransform();
-    applied_initial_transform_key.current = document_key;
-  }, [document_key, scene.children]);
+    applied_initial_transform_key.current = scene.id;
+  }, [scene.id, scene.children]);
 
   return (
     <div

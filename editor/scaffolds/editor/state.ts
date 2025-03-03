@@ -72,7 +72,7 @@ export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
 
 export interface CanvasDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_canvas";
-  canvas_one: CanvasDocumentSnapshotSchema;
+  document: CanvasDocumentSnapshotSchema;
 }
 
 export interface SchemaDocumentTableInit {
@@ -99,7 +99,8 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
   start:
-    | (grida.program.document.IDocumentDefinition & { template_id: string })
+    | // TODO: review me - only need single scene
+    (grida.program.document.Document & { template_id: string })
     | null;
   ending: EditorState["form"]["ending"];
   connections?: {

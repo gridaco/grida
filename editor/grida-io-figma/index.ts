@@ -179,7 +179,7 @@ export namespace iofigma {
         node: SubcanvasNode,
         images: { [key: string]: string },
         context: FactoryContext
-      ): grida.program.document.IDocumentDefinition {
+      ): grida.program.document.IPackedSceneDocument {
         const nodes: Record<string, grida.program.nodes.Node> = {};
 
         function processNode(

@@ -10,6 +10,7 @@ import {
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
+  useCurrentScene,
   useDocument,
   useEventTargetCSSCursor,
   useNode,
@@ -411,10 +412,9 @@ function DropzoneOverlay(props: DropzoneIndication) {
 
 function RootFramesBarOverlay() {
   const { state } = useDocument();
+  const scene = useCurrentScene();
   const rootframes = useMemo(() => {
-    const children = state.document.scene.children.map(
-      (id) => state.document.nodes[id]
-    );
+    const children = scene.children.map((id) => state.document.nodes[id]);
     return children.filter(
       (n) =>
         n.type === "container" ||
@@ -422,9 +422,9 @@ function RootFramesBarOverlay() {
         n.type === "component" ||
         n.type === "instance"
     );
-  }, [state.document.scene.children, state.document.nodes]);
+  }, [scene.children, state.document.nodes]);
 
-  if (state.document.scene.constraints.children === "single") {
+  if (scene.constraints.children === "single") {
     const rootframe = rootframes[0];
     if (!rootframe) return null;
     return (

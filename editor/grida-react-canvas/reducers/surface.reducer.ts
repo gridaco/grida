@@ -32,7 +32,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/guide/delete": {
       const { idx } = action;
       return produce(state, (draft) => {
-        draft.document.scene.guides.splice(idx, 1);
+        assert(draft.scene_id, "scene_id is not set");
+        const scene = draft.document.scenes[draft.scene_id];
+        scene.guides.splice(idx, 1);
       });
     }
     case "surface/pixel-grid": {
@@ -203,6 +205,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "guide": {
             const { axis, idx } = gesture;
 
+            assert(draft.scene_id, "scene_id is not set");
+            const scene = draft.document.scenes[draft.scene_id];
+
             if (idx === -1) {
               const t = cmath.transform.getTranslate(state.transform);
               const s = cmath.transform.getScale(state.transform);
@@ -213,7 +218,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 axis,
                 offset: -cmath.quantize(t[axi] * (1 / s[axi]), 1),
               } satisfies Guide;
-              const idx = draft.document.scene.guides.push(next) - 1;
+              const idx = scene.guides.push(next) - 1;
 
               // new
               draft.gesture = {
@@ -228,7 +233,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               };
             } else {
               // existing
-              const guide = state.document.scene.guides[idx];
+              const guide = scene.guides[idx];
               assert(guide.axis === axis, "guide gesture axis mismatch");
               draft.gesture = {
                 type: "guide",

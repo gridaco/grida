@@ -37,7 +37,11 @@ import {
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React, { useMemo } from "react";
-import { useNodeAction, useTransform } from "@/grida-react-canvas/provider";
+import {
+  useCurrentScene,
+  useNodeAction,
+  useTransform,
+} from "@/grida-react-canvas/provider";
 import { document as dq } from "@/grida-react-canvas/document-query";
 
 function NodeHierarchyItemContextMenuWrapper({
@@ -124,20 +128,18 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const {
-    state: { document, document_ctx, selection, hovered_node_id },
+    state: { document, document_ctx },
     select,
     hoverNode,
     toggleNodeLocked,
     toggleNodeActive,
   } = useDocument();
-
-  // TODO: need nested nodes for templates
+  const { children, selection, hovered_node_id } = useCurrentScene();
 
   const list = useMemo(() => {
-    return document.scene.children
-      .map((top) => dq.hierarchy(top, document_ctx))
-      .flat();
-  }, [document.scene.children, document_ctx]);
+    // TODO: need nested nodes for templates
+    return children.map((top) => dq.hierarchy(top, document_ctx)).flat();
+  }, [children, document_ctx]);
 
   // const ids = Object.keys(document.nodes);
 

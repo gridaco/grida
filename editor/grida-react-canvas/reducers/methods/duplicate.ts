@@ -35,7 +35,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
 
     // create sub document with prototype
     const sub =
-      grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+      grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         nid
       );

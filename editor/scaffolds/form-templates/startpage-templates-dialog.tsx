@@ -117,14 +117,17 @@ export function BrowseStartPageTemplatesDialog({
                             template
                           ),
                       },
-                      scene: {
-                        type: "scene",
-                        id: "preview",
-                        name: "preview",
-                        children: ["preview"],
-                        guides: [],
-                        constraints: {
-                          children: "single",
+                      entry_scene_id: "preview",
+                      scenes: {
+                        preview: {
+                          type: "scene",
+                          id: "preview",
+                          name: "preview",
+                          children: ["preview"],
+                          guides: [],
+                          constraints: {
+                            children: "single",
+                          },
                         },
                       },
                     },
