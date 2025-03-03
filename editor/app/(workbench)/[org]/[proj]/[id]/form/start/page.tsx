@@ -154,7 +154,7 @@ function SetupStartPage() {
                 ALPHA
               </Badge>
               <span className="text-xs text-muted-foreground">
-                Technical preview
+                UNSTABLE Technical preview
               </span>
             </div>
             <CardTitle>Add a cover page for your campaign</CardTitle>

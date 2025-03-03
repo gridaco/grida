@@ -37,7 +37,7 @@ import {
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React, { useMemo } from "react";
-import { useNodeAction } from "@/grida-react-canvas/provider";
+import { useNodeAction, useTransform } from "@/grida-react-canvas/provider";
 import { document as dq } from "@/grida-react-canvas/document-query";
 
 function NodeHierarchyItemContextMenuWrapper({
@@ -47,6 +47,7 @@ function NodeHierarchyItemContextMenuWrapper({
   node_id: string;
 }>) {
   const { copy, deleteNode } = useDocument();
+  const { fit } = useTransform();
   const change = useNodeAction(node_id)!;
 
   return (
@@ -93,6 +94,15 @@ function NodeHierarchyItemContextMenuWrapper({
           Set Active/Inactive
           <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
         </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            fit([node_id]);
+          }}
+          className="text-xs"
+        >
+          Zoom to fit
+          <ContextMenuShortcut>{"⇧1"}</ContextMenuShortcut>
+        </ContextMenuItem>
         <ContextMenuItem onSelect={change.toggleLocked} className="text-xs">
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
@@ -135,6 +145,7 @@ export function NodeHierarchyList() {
     <>
       {list.map(({ id, depth }) => {
         const n = document.nodes[id];
+        if (!n) return null;
         const selected = selection.includes(id);
         const hovered = hovered_node_id === id;
         return (

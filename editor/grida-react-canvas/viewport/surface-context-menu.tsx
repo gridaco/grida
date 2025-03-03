@@ -12,10 +12,12 @@ import {
   useSelection,
 } from "../provider";
 import toast from "react-hot-toast";
+import { cn } from "@/utils";
 
 export function EditorSurfaceContextMenu({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
   const { selection, state, paste, order, autoLayout, contain, deleteNode } =
     useDocument();
   const { insertText } = useDataTransferEventTarget();
@@ -54,7 +56,9 @@ export function EditorSurfaceContextMenu({
   //
   return (
     <ContextMenu>
-      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger className={cn("w-full h-full", className)}>
+        {children}
+      </ContextMenuTrigger>
       {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
       <ContextMenuContent className="min-w-52">
         <ContextMenuItem
