@@ -27,6 +27,7 @@ export default function FormCollectionPage() {
     state: { document, templates },
   } = useDocument();
 
+  // FIXME: 250303 UNKNOWN
   const root = document.nodes["root"];
   assert(root.type === "template_instance");
   const { props: props } = root;

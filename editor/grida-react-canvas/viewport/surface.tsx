@@ -30,7 +30,7 @@ import {
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
-import { ColumnsIcon, PlayIcon, RowsIcon } from "@radix-ui/react-icons";
+import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { cmath } from "@grida/cmath";
 import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";

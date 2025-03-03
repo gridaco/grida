@@ -157,6 +157,7 @@ export function SideControlGlobal() {
 function FormStartPageControl() {
   const { changeNodeProps } = useDocument();
 
+  // FIXME: 250303 UNKNOWN
   const { props, template_id, properties } = useNode("root");
   const { default: defaultProps } = useTemplateDefinition(template_id!);
 
@@ -184,6 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
+              // FIXME: 250303 UNKNOWN
               changeNodeProps("root", k, v);
             }}
           />
