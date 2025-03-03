@@ -289,131 +289,129 @@ export default function CanvasPlayground({
                     <>
                       <SidebarRoot className="hidden sm:block">
                         <DarwinSidebarHeaderDragArea />
-                        <SidebarSection className="my-4">
-                          <span className="px-2">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="me-2">
-                                <GridaLogo className="inline-block w-4 h-4" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="start"
-                                className="min-w-52"
+                        <header className="h-11 flex items-center px-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="me-2">
+                              <GridaLogo className="inline-block w-4 h-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="start"
+                              className="min-w-52"
+                            >
+                              <DropdownMenuItem
+                                onClick={importFromJson.openDialog}
+                                className="text-xs"
                               >
-                                <DropdownMenuItem
-                                  onClick={importFromJson.openDialog}
-                                  className="text-xs"
-                                >
-                                  <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Open .grida
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={onExport}
-                                  className="text-xs"
-                                >
-                                  <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Save as .grida
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={importFromFigmaDialog.openDialog}
-                                  className="text-xs"
-                                >
-                                  <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                                  Import Figma
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={settingsDialog.openDialog}
-                                  className="text-xs"
-                                >
-                                  <GearIcon className="me-2" />
-                                  Settings
-                                </DropdownMenuItem>
+                                <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                Open .grida
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={onExport}
+                                className="text-xs"
+                              >
+                                <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                Save as .grida
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={importFromFigmaDialog.openDialog}
+                                className="text-xs"
+                              >
+                                <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                Import Figma
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={settingsDialog.openDialog}
+                                className="text-xs"
+                              >
+                                <GearIcon className="me-2" />
+                                Settings
+                              </DropdownMenuItem>
 
-                                <DropdownMenuSeparator />
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger className="text-xs">
-                                    <OpenInNewWindowIcon className="me-2" />
-                                    Tools
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="text-xs">
+                                  <OpenInNewWindowIcon className="me-2" />
+                                  Tools
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  <Link
+                                    href="/canvas/tools/io-figma"
+                                    target="_blank"
+                                  >
+                                    <DropdownMenuItem className="text-xs">
+                                      <OpenInNewWindowIcon className="me-2" />
+                                      IO Figma
+                                    </DropdownMenuItem>
+                                  </Link>
+                                  <Link
+                                    href="/canvas/tools/io-svg"
+                                    target="_blank"
+                                  >
+                                    <DropdownMenuItem className="text-xs">
+                                      <OpenInNewWindowIcon className="me-2" />
+                                      IO SVG
+                                    </DropdownMenuItem>
+                                  </Link>
+                                  <Link
+                                    href="https://github.com/gridaco/p666"
+                                    target="_blank"
+                                  >
+                                    <DropdownMenuItem className="text-xs">
+                                      <OpenInNewWindowIcon className="me-2" />
+                                      P666 Daemon
+                                    </DropdownMenuItem>
+                                  </Link>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="text-xs">
+                                  <MixIcon className="me-2" />
+                                  Examples
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  {canvas_examples.map((example) => (
                                     <Link
-                                      href="/canvas/tools/io-figma"
+                                      key={example.id}
+                                      href={"/canvas/examples/" + example.id}
                                       target="_blank"
                                     >
                                       <DropdownMenuItem className="text-xs">
                                         <OpenInNewWindowIcon className="me-2" />
-                                        IO Figma
+                                        {example.name}
                                       </DropdownMenuItem>
                                     </Link>
-                                    <Link
-                                      href="/canvas/tools/io-svg"
-                                      target="_blank"
-                                    >
-                                      <DropdownMenuItem className="text-xs">
-                                        <OpenInNewWindowIcon className="me-2" />
-                                        IO SVG
-                                      </DropdownMenuItem>
-                                    </Link>
-                                    <Link
-                                      href="https://github.com/gridaco/p666"
-                                      target="_blank"
-                                    >
-                                      <DropdownMenuItem className="text-xs">
-                                        <OpenInNewWindowIcon className="me-2" />
-                                        P666 Daemon
-                                      </DropdownMenuItem>
-                                    </Link>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger className="text-xs">
-                                    <MixIcon className="me-2" />
-                                    Examples
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent>
-                                    {canvas_examples.map((example) => (
-                                      <Link
-                                        key={example.id}
-                                        href={"/canvas/examples/" + example.id}
-                                        target="_blank"
-                                      >
-                                        <DropdownMenuItem className="text-xs">
-                                          <OpenInNewWindowIcon className="me-2" />
-                                          {example.name}
-                                        </DropdownMenuItem>
-                                      </Link>
-                                    ))}
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                                <DropdownMenuSeparator />
-                                <Link
-                                  href="https://github.com/gridaco/grida"
-                                  target="_blank"
-                                >
-                                  <DropdownMenuItem className="text-xs">
-                                    <GitHubLogoIcon className="me-2" />
-                                    GitHub
-                                  </DropdownMenuItem>
-                                </Link>
-                                <Link
-                                  href="https://grida.co/join-slack"
-                                  target="_blank"
-                                >
-                                  <DropdownMenuItem className="text-xs">
-                                    <SlackIcon className="me-2 w-4 h-4" />
-                                    Slack Community
-                                  </DropdownMenuItem>
-                                </Link>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <span className="font-bold text-xs">
-                              Canvas
-                              <Badge variant="outline" className="ms-2 text-xs">
-                                BETA
-                              </Badge>
-                            </span>
+                                  ))}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuSeparator />
+                              <Link
+                                href="https://github.com/gridaco/grida"
+                                target="_blank"
+                              >
+                                <DropdownMenuItem className="text-xs">
+                                  <GitHubLogoIcon className="me-2" />
+                                  GitHub
+                                </DropdownMenuItem>
+                              </Link>
+                              <Link
+                                href="https://grida.co/join-slack"
+                                target="_blank"
+                              >
+                                <DropdownMenuItem className="text-xs">
+                                  <SlackIcon className="me-2 w-4 h-4" />
+                                  Slack Community
+                                </DropdownMenuItem>
+                              </Link>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <span className="font-bold text-xs">
+                            Canvas
+                            <Badge variant="outline" className="ms-2 text-xs">
+                              BETA
+                            </Badge>
                           </span>
-                        </SidebarSection>
+                        </header>
                         <hr />
                         <SidebarSection>
                           <SidebarSectionHeaderItem>
@@ -476,26 +474,24 @@ export default function CanvasPlayground({
               {ui.sidebar === "visible" && (
                 <aside className="h-full">
                   <SidebarRoot side="right" className="hidden sm:block">
-                    <div className="p-2">
-                      <div className="flex items-center justify-end gap-2">
-                        <Zoom
-                          className={cn(
-                            WorkbenchUI.inputVariants({
-                              variant: "input",
-                              size: "xs",
-                            }),
-                            "w-auto"
-                          )}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={playDialog.openDialog}
-                        >
-                          <PlayIcon />
-                        </Button>
-                      </div>
-                    </div>
+                    <header className="h-11 flex items-center px-2 justify-end gap-2">
+                      <Zoom
+                        className={cn(
+                          WorkbenchUI.inputVariants({
+                            variant: "input",
+                            size: "xs",
+                          }),
+                          "w-auto"
+                        )}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={playDialog.openDialog}
+                      >
+                        <PlayIcon />
+                      </Button>
+                    </header>
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
                       {state.tool.type === "insert" &&

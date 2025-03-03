@@ -489,7 +489,11 @@ function NodeTitleBar({
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
-        select([node.id]);
+        if (event.shiftKey) {
+          select("selection", [node.id]);
+        } else {
+          select([node.id]);
+        }
       },
     },
     {
