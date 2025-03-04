@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import { AgentThemeProvider } from "@/scaffolds/agent/theme";
-import { useEditorState } from "@/scaffolds/editor";
 import {
   ViewportRoot,
   EditorSurface,
@@ -22,6 +20,8 @@ import _002 from "@/theme/templates/formstart/002/page";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import Home from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/page";
+import PolestarPromo from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/page";
 
 export default function SiteDeisngPage() {
   return (
@@ -45,9 +45,9 @@ function CurrentPageCanvas() {
                 <AutoInitialFitTransformer>
                   <StandaloneDocumentContent
                     templates={{
-                      "tmp-2503-invite": CustomComponent,
-                      "tmp-2503-join": CustomComponent,
-                      "tmp-2503-portal": CustomComponent,
+                      "tmp-2503-invite": CustomComponent__Invite,
+                      "tmp-2503-join": CustomComponent__Join,
+                      "tmp-2503-portal": CustomComponent__Portal,
                     }}
                   />
                 </AutoInitialFitTransformer>
@@ -67,7 +67,22 @@ function CurrentPageCanvas() {
   );
 }
 
-function CustomComponent(props: any) {
+function CustomComponent__Invite(props: any) {
+  return (
+    <div
+      className="rounded shadow border"
+      style={{
+        width: 375,
+        height: 812,
+      }}
+      {...queryattributes(props)}
+    >
+      <PolestarPromo params={{ cid: "00000000" }} />
+    </div>
+  );
+}
+
+function CustomComponent__Join(props: any) {
   return (
     <div
       className="rounded shadow border"
@@ -78,6 +93,21 @@ function CustomComponent(props: any) {
       {...queryattributes(props)}
     >
       <_002 />
+    </div>
+  );
+}
+
+function CustomComponent__Portal(props: any) {
+  return (
+    <div
+      className="rounded shadow border"
+      style={{
+        width: 375,
+        height: 812,
+      }}
+      {...queryattributes(props)}
+    >
+      <Home />
     </div>
   );
 }
