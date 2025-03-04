@@ -68,6 +68,6 @@ To see snapping in action as you center an element, follow the steps below
 
 This below gif shows the indicating lines appearing when the square's center is aligned with top rectangle center and the left rectangle center
 
-![central snap 3](./images/central-snap-3%20.gif)
+![central snap 3](./images/central-snap-3.gif)
 
 The same threshold logic applies described above, say the left rectangle center is positioned at (20,100). This is a 2D position - (x,y) on the canvas. Now let's assume your square is positioned at (100, 75). To make the centers aligned, you would move the square along the y-axis. Say, you are at (100, 96), at this point, the square snaps to (100, 100). This is because internally we have threshold of 4 units.
