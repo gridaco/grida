@@ -35,8 +35,7 @@ export type EditorAction =
 
 export type DocumentAction =
   | LoadSceneAction
-  | NewSceneAction
-  | SceneBackgroundAction
+  | SceneAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -123,13 +122,35 @@ export interface LoadSceneAction {
   scene: string;
 }
 
-export interface NewSceneAction {
-  type: "new";
+export type SceneAction =
+  | CreateNewSceneAction
+  | DeleteSceneAction
+  | DuplicateSceneAction
+  | ChangeSceneNameAction
+  | ChangeSceneBackgroundAction;
+
+export interface CreateNewSceneAction {
+  type: "scenes/new";
   scene?: grida.program.document.SceneInit;
 }
 
-export interface SceneBackgroundAction {
-  type: "background-color";
+export interface DeleteSceneAction {
+  type: "scenes/delete";
+  scene: string;
+}
+
+export interface DuplicateSceneAction {
+  type: "scenes/duplicate";
+  scene: string;
+}
+
+export interface ChangeSceneNameAction {
+  type: "scenes/change/name";
+  scene: string;
+  name: string;
+}
+export interface ChangeSceneBackgroundAction {
+  type: "scenes/change/background-color";
   scene: string;
   backgroundColor: grida.program.document.ISceneBackground["backgroundColor"];
 }

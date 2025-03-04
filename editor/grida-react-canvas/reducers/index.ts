@@ -68,7 +68,7 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.surface_raycast_detected_node_ids = [];
       });
     }
-    case "new": {
+    case "scenes/new": {
       const { scene } = action;
       const new_scene = grida.program.document.init_scene(
         scene ?? {
@@ -106,7 +106,53 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.surface_raycast_detected_node_ids = [];
       });
     }
-    case "background-color": {
+    case "scenes/delete": {
+      const { scene } = action;
+      return produce(state, (draft: Draft<S>) => {
+        // 0. remove the scene
+        delete draft.document.scenes[scene];
+        // 1. change the scene_id
+        if (draft.scene_id === scene) {
+          draft.scene_id = Object.keys(draft.document.scenes)[0];
+        }
+        if (draft.document.entry_scene_id === scene) {
+          draft.document.entry_scene_id = draft.scene_id;
+        }
+        // 2. clear scene-specific state
+        // TODO:
+      });
+    }
+    case "scenes/duplicate": {
+      const { scene: scene_id } = action;
+
+      // check if the scene exists
+      const origin = state.document.scenes[scene_id];
+      if (!origin) return state;
+
+      const next = grida.program.document.init_scene({
+        ...origin,
+        id: nid(),
+        name: origin.name + " copy",
+        order: origin.order ? origin.order + 1 : undefined,
+      });
+
+      return produce(state, (draft: Draft<S>) => {
+        // 0. add the new scene
+        draft.document.scenes[next.id] = next;
+        // 1. change the scene_id
+        draft.scene_id = next.id;
+
+        // 2. clear scene-specific state
+        // TODO:
+      });
+    }
+    case "scenes/change/name": {
+      const { scene, name } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.scenes[scene].name = name;
+      });
+    }
+    case "scenes/change/background-color": {
       const { scene } = action;
       return produce(state, (draft: Draft<S>) => {
         draft.document.scenes[scene].backgroundColor = action.backgroundColor;

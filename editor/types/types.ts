@@ -415,7 +415,7 @@ interface FormPageThemeEmbeddedBackgroundData {
   /**
    * allowed for all
    */
-  "background-color"?: string;
+  "scenes/change/background-color"?: string;
 }
 
 export type FormStartPageSchema = grida.program.document.Document & {

@@ -1440,8 +1440,39 @@ export function useDocument() {
   const createScene = useCallback(
     (scene?: grida.program.document.SceneInit) => {
       dispatch({
-        type: "new",
+        type: "scenes/new",
         scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteScene = useCallback(
+    (scene: string) => {
+      dispatch({
+        type: "scenes/delete",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const duplicateScene = useCallback(
+    (scene: string) => {
+      dispatch({
+        type: "scenes/duplicate",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const renameScene = useCallback(
+    (scene: string, name: string) => {
+      dispatch({
+        type: "scenes/change/name",
+        scene,
+        name,
       });
     },
     [dispatch]
@@ -1917,6 +1948,10 @@ export function useDocument() {
       scene_id,
       loadScene,
       createScene,
+      deleteScene,
+      duplicateScene,
+      renameScene,
+
       //
       select,
       blur,
@@ -1969,6 +2004,9 @@ export function useDocument() {
     scene_id,
     loadScene,
     createScene,
+    deleteScene,
+    duplicateScene,
+    renameScene,
     //
     select,
     blur,
@@ -2042,7 +2080,7 @@ export function useScene(scene_id: string): UseScene {
     ) => {
       if (!scene_id) return;
       dispatch({
-        type: "background-color",
+        type: "scenes/change/background-color",
         scene: scene_id,
         backgroundColor,
       });
