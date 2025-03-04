@@ -96,7 +96,7 @@ function BigImageContainer({
       animate={{ opacity: 1 }}
       transition={{ duration: 1 }}
     >
-      <Image {...props} width={width} height={height} />
+      <Image {...props} width={width} height={height} alt="demo" />
     </motion.div>
   );
 }
