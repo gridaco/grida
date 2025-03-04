@@ -3,11 +3,13 @@ import React, { useState, useRef, useEffect } from "react";
 import HTMLFlipBook from "react-pageflip";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Document, Page } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import { pdfjs } from "react-pdf";
 import { useMeasure, useMediaQuery } from "@uidotdev/usehooks";
 import { PDFDocumentProxy } from "pdfjs-dist";
+// import { PDFLinkService } from "pdfjs-dist/web/pdf_viewer";
+
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 type OnDocumentLoadSuccess = (document: PDFDocumentProxy) => void;
 
@@ -35,26 +37,81 @@ interface FlipPageProps {
   width: number;
   height: number;
   pageNumber: number;
+  onLinkClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-const FlipPage: React.FC<FlipPageProps> = React.forwardRef((props, ref) => {
-  return (
-    <div
-      className="shadow-lg rounded overflow-hidden"
-      ref={ref as React.RefObject<HTMLDivElement>}
-    >
-      <Page
-        pageNumber={props.pageNumber}
-        width={props.width}
-        height={props.height}
-        renderAnnotationLayer={false}
-        renderTextLayer={false}
-      />
-    </div>
-  );
-});
+const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
+  ({ onLinkClick, pageNumber, width, height, ...props }, ref) => {
+    return (
+      <div
+        className="shadow-lg rounded overflow-hidden"
+        ref={ref as React.RefObject<HTMLDivElement>}
+      >
+        <Page
+          pageNumber={pageNumber}
+          width={width}
+          height={height}
+          renderAnnotationLayer={true}
+          renderTextLayer={true}
+          onClick={(e) => {
+            const anchor = (e.target as HTMLElement).closest("a");
+            if (anchor) {
+              onLinkClick?.(e);
+            }
+            //
+          }}
+        />
+      </div>
+    );
+  }
+);
 
 FlipPage.displayName = "FlipPage";
+
+/**
+ * Finds the page number targeted by a link annotation based on its annotation ID.
+ *
+ * @param pdfDoc - The PDF document proxy object from PDF.js.
+ * @param annotationId - The unique identifier of the annotation to locate.
+ * @returns The 1-based page number the annotation links to, or `null` if not found.
+ */
+async function findPageNumberByAnnotationId(
+  pdfDoc: PDFDocumentProxy,
+  annotationId: string
+): Promise<number | null> {
+  const numPages = pdfDoc.numPages;
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdfDoc.getPage(pageNum);
+    const annotations = await page.getAnnotations();
+
+    for (const annotation of annotations) {
+      // Match the annotation ID (usually stored in annotation.id or annotation.ref)
+      if (
+        annotation.id === annotationId ||
+        (annotation.ref && annotation.ref.toString() === annotationId)
+      ) {
+        // For link annotations, destination contains the target page information
+        if (annotation.dest) {
+          const dest = annotation.dest;
+          const targetPageIndex = await pdfDoc.getPageIndex(dest[0]);
+          return targetPageIndex + 1; // pageIndex is 0-based, add 1 for the correct page number
+        } else if (
+          annotation.action === "GoTo" &&
+          annotation.unsafeUrl === undefined
+        ) {
+          const dest = annotation.dest || annotation.newWindow;
+          if (dest) {
+            const targetPageIndex = await pdfDoc.getPageIndex(dest[0]);
+            return targetPageIndex + 1;
+          }
+        }
+      }
+    }
+  }
+
+  return null; // Annotation not found
+}
 
 const PDFViewer = ({
   file,
@@ -76,13 +133,15 @@ const PDFViewer = ({
     height: number;
   } | null>(null);
   const book = useRef(null);
-
+  const doc = useRef<PDFDocumentProxy | null>(null);
   const isPortrait = useMediaQuery("only screen and (max-width : 768px)");
   const [ref, { width: _width, height: _height }] = useMeasure();
 
-  const onDocumentLoadSuccess: OnDocumentLoadSuccess = (
+  const onDocumentLoadSuccess: OnDocumentLoadSuccess = async (
     document: PDFDocumentProxy
   ) => {
+    doc.current = document;
+
     if (!title) {
       document.getMetadata().then(({ info }) => {
         try {
@@ -179,6 +238,23 @@ const PDFViewer = ({
                     height={cachedDimensions.height}
                     number={index + 1}
                     pageNumber={index + 1}
+                    onLinkClick={(e) => {
+                      const anchor = (e.target as HTMLElement).closest("a")!;
+                      const href = anchor.getAttribute("href");
+                      if (!href || href === "#") {
+                        const id = anchor.dataset.elementId;
+                        if (id) {
+                          e.preventDefault();
+                          findPageNumberByAnnotationId(doc.current!, id).then(
+                            (pagenum) => {
+                              if (pagenum) {
+                                setPage(pagenum);
+                              }
+                            }
+                          );
+                        }
+                      }
+                    }}
                   />
                 ))}
               </HTMLFlipBook>

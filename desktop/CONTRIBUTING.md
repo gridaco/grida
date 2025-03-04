@@ -3,6 +3,7 @@
 Thank you for your interest in contributing to Grida Desktop! We appreciate your contributions and welcome improvements, bug fixes, and new ideas. This guide is tailored specifically for macOS users.
 
 ## Table of Contents
+
 - [Prerequisites](#prerequisites)
 - [Setting Up Your Environment](#setting-up-your-environment)
 - [Development Workflow](#development-workflow)
@@ -26,28 +27,26 @@ Before you start, ensure you have the following installed on your Mac:
   ```sh
   brew install mono
   brew install --cask wine-stable
-
+  ```
 
 ## Setting Up Your Environment
 
-
-1.	Clone the Repository
+1. Clone the Repository
 
 ```bash
 git clone https://github.com/gridaco/grida.git
 cd grida/desktop
 ```
 
-2.	Install Dependencies
+2. Install Dependencies
 
 ```bash
 pnpm install
 ```
 
-3.	Configure Environment Variables
+3. Configure Environment Variables
 
 Create a .env file in the project root (if required) using the provided .env.example as a guide.
-
 
 ## Development Workflow
 
@@ -55,10 +54,10 @@ Create a .env file in the project root (if required) using the provided .env.exa
 pnpm run dev
 ```
 
-
 ## Troubleshooting Mono and Wine Installation
 
 If you still see:
+
 ```
 Error: You must install both Mono and Wine on non-Windows
 ```
@@ -74,10 +73,18 @@ after installing both, try the following steps:
 You might see `“Wine Stable.app” Not Opened`. Go to System Preferences > Security & Privacy and allow the app to open.
 
 Check if you have Rosetta installed. If not, you can install it by running:
+
 ```sh
 softwareupdate --install-rosetta
 ```
 
+## Linux Build on macOS
+
+```bash
+brew install rpm
+brew install fakeroot
+brew install dpkg
+```
 
 ## Linux Build on macOS using Docker
 
@@ -97,12 +104,9 @@ If you're on macOS and want to build Linux packages for Grida Desktop, you can u
    Use an image that matches your build environment, for example, Node 18 on Debian Bullseye.
    ```sh
    docker pull node:22-bullseye
-
-
-
+   ```
 
 ## Misc: Making Icons
-
 
 ### macOS Icon (.icns)
 
@@ -130,4 +134,30 @@ rm -r icon.iconset
 
 ```bash
 convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+```
+
+## Building for each platform
+
+**Mac** (runs only on mac device)
+
+```bash
+pnpm make --arch="x64,arm64,universal"
+# or (for publishing)
+pnpm forge:publish --arch="x64,arm64,universal"
+```
+
+**Windows** (recommeded to run windows device)
+
+```bash
+pnpm make --arch="x64,arm64"
+# or (for publishing)
+pnpm forge:publish --platform=win32 --arch="x64,arm64"
+```
+
+**Linux**
+
+```bash
+pnpm make --platform=linux --arch="x64,arm64"
+# or (for publishing)
+pnpm forge:publish --platform=linux --arch="x64,arm64"
 ```

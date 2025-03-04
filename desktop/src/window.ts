@@ -5,19 +5,74 @@ import {
 } from "electron";
 import path from "node:path";
 
+const TITLE_BAR_HEIGHT = 44;
+
 const trafficLightPosition = {
   x: 14,
   y: 14,
 } as const;
 
-const DEFAILT_WINDOW_CONFIG: BaseWindowConstructorOptions = {
-  titleBarStyle: "hidden",
-  trafficLightPosition,
-  width: 1440,
-  height: 960,
-  minWidth: 384,
-  minHeight: 384,
+const WINDOW_ICON: { [key: string]: string | null } = {
+  aix: null,
+  android: null,
+  darwin: null,
+  freebsd: null,
+  haiku: null,
+  linux: path.join(__dirname, "../images/icon.png"),
+  openbsd: null,
+  win32: path.join(__dirname, "../images/icon.ico"),
+  cygwin: null,
+  netbsd: null,
 };
+
+function get_window_constructor_options(): BaseWindowConstructorOptions {
+  const icon = WINDOW_ICON[process.platform];
+  const size = {
+    width: 1440,
+    height: 960,
+    minWidth: 384,
+    minHeight: 384,
+  };
+  switch (process.platform) {
+    case "darwin": {
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        trafficLightPosition,
+        ...size,
+      };
+    }
+    case "linux":
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: TITLE_BAR_HEIGHT - 1,
+          // linux does not support transparent title bars
+          color: "#ffff",
+        },
+        ...size,
+      };
+    case "win32": {
+      return {
+        icon,
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+          height: TITLE_BAR_HEIGHT,
+          color: "#00000000",
+        },
+        ...size,
+      };
+    }
+    default: {
+      return {
+        icon,
+        titleBarStyle: "default",
+        ...size,
+      };
+    }
+  }
+}
 
 function register_window_hooks(
   window: BrowserWindow,
@@ -45,7 +100,7 @@ function register_window_hooks(
 
 export default function create_main_window({ baseUrl }: { baseUrl: string }) {
   const window = new BrowserWindow({
-    ...DEFAILT_WINDOW_CONFIG,
+    ...get_window_constructor_options(),
     title: "Grida",
     webPreferences: {
       nodeIntegration: false,
@@ -66,8 +121,8 @@ export function create_canvas_playground_window({
   baseUrl: string;
 }) {
   const window = new BrowserWindow({
+    ...get_window_constructor_options(),
     title: "Playground",
-    ...DEFAILT_WINDOW_CONFIG,
     webPreferences: {
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
@@ -111,6 +166,8 @@ function shouldOpenExternally(baseUrl: string, origin: string, target: string) {
   // if the redirect is triggered by the sign-in page, allow it
   if (origin.includes("/sign-in")) return false;
   if (origin.includes("/insiders/auth")) return false;
+  // remove me when auth deeplinking is implemented
+  if (target.includes("accounts.google.com")) return false;
 
   // need some more handling
   if (target.startsWith(baseUrl)) {

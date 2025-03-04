@@ -7,9 +7,10 @@
 <div align="center">
   <h1>Grida</h1>
   <p>
-    <strong>Grida is a open source platform where you can manage your database, design websites, and create forms in one place. <u>Designed for Supabase</u>.</strong>
+    <strong>Grida is a open source Canvas platform where you can manage your database, design websites, and create forms in one place. <u>Designed for Supabase</u>.</strong>
   </p>
   <p>
+    <a href="https://app.grida.co/downloads">Downloads</a> •
     <a href="./CONTRIBUTING.md">Contributing</a> •
     <a href="https://app.grida.co">Website</a> •
     <a href="https://grida.co/join-slack">Slack Community</a>
@@ -85,21 +86,34 @@
 
 ![Grida Database Editor](./.readme/cover-grida-canvas.png)
 
-# Canvas (Canary)
+# Canvas (Technical Preview)
 
-[Technical Demo](https://canary.grida.co/canvas)
+[Technical Demo](https://app.grida.co/canvas) • [Canary](https://canary.grida.co/canvas)
 
+- [x] Infinite Canvas
+- [x] Standard Library
+- [x] Drag & Drop
+- [x] Document Model
+- [x] Import from Figma
+- [x] Bitmap Editor (TP)
+- [x] SVG Editor (TP)
+- [x] HTML Backend
+- [x] HTML Layout Backend
+- [ ] WebGL Backend
+- [ ] WebGPU Backend
+- [ ] Connector Nodes
+- [ ] Design Components
+- [ ] Design Presentations
 - [ ] Design Websites
-- [ ] Design Instagram posts
-- [ ] Design with AI
-- [ ] Drag & Drop
-- [ ] DOM rendering
-- [ ] GL rendering
 - [ ] Theming
 - [ ] Components / Templates
-- [ ] Import from Figma
 - [ ] Data Interface
 - [ ] SDK
+- [ ] AI Agent
+
+> The canvas project is not documented yet. Any questions or interest, please reach out to me on [Slack](https://grida.co/join-slack). or [Open an issue](https://github.com/gridaco/grida/issues/new).
+
+Learn more about our [roadmap](https://github.com/gridaco/grida/issues/231)
 
 <br/>
 <br/>
