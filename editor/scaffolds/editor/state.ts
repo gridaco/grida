@@ -386,11 +386,7 @@ export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
 interface IEditorPagesState {
   pages: MenuGroup<{ id: string }>[];
-  selected_page_id?:
-    | "form"
-    | "form/startpage"
-    | "site/dev-collection"
-    | (string & {});
+  selected_page_id?: "form" | "form/startpage" | "site" | (string & {});
 }
 
 export interface BaseDocumentEditorState
@@ -417,8 +413,8 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   documents: {
-    ["site/dev-collection"]?: IDocumentEditorState;
-    ["canvas/one"]?: IDocumentEditorState;
+    ["site"]?: IDocumentEditorState;
+    ["canvas"]?: IDocumentEditorState;
     ["form/startpage"]?: IDocumentEditorState & { template_id: string };
     // [key: string]: ITemplateEditorState;
   };

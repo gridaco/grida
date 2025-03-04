@@ -5,9 +5,6 @@ import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
   SidebarRoot,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
   SidebarVirtualizedMenuGrid,
 } from "@/components/sidebar";
 import {
@@ -16,11 +13,10 @@ import {
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
-import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
+  NodeHierarchyGroup,
   ScenesGroup,
-  ScenesList,
-} from "@/scaffolds/sidebar/sidebar-scenes-list";
+} from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
   StandaloneDocumentContent,
@@ -56,6 +52,19 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportFromFigmaDialog } from "@/scaffolds/playground-canvas/modals/import-from-figma";
@@ -67,13 +76,6 @@ import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { HoverCard, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -112,16 +114,7 @@ import { io } from "@/grida-io-model";
 import { canvas_examples } from "../playground/k";
 import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -441,12 +434,7 @@ export default function CanvasPlayground({
                           <SidebarContent>
                             <ScenesGroup />
                             <hr />
-                            <SidebarGroup>
-                              <SidebarGroupLabel>Layers</SidebarGroupLabel>
-                              <SidebarGroupContent>
-                                <NodeHierarchyList />
-                              </SidebarGroupContent>
-                            </SidebarGroup>
+                            <NodeHierarchyGroup />
                           </SidebarContent>
                         </Sidebar>
                       </>
@@ -485,11 +473,11 @@ export default function CanvasPlayground({
                                   <BrushToolbar />
                                 </div>
                               </div>
-                              <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                              <ToolbarPosition>
                                 <PlaygroundToolbar
                                   onAddButtonClick={libraryDialog.openDialog}
                                 />
-                              </div>
+                              </ToolbarPosition>
                             </>
                           )}
                         </ViewportRoot>

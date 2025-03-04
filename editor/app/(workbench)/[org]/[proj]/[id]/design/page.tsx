@@ -1,23 +1,27 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { useEditorState } from "@/scaffolds/editor";
-import { SideControl } from "@/scaffolds/sidecontrol";
-import FormCollectionPage from "@/theme/templates/formcollection/page";
-import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 import {
-  StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
   StandaloneDocumentContent,
 } from "@/grida-react-canvas";
-import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { CanvasAction } from "@/grida-react-canvas";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+import {
+  AutoInitialFitTransformer,
+  StandaloneSceneBackground,
+} from "@/grida-react-canvas/renderer";
+import { SideControl } from "@/scaffolds/sidecontrol";
+import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import _002 from "@/theme/templates/formstart/002/page";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+import Toolbar, {
+  ToolbarPosition,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 export default function SiteDeisngPage() {
   return (
@@ -28,59 +32,39 @@ export default function SiteDeisngPage() {
 }
 
 function CurrentPageCanvas() {
-  const [state, dispatch] = useEditorState();
+  useEditorHotKeys();
 
-  const {
-    theme: { lang },
-    selected_page_id,
-    documents,
-  } = state;
-
-  // @ts-ignore
-  const document = documents[selected_page_id!];
-
-  const documentDispatch = useCallback(
-    (action: CanvasAction) => {
-      dispatch(
-        composeEditorDocumentAction(
-          // @ts-ignore
-          selected_page_id!,
-          action
-        )
-      );
-    },
-    [selected_page_id, dispatch]
-  );
-
-  switch (selected_page_id) {
-    case "site/dev-collection":
-      return (
-        <StandaloneDocumentEditor
-          editable
-          initial={document}
-          dispatch={documentDispatch}
-        >
-          {/*  */}
-          <div className="flex w-full h-full">
-            <EditorSurfaceContextMenu>
-              <ViewportRoot className="relative w-full h-full overflow-hidden">
+  return (
+    <div className="flex w-full h-full">
+      <EditorSurfaceClipboardSyncProvider>
+        <EditorSurfaceDropzone>
+          <EditorSurfaceContextMenu>
+            <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+              <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                 <EditorSurface />
                 <AutoInitialFitTransformer>
                   <StandaloneDocumentContent
                     templates={{
-                      "002": CustomComponent,
+                      "tmp-2503-invite": CustomComponent,
+                      "tmp-2503-join": CustomComponent,
+                      "tmp-2503-portal": CustomComponent,
                     }}
                   />
                 </AutoInitialFitTransformer>
+                <ToolbarPosition>
+                  <Toolbar />
+                </ToolbarPosition>
               </ViewportRoot>
-            </EditorSurfaceContextMenu>
-          </div>
-        </StandaloneDocumentEditor>
-      );
+            </StandaloneSceneBackground>
+          </EditorSurfaceContextMenu>
+        </EditorSurfaceDropzone>
+      </EditorSurfaceClipboardSyncProvider>
 
-    default:
-      return <>UNKNOWN PAGE {selected_page_id}</>;
-  }
+      <aside className="hidden lg:flex h-full">
+        <SideControl />
+      </aside>
+    </div>
+  );
 }
 
 function CustomComponent(props: any) {

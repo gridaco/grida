@@ -31,6 +31,8 @@ import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";
 import { FormAgentThemeSyncProvider } from "./sync";
+import { CanvasAction, StandaloneDocumentEditor } from "@/grida-react-canvas";
+import { composeEditorDocumentAction } from "./action";
 
 export function EditorProvider({
   initial,
@@ -71,28 +73,6 @@ export function EditorProvider({
     default:
       throw new Error("unsupported doctype");
   }
-}
-
-function CanvasDocumentEditorProvider({
-  initial,
-  children,
-}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
-  const [state, dispatch] = React.useReducer(
-    reducer,
-    initialEditorState(initial)
-  );
-  return (
-    <StateProvider state={state} dispatch={dispatch}>
-      <Multiplayer>
-        <TooltipProvider>
-          <MediaViewerProvider>
-            {/*  */}
-            {children}
-          </MediaViewerProvider>
-        </TooltipProvider>
-      </Multiplayer>
-    </StateProvider>
-  );
 }
 
 function DatabaseDocumentEditorProvider({
@@ -140,6 +120,30 @@ function BucketDocumentEditorProvider({
   );
 }
 
+function CanvasDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <MediaViewerProvider>
+            <CanvasProvider>
+              {/*  */}
+              {children}
+            </CanvasProvider>
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
+}
+
 function SiteDocumentEditorProvider({
   initial,
   children,
@@ -154,12 +158,46 @@ function SiteDocumentEditorProvider({
         <TooltipProvider>
           <AssetsBackgroundsResolver />
           <MediaViewerProvider>
-            {/*  */}
-            {children}
+            <CanvasProvider>
+              {/*  */}
+              {children}
+            </CanvasProvider>
           </MediaViewerProvider>
         </TooltipProvider>
       </Multiplayer>
     </StateProvider>
+  );
+}
+
+function CanvasProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const { selected_page_id, documents } = state;
+
+  // @ts-ignore
+  const document = documents[selected_page_id!];
+
+  const documentDispatch = useCallback(
+    (action: CanvasAction) => {
+      dispatch(
+        composeEditorDocumentAction(
+          // @ts-ignore
+          selected_page_id!,
+          action
+        )
+      );
+    },
+    [selected_page_id, dispatch]
+  );
+
+  return (
+    <StandaloneDocumentEditor
+      editable
+      initial={document}
+      dispatch={documentDispatch}
+    >
+      {children}
+    </StandaloneDocumentEditor>
   );
 }
 

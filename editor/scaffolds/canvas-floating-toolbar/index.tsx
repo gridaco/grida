@@ -37,7 +37,7 @@ export function SamplesSelect() {
 
     dispatch({
       type: "editor/document",
-      key: "site/dev-collection",
+      key: "site",
       action: {
         type: "document/template/set/props",
         data: data,

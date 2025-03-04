@@ -2,17 +2,14 @@
 
 import React, { useReducer } from "react";
 import {
-  SidebarRoot,
-  SidebarSection,
-  SidebarSectionHeaderItem,
-  SidebarSectionHeaderLabel,
-} from "@/components/sidebar";
-import {
   Align,
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
+import {
+  NodeHierarchyGroup,
+  ScenesGroup,
+} from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
   StandaloneDocumentContent,
@@ -22,7 +19,6 @@ import {
   initDocumentEditorState,
 } from "@/grida-react-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
@@ -33,7 +29,16 @@ import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import Toolbar, {
+  ToolbarPosition,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -62,46 +67,43 @@ export default function CanvasPlayground() {
 
   return (
     <TooltipProvider>
-      <main className="w-screen h-screen overflow-hidden select-none">
-        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
-          <Hotkyes />
-          <div className="flex w-full h-full">
-            <aside className="absolute left-4 top-4 bottom-4 h-full rounded-xl overflow-hidden bg-background z-50">
-              <SidebarRoot>
-                <hr />
-                <SidebarSection>
-                  <SidebarSectionHeaderItem>
-                    <SidebarSectionHeaderLabel>
-                      Layers
-                    </SidebarSectionHeaderLabel>
-                  </SidebarSectionHeaderItem>
-                  <NodeHierarchyList />
-                </SidebarSection>
-              </SidebarRoot>
-            </aside>
-            <EditorSurfaceClipboardSyncProvider>
-              <EditorSurfaceDropzone>
-                <EditorSurfaceContextMenu>
-                  <div className="w-full h-full flex flex-col relative bg-black/5">
-                    <ViewportRoot className="relative w-full h-full overflow-hidden">
-                      <EditorSurface />
-                      <AutoInitialFitTransformer>
-                        <StandaloneDocumentContent />
-                      </AutoInitialFitTransformer>
-
-                      <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                        <Toolbar />
+      <SidebarProvider>
+        <main className="w-screen h-screen overflow-hidden select-none">
+          <StandaloneDocumentEditor
+            editable
+            initial={state}
+            dispatch={dispatch}
+          >
+            <Hotkyes />
+            <div className="flex w-full h-full">
+              <Sidebar side="left" variant="floating">
+                <SidebarContent>
+                  <ScenesGroup />
+                  <hr />
+                  <NodeHierarchyGroup />
+                </SidebarContent>
+              </Sidebar>
+              <SidebarInset>
+                <EditorSurfaceClipboardSyncProvider>
+                  <EditorSurfaceDropzone>
+                    <EditorSurfaceContextMenu>
+                      <div className="w-full h-full flex flex-col relative bg-black/5">
+                        <ViewportRoot className="relative w-full h-full overflow-hidden">
+                          <EditorSurface />
+                          <AutoInitialFitTransformer>
+                            <StandaloneDocumentContent />
+                          </AutoInitialFitTransformer>
+                          <ToolbarPosition>
+                            <Toolbar />
+                          </ToolbarPosition>
+                        </ViewportRoot>
                       </div>
-                    </ViewportRoot>
-                    {/* <DevtoolsPanel /> */}
-                  </div>
-                </EditorSurfaceContextMenu>
-              </EditorSurfaceDropzone>
-            </EditorSurfaceClipboardSyncProvider>
-
-            <aside className="absolute right-4 top-4 bottom-4 h-full rounded-xl overflow-hidden bg-background z-50">
-              <SidebarRoot side="right">
-                <div className="p-2">
+                    </EditorSurfaceContextMenu>
+                  </EditorSurfaceDropzone>
+                </EditorSurfaceClipboardSyncProvider>
+              </SidebarInset>
+              <Sidebar side="right" variant="floating">
+                <SidebarHeader className="border-b">
                   <div className="flex items-center justify-end gap-2">
                     <Zoom
                       className={cn(
@@ -113,19 +115,19 @@ export default function CanvasPlayground() {
                       )}
                     />
                   </div>
-                </div>
-                <hr />
-                <FontFamilyListProvider fonts={fonts}>
-                  <Align />
                   <hr />
-                  <Selection />
-                </FontFamilyListProvider>
-              </SidebarRoot>
-            </aside>
-          </div>
-        </StandaloneDocumentEditor>
-        <HelpFab />
-      </main>
+                  <Align />
+                </SidebarHeader>
+                <SidebarContent>
+                  <FontFamilyListProvider fonts={fonts}>
+                    <Selection />
+                  </FontFamilyListProvider>
+                </SidebarContent>
+              </Sidebar>
+            </div>
+          </StandaloneDocumentEditor>
+        </main>
+      </SidebarProvider>
     </TooltipProvider>
   );
 }

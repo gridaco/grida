@@ -2,15 +2,12 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { Spinner } from "@/components/spinner";
 import {
-  CanvasAction,
   EditorSurface,
   StandaloneDocumentContent,
-  StandaloneDocumentEditor,
   ViewportRoot,
 } from "@/grida-react-canvas";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { useEditorState } from "@/scaffolds/editor";
-import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import { createClientCanvasClient } from "@/lib/supabase/client";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
@@ -24,7 +21,9 @@ import {
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import Toolbar, {
+  ToolbarPosition,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 function useSync(document: grida.program.document.Document | undefined) {
   const [{ document_id }, dispatch] = useEditorState();
@@ -64,18 +63,12 @@ function useSync(document: grida.program.document.Document | undefined) {
 export default function CanvasPage() {
   const [state, dispatch] = useEditorState();
 
-  useSync(state.documents["canvas/one"]?.document);
+  useSync(state.documents["canvas"]?.document);
+  useEditorHotKeys();
 
   const {
-    documents: { "canvas/one": document },
+    documents: { canvas: document },
   } = state;
-
-  const startPageDocumentDispatch = useCallback(
-    (action: CanvasAction) => {
-      dispatch(composeEditorDocumentAction("canvas/one", action));
-    },
-    [dispatch]
-  );
 
   if (!document) {
     return <Spinner />;
@@ -83,41 +76,28 @@ export default function CanvasPage() {
 
   return (
     <>
-      <StandaloneDocumentEditor
-        editable
-        initial={document}
-        dispatch={startPageDocumentDispatch}
-      >
-        <Hotkyes />
-        <div className="flex w-full h-full">
-          <EditorSurfaceClipboardSyncProvider>
-            <EditorSurfaceDropzone>
-              <EditorSurfaceContextMenu>
-                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                  <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-                    <EditorSurface />
-                    <AutoInitialFitTransformer>
-                      <StandaloneDocumentContent />
-                    </AutoInitialFitTransformer>
-                    <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                      <Toolbar />
-                    </div>
-                  </ViewportRoot>
-                </StandaloneSceneBackground>
-              </EditorSurfaceContextMenu>
-            </EditorSurfaceDropzone>
-          </EditorSurfaceClipboardSyncProvider>
-          <aside className="hidden lg:flex h-full">
-            <SideControl />
-          </aside>
-        </div>
-      </StandaloneDocumentEditor>
+      <div className="flex w-full h-full">
+        <EditorSurfaceClipboardSyncProvider>
+          <EditorSurfaceDropzone>
+            <EditorSurfaceContextMenu>
+              <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                  <EditorSurface />
+                  <AutoInitialFitTransformer>
+                    <StandaloneDocumentContent />
+                  </AutoInitialFitTransformer>
+                  <ToolbarPosition>
+                    <Toolbar />
+                  </ToolbarPosition>
+                </ViewportRoot>
+              </StandaloneSceneBackground>
+            </EditorSurfaceContextMenu>
+          </EditorSurfaceDropzone>
+        </EditorSurfaceClipboardSyncProvider>
+        <aside className="hidden lg:flex h-full">
+          <SideControl />
+        </aside>
+      </div>
     </>
   );
-}
-
-function Hotkyes() {
-  useEditorHotKeys();
-
-  return <></>;
 }

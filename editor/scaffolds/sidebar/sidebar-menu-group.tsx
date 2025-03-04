@@ -60,6 +60,7 @@ export function Tree({
         size="sm"
         link={item.link}
         isActive={selection?.includes(id)}
+        disabled={item.disabled}
         className="data-[active=true]:bg-transparent"
       >
         {icon ? <ResourceTypeIcon type={icon} /> : <File />}
@@ -72,7 +73,11 @@ export function Tree({
     <SidebarMenuItem>
       <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
         <CollapsibleTrigger asChild>
-          <SidebarMenuLinkButton link={item.link} size="sm">
+          <SidebarMenuLinkButton
+            link={item.link}
+            disabled={item.disabled}
+            size="sm"
+          >
             <ChevronRight className="transition-transform" />
             <Folder />
             <span className="truncate select-none">{label}</span>

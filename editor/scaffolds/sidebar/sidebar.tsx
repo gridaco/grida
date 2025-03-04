@@ -21,6 +21,7 @@ import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import Link from "next/link";
+import { ModeDesignForm } from "./sidebar-mode-design-form";
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
@@ -112,7 +113,9 @@ export function EditorSidebar() {
             <ModeProject />
           </TabsContent>
           <TabsContent value="build">
-            <ModeDesign />
+            {state.doctype === "v0_form" && <ModeDesignForm />}
+            {state.doctype === "v0_canvas" && <ModeDesign />}
+            {state.doctype === "v0_site" && <ModeDesign />}
           </TabsContent>
           <TabsContent value="data">
             <ModeData />

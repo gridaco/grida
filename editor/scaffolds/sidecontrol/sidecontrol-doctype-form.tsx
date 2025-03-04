@@ -36,7 +36,7 @@ export function SideControlDoctypeForm() {
     case "form/startpage": {
       return <SelectedPageFormStart />;
     }
-    case "site/dev-collection":
+    case "site":
       throw new Error("invalid page");
   }
 }

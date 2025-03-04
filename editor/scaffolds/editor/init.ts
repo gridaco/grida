@@ -310,6 +310,111 @@ function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
  * @returns
  */
 function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
+  // documents: {
+  //   ["site"]: initDocumentEditorState({
+  //     editable: true,
+  //     debug: false,
+  //     document: {
+  //       nodes: {},
+  //       scene: {
+  //         type: "scene",
+  //         children: ["root"],
+  //         guides: [],
+  //         constraints: {
+  //           children: "single",
+  //         },
+  //       },
+  //     },
+  //     templates: {
+  //       ["formcollection_sample_001_the_bundle"]: {
+  //         name: "formcollection_sample_001_the_bundle",
+  //         type: "template",
+  //         properties: {},
+  //         default: {},
+  //         // props: samples["formcollection_sample_001_the_bundle"] as any,
+  //         // overrides: {},
+  //         version: "0.0.0",
+  //         nodes: {},
+  //       },
+  //     },
+  //   }),
+  // },
+
+  // {
+  //   type: "group",
+  //   label: "Pages",
+  //   children: [
+  //     {
+  //       type: "item",
+  //       id: "home",
+  //       label: "home",
+  //       link: {
+  //         href: `/${basepath}/${document_id}/design`,
+  //       },
+  //       icon: "home",
+  //     },
+  //     {
+  //       type: "folder",
+  //       id: "/invite",
+  //       label: "/invite",
+  //       icon: "folder",
+  //       children: [
+  //         {
+  //           type: "folder",
+  //           id: "/invite/<slug>",
+  //           label: "[slug]",
+  //           icon: "folder",
+  //           children: [
+  //             {
+  //               type: "item",
+  //               id: "/invite/<slug>/page",
+  //               label: "page",
+  //               link: {
+  //                 href: `?scene=/invite/<slug>/page`,
+  //               },
+  //               icon: "file",
+  //             },
+  //           ],
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       type: "folder",
+  //       id: "/join",
+  //       label: "/join",
+  //       icon: "folder",
+  //       children: [
+  //         {
+  //           type: "folder",
+  //           id: "/join/<slug>",
+  //           label: "[slug]",
+  //           icon: "folder",
+  //           children: [
+  //             {
+  //               type: "item",
+  //               id: "/join/<slug>/page",
+  //               label: "page",
+  //               link: {
+  //                 href: `?scene=/join/<slug>/page`,
+  //               },
+  //               icon: "file",
+  //             },
+  //           ],
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       type: "item",
+  //       id: "/portal",
+  //       label: "portal",
+  //       link: {
+  //         href: `?scene=/portal`,
+  //       },
+  //       icon: "file",
+  //     },
+  //   ],
+  // }
+
   const base = initialBaseDocumentEditorState(init);
   // @ts-ignore
   return {
@@ -318,47 +423,44 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       basepath: base.basepath,
       document_id: init.document_id,
     }),
-    selected_page_id: "site/dev-collection",
-    // documents: {
-    //   ["site/dev-collection"]: initDocumentEditorState({
-    //     editable: true,
-    //     debug: false,
-    //     document: {
-    //       nodes: {},
-    //       scene: {
-    //         type: "scene",
-    //         children: ["root"],
-    //         guides: [],
-    //         constraints: {
-    //           children: "single",
-    //         },
-    //       },
-    //     },
-    //     templates: {
-    //       ["formcollection_sample_001_the_bundle"]: {
-    //         name: "formcollection_sample_001_the_bundle",
-    //         type: "template",
-    //         properties: {},
-    //         default: {},
-    //         // props: samples["formcollection_sample_001_the_bundle"] as any,
-    //         // overrides: {},
-    //         version: "0.0.0",
-    //         nodes: {},
-    //       },
-    //     },
-    //   }),
-    // },
+    selected_page_id: "site",
     documents: {
-      ["site/dev-collection"]: initDocumentEditorState({
+      ["site"]: initDocumentEditorState({
         editable: true,
         debug: false,
         document: {
           nodes: {
-            page: {
-              id: "page",
-              name: "Page",
+            invite: {
+              id: "invite",
+              name: "Invite Page",
               type: "template_instance",
-              template_id: "002",
+              template_id: "tmp-2503-invite",
+              position: "relative",
+              removable: false,
+              active: true,
+              locked: false,
+              properties: {},
+              props: {},
+              overrides: {},
+            },
+            join: {
+              id: "join",
+              name: "Join Page",
+              type: "template_instance",
+              template_id: "tmp-2503-join",
+              position: "relative",
+              removable: false,
+              active: true,
+              locked: false,
+              properties: {},
+              props: {},
+              overrides: {},
+            },
+            portal: {
+              id: "portal",
+              name: "Portal Page",
+              type: "template_instance",
+              template_id: "tmp-2503-portal",
               position: "relative",
               removable: false,
               active: true,
@@ -368,22 +470,62 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
               overrides: {},
             },
           },
+          entry_scene_id: "invite",
           scenes: {
-            collection: {
+            invite: {
               type: "scene",
-              id: "collection",
-              name: "collection",
-              children: ["page"],
+              id: "invite",
+              name: "Invite",
+              children: ["invite"],
               guides: [],
               constraints: {
                 children: "single",
               },
+              order: 1,
+            },
+            join: {
+              type: "scene",
+              id: "join",
+              name: "Join",
+              children: ["join"],
+              guides: [],
+              constraints: {
+                children: "single",
+              },
+              order: 2,
+            },
+            portal: {
+              type: "scene",
+              id: "portal",
+              name: "Portal",
+              children: ["portal"],
+              guides: [],
+              constraints: {
+                children: "single",
+              },
+              order: 3,
             },
           },
         },
         templates: {
-          ["002"]: {
-            name: "002",
+          ["tmp-2503-invite"]: {
+            name: "Invite",
+            type: "template",
+            properties: {},
+            default: {},
+            version: "0.0.0",
+            nodes: {},
+          },
+          ["tmp-2503-join"]: {
+            name: "Join",
+            type: "template",
+            properties: {},
+            default: {},
+            version: "0.0.0",
+            nodes: {},
+          },
+          ["tmp-2503-portal"]: {
+            name: "Portal",
             type: "template",
             properties: {},
             default: {},
@@ -423,9 +565,9 @@ function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
   return {
     ...base,
     pages: [],
-    selected_page_id: "canvas/one",
+    selected_page_id: "canvas",
     documents: {
-      ["canvas/one"]: initDocumentEditorState({
+      ["canvas"]: initDocumentEditorState({
         editable: true,
         debug: false,
         document: init.document,
@@ -736,88 +878,13 @@ function sitedocumentpagesinit({
   document_id: string;
 }): MenuGroup<{ id: string }>[] {
   // {
-  //   id: "site/dev-collection",
+  //   id: "site",
   //   label: "home",
   //   link: {
   //     href: `/${basepath}/${document_id}/design`,
   //   },
   // },
-  return [
-    {
-      type: "group",
-      label: "Pages",
-      children: [
-        {
-          type: "item",
-          id: "home",
-          label: "home",
-          link: {
-            href: `/${basepath}/${document_id}/design`,
-          },
-          icon: "home",
-        },
-        {
-          type: "folder",
-          id: "/invite",
-          label: "/invite",
-          icon: "folder",
-          children: [
-            {
-              type: "folder",
-              id: "/invite/<slug>",
-              label: "[slug]",
-              icon: "folder",
-              children: [
-                {
-                  type: "item",
-                  id: "/invite/<slug>/page",
-                  label: "page",
-                  link: {
-                    href: `?scene=/invite/<slug>/page`,
-                  },
-                  icon: "file",
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: "folder",
-          id: "/join",
-          label: "/join",
-          icon: "folder",
-          children: [
-            {
-              type: "folder",
-              id: "/join/<slug>",
-              label: "[slug]",
-              icon: "folder",
-              children: [
-                {
-                  type: "item",
-                  id: "/join/<slug>/page",
-                  label: "page",
-                  link: {
-                    href: `?scene=/join/<slug>/page`,
-                  },
-                  icon: "file",
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: "item",
-          id: "/portal",
-          label: "portal",
-          link: {
-            href: `?scene=/portal`,
-          },
-          icon: "file",
-        },
-      ],
-    },
-  ];
+  return [];
 }
 
 function formdocumentpagesinit({

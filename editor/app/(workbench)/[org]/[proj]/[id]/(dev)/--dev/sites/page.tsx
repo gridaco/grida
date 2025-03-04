@@ -48,7 +48,7 @@ function CurrentPageCanvas() {
   );
 
   switch (selected_page_id) {
-    case "site/dev-collection":
+    case "site":
       return (
         <StandaloneDocumentEditor
           editable

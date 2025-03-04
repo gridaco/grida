@@ -452,12 +452,12 @@ export interface FormStartPageRemoveAction {
 
 export interface EditorDocumentAction {
   type: "editor/document";
-  key: "site/dev-collection" | "form/startpage" | "canvas/one";
+  key: "site" | "form/startpage" | "canvas";
   action: CanvasAction;
 }
 
 export function composeEditorDocumentAction(
-  document_key: "site/dev-collection" | "form/startpage" | "canvas/one",
+  document_key: "site" | "form/startpage" | "canvas",
   action: CanvasAction
 ): EditorDocumentAction {
   return {
