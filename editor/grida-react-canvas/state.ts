@@ -105,6 +105,15 @@ export type SurfaceRaycastTargeting = {
   ignores_locked: boolean;
 };
 
+const DEFAULT_GESTURE_MODIFIERS: GestureModifiers = {
+  translate_with_hierarchy_change: "on",
+  translate_with_clone: "off",
+  tarnslate_with_axis_lock: "off",
+  transform_with_center_origin: "off",
+  transform_with_preserve_aspect_ratio: "off",
+  rotate_with_quantize: "off",
+};
+
 export type GestureModifiers = {
   /**
    * when on, this will translate the selected nodes with the hierarchy change - when cursor escapes and hits a new parent, the selected nodes will be moved to the new parent, maintining its absolute position
@@ -140,6 +149,8 @@ export type GestureModifiers = {
   rotate_with_quantize: "off" | number;
 };
 
+type CurrentBrush = BitmapEditorBrush & { opacity: number };
+
 export interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
@@ -168,7 +179,7 @@ export interface IDocumentEditorClipboardState {
   next_font_family?: string;
   next_paint_color?: grida.program.cg.RGBA8888;
   user_clipboard_color?: grida.program.cg.RGBA8888;
-  brush: BitmapEditorBrush & { opacity: number };
+  brush: CurrentBrush;
 }
 
 interface IDocumentEditorTransformState {
@@ -548,15 +559,65 @@ export type DropzoneIndication =
       rect: cmath.Rectangle;
     };
 
+interface ISurfaceEventTargetConfig {
+  /**
+   * the config of how the surface raycast targeting should be
+   */
+  surface_raycast_targeting: SurfaceRaycastTargeting;
+
+  ruler: "on" | "off";
+
+  pixelgrid: "on" | "off";
+
+  surface_measurement_targeting_locked: boolean;
+  surface_measurement_targeting: "on" | "off";
+}
+
 /**
- * [Surface Support State]
+ * the default state of the scene
+ *
+ * this is applied when the scene is loaded (switched)
+ */
+export const DEFAULT_SCENE_STATE: IScenePersistenceState & ISceneSurfaceState =
+  {
+    active_duplication: null,
+    content_edit_mode: undefined,
+    dropzone: undefined,
+    gesture: { type: "idle" },
+    hovered_node_id: null,
+    hovered_vertex_idx: null,
+    marquee: undefined,
+    selection: [],
+    surface_measurement_target: undefined,
+    surface_raycast_detected_node_ids: [],
+    surface_snapping: undefined,
+  };
+
+interface IScenePersistenceState {
+  selection: string[];
+
+  /**
+   * @private - internal use only
+   *
+   * current content edit mode
+   *
+   * @default false
+   */
+  content_edit_mode?: ContentEditModeState;
+}
+
+/**
+ * [Scene Surface Support State]
  *
  * this support state is not part of the document state and does not get saved or recorded as history
  */
-interface IDocumentEditorEventTargetState {
+interface ISceneSurfaceState {
+  /**
+   * the current gesture state
+   *
+   * @default idle
+   */
   gesture: GestureState;
-
-  gesture_modifiers: GestureModifiers;
 
   /**
    * the latest snap result from the gesture
@@ -565,50 +626,71 @@ interface IDocumentEditorEventTargetState {
 
   /**
    * general hover state
+   *
+   * @default null
    */
   hovered_node_id: string | null;
 
   /**
    * hovered vertex index (of a selected path node)
+   *
+   * @default null
    */
   hovered_vertex_idx: number | null;
 
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
+   *
+   * @default undefined
    */
-  dropzone?: DropzoneIndication;
-
-  /**
-   * the config of how the surface raycast targeting should be
-   */
-  surface_raycast_targeting: SurfaceRaycastTargeting;
+  dropzone: DropzoneIndication | undefined;
 
   /**
    * @private - internal use only
    *
    * All node ids detected by the raycast (internally) - does not get affected by the targeting config
+   *
+   * @default []
    */
   surface_raycast_detected_node_ids: string[];
 
   /**
-   * when user tries to remove a node that is not removable (removable=false) or tries to remove root node that is required by constraints, this is the behavior
+   * surface measurement target
    *
-   * - `ignore` - ignore the action
-   * - `deactivate` - deactivate the node (set active=false)
-   * - `force` - force remove the node (even if it's not removable) (this may cause unexpected behavior or cause system to crash)
-   * - `throw` - throw an error
+   * @default undefined
    */
-  when_not_removable: "ignore" | "deactivate" | "force" | "throw";
+  surface_measurement_target?: string[];
 
+  /**
+   * Marquee transform in canvas space
+   *
+   * @default undefined
+   */
+  marquee?: Marquee;
+
+  /**
+   * active, repeatable duplication state
+   *
+   * @default null
+   */
+  active_duplication: ActiveDuplication | null;
+}
+
+/**
+ * [Surface Support State]
+ *
+ * this support state is not part of the document state and does not get saved or recorded as history
+ */
+interface IDocumentEditorEventTargetState
+  extends ISurfaceEventTargetConfig,
+    ISceneSurfaceState {
   pointer: {
     position: cmath.Vector2;
     last: cmath.Vector2;
     // position_snap: cmath.Vector2;
   };
 
-  ruler: "on" | "off";
-
-  pixelgrid: "on" | "off";
+  gesture_modifiers: GestureModifiers;
 
   /**
    * @private - internal use only
@@ -618,23 +700,6 @@ interface IDocumentEditorEventTargetState {
    * @default {type: "cursor"}
    */
   tool: ToolMode;
-
-  /**
-   * target node id to measure distance between the selection
-   */
-  surface_measurement_target?: string[];
-  surface_measurement_targeting_locked: boolean;
-  surface_measurement_targeting: "on" | "off";
-
-  /**
-   * Marquee transform in canvas space
-   */
-  marquee?: Marquee;
-
-  /**
-   * active, repeatable duplication state
-   */
-  active_duplication: ActiveDuplication | null;
 }
 
 /**
@@ -659,21 +724,30 @@ export interface ActiveDuplication {
   clones: grida.program.nodes.NodeID[];
 }
 
-interface IDocumentEditorConfig {
+interface IEditorConfig {
   /**
-   *
    * when editable is false, the document definition is not editable
    * set editable false on production context - end-user-facing context
    */
   editable: boolean;
   debug: boolean;
+
+  /**
+   * when user tries to remove a node that is not removable (removable=false) or tries to remove root node that is required by constraints, this is the behavior
+   *
+   * - `ignore` - ignore the action
+   * - `deactivate` - deactivate the node (set active=false)
+   * - `force` - force remove the node (even if it's not removable) (this may cause unexpected behavior or cause system to crash)
+   * - `throw` - throw an error
+   */
+  when_not_removable: "ignore" | "deactivate" | "force" | "throw";
 }
 
-interface IDocumentGoogleFontsState {
+interface IEditorGoogleFontsState {
   googlefonts: { family: string }[];
 }
 
-interface IDocumentBrusesState {
+interface IEditorBrusesState {
   brushes: BitmapEditorBrush[];
 }
 
@@ -683,35 +757,12 @@ export type HistoryEntry = {
   state: IDocumentState;
 };
 
-// export type HistoryState = {
-//   past: HistoryEntry[];
-//   present: IDocumentState;
-//   future: HistoryEntry[];
-// };
-
-// function initialHistoryState(init: IDocumentEditorInit): HistoryState {
-//   return {
-//     past: [],
-//     present: {
-//       selection: [],
-//       document_ctx:
-//         grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
-//           init.document
-//         ),
-//       document: init.document,
-//     },
-//     future: [],
-//   };
-// }
-
 /**
  * a global class based editor instances
  */
 export const __global_editors = {
   bitmap: null as BitmapLayerEditor | null,
 };
-
-class A {}
 
 type ContentEditModeState =
   | TextContentEditMode
@@ -790,22 +841,13 @@ export interface Guide {
   readonly offset: number;
 }
 
-export interface IDocumentState extends IMinimalDocumentState {
-  selection: string[];
-
-  /**
-   * @private - internal use only
-   *
-   * current content edit mode
-   *
-   * @default false
-   */
-  content_edit_mode?: ContentEditModeState;
-
+export interface IDocumentState
+  extends IMinimalDocumentState,
+    IScenePersistenceState {
   /**
    * current scene id
    */
-  scene_id?: string;
+  scene_id: string | undefined;
 }
 
 interface __TMP_HistoryExtension {
@@ -816,7 +858,7 @@ interface __TMP_HistoryExtension {
 }
 
 export interface IDocumentEditorInit
-  extends IDocumentEditorConfig,
+  extends Pick<IEditorConfig, "editable" | "debug">,
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
     grida.program.document.Document,
@@ -826,15 +868,23 @@ export interface IDocumentEditorInit
 }
 
 export interface IDocumentEditorState
-  extends IDocumentEditorConfig,
+  extends IEditorConfig,
     IDocumentEditorClipboardState,
     IDocumentEditorTransformState,
     IDocumentEditorEventTargetState,
-    IDocumentGoogleFontsState,
-    IDocumentBrusesState,
+    IEditorGoogleFontsState,
+    IEditorBrusesState,
     grida.program.document.IDocumentTemplatesRepository,
     __TMP_HistoryExtension,
     IDocumentState {}
+
+const DEFAULT_BRUSH: CurrentBrush = {
+  name: "Default",
+  hardness: 1,
+  size: [4, 4],
+  spacing: 0,
+  opacity: 1,
+};
 
 export function initDocumentEditorState({
   debug,
@@ -853,19 +903,13 @@ export function initDocumentEditorState({
       },
       {} as grida.program.document.Document["scenes"]
     ),
-    //  ,
   };
 
   const s = new document.DocumentState(doc);
 
-  // console.log("i", init["transform"]);
-
   return {
     transform: cmath.transform.identity,
     debug: debug ?? false,
-    selection: [],
-    hovered_node_id: null,
-    hovered_vertex_idx: null,
     pointer: {
       position: cmath.vector2.zero,
       last: cmath.vector2.zero,
@@ -874,36 +918,20 @@ export function initDocumentEditorState({
       future: [],
       past: [],
     },
-    gesture: { type: "idle" },
-    gesture_modifiers: {
-      translate_with_hierarchy_change: "on",
-      translate_with_clone: "off",
-      tarnslate_with_axis_lock: "off",
-      transform_with_center_origin: "off",
-      transform_with_preserve_aspect_ratio: "off",
-      rotate_with_quantize: "off",
-    },
+    gesture_modifiers: DEFAULT_GESTURE_MODIFIERS,
     ruler: "on",
     pixelgrid: "on",
-    active_duplication: null,
     when_not_removable: "ignore",
     document_ctx: document.Context.from(doc).snapshot(),
-    // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
     surface_measurement_targeting_locked: false,
-    surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
     brushes: [],
     tool: { type: "cursor" },
-    brush: {
-      name: "Default",
-      hardness: 1,
-      size: [4, 4],
-      spacing: 0,
-      opacity: 1,
-    },
+    brush: DEFAULT_BRUSH,
     scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
+    ...DEFAULT_SCENE_STATE,
     ...init,
     document: doc,
   };

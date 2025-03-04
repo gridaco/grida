@@ -1,4 +1,4 @@
-import type { IDocumentEditorState } from "../state";
+import { DEFAULT_SCENE_STATE, type IDocumentEditorState } from "../state";
 import type { Action, EditorAction } from "../action";
 import { produce, type Draft } from "immer";
 import {
@@ -54,18 +54,7 @@ export default function reducer<S extends IDocumentEditorState>(
         // 1. change the scene_id
         draft.scene_id = scene;
         // 2. clear scene-specific state
-        // TODO: move the related properties under scene state object.
-        draft.selection = [];
-        draft.hovered_node_id = null;
-        draft.hovered_vertex_idx = null;
-        draft.dropzone = undefined;
-        draft.gesture = { type: "idle" };
-        draft.surface_measurement_target = undefined;
-        draft.content_edit_mode = undefined;
-        draft.marquee = undefined;
-        draft.surface_snapping = undefined;
-        draft.surface_measurement_target = undefined;
-        draft.surface_raycast_detected_node_ids = [];
+        Object.assign(draft, DEFAULT_SCENE_STATE);
       });
     }
     case "scenes/new": {
@@ -90,20 +79,8 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.document.scenes[new_scene.id] = new_scene;
         // 1. change the scene_id
         draft.scene_id = new_scene.id;
-
         // 2. clear scene-specific state
-        // TODO: move the related properties under scene state object.
-        draft.selection = [];
-        draft.hovered_node_id = null;
-        draft.hovered_vertex_idx = null;
-        draft.dropzone = undefined;
-        draft.gesture = { type: "idle" };
-        draft.surface_measurement_target = undefined;
-        draft.content_edit_mode = undefined;
-        draft.marquee = undefined;
-        draft.surface_snapping = undefined;
-        draft.surface_measurement_target = undefined;
-        draft.surface_raycast_detected_node_ids = [];
+        Object.assign(draft, DEFAULT_SCENE_STATE);
       });
     }
     case "scenes/delete": {
@@ -119,7 +96,7 @@ export default function reducer<S extends IDocumentEditorState>(
           draft.document.entry_scene_id = draft.scene_id;
         }
         // 2. clear scene-specific state
-        // TODO:
+        Object.assign(draft, DEFAULT_SCENE_STATE);
       });
     }
     case "scenes/duplicate": {
@@ -141,9 +118,8 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.document.scenes[next.id] = next;
         // 1. change the scene_id
         draft.scene_id = next.id;
-
         // 2. clear scene-specific state
-        // TODO:
+        Object.assign(draft, DEFAULT_SCENE_STATE);
       });
     }
     case "scenes/change/name": {

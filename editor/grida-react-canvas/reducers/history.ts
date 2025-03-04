@@ -8,6 +8,7 @@ export namespace history {
   ) {
     //
     draft.selection = snapshot.selection;
+    draft.scene_id = snapshot.scene_id;
     draft.document = snapshot.document;
     draft.document_ctx = snapshot.document_ctx;
     draft.content_edit_mode = snapshot.content_edit_mode;
@@ -23,6 +24,7 @@ export namespace history {
   export function snapshot(state: IDocumentState): IDocumentState {
     return {
       selection: state.selection,
+      scene_id: state.scene_id,
       document: state.document,
       document_ctx: state.document_ctx,
       content_edit_mode: state.content_edit_mode,
