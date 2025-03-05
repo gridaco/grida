@@ -49,9 +49,9 @@ const inter = Inter({ subsets: ["latin"] });
 export async function generateMetadata({
   params,
 }: {
-  params: GDocEditorRouteParams;
+  params: Promise<GDocEditorRouteParams>;
 }): Promise<Metadata> {
-  const { id, proj } = params;
+  const { id, proj } = await params;
   const cookieStore = await cookies();
   const supabase = createServerComponentWorkspaceClient(cookieStore);
   const { data, error } = await supabase
@@ -74,9 +74,9 @@ export default async function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: GDocEditorRouteParams;
+  params: Promise<GDocEditorRouteParams>;
 }>) {
-  const { id, org, proj } = params;
+  const { id, org, proj } = await params;
 
   // in local dev, the vercel insights script is not loaded, will hit this route
   if (org === "_vercel") return notFound();
