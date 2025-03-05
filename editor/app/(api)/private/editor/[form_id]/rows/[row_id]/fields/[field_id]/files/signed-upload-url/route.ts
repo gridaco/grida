@@ -38,7 +38,7 @@ async function handler(
 
   const { form_id, row_id, field_id } = context.params;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: form, error: formerr } = await supabase

@@ -52,7 +52,7 @@ export async function generateMetadata({
   params: GDocEditorRouteParams;
 }): Promise<Metadata> {
   const { id, proj } = params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentWorkspaceClient(cookieStore);
   const { data, error } = await supabase
     .from("document")
@@ -81,7 +81,7 @@ export default async function Layout({
   // in local dev, the vercel insights script is not loaded, will hit this route
   if (org === "_vercel") return notFound();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 

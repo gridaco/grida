@@ -20,7 +20,7 @@ export async function GET(
   }
 ) {
   const { uid } = context.params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const client = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 

@@ -13,7 +13,7 @@ export default async function PoeplesPage({
   };
 }) {
   const organization_name = params.organization_name;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);
   const avatar_url = PublicUrls.organization_avatar_url(supabase);
   const { data: auth } = await supabase.auth.getUser();

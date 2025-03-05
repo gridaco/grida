@@ -13,7 +13,7 @@ interface Context {
 }
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 
@@ -120,7 +120,7 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 

@@ -158,7 +158,7 @@ export async function GET(
     response.error = e;
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   // TODO: strict with permissions
   const supabase = grida_forms_client;
   // const supabase = createRouteHandlerClient(cookieStore);

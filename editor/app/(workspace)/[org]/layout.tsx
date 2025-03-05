@@ -17,7 +17,7 @@ export default async function Layout({
   children: React.ReactNode;
   params: { org: string };
 }>) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 

@@ -11,7 +11,7 @@ interface Context {
 }
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 

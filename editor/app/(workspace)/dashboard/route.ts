@@ -7,7 +7,7 @@ export const revalidate = 0;
 export async function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getUser();

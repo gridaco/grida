@@ -11,7 +11,7 @@ export async function POST(
   }
 ) {
   const origin = req.nextUrl.origin;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const org = context.params.org;
 
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);

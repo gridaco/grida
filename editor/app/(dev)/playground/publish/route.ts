@@ -20,7 +20,7 @@ const nanoid = customAlphabet(alphabet, 39);
  */
 export async function POST(req: NextRequest) {
   const form = await req.formData();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const gist = form.get("gist");

@@ -20,7 +20,7 @@ export default async function Layout({
   // in local dev, the vercel insights script is not loaded, will hit this route
   if (org === "_vercel") return notFound();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const platform = await getPlatform(cookieStore);
 
   const supabase = createServerComponentClient(cookieStore);

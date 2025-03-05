@@ -22,7 +22,7 @@ export async function POST(
   const formdata = await req.formData();
 
   const origin = req.nextUrl.origin;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const { form_id } = context.params;
   const next = req.nextUrl.searchParams.get("next");
   const supabase = createRouteHandlerClient(cookieStore);

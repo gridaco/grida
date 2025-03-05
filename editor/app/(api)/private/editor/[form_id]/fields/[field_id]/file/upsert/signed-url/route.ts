@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, context: Context) {
 
   assert(path);
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: form, error: formerr } = await supabase

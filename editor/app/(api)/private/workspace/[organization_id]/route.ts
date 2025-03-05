@@ -13,7 +13,7 @@ export async function GET(
   }
 ) {
   const { organization_id } = context.params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const client = createRouteHandlerWorkspaceClient(cookieStore);
 
   const avatar_url = PublicUrls.organization_avatar_url(client);

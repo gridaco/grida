@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, context: Context) {
   const supabase_schema_name = req.headers.get("Accept-Profile") || "public";
   const { supabase_project_id, supabase_table_name } = context.params;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const client = createRouteHandlerXSBClient(cookieStore);
 
   // fetch connection

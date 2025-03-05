@@ -20,7 +20,7 @@ type Context = {
 };
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const schema_id = context.params.schema_id;
   const supabase = createRouteHandlerClient(cookieStore);
   const grida_x_sb_client = createRouteHandlerXSBClient(cookieStore);

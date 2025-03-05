@@ -15,7 +15,7 @@ interface Context {
 // Special route for fetching auth.users via proxy supabase client, for in-editor use.
 // this route is protected via supabase_project access RLS.
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 

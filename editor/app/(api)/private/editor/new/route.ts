@@ -61,7 +61,7 @@ export type NewDocumentResponse = EditorApiResponse<
 >;
 
 export async function POST(request: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
   const origin = request.nextUrl.origin;
   const data = (await request.json()) as NewDocumentRequest;

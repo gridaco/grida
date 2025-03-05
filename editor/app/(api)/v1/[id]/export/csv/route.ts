@@ -13,7 +13,7 @@ export async function GET(
   context: { params: { id: string } }
 ) {
   const id = context.params.id;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   //
   const { data } = await supabase

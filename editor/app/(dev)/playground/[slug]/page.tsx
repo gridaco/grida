@@ -13,7 +13,7 @@ export default async function SharedPlaygroundPage({
   };
 }) {
   const { slug } = params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data: _gist } = await supabase

@@ -31,7 +31,7 @@ export default async function OrganizationsSettingsProfilePage({
   };
 }) {
   const organization_name = params.organization_name;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);
 

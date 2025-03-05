@@ -19,7 +19,7 @@ type Context = {
 };
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const data = (await req.json()) as Omit<
     CreateNewSchemaTableRequest,
     "schema_id"

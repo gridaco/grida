@@ -12,7 +12,7 @@ export async function POST(
   }
 ) {
   const origin = req.nextUrl.origin;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
   const org = context.params.org;

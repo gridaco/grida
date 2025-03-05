@@ -27,7 +27,7 @@ export async function POST(
   }
 ) {
   const { form_id } = context.params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";

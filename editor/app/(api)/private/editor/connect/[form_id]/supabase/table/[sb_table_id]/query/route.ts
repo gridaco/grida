@@ -16,7 +16,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
   const { form_id, sb_table_id: _sb_table_id } = context.params;
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
   const { form_id, sb_table_id: _sb_table_id } = context.params;
@@ -91,7 +91,7 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
   const { form_id, sb_table_id: _sb_table_id } = context.params;

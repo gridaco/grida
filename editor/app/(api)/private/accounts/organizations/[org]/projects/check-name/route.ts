@@ -15,7 +15,7 @@ export async function POST(
     };
   }
 ) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const org = context.params.org;
 

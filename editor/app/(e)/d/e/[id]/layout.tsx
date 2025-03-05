@@ -79,7 +79,7 @@ export default async function Layout({
   params: { id: string };
 }>) {
   const { id } = params;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data, error } = await grida_forms_client

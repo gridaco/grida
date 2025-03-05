@@ -15,7 +15,7 @@ type Context = {
 export async function DELETE(req: NextRequest, context: Context) {
   const { schema_id, table_id } = context.params;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { user_confirmation_txt } = await req.json();

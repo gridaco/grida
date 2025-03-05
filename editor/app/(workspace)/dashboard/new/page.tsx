@@ -25,7 +25,7 @@ export default async function OnboardWithNewFormPage({
     period?: "monthly" | "yearly";
   };
 }) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const { plan, period } = searchParams || {};
   const price = prices[plan || "free"][period || "monthly"];
 

@@ -15,7 +15,7 @@ export async function GET(
 ) {
   const { id, org, proj } = context.params;
   const origin = request.nextUrl.origin;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const supabase = createRouteHandlerClient(cookieStore);
 

@@ -24,7 +24,7 @@ export async function GET(
   // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
 
   // TODO: support RLS
-  // const cookieStore = cookies();
+  // const cookieStore = await cookies();
   // const supabase = createRouteHandlerClient(cookieStore);
   const supabase = grida_forms_client;
 

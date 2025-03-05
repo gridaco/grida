@@ -20,7 +20,7 @@ interface XSBStorageBulkResolverRequest {
 }
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
