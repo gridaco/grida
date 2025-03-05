@@ -16,17 +16,27 @@ import type {
   TableMenuItem,
   CanvasDocumentEditorInit,
   BucketDocumentEditorInit,
+  SchemaMayVaryDocument,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { FormFieldDefinition, GridaXSupabase } from "@/types";
+import {
+  FormFieldDefinition,
+  FormStartPageSchema,
+  GridaXSupabase,
+  SchemaMayVaryDocumentServerObject,
+} from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import { FormStartPage } from "@/theme/templates/formstart";
-import { initDocumentEditorState } from "@/grida-react-canvas";
+import {
+  IDocumentEditorState,
+  initDocumentEditorState,
+} from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
+import { grida } from "@/grida";
 // import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -425,115 +435,119 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     }),
     selected_page_id: "site",
     documents: {
-      ["site"]: initDocumentEditorState({
-        editable: true,
-        debug: false,
-        document: {
-          nodes: {
-            invite: {
-              id: "invite",
-              name: "Invite Page",
-              type: "template_instance",
-              template_id: "tmp-2503-invite",
-              position: "relative",
-              removable: false,
-              active: true,
-              locked: false,
-              properties: {},
-              props: {},
-              overrides: {},
+      ["site"]: {
+        __schema_version: grida.program.document.SCHEMA_VERSION,
+        __schema_valid: true,
+        state: initDocumentEditorState({
+          editable: true,
+          debug: false,
+          document: {
+            nodes: {
+              invite: {
+                id: "invite",
+                name: "Invite Page",
+                type: "template_instance",
+                template_id: "tmp-2503-invite",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
+              join: {
+                id: "join",
+                name: "Join Page",
+                type: "template_instance",
+                template_id: "tmp-2503-join",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
+              portal: {
+                id: "portal",
+                name: "Portal Page",
+                type: "template_instance",
+                template_id: "tmp-2503-portal",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
             },
-            join: {
-              id: "join",
-              name: "Join Page",
-              type: "template_instance",
-              template_id: "tmp-2503-join",
-              position: "relative",
-              removable: false,
-              active: true,
-              locked: false,
-              properties: {},
-              props: {},
-              overrides: {},
-            },
-            portal: {
-              id: "portal",
-              name: "Portal Page",
-              type: "template_instance",
-              template_id: "tmp-2503-portal",
-              position: "relative",
-              removable: false,
-              active: true,
-              locked: false,
-              properties: {},
-              props: {},
-              overrides: {},
+            entry_scene_id: "invite",
+            scenes: {
+              invite: {
+                type: "scene",
+                id: "invite",
+                name: "Invite",
+                children: ["invite"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 1,
+              },
+              join: {
+                type: "scene",
+                id: "join",
+                name: "Join",
+                children: ["join"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 2,
+              },
+              portal: {
+                type: "scene",
+                id: "portal",
+                name: "Portal",
+                children: ["portal"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 3,
+              },
             },
           },
-          entry_scene_id: "invite",
-          scenes: {
-            invite: {
-              type: "scene",
-              id: "invite",
+          templates: {
+            ["tmp-2503-invite"]: {
               name: "Invite",
-              children: ["invite"],
-              guides: [],
-              constraints: {
-                children: "single",
-              },
-              order: 1,
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
             },
-            join: {
-              type: "scene",
-              id: "join",
+            ["tmp-2503-join"]: {
               name: "Join",
-              children: ["join"],
-              guides: [],
-              constraints: {
-                children: "single",
-              },
-              order: 2,
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
             },
-            portal: {
-              type: "scene",
-              id: "portal",
+            ["tmp-2503-portal"]: {
               name: "Portal",
-              children: ["portal"],
-              guides: [],
-              constraints: {
-                children: "single",
-              },
-              order: 3,
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
             },
           },
-        },
-        templates: {
-          ["tmp-2503-invite"]: {
-            name: "Invite",
-            type: "template",
-            properties: {},
-            default: {},
-            version: "0.0.0",
-            nodes: {},
-          },
-          ["tmp-2503-join"]: {
-            name: "Join",
-            type: "template",
-            properties: {},
-            default: {},
-            version: "0.0.0",
-            nodes: {},
-          },
-          ["tmp-2503-portal"]: {
-            name: "Portal",
-            type: "template",
-            properties: {},
-            default: {},
-            version: "0.0.0",
-            nodes: {},
-          },
-        },
-      }),
+        }),
+      },
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -553,6 +567,76 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   };
 }
 
+function __init_canvas(
+  data: unknown | SchemaMayVaryDocumentServerObject
+): SchemaMayVaryDocument<IDocumentEditorState> | undefined {
+  // data is empty = no start page is set.
+  if (!data) return undefined;
+
+  // check the version
+  if (
+    (data as SchemaMayVaryDocumentServerObject).__schema_version !==
+    "0.0.1-beta.1+20250303"
+  ) {
+    return {
+      __schema_version: (data as SchemaMayVaryDocumentServerObject)
+        .__schema_version,
+      __schema_valid: false,
+      state: null,
+    };
+  }
+
+  const valid = data as SchemaMayVaryDocumentServerObject;
+
+  return {
+    __schema_version: valid.__schema_version,
+    __schema_valid: true,
+    state: {
+      ...initDocumentEditorState({
+        editable: true,
+        debug: false,
+        document: valid,
+      }),
+    },
+  };
+}
+
+function __init_form_start_page_state(
+  data: unknown | FormStartPageSchema
+): BaseDocumentEditorState["documents"]["form/startpage"] | undefined {
+  // data is empty = no start page is set.
+  if (!data) return undefined;
+
+  // check the version
+  if (
+    (data as FormStartPageSchema).__schema_version !== "0.0.1-beta.1+20250303"
+  ) {
+    return {
+      __schema_version: (data as FormStartPageSchema).__schema_version,
+      __schema_valid: false,
+      state: null,
+    };
+  }
+
+  const valid = data as FormStartPageSchema;
+
+  return {
+    __schema_version: valid.__schema_version,
+    __schema_valid: true,
+    state: {
+      template_id: valid.template_id,
+      ...initDocumentEditorState({
+        editable: true,
+        debug: false,
+        document: valid,
+        templates: {
+          [valid.template_id]: FormStartPage.getTemplate(valid.template_id),
+        },
+      }),
+    },
+  };
+}
+
 /**
  * // FIXME: not ready
  * @deprecated @beta
@@ -567,11 +651,7 @@ function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
     pages: [],
     selected_page_id: "canvas",
     documents: {
-      ["canvas"]: initDocumentEditorState({
-        editable: true,
-        debug: false,
-        document: init.document,
-      }),
+      ["canvas"]: __init_canvas(init.document),
     },
     sidebar: {
       mode: "build",
@@ -808,21 +888,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     }),
     selected_page_id: "form",
     documents: {
-      "form/startpage": init.start
-        ? {
-            template_id: init.start.template_id,
-            ...initDocumentEditorState({
-              editable: true,
-              debug: false,
-              document: init.start,
-              templates: {
-                [init.start.template_id]: FormStartPage.getTemplate(
-                  init.start.template_id
-                ),
-              },
-            }),
-          }
-        : undefined,
+      "form/startpage": __init_form_start_page_state(init.start),
     },
     form: {
       form_id: init.form_id,

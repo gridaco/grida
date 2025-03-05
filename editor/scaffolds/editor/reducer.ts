@@ -113,8 +113,9 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         assert(draft.documents, "draft.documents is required");
         const document = draft.documents[key];
         assert(document, "document is required");
-        draft.documents[key] = builderReducer(
-          state.documents[key]!,
+        assert(document.__schema_valid, "document schema is not supported");
+        document.state = builderReducer(
+          document.state,
           _action
         ) as IDocumentEditorState & { template_id: string };
       });
@@ -378,35 +379,39 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return produce(state, (draft) => {
         const template_id = startpage.name;
         draft.documents["form/startpage"] = {
-          template_id: template_id,
-          ...initDocumentEditorState({
-            editable: true,
-            debug: false,
-            document: {
-              nodes: {
-                ["page"]:
-                  grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
-                    "page",
-                    startpage
-                  ),
-              },
-              scenes: {
-                startpage: {
-                  type: "scene",
-                  id: "startpage",
-                  name: "Start",
-                  children: ["page"],
-                  guides: [],
-                  constraints: {
-                    children: "single",
+          __schema_version: grida.program.document.SCHEMA_VERSION,
+          __schema_valid: true,
+          state: {
+            template_id: template_id,
+            ...initDocumentEditorState({
+              editable: true,
+              debug: false,
+              document: {
+                nodes: {
+                  ["page"]:
+                    grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
+                      "page",
+                      startpage
+                    ),
+                },
+                scenes: {
+                  startpage: {
+                    type: "scene",
+                    id: "startpage",
+                    name: "Start",
+                    children: ["page"],
+                    guides: [],
+                    constraints: {
+                      children: "single",
+                    },
                   },
                 },
               },
-            },
-            templates: {
-              [template_id]: startpage,
-            },
-          }),
+              templates: {
+                [template_id]: startpage,
+              },
+            }),
+          },
         };
       });
     }

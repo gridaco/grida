@@ -33,6 +33,7 @@ import Multiplayer from "./multiplayer";
 import { FormAgentThemeSyncProvider } from "./sync";
 import { CanvasAction, StandaloneDocumentEditor } from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "./action";
+import { ErrorInvalidSchema } from "@/components/error";
 
 export function EditorProvider({
   initial,
@@ -170,19 +171,15 @@ function SiteDocumentEditorProvider({
 }
 
 function CanvasProvider({ children }: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
+  const [{ selected_page_id, documents }, dispatch] = useEditorState();
 
-  const { selected_page_id, documents } = state;
-
-  // @ts-ignore
-  const document = documents[selected_page_id!];
+  const document = documents[selected_page_id! as "site" | "canvas"];
 
   const documentDispatch = useCallback(
     (action: CanvasAction) => {
       dispatch(
         composeEditorDocumentAction(
-          // @ts-ignore
-          selected_page_id!,
+          selected_page_id! as "site" | "canvas",
           action
         )
       );
@@ -190,10 +187,18 @@ function CanvasProvider({ children }: React.PropsWithChildren<{}>) {
     [selected_page_id, dispatch]
   );
 
+  if (!document || !document.__schema_valid) {
+    return (
+      <ErrorInvalidSchema
+        data={{ __schema_version: document?.__schema_version }}
+      />
+    );
+  }
+
   return (
     <StandaloneDocumentEditor
       editable
-      initial={document}
+      initial={document.state}
       dispatch={documentDispatch}
     >
       {children}

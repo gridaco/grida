@@ -45,7 +45,7 @@ function useSync(document: grida.program.document.Document | undefined) {
         .update({
           data: debounced
             ? ({
-                __schema_version: "2025-03-03",
+                __schema_version: "0.0.1-beta.1+20250303",
                 ...debounced,
               } satisfies CanvasDocumentSnapshotSchema as {})
             : null,
@@ -61,9 +61,23 @@ function useSync(document: grida.program.document.Document | undefined) {
 }
 
 export default function CanvasPage() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
-  useSync(state.documents["canvas"]?.document);
+  const {
+    documents: { canvas: document },
+  } = state;
+
+  if (!document) {
+    return <Spinner />;
+  }
+
+  return <Ready />;
+}
+
+function Ready() {
+  const [state] = useEditorState();
+
+  useSync(state.documents["canvas"]?.state?.document);
   useEditorHotKeys();
 
   const {

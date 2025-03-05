@@ -20,8 +20,8 @@ import _002 from "@/theme/templates/formstart/002/page";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import Home from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/page";
-import PolestarPromo from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/page";
+import TMP_Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/component";
+import TMP_Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/component";
 
 export default function SiteDeisngPage() {
   return (
@@ -77,7 +77,7 @@ function CustomComponent__Invite(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <PolestarPromo params={{ cid: "00000000" }} />
+      <TMP_Invite params={{ cid: "00000000" }} />
     </div>
   );
 }
@@ -107,7 +107,7 @@ function CustomComponent__Portal(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Home />
+      <TMP_Portal />
     </div>
   );
 }

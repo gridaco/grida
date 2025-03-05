@@ -217,7 +217,7 @@ export default function CanvasPlayground({
 
   const onExport = () => {
     const documentData = {
-      version: "2025-03-03",
+      version: "0.0.1-beta.1+20250303",
       document: state.document,
     } satisfies io.JSONDocumentFileModel;
 

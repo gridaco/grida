@@ -16,6 +16,7 @@ import {
   isValidSchemaName,
   schemaname_validation_messages,
 } from "../utils/regex";
+import { grida } from "@/grida";
 
 /**
  * NO RLS - use with caution
@@ -250,7 +251,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
       .insert({
         id: masterdoc_ref.id,
         data: {
-          __schema_version: "2025-03-03",
+          __schema_version: grida.program.document.SCHEMA_VERSION,
           nodes: {},
           scenes: {
             "0": {

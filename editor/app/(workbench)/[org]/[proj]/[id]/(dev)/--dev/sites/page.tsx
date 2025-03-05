@@ -25,24 +25,15 @@ export default function SiteDeisngPage() {
 function CurrentPageCanvas() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    theme: { lang },
-    selected_page_id,
-    documents,
-  } = state;
+  const { selected_page_id, documents } = state;
 
   // @ts-ignore
   const document = documents[selected_page_id!];
 
   const documentDispatch = useCallback(
     (action: CanvasAction) => {
-      dispatch(
-        composeEditorDocumentAction(
-          // @ts-ignore
-          selected_page_id!,
-          action
-        )
-      );
+      // @ts-ignore
+      dispatch(composeEditorDocumentAction(selected_page_id!, action));
     },
     [selected_page_id, dispatch]
   );

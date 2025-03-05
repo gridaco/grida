@@ -223,7 +223,7 @@ function FormStartPageTemplateControl() {
     <>
       <BrowseStartPageTemplatesDialog
         {...switchTemplateDialog.props}
-        defaultValue={state.documents["form/startpage"]?.template_id}
+        defaultValue={state.documents["form/startpage"]?.state?.template_id}
         onValueCommit={setupStartPage}
       />
       <AlertDialog {...removeConfirmDialog.props}>

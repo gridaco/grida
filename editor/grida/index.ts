@@ -170,7 +170,7 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
-  export const SCHEMA_VERSION = "2025-03-03";
+  export const SCHEMA_VERSION = "0.0.1-beta.1+20250303";
 
   /**
    * Simple Node Selector

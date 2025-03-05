@@ -18,7 +18,6 @@ import type {
   FormBlock,
   FormFieldDefinition,
   FormPageBackgroundSchema,
-  FormStartPageSchema,
   FormStyleSheetV1Schema,
 } from "@/types";
 import type {
@@ -228,9 +227,7 @@ export default async function Layout({
                     form.unknown_field_handling_strategy,
                   method: data.method,
                 },
-                start: validate_form_start_page_schema_version(data.start_page)
-                  ? (data.start_page as {} as FormStartPageSchema)
-                  : null,
+                start: data.start_page,
                 ending: {
                   is_redirect_after_response_uri_enabled:
                     data.is_redirect_after_response_uri_enabled,
@@ -550,11 +547,4 @@ function BaseLayout({
       </ThemeProvider>
     </div>
   );
-}
-
-function validate_form_start_page_schema_version(
-  data: any
-): data is FormStartPageSchema {
-  if (!data) return false;
-  return (data as any).__schema_version === "2024-10-24";
 }
