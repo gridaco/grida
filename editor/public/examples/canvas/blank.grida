@@ -5,6 +5,7 @@
     "scenes": {
       "blank": {
         "id": "blank",
+        "name": "blank",
         "type": "scene",
         "children": [],
         "constraints": {

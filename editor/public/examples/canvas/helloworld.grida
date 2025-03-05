@@ -197,19 +197,23 @@
         "effects": []
       }
     },
-    "scene": {
-      "type": "scene",
-      "children": [
-        "454:341"
-      ],
-      "constraints": {
-        "children": "multiple"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "hello": {
+        "id": "hello",
+        "name": "hello",
+        "type": "scene",
+        "children": [
+          "454:341"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }

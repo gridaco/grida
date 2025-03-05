@@ -970,19 +970,23 @@
         "fontWeight": 600
       }
     },
-    "scene": {
-      "type": "scene",
-      "children": [
-        "291:302"
-      ],
-      "constraints": {
-        "children": "single"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "main": {
+        "id": "main",
+        "name": "main",
+        "type": "scene",
+        "children": [
+          "291:302"
+        ],
+        "constraints": {
+          "children": "single"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }

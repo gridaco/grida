@@ -79,19 +79,23 @@
         }
       }
     },
-    "scene": {
-      "type": "scene",
-      "children": [
-        "root"
-      ],
-      "constraints": {
-        "children": "multiple"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "demo": {
+        "id": "demo",
+        "name": "demo",
+        "type": "scene",
+        "children": [
+          "root"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }

@@ -494,19 +494,23 @@
         ]
       }
     },
-    "scene": {
-      "type": "scene",
-      "children": [
-        "root"
-      ],
-      "constraints": {
-        "children": "multiple"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "001": {
+        "id": "001",
+        "name": "sketch",
+        "type": "scene",
+        "children": [
+          "root"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }

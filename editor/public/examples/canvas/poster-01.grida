@@ -895,19 +895,23 @@
         ]
       }
     },
-    "scene": {
-      "type": "scene",
-      "children": [
-        "102:2"
-      ],
-      "constraints": {
-        "children": "multiple"
-      },
-      "backgroundColor": {
-        "r": 245,
-        "g": 245,
-        "b": 245,
-        "a": 1
+    "scenes": {
+      "hymym": {
+        "id": "hymym",
+        "name": "How I Met Your Mother",
+        "type": "scene",
+        "children": [
+          "102:2"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
     }
   }
