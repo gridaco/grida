@@ -155,12 +155,10 @@ export function SideControlGlobal() {
 }
 
 function FormStartPageControl() {
-  const {
-    state: { document },
-    changeNodeProps,
-  } = useDocument();
+  const { changeNodeProps } = useDocument();
 
-  const { props, template_id, properties } = useNode(document.root_id);
+  // FIXME: 250303 UNKNOWN
+  const { props, template_id, properties } = useNode("page");
   const { default: defaultProps } = useTemplateDefinition(template_id!);
 
   const shallowProps = useMemo(
@@ -187,7 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              changeNodeProps(document.root_id, k, v);
+              changeNodeProps("page", k, v);
             }}
           />
         </SidebarMenuSectionContent>
@@ -224,7 +222,7 @@ function FormStartPageTemplateControl() {
     <>
       <BrowseStartPageTemplatesDialog
         {...switchTemplateDialog.props}
-        defaultValue={state.documents["form/startpage"]?.template_id}
+        defaultValue={state.documents["form/startpage"]?.state?.template_id}
         onValueCommit={setupStartPage}
       />
       <AlertDialog {...removeConfirmDialog.props}>

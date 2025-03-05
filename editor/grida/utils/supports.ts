@@ -33,3 +33,9 @@ export namespace supports {
   export const boxShadow = (type: NodeType) =>
     __supports.boxShadow.includes(type);
 }
+
+export const is_direct_component_consumer = (type: NodeType) => {
+  return (
+    type === "component" || type === "instance" || type === "template_instance"
+  );
+};

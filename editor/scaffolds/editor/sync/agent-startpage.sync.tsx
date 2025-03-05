@@ -10,7 +10,7 @@ import equal from "deep-equal";
 export function useSyncFormAgentStartPage() {
   const [state, dispatch] = useEditorState();
   const { document_id, documents } = state;
-  const startpagestate = documents["form/startpage"];
+  const startpagestate = documents["form/startpage"]?.state;
   const document = startpagestate?.document;
   const debounced = useDebounce(document, 1000);
   const prev = usePrevious(debounced);
@@ -30,7 +30,7 @@ export function useSyncFormAgentStartPage() {
         .update({
           start_page: debounced
             ? ({
-                __schema_version: "2024-10-24",
+                __schema_version: "0.0.1-beta.1+20250303",
                 template_id: startpagestate!.template_id,
                 ...debounced,
               } satisfies FormStartPageSchema as {})

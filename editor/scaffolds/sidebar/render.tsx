@@ -60,6 +60,7 @@ export function renderMenuGroup<T extends TMenuData>(
                   <SidebarMenuLinkButton
                     size="sm"
                     // data-level={item.level}
+                    disabled={item.disabled}
                     link={item.link}
                     onClick={() => {
                       onSelect?.(item);

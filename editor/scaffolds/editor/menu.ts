@@ -109,13 +109,16 @@ export type MenuItem<T extends TMenuData = TMenuData> =
       type: "folder";
       label: string;
       children: MenuItem<T>[];
+      disabled?: boolean;
       icon?: ResourceTypeIconName;
       link?: MenuLink;
       layout?: boolean;
+      defaultOpen?: boolean;
     } & T)
   | ({
       type: "item";
       label: string;
+      disabled?: boolean;
       icon?: ResourceTypeIconName;
       link?: MenuLink;
     } & T);

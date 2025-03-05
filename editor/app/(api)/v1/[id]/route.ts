@@ -153,9 +153,8 @@ export async function GET(
   let system_keys: GFKeys = {};
   try {
     system_keys = parseGFKeys(searchParams);
-  } catch (e) {
+  } catch (e: any) {
     console.error("error while parsing system keys:", e);
-    // @ts-ignore
     response.error = e;
   }
 

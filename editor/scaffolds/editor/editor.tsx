@@ -31,6 +31,9 @@ import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";
 import { FormAgentThemeSyncProvider } from "./sync";
+import { CanvasAction, StandaloneDocumentEditor } from "@/grida-react-canvas";
+import { composeEditorDocumentAction } from "./action";
+import { ErrorInvalidSchema } from "@/components/error";
 
 export function EditorProvider({
   initial,
@@ -71,28 +74,6 @@ export function EditorProvider({
     default:
       throw new Error("unsupported doctype");
   }
-}
-
-function CanvasDocumentEditorProvider({
-  initial,
-  children,
-}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
-  const [state, dispatch] = React.useReducer(
-    reducer,
-    initialEditorState(initial)
-  );
-  return (
-    <StateProvider state={state} dispatch={dispatch}>
-      <Multiplayer>
-        <TooltipProvider>
-          <MediaViewerProvider>
-            {/*  */}
-            {children}
-          </MediaViewerProvider>
-        </TooltipProvider>
-      </Multiplayer>
-    </StateProvider>
-  );
 }
 
 function DatabaseDocumentEditorProvider({
@@ -140,6 +121,30 @@ function BucketDocumentEditorProvider({
   );
 }
 
+function CanvasDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <MediaViewerProvider>
+            <CanvasProvider>
+              {/*  */}
+              {children}
+            </CanvasProvider>
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
+}
+
 function SiteDocumentEditorProvider({
   initial,
   children,
@@ -154,12 +159,50 @@ function SiteDocumentEditorProvider({
         <TooltipProvider>
           <AssetsBackgroundsResolver />
           <MediaViewerProvider>
-            {/*  */}
-            {children}
+            <CanvasProvider>
+              {/*  */}
+              {children}
+            </CanvasProvider>
           </MediaViewerProvider>
         </TooltipProvider>
       </Multiplayer>
     </StateProvider>
+  );
+}
+
+function CanvasProvider({ children }: React.PropsWithChildren<{}>) {
+  const [{ selected_page_id, documents }, dispatch] = useEditorState();
+
+  const document = documents[selected_page_id! as "site" | "canvas"];
+
+  const documentDispatch = useCallback(
+    (action: CanvasAction) => {
+      dispatch(
+        composeEditorDocumentAction(
+          selected_page_id! as "site" | "canvas",
+          action
+        )
+      );
+    },
+    [selected_page_id, dispatch]
+  );
+
+  if (!document || !document.__schema_valid) {
+    return (
+      <ErrorInvalidSchema
+        data={{ __schema_version: document?.__schema_version }}
+      />
+    );
+  }
+
+  return (
+    <StandaloneDocumentEditor
+      editable
+      initial={document.state}
+      dispatch={documentDispatch}
+    >
+      {children}
+    </StandaloneDocumentEditor>
   );
 }
 

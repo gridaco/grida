@@ -16,17 +16,27 @@ import type {
   TableMenuItem,
   CanvasDocumentEditorInit,
   BucketDocumentEditorInit,
+  SchemaMayVaryDocument,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { FormFieldDefinition, GridaXSupabase } from "@/types";
+import {
+  FormFieldDefinition,
+  FormStartPageSchema,
+  GridaXSupabase,
+  SchemaMayVaryDocumentServerObject,
+} from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import { FormStartPage } from "@/theme/templates/formstart";
-import { initDocumentEditorState } from "@/grida-react-canvas";
+import {
+  IDocumentEditorState,
+  initDocumentEditorState,
+} from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
+import { grida } from "@/grida";
 // import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -310,6 +320,111 @@ function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
  * @returns
  */
 function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
+  // documents: {
+  //   ["site"]: initDocumentEditorState({
+  //     editable: true,
+  //     debug: false,
+  //     document: {
+  //       nodes: {},
+  //       scene: {
+  //         type: "scene",
+  //         children: ["root"],
+  //         guides: [],
+  //         constraints: {
+  //           children: "single",
+  //         },
+  //       },
+  //     },
+  //     templates: {
+  //       ["formcollection_sample_001_the_bundle"]: {
+  //         name: "formcollection_sample_001_the_bundle",
+  //         type: "template",
+  //         properties: {},
+  //         default: {},
+  //         // props: samples["formcollection_sample_001_the_bundle"] as any,
+  //         // overrides: {},
+  //         version: "0.0.0",
+  //         nodes: {},
+  //       },
+  //     },
+  //   }),
+  // },
+
+  // {
+  //   type: "group",
+  //   label: "Pages",
+  //   children: [
+  //     {
+  //       type: "item",
+  //       id: "home",
+  //       label: "home",
+  //       link: {
+  //         href: `/${basepath}/${document_id}/design`,
+  //       },
+  //       icon: "home",
+  //     },
+  //     {
+  //       type: "folder",
+  //       id: "/invite",
+  //       label: "/invite",
+  //       icon: "folder",
+  //       children: [
+  //         {
+  //           type: "folder",
+  //           id: "/invite/<slug>",
+  //           label: "[slug]",
+  //           icon: "folder",
+  //           children: [
+  //             {
+  //               type: "item",
+  //               id: "/invite/<slug>/page",
+  //               label: "page",
+  //               link: {
+  //                 href: `?scene=/invite/<slug>/page`,
+  //               },
+  //               icon: "file",
+  //             },
+  //           ],
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       type: "folder",
+  //       id: "/join",
+  //       label: "/join",
+  //       icon: "folder",
+  //       children: [
+  //         {
+  //           type: "folder",
+  //           id: "/join/<slug>",
+  //           label: "[slug]",
+  //           icon: "folder",
+  //           children: [
+  //             {
+  //               type: "item",
+  //               id: "/join/<slug>/page",
+  //               label: "page",
+  //               link: {
+  //                 href: `?scene=/join/<slug>/page`,
+  //               },
+  //               icon: "file",
+  //             },
+  //           ],
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       type: "item",
+  //       id: "/portal",
+  //       label: "portal",
+  //       link: {
+  //         href: `?scene=/portal`,
+  //       },
+  //       icon: "file",
+  //     },
+  //   ],
+  // }
+
   const base = initialBaseDocumentEditorState(init);
   // @ts-ignore
   return {
@@ -318,40 +433,121 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       basepath: base.basepath,
       document_id: init.document_id,
     }),
-    selected_page_id: "site/dev-collection",
+    selected_page_id: "site",
     documents: {
-      ["site/dev-collection"]: initDocumentEditorState({
-        editable: true,
-        debug: false,
-        document: {
-          root_id: "page",
-          nodes: {
-            page: {
-              id: "page",
-              active: true,
-              name: "Page",
-              type: "template_instance",
-              template_id: "formcollection_sample_001_the_bundle",
-              props: {},
-              locked: false,
-              overrides: {},
-              properties: {},
+      ["site"]: {
+        __schema_version: grida.program.document.SCHEMA_VERSION,
+        __schema_valid: true,
+        state: initDocumentEditorState({
+          editable: true,
+          debug: false,
+          document: {
+            nodes: {
+              invite: {
+                id: "invite",
+                name: "Invite Page",
+                type: "template_instance",
+                template_id: "tmp-2503-invite",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
+              join: {
+                id: "join",
+                name: "Join Page",
+                type: "template_instance",
+                template_id: "tmp-2503-join",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
+              portal: {
+                id: "portal",
+                name: "Portal Page",
+                type: "template_instance",
+                template_id: "tmp-2503-portal",
+                position: "relative",
+                removable: false,
+                active: true,
+                locked: false,
+                properties: {},
+                props: {},
+                overrides: {},
+              },
+            },
+            entry_scene_id: "invite",
+            scenes: {
+              invite: {
+                type: "scene",
+                id: "invite",
+                name: "Invite",
+                children: ["invite"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 1,
+              },
+              join: {
+                type: "scene",
+                id: "join",
+                name: "Join",
+                children: ["join"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 2,
+              },
+              portal: {
+                type: "scene",
+                id: "portal",
+                name: "Portal",
+                children: ["portal"],
+                guides: [],
+                constraints: {
+                  children: "single",
+                },
+                order: 3,
+              },
             },
           },
-        },
-        templates: {
-          ["formcollection_sample_001_the_bundle"]: {
-            name: "formcollection_sample_001_the_bundle",
-            type: "template",
-            properties: {},
-            default: {},
-            // props: samples["formcollection_sample_001_the_bundle"] as any,
-            // overrides: {},
-            version: "0.0.0",
-            nodes: {},
+          templates: {
+            ["tmp-2503-invite"]: {
+              name: "Invite",
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
+            },
+            ["tmp-2503-join"]: {
+              name: "Join",
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
+            },
+            ["tmp-2503-portal"]: {
+              name: "Portal",
+              type: "template",
+              properties: {},
+              default: {},
+              version: "0.0.0",
+              nodes: {},
+            },
           },
-        },
-      }),
+        }),
+      },
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -371,6 +567,76 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   };
 }
 
+function __init_canvas(
+  data: unknown | SchemaMayVaryDocumentServerObject
+): SchemaMayVaryDocument<IDocumentEditorState> | undefined {
+  // data is empty = no start page is set.
+  if (!data) return undefined;
+
+  // check the version
+  if (
+    (data as SchemaMayVaryDocumentServerObject).__schema_version !==
+    "0.0.1-beta.1+20250303"
+  ) {
+    return {
+      __schema_version: (data as SchemaMayVaryDocumentServerObject)
+        .__schema_version,
+      __schema_valid: false,
+      state: null,
+    };
+  }
+
+  const valid = data as SchemaMayVaryDocumentServerObject;
+
+  return {
+    __schema_version: valid.__schema_version,
+    __schema_valid: true,
+    state: {
+      ...initDocumentEditorState({
+        editable: true,
+        debug: false,
+        document: valid,
+      }),
+    },
+  };
+}
+
+function __init_form_start_page_state(
+  data: unknown | FormStartPageSchema
+): BaseDocumentEditorState["documents"]["form/startpage"] | undefined {
+  // data is empty = no start page is set.
+  if (!data) return undefined;
+
+  // check the version
+  if (
+    (data as FormStartPageSchema).__schema_version !== "0.0.1-beta.1+20250303"
+  ) {
+    return {
+      __schema_version: (data as FormStartPageSchema).__schema_version,
+      __schema_valid: false,
+      state: null,
+    };
+  }
+
+  const valid = data as FormStartPageSchema;
+
+  return {
+    __schema_version: valid.__schema_version,
+    __schema_valid: true,
+    state: {
+      template_id: valid.template_id,
+      ...initDocumentEditorState({
+        editable: true,
+        debug: false,
+        document: valid,
+        templates: {
+          [valid.template_id]: FormStartPage.getTemplate(valid.template_id),
+        },
+      }),
+    },
+  };
+}
+
 /**
  * // FIXME: not ready
  * @deprecated @beta
@@ -383,13 +649,9 @@ function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
   return {
     ...base,
     pages: [],
-    selected_page_id: "canvas/one",
+    selected_page_id: "canvas",
     documents: {
-      ["canvas/one"]: initDocumentEditorState({
-        editable: true,
-        debug: false,
-        document: init.canvas_one.pages.one,
-      }),
+      ["canvas"]: __init_canvas(init.document),
     },
     sidebar: {
       mode: "build",
@@ -626,21 +888,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     }),
     selected_page_id: "form",
     documents: {
-      "form/startpage": init.start
-        ? {
-            template_id: init.start.template_id,
-            ...initDocumentEditorState({
-              editable: true,
-              debug: false,
-              document: init.start,
-              templates: {
-                [init.start.template_id]: FormStartPage.getTemplate(
-                  init.start.template_id
-                ),
-              },
-            }),
-          }
-        : undefined,
+      "form/startpage": __init_form_start_page_state(init.start),
     },
     form: {
       form_id: init.form_id,
@@ -696,69 +944,13 @@ function sitedocumentpagesinit({
   document_id: string;
 }): MenuGroup<{ id: string }>[] {
   // {
-  //   id: "site/dev-collection",
+  //   id: "site",
   //   label: "home",
   //   link: {
   //     href: `/${basepath}/${document_id}/design`,
   //   },
   // },
-  return [
-    {
-      type: "group",
-      label: "Pages",
-      children: [
-        {
-          type: "item",
-          id: "home",
-          label: "home",
-          link: {
-            href: `/${basepath}/${document_id}/design`,
-          },
-          icon: "home",
-        },
-        {
-          type: "folder",
-          id: "/blog",
-          label: "/blog",
-          link: {
-            href: `#`,
-          },
-          icon: "folder",
-          children: [
-            {
-              type: "item",
-              id: "/blog/page",
-              label: "page",
-              link: {
-                href: `#`,
-              },
-              icon: "file",
-            },
-            {
-              type: "folder",
-              id: "/blog/[slug]",
-              label: "/[slug]",
-              link: {
-                href: `#`,
-              },
-              icon: "folder",
-              children: [
-                {
-                  type: "item",
-                  id: "/blog/[slug]/page",
-                  label: "page",
-                  link: {
-                    href: `#`,
-                  },
-                  icon: "file",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  return [];
 }
 
 function formdocumentpagesinit({
@@ -774,6 +966,7 @@ function formdocumentpagesinit({
       label: "Design",
       children: [
         {
+          defaultOpen: true,
           type: "folder",
           id: "campaign",
           label: "Campaign",
@@ -787,6 +980,7 @@ function formdocumentpagesinit({
               type: "item",
               id: "form/startpage",
               label: "Cover",
+              disabled: true,
               link: {
                 href: `/${basepath}/${document_id}/form/start`,
               },

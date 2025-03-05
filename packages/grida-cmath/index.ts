@@ -1824,6 +1824,112 @@ export namespace cmath.rect {
   }
 
   /**
+   * Applies padding to a rectangle, expanding it while preserving its center.
+   *
+   * The padding can be specified as a uniform number (applied to all sides) or as an object with optional
+   * properties: `top`, `right`, `bottom`, and `left`. The resulting rectangle has its center unchanged,
+   * with its width increased by the sum of the left and right paddings, and its height increased by the sum
+   * of the top and bottom paddings.
+   *
+   * @param rect - The original rectangle.
+   * @param padding - A uniform padding number or an object specifying padding for each side.
+   * @returns A new rectangle with the padding applied and the same center as the original.
+   *
+   * @example
+   * // Uniform padding of 10 on all sides:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const padded = cmath.rect.pad(rect, 10);
+   * // Result: { x: 40, y: 40, width: 120, height: 100 }
+   *
+   * @example
+   * // Different padding for each side:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const padded = cmath.rect.pad(rect, { top: 5, right: 15, bottom: 10, left: 20 });
+   * // The center of `padded` is the same as the center of `rect`.
+   */
+  export function pad(
+    rect: Rectangle,
+    padding:
+      | number
+      | { top?: number; right?: number; bottom?: number; left?: number }
+  ): Rectangle {
+    let top: number, right: number, bottom: number, left: number;
+    if (typeof padding === "number") {
+      top = right = bottom = left = padding;
+    } else {
+      top = padding.top ?? 0;
+      right = padding.right ?? 0;
+      bottom = padding.bottom ?? 0;
+      left = padding.left ?? 0;
+    }
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    const newWidth = rect.width + left + right;
+    const newHeight = rect.height + top + bottom;
+    return {
+      x: centerX - newWidth / 2,
+      y: centerY - newHeight / 2,
+      width: newWidth,
+      height: newHeight,
+    };
+  }
+
+  /**
+   * Insets (shrinks) a rectangle by the given margin(s) while preserving its center.
+   *
+   * The margin can be specified as a uniform number (applied to all sides) or as an object with optional
+   * properties: `top`, `right`, `bottom`, and `left`. The resulting rectangle's width and height are clamped
+   * to be non-negative.
+   *
+   * @param rect - The original rectangle.
+   * @param margin - A uniform margin number or an object specifying margins for each side.
+   * @returns A new rectangle with the margin applied inward and the same center as the original.
+   *
+   * @example
+   * // Uniform inset of 10 on all sides:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const insetRect = cmath.rect.inset(rect, 10);
+   * // New dimensions: width = 100 - 20 = 80, height = 80 - 20 = 60, center remains at (100, 90)
+   * // Result: { x: 100 - 40, y: 90 - 30, width: 80, height: 60 } → { x: 60, y: 60, width: 80, height: 60 }
+   *
+   * @example
+   * // Non-uniform inset:
+   * const rect = { x: 50, y: 50, width: 100, height: 80 };
+   * const insetRect = cmath.rect.inset(rect, { top: 5, right: 15, bottom: 10, left: 20 });
+   * // New width = 100 - (20+15) = 65, new height = 80 - (5+10) = 65,
+   * // Center remains at (100, 90), so new x = 100 - 65/2 = 67.5, new y = 90 - 65/2 = 57.5
+   * // Result: { x: 67.5, y: 57.5, width: 65, height: 65 }
+   */
+  export function inset(
+    rect: Rectangle,
+    margin:
+      | number
+      | { top?: number; right?: number; bottom?: number; left?: number }
+  ): Rectangle {
+    let top: number, right: number, bottom: number, left: number;
+    if (typeof margin === "number") {
+      top = right = bottom = left = margin;
+    } else {
+      top = margin.top ?? 0;
+      right = margin.right ?? 0;
+      bottom = margin.bottom ?? 0;
+      left = margin.left ?? 0;
+    }
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    let newWidth = rect.width - (left + right);
+    let newHeight = rect.height - (top + bottom);
+    newWidth = newWidth < 0 ? 0 : newWidth;
+    newHeight = newHeight < 0 ? 0 : newHeight;
+    return {
+      x: centerX - newWidth / 2,
+      y: centerY - newHeight / 2,
+      width: newWidth,
+      height: newHeight,
+    };
+  }
+
+  /**
    * Aligns an array of rectangles along a specified axis and alignment type.
    *
    * @param rectangles - An array of rectangles to align.
@@ -2099,6 +2205,100 @@ export namespace cmath.rect {
     }
 
     return distributed;
+  }
+}
+
+/**
+ * Boolean operations on rectangles for vector graphics calculations.
+ *
+ * This module provides functions to perform basic boolean operations on rectangles,
+ * tailored for vector graphics use cases where precise layout and bounding calculations
+ * are required.
+ *
+ * - **intersect: A ∩ B**
+ *   Computes the intersecting region of A and B, returning a single rectangle (or null if there is no overlap).
+ *
+ * - **subtract: A - B**
+ *   Subtracts B from A, returning an array of rectangles that represent the area of A excluding the overlapping region with B.
+ *
+ * - **exclude: A ⊖ B**
+ *   Computes the symmetric difference, defined as (A ∪ B) minus (A ∩ B), returning an array of rectangles that represent the non-overlapping portions of A and B.
+ */
+export namespace cmath.rect.boolean {
+  /**
+   * Subtracts rectangle `b` from rectangle `a`, returning the remaining disjoint subregions.
+   *
+   * In the context of vector graphics calculations, this function computes the boolean
+   * difference \(A - B\) by removing the overlapping area of `b` (if any) from `a`. The operation
+   * returns an array of rectangles representing the parts of `a` that are not covered by `b`.
+   * Only the portion of `b` that overlaps with `a` is subtracted; the resulting regions will always be
+   * confined within `a`.
+   *
+   * @param a - The rectangle from which to subtract.
+   * @param b - The rectangle to subtract.
+   * @returns An array of rectangles representing the area of `a` after subtracting the overlap with `b`.
+   *
+   * @example
+   * ```typescript
+   * const a: Rectangle = { x: 10, y: 10, width: 30, height: 30 };
+   * const b: Rectangle = { x: 20, y: 20, width: 10, height: 10 };
+   * const result = cmath.rect.boolean.subtract(a, b);
+   * // result:
+   * // [
+   * //   { x: 10, y: 10, width: 30, height: 10 }, // top region of A above B
+   * //   { x: 10, y: 30, width: 30, height: 10 }, // bottom region of A below B
+   * //   { x: 10, y: 20, width: 10, height: 10 }, // left region of A left of B
+   * //   { x: 30, y: 20, width: 10, height: 10 }  // right region of A right of B
+   * // ]
+   * ```
+   */
+  export function subtract(a: Rectangle, b: Rectangle): Rectangle[] {
+    const inter = cmath.rect.intersection(a, b);
+    if (!inter) return [a];
+
+    const result: Rectangle[] = [];
+
+    // Top region: area of `a` above the intersection.
+    if (a.y < inter.y) {
+      result.push({
+        x: a.x,
+        y: a.y,
+        width: a.width,
+        height: inter.y - a.y,
+      });
+    }
+
+    // Bottom region: area of `a` below the intersection.
+    if (a.y + a.height > inter.y + inter.height) {
+      result.push({
+        x: a.x,
+        y: inter.y + inter.height,
+        width: a.width,
+        height: a.y + a.height - (inter.y + inter.height),
+      });
+    }
+
+    // Left region: area of `a` to the left of the intersection (within the vertical span of the intersection).
+    if (a.x < inter.x) {
+      result.push({
+        x: a.x,
+        y: inter.y,
+        width: inter.x - a.x,
+        height: inter.height,
+      });
+    }
+
+    // Right region: area of `a` to the right of the intersection (within the vertical span of the intersection).
+    if (a.x + a.width > inter.x + inter.width) {
+      result.push({
+        x: inter.x + inter.width,
+        y: inter.y,
+        width: a.x + a.width - (inter.x + inter.width),
+        height: inter.height,
+      });
+    }
+
+    return result;
   }
 }
 
@@ -2833,6 +3033,140 @@ export namespace cmath.transform {
     const radians = Math.atan2(c, a); // typical for rotation matrix: a = cosθ, c = sinθ
     const degrees = radians * (180 / Math.PI);
     return degrees;
+  }
+}
+
+/**
+ * Algorithms and utilities for rectangle packing, bin packing, and layout optimization.
+ *
+ * Provides core implementations for various rectangle packing algorithms useful for graphical canvas
+ * applications, UI layout management, and efficient spatial utilization scenarios.
+ *
+ * ### Common Use Cases:
+ * - Arranging graphical elements dynamically on a canvas.
+ * - Sprite sheet generation.
+ * - UI element placement and responsive layout systems.
+ * - Spatial optimization tasks such as texture atlas management.
+ *
+ * @remarks
+ * These algorithms are optimized for performance and clarity, suitable for real-time graphical
+ * applications where efficiency is critical.
+ *
+ */
+export namespace cmath.packing {
+  /**
+   * Calculates the next viable placement for a rectangular agent within a bounded domain.
+   *
+   * Given a rectangular domain V, an agent of dimensions (w, h), and a set of occupied regions A,
+   * this function computes a candidate placement R ⊆ V such that R ∩ a = ∅ for every a ∈ A.
+   *
+   * @param view - The domain rectangle V defined by (x, y, width, height).
+   * @param agent - An object with dimensions {width: number, height: number} for the agent.
+   * @param anchors - An array of rectangles representing occupied regions A (which may extend beyond V).
+   * @returns A rectangle R = (x, y, w, h) representing the placement of the agent, or null if none exists.
+   *
+   * @remarks
+   * This function implements a foundational variation of the MaxRects algorithm:
+   * 1. Initialize F = {V}.
+   * 2. For each a ∈ A, replace each r ∈ F with r \ a.
+   * 3. Select a candidate r ∈ F such that r.width ≥ w and r.height ≥ h, using a lexicographical minimality criterion.
+   */
+  export function fit(
+    view: Rectangle,
+    agent: { width: number; height: number },
+    anchors: Rectangle[]
+  ): Rectangle | null {
+    let freeRegions: Rectangle[] = [view];
+    for (const anchor of anchors) {
+      let updatedRegions: Rectangle[] = [];
+      for (const region of freeRegions) {
+        updatedRegions.push(...cmath.rect.boolean.subtract(region, anchor));
+      }
+      freeRegions = updatedRegions;
+    }
+    const candidates = freeRegions.filter(
+      (r) => r.width >= agent.width && r.height >= agent.height
+    );
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => a.y - b.y || a.x - b.x);
+    const chosen = candidates[0];
+    return {
+      x: chosen.x,
+      y: chosen.y,
+      width: agent.width,
+      height: agent.height,
+    };
+  }
+}
+
+export namespace cmath.packing.ext {
+  /**
+   * TODO: can be optimized
+   * Attempts to find a valid placement for the agent by "walking" outward from the view,
+   * expanding the search towards the right and down directions. This function is used when
+   * a fit within the initial view cannot be found.
+   *
+   * The algorithm iteratively expands the search region (starting at the view's top-left corner)
+   * and tests candidate placements on a grid. The first candidate that does not overlap any anchor
+   * is returned. The search is performed only in the positive (right and down) directions.
+   *
+   * @param view - The original view rectangle.
+   * @param agent - The dimensions of the agent rectangle (width and height).
+   * @param anchors - An array of rectangles representing occupied regions.
+   * @returns A rectangle representing the placement of the agent that does not overlap any anchor.
+   *
+   * @example
+   * ```typescript
+   * const view = { x: 0, y: 0, width: 100, height: 100 };
+   * const agent = { width: 50, height: 50 };
+   * const anchors = [{ x: 0, y: 0, width: 100, height: 100 }];
+   * // Since no fit is found within view, walk_to_fit searches outward.
+   * const placement = cmath.packing.walk_to_fit(view, agent, anchors);
+   * // placement might be something like { x: 100, y: 0, width: 50, height: 50 }.
+   * ```
+   */
+  export function walk_to_fit(
+    view: Rectangle,
+    agent: { width: number; height: number },
+    anchors: Rectangle[]
+  ): Rectangle {
+    // First, try to fit within the original view.
+    const fits = cmath.packing.fit(view, agent, anchors);
+    if (fits) return fits;
+
+    // Define a step size (use half the smaller dimension of the agent, but at least 1).
+    const step = Math.max(
+      1,
+      Math.floor(Math.min(agent.width, agent.height) / 2)
+    );
+    // We'll search in an expanding square region starting at view.x, view.y.
+    let searchRadius = step;
+
+    while (true) {
+      // Iterate over candidate positions within [view.x, view.x + searchRadius] and [view.y, view.y + searchRadius].
+      for (let dy = 0; dy <= searchRadius; dy += step) {
+        for (let dx = 0; dx <= searchRadius; dx += step) {
+          // We only search in the right/down direction.
+          const candidateX = view.x + dx;
+          const candidateY = view.y + dy;
+          const candidateRect: Rectangle = {
+            x: candidateX,
+            y: candidateY,
+            width: agent.width,
+            height: agent.height,
+          };
+          // Check if candidate overlaps any anchor.
+          if (
+            !anchors.some((anchor) =>
+              cmath.rect.intersects(candidateRect, anchor)
+            )
+          ) {
+            return candidateRect;
+          }
+        }
+      }
+      searchRadius += step;
+    }
   }
 }
 
@@ -3664,7 +3998,13 @@ export namespace cmath.ext.snap {
     tolerance = 0
   ): Sanp2DAxisAlignedResult {
     assert(agents.length > 0, "Agents must contain at least one point.");
-    assert(anchors.length > 0, "Anchors must contain at least one point.");
+
+    if (anchors.length === 0) {
+      return {
+        x: null,
+        y: null,
+      };
+    }
 
     // Separate the scalar points for each axis
     const x_agent_points = agents.map(([x]) => x);

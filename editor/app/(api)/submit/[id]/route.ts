@@ -1438,8 +1438,7 @@ async function hook_notifications({ form_id }: { form_id: string }) {
 
 function isObjectEmpty(obj: object | null | undefined) {
   try {
-    // @ts-ignore
-    return Object.keys(obj).length === 0;
+    return Object.keys(obj as any).length === 0;
   } catch (e) {
     return true;
   }

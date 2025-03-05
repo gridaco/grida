@@ -32,7 +32,9 @@ import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import Toolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import Toolbar, {
+  ToolbarPosition,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import { Card } from "@/components/ui/card";
 import { PenToolIcon } from "lucide-react";
 
@@ -44,33 +46,19 @@ export function GridaCanvasFormField() {
     initDocumentEditorState({
       editable: true,
       document: {
-        nodes: {
-          root: {
-            id: "root",
-            name: "root",
-            active: true,
-            locked: false,
-            type: "container",
+        nodes: {},
+        scenes: {
+          main: {
+            type: "scene",
+            id: "main",
+            name: "main",
             children: [],
-            width: 800,
-            height: 600,
-            position: "relative",
-            style: {},
-            opacity: 1,
-            zIndex: 0,
-            rotation: 0,
-            expanded: false,
-            cornerRadius: 0,
-            padding: 0,
-            layout: "flow",
-            direction: "horizontal",
-            mainAxisAlignment: "start",
-            crossAxisAlignment: "start",
-            mainAxisGap: 0,
-            crossAxisGap: 0,
+            guides: [],
+            constraints: {
+              children: "multiple",
+            },
           },
         },
-        root_id: "root",
       },
     })
   );
@@ -124,10 +112,9 @@ export function GridaCanvasFormField() {
                       <AutoInitialFitTransformer>
                         <StandaloneDocumentContent />
                       </AutoInitialFitTransformer>
-
-                      <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                      <ToolbarPosition>
                         <Toolbar />
-                      </div>
+                      </ToolbarPosition>
                     </ViewportRoot>
                     {/* <DevtoolsPanel /> */}
                   </div>

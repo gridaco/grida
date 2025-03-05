@@ -34,7 +34,8 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
-  | DocumentBackgroundAction
+  | LoadSceneAction
+  | SceneAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -116,9 +117,42 @@ export interface __InternalResetAction {
   state: IDocumentEditorState;
 }
 
-export interface DocumentBackgroundAction {
-  type: "background-color";
-  backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"];
+export interface LoadSceneAction {
+  type: "load";
+  scene: string;
+}
+
+export type SceneAction =
+  | CreateNewSceneAction
+  | DeleteSceneAction
+  | DuplicateSceneAction
+  | ChangeSceneNameAction
+  | ChangeSceneBackgroundAction;
+
+export interface CreateNewSceneAction {
+  type: "scenes/new";
+  scene?: grida.program.document.SceneInit;
+}
+
+export interface DeleteSceneAction {
+  type: "scenes/delete";
+  scene: string;
+}
+
+export interface DuplicateSceneAction {
+  type: "scenes/duplicate";
+  scene: string;
+}
+
+export interface ChangeSceneNameAction {
+  type: "scenes/change/name";
+  scene: string;
+  name: string;
+}
+export interface ChangeSceneBackgroundAction {
+  type: "scenes/change/background-color";
+  scene: string;
+  backgroundColor: grida.program.document.ISceneBackground["backgroundColor"];
 }
 
 export interface EditorSelectAction {
@@ -508,10 +542,16 @@ export type EditorSurface_StartGesture = {
 
 // #endregion surface action
 
-export interface DocumentEditorInsertNodeAction {
+export type DocumentEditorInsertNodeAction = {
   type: "insert";
-  prototype: grida.program.nodes.NodePrototype;
-}
+} & (
+  | {
+      prototype: grida.program.nodes.NodePrototype;
+    }
+  | {
+      document: grida.program.document.IPackedSceneDocument;
+    }
+);
 
 interface ITemplateInstanceNodeID {
   template_instance_node_id: string;

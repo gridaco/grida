@@ -3,7 +3,7 @@ import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 export default function Page() {
   return (
     <ScreenWindowRoot>
-      {/* @ts-ignore */}
+      {/*  */}
       {/* <_003 /> */}
     </ScreenWindowRoot>
   );

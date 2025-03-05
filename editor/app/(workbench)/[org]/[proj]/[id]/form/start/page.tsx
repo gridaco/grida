@@ -29,8 +29,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { useDebounceCallback } from "usehooks-ts";
-import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
@@ -63,22 +61,14 @@ import { CanvasAction } from "@/grida-react-canvas";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
+import { ErrorInvalidSchema } from "@/components/error";
 
 export default function FormStartEditPage() {
-  const [state, dispatch] = useEditorState();
-
-  useSyncFormAgentStartPage();
+  const [state] = useEditorState();
 
   const {
     documents: { "form/startpage": startpage },
   } = state;
-
-  const startPageDocumentDispatch = useCallback(
-    (action: CanvasAction) => {
-      dispatch(composeEditorDocumentAction("form/startpage", action));
-    },
-    [dispatch]
-  );
 
   return (
     <CurrentPage
@@ -90,33 +80,69 @@ export default function FormStartEditPage() {
       }
     >
       <main className="h-full flex flex-1 w-full">
-        {startpage ? (
-          <StandaloneDocumentEditor
-            key={startpage.template_id}
-            editable
-            initial={{
-              ...startpage,
-              templates: {
-                [startpage.template_id]: FormStartPage.getTemplate(
-                  startpage.template_id
-                ),
-              },
-            }}
-            dispatch={startPageDocumentDispatch}
-          >
-            <div className="w-full h-full flex flex-col">
-              <StartPageEditor template_id={startpage.template_id} />
-              {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
-            </div>
-            <aside className="hidden lg:flex h-full">
-              <SideControl />
-            </aside>
-          </StandaloneDocumentEditor>
-        ) : (
-          <SetupStartPage />
-        )}
+        {startpage ? <Exists /> : <SetupStartPage />}
       </main>
     </CurrentPage>
+  );
+}
+
+function Exists() {
+  const [state] = useEditorState();
+
+  const {
+    documents: { "form/startpage": startpage },
+  } = state;
+
+  if (!startpage || !startpage.__schema_valid) {
+    return (
+      <ErrorInvalidSchema
+        data={{ __schema_version: startpage?.__schema_version }}
+      />
+    );
+  }
+
+  return <Ready />;
+}
+
+function Ready() {
+  const [
+    {
+      documents: { "form/startpage": startpage },
+    },
+    dispatch,
+  ] = useEditorState();
+
+  const state = startpage!.state!;
+
+  useSyncFormAgentStartPage();
+
+  const startPageDocumentDispatch = useCallback(
+    (action: CanvasAction) => {
+      dispatch(composeEditorDocumentAction("form/startpage", action));
+    },
+    [dispatch]
+  );
+
+  return (
+    <StandaloneDocumentEditor
+      key={state.template_id}
+      editable
+      initial={{
+        ...state,
+        templates: {
+          [state.template_id]: FormStartPage.getTemplate(state.template_id),
+        },
+      }}
+      dispatch={startPageDocumentDispatch}
+    >
+      <div className="w-full h-full flex flex-col">
+        <StartPageEditor template_id={state.template_id} />
+        {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
+      </div>
+      <aside className="hidden lg:flex h-full">
+        <SideControl />
+      </aside>
+    </StandaloneDocumentEditor>
   );
 }
 
@@ -154,7 +180,7 @@ function SetupStartPage() {
                 ALPHA
               </Badge>
               <span className="text-xs text-muted-foreground">
-                Technical preview
+                UNSTABLE Technical preview
               </span>
             </div>
             <CardTitle>Add a cover page for your campaign</CardTitle>
@@ -221,19 +247,18 @@ function StartPageEditor({ template_id }: { template_id: string }) {
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProps, rootProperties, rootProps } =
-    useRootTemplateInstanceNode();
+    useRootTemplateInstanceNode("page");
   const [state, dispatch] = useEditorState();
 
-  const { uploadPublic } = useDocumentAssetUpload();
-
-  const debouncedRichTextHtmlChange = useDebounceCallback(
-    (editor: BlockNoteEditor<any>, content: Block[]) => {
-      editor.blocksToHTMLLossy(content).then((html) => {
-        changeRootProps("body_html", html);
-      });
-    },
-    300
-  );
+  // const { uploadPublic } = useDocumentAssetUpload();
+  // const debouncedRichTextHtmlChange = useDebounceCallback(
+  //   (editor: BlockNoteEditor<any>, content: Block[]) => {
+  //     editor.blocksToHTMLLossy(content).then((html) => {
+  //       changeRootProps("body_html", html);
+  //     });
+  //   },
+  //   300
+  // );
 
   const {
     form: { campaign },

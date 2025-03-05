@@ -10,13 +10,14 @@ import {
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
+  useCurrentScene,
   useDocument,
   useEventTargetCSSCursor,
   useNode,
   useTransform,
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
-import { supports } from "@/grida/utils/supports";
+import { is_direct_component_consumer, supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";
@@ -48,6 +49,12 @@ import { AxisRuler, Tick } from "@grida/ruler";
 import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
 import type { BitmapEditorBrush } from "@grida/bitmap";
+import {
+  FloatingBar,
+  FloatingBarContent,
+  FloatingBarTitle,
+} from "./ui/floating-bar";
+import { grida } from "@/grida";
 
 const DRAG_THRESHOLD = 2;
 
@@ -375,6 +382,7 @@ export function EditorSurface() {
             </SurfaceGroup>
           </SurfaceGroup>
           {dropzone && <DropzoneOverlay {...dropzone} />}
+          <RootFramesBarOverlay />
         </div>
       </div>
     </SurfaceSelectionGroupProvider>
@@ -400,6 +408,113 @@ function DropzoneOverlay(props: DropzoneIndication) {
         />
       );
   }
+}
+
+function RootFramesBarOverlay() {
+  const { state } = useDocument();
+  const scene = useCurrentScene();
+  const rootframes = useMemo(() => {
+    const children = scene.children.map((id) => state.document.nodes[id]);
+    return children.filter(
+      (n) =>
+        n.type === "container" ||
+        n.type === "template_instance" ||
+        n.type === "component" ||
+        n.type === "instance"
+    );
+  }, [scene.children, state.document.nodes]);
+
+  if (scene.constraints.children === "single") {
+    const rootframe = rootframes[0];
+    if (!rootframe) return null;
+    return (
+      <NodeTitleBar
+        node={rootframe}
+        node_id={rootframe.id}
+        state={"active"}
+        sideOffset={8}
+      >
+        <FloatingBarContent>
+          <FloatingBarTitle>{rootframe.name} (single mode)</FloatingBarTitle>
+        </FloatingBarContent>
+      </NodeTitleBar>
+    );
+  }
+
+  return (
+    <>
+      {rootframes.map((node) => (
+        <NodeTitleBar
+          key={node.id}
+          node={node}
+          node_id={node.id}
+          state={
+            state.selection.includes(node.id)
+              ? "active"
+              : state.hovered_node_id === node.id
+                ? "hover"
+                : "idle"
+          }
+        >
+          <FloatingBarTitle>{node.name}</FloatingBarTitle>
+        </NodeTitleBar>
+      ))}
+    </>
+  );
+}
+
+function NodeTitleBar({
+  node,
+  node_id,
+  state,
+  sideOffset,
+  children,
+}: React.PropsWithChildren<{
+  node: grida.program.nodes.Node;
+  sideOffset?: number;
+  node_id: string;
+  state: "idle" | "hover" | "active";
+}>) {
+  const { select, hoverEnterNode, changeNodeName } = useDocument();
+
+  // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
+  const bind = useSurfaceGesture(
+    {
+      onPointerMove: ({ event }) => {
+        hoverEnterNode(node.id);
+      },
+      onDoubleClick: ({ event }) => {
+        const name = prompt("rename", node.name);
+        if (name) changeNodeName(node.id, name);
+      },
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        if (event.shiftKey) {
+          select("selection", [node.id]);
+        } else {
+          select([node.id]);
+        }
+      },
+    },
+    {
+      drag: {
+        threshold: DRAG_THRESHOLD,
+      },
+    }
+  );
+
+  return (
+    <FloatingBar
+      node_id={node_id}
+      state={state}
+      sideOffset={sideOffset}
+      isComponentConsumer={is_direct_component_consumer(node.type)}
+    >
+      <div {...bind()} style={{ touchAction: "none" }}>
+        {children}
+      </div>
+    </FloatingBar>
+  );
 }
 
 /**

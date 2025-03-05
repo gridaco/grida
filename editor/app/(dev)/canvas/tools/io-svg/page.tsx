@@ -24,7 +24,6 @@ export default function IOSVGPage() {
   const [raw, setRaw] = useState<string>();
   const [svgo, setSvgo] = useState<string>();
   const [result, setResult] = useState<any>();
-  const [doc, setDoc] = useState<grida.program.document.IDocumentDefinition>();
   const { openFilePicker, filesContent } = useFilePicker({
     readAs: "Text",
     multiple: false,
@@ -37,31 +36,17 @@ export default function IOSVGPage() {
       editable: true,
       debug: true,
       document: {
-        root_id: "root",
-        nodes: {
-          root: {
-            id: "root",
-            name: "root",
-            active: true,
-            locked: false,
-            type: "container",
+        nodes: {},
+        scenes: {
+          iosvg: {
+            type: "scene",
+            id: "iosvg",
+            name: "iosvg",
             children: [],
-            width: 800,
-            height: 600,
-            position: "relative",
-            style: {},
-            opacity: 1,
-            zIndex: 0,
-            rotation: 0,
-            expanded: false,
-            cornerRadius: 0,
-            padding: 0,
-            layout: "flow",
-            direction: "horizontal",
-            mainAxisAlignment: "start",
-            crossAxisAlignment: "start",
-            mainAxisGap: 0,
-            crossAxisGap: 0,
+            guides: [],
+            constraints: {
+              children: "single",
+            },
           },
         },
       },
@@ -102,12 +87,13 @@ export default function IOSVGPage() {
       .then((result) => {
         if (result) {
           const doc =
-            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
-              result,
-              () => v4()
+            grida.program.nodes.factory.packed_scene_document_to_full_document(
+              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                result,
+                () => v4()
+              )
             );
 
-          setDoc(doc);
           dispatch({
             type: "__internal/reset",
             state: initDocumentEditorState({
@@ -174,21 +160,18 @@ export default function IOSVGPage() {
               <section className="flex-1">
                 <span className="text-sm font-bold font-mono">Grida</span>
                 <div className="w-full border h-96">
-                  {doc && (
-                    <StandaloneDocumentEditor
-                      key={doc.root_id}
-                      editable
-                      dispatch={dispatch}
-                      initial={state}
-                    >
-                      <ViewportRoot className="relative w-full h-full p-4">
-                        <EditorSurface />
-                        <AutoInitialFitTransformer>
-                          <StandaloneDocumentContent className="w-full h-full" />
-                        </AutoInitialFitTransformer>
-                      </ViewportRoot>
-                    </StandaloneDocumentEditor>
-                  )}
+                  <StandaloneDocumentEditor
+                    editable
+                    dispatch={dispatch}
+                    initial={state}
+                  >
+                    <ViewportRoot className="relative w-full h-full p-4">
+                      <EditorSurface />
+                      <AutoInitialFitTransformer>
+                        <StandaloneDocumentContent className="w-full h-full" />
+                      </AutoInitialFitTransformer>
+                    </ViewportRoot>
+                  </StandaloneDocumentEditor>
                 </div>
                 <span className="text-sm font-bold font-mono">SVG / SVGO</span>
                 <div className="flex w-full h-96 p-4 border overflow-scroll">

@@ -69,11 +69,6 @@ export default function nodeTransformReducer(
   action: NodeTransformAction
 ) {
   return produce(node, (draft) => {
-    assert(
-      draft.type !== "template_instance",
-      "template_instance cannot be transformed"
-    );
-
     switch (action.type) {
       case "position": {
         const { x, y } = action;

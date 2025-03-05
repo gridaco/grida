@@ -16,6 +16,7 @@ import {
   isValidSchemaName,
   schemaname_validation_messages,
 } from "../utils/regex";
+import { grida } from "@/grida";
 
 /**
  * NO RLS - use with caution
@@ -250,40 +251,22 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
       .insert({
         id: masterdoc_ref.id,
         data: {
-          __schema_version: "2024-12-31",
-          pages: {
-            one: {
-              root_id: "root",
-              nodes: {
-                root: {
-                  id: "root",
-                  name: "root",
-                  active: true,
-                  locked: false,
-                  type: "container",
-                  children: [],
-                  width: 500,
-                  height: 500,
-                  position: "relative",
-                  style: {},
-                  opacity: 1,
-                  zIndex: 0,
-                  rotation: 0,
-                  expanded: false,
-                  cornerRadius: 0,
-                  padding: 0,
-                  layout: "flow",
-                  direction: "horizontal",
-                  mainAxisAlignment: "start",
-                  crossAxisAlignment: "start",
-                  mainAxisGap: 0,
-                  crossAxisGap: 0,
-                },
+          __schema_version: grida.program.document.SCHEMA_VERSION,
+          nodes: {},
+          scenes: {
+            "0": {
+              type: "scene",
+              id: "0",
+              name: "main",
+              children: [],
+              guides: [],
+              constraints: {
+                children: "multiple",
               },
-              bitmaps: {},
-              properties: {},
             },
           },
+          bitmaps: {},
+          properties: {},
         } satisfies CanvasDocumentSnapshotSchema as {},
       })
       .select()

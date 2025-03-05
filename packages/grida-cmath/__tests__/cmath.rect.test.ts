@@ -244,6 +244,91 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("pad", () => {
+    test("applies uniform padding", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const padded = cmath.rect.pad(rect, 10);
+      // Original center: (50 + 100/2, 50 + 80/2) = (100, 90)
+      // New dimensions: width = 100 + 10 + 10 = 120, height = 80 + 10 + 10 = 100
+      // New x = 100 - 120/2 = 40, New y = 90 - 100/2 = 40
+      expect(padded).toEqual({ x: 40, y: 40, width: 120, height: 100 });
+    });
+
+    test("applies non-uniform padding", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const padded = cmath.rect.pad(rect, {
+        top: 5,
+        right: 15,
+        bottom: 10,
+        left: 20,
+      });
+      // Original center: (100, 90)
+      // New width = 100 + 20 + 15 = 135, New height = 80 + 5 + 10 = 95
+      // New x = 100 - 135/2 = 32.5, New y = 90 - 95/2 = 42.5
+      expect(padded).toEqual({ x: 32.5, y: 42.5, width: 135, height: 95 });
+    });
+
+    test("returns same rectangle when padding is 0", () => {
+      const rect = { x: 10, y: 20, width: 50, height: 60 };
+      const padded = cmath.rect.pad(rect, 0);
+      expect(padded).toEqual(rect);
+    });
+  });
+
+  describe("inset", () => {
+    test("applies uniform inset", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const insetRect = cmath.rect.inset(rect, 10);
+      // Original center: (50+50, 50+40) = (100, 90)
+      // New width = 100 - 20 = 80, New height = 80 - 20 = 60
+      // New x = 100 - 80/2 = 60, New y = 90 - 60/2 = 60
+      expect(insetRect).toEqual({ x: 60, y: 60, width: 80, height: 60 });
+    });
+
+    test("applies non-uniform inset", () => {
+      const rect = { x: 50, y: 50, width: 100, height: 80 };
+      const insetRect = cmath.rect.inset(rect, {
+        top: 5,
+        right: 15,
+        bottom: 10,
+        left: 20,
+      });
+      // Original center: (100, 90)
+      // New width = 100 - (20+15) = 65, New height = 80 - (5+10) = 65
+      // New x = 100 - 65/2 = 67.5, New y = 90 - 65/2 = 57.5
+      expect(insetRect).toEqual({ x: 67.5, y: 57.5, width: 65, height: 65 });
+    });
+
+    test("returns same rectangle when inset is 0", () => {
+      const rect = { x: 10, y: 20, width: 50, height: 60 };
+      const insetRect = cmath.rect.inset(rect, 0);
+      expect(insetRect).toEqual(rect);
+    });
+
+    test("clamps dimensions to non-negative when inset is too large (uniform)", () => {
+      const rect = { x: 50, y: 50, width: 30, height: 30 };
+      // Uniform inset of 20 leads to new width = 30 - 40 = -10 and height = -10, so clamped to 0.
+      // Center: (65, 65)
+      const insetRect = cmath.rect.inset(rect, 20);
+      expect(insetRect).toEqual({ x: 65, y: 65, width: 0, height: 0 });
+    });
+
+    test("clamps width to non-negative when inset is too large in one dimension", () => {
+      const rect = { x: 10, y: 10, width: 100, height: 50 };
+      // Apply non-uniform inset: left=60, right=60, top=5, bottom=5.
+      // New width = 100 - (60+60) = -20 (clamped to 0), new height = 50 - (5+5) = 40.
+      // Center remains at (10+50, 10+25) = (60, 35)
+      // New rect: x = 60 - 0/2 = 60, y = 35 - 40/2 = 15
+      const insetRect = cmath.rect.inset(rect, {
+        left: 60,
+        right: 60,
+        top: 5,
+        bottom: 5,
+      });
+      expect(insetRect).toEqual({ x: 60, y: 15, width: 0, height: 40 });
+    });
+  });
+
   describe("align", () => {
     it("should align rectangles to the left", () => {
       const rectangles: cmath.Rectangle[] = [
@@ -660,6 +745,58 @@ describe("cmath.rect", () => {
       const aTransformed = cmath.rect.transform(a, t);
 
       expect(aTransformed).toEqual(b);
+    });
+  });
+});
+
+describe("cmath.rect.boolean", () => {
+  describe("subtract", () => {
+    test("returns original rectangle when no intersection", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 50, y: 50, width: 10, height: 10 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
+    });
+
+    test("returns empty array when b fully covers a", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 5, y: 5, width: 40, height: 40 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([]);
+    });
+
+    test("returns four subregions for full inner intersection", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 20, y: 20, width: 10, height: 10 };
+      const expected = [
+        { x: 10, y: 10, width: 30, height: 10 }, // top region
+        { x: 10, y: 30, width: 30, height: 10 }, // bottom region
+        { x: 10, y: 20, width: 10, height: 10 }, // left region
+        { x: 30, y: 20, width: 10, height: 10 }, // right region
+      ];
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual(expected);
+    });
+
+    test("returns two subregions for partial overlap from one side", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      // b overlaps a from above such that the intersection is { x: 25, y: 10, width: 15, height: 15 }
+      const b = { x: 25, y: 5, width: 20, height: 20 };
+      const expected = [
+        { x: 10, y: 25, width: 30, height: 15 }, // bottom region
+        { x: 10, y: 10, width: 15, height: 15 }, // left region
+      ];
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual(expected);
+    });
+
+    test("returns original rectangle when b has zero area", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      const b = { x: 20, y: 20, width: 0, height: 0 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
+    });
+
+    test("returns original rectangle when rectangles only touch edges", () => {
+      const a = { x: 10, y: 10, width: 30, height: 30 };
+      // b touches a's right edge (x:40) exactly
+      const b = { x: 40, y: 10, width: 20, height: 30 };
+      expect(cmath.rect.boolean.subtract(a, b)).toEqual([a]);
     });
   });
 });

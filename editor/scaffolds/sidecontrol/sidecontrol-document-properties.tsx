@@ -30,16 +30,17 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCurrentScene, useScene } from "@/grida-react-canvas/provider";
 
-function DocumentBackgroundPropertyLine() {
-  const { background, setBackground } = useDocument();
+function SceneBackgroundPropertyLine() {
+  const { backgroundColor, setBackgroundColor } = useCurrentScene();
 
   return (
     <PropertyLine>
       <RGBAColorControl
-        value={background ? background : undefined}
+        value={backgroundColor ? backgroundColor : undefined}
         onValueChange={(color) => {
-          setBackground(color);
+          setBackgroundColor(color);
         }}
       />
     </PropertyLine>
@@ -67,10 +68,10 @@ export function DocumentProperties({ className }: { className?: string }) {
     <div className={className}>
       <SidebarSection className="pb-2">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Document</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Scene</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <DocumentBackgroundPropertyLine />
+          <SceneBackgroundPropertyLine />
         </SidebarMenuSectionContent>
       </SidebarSection>
       <hr />

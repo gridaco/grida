@@ -1,4 +1,4 @@
-import type { IDocumentEditorState } from "../state";
+import { DEFAULT_SCENE_STATE, type IDocumentEditorState } from "../state";
 import type { Action, EditorAction } from "../action";
 import { produce, type Draft } from "immer";
 import {
@@ -9,6 +9,8 @@ import { history } from "./history";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import equal from "deep-equal";
+import { grida } from "@/grida";
+import nid from "./tools/id";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -35,9 +37,101 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.transform = prev_state.transform;
       }) as S;
     }
-    case "background-color": {
+    case "load": {
+      const { scene } = action;
+
+      // check if the scene exists
+      if (!state.document.scenes[scene]) {
+        return state;
+      }
+
+      // check if already loaded
+      if (state.scene_id === scene) {
+        return state;
+      }
+
       return produce(state, (draft: Draft<S>) => {
-        draft.document.backgroundColor = action.backgroundColor;
+        // 1. change the scene_id
+        draft.scene_id = scene;
+        // 2. clear scene-specific state
+        Object.assign(draft, DEFAULT_SCENE_STATE);
+      });
+    }
+    case "scenes/new": {
+      const { scene } = action;
+      const new_scene = grida.program.document.init_scene(
+        scene ?? {
+          id: nid(), // TODO: use other than nid
+          name: `Scene ${Object.keys(state.document.scenes).length + 1}`,
+          order: Object.keys(state.document.scenes).length,
+        }
+      );
+
+      const scene_id = new_scene.id;
+      // check if the scene id does not conflict
+      if (state.document.scenes[scene_id]) {
+        console.error(`Scene id ${scene_id} already exists`);
+        return state;
+      }
+
+      return produce(state, (draft: Draft<S>) => {
+        // 0. add the new scene
+        draft.document.scenes[new_scene.id] = new_scene;
+        // 1. change the scene_id
+        draft.scene_id = new_scene.id;
+        // 2. clear scene-specific state
+        Object.assign(draft, DEFAULT_SCENE_STATE);
+      });
+    }
+    case "scenes/delete": {
+      const { scene } = action;
+      return produce(state, (draft: Draft<S>) => {
+        // 0. remove the scene
+        delete draft.document.scenes[scene];
+        // 1. change the scene_id
+        if (draft.scene_id === scene) {
+          draft.scene_id = Object.keys(draft.document.scenes)[0];
+        }
+        if (draft.document.entry_scene_id === scene) {
+          draft.document.entry_scene_id = draft.scene_id;
+        }
+        // 2. clear scene-specific state
+        Object.assign(draft, DEFAULT_SCENE_STATE);
+      });
+    }
+    case "scenes/duplicate": {
+      const { scene: scene_id } = action;
+
+      // check if the scene exists
+      const origin = state.document.scenes[scene_id];
+      if (!origin) return state;
+
+      const next = grida.program.document.init_scene({
+        ...origin,
+        id: nid(),
+        name: origin.name + " copy",
+        order: origin.order ? origin.order + 1 : undefined,
+      });
+
+      return produce(state, (draft: Draft<S>) => {
+        // 0. add the new scene
+        draft.document.scenes[next.id] = next;
+        // 1. change the scene_id
+        draft.scene_id = next.id;
+        // 2. clear scene-specific state
+        Object.assign(draft, DEFAULT_SCENE_STATE);
+      });
+    }
+    case "scenes/change/name": {
+      const { scene, name } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.scenes[scene].name = name;
+      });
+    }
+    case "scenes/change/background-color": {
+      const { scene } = action;
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.scenes[scene].backgroundColor = action.backgroundColor;
       });
     }
     case "transform": {
@@ -128,8 +222,9 @@ function _reducer<S extends IDocumentEditorState>(
         if (config.ignores_locked)
           draft.surface_raycast_targeting.ignores_locked =
             config.ignores_locked;
-        if (config.ignores_root)
-          draft.surface_raycast_targeting.ignores_root = config.ignores_root;
+        if (config.ignores_root_with_children)
+          draft.surface_raycast_targeting.ignores_root_with_children =
+            config.ignores_root_with_children;
         self_updateSurfaceHoverState(draft);
       });
     }

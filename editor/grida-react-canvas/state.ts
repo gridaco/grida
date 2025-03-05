@@ -37,7 +37,7 @@ export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
-  ignores_root: true,
+  ignores_root_with_children: true,
   ignores_locked: true,
 };
 
@@ -93,16 +93,25 @@ export type SurfaceRaycastTargeting = {
   target: "auto" | "deepest" | "shallowest";
 
   /**
-   * ignores the root node from the targeting
+   * ignores the root node from the targeting (if not empty)
    * @default true
    */
-  ignores_root: boolean;
+  ignores_root_with_children: boolean;
 
   /**
    * ignores the locked node from the targeting
    * @default true
    */
   ignores_locked: boolean;
+};
+
+const DEFAULT_GESTURE_MODIFIERS: GestureModifiers = {
+  translate_with_hierarchy_change: "on",
+  translate_with_clone: "off",
+  tarnslate_with_axis_lock: "off",
+  transform_with_center_origin: "off",
+  transform_with_preserve_aspect_ratio: "off",
+  rotate_with_quantize: "off",
 };
 
 export type GestureModifiers = {
@@ -140,6 +149,8 @@ export type GestureModifiers = {
   rotate_with_quantize: "off" | number;
 };
 
+type CurrentBrush = BitmapEditorBrush & { opacity: number };
+
 export interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
@@ -168,7 +179,7 @@ export interface IDocumentEditorClipboardState {
   next_font_family?: string;
   next_paint_color?: grida.program.cg.RGBA8888;
   user_clipboard_color?: grida.program.cg.RGBA8888;
-  brush: BitmapEditorBrush & { opacity: number };
+  brush: CurrentBrush;
 }
 
 interface IDocumentEditorTransformState {
@@ -287,22 +298,31 @@ export type GestureTranslate = IGesture & {
  *
  * Contains collection of nodes' bounding rect.
  */
-export interface LayoutSnapshot {
-  /**
-   * the type of the layout
-   */
-  type: "flex" | "group";
-
-  /**
-   * the grouping parent id
-   */
-  group: string;
-
+export type LayoutSnapshot = {
   /**
    * relative objects to the parent
    */
   objects: Array<cmath.Rectangle & { id: string }>;
-}
+} & (
+  | {
+      /**
+       * the type of the layout
+       */
+      type: "flex";
+
+      /**
+       * the grouping parent id
+       */
+      group: string;
+    }
+  | {
+      type: "group";
+      /**
+       * the grouping parent id (null if document root)
+       */
+      group: string | null;
+    }
+);
 
 /**
  * Sort the node within the layout (re-order)
@@ -539,15 +559,65 @@ export type DropzoneIndication =
       rect: cmath.Rectangle;
     };
 
+interface ISurfaceEventTargetConfig {
+  /**
+   * the config of how the surface raycast targeting should be
+   */
+  surface_raycast_targeting: SurfaceRaycastTargeting;
+
+  ruler: "on" | "off";
+
+  pixelgrid: "on" | "off";
+
+  surface_measurement_targeting_locked: boolean;
+  surface_measurement_targeting: "on" | "off";
+}
+
 /**
- * [Surface Support State]
+ * the default state of the scene
+ *
+ * this is applied when the scene is loaded (switched)
+ */
+export const DEFAULT_SCENE_STATE: IScenePersistenceState & ISceneSurfaceState =
+  {
+    active_duplication: null,
+    content_edit_mode: undefined,
+    dropzone: undefined,
+    gesture: { type: "idle" },
+    hovered_node_id: null,
+    hovered_vertex_idx: null,
+    marquee: undefined,
+    selection: [],
+    surface_measurement_target: undefined,
+    surface_raycast_detected_node_ids: [],
+    surface_snapping: undefined,
+  };
+
+interface IScenePersistenceState {
+  selection: string[];
+
+  /**
+   * @private - internal use only
+   *
+   * current content edit mode
+   *
+   * @default false
+   */
+  content_edit_mode?: ContentEditModeState;
+}
+
+/**
+ * [Scene Surface Support State]
  *
  * this support state is not part of the document state and does not get saved or recorded as history
  */
-interface IDocumentEditorEventTargetState {
+interface ISceneSurfaceState {
+  /**
+   * the current gesture state
+   *
+   * @default idle
+   */
   gesture: GestureState;
-
-  gesture_modifiers: GestureModifiers;
 
   /**
    * the latest snap result from the gesture
@@ -556,40 +626,71 @@ interface IDocumentEditorEventTargetState {
 
   /**
    * general hover state
+   *
+   * @default null
    */
   hovered_node_id: string | null;
 
   /**
    * hovered vertex index (of a selected path node)
+   *
+   * @default null
    */
   hovered_vertex_idx: number | null;
 
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
+   *
+   * @default undefined
    */
-  dropzone?: DropzoneIndication;
-
-  /**
-   * the config of how the surface raycast targeting should be
-   */
-  surface_raycast_targeting: SurfaceRaycastTargeting;
+  dropzone: DropzoneIndication | undefined;
 
   /**
    * @private - internal use only
    *
    * All node ids detected by the raycast (internally) - does not get affected by the targeting config
+   *
+   * @default []
    */
   surface_raycast_detected_node_ids: string[];
 
+  /**
+   * surface measurement target
+   *
+   * @default undefined
+   */
+  surface_measurement_target?: string[];
+
+  /**
+   * Marquee transform in canvas space
+   *
+   * @default undefined
+   */
+  marquee?: Marquee;
+
+  /**
+   * active, repeatable duplication state
+   *
+   * @default null
+   */
+  active_duplication: ActiveDuplication | null;
+}
+
+/**
+ * [Surface Support State]
+ *
+ * this support state is not part of the document state and does not get saved or recorded as history
+ */
+interface IDocumentEditorEventTargetState
+  extends ISurfaceEventTargetConfig,
+    ISceneSurfaceState {
   pointer: {
     position: cmath.Vector2;
     last: cmath.Vector2;
     // position_snap: cmath.Vector2;
   };
 
-  ruler: "on" | "off";
-
-  pixelgrid: "on" | "off";
+  gesture_modifiers: GestureModifiers;
 
   /**
    * @private - internal use only
@@ -599,23 +700,6 @@ interface IDocumentEditorEventTargetState {
    * @default {type: "cursor"}
    */
   tool: ToolMode;
-
-  /**
-   * target node id to measure distance between the selection
-   */
-  surface_measurement_target?: string[];
-  surface_measurement_targeting_locked: boolean;
-  surface_measurement_targeting: "on" | "off";
-
-  /**
-   * Marquee transform in canvas space
-   */
-  marquee?: Marquee;
-
-  /**
-   * active, repeatable duplication state
-   */
-  active_duplication: ActiveDuplication | null;
 }
 
 /**
@@ -640,21 +724,30 @@ export interface ActiveDuplication {
   clones: grida.program.nodes.NodeID[];
 }
 
-interface IDocumentEditorConfig {
+interface IEditorConfig {
   /**
-   *
    * when editable is false, the document definition is not editable
    * set editable false on production context - end-user-facing context
    */
   editable: boolean;
   debug: boolean;
+
+  /**
+   * when user tries to remove a node that is not removable (removable=false) or tries to remove root node that is required by constraints, this is the behavior
+   *
+   * - `ignore` - ignore the action
+   * - `deactivate` - deactivate the node (set active=false)
+   * - `force` - force remove the node (even if it's not removable) (this may cause unexpected behavior or cause system to crash)
+   * - `throw` - throw an error
+   */
+  when_not_removable: "ignore" | "deactivate" | "force" | "throw";
 }
 
-interface IDocumentGoogleFontsState {
+interface IEditorGoogleFontsState {
   googlefonts: { family: string }[];
 }
 
-interface IDocumentBrusesState {
+interface IEditorBrusesState {
   brushes: BitmapEditorBrush[];
 }
 
@@ -664,35 +757,12 @@ export type HistoryEntry = {
   state: IDocumentState;
 };
 
-// export type HistoryState = {
-//   past: HistoryEntry[];
-//   present: IDocumentState;
-//   future: HistoryEntry[];
-// };
-
-// function initialHistoryState(init: IDocumentEditorInit): HistoryState {
-//   return {
-//     past: [],
-//     present: {
-//       selection: [],
-//       document_ctx:
-//         grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
-//           init.document
-//         ),
-//       document: init.document,
-//     },
-//     future: [],
-//   };
-// }
-
 /**
  * a global class based editor instances
  */
 export const __global_editors = {
   bitmap: null as BitmapLayerEditor | null,
 };
-
-class A {}
 
 type ContentEditModeState =
   | TextContentEditMode
@@ -756,14 +826,14 @@ type GradientContentEditMode = {
 };
 
 export interface IMinimalDocumentState {
-  document: grida.program.document.IDocumentDefinition;
+  document: grida.program.document.Document;
   /**
    * the document key set by user. user can update this to tell it's entirely replaced
    *
    * Optional, but recommended to set for better tracking and debugging.
    */
   document_key?: string;
-  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+  document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
 }
 
 export interface Guide {
@@ -771,24 +841,13 @@ export interface Guide {
   readonly offset: number;
 }
 
-export interface IDocumentState extends IMinimalDocumentState {
-  selection: string[];
-
+export interface IDocumentState
+  extends IMinimalDocumentState,
+    IScenePersistenceState {
   /**
-   * @private - internal use only
-   *
-   * current content edit mode
-   *
-   * @default false
+   * current scene id
    */
-  content_edit_mode?: ContentEditModeState;
-
-  /**
-   * the ruler guides.
-   *
-   * objects sanps to this when ruler is on
-   */
-  guides: Guide[];
+  scene_id: string | undefined;
 }
 
 interface __TMP_HistoryExtension {
@@ -799,25 +858,33 @@ interface __TMP_HistoryExtension {
 }
 
 export interface IDocumentEditorInit
-  extends IDocumentEditorConfig,
+  extends Pick<IEditorConfig, "editable" | "debug">,
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
-    grida.program.document.IDocumentDefinition,
-    "nodes" | "root_id" | "backgroundColor"
+    grida.program.document.Document,
+    "nodes" | "scenes" | "entry_scene_id"
   > &
-    Partial<grida.program.document.IDocumentBitmapsRepository>;
+    Partial<grida.program.document.IBitmapsRepository>;
 }
 
 export interface IDocumentEditorState
-  extends IDocumentEditorConfig,
+  extends IEditorConfig,
     IDocumentEditorClipboardState,
     IDocumentEditorTransformState,
     IDocumentEditorEventTargetState,
-    IDocumentGoogleFontsState,
-    IDocumentBrusesState,
+    IEditorGoogleFontsState,
+    IEditorBrusesState,
     grida.program.document.IDocumentTemplatesRepository,
     __TMP_HistoryExtension,
     IDocumentState {}
+
+const DEFAULT_BRUSH: CurrentBrush = {
+  name: "Default",
+  hardness: 1,
+  size: [4, 4],
+  spacing: 0,
+  opacity: 1,
+};
 
 export function initDocumentEditorState({
   debug,
@@ -825,22 +892,24 @@ export function initDocumentEditorState({
 }: Omit<IDocumentEditorInit, "debug"> & {
   debug?: boolean;
 }): IDocumentEditorState {
-  const def: grida.program.document.IDocumentDefinition = {
+  const doc: grida.program.document.Document = {
     bitmaps: {},
     properties: {},
     ...init.document,
+    scenes: Object.entries(init.document.scenes).reduce(
+      (acc, [key, scene]) => {
+        acc[key] = grida.program.document.init_scene(scene);
+        return acc;
+      },
+      {} as grida.program.document.Document["scenes"]
+    ),
   };
 
-  const s = new document.DocumentState(def);
-
-  // console.log("i", init["transform"]);
+  const s = new document.DocumentState(doc);
 
   return {
     transform: cmath.transform.identity,
     debug: debug ?? false,
-    selection: [],
-    hovered_node_id: null,
-    hovered_vertex_idx: null,
     pointer: {
       position: cmath.vector2.zero,
       last: cmath.vector2.zero,
@@ -849,36 +918,21 @@ export function initDocumentEditorState({
       future: [],
       past: [],
     },
-    gesture: { type: "idle" },
-    gesture_modifiers: {
-      translate_with_hierarchy_change: "on",
-      translate_with_clone: "off",
-      tarnslate_with_axis_lock: "off",
-      transform_with_center_origin: "off",
-      transform_with_preserve_aspect_ratio: "off",
-      rotate_with_quantize: "off",
-    },
+    gesture_modifiers: DEFAULT_GESTURE_MODIFIERS,
     ruler: "on",
     pixelgrid: "on",
-    guides: [],
-    active_duplication: null,
-    document_ctx: document.Context.from(def).snapshot(),
-    // history: initialHistoryState(init),
+    when_not_removable: "ignore",
+    document_ctx: document.Context.from(doc).snapshot(),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
     surface_measurement_targeting_locked: false,
-    surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
     brushes: [],
     tool: { type: "cursor" },
-    brush: {
-      name: "Default",
-      hardness: 1,
-      size: [4, 4],
-      spacing: 0,
-      opacity: 1,
-    },
+    brush: DEFAULT_BRUSH,
+    scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
+    ...DEFAULT_SCENE_STATE,
     ...init,
-    document: def,
+    document: doc,
   };
 }

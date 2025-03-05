@@ -32,7 +32,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/guide/delete": {
       const { idx } = action;
       return produce(state, (draft) => {
-        draft.guides.splice(idx, 1);
+        assert(draft.scene_id, "scene_id is not set");
+        const scene = draft.document.scenes[draft.scene_id];
+        scene.guides.splice(idx, 1);
       });
     }
     case "surface/pixel-grid": {
@@ -203,6 +205,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "guide": {
             const { axis, idx } = gesture;
 
+            assert(draft.scene_id, "scene_id is not set");
+            const scene = draft.document.scenes[draft.scene_id];
+
             if (idx === -1) {
               const t = cmath.transform.getTranslate(state.transform);
               const s = cmath.transform.getScale(state.transform);
@@ -213,7 +218,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 axis,
                 offset: -cmath.quantize(t[axi] * (1 / s[axi]), 1),
               } satisfies Guide;
-              const idx = draft.guides.push(next) - 1;
+              const idx = scene.guides.push(next) - 1;
 
               // new
               draft.gesture = {
@@ -228,7 +233,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               };
             } else {
               // existing
-              const guide = state.guides[idx];
+              const guide = scene.guides[idx];
               assert(guide.axis === axis, "guide gesture axis mismatch");
               draft.gesture = {
                 type: "guide",
@@ -392,7 +397,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 return;
               }
 
-              const layout = createLayoutSnapshot(state, parent_id!, selection);
+              const layout = createLayoutSnapshot(state, parent_id, selection);
               layout.objects.sort((a, b) => a[axis] - b[axis]);
 
               const [gap] = cmath.rect.getUniformGap(
@@ -466,19 +471,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
 function createLayoutSnapshot(
   state: IDocumentEditorState,
-  group: string,
+  group: string | null,
   items: string[]
 ): LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
-  const parent = document.__getNodeById(state, group);
-  const parent_rect = cdom.getNodeBoundingRect(group)!;
+  let reldelta: cmath.Vector2 = [0, 0];
+  let parent: grida.program.nodes.Node | null = null;
+  if (group) {
+    parent = document.__getNodeById(state, group);
+    const parent_rect = cdom.getNodeBoundingRect(group)!;
+    reldelta = [-parent_rect.x, -parent_rect.y];
+  }
+
   const objects: LayoutSnapshot["objects"] = items.map((node_id) => {
     const abs_rect = cdom.getNodeBoundingRect(node_id)!;
-    const rel_rect = cmath.rect.translate(abs_rect, [
-      -parent_rect.x,
-      -parent_rect.y,
-    ]);
+    const rel_rect = cmath.rect.translate(abs_rect, reldelta);
 
     return {
       ...rel_rect,
@@ -487,13 +495,21 @@ function createLayoutSnapshot(
   });
 
   const is_group_flex_container =
-    parent.type === "container" && parent.layout === "flex";
+    parent && parent.type === "container" && parent.layout === "flex";
 
-  return {
-    type: is_group_flex_container ? "flex" : "group",
-    group,
-    objects,
-  };
+  if (is_group_flex_container) {
+    return {
+      type: "flex",
+      group: parent!.id,
+      objects,
+    };
+  } else {
+    return {
+      type: "group",
+      group,
+      objects,
+    };
+  }
 }
 
 function self_start_gesture_scale(
@@ -530,14 +546,36 @@ function self_start_gesture_scale(
     // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
     // need to assign a fixed size if width or height is a variable length
     const _node = node as grida.program.nodes.i.ICSSDimension;
-    if (typeof _node.width !== "number") {
-      _node.width = rect.width;
+
+    // needs to set width
+    if (
+      direction === "e" ||
+      direction === "w" ||
+      direction === "ne" ||
+      direction === "se" ||
+      direction === "nw" ||
+      direction === "sw"
+    ) {
+      if (typeof _node.width !== "number") {
+        _node.width = cmath.quantize(rect.width, 1);
+      }
     }
-    if (typeof _node.height !== "number") {
-      if (node.type === "line") {
-        _node.height = 0;
-      } else {
-        _node.height = rect.height;
+
+    // needs to set height
+    if (
+      direction === "n" ||
+      direction === "s" ||
+      direction === "ne" ||
+      direction === "nw" ||
+      direction === "se" ||
+      direction === "sw"
+    ) {
+      if (typeof _node.height !== "number") {
+        if (node.type === "line") {
+          _node.height = 0;
+        } else {
+          _node.height = cmath.quantize(rect.height, 1);
+        }
       }
     }
   }
