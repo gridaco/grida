@@ -15,10 +15,10 @@ export default async function SubmitCompletePage({
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: FormLinkURLParams["complete"];
+  searchParams: Promise<FormLinkURLParams["complete"]>;
 }) {
   const { id: form_id } = await params;
-  const response_id = searchParams.rid;
+  const { rid: response_id } = await searchParams;
 
   const { data, error } = await grida_forms_client
     .from("form")

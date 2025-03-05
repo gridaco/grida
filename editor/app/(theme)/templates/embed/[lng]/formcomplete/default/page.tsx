@@ -3,6 +3,7 @@ import i18next from "i18next";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
 
 type Params = { lng: string };
+type SearchParams = { title?: string };
 
 const mock = {
   title: "ACME Form Title",
@@ -14,11 +15,10 @@ export default async function Component({
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: {
-    title?: string;
-  };
+  searchParams: Promise<SearchParams>;
 }) {
   const { lng } = await params;
+  const { title = mock.title } = await searchParams;
   await i18next.init({
     lng: lng,
     fallbackLng: "en",
@@ -26,7 +26,6 @@ export default async function Component({
     resources: resources,
   });
 
-  const title = searchParams.title || mock.title;
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageDefault

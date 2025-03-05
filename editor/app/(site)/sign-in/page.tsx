@@ -6,19 +6,30 @@ import { ContinueWithGoogleButton } from "@/scaffolds/auth/continue-with-google-
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
+import type { Metadata } from "next";
 
-export default function SigninPage({
+type SearchParams = {
+  redirect_uri?: string;
+  next?: string;
+};
+
+export const metadata: Metadata = {
+  title: "Sign In",
+  description: "Sign in to Grida",
+};
+
+export default async function SigninPage({
   searchParams,
 }: {
-  searchParams: {
-    redirect_uri?: string;
-    next?: string;
-  };
+  searchParams: Promise<SearchParams>;
 }) {
+  const { next, redirect_uri } = await searchParams;
+
   if (process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1") {
-    const q = new URLSearchParams(searchParams).toString();
+    const q = new URLSearchParams(await searchParams).toString();
     return redirect("/insiders/auth/basic" + (q ? "?" + q : ""));
   }
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex flex-col flex-1 bg-alternative">
@@ -61,8 +72,8 @@ export default function SigninPage({
               <div className="flex flex-col gap-5">
                 <Suspense>
                   <ContinueWithGoogleButton
-                    next={searchParams.next}
-                    redirect_uri={searchParams.redirect_uri}
+                    next={next}
+                    redirect_uri={redirect_uri}
                   />
                 </Suspense>
               </div>

@@ -22,12 +22,12 @@ export default async function FormClosedPage({
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: FormLinkURLParams["formclosed"];
+  searchParams: Promise<FormLinkURLParams["formclosed"]>;
 }) {
   const { id: form_id } = await params;
+  const { oops } = await searchParams;
   await ssr_page_init_i18n({ form_id });
 
-  const oops = searchParams.oops;
   return (
     <main className="container mx-auto flex items-center justify-center w-screen h-screen">
       <Card className="w-full max-w-md p-4">

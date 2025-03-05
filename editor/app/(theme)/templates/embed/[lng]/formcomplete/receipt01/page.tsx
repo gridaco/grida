@@ -8,17 +8,17 @@ const mock = {
 } as const;
 
 type Params = { lng: string };
+type SearchParams = { title?: string };
 
 export default async function Component({
   params,
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: {
-    title?: string;
-  };
+  searchParams: Promise<SearchParams>;
 }) {
   const { lng } = await params;
+  const { title = mock.title } = await searchParams;
   await i18next.init({
     lng: lng,
     fallbackLng: "en",
@@ -26,7 +26,6 @@ export default async function Component({
     resources: resources,
   });
 
-  const title = searchParams.title || mock.title;
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageTemplate_receipt01

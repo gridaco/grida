@@ -17,16 +17,18 @@ const prices = {
   },
 } as const;
 
+type SearchParams = {
+  plan?: keyof typeof prices;
+  period?: "monthly" | "yearly";
+};
+
 export default async function OnboardWithNewFormPage({
   searchParams,
 }: {
-  searchParams: {
-    plan?: keyof typeof prices;
-    period?: "monthly" | "yearly";
-  };
+  searchParams: Promise<SearchParams>;
 }) {
   const cookieStore = await cookies();
-  const { plan, period } = searchParams || {};
+  const { plan, period } = await searchParams;
   const price = prices[plan || "free"][period || "monthly"];
 
   const supabase = createServerComponentClient(cookieStore);
@@ -34,7 +36,7 @@ export default async function OnboardWithNewFormPage({
   const { data: auth } = await supabase.auth.getUser();
   // if no auth, sign in, redirect back here
   if (!auth.user) {
-    const search = new URLSearchParams(searchParams).toString();
+    const search = new URLSearchParams(await searchParams).toString();
     const uri = encodeURIComponent("/dashboard/new?" + search);
     redirect("/sign-in?redirect_uri=" + uri);
   }

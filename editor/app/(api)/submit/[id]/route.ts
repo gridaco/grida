@@ -345,7 +345,7 @@ async function submit({
         ? possible_selection_option_ids[0]
         : null;
 
-    console.log("selection_id", selection_id);
+    // console.log("selection_id", selection_id);
 
     // validate if inventory is present
     const inventory_access_error = await validate_options_inventory({

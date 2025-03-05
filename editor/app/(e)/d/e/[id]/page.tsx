@@ -5,13 +5,14 @@ import { ssr_page_init_i18n } from "@/i18n/ssr";
 export const revalidate = 0;
 
 type Params = { id: string };
+type SearchParams = { [key: string]: string };
 
 export default async function FormPage({
   params,
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: { [key: string]: string };
+  searchParams: Promise<SearchParams>;
 }) {
   const { id: form_id } = await params;
   await ssr_page_init_i18n({ form_id });
@@ -19,7 +20,7 @@ export default async function FormPage({
   return (
     <Agent
       form_id={form_id}
-      params={searchParams}
+      params={await searchParams}
       translation={{
         next: i18next.t("next"),
         back: i18next.t("back"),
