@@ -186,6 +186,11 @@ export const keybindings_sheet = [
     keys: ["shift+'"],
   },
   {
+    name: "preview",
+    description: "preview current selection",
+    keys: ["shift+space"],
+  },
+  {
     name: "eye dropper",
     description: "Use eye dropper to pick color",
     keys: ["i"],
