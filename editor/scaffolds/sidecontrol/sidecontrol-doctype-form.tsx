@@ -34,6 +34,7 @@ export function SideControlDoctypeForm() {
       return <SelectedPageForm />;
     }
     case "form/startpage": {
+      return null;
       return <SelectedPageFormStart />;
     }
     case "site":

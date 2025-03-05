@@ -158,7 +158,7 @@ function FormStartPageControl() {
   const { changeNodeProps } = useDocument();
 
   // FIXME: 250303 UNKNOWN
-  const { props, template_id, properties } = useNode("root");
+  const { props, template_id, properties } = useNode("page");
   const { default: defaultProps } = useTemplateDefinition(template_id!);
 
   const shallowProps = useMemo(
@@ -185,8 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              // FIXME: 250303 UNKNOWN
-              changeNodeProps("root", k, v);
+              changeNodeProps("page", k, v);
             }}
           />
         </SidebarMenuSectionContent>

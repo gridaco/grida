@@ -8,6 +8,7 @@ export function SidebarMenuLinkButton({
   layout,
   children,
   isActive,
+  disabled,
   ...props
 }: React.ComponentProps<typeof SidebarMenuButton> & {
   link?: {
@@ -25,9 +26,14 @@ export function SidebarMenuLinkButton({
     ? pathName === link.href || (layout && pathName.startsWith(link.href + "/"))
     : false;
 
-  if (link) {
+  if (link && !disabled) {
     return (
-      <SidebarMenuButton asChild isActive={selected || isActive} {...props}>
+      <SidebarMenuButton
+        asChild
+        isActive={selected || isActive}
+        disabled={disabled}
+        {...props}
+      >
         <Link href={link.href} target={link.target}>
           {children}
         </Link>
@@ -35,7 +41,7 @@ export function SidebarMenuLinkButton({
     );
   } else {
     return (
-      <SidebarMenuButton isActive={isActive} {...props}>
+      <SidebarMenuButton isActive={isActive} disabled={disabled} {...props}>
         {children}
       </SidebarMenuButton>
     );

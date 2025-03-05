@@ -113,6 +113,7 @@ export type MenuItem<T extends TMenuData = TMenuData> =
       icon?: ResourceTypeIconName;
       link?: MenuLink;
       layout?: boolean;
+      defaultOpen?: boolean;
     } & T)
   | ({
       type: "item";

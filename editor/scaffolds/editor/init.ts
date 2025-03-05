@@ -966,6 +966,7 @@ function formdocumentpagesinit({
       label: "Design",
       children: [
         {
+          defaultOpen: true,
           type: "folder",
           id: "campaign",
           label: "Campaign",
@@ -979,6 +980,7 @@ function formdocumentpagesinit({
               type: "item",
               id: "form/startpage",
               label: "Cover",
+              disabled: true,
               link: {
                 href: `/${basepath}/${document_id}/form/start`,
               },

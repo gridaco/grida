@@ -71,7 +71,10 @@ export function Tree({
 
   return (
     <SidebarMenuItem>
-      <Collapsible className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
+      <Collapsible
+        defaultOpen={item.defaultOpen}
+        className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+      >
         <CollapsibleTrigger asChild>
           <SidebarMenuLinkButton
             link={item.link}

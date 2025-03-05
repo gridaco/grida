@@ -247,7 +247,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProps, rootProperties, rootProps } =
-    useRootTemplateInstanceNode("root");
+    useRootTemplateInstanceNode("page");
   const [state, dispatch] = useEditorState();
 
   // const { uploadPublic } = useDocumentAssetUpload();

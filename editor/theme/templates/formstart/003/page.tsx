@@ -37,10 +37,10 @@ function Consumer() {
               <h1 className="text-6xl font-bold w-4/5">
                 <NodeElement node_id="003.title" />
               </h1>
-              <p className="text-lg text-foreground/80 w-4/5">
+              <div className="text-lg text-foreground/80 w-4/5">
                 <NodeElement node_id="003.subtitle" />
                 {/* {data.subtitle} */}
-              </p>
+              </div>
             </div>
           </TextAlign>
           <div className="flex justify-center items-center p-4 py-10">
