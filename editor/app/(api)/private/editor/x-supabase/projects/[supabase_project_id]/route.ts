@@ -6,16 +6,16 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { supabase_project_id: number };
+
 interface Context {
-  params: {
-    supabase_project_id: number;
-  };
+  params: Promise<Params>;
 }
 
 export async function GET(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   const { data: supabase_project, error: rls_err } = await supabase
     .from("supabase_project")
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, context: Context) {
 export async function PATCH(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   const { data: supabase_project, error: rls_err } = await supabase
     .from("supabase_project")
@@ -122,7 +122,7 @@ export async function PATCH(req: NextRequest, context: Context) {
 export async function DELETE(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   const { count, error } = await supabase
     .from("supabase_project")

@@ -7,12 +7,14 @@ import { FieldStorageService } from "@/services/form/storage";
 import type { FormFieldStorageSchema } from "@/types";
 import assert from "assert";
 
+type Params = {
+  form_id: string;
+  row_id: string;
+  field_id: string;
+};
+
 type Context = {
-  params: {
-    form_id: string;
-    row_id: string;
-    field_id: string;
-  };
+  params: Promise<Params>;
 };
 
 export function POST(req: NextRequest, context: Context) {
@@ -36,7 +38,7 @@ async function handler(
 
   const { file } = body;
 
-  const { form_id, row_id, field_id } = context.params;
+  const { form_id, row_id, field_id } = await context.params;
 
   const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);

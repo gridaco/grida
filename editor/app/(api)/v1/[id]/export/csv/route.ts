@@ -6,13 +6,17 @@ import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_local_index } from "@/utils/fmt";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 
+type Params = { id: string };
+
 export const revalidate = 0;
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: {
+    params: Promise<Params>;
+  }
 ) {
-  const id = context.params.id;
+  const { id } = await context.params;
   const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   //

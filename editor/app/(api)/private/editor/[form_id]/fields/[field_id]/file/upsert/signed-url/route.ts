@@ -11,15 +11,15 @@ import { queryorbody } from "@/utils/qs";
 import { FieldStorageService } from "@/services/form/storage";
 import assert from "assert";
 
-type Context = {
-  params: {
-    form_id: string;
-    field_id: string;
-  };
-};
+type Params = { form_id: string; field_id: string };
 
-export async function PUT(req: NextRequest, context: Context) {
-  const { form_id, field_id } = context.params;
+export async function PUT(
+  req: NextRequest,
+  context: {
+    params: Promise<Params>;
+  }
+) {
+  const { form_id, field_id } = await context.params;
 
   let body = {};
   try {

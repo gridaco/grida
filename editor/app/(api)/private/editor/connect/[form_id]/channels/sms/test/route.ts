@@ -3,12 +3,14 @@ import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  form_id: string;
+};
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: {
-      form_id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const cookieStore = await cookies();
@@ -24,7 +26,7 @@ export async function POST(
     );
   }
 
-  const { form_id } = context.params;
+  const { form_id } = await context.params;
   const body = await req.json();
 
   const { to, message } = body;

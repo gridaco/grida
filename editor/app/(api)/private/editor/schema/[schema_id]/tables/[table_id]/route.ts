@@ -5,15 +5,14 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { schema_id: string; table_id: string };
+
 type Context = {
-  params: {
-    schema_id: string;
-    table_id: string;
-  };
+  params: Promise<Params>;
 };
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const { schema_id, table_id } = context.params;
+  const { schema_id, table_id } = await context.params;
 
   const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);

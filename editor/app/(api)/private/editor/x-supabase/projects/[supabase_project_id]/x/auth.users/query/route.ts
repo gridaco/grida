@@ -5,10 +5,10 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { GridaXSupabase } from "@/types";
 
+type Params = { supabase_project_id: number };
+
 interface Context {
-  params: {
-    supabase_project_id: number;
-  };
+  params: Promise<Params>;
 }
 
 // [EXTRA SECURITY REQUIRED]
@@ -17,7 +17,7 @@ interface Context {
 export async function GET(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   const _q_page = req.nextUrl.searchParams.get("page");
   const page = _q_page ? parseInt(_q_page) : undefined;

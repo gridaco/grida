@@ -1,15 +1,19 @@
 import { grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { id: string };
+
 /**
  * create a new form_field
  * @returns
  */
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: {
+    params: Promise<Params>;
+  }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
   const data = await req.json();
 
   return NextResponse.json(

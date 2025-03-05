@@ -11,16 +11,15 @@ const expiresIn = 60 * 60;
 
 export const revalidate = expiresIn;
 
+type Params = { form_id: string; field_id: string };
+
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      form_id: string;
-      field_id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { form_id, field_id } = context.params;
+  const { form_id, field_id } = await context.params;
 
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);

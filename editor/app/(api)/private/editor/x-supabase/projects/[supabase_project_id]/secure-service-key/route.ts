@@ -6,16 +6,16 @@ import {
   __dangerously_fetch_secure_service_role_key,
 } from "@/services/x-supabase";
 
+type Params = { supabase_project_id: number };
+
 interface Context {
-  params: {
-    supabase_project_id: number;
-  };
+  params: Promise<Params>;
 }
 
 export async function GET(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, context: Context) {
 export async function POST(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).

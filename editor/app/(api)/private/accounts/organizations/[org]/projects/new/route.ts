@@ -3,19 +3,18 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { org: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: {
-      org: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const origin = req.nextUrl.origin;
+  const { org } = await context.params;
   const cookieStore = await cookies();
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
-
-  const org = context.params.org;
 
   const { data: orgref, error: orgerr } = await wsclient
     .from("organization")

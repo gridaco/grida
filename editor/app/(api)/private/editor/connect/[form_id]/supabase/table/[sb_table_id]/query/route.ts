@@ -8,18 +8,20 @@ import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { get_grida_table_x_supabase_table_connector } from "@/services/x-supabase";
 import { omit } from "@/utils/qs";
 
+type Params = {
+  form_id: string;
+  sb_table_id: string;
+};
+
 type Context = {
-  params: {
-    form_id: string;
-    sb_table_id: string;
-  };
+  params: Promise<Params>;
 };
 
 export async function GET(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
-  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const searchParams = omit(
@@ -64,7 +66,7 @@ export async function PATCH(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
-  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =
@@ -94,7 +96,7 @@ export async function DELETE(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
 
-  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =

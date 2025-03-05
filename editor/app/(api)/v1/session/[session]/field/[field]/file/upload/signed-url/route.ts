@@ -8,17 +8,15 @@ import type {
 import assert from "assert";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { session: string; field: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: {
-      session: string;
-      field: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const session_id = context.params.session;
-  const field_id = context.params.field;
+  const { session: session_id, field: field_id } = await context.params;
 
   const body = (await req.json()) as CreateSessionSignedUploadUrlRequest;
 
@@ -63,14 +61,10 @@ export async function POST(
 export async function PUT(
   req: NextRequest,
   context: {
-    params: {
-      session: string;
-      field: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const session_id = context.params.session;
-  const field_id = context.params.field;
+  const { session: session_id, field: field_id } = await context.params;
 
   const body = (await req.json()) as CreateSessionSignedUploadUrlRequest;
 

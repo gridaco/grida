@@ -4,15 +4,15 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { organization_id: number };
+
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      organization_id: number;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { organization_id } = context.params;
+  const { organization_id } = await context.params;
   const cookieStore = await cookies();
   const client = createRouteHandlerWorkspaceClient(cookieStore);
 

@@ -7,16 +7,15 @@ import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { form_id: string; field_id: string };
+
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      form_id: string;
-      field_id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { form_id, field_id } = context.params;
+  const { form_id, field_id } = await context.params;
   const qpath = req.nextUrl.searchParams.get("path");
 
   // passing the options will make image transform (even without empty options) - which will occur 403 on free plan tiers.

@@ -13,15 +13,17 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  schema_id: string;
+};
+
 type Context = {
-  params: {
-    schema_id: string;
-  };
+  params: Promise<Params>;
 };
 
 export async function POST(req: NextRequest, context: Context) {
   const cookieStore = await cookies();
-  const schema_id = context.params.schema_id;
+  const { schema_id } = await context.params;
   const supabase = createRouteHandlerClient(cookieStore);
   const grida_x_sb_client = createRouteHandlerXSBClient(cookieStore);
 

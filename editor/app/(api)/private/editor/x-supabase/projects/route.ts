@@ -11,11 +11,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-interface Context {
-  params: {};
-}
-
-export async function GET(req: NextRequest, context: Context) {
+export async function GET(req: NextRequest) {
   const workbench_project_id = Number(
     req.nextUrl.searchParams.get("grida_project_id")
   );
@@ -48,7 +44,7 @@ export async function GET(req: NextRequest, context: Context) {
   //
 }
 
-export async function POST(req: NextRequest, context: Context) {
+export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
 

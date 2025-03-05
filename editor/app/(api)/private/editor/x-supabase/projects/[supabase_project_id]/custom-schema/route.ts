@@ -5,17 +5,17 @@ import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
+type Params = { supabase_project_id: number };
+
 interface Context {
-  params: {
-    supabase_project_id: number;
-  };
+  params: Promise<Params>;
 }
 
 export async function POST(req: NextRequest, context: Context) {
   //
   const cookieStore = await cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
-  const { supabase_project_id } = context.params;
+  const { supabase_project_id } = await context.params;
 
   const body: XSupabasePrivateApiTypes.AddSchemaNameRequestData =
     await req.json();

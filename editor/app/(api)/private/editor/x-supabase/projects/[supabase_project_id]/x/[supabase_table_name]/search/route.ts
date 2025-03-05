@@ -8,17 +8,19 @@ import { omit } from "@/utils/qs";
 import type { GridaXSupabase } from "@/types";
 import type { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
+type Params = {
+  supabase_project_id: number;
+  supabase_table_name: string;
+};
+
 type Context = {
-  params: {
-    supabase_project_id: number;
-    supabase_table_name: string;
-  };
+  params: Promise<Params>;
 };
 
 export async function GET(req: NextRequest, context: Context) {
   const searchParams = omit(req.nextUrl.searchParams, "r"); // not used, only for swr key
   const supabase_schema_name = req.headers.get("Accept-Profile") || "public";
-  const { supabase_project_id, supabase_table_name } = context.params;
+  const { supabase_project_id, supabase_table_name } = await context.params;
 
   const cookieStore = await cookies();
   const client = createRouteHandlerXSBClient(cookieStore);
