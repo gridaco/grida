@@ -137,6 +137,7 @@ const BUCLET = {
 export default function FileExplorer({
   params,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     id: string;
     org: string;

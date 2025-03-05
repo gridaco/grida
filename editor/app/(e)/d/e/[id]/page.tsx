@@ -4,14 +4,16 @@ import { ssr_page_init_i18n } from "@/i18n/ssr";
 
 export const revalidate = 0;
 
+type Params = { id: string };
+
 export default async function FormPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
   searchParams: { [key: string]: string };
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
   await ssr_page_init_i18n({ form_id });
 
   return (

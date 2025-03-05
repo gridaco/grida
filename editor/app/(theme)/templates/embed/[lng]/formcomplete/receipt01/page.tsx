@@ -7,19 +7,20 @@ const mock = {
   response_short_id: "#123",
 } as const;
 
+type Params = { lng: string };
+
 export default async function Component({
   params,
   searchParams,
 }: {
-  params: {
-    lng: string;
-  };
+  params: Promise<Params>;
   searchParams: {
     title?: string;
   };
 }) {
+  const { lng } = await params;
   await i18next.init({
-    lng: params.lng,
+    lng: lng,
     fallbackLng: "en",
     debug: false,
     resources: resources,
@@ -32,7 +33,7 @@ export default async function Component({
         context={{
           title: title,
           form_title: title,
-          language: params.lng,
+          language: lng,
           response: {
             idx: "#123",
             index: 123,

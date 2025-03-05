@@ -75,13 +75,7 @@ import { cookies } from "next/headers";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export default function Dashboard({
-  params,
-}: {
-  params: {
-    id: string;
-  };
-}) {
+export default function Dashboard() {
   // const form_id = params.id;
   // const cookieStore = await cookies();
   // const supabase = createServerComponentClient(cookieStore);

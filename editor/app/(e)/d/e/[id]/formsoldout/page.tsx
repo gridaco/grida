@@ -10,12 +10,14 @@ import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 
+type Params = { id: string };
+
 export default async function FormSoldoutPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
   await ssr_page_init_i18n({ form_id });
 
   return (

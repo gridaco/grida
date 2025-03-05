@@ -31,6 +31,7 @@ export default function DashboardProjectsPage({
   params,
   searchParams,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     org: string;
   };

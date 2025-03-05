@@ -15,14 +15,16 @@ import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 
+type Params = { id: string };
+
 export default async function FormClosedPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
   searchParams: FormLinkURLParams["formclosed"];
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
   await ssr_page_init_i18n({ form_id });
 
   const oops = searchParams.oops;

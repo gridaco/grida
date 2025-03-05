@@ -23,14 +23,14 @@ import { GridaLogo } from "@/components/grida-logo";
 import { DeleteOrganizationConfirm } from "./delete";
 import { Badge } from "@/components/ui/badge";
 
+type Params = { organization_name: string };
+
 export default async function OrganizationsSettingsProfilePage({
   params,
 }: {
-  params: {
-    organization_name: string;
-  };
+  params: Promise<Params>;
 }) {
-  const organization_name = params.organization_name;
+  const { organization_name } = await params;
   const cookieStore = await cookies();
 
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);

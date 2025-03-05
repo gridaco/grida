@@ -8,14 +8,16 @@ import { EndingPageI18nOverrides, FormDocument } from "@/types";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 import { FormValue } from "@/services/form";
 
+type Params = { id: string };
+
 export default async function SubmitCompletePage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
   searchParams: FormLinkURLParams["complete"];
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
   const response_id = searchParams.rid;
 
   const { data, error } = await grida_forms_client
