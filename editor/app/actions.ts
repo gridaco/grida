@@ -22,8 +22,7 @@ export async function generate(input: string, gist?: string) {
 
     stream.done();
 
-    // @ts-ignore
-    const final = stream.value["curr"];
+    const final = (stream.value as any)["curr"];
 
     if (gist) {
       const { error, data } = await grida_forms_client

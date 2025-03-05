@@ -3,7 +3,7 @@ import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 export default function CampaignStartPageDev() {
   return (
     <ScreenWindowRoot>
-      {/* @ts-ignore */}
+      {/*  */}
       <Page />
     </ScreenWindowRoot>
   );

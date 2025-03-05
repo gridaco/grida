@@ -53,25 +53,19 @@ export async function POST(
 
       if (fieldType === "email") {
         if (validator.isEmail(value)) {
-          info.provisional_email.push(
-            // @ts-ignore
-            value
-          );
+          info.provisional_email.push(value);
         }
       } else if (fieldType === "tel") {
         if (validator.isMobilePhone(value, "any")) {
-          info.provisional_phone.push(
-            // @ts-ignore
-            value
-          );
+          info.provisional_phone.push(value);
         }
       }
 
       return info;
     },
     {
-      provisional_email: [],
-      provisional_phone: [],
+      provisional_email: [] as string[],
+      provisional_phone: [] as string[],
     }
   );
 
