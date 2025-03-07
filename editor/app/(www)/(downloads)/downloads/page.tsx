@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
 import { Button } from "@/components/ui/button";
@@ -53,31 +54,54 @@ export default async function DownloadsPage() {
     <main className="min-h-screen flex flex-col">
       <Header />
       <div className="h-60" />
-      <main className="flex-grow flex items-center">
-        <section className="container max-w-2xl mx-auto py-20 text-center border rounded-lg">
-          <h1 className="text-6xl font-bold mb-6">
-            Download Grida Desktop app
-          </h1>
-          <p className="text-base text-muted-foreground mb-12">
-            Optimized for macOS. Download now and start creating effortlessly.
-          </p>
-          <div className="flex justify-center space-x-4">
-            {os ? (
-              <Link href={links.default!.url}>
-                <Button size="lg">
-                  <OSIcon os={os} className="mr-2 size-4" /> Download for{" "}
-                  {oslabel[os]}
-                </Button>
-              </Link>
-            ) : (
-              <Link href={sitemap.links.releases_latest}>
-                <Button size="lg">
-                  <DownloadIcon className="mr-2 size-4" /> Download
-                </Button>
-              </Link>
-            )}
+      <main className="container items-center">
+        <section className="container bg-white max-w-xl lg:max-w-7xl mx-auto py-8 px-12 lg:px-16 lg:py-10 xl:py-2 text-left border rounded-lg flex flex-col-reverse lg:flex-row items-center justify-between overflow-hidden">
+          <div className="max-w-lg text-center lg:text-left">
+            <h1 className="text-black text-4xl md:text-6xl font-bold mb-16 lg:mb-24">
+              Download <br />
+              Grida Desktop app
+            </h1>
+            <div>
+              <div className="flex justify-center lg:justify-start space-x-4">
+                {os ? (
+                  <Link href={links.default!.url}>
+                    <Button
+                      size="lg"
+                      className="bg-black text-white hover:bg-black/70"
+                    >
+                      <OSIcon os={os} className="mr-2 size-4" /> Download for{" "}
+                      {oslabel[os]}
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href={sitemap.links.releases_latest}>
+                    <Button size="lg">
+                      <DownloadIcon className="mr-2 size-4" /> Download
+                    </Button>
+                  </Link>
+                )}
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground text-center lg:text-left">
+                <Link
+                  href="https://github.com/gridaco/grida/releases/latest"
+                  target="_blank"
+                  className="underline"
+                >
+                  View all release on GitHub
+                </Link>
+              </p>
+            </div>
           </div>
-          <div className="mt-2"></div>
+
+          <div className="w-full md:w-1/2 flex justify-center md:justify-end mt-10 md:mt-0">
+            <Image
+              src="/images/download.png"
+              width={600}
+              height={600}
+              alt="download"
+              className="overflow-hidden"
+            />
+          </div>
         </section>
       </main>
       <div className="h-32" />
@@ -89,6 +113,15 @@ export default async function DownloadsPage() {
           A faster, more focused experience awaits.
         </p>
         <DownloadButtons links={links} />
+        <p className="mt-4 text-sm text-muted-foreground text-center">
+          <Link
+            href="https://github.com/gridaco/grida/releases/latest"
+            target="_blank"
+            className="underline"
+          >
+            View all release on GitHub
+          </Link>
+        </p>
       </div>
       <div className="h-96" />
       <Footer />
@@ -101,21 +134,21 @@ function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
     <div className="container max-w-3xl flex flex-wrap justify-center gap-3 mx-auto">
       {/* macOS Universal */}
       <Link href={links.mac_dmg_universal} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Apple className="mr-2 size-4" /> Download for macOS (Universal)
         </Button>
       </Link>
 
       {/* macOS Apple Silicon */}
       <Link href={links.mac_dmg_arm64} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Apple className="mr-2 size-4" /> Download for macOS (Apple Silicon)
         </Button>
       </Link>
 
       {/* macOS Intel */}
       <Link href={links.mac_dmg_x64} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Apple className="mr-2 size-4" /> Download for macOS (Intel-based
           Macs)
         </Button>
@@ -123,21 +156,21 @@ function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
 
       {/* Windows x64 */}
       <Link href={links.windows_exe_x64} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Windows className="mr-2 size-4" /> Download for Windows (x64)
         </Button>
       </Link>
 
       {/* Windows Debian */}
       <Link href={links.linux_deb_x64} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Linux className="mr-2 size-4" /> Download for Linux (Debian / Ubuntu)
         </Button>
       </Link>
 
       {/* Windows Red Hat */}
       <Link href={links.linux_rpm_x64} download>
-        <Button size="lg">
+        <Button size="lg" variant="outline">
           <Linux className="mr-2 size-4" /> Download for Linux (Red Hat / Fedora
           / SUSE)
         </Button>
