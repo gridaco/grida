@@ -1559,6 +1559,31 @@ export namespace cmath.rect {
   }
 
   /**
+   * Returns the signed offset from the given point to the nearest edge of the rectangle.
+   * Negative values indicate the point is left or above the rectangle's boundary.
+   *
+   * @param rect - The rectangle defined by { x, y, width, height }.
+   * @param point - The point as a tuple [x, y].
+   * @returns A tuple [dx, dy] representing the signed offset.
+   *
+   * @example
+   * ```ts
+   * const rect = { x: 10, y: 10, width: 100, height: 50 };
+   * console.log(offset(rect, [5, 30]));   // Output: [-5, 0]
+   * console.log(offset(rect, [50, 30]));  // Output: [0, 0]
+   * console.log(offset(rect, [120, 70])); // Output: [10, 10]
+   * ```
+   */
+  export function offset(
+    rect: { x: number; y: number; width: number; height: number },
+    point: [number, number]
+  ): [number, number] {
+    const clampedX = Math.min(Math.max(point[0], rect.x), rect.x + rect.width);
+    const clampedY = Math.min(Math.max(point[1], rect.y), rect.y + rect.height);
+    return [point[0] - clampedX, point[1] - clampedY];
+  }
+
+  /**
    * Checks if rectangle `a` intersects with rectangle `b`.
    *
    * Two rectangles are considered intersecting if they overlap, either partially or fully. Edges and corners touching
