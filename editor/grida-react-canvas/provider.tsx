@@ -2317,6 +2317,7 @@ export function useEventTarget() {
     transform,
     surface_snapping,
     gesture,
+    dragging,
     hovered_node_id,
     dropzone,
     selection,
@@ -2481,7 +2482,8 @@ export function useEventTarget() {
 
       dispatch({
         type: "event-target/event/on-pointer-move",
-        position: position,
+        position_canvas: position,
+        position_client: { x: event.clientX, y: event.clientY },
       });
 
       _throttled_pointer_move_with_raycast(event, position);
@@ -2735,6 +2737,7 @@ export function useEventTarget() {
       debug,
       features,
       gesture,
+      dragging,
       surface_snapping,
       //
       marquee,
@@ -2795,6 +2798,7 @@ export function useEventTarget() {
     debug,
     features,
     gesture,
+    dragging,
     surface_snapping,
     //
     marquee,

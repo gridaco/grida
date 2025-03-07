@@ -55,6 +55,7 @@ import {
   FloatingBarTitle,
 } from "./ui/floating-bar";
 import { grida } from "@/grida";
+import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
 
 const DRAG_THRESHOLD = 2;
 
@@ -133,6 +134,7 @@ function SurfaceGroup({
 }
 
 export function EditorSurface() {
+  useEdgeScrolling({ enabled: true });
   const isWindowResizing = useIsWindowResizing();
   const { transform } = useTransform();
   const {
