@@ -731,6 +731,30 @@ export namespace cmath.vector2 {
   }
 
   /**
+   * Clamps each component of a 2D vector within the corresponding min and max bounds.
+   *
+   * @param vector - The input vector [x, y].
+   * @param min - The minimum allowed values [minX, minY].
+   * @param max - The maximum allowed values [maxX, maxY].
+   * @returns A new vector [clampedX, clampedY] where each component is between the corresponding min and max.
+   *
+   * @example
+   * ```ts
+   * // [5, 15] clamped between [0, 10] and [10, 20] remains [5, 15]
+   * console.log(clamp([5, 15], [0, 10], [10, 20])); // [5, 15]
+   *
+   * // [15, 5] clamped between [0, 10] and [10, 20] becomes [10, 10]
+   * console.log(clamp([15, 5], [0, 10], [10, 20])); // [10, 10]
+   * ```
+   */
+  export function clamp(vector: Vector2, min: Vector2, max: Vector2): Vector2 {
+    return [
+      Math.min(Math.max(vector[0], min[0]), max[0]),
+      Math.min(Math.max(vector[1], min[1]), max[1]),
+    ];
+  }
+
+  /**
    * Calculates the Euclidean distance between two 2D vectors.
    *
    * The Euclidean distance is the straight-line distance between two points in a 2D space.
