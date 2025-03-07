@@ -157,6 +157,7 @@ export function EditorSurface() {
     pointerUp,
     click,
     doubleClick,
+    setTool,
     drag,
     dragStart,
     dragEnd,
@@ -200,8 +201,26 @@ export function EditorSurface() {
       });
   }, [eventTargetRef.current]);
 
+  const __hand_tool_triggered_by_aux_button = useRef(false);
+
   const bind = useSurfaceGesture(
     {
+      onMouseDown: ({ event }) => {
+        if (event.defaultPrevented) return;
+        if (event.button === 1) {
+          __hand_tool_triggered_by_aux_button.current = true;
+          setTool({ type: "hand" });
+        }
+      },
+      onMouseUp: ({ event }) => {
+        if (event.defaultPrevented) return;
+        if (event.button === 1) {
+          if (__hand_tool_triggered_by_aux_button.current) {
+            __hand_tool_triggered_by_aux_button.current = false;
+            setTool({ type: "cursor" });
+          }
+        }
+      },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
         pointerDown(event);
@@ -245,9 +264,11 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
+        pointer: {
+          buttons: [1, 4], // Primary button (1) // Aux button (4)
+          keys: false, // disable drag gesture with arrow keys
+        },
         threshold: DRAG_THRESHOLD,
-        // disable drag gesture with arrow keys
-        keyboardDisplacement: 0,
       },
     }
   );
