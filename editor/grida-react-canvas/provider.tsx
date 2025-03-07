@@ -2327,6 +2327,7 @@ export function useEventTarget() {
     debug,
     pixelgrid,
     ruler,
+    features,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2732,6 +2733,7 @@ export function useEventTarget() {
       pointer,
       transform,
       debug,
+      features,
       gesture,
       surface_snapping,
       //
@@ -2791,6 +2793,7 @@ export function useEventTarget() {
     pointer,
     transform,
     debug,
+    features,
     gesture,
     surface_snapping,
     //

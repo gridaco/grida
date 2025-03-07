@@ -101,8 +101,10 @@ function get_repeating_translation_delta(
     const b_pos: cmath.Vector2 = [b_rect.x, b_rect.y];
 
     assert(
-      Math.abs(a_rect.width - b_rect.width) < 0.01 &&
-        Math.abs(a_rect.height - b_rect.height) < 0.01,
+      // TODO: room for improvement
+      // the a-b dimension must be identical (since we rely on the cdom, we'll use 1 as threshold)
+      Math.abs(a_rect.width - b_rect.width) < 1 &&
+        Math.abs(a_rect.height - b_rect.height) < 1,
       "the active duplication is invalid and modified"
     );
 

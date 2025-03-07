@@ -22,6 +22,12 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import Link from "next/link";
 import { ModeDesignForm } from "./sidebar-mode-design-form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
@@ -63,14 +69,27 @@ export function EditorSidebar() {
       <SidebarHeader className="min-w-60 w-min p-0 gap-0">
         <DarwinSidebarHeaderDragArea />
         <header className="desktop-drag-area h-11 min-h-11 flex items-center px-4 border-b">
-          <Link
-            href={`/${state.organization.name}/${state.project.name}`}
-            prefetch={false}
-          >
-            <span className="flex items-center gap-2 text-md font-black select-none">
-              <GridaLogo size={15} />
-            </span>
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 text-md font-black select-none outline-none">
+                <GridaLogo size={15} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="bottom"
+              align="start"
+              className="min-w-52"
+            >
+              <Link
+                href={`/${state.organization.name}/${state.project.name}`}
+                prefetch={false}
+              >
+                <DropdownMenuItem className="text-xs">
+                  Back to Dashboard
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
           <EditableDocumentTitle
             id={state.document_id}
@@ -108,20 +127,28 @@ export function EditorSidebar() {
         </Tabs>
       </SidebarHeader>
       <SidebarContent>
-        <Tabs value={state.sidebar.mode}>
-          <TabsContent value="project">
-            <ModeProject />
+        <Tabs value={state.sidebar.mode} className="h-full">
+          <TabsContent value="project" className="h-full">
+            <SidebarContent className="h-full">
+              <ModeProject />
+            </SidebarContent>
           </TabsContent>
-          <TabsContent value="build">
-            {state.doctype === "v0_form" && <ModeDesignForm />}
-            {state.doctype === "v0_canvas" && <ModeDesign />}
-            {state.doctype === "v0_site" && <ModeDesign />}
+          <TabsContent value="build" className="h-full">
+            <SidebarContent className="h-full">
+              {state.doctype === "v0_form" && <ModeDesignForm />}
+              {state.doctype === "v0_canvas" && <ModeDesign />}
+              {state.doctype === "v0_site" && <ModeDesign />}
+            </SidebarContent>
           </TabsContent>
-          <TabsContent value="data">
-            <ModeData />
+          <TabsContent value="data" className="h-full">
+            <SidebarContent className="h-full">
+              <ModeData />
+            </SidebarContent>
           </TabsContent>
-          <TabsContent value="connect">
-            <ModeConnect />
+          <TabsContent value="connect" className="h-full">
+            <SidebarContent className="h-full">
+              <ModeConnect />
+            </SidebarContent>
           </TabsContent>
         </Tabs>
       </SidebarContent>
