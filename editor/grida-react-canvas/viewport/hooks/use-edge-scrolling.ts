@@ -1,20 +1,21 @@
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useEventTarget, useTransform } from "../../provider";
-import { cmath } from "@grida/cmath";
 import { useViewport } from "../context";
+import { cmath } from "@grida/cmath";
 
 const EDGE_SCROLLING_THRESHOLD = 16;
 
 export function useEdgeScrolling({ enabled = true }: { enabled?: boolean }) {
-  const { pointer, dragging } = useEventTarget();
+  const { pointer, dragging, tool } = useEventTarget();
   const { transform, setTransform } = useTransform();
   const viewport = useViewport();
 
   useEffect(() => {
     let rafId: number;
     const loop = () => {
+      if (tool.type !== "cursor") return;
       if (!enabled) return;
       if (!dragging) return;
       if (!viewport) return;
@@ -45,5 +46,5 @@ export function useEdgeScrolling({ enabled = true }: { enabled?: boolean }) {
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [dragging, pointer.client, transform, viewport, enabled]);
+  }, [dragging, pointer.client, transform, viewport, enabled, tool.type]);
 }
