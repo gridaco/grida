@@ -204,6 +204,12 @@ const PDFViewer = ({
         </header>
       )}
       <div className="relative w-full h-full p-8 md:p-20 z-10">
+        <NavigationControlOverlay
+          hasNext={currentPage + 2 < numPages}
+          hasPrev={currentPage > 0}
+          onNext={nextPage}
+          onPrev={prevPage}
+        />
         <div
           ref={ref}
           className="w-full h-full flex flex-col justify-center items-center"
@@ -224,7 +230,7 @@ const PDFViewer = ({
                 onFlip={onFlip}
                 ref={book}
                 startPage={0}
-                showPageCorners={true}
+                showPageCorners={false}
                 flippingTime={600}
                 usePortrait={isPortrait}
                 startZIndex={0}
@@ -261,12 +267,6 @@ const PDFViewer = ({
             )}
           </Document>
         </div>
-        <NavigationControlOverlay
-          hasNext={currentPage + 2 < numPages}
-          hasPrev={currentPage > 0}
-          onNext={nextPage}
-          onPrev={prevPage}
-        />
         <div className="absolute bottom-4 left-0 right-0 w-full flex justify-center z-20 pointer-events-none">
           <NavigationPageNumberControl
             page={currentPage}
@@ -301,21 +301,32 @@ function NavigationControlOverlay({
   onNext: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-10 pointer-events-none">
-      <button
-        disabled={!hasPrev}
-        onClick={onPrev}
-        className="px-4 absolute top-0 left-0 bottom-0 pointer-events-auto cursor-pointer disabled:opacity-50"
-      >
-        <ChevronLeft size={20} />
-      </button>
-      <button
-        disabled={!hasNext}
-        onClick={onNext}
-        className="px-4 absolute top-0 right-0 bottom-0 pointer-events-auto cursor-pointer disabled:opacity-50"
-      >
-        <ChevronRight size={20} />
-      </button>
+    <div className="absolute inset-0 pointer-events-none">
+      <div className="w-full h-full flex justify-between pointer-events-none">
+        <aside
+          className="flex-1 pointer-events-auto cursor-w-resize"
+          onClick={onPrev}
+        >
+          <button
+            disabled={!hasPrev}
+            className="px-4 absolute top-0 left-0 bottom-0 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        </aside>
+        <div className="w-10" />
+        <aside
+          className="flex-1 pointer-events-auto cursor-e-resize"
+          onClick={onNext}
+        >
+          <button
+            disabled={!hasNext}
+            className="px-4 absolute top-0 right-0 bottom-0 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </aside>
+      </div>
     </div>
   );
 }
