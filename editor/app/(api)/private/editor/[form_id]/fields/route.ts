@@ -18,16 +18,16 @@ import { UpsertDto } from "@/types/supabase-ext";
 
 export const revalidate = 0;
 
+type Params = { form_id: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: {
-      form_id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { form_id } = context.params;
-  const cookieStore = cookies();
+  const { form_id } = await context.params;
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";

@@ -203,12 +203,24 @@
         "effects": []
       }
     },
-    "root_id": "component",
-    "backgroundColor": {
-      "r": 245,
-      "g": 245,
-      "b": 245,
-      "a": 1
+    "scenes": {
+      "demo": {
+        "id": "demo",
+        "name": "demo",
+        "type": "scene",
+        "children": [
+          "component"
+        ],
+        "constraints": {
+          "children": "single"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
+      }
     }
   }
 }

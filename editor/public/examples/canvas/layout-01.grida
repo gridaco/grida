@@ -247,12 +247,24 @@
         "cornerRadius": 0
       }
     },
-    "root_id": "173:49",
-    "backgroundColor": {
-      "r": 245,
-      "g": 245,
-      "b": 245,
-      "a": 1
+    "scenes": {
+      "flex": {
+        "id": "flex",
+        "name": "flex",
+        "type": "scene",
+        "children": [
+          "173:49"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
+      }
     }
   }
 }

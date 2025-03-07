@@ -1,44 +1,23 @@
 {
   "doctype": "v0_document",
   "document": {
-    "nodes": {
-      "root": {
-        "id": "root",
-        "name": "root",
-        "active": true,
-        "locked": false,
-        "rotation": 0,
-        "opacity": 1,
-        "zIndex": 0,
-        "type": "container",
-        "expanded": false,
-        "position": "relative",
-        "left": 0,
-        "top": 0,
-        "width": 500,
-        "height": 500,
-        "fill": {
-          "type": "solid",
-          "color": {
-            "r": 255,
-            "g": 255,
-            "b": 255,
-            "a": 1
-          }
+    "nodes": {},
+    "scenes": {
+      "blank": {
+        "id": "blank",
+        "name": "blank",
+        "type": "scene",
+        "children": [],
+        "constraints": {
+          "children": "multiple"
         },
-        "style": {
-          "overflow": "clip"
-        },
-        "cornerRadius": 0,
-        "children": []
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
       }
-    },
-    "root_id": "root",
-    "backgroundColor": {
-      "r": 245,
-      "g": 245,
-      "b": 245,
-      "a": 1
     }
   }
 }

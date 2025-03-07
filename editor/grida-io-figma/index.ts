@@ -179,7 +179,7 @@ export namespace iofigma {
         node: SubcanvasNode,
         images: { [key: string]: string },
         context: FactoryContext
-      ): grida.program.document.IDocumentDefinition {
+      ): grida.program.document.IPackedSceneDocument {
         const nodes: Record<string, grida.program.nodes.Node> = {};
 
         function processNode(
@@ -226,7 +226,16 @@ export namespace iofigma {
 
         return {
           nodes,
-          root_id: rootNode.id,
+          scene: {
+            type: "scene",
+            id: "scene-" + rootNode.id,
+            name: rootNode.name,
+            children: [rootNode.id],
+            guides: [],
+            constraints: {
+              children: "multiple",
+            },
+          },
           // TODO:
           bitmaps: {},
           properties: {},

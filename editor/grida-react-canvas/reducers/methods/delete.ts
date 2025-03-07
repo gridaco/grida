@@ -2,14 +2,35 @@ import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
 import type { grida } from "@/grida";
 import { document } from "@/grida-react-canvas/document-query";
+import assert from "assert";
 
-export function self_deleteNode<S extends IDocumentEditorState>(
+/**
+ * @returns if the node is handled (removed or deactivated)
+ */
+export function self_try_remove_node<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ): boolean {
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
+  // check if the node is removable
   // do not allow deletion of the root node
-  if (node_id === draft.document.root_id) {
-    return false;
+  const is_single_child_constraint_root_node =
+    scene.constraints.children === "single" && scene.children.includes(node_id);
+  const node = draft.document.nodes[node_id];
+  const is_removable_from_scene = node.removable !== false;
+  if (is_single_child_constraint_root_node || !is_removable_from_scene) {
+    switch (draft.when_not_removable) {
+      case "deactivate":
+        node.active = false;
+        return true;
+      case "ignore":
+        return false;
+      case "throw":
+        throw new Error("Node is not removable");
+      case "force":
+        break;
+    }
   }
 
   // how delete works.
@@ -24,7 +45,14 @@ export function self_deleteNode<S extends IDocumentEditorState>(
 
   // [2]
   for (const entry of list) {
+    // delete from nodes registry
     delete draft.document.nodes[entry.id];
+
+    // delete from top children reference (only applies when it's a top node)
+    const i = scene.children.indexOf(entry.id);
+    if (i >= 0) {
+      scene.children.splice(i, 1);
+    }
   }
 
   // [3]

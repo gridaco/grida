@@ -4,7 +4,7 @@ import {
   type IDocumentEditorState,
 } from "../../state";
 import { self_insertSubDocument } from "./insert";
-import { self_deleteNode } from "./delete";
+import { self_try_remove_node } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
@@ -77,6 +77,8 @@ function __self_update_gesture_transform_translate(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(draft.gesture.type === "translate", "Gesture type must be translate");
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
   const {
     movement: _movement,
     initial_selection,
@@ -108,9 +110,9 @@ function __self_update_gesture_transform_translate(
         const initial_parent_id = document.getParentId(
           initial_snapshot.document_ctx,
           original_id
-        )!;
+        );
 
-        const parent_id = initial_parent_id ?? draft.document.root_id;
+        const parent_id = initial_parent_id;
 
         const prototype =
           grida.program.nodes.factory.createPrototypeFromSnapshot(
@@ -119,7 +121,7 @@ function __self_update_gesture_transform_translate(
           );
 
         const sub =
-          grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+          grida.program.nodes.factory.create_packed_scene_document_from_prototype(
             prototype,
             (_, depth) => {
               // the root shall be assigned to reserved id
@@ -161,7 +163,7 @@ function __self_update_gesture_transform_translate(
 
       try {
         initial_clone_ids.forEach((clone) => {
-          self_deleteNode(draft, clone);
+          self_try_remove_node(draft, clone);
         });
       } catch (e) {}
 
@@ -237,24 +239,36 @@ function __self_update_gesture_transform_translate(
         const prev_parent_id = document.getParentId(
           draft.document_ctx,
           node_id
-        )!;
+        );
         if (prev_parent_id === new_parent_id) return;
 
         is_parent_changed = true;
 
         // unregister the node from the previous parent
-        const parent = document.__getNodeById(
-          draft,
-          prev_parent_id
-        ) as grida.program.nodes.i.IChildrenReference;
-        parent.children = parent.children.filter((id) => id !== node_id);
+        if (prev_parent_id) {
+          const parent = document.__getNodeById(
+            draft,
+            prev_parent_id
+          ) as grida.program.nodes.i.IChildrenReference;
+          parent.children = parent.children.filter((id) => id !== node_id);
+        } else {
+          // root
+          // FIXME: do not directly modify scene children here.
+          scene.children = scene.children.filter((id) => id !== node_id);
+        }
 
         // register the node to the new parent
-        const new_parent = document.__getNodeById(
-          draft,
-          new_parent_id
-        ) as grida.program.nodes.i.IChildrenReference;
-        new_parent.children.push(node_id);
+        if (new_parent_id) {
+          const new_parent = document.__getNodeById(
+            draft,
+            new_parent_id
+          ) as grida.program.nodes.i.IChildrenReference;
+          new_parent.children.push(node_id);
+        } else {
+          // root
+          // FIXME: do not directly modify scene children here.
+          scene.children.push(node_id);
+        }
 
         // update the context
         draft.document_ctx = document.Context.from(draft.document).snapshot();
@@ -287,7 +301,7 @@ function __self_update_gesture_transform_translate(
     initial_rects,
     {
       objects: snap_target_node_rects,
-      guides: draft.ruler === "on" ? draft.guides : undefined,
+      guides: draft.ruler === "on" ? scene.guides : undefined,
     },
     adj_movement,
     threshold(DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR, draft.transform)
@@ -302,30 +316,38 @@ function __self_update_gesture_transform_translate(
       const node = document.__getNodeById(draft, node_id);
       const r = translated[i++];
 
-      const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+      const parent_id = document.getParentId(draft.document_ctx, node_id);
 
-      if (!parent_rect) {
-        console.error("below error is caused by");
-        console.error(
-          JSON.parse(
-            JSON.stringify({
-              document_ctx: draft.document_ctx,
-              document: draft.document,
-            })
-          )
-        );
-        throw new Error(
-          `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
-        );
+      let relative_position: cmath.Vector2;
+      if (parent_id) {
+        // sub node
+        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+
+        if (!parent_rect) {
+          console.error("below error is caused by");
+          console.error(
+            JSON.parse(
+              JSON.stringify({
+                document_ctx: draft.document_ctx,
+                document: draft.document,
+              })
+            )
+          );
+          throw new Error(
+            `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
+          );
+        }
+
+        // the r position is relative to the canvas, we need to convert it to the node's local position
+        // absolute to relative => accumulated parent's position
+        relative_position = cmath.vector2.sub(r.position, [
+          parent_rect.x,
+          parent_rect.y,
+        ]);
+      } else {
+        // top node
+        relative_position = r.position;
       }
-
-      // the r position is relative to the canvas, we need to convert it to the node's local position
-      // absolute to relative => accumulated parent's position
-      const relative_position = cmath.vector2.sub(r.position, [
-        parent_rect.x,
-        parent_rect.y,
-      ]);
 
       draft.document.nodes[node_id] = nodeTransformReducer(node, {
         type: "position",
@@ -420,6 +442,8 @@ function __self_update_gesture_transform_scale(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(draft.gesture.type === "scale", "Gesture type must be scale");
+  assert(draft.scene_id, "scene_id is not set");
+  const scene = draft.document.scenes[draft.scene_id];
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.gesture_modifiers;
 
@@ -488,11 +512,10 @@ function __self_update_gesture_transform_scale(
   for (const node_id of selection) {
     const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
-    const is_root = node_id === draft.document.root_id;
+    const is_root = scene.children.includes(node_id);
 
     // TODO: scaling for bitmap node is not supported yet.
     const is_scalable = node.type !== "bitmap";
-
     if (!is_scalable) continue;
 
     if (is_root) {

@@ -170,6 +170,8 @@ export namespace grida {
 }
 
 export namespace grida.program.document {
+  export const SCHEMA_VERSION = "0.0.1-beta.1+20250303";
+
   /**
    * Simple Node Selector
    *
@@ -208,28 +210,6 @@ export namespace grida.program.document {
   }
 
   /**
-   * contains all nodes under this defined document in k:v pair
-   *
-   * @see {@link IDocumentDefinition}
-   */
-  export interface IDocumentNodesRepository {
-    nodes: Record<nodes.NodeID, nodes.Node>;
-  }
-
-  /**
-   * contains all images (data) under this defined document in k:v pair
-   *
-   * @see {@link IDocumentDefinition}
-   */
-  export interface IDocumentBitmapsRepository {
-    bitmaps: Record<
-      string,
-      cmath.raster.Bitmap & {
-        version: number;
-      }
-    >;
-  }
-  /**
    * general purpose cascading document properties for envs, styles, constants, etc.
    */
   export interface IDocumentProperties {
@@ -237,16 +217,6 @@ export namespace grida.program.document {
      * document level properties / variables
      */
     properties: schema.Properties;
-  }
-
-  /**
-   * background color of the document
-   */
-  export interface IDocumentBackground {
-    /**
-     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
-     */
-    backgroundColor?: cg.RGBA8888 | null | undefined | "";
   }
 
   /**
@@ -259,11 +229,53 @@ export namespace grida.program.document {
     templates?: Record<string, template.TemplateDocumentDefinition>;
   }
 
-  export interface IDocumentOverridesRepository {
+  export interface IOverridesRepository {
     /**
      * instance's exposed child node overrides
      */
     overrides: Record<nodes.NodeID, nodes.NodeChange>;
+  }
+
+  /**
+   * contains all nodes under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface INodesRepository {
+    nodes: Record<nodes.NodeID, nodes.Node>;
+  }
+
+  /**
+   * contains all images (data) under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface IBitmapsRepository {
+    bitmaps: Record<
+      string,
+      cmath.raster.Bitmap & {
+        version: number;
+      }
+    >;
+  }
+
+  /**
+   * background color of the scene
+   */
+  export interface ISceneBackground {
+    /**
+     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
+     */
+    backgroundColor?: cg.RGBA8888 | null | undefined | "";
+  }
+
+  export interface Guide2D {
+    readonly axis: cmath.Axis;
+    readonly offset: number;
+  }
+
+  export interface I2DGuides {
+    guides: Array<Guide2D>;
   }
 
   /**
@@ -334,14 +346,83 @@ export namespace grida.program.document {
    * ```
    */
   export interface IDocumentDefinition
-    extends IDocumentNodesRepository,
-      IDocumentBitmapsRepository,
-      IDocumentProperties,
-      IDocumentBackground {
+    extends IBitmapsRepository,
+      document.INodesRepository,
+      IDocumentProperties {
+    // scene: Scene;
+  }
+
+  /**
+   * [Grida Document Model]
+   *
+   * Grida document contains all nodes, properties, and embedded data required to render a complete document.
+   */
+  export interface Document extends IDocumentDefinition {
+    scenes: Record<string, Scene>;
+    entry_scene_id?: string;
+  }
+
+  /**
+   * [Packed Scene Document] A.K.A single scene document
+   *
+   * this is a portable document model with primary scene, used for in-memory operations. like import, copy-paste, drag-drop, etc.
+   */
+  export interface IPackedSceneDocument extends IDocumentDefinition {
+    scene: Scene;
+  }
+
+  /**
+   * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
+   */
+  export interface Scene extends document.ISceneBackground, document.I2DGuides {
+    type: "scene";
+
     /**
-     * root node id. must be defined in {@link IDocumentDefinition.nodes}
+     * the scene identifier - the id is only required to be unique across the current document scenes.
+     * (it is not required to be globally unique within the nodes)
      */
-    root_id: string;
+    readonly id: string;
+
+    /**
+     * the user-friendly name of the scene
+     */
+    name: string;
+
+    /**
+     * the children of the scene. each children must be registreed in the node repository under the document where this scene is defined.
+     */
+    children: nodes.NodeID[];
+    constraints: {
+      children: "single" | "multiple";
+    };
+
+    /**
+     * optional order of the scene
+     */
+    order?: number;
+  }
+
+  /**
+   * Minimal Scene Definition for API usage (and for older versions)
+   *
+   * will follow the default values of {@link Scene} for missing properties.
+   */
+  export type SceneInit = Partial<Scene> & Pick<Scene, "id">;
+
+  /**
+   * initializes a minimal scene definition
+   * @param init minimal scene definition
+   * @returns a compatible scene definition
+   */
+  export function init_scene(init: SceneInit): grida.program.document.Scene {
+    return {
+      // default, fallback values
+      type: "scene",
+      guides: [],
+      constraints: { children: "multiple" },
+      children: [],
+      ...init,
+    } as grida.program.document.Scene;
   }
 
   export namespace internal {
@@ -371,7 +452,7 @@ export namespace grida.program.document {
      *   current relationships.
      *
      */
-    export interface IDocumentDefinitionRuntimeHierarchyContext {
+    export interface INodesRepositoryRuntimeHierarchyContext {
       /**
        * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
        */
@@ -380,7 +461,10 @@ export namespace grida.program.document {
       /**
        * Maps each node ID to its respective parent node ID, facilitating upward traversal.
        */
-      readonly __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
+      readonly __ctx_nid_to_parent_id: Record<
+        nodes.NodeID,
+        nodes.NodeID | null
+      >;
 
       /**
        * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
@@ -394,15 +478,15 @@ export namespace grida.program.document {
      * Builds the runtime context for document hierarchy, providing mappings for
      * parent-child relationships without modifying core node structure.
      *
-     * @param document - The document definition containing all nodes.
-     * @returns {grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
+     * @param repository - The document definition containing all nodes.
+     * @returns {grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext} The hierarchy context,
      * containing mappings of each node's parent and children.
      */
-    export function createDocumentDefinitionRuntimeHierarchyContext(
-      document: IDocumentDefinition
-    ): IDocumentDefinitionRuntimeHierarchyContext {
-      const { nodes } = document;
-      const ctx: IDocumentDefinitionRuntimeHierarchyContext = {
+    export function create_nodes_repository_runtime_hierarchy_context(
+      repository: INodesRepository
+    ): INodesRepositoryRuntimeHierarchyContext {
+      const { nodes } = repository;
+      const ctx: INodesRepositoryRuntimeHierarchyContext = {
         __ctx_nids: Object.keys(nodes),
         __ctx_nid_to_parent_id: {},
         __ctx_nid_to_children_ids: {},
@@ -466,7 +550,7 @@ export namespace grida.program.document {
     INodeHtmlDocumentQueryDataAttributes & N;
 
   export type IGlobalRenderingContext = {
-    context: IDocumentBitmapsRepository;
+    context: IBitmapsRepository;
   };
 
   /**
@@ -503,7 +587,7 @@ export namespace grida.program.document {
 
     export interface TemplateDocumentDefinition<
       P extends schema.Properties = schema.Properties,
-    > extends IDocumentNodesRepository {
+    > extends INodesRepository {
       /**
        * @deprecated - rename to template_id
        */
@@ -665,9 +749,11 @@ export namespace grida.program.css {
     //
   >;
 }
+
 export namespace grida.program.nodes {
   export type NodeID = string;
   export type NodeType = Node["type"];
+
   export type Node =
     | TextNode
     | ImageNode
@@ -754,22 +840,43 @@ export namespace grida.program.nodes {
 
   export type UnknownNodeProperties = Record<keyof UnknwonNode, unknown>;
 
+  // #region node prototypes
+  export type TextNodePrototype = __TPrototypeNode<
+    Omit<Partial<TextNode>, __base_scene_node_properties>
+  >;
+  export type ImageNodePrototype = __TPrototypeNode<
+    Omit<Partial<ImageNode>, __base_scene_node_properties>
+  >;
+  export type VideoNodePrototype = __TPrototypeNode<
+    Omit<Partial<VideoNode>, __base_scene_node_properties>
+  >;
+  export type ContainerNodePrototype = __TPrototypeNode<
+    Omit<Partial<ContainerNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
+  export type PathNodePrototype = __TPrototypeNode<
+    Omit<Partial<PathNode>, __base_scene_node_properties>
+  >;
+  export type LineNodePrototype = __TPrototypeNode<
+    Omit<Partial<LineNode>, __base_scene_node_properties>
+  >;
+  export type RectangleNodePrototype = __TPrototypeNode<
+    Omit<Partial<RectangleNode>, __base_scene_node_properties>
+  >;
+  export type EllipseNodePrototype = __TPrototypeNode<
+    Omit<Partial<EllipseNode>, __base_scene_node_properties>
+  >;
+
   /**
    * A virtual, before-instantiation node that only stores the prototype of a node.
    *
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
-    | __TPrototypeNode<Omit<Partial<TextNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<ImageNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<VideoNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<
-        Omit<
-          Partial<ContainerNode>,
-          __base_scene_node_properties | "children"
-        > &
-          __IPrototypeNodeChildren
-      >
+    | TextNodePrototype
+    | ImageNodePrototype
+    | VideoNodePrototype
+    | ContainerNodePrototype
     | __TPrototypeNode<
         Omit<Partial<HTMLIFrameNode>, __base_scene_node_properties>
       >
@@ -778,12 +885,10 @@ export namespace grida.program.nodes {
       >
     | __TPrototypeNode<Omit<Partial<BitmapNode>, __base_scene_node_properties>>
     | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<PathNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<Partial<LineNode>, __base_scene_node_properties>>
-    | __TPrototypeNode<
-        Omit<Partial<RectangleNode>, __base_scene_node_properties>
-      >
-    | __TPrototypeNode<Omit<Partial<EllipseNode>, __base_scene_node_properties>>
+    | PathNodePrototype
+    | LineNodePrototype
+    | RectangleNodePrototype
+    | EllipseNodePrototype
     | __TPrototypeNode<
         Omit<
           Partial<ComponentNode>,
@@ -817,6 +922,8 @@ export namespace grida.program.nodes {
   type __IPrototypeNodeChildren = {
     children: NodePrototype[];
   };
+
+  // #endregion node prototypes
 
   /**
    * Type for containing instance's node changes data relative to master node
@@ -859,6 +966,15 @@ export namespace grida.program.nodes {
        * @internal
        */
       locked: boolean;
+
+      /**
+       * whether this node is removable (if not remove action will trigger active=false)
+       *
+       * currently, this will only be prevented when the node is a root-level node, and the delete is directly triggered to it.
+       *
+       * @default false
+       */
+      removable?: boolean;
     }
 
     export namespace props {
@@ -1408,7 +1524,7 @@ export namespace grida.program.nodes {
    *
    * For loading png, jpg, etc. images, use {@link ImageNode} instead.
    *
-   * The bitmap data can by found in {@link document.IDocumentBitmapsRepository} images[this.id].data
+   * The bitmap data can by found in {@link document.IBitmapsRepository} images[this.id].data
    */
   export interface BitmapNode
     extends i.IBaseNode,
@@ -1648,10 +1764,11 @@ export namespace grida.program.nodes {
       i.IHrefable,
       i.IMouseCursor,
       i.ISceneNode,
+      i.IPositioning,
       i.IProperties,
       i.IProps,
       // TODO: migration required - remove me - use global override table instead
-      document.IDocumentOverridesRepository {
+      document.IOverridesRepository {
     readonly type: "template_instance";
 
     /**
@@ -1679,6 +1796,7 @@ export namespace grida.program.nodes {
         type: "template_instance",
         active: true,
         locked: false,
+        position: "relative",
         properties,
         props: {},
         userdata: {},
@@ -1779,20 +1897,29 @@ export namespace grida.program.nodes {
     type FactoryNodeIdGenerator<D> = (data: D, depth: number) => NodeID;
 
     /**
-     * Creates a sub document {@link document.IDocumentDefinition} from a prototype input.
+     * Creates a sub document {@link document.IPackedSceneDocument} from a prototype input.
      *
      * When injecting this to the master document, simply merge this to the master document, and add the root as a children of certain node.
      */
-    export function createSubDocumentDefinitionFromPrototype<
+    export function create_packed_scene_document_from_prototype<
       D extends Partial<NodePrototype>,
     >(
       prototype: D,
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
-    ): document.IDocumentDefinition {
-      const document: document.IDocumentDefinition = {
+    ): document.IPackedSceneDocument {
+      const document: document.IPackedSceneDocument = {
         bitmaps: {},
         nodes: {},
-        root_id: "",
+        scene: {
+          type: "scene",
+          id: "tmp",
+          name: "tmp",
+          children: [],
+          guides: [],
+          constraints: {
+            children: "multiple",
+          },
+        },
         properties: {},
       };
 
@@ -1818,9 +1945,21 @@ export namespace grida.program.nodes {
       }
 
       const rootNode = processNode(prototype, nid);
-      document.root_id = rootNode.id;
+      document.scene.children = [rootNode.id];
 
       return document;
+    }
+
+    export function packed_scene_document_to_full_document(
+      packed: document.IPackedSceneDocument
+    ): document.Document {
+      const { scene, ...defs } = packed;
+      return {
+        ...defs,
+        scenes: {
+          [scene.id]: scene,
+        },
+      };
     }
 
     /**

@@ -27,6 +27,25 @@ import {
 } from "@/grida-react-canvas/toolbar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEventTarget } from "@/grida-react-canvas/provider";
+import { cn } from "@/utils";
+
+export function ToolbarPosition({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn(
+        "absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function Toolbar() {
   const { setTool, tool } = useEventTarget();

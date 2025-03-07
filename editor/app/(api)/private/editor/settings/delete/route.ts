@@ -7,7 +7,7 @@ export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const formdata = await req.formData();
 

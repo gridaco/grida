@@ -72,7 +72,7 @@ export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
 
 export interface CanvasDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_canvas";
-  canvas_one: CanvasDocumentSnapshotSchema;
+  document: CanvasDocumentSnapshotSchema;
 }
 
 export interface SchemaDocumentTableInit {
@@ -98,9 +98,13 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
-  start:
-    | (grida.program.document.IDocumentDefinition & { template_id: string })
-    | null;
+
+  /**
+   * the start document as-is (the typing is ignored - this should be assured before being actually passed under the provider)
+   *
+   * TODO: review me - only need single scene
+   */
+  start: FormStartPageSchema | unknown;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
@@ -385,12 +389,32 @@ export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
 interface IEditorPagesState {
   pages: MenuGroup<{ id: string }>[];
-  selected_page_id?:
-    | "form"
-    | "form/startpage"
-    | "site/dev-collection"
-    | (string & {});
+  selected_page_id?: "form" | "form/startpage" | "site" | (string & {});
 }
+
+export type SchemaMayVaryDocument<S> = {
+  /**
+   * the schema version from the server
+   */
+  __schema_version: string;
+} & (
+  | {
+      /**
+       * if the schema is validated (the version is correct)
+       */
+      __schema_valid: true;
+
+      state: S;
+    }
+  | {
+      /**
+       * if the schema is validated (the version is correct)
+       */
+      __schema_valid: false;
+
+      state: null;
+    }
+);
 
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
@@ -416,9 +440,11 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   documents: {
-    ["site/dev-collection"]?: IDocumentEditorState;
-    ["canvas/one"]?: IDocumentEditorState;
-    ["form/startpage"]?: IDocumentEditorState & { template_id: string };
+    ["site"]?: SchemaMayVaryDocument<IDocumentEditorState>;
+    ["canvas"]?: SchemaMayVaryDocument<IDocumentEditorState>;
+    ["form/startpage"]?:
+      | SchemaMayVaryDocument<IDocumentEditorState & { template_id: string }>
+      | undefined;
     // [key: string]: ITemplateEditorState;
   };
   theme: {

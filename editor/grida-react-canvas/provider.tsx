@@ -35,6 +35,7 @@ import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
 import { BitmapEditorBrush } from "@grida/bitmap";
+import { is_direct_component_consumer } from "@/grida/utils/supports";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -1417,18 +1418,61 @@ export function useSelectionPaints() {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selection, transform } = state;
+  const {
+    selection,
+    transform,
+    scene_id,
+    document: { scenes },
+  } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
-  const backgroundColor = state.document.backgroundColor;
-  const setBackgroundColor = useCallback(
-    (
-      backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"]
-    ) => {
+  const loadScene = useCallback(
+    (scene: string) => {
       dispatch({
-        type: "background-color",
-        backgroundColor,
+        type: "load",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const createScene = useCallback(
+    (scene?: grida.program.document.SceneInit) => {
+      dispatch({
+        type: "scenes/new",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteScene = useCallback(
+    (scene: string) => {
+      dispatch({
+        type: "scenes/delete",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const duplicateScene = useCallback(
+    (scene: string) => {
+      dispatch({
+        type: "scenes/duplicate",
+        scene,
+      });
+    },
+    [dispatch]
+  );
+
+  const renameScene = useCallback(
+    (scene: string, name: string) => {
+      dispatch({
+        type: "scenes/change/name",
+        scene,
+        name,
       });
     },
     [dispatch]
@@ -1900,8 +1944,14 @@ export function useDocument() {
       selection,
       transform,
       //
-      background: backgroundColor,
-      setBackground: setBackgroundColor,
+      scenes,
+      scene_id,
+      loadScene,
+      createScene,
+      deleteScene,
+      duplicateScene,
+      renameScene,
+
       //
       select,
       blur,
@@ -1950,8 +2000,13 @@ export function useDocument() {
     selection,
     transform,
     //
-    backgroundColor,
-    setBackgroundColor,
+    scenes,
+    scene_id,
+    loadScene,
+    createScene,
+    deleteScene,
+    duplicateScene,
+    renameScene,
     //
     select,
     blur,
@@ -1997,10 +2052,64 @@ export function useDocument() {
   ]);
 }
 
-export function useTransform() {
+type UseScene = grida.program.document.Scene & {
+  selection: IDocumentEditorState["selection"];
+  transform: IDocumentEditorState["transform"];
+  hovered_node_id: IDocumentEditorState["hovered_node_id"];
+  hovered_vertex_idx: IDocumentEditorState["hovered_vertex_idx"];
+  document_ctx: IDocumentEditorState["document_ctx"];
+  setBackgroundColor: (
+    backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+  ) => void;
+};
+
+export function useScene(scene_id: string): UseScene {
   const [state, dispatch] = __useInternal();
 
-  const { transform } = state;
+  const {
+    selection,
+    transform,
+    hovered_node_id,
+    hovered_vertex_idx,
+    document_ctx,
+  } = state;
+
+  const setBackgroundColor = useCallback(
+    (
+      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    ) => {
+      if (!scene_id) return;
+      dispatch({
+        type: "scenes/change/background-color",
+        scene: scene_id,
+        backgroundColor,
+      });
+    },
+    [dispatch, scene_id]
+  );
+
+  const scene = state.document.scenes[scene_id];
+  return {
+    selection,
+    transform,
+    hovered_node_id,
+    hovered_vertex_idx,
+    document_ctx,
+    ...scene,
+    setBackgroundColor,
+  };
+}
+
+export function useCurrentScene(): UseScene {
+  const [state] = __useInternal();
+  return useScene(state.scene_id!);
+}
+
+export function useTransform() {
+  const [_, dispatch] = __useInternal();
+  const scene = useCurrentScene();
+
+  const { transform } = scene;
 
   const scale = useCallback(
     (
@@ -2063,8 +2172,8 @@ export function useTransform() {
       margin: number | [number, number, number, number] = 64
     ) => {
       const ids = document.querySelector(
-        state.document_ctx,
-        state.selection,
+        scene.document_ctx,
+        scene.selection,
         selector
       );
 
@@ -2072,7 +2181,7 @@ export function useTransform() {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.CanvasDOM(scene.transform);
 
       const area = cmath.rect.union(
         ids
@@ -2092,10 +2201,10 @@ export function useTransform() {
     },
     [
       dispatch,
-      state.transform,
-      state.document_ctx,
-      state.document.root_id,
-      state.selection,
+      scene.document_ctx,
+      scene.transform,
+      scene.selection,
+      scene.children,
     ]
   );
 
@@ -2126,7 +2235,7 @@ export function useTransform() {
   );
 
   return useMemo(() => {
-    const transform = state.transform;
+    const transform = scene.transform;
     const scaleX = transform[0][0];
     const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
@@ -2199,6 +2308,9 @@ export function useEventTargetCSSCursor() {
 
 export function useEventTarget() {
   const [state, dispatch] = __useInternal();
+  const scene = useCurrentScene();
+
+  const { guides } = scene;
 
   const {
     pointer,
@@ -2215,7 +2327,6 @@ export function useEventTarget() {
     debug,
     pixelgrid,
     ruler,
-    guides,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -3153,12 +3264,12 @@ export function useSurfacePathEditor() {
 /**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
-export function useRootTemplateInstanceNode() {
+export function useRootTemplateInstanceNode(root_id: string) {
   const { state, changeNodeProps } = useDocument();
 
   const { document, templates } = state;
 
-  const rootnode = document.nodes[document.root_id];
+  const rootnode = document.nodes[root_id];
 
   assert(rootnode.type === "template_instance", "root node must be template");
   assert(templates && templates[rootnode.template_id], "template not found");
@@ -3169,9 +3280,9 @@ export function useRootTemplateInstanceNode() {
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
-      changeNodeProps(state.document.root_id, key, value);
+      changeNodeProps(root_id, key, value);
     },
-    [changeNodeProps, state.document.root_id]
+    [changeNodeProps, root_id]
   );
 
   return useMemo(
@@ -3209,14 +3320,13 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
 };
 
 export function useNode(node_id: string): NodeWithMeta {
+  assert(node_id, "node_id is required");
   const { state } = useDocument();
 
   const {
-    document: { nodes, root_id },
+    document: { nodes },
     templates,
   } = state;
-
-  const root = nodes[root_id];
 
   let node_definition: grida.program.nodes.Node | undefined = undefined;
   let node_change: grida.program.nodes.NodeChange = undefined;
@@ -3273,12 +3383,10 @@ export function useNode(node_id: string): NodeWithMeta {
     ) as grida.program.nodes.UnknwonNode;
   }, [node_definition, node_change]);
 
-  const is_component_consumer =
-    root.type === "component" ||
-    root.type === "instance" ||
-    root.type === "template_instance";
-
   const is_flex_parent = node.type === "container" && node.layout === "flex";
+
+  // TODO: also check the ancestor nodes
+  const is_component_consumer = is_direct_component_consumer(node.type);
 
   return {
     ...node,
@@ -3287,6 +3395,15 @@ export function useNode(node_id: string): NodeWithMeta {
       is_flex_parent,
     },
   };
+}
+
+/**
+ * @param node_id self or child node id
+ */
+export function useTopNode(node_id: string) {
+  const { state } = useDocument();
+  const top_id = document.getTopId(state.document_ctx, node_id)!;
+  return useNode(top_id);
 }
 
 export function useComputedNode(

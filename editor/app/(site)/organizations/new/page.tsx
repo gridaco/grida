@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebounce } from "@uidotdev/usehooks";
 import Link from "next/link";
-import { useFormStatus } from "react-dom";
 import { Spinner } from "@/components/spinner";
 
 const checkname = async (name: string) => {
@@ -29,12 +28,13 @@ const checkname = async (name: string) => {
   return data as { ok: boolean; message: string };
 };
 
+type SearchParams = { error?: string };
+
 export default function NewOrganizationSetupPage({
   searchParams,
 }: {
-  searchParams: {
-    error?: string;
-  };
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
+  searchParams: SearchParams;
 }) {
   const [name, setName] = useState("");
   const [ok, setOK] = useState(false);

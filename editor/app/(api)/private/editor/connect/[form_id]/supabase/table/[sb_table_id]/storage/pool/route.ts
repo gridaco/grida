@@ -8,11 +8,13 @@ import {
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  form_id: string;
+  sb_table_id: string;
+};
+
 type Context = {
-  params: {
-    form_id: string;
-    sb_table_id: string;
-  };
+  params: Promise<Params>;
 };
 
 interface XSBStorageBulkResolverRequest {
@@ -20,9 +22,9 @@ interface XSBStorageBulkResolverRequest {
 }
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
-  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const body: XSBStorageBulkResolverRequest = await req.json();

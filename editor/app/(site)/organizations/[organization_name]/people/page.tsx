@@ -5,15 +5,15 @@ import { notFound, redirect } from "next/navigation";
 import { PublicUrls } from "@/services/public-urls";
 import MemberList, { MemberItem } from "./list";
 
+type Params = { organization_name: string };
+
 export default async function PoeplesPage({
   params,
 }: {
-  params: {
-    organization_name: string;
-  };
+  params: Promise<Params>;
 }) {
-  const organization_name = params.organization_name;
-  const cookieStore = cookies();
+  const { organization_name } = await params;
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);
   const avatar_url = PublicUrls.organization_avatar_url(supabase);
   const { data: auth } = await supabase.auth.getUser();

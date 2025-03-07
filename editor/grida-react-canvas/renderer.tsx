@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useLayoutEffect, useMemo, useRef } from "react";
-import { useDocument, useTransform } from "./provider";
+import { useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
@@ -19,45 +19,44 @@ export function useUserDocumentCustomRenderer() {
 
 type CustomReactRenderer = React.ComponentType<any>;
 
-interface DocumentContentViewProps {
+export interface StandaloneDocumentContentProps {
   /**
    * custom templates to render
    */
   templates?: Record<string, CustomReactRenderer>;
 }
 
-export function StandaloneDocumentContent({
+export function StandaloneSceneContent({
   templates,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
+}: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const {
-    state: { document, pointer },
-  } = useDocument();
-  const { root_id } = document;
+  const { children } = useCurrentScene();
 
   return (
     <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
       {/* <DebugPointer position={pointer.position} /> */}
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
-        <NodeElement node_id={root_id} />
+        {children.map((id) => (
+          <NodeElement key={id} node_id={id} />
+        ))}
       </UserDocumentCustomRendererContext.Provider>
     </div>
   );
 }
 
-export function StandaloneDocumentBackground({
+export function StandaloneSceneBackground({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { background, transform } = useDocument();
+  const { backgroundColor, transform } = useCurrentScene();
 
-  const [backgroundColor, opacity] = useMemo(() => {
-    if (!background) return [undefined, 1] as const;
-    const hex = "#" + css.rgbaToHex(background);
-    const opacity = background.a;
+  const [cssBackgroundColor, opacity] = useMemo(() => {
+    if (!backgroundColor) return [undefined, 1] as const;
+    const hex = "#" + css.rgbaToHex(backgroundColor);
+    const opacity = backgroundColor.a;
     return [hex, opacity] as const;
-  }, [background]);
+  }, [backgroundColor]);
 
   const [visiblearea, { width, height }] = useMeasure();
 
@@ -78,7 +77,7 @@ export function StandaloneDocumentBackground({
         {/* background color */}
         <div
           className="absolute inset-0 overflow-hidden"
-          style={{ backgroundColor: backgroundColor }}
+          style={{ backgroundColor: cssBackgroundColor }}
         />
       </div>
       {children}
@@ -104,21 +103,25 @@ export function Transformer({ children }: React.PropsWithChildren<{}>) {
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {
-  const {
-    state: {
-      document: { root_id },
-      document_key,
-    },
-  } = useDocument();
+  const scene = useCurrentScene();
   const { transform, style, setTransform } = useTransform();
 
   const applied_initial_transform_key = useRef<string | undefined>("__noop__");
   useLayoutEffect(() => {
-    if (applied_initial_transform_key.current === document_key) return;
+    if (applied_initial_transform_key.current === scene.id) return;
 
     const retransform = () => {
+      if (scene.children.length === 0) return;
       const cdom = new domapi.CanvasDOM(transform);
-      const rect = cdom.getNodeBoundingRect(root_id);
+      const root_rects = scene.children
+        .map((id) => cdom.getNodeBoundingRect(id))
+        .filter(Boolean) as cmath.Rectangle[];
+
+      const rect: cmath.Rectangle =
+        root_rects.length > 0
+          ? cmath.rect.union(root_rects)
+          : { x: 0, y: 0, width: 0, height: 0 };
+
       const _vrect = domapi.get_viewport_rect();
       const vrect = {
         x: 0,
@@ -131,8 +134,8 @@ export function AutoInitialFitTransformer({
     };
 
     retransform();
-    applied_initial_transform_key.current = document_key;
-  }, [document_key, root_id]);
+    applied_initial_transform_key.current = scene.id;
+  }, [scene.id, scene.children]);
 
   return (
     <div

@@ -21,10 +21,10 @@ type SerachParams = {
   next?: string;
 };
 
-export default function InsidersBasicAuthPage({
+export default async function InsidersBasicAuthPage({
   searchParams,
 }: {
-  searchParams: SerachParams;
+  searchParams: Promise<SerachParams>;
 }) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
@@ -35,7 +35,7 @@ export default function InsidersBasicAuthPage({
           </div>
           Grida
         </a>
-        <Form searchParams={searchParams} />
+        <Form searchParams={await searchParams} />
       </div>
     </div>
   );

@@ -133,12 +133,12 @@ export function DevtoolsPanel() {
 }
 
 function devdata_hierarchy_only(
-  document: grida.program.document.IDocumentDefinition,
-  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+  document: grida.program.document.Document,
+  document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext
 ) {
-  const { root_id, nodes } = document;
+  const { scenes, nodes } = document;
   return {
-    root_id: root_id,
+    scenes,
     document_ctx,
     nodes: Object.entries(nodes).reduce((acc: any, [id, node]) => {
       acc[id] = {

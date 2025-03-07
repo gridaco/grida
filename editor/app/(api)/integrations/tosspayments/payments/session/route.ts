@@ -23,12 +23,10 @@ async function get_tosspayments_customer_key(
   form_id: string,
   testmode: boolean = true
 ): Promise<string> {
-  // @ts-ignore
-  if (testmode) return INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY;
+  if (testmode) return INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY as string;
 
   // TODO: find customer key by form_id
-  // @ts-ignore
-  return INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY;
+  return INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY as string;
 }
 
 export async function POST(req: NextRequest) {

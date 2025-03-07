@@ -380,7 +380,7 @@ export namespace iosvg {
       node: INode,
       context: SVGFactoryContext,
       inheritedAttributes: Partial<SVGElementAttributes> = {}
-    ): grida.program.nodes.NodePrototype[] | null {
+    ): SVGIOCompatibleNodePrototype[] | null {
       const { name, attributes: _attributes, children } = node;
 
       const nodename = context.depth === 0 ? context.name : name;
@@ -414,7 +414,7 @@ export namespace iosvg {
                 )
                 .flat()
                 .filter(Boolean) as grida.program.nodes.NodePrototype[],
-            } satisfies grida.program.nodes.NodePrototype,
+            } satisfies grida.program.nodes.ContainerNodePrototype,
           ];
         }
 
@@ -428,7 +428,7 @@ export namespace iosvg {
                 attributes
               )
             )
-            .filter(Boolean) as grida.program.nodes.NodePrototype[];
+            .filter(Boolean) as SVGIOCompatibleNodePrototype[];
         }
 
         // [path] => path with vector network
@@ -462,7 +462,7 @@ export namespace iosvg {
               left: 0,
               top: 0,
               fillRule: fillRule,
-            } satisfies grida.program.nodes.NodePrototype,
+            } satisfies grida.program.nodes.PathNodePrototype,
           ];
         }
 
@@ -504,7 +504,7 @@ export namespace iosvg {
               cornerRadius: parseFloat(rx as string),
               opacity: map.opacity(opacity as string),
               fill: map.fill(fill as string, context),
-            } satisfies grida.program.nodes.NodePrototype,
+            } satisfies grida.program.nodes.RectangleNodePrototype,
           ];
           break;
 
@@ -534,7 +534,7 @@ export namespace iosvg {
               height: ry * 2,
               opacity: map.opacity(opacity as string),
               fill: map.fill(fill as string, context),
-            } satisfies grida.program.nodes.NodePrototype,
+            } satisfies grida.program.nodes.EllipseNodePrototype,
           ];
 
           break;
@@ -649,10 +649,16 @@ export namespace iosvg {
       return result;
     }
 
+    type SVGIOCompatibleNodePrototype =
+      | grida.program.nodes.ContainerNodePrototype
+      | grida.program.nodes.PathNodePrototype
+      | grida.program.nodes.RectangleNodePrototype
+      | grida.program.nodes.EllipseNodePrototype;
+
     export async function convert(
       svgstr: string,
       context: SVGFactoryUserContext
-    ): Promise<grida.program.nodes.NodePrototype | null> {
+    ): Promise<SVGIOCompatibleNodePrototype | null> {
       const node = await parse(svgstr);
 
       // console.log("iosvg.convert(node)", node);

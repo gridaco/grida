@@ -11,7 +11,7 @@ import assert from "assert";
 export async function POST(req: NextRequest) {
   const data: UpdateFormAccessForceClosedRequest = await req.json();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const { form_id, closed } = data;
 

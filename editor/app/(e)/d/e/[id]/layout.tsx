@@ -28,13 +28,15 @@ const fonts = {
 
 const IS_PRODUTION = process.env.NODE_ENV === "production";
 
+type Params = { id: string };
+
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
 }): Promise<Metadata> {
   // room for improvement - query optimization via rpc or meta from client side
-  const id = params.id;
+  const { id } = await params;
 
   const { data: formdoc, error: formdoc_err } = await grida_forms_client
     .from("form_document")
@@ -76,10 +78,10 @@ export default async function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<Params>;
 }>) {
-  const { id } = params;
-  const cookieStore = cookies();
+  const { id } = await params;
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data, error } = await grida_forms_client

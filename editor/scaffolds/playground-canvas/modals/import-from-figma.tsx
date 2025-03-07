@@ -174,7 +174,7 @@ export function ImportFromFigmaDialog({
           </div>
         </form>
         <DialogFooter>
-          <DialogClose>
+          <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>
           <Button form="import" type="submit">

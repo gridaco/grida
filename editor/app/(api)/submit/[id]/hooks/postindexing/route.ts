@@ -6,13 +6,15 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import validator from "validator";
 
+type Params = { id: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<Params>;
   }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
   const { response_id } = await req.json();
 
   assert(response_id, "response_id is required");
@@ -53,25 +55,19 @@ export async function POST(
 
       if (fieldType === "email") {
         if (validator.isEmail(value)) {
-          info.provisional_email.push(
-            // @ts-ignore
-            value
-          );
+          info.provisional_email.push(value);
         }
       } else if (fieldType === "tel") {
         if (validator.isMobilePhone(value, "any")) {
-          info.provisional_phone.push(
-            // @ts-ignore
-            value
-          );
+          info.provisional_phone.push(value);
         }
       }
 
       return info;
     },
     {
-      provisional_email: [],
-      provisional_phone: [],
+      provisional_email: [] as string[],
+      provisional_phone: [] as string[],
     }
   );
 

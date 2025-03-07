@@ -1,19 +1,21 @@
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import Playground from "@/scaffolds/playground";
 
 export const maxDuration = 60;
 
+type Params = {
+  slug: string;
+};
+
 export default async function SharedPlaygroundPage({
   params,
 }: {
-  params: {
-    slug: string;
-  };
+  params: Promise<Params>;
 }) {
-  const { slug } = params;
-  const cookieStore = cookies();
+  const { slug } = await params;
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data: _gist } = await supabase

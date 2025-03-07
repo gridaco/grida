@@ -8,7 +8,7 @@ import type { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest, res: NextResponse) {
   const requestUrl = new URL(req.url);
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient<Database>({
     cookies: () => cookieStore,
   });

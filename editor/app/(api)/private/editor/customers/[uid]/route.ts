@@ -7,6 +7,10 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  uid: string;
+};
+
 export interface FormCustomerDetail extends Customer {
   responses: (FormResponse & { form: Form })[];
 }
@@ -14,13 +18,11 @@ export interface FormCustomerDetail extends Customer {
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      uid: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { uid } = context.params;
-  const cookieStore = cookies();
+  const { uid } = await context.params;
+  const cookieStore = await cookies();
   const client = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 

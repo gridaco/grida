@@ -25,7 +25,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
   );
 
   for (const origin_id of targets) {
-    if (origin_id === draft.document.root_id) continue;
+    // if (origin_id === draft.document.children) continue;
 
     // serialize the node
     const prototype = grida.program.nodes.factory.createPrototypeFromSnapshot(
@@ -35,16 +35,15 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
 
     // create sub document with prototype
     const sub =
-      grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+      grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         nid
       );
 
     const parent_id = document.getParentId(draft.document_ctx, origin_id);
-    assert(parent_id, `Parent node not found`);
 
     // insert the sub document
-    const clone_id = self_insertSubDocument(draft, parent_id, sub);
+    const clone_id = self_insertSubDocument(draft, parent_id, sub)[0];
 
     // apply the delta
     if (nextdelta) {

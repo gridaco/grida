@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 export default function TableDefinitionPage({
   params,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     tablename: string;
   };

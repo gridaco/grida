@@ -26,7 +26,7 @@ export function PlayActions() {
               </div>
             </TooltipTrigger>
             <TooltipContent>
-              Preview is not available for database documents
+              Preview is not available for site documents
             </TooltipContent>
           </Tooltip>
         </>

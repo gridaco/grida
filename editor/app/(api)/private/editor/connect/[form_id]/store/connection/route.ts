@@ -13,17 +13,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
 
+type Params = { form_id: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: { form_id: string };
+    params: Promise<Params>;
   }
 ) {
   const formdata = await req.formData();
 
   const origin = req.nextUrl.origin;
-  const cookieStore = cookies();
-  const { form_id } = context.params;
+  const cookieStore = await cookies();
+  const { form_id } = await context.params;
   const next = req.nextUrl.searchParams.get("next");
   const supabase = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);

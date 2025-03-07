@@ -10,21 +10,23 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  schema_id: string;
+};
+
 type ResponsePayload = EditorApiResponse<CreateNewSchemaTableResponse>;
 
 type Context = {
-  params: {
-    schema_id: string;
-  };
+  params: Promise<Params>;
 };
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const data = (await req.json()) as Omit<
     CreateNewSchemaTableRequest,
     "schema_id"
   >;
-  const schema_id = context.params.schema_id;
+  const { schema_id } = await context.params;
   assert(data.table_name, "table_name is required");
 
   const supabase = createRouteHandlerClient(cookieStore);

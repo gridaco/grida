@@ -17,7 +17,7 @@ export function MarqueeArea({ a, b }: Marquee) {
 
   return (
     <div
-      className="absolute border border-workbench-accent-sky bg-workbench-accent-sky/20 pointer-events-none"
+      className="absolute border border-workbench-accent-sky bg-workbench-accent-sky/20 pointer-events-none z-50"
       style={{
         left: r.x,
         top: r.y,

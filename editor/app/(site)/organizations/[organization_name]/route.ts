@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function GET(
+type Params = {
+  organization_name: string;
+};
+
+export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      organization_name: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const origin = req.nextUrl.origin;
-  const org = context.params.organization_name;
+  const { organization_name: org } = await context.params;
 
   const dashboard = `/${org}`;
   return NextResponse.redirect(origin + dashboard, {

@@ -7,7 +7,7 @@ export default async function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data } = await supabase.auth.getUser();

@@ -18,17 +18,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
-import { DesktopDragArea } from "@/host/desktop-drag-area";
 import { Button } from "@/components/ui/button";
 
 export default function FormsDashboardPage({
   params,
   searchParams,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     org: string;
     proj: string;
   };
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   searchParams: {
     layout?: "grid" | "list";
   };
@@ -47,77 +48,70 @@ export default function FormsDashboardPage({
   }
 
   return (
-    <div className="h-full flex flex-1 w-full">
+    <main className="w-full h-full overflow-y-scroll">
       <Head>
         <title>
           {organization_name}/{project_name} | Grida
         </title>
       </Head>
-      <div className="flex flex-col overflow-hidden w-full h-full">
-        <DesktopDragArea className="desktop-title-bar-height border-b bg-sidebar" />
-        <main className="w-full h-full overflow-y-scroll">
-          <div className="container mx-auto">
-            <header className="py-10 flex justify-between">
-              <div>
-                <span className="flex items-center gap-2 text-2xl font-black select-none">
-                  {project_name}
-                </span>
-                <span className="font-mono opacity-50">
-                  {organization_name}
-                </span>
-              </div>
-              {project && (
-                <div>
-                  <CreateNewDocumentButton
-                    project_name={project_name}
-                    project_id={project.id}
-                  >
-                    <Button className="gap-1">
-                      <PlusIcon />
-                      Create New
-                      <ChevronDownIcon />
-                    </Button>
-                  </CreateNewDocumentButton>
-                </div>
-              )}
-            </header>
-            {loading ? (
-              <>
-                <div>
-                  <Skeleton className="w-full h-32 rounded" />
-                </div>
-              </>
-            ) : (
-              <div>
-                <section>
-                  <ProjectStats project_ids={[project!.id]} />
-                </section>
-                <section className="w-full flex justify-end gap-2 mt-10">
-                  <Link href="?layout=grid" replace>
-                    <ViewGridIcon />
-                  </Link>
-                  <Link href="?layout=list" replace>
-                    <ViewHorizontalIcon />
-                  </Link>
-                </section>
-                <hr className="mb-10 mt-5 dark:border-neutral-700" />
-                <DocumentsGrid
-                  organization_name={organization_name}
-                  project_name={project_name}
-                  documents={documents.filter(
-                    (doc) => doc.project_id === project!.id
-                  )}
-                  layout={layout}
-                />
-                <footer className="mt-10 mb-5">
-                  <PoweredByGridaFooter />
-                </footer>
-              </div>
-            )}
+      <div className="container mx-auto">
+        <header className="py-10 flex justify-between">
+          <div>
+            <span className="flex items-center gap-2 text-2xl font-black select-none">
+              {project_name}
+            </span>
+            <span className="font-mono opacity-50">{organization_name}</span>
           </div>
-        </main>
+          {project && (
+            <div>
+              <CreateNewDocumentButton
+                project_name={project_name}
+                project_id={project.id}
+              >
+                <Button className="gap-1">
+                  <PlusIcon />
+                  Create New
+                  <ChevronDownIcon />
+                </Button>
+              </CreateNewDocumentButton>
+            </div>
+          )}
+        </header>
+        {loading ? (
+          <>
+            <div>
+              <Skeleton className="w-full h-32 rounded" />
+            </div>
+          </>
+        ) : (
+          <div>
+            <section>
+              <ProjectStats project_ids={[project!.id]} />
+            </section>
+            <section className="w-full flex justify-end gap-2 mt-10">
+              <Link href="?layout=grid" replace>
+                <ViewGridIcon />
+              </Link>
+              <Link href="?layout=list" replace>
+                <ViewHorizontalIcon />
+              </Link>
+            </section>
+            <hr className="mb-10 mt-5 dark:border-neutral-700" />
+            <DocumentsGrid
+              organization_name={organization_name}
+              project_name={project_name}
+              documents={documents.filter(
+                (doc) => doc.project_id === project!.id
+              )}
+              layout={layout}
+            />
+            <footer className="mt-10 mb-5">
+              <PoweredByGridaFooter />
+            </footer>
+          </div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }
 

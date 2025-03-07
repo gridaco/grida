@@ -6,6 +6,8 @@ import { notFound } from "next/navigation";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
+type Params = { session: string; field: string };
+
 /**
  * [search/meta] This endpoint serves the meta information for the search action.
  * since we support db connection and search field on form can be a potential security risk,
@@ -14,13 +16,10 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      session: string;
-      field: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { session: session_id, field: field_id } = context.params;
+  const { session: session_id, field: field_id } = await context.params;
 
   const { data, error } = await grida_forms_client
     .from("response_session")

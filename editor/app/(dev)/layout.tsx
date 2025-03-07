@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
-
+import { cookies } from "next/headers";
+import { getPlatform } from "@/host/platform";
+import PlatformProvider from "@/host/platform-provider";
 import "../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -12,11 +14,14 @@ export const metadata: Metadata = {
   title: "Grida",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const platform = await getPlatform(cookieStore);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
@@ -27,7 +32,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <PlatformProvider {...platform}>{children}</PlatformProvider>
         </ThemeProvider>
       </body>
     </html>

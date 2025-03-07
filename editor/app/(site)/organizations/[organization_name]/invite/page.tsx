@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/breadcrumb";
 import Link from "next/link";
 
-export default function NewOrganizationSetupInvitePage({
+type Params = { organization_name: string };
+
+export default async function NewOrganizationSetupInvitePage({
   params,
 }: {
-  params: {
-    organization_name: string;
-  };
+  params: Promise<Params>;
 }) {
-  const { organization_name } = params;
+  const { organization_name } = await params;
 
   return (
     <main className="max-w-md mx-auto p-4 md:p-0">

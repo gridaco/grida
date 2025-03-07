@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function GET(
+type Params = {
+  organization_name: string;
+};
+
+export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      organization_name: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const origin = req.nextUrl.origin;
-  const organization_name = context.params.organization_name;
+  const { organization_name: org } = await context.params;
   return NextResponse.redirect(
-    origin + `/organizations/${organization_name}/settings/profile`,
+    origin + `/organizations/${org}/settings/profile`,
     {
       status: 307,
     }

@@ -14,7 +14,7 @@ export namespace sitemap {
     forms: "/forms",
     canvas: "/canvas",
     cookies: "/cookies-policy",
-    signin: "/signin",
+    signin: "/sign-in",
     cta: "/dashboard/new?plan=free",
     thebundle: "/bundle",
     playground: "/playground",

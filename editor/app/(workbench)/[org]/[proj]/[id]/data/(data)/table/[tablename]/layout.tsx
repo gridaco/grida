@@ -10,6 +10,7 @@ export default function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     tablename: string;
   };

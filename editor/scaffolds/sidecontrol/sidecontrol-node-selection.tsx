@@ -8,7 +8,6 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
 import { FontWeightControl } from "./controls/font-weight";
@@ -59,9 +58,11 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
 import {
+  useCurrentScene,
   useNodeAction,
   useSelection,
   useSelectionPaints,
+  useTopNode,
 } from "@/grida-react-canvas/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -75,12 +76,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -125,11 +120,7 @@ export function Selection({ empty }: { empty?: React.ReactNode }) {
 }
 
 function SelectionMixedProperties() {
-  const { state: document } = useDocument();
-
-  const {
-    document: { root_id },
-  } = document;
+  const scene = useCurrentScene();
 
   const { selection: ids, nodes, properties, actions: change } = useSelection();
   const {
@@ -185,7 +176,7 @@ function SelectionMixedProperties() {
   } = properties;
 
   const sid = ids.join(",");
-  const is_root = ids[0] === root_id; // assuming when root is selected, only root is selected
+  const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
@@ -231,7 +222,7 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={is_root} className="border-b pb-4">
+        <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -603,20 +594,17 @@ function SelectionMixedProperties() {
 
 function SelectedNodeProperties() {
   const { state } = useDocument();
+  const scene = useCurrentScene();
 
   // - color - variables
-  const {
-    selection,
-    document: { root_id },
-    debug,
-  } = state;
+  const { selection, debug, document } = state;
 
   assert(selection.length === 1);
   const node_id = selection[0];
   const actions = useNodeAction(node_id)!;
 
   const node = useNode(node_id);
-  const root = useNode(root_id);
+  const root = useTopNode(node_id);
   const computed = useComputedNode(node_id);
   const {
     id,
@@ -683,7 +671,9 @@ function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_root = node_id === root_id;
+  const is_root = node_id === root.id;
+  const is_single_mode_root =
+    scene.constraints.children === "single" && is_root;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
@@ -732,7 +722,7 @@ function SelectedNodeProperties() {
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={is_root} className="border-b pb-4">
+        <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -803,13 +793,19 @@ function SelectedNodeProperties() {
             <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
 
-          {properties && (
+          {properties && Object.keys(properties).length ? (
             <SidebarMenuSectionContent className="space-y-2">
               <PropsControl
                 properties={properties}
                 props={computed.props || {}}
                 onValueChange={actions.value}
               />
+            </SidebarMenuSectionContent>
+          ) : (
+            <SidebarMenuSectionContent className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                No properties defined
+              </p>
             </SidebarMenuSectionContent>
           )}
         </SidebarSection>

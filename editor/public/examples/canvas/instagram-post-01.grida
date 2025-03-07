@@ -366,12 +366,24 @@
         "fontWeight": 800
       }
     },
-    "root_id": "202:2",
-    "backgroundColor": {
-      "r": 245,
-      "g": 245,
-      "b": 245,
-      "a": 1
+    "scenes": {
+      "post": {
+        "id": "post",
+        "name": "post",
+        "type": "scene",
+        "children": [
+          "202:2"
+        ],
+        "constraints": {
+          "children": "multiple"
+        },
+        "backgroundColor": {
+          "r": 245,
+          "g": 245,
+          "b": 245,
+          "a": 1
+        }
+      }
     }
   }
 }

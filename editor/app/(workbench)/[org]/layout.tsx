@@ -8,19 +8,21 @@ import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
+type Params = { org: string };
+
 export default async function Layout({
   params,
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: { org: string };
+  params: Promise<Params>;
 }>) {
-  const org = params.org;
+  const { org } = await params;
 
   // in local dev, the vercel insights script is not loaded, will hit this route
   if (org === "_vercel") return notFound();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const platform = await getPlatform(cookieStore);
 
   const supabase = createServerComponentClient(cookieStore);
