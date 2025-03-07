@@ -7,32 +7,32 @@ const mock = {
   response_short_id: "#123",
 } as const;
 
+type Params = { lng: string };
+type SearchParams = { title?: string };
+
 export default async function Component({
   params,
   searchParams,
 }: {
-  params: {
-    lng: string;
-  };
-  searchParams: {
-    title?: string;
-  };
+  params: Promise<Params>;
+  searchParams: Promise<SearchParams>;
 }) {
+  const { lng } = await params;
+  const { title = mock.title } = await searchParams;
   await i18next.init({
-    lng: params.lng,
+    lng: lng,
     fallbackLng: "en",
     debug: false,
     resources: resources,
   });
 
-  const title = searchParams.title || mock.title;
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageTemplate_receipt01
         context={{
           title: title,
           form_title: title,
-          language: params.lng,
+          language: lng,
           response: {
             idx: "#123",
             index: 123,

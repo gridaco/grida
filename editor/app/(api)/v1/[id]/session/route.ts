@@ -2,13 +2,17 @@ import { parseGFKeys } from "@/lib/forms/gfkeys";
 import { grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { id: string };
+
 // the phylosophy behind response session is, always create, do not validate.
 // this is because to keep the session dedicated only for tracking page views and partial submissions
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: {
+    params: Promise<Params>;
+  }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
 
   // TODO: also support customer init in session creation
   const { __gf_customer_uuid, __gf_fp_fingerprintjs_visitorid } = parseGFKeys(

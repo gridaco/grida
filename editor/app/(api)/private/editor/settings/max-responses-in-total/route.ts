@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   const data: UpdateFormAccessMaxResponseInTotalRequest = await req.json();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const { form_id, enabled, max } = data;
 

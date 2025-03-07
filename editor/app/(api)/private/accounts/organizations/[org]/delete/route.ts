@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { org: string };
+
 //
 // !!!!!DANGER!!!!!
 // !!!!!DANGER!!!!!
@@ -14,14 +16,12 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(
   req: NextRequest,
   context: {
-    params: {
-      org: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const origin = req.nextUrl.origin;
-  const org = context.params.org;
-  const cookieStore = cookies();
+  const { org } = await context.params;
+  const cookieStore = await cookies();
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: orgref, error: orgreferr } = await wsclient

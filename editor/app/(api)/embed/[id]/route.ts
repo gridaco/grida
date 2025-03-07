@@ -1,15 +1,15 @@
 import { formlink } from "@/lib/forms/url";
 import { NextRequest, NextResponse } from "next/server";
 
-export function GET(
+export async function GET(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<{ id: string }>;
   }
 ) {
   const origin = req.nextUrl.origin;
-  const id = context.params.id;
-  return NextResponse.redirect(formlink(origin, id), {
+  const { id: form_id } = await context.params;
+  return NextResponse.redirect(formlink(origin, form_id), {
     status: 301,
   });
 }

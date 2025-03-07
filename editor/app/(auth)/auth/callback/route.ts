@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const redirect_uri = requestUrl.searchParams.get("redirect_uri");
 
   if (code) {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient<Database>({
       cookies: () => cookieStore,
     });

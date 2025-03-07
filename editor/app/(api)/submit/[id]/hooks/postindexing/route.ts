@@ -6,13 +6,15 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import validator from "validator";
 
+type Params = { id: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<Params>;
   }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
   const { response_id } = await req.json();
 
   assert(response_id, "response_id is required");

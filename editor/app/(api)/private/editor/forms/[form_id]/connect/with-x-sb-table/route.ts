@@ -10,17 +10,19 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = {
+  form_id: string;
+};
+
 interface Context {
-  params: {
-    form_id: string;
-  };
+  params: Promise<Params>;
 }
 
 // TODO: safely remove
 /*
 export async function GET(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: conn_ref, error: conn_ref_error } = await supabase
@@ -58,8 +60,8 @@ export async function GET(req: NextRequest, context: Context) {
 // FIXME: this will fail since we don't craete connection_supabase on project connection.
 // @see https://github.com/gridaco/grida/pull/179
 export async function PUT(req: NextRequest, context: Context) {
-  const form_id = context.params.form_id;
-  const cookieStore = cookies();
+  const { form_id } = await context.params;
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
   const {
@@ -143,7 +145,7 @@ export async function PUT(req: NextRequest, context: Context) {
 // TODO: add once ready on ui
 // export async function DELETE(req: NextRequest, context: Context) {
 //   const form_id = context.params.form_id;
-//   const cookieStore = cookies();
+//   const cookieStore = await cookies();
 //   const supabase = createRouteHandlerClient(cookieStore);
 
 //   const { count, error } = await supabase

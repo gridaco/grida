@@ -11,14 +11,16 @@ import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 
+type Params = { id: string };
+
 export default async function AlreadyRespondedPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: Promise<Params>;
   searchParams?: FormLinkURLParams["alreadyresponded"];
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
   const { fingerprint, customer_id, session_id } = searchParams || {};
   await ssr_page_init_i18n({ form_id });
 

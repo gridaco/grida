@@ -59,15 +59,17 @@ import { TemplateVariables } from "@/lib/templating";
 import { RichTextStagedFileUtils } from "@/services/form/utils";
 import { Env } from "@/env";
 
+type Params = { id: string };
+
 export const revalidate = 0;
 
 export async function GET(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<Params>;
   }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
 
   // #region 1 prevalidate request form data (query)
   const __keys = Array.from(req.nextUrl.searchParams.keys());
@@ -94,10 +96,10 @@ export async function GET(
 export async function POST(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<Params>;
   }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
 
   // #region 1 prevalidate request form data
   let data: FormData;
@@ -345,7 +347,7 @@ async function submit({
         ? possible_selection_option_ids[0]
         : null;
 
-    console.log("selection_id", selection_id);
+    // console.log("selection_id", selection_id);
 
     // validate if inventory is present
     const inventory_access_error = await validate_options_inventory({

@@ -15,17 +15,19 @@ import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 
+type Params = { id: string };
+
 export default async function FormClosedPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
-  searchParams: FormLinkURLParams["formclosed"];
+  params: Promise<Params>;
+  searchParams: Promise<FormLinkURLParams["formclosed"]>;
 }) {
-  const form_id = params.id;
+  const { id: form_id } = await params;
+  const { oops } = await searchParams;
   await ssr_page_init_i18n({ form_id });
 
-  const oops = searchParams.oops;
   return (
     <main className="container mx-auto flex items-center justify-center w-screen h-screen">
       <Card className="w-full max-w-md p-4">

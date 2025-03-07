@@ -4,13 +4,15 @@ import { grida_forms_client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
 
+type Params = { id: string };
+
 export async function POST(
   req: NextRequest,
   context: {
-    params: { id: string };
+    params: Promise<Params>;
   }
 ) {
-  const form_id = context.params.id;
+  const { id: form_id } = await context.params;
   const { response_id, session_id } = await req.json();
 
   assert(response_id, "response_id is required");

@@ -48,6 +48,8 @@ import { requesterurl, resolverurl } from "@/services/form/session-storage";
 import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
 
+type Params = { id: string };
+
 export const revalidate = 0;
 
 const cjk = ["ko", "ja"];
@@ -138,16 +140,14 @@ export interface MaxResponseByCustomerError {
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
   const response: FormClientFetchResponse = {
     data: null,
     error: null,
   };
-  const id = context.params.id;
+  const { id } = await context.params;
   const searchParams = req.nextUrl.searchParams;
 
   let system_keys: GFKeys = {};
@@ -158,7 +158,7 @@ export async function GET(
     response.error = e;
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   // TODO: strict with permissions
   const supabase = grida_forms_client;
   // const supabase = createRouteHandlerClient(cookieStore);

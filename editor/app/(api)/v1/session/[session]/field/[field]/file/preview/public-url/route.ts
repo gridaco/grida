@@ -4,17 +4,15 @@ import { FormsApiResponse, StoragePublicUrlData } from "@/types/private/api";
 import assert from "assert";
 import { NextRequest, NextResponse } from "next/server";
 
+type Params = { session: string; field: string };
+
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      session: string;
-      field: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const session_id = context.params.session;
-  const field_id = context.params.field;
+  const { session: session_id, field: field_id } = await context.params;
   const path = req.nextUrl.searchParams.get("path");
 
   assert(path, "path is required");

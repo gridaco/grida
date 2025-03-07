@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
   const data: UpdateFormRedirectAfterSubmissionRequest = await req.json();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const {
     form_id,

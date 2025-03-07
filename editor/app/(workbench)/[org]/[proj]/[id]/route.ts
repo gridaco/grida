@@ -1,18 +1,15 @@
 import { editorlink } from "@/lib/forms/url";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 
-export function GET(
+export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      org: string;
-      proj: string;
-      id: string;
-    };
+    params: Promise<GDocEditorRouteParams>;
   }
 ) {
   const origin = req.nextUrl.origin;
-  const { id, org, proj } = context.params;
+  const { id, org, proj } = await context.params;
 
   return NextResponse.redirect(
     editorlink("data", {

@@ -11,21 +11,20 @@ const expiresIn = 60 * 60;
 
 export const revalidate = expiresIn;
 
+type Params = { form_id: string; field_id: string };
+
 export async function GET(
   req: NextRequest,
   context: {
-    params: {
-      form_id: string;
-      field_id: string;
-    };
+    params: Promise<Params>;
   }
 ) {
-  const { form_id, field_id } = context.params;
+  const { form_id, field_id } = await context.params;
 
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
   // TODO: support RLS
-  // const cookieStore = cookies();
+  // const cookieStore = await cookies();
   // const supabase = createRouteHandlerClient(cookieStore);
   const supabase = grida_forms_client;
 

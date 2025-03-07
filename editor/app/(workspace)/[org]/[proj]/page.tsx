@@ -24,10 +24,12 @@ export default function FormsDashboardPage({
   params,
   searchParams,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     org: string;
     proj: string;
   };
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   searchParams: {
     layout?: "grid" | "list";
   };

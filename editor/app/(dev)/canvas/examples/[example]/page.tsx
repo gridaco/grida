@@ -10,9 +10,9 @@ type Params = {
 export async function generateMetadata({
   params,
 }: {
-  params: Params;
+  params: Promise<Params>;
 }): Promise<Metadata | null> {
-  const { example: example_id } = params;
+  const { example: example_id } = await params;
 
   const example = canvas_examples.find((e) => e.id === example_id);
 
@@ -24,8 +24,12 @@ export async function generateMetadata({
   };
 }
 
-export default function FileExamplePage({ params }: { params: Params }) {
-  const { example: example_id } = params;
+export default async function FileExamplePage({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
+  const { example: example_id } = await params;
   const example = canvas_examples.find((e) => e.id === example_id);
 
   if (!example) return notFound();

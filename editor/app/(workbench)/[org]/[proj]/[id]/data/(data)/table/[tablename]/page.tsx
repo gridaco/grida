@@ -27,6 +27,7 @@ import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 export default function SchemaTablePage({
   params,
 }: {
+  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
   params: {
     tablename: string;
   };
