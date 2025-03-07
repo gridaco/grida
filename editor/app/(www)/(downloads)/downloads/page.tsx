@@ -99,7 +99,7 @@ export default async function DownloadsPage() {
               width={600}
               height={600}
               alt="download"
-              className="overflow-hidden"
+              className="overflow-hidden hover:scale-110 transition-all duration-300"
             />
           </div>
         </section>
