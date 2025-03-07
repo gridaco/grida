@@ -114,6 +114,7 @@ export default function reducer<S extends IDocumentEditorState>(
       });
 
       return produce(state, (draft: Draft<S>) => {
+        // FIXME: clone nodes entirely
         // 0. add the new scene
         draft.document.scenes[next.id] = next;
         // 1. change the scene_id
@@ -136,7 +137,17 @@ export default function reducer<S extends IDocumentEditorState>(
     }
     case "transform": {
       return produce(state, (draft: Draft<S>) => {
-        draft.transform = action.transform;
+        const prev_transform = state.transform;
+        const next_transform = action.transform;
+
+        // set the transform
+        draft.transform = next_transform;
+
+        // TODO: need to update the pointer position (recalculate)
+        // ...
+
+        // update hooked events
+        self_updateSurfaceHoverState(draft);
       });
     }
     case "undo":

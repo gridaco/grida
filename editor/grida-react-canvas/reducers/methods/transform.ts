@@ -52,6 +52,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "curve") return;
   if (draft.gesture.type === "gap") return;
   if (draft.gesture.type === "brush") return;
+  if (draft.gesture.type === "guide") return;
 
   switch (draft.gesture.type) {
     case "translate": {

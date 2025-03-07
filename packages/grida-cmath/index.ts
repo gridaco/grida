@@ -731,6 +731,30 @@ export namespace cmath.vector2 {
   }
 
   /**
+   * Clamps each component of a 2D vector within the corresponding min and max bounds.
+   *
+   * @param vector - The input vector [x, y].
+   * @param min - The minimum allowed values [minX, minY].
+   * @param max - The maximum allowed values [maxX, maxY].
+   * @returns A new vector [clampedX, clampedY] where each component is between the corresponding min and max.
+   *
+   * @example
+   * ```ts
+   * // [5, 15] clamped between [0, 10] and [10, 20] remains [5, 15]
+   * console.log(clamp([5, 15], [0, 10], [10, 20])); // [5, 15]
+   *
+   * // [15, 5] clamped between [0, 10] and [10, 20] becomes [10, 10]
+   * console.log(clamp([15, 5], [0, 10], [10, 20])); // [10, 10]
+   * ```
+   */
+  export function clamp(vector: Vector2, min: Vector2, max: Vector2): Vector2 {
+    return [
+      Math.min(Math.max(vector[0], min[0]), max[0]),
+      Math.min(Math.max(vector[1], min[1]), max[1]),
+    ];
+  }
+
+  /**
    * Calculates the Euclidean distance between two 2D vectors.
    *
    * The Euclidean distance is the straight-line distance between two points in a 2D space.
@@ -1556,6 +1580,31 @@ export namespace cmath.rect {
     const [px, py] = point;
     const { x, y, width, height } = rect;
     return px >= x && px <= x + width && py >= y && py <= y + height;
+  }
+
+  /**
+   * Returns the signed offset from the given point to the nearest edge of the rectangle.
+   * Negative values indicate the point is left or above the rectangle's boundary.
+   *
+   * @param rect - The rectangle defined by { x, y, width, height }.
+   * @param point - The point as a tuple [x, y].
+   * @returns A tuple [dx, dy] representing the signed offset.
+   *
+   * @example
+   * ```ts
+   * const rect = { x: 10, y: 10, width: 100, height: 50 };
+   * console.log(offset(rect, [5, 30]));   // Output: [-5, 0]
+   * console.log(offset(rect, [50, 30]));  // Output: [0, 0]
+   * console.log(offset(rect, [120, 70])); // Output: [10, 10]
+   * ```
+   */
+  export function offset(
+    rect: { x: number; y: number; width: number; height: number },
+    point: [number, number]
+  ): [number, number] {
+    const clampedX = Math.min(Math.max(point[0], rect.x), rect.x + rect.width);
+    const clampedY = Math.min(Math.max(point[1], rect.y), rect.y + rect.height);
+    return [point[0] - clampedX, point[1] - clampedY];
   }
 
   /**

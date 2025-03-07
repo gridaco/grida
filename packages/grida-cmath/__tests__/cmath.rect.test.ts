@@ -134,6 +134,38 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("offset", () => {
+    const rect = { x: 10, y: 10, width: 100, height: 50 };
+
+    test("returns [0, 0] when point is inside the rectangle", () => {
+      expect(cmath.rect.offset(rect, [50, 30])).toEqual([0, 0]);
+    });
+
+    test("returns negative x when point is left of the rectangle", () => {
+      expect(cmath.rect.offset(rect, [5, 30])).toEqual([-5, 0]);
+    });
+
+    test("returns positive x when point is right of the rectangle", () => {
+      expect(cmath.rect.offset(rect, [120, 30])).toEqual([10, 0]);
+    });
+
+    test("returns negative y when point is above the rectangle", () => {
+      expect(cmath.rect.offset(rect, [50, 5])).toEqual([0, -5]);
+    });
+
+    test("returns positive y when point is below the rectangle", () => {
+      expect(cmath.rect.offset(rect, [50, 70])).toEqual([0, 10]);
+    });
+
+    test("returns negative x and y when point is top-left of the rectangle", () => {
+      expect(cmath.rect.offset(rect, [5, 5])).toEqual([-5, -5]);
+    });
+
+    test("returns positive x and y when point is bottom-right of the rectangle", () => {
+      expect(cmath.rect.offset(rect, [120, 70])).toEqual([10, 10]);
+    });
+  });
+
   describe("intersects", () => {
     it("should return true when rectangle A intersects rectangle B partially", () => {
       const a: cmath.Rectangle = { x: 50, y: 50, width: 50, height: 50 };

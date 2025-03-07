@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SlashIcon,
   BoxIcon,
@@ -48,8 +48,26 @@ export function ToolbarPosition({
 }
 
 export default function Toolbar() {
-  const { setTool, tool } = useEventTarget();
+  const { setTool, tool, features } = useEventTarget();
   const value = toolmode_to_toolbar_value(tool);
+
+  const tools = useMemo(() => {
+    const stable: Array<{
+      value: ToolbarToolType;
+      label: string;
+      shortcut?: string;
+    }> = [
+      { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
+      { value: "path", label: "Path tool", shortcut: "P" },
+    ];
+
+    if (features.__unstable_brush_tool === "on") {
+      stable.push({ value: "brush", label: "Brush tool", shortcut: "B" });
+      stable.push({ value: "eraser", label: "Eraser tool", shortcut: "E" });
+    }
+
+    return stable;
+  }, [features.__unstable_brush_tool]);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
@@ -96,12 +114,7 @@ export default function Toolbar() {
         />
         <ToolsGroup
           value={value}
-          options={[
-            { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
-            { value: "path", label: "Path tool", shortcut: "P" },
-            { value: "brush", label: "Brush tool", shortcut: "B" },
-            { value: "eraser", label: "Eraser tool", shortcut: "E" },
-          ]}
+          options={tools}
           onValueChange={(v) => {
             setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}

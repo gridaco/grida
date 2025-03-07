@@ -113,6 +113,15 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     }
     case "surface/tool": {
       const { tool } = action;
+
+      if (
+        state.features.__unstable_brush_tool !== "on" &&
+        (tool.type === "brush" || tool.type === "eraser")
+      ) {
+        console.warn("unstable brush tool is not enabled");
+        return state;
+      }
+
       const path_edit_mode_valid_tool_modes: ToolModeType[] = [
         "cursor",
         "hand",

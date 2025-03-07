@@ -190,6 +190,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     children,
     onSelect,
     onExpandChange,
+    onPointerDown,
     onPointerEnter,
     onPointerLeave,
   }: React.PropsWithChildren<{
@@ -208,6 +209,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     icon?: React.ReactNode;
     onSelect?: (e: React.MouseEvent<HTMLDivElement>) => void;
     onExpandChange?: (expand: boolean) => void;
+    onPointerDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
     onPointerEnter?: () => void;
     onPointerLeave?: () => void;
   }>,
@@ -219,6 +221,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       ref={forwardedRef as any}
       data-level={level}
       data-muted={muted}
+      onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       data-disabled={disabled}
