@@ -5,96 +5,121 @@ import { cmath } from "@grida/cmath";
 import { useMeasure } from "@uidotdev/usehooks";
 import { useGesture } from "@use-gesture/react";
 
+type Size = { width: number; height: number };
+
+interface ResizableProps extends React.HTMLAttributes<HTMLDivElement> {
+  fullscreen?: boolean;
+  min?: Size;
+  initial?: Size;
+  value?: Size;
+  onValueChange?: (value: Size) => void;
+  step?: number;
+}
+
 function Resizable({
   fullscreen = false,
   min = { width: 100, height: 100 },
   initial = { width: 500, height: 500 },
+  value,
+  onValueChange,
   children,
   className,
+  step = 1,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-  fullscreen?: boolean;
-  min?: { width: number; height: number };
-  initial?: { width: number; height: number };
-}) {
+}: ResizableProps) {
   const [containerRef, containerSize] = useMeasure();
-  const [size, setSize] = useState(initial);
+  const [internalSize, setInternalSize] = useState(initial);
+  const currentSize = value || internalSize;
 
-  // Ensure initial size meets minimum
   useEffect(() => {
     if (containerSize.width === null || containerSize.height === null) return;
-    setSize((prev) => ({
-      width: Math.max(min.width, prev.width),
-      height: Math.max(min.height, prev.height),
-    }));
-  }, [containerSize.width, containerSize.height]);
-
-  // Adjust size on container resize to avoid overflow (after resize completes)
-  useEffect(() => {
-    if (containerSize.width === null || containerSize.height === null) return;
-    const timeout = setTimeout(() => {
-      setSize((prev) => ({
-        width: cmath.clamp(
-          prev.width,
-          min.width,
-          containerSize.width ?? Infinity
-        ),
-        height: cmath.clamp(
-          prev.height,
-          min.height,
-          containerSize.height ?? Infinity
-        ),
+    if (!value) {
+      setInternalSize((prev) => ({
+        width: Math.max(min.width, prev.width),
+        height: Math.max(min.height, prev.height),
       }));
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [containerSize.width, containerSize.height]);
+    }
+  }, [containerSize.width, containerSize.height, value]);
 
-  // Left handle: decrease width
+  useEffect(() => {
+    if (containerSize.width === null || containerSize.height === null) return;
+    if (!value) {
+      const timeout = setTimeout(() => {
+        setInternalSize((prev) => ({
+          width: cmath.quantize(
+            cmath.clamp(prev.width, min.width, containerSize.width ?? Infinity),
+            step
+          ),
+          height: cmath.quantize(
+            cmath.clamp(
+              prev.height,
+              min.height,
+              containerSize.height ?? Infinity
+            ),
+            step
+          ),
+        }));
+      }, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [containerSize.width, containerSize.height, value]);
+
+  const updateSize = (newSize: Partial<Size>) => {
+    const updated = { ...currentSize, ...newSize };
+    if (onValueChange) {
+      onValueChange(updated);
+    } else {
+      setInternalSize(updated);
+    }
+  };
+
   const bindHorizontalLeft = useGesture(
     {
-      onDrag: ({ delta: [dx] }) => {
-        setSize((prev) => ({
-          ...prev,
-          width: cmath.clamp(
-            prev.width - dx * 2,
-            min.width,
-            containerSize.width ?? Infinity
+      onDrag: ({ delta: [dx] }) =>
+        updateSize({
+          width: cmath.quantize(
+            cmath.clamp(
+              currentSize.width - dx * 2,
+              min.width,
+              containerSize.width ?? Infinity
+            ),
+            step
           ),
-        }));
-      },
+        }),
     },
     { drag: { axis: "x" } }
   );
 
-  // Right handle: increase width
   const bindHorizontalRight = useGesture(
     {
-      onDrag: ({ delta: [dx] }) => {
-        setSize((prev) => ({
-          ...prev,
-          width: cmath.clamp(
-            prev.width + dx * 2,
-            min.width,
-            containerSize.width ?? Infinity
+      onDrag: ({ delta: [dx] }) =>
+        updateSize({
+          width: cmath.quantize(
+            cmath.clamp(
+              currentSize.width + dx * 2,
+              min.width,
+              containerSize.width ?? Infinity
+            ),
+            step
           ),
-        }));
-      },
+        }),
     },
     { drag: { axis: "x" } }
   );
 
-  // Bottom handle: increase height
   const bindVertical = useGesture(
     {
       onDrag: ({ delta: [, dy] }) =>
-        setSize((prev) => ({
-          ...prev,
-          height: cmath.clamp(
-            prev.height + dy * 2,
-            min.height,
-            containerSize.height ?? Infinity
+        updateSize({
+          height: cmath.quantize(
+            cmath.clamp(
+              currentSize.height + dy * 2,
+              min.height,
+              containerSize.height ?? Infinity
+            ),
+            step
           ),
-        })),
+        }),
     },
     { drag: { axis: "y" } }
   );
@@ -118,14 +143,10 @@ function Resizable({
           style={
             fullscreen
               ? { width: "100%", height: "100%" }
-              : {
-                  width: size.width,
-                  height: size.height,
-                }
+              : { width: currentSize.width, height: currentSize.height }
           }
         >
           {children}
-          {/* Left resize handle */}
           <div
             aria-description="vertical-resize"
             data-direction="left"
@@ -134,7 +155,6 @@ function Resizable({
           >
             <button className="w-1 h-16 bg-ring/50 rounded-full hover:bg-ring transition-colors cursor-ew-resize" />
           </div>
-          {/* Right resize handle */}
           <div
             aria-description="vertical-resize"
             data-direction="right"
@@ -143,7 +163,6 @@ function Resizable({
           >
             <button className="w-1 h-16 bg-ring/50 rounded-full hover:bg-ring transition-colors cursor-ew-resize" />
           </div>
-          {/* Bottom resize handle */}
           <div
             aria-description="bottom-resize"
             {...bindVertical()}

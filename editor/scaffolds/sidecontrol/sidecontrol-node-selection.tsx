@@ -213,9 +213,9 @@ function SelectionMixedProperties() {
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockOpen1Icon className="w-3 h-3" />
-                ) : (
                   <LockClosedIcon className="w-3 h-3" />
+                ) : (
+                  <LockOpen1Icon className="w-3 h-3" />
                 )}
               </Toggle>
               {/* <small className="ms-2 font-mono">{id}</small> */}
@@ -707,9 +707,9 @@ function SelectedNodeProperties() {
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockOpen1Icon className="w-3 h-3" />
-                ) : (
                   <LockClosedIcon className="w-3 h-3" />
+                ) : (
+                  <LockOpen1Icon className="w-3 h-3" />
                 )}
               </Toggle>
             </PropertyLine>

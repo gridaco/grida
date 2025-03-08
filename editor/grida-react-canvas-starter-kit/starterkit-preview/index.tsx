@@ -26,6 +26,11 @@ import { document } from "@/grida-react-canvas/document-query";
 import { useCurrentScene } from "@/grida-react-canvas/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/utils";
+import { WorkbenchUI } from "@/components/workbench";
+
+const min = { width: 100, height: 100 };
 
 const Context = React.createContext<{
   open: boolean;
@@ -44,6 +49,7 @@ export function PreviewProvider({
   const [mode, setMode] = useState<"framed" | "fullscreen">("framed");
   const [open, setOpen] = useState(false);
   const [id, setId] = useState<string>();
+  const [size, setSize] = useState({ width: 1200, height: 960 });
 
   const close = () => {
     setOpen(false);
@@ -122,8 +128,8 @@ export function PreviewProvider({
         >
           <DialogTitle className="sr-only">Preivew</DialogTitle>
           {mode === "framed" && (
-            <DialogHeader className="p-4 flex flex-row items-center border-b">
-              <div className="flex flex-row items-center gap-2">
+            <DialogHeader className="p-4 flex flex-row items-center justify-between border-b">
+              <div className="flex-1 flex items-center gap-2">
                 <DialogClose asChild>
                   <Button title="Close (esc)" variant="ghost" size="icon">
                     <Cross2Icon />
@@ -134,6 +140,51 @@ export function PreviewProvider({
                   Full Screen
                 </Button>
               </div>
+              <div className="flex-1 flex items-center justify-center">
+                <div className="max-w-xs flex items-center gap-2">
+                  <label className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-xs">W</span>
+                    <Input
+                      type="number"
+                      placeholder="width"
+                      min={min.width}
+                      step={1}
+                      className={cn(
+                        WorkbenchUI.inputVariants({ size: "xs" }),
+                        "max-w-20"
+                      )}
+                      value={size.width}
+                      onChange={(e) =>
+                        setSize((prev) => ({
+                          ...prev,
+                          width: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-xs">H</span>
+                    <Input
+                      type="number"
+                      placeholder="height"
+                      min={min.height}
+                      step={1}
+                      className={cn(
+                        WorkbenchUI.inputVariants({ size: "xs" }),
+                        "max-w-20"
+                      )}
+                      value={size.height}
+                      onChange={(e) =>
+                        setSize((prev) => ({
+                          ...prev,
+                          height: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="flex-1" />
             </DialogHeader>
           )}
 
@@ -154,7 +205,9 @@ export function PreviewProvider({
             <ErrorBoundary>
               <StandaloneSceneBackground className="w-full h-full">
                 <Resizable
-                  initial={{ width: 1200, height: 960 }}
+                  value={size}
+                  onValueChange={setSize}
+                  min={min}
                   fullscreen={mode === "fullscreen"}
                 >
                   {id && <StandaloneRootNodeContent node_id={id} />}
