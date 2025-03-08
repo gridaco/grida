@@ -15,6 +15,7 @@ import { StandaloneSceneContent } from "@/grida-react-canvas";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
+import { UserCustomTemplatesProvider } from "@/grida-react-canvas/renderer";
 
 export namespace FormStartPage {
   type ClientTemplateDefinition =
@@ -109,12 +110,13 @@ export namespace FormStartPage {
     return (
       <FormCampaignStartPageContextProvider value={meta}>
         <I18nextProvider i18n={i18n}>
-          <StandaloneSceneContent
+          <UserCustomTemplatesProvider
             templates={{
               [name]: template.component,
             }}
-            className="w-full h-full"
-          />
+          >
+            <StandaloneSceneContent className="w-full h-full" />
+          </UserCustomTemplatesProvider>
         </I18nextProvider>
       </FormCampaignStartPageContextProvider>
     );

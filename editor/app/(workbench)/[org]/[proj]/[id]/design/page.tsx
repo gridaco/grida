@@ -12,6 +12,7 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
+  UserCustomTemplatesProvider,
 } from "@/grida-react-canvas/renderer";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
@@ -22,6 +23,7 @@ import Toolbar, {
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import TMP_Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/component";
 import TMP_Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/component";
+import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 
 export default function SiteDeisngPage() {
   return (
@@ -35,35 +37,38 @@ function CurrentPageCanvas() {
   useEditorHotKeys();
 
   return (
-    <div className="flex w-full h-full">
-      <EditorSurfaceClipboardSyncProvider>
-        <EditorSurfaceDropzone>
-          <EditorSurfaceContextMenu>
-            <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-              <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-                <EditorSurface />
-                <AutoInitialFitTransformer>
-                  <StandaloneSceneContent
-                    templates={{
-                      "tmp-2503-invite": CustomComponent__Invite,
-                      "tmp-2503-join": CustomComponent__Join,
-                      "tmp-2503-portal": CustomComponent__Portal,
-                    }}
-                  />
-                </AutoInitialFitTransformer>
-                <ToolbarPosition>
-                  <Toolbar />
-                </ToolbarPosition>
-              </ViewportRoot>
-            </StandaloneSceneBackground>
-          </EditorSurfaceContextMenu>
-        </EditorSurfaceDropzone>
-      </EditorSurfaceClipboardSyncProvider>
-
-      <aside className="hidden lg:flex h-full">
-        <SideControl />
-      </aside>
-    </div>
+    <UserCustomTemplatesProvider
+      templates={{
+        "tmp-2503-invite": CustomComponent__Invite,
+        "tmp-2503-join": CustomComponent__Join,
+        "tmp-2503-portal": CustomComponent__Portal,
+      }}
+    >
+      <div className="flex w-full h-full">
+        <PreviewProvider>
+          <EditorSurfaceClipboardSyncProvider>
+            <EditorSurfaceDropzone>
+              <EditorSurfaceContextMenu>
+                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                  <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                    <EditorSurface />
+                    <AutoInitialFitTransformer>
+                      <StandaloneSceneContent />
+                    </AutoInitialFitTransformer>
+                    <ToolbarPosition>
+                      <Toolbar />
+                    </ToolbarPosition>
+                  </ViewportRoot>
+                </StandaloneSceneBackground>
+              </EditorSurfaceContextMenu>
+            </EditorSurfaceDropzone>
+          </EditorSurfaceClipboardSyncProvider>
+        </PreviewProvider>
+        <aside className="hidden lg:flex h-full">
+          <SideControl />
+        </aside>
+      </div>
+    </UserCustomTemplatesProvider>
   );
 }
 
@@ -72,8 +77,9 @@ function CustomComponent__Invite(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        width: 375,
-        height: 812,
+        minWidth: 375,
+        minHeight: 812,
+        ...props.style,
       }}
       {...queryattributes(props)}
     >
@@ -87,8 +93,9 @@ function CustomComponent__Join(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        width: 375,
-        height: 812,
+        minWidth: 375,
+        minHeight: 812,
+        ...props.style,
       }}
       {...queryattributes(props)}
     >
@@ -102,8 +109,9 @@ function CustomComponent__Portal(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        width: 375,
-        height: 812,
+        minWidth: 375,
+        minHeight: 812,
+        ...props.style,
       }}
       {...queryattributes(props)}
     >

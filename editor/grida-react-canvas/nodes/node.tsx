@@ -6,7 +6,7 @@ import { grida } from "@/grida";
 import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
-import { useUserDocumentCustomRenderer } from "../renderer";
+import { useUserCustomTemplates } from "../renderer";
 import { css } from "@/grida/css";
 
 class RendererNotFound extends Error {
@@ -46,7 +46,7 @@ export function NodeElement<P extends Record<string, any>>({
   style,
   override,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
-  const user_registered_renderers = useUserDocumentCustomRenderer();
+  const user_registered_renderers = useUserCustomTemplates();
   const { state: document, selection } = useDocument();
 
   const node = useNode(node_id);

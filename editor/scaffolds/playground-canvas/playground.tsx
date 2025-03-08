@@ -105,6 +105,8 @@ import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   StandaloneDocumentContentProps,
+  UserCustomTemplatesProvider,
+  UserCustomTemplatesProps,
 } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
@@ -130,7 +132,7 @@ const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 export type CanvasPlaygroundProps = {
   src?: string;
   document?: IDocumentEditorInit;
-} & Partial<StandaloneDocumentContentProps>;
+} & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
   document = {
@@ -438,9 +440,11 @@ export default function CanvasPlayground({
                         <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
                           <ViewportRoot className="relative w-full h-full overflow-hidden">
                             <EditorSurface />
-                            <AutoInitialFitTransformer>
-                              <StandaloneSceneContent templates={templates} />
-                            </AutoInitialFitTransformer>
+                            <UserCustomTemplatesProvider templates={templates}>
+                              <AutoInitialFitTransformer>
+                                <StandaloneSceneContent />
+                              </AutoInitialFitTransformer>
+                            </UserCustomTemplatesProvider>
 
                             {ui.sidebar === "visible" && (
                               <>

@@ -1,11 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useReducer, useState } from "react";
-import {
-  StandaloneSceneContent,
-  useDocument,
-  useEventTarget,
-} from "@/grida-react-canvas";
+import React, { useState } from "react";
+import { useDocument } from "@/grida-react-canvas";
 import {
   StandaloneRootNodeContent,
   StandaloneSceneBackground,
@@ -13,31 +9,39 @@ import {
 } from "@/grida-react-canvas/renderer";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { PlayIcon } from "@radix-ui/react-icons";
+import {
+  Cross2Icon,
+  EnterFullScreenIcon,
+  PlayIcon,
+} from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { useHotkeys } from "react-hotkeys-hook";
 import { document } from "@/grida-react-canvas/document-query";
 import { useCurrentScene } from "@/grida-react-canvas/provider";
 import Resizable from "./resizable";
+import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 
 const Context = React.createContext<{
   open: boolean;
   close: () => void;
   setOpen: (open: boolean) => void;
   preview: (node_id?: string) => void;
+  mode: "framed" | "fullscreen";
+  setMode: (mode: "framed" | "fullscreen") => void;
 } | null>(null);
 
 export function PreviewProvider({
-  templates,
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
   const { state } = useDocument();
   const scene = useCurrentScene();
+  const [mode, setMode] = useState<"framed" | "fullscreen">("framed");
   const [open, setOpen] = useState(false);
   const [id, setId] = useState<string>();
 
@@ -105,24 +109,58 @@ export function PreviewProvider({
     preview();
   });
 
+  const toggleMode = () => {
+    setMode((prev) => (prev === "framed" ? "fullscreen" : "framed"));
+  };
+
   return (
-    <Context.Provider value={{ open, setOpen, close, preview }}>
+    <Context.Provider value={{ mode, open, setOpen, close, preview, setMode }}>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-screen h-screen flex flex-col p-0 gap-0">
-          <DialogHeader className="p-4">
-            <DialogTitle>Preivew</DialogTitle>
-          </DialogHeader>
+        <DialogContent
+          hideCloseButton
+          className="max-w-screen h-screen flex flex-col p-0 gap-0 !rounded-none"
+        >
+          <DialogTitle className="sr-only">Preivew</DialogTitle>
+          {mode === "framed" && (
+            <DialogHeader className="p-4 flex flex-row items-center border-b">
+              <div className="flex flex-row items-center gap-2">
+                <DialogClose asChild>
+                  <Button title="Close (esc)" variant="ghost" size="icon">
+                    <Cross2Icon />
+                  </Button>
+                </DialogClose>
+                <Button variant="ghost" size="sm" onClick={toggleMode}>
+                  <EnterFullScreenIcon className="me-2" />
+                  Full Screen
+                </Button>
+              </div>
+            </DialogHeader>
+          )}
+
+          {mode === "fullscreen" && (
+            <div className="absolute top-4 left-4 z-50">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={toggleMode}
+              >
+                Show UI
+              </Button>
+            </div>
+          )}
+
           <div className="relative w-full h-full">
-            <StandaloneSceneBackground className="w-full h-full">
-              <Resizable initial={{ width: 1200, height: 960 }}>
-                {id && (
-                  <StandaloneRootNodeContent
-                    node_id={id}
-                    templates={templates}
-                  />
-                )}
-              </Resizable>
-            </StandaloneSceneBackground>
+            <ErrorBoundary>
+              <StandaloneSceneBackground className="w-full h-full">
+                <Resizable
+                  initial={{ width: 1200, height: 960 }}
+                  fullscreen={mode === "fullscreen"}
+                >
+                  {id && <StandaloneRootNodeContent node_id={id} />}
+                </Resizable>
+              </StandaloneSceneBackground>
+            </ErrorBoundary>
           </div>
         </DialogContent>
       </Dialog>

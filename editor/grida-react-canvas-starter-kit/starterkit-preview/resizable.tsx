@@ -6,12 +6,14 @@ import { useMeasure } from "@uidotdev/usehooks";
 import { useGesture } from "@use-gesture/react";
 
 function Resizable({
+  fullscreen = false,
   min = { width: 100, height: 100 },
   initial = { width: 500, height: 500 },
   children,
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & {
+  fullscreen?: boolean;
   min?: { width: number; height: number };
   initial?: { width: number; height: number };
 }) {
@@ -98,18 +100,29 @@ function Resizable({
   );
 
   return (
-    <div {...props} className={cn("relative w-full h-full p-8", className)}>
+    <div
+      data-fullscreen={fullscreen}
+      {...props}
+      className={cn(
+        "group relative w-full h-full p-8 data-[fullscreen=true]:p-0",
+        className
+      )}
+    >
       <div
         ref={containerRef}
         className="w-full h-full flex flex-col items-center justify-center"
       >
         <div
           id="resizable"
-          style={{
-            position: "relative",
-            width: size.width,
-            height: size.height,
-          }}
+          className="relative"
+          style={
+            fullscreen
+              ? { width: "100%", height: "100%" }
+              : {
+                  width: size.width,
+                  height: size.height,
+                }
+          }
         >
           {children}
           {/* Left resize handle */}

@@ -9,22 +9,32 @@ import { css } from "@/grida/css";
 import { TransparencyGrid } from "@grida/transparency-grid";
 import { useMeasure } from "@uidotdev/usehooks";
 
-const UserDocumentCustomRendererContext = React.createContext<
-  Record<string, CustomReactRenderer>
+type CustomComponent = React.ComponentType<any>;
+
+const UserCustomTemplatesContext = React.createContext<
+  Record<string, CustomComponent>
 >({});
 
-export function useUserDocumentCustomRenderer() {
-  return useContext(UserDocumentCustomRendererContext);
+export function useUserCustomTemplates() {
+  return useContext(UserCustomTemplatesContext);
 }
 
-type CustomReactRenderer = React.ComponentType<any>;
+export function UserCustomTemplatesProvider({
+  children,
+  templates,
+}: React.PropsWithChildren<UserCustomTemplatesProps>) {
+  return (
+    <UserCustomTemplatesContext.Provider value={templates ?? {}}>
+      {children}
+    </UserCustomTemplatesContext.Provider>
+  );
+}
+
+export interface UserCustomTemplatesProps {
+  templates?: Record<string, CustomComponent>;
+}
 
 export interface StandaloneDocumentContentProps {
-  /**
-   * custom templates to render
-   */
-  templates?: Record<string, CustomReactRenderer>;
-
   /**
    * when primary, it sets the id of the view - this is essential for the editor to work
    * multiple primary contents will cause an error
@@ -38,7 +48,6 @@ export interface StandaloneDocumentContentProps {
 
 export function StandaloneSceneContent({
   primary = true,
-  templates,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
   const { children } = useCurrentScene();
@@ -48,19 +57,15 @@ export function StandaloneSceneContent({
       id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
       {...props}
     >
-      {/* <DebugPointer position={pointer.position} /> */}
-      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
-        {children.map((id) => (
-          <NodeElement key={id} node_id={id} />
-        ))}
-      </UserDocumentCustomRendererContext.Provider>
+      {children.map((id) => (
+        <NodeElement key={id} node_id={id} />
+      ))}
     </div>
   );
 }
 
 export function StandaloneRootNodeContent({
   primary = false,
-  templates,
   node_id,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> &
@@ -72,22 +77,21 @@ export function StandaloneRootNodeContent({
       id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
       {...props}
     >
-      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
-        <NodeElement
-          node_id={node_id}
-          override={{
-            style: {
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              right: 0,
-              width: "100%",
-              height: "100%",
-            },
-          }}
-        />
-      </UserDocumentCustomRendererContext.Provider>
+      <NodeElement
+        node_id={node_id}
+        override={{
+          style: {
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: "100%",
+            height: "100%",
+            overflow: "auto",
+          },
+        }}
+      />
     </div>
   );
 }
