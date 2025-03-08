@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import data from "./data.json";
 
 export default function Verify() {
   const [name, setName] = useState("");
@@ -37,9 +38,9 @@ export default function Verify() {
 
   return (
     <div className="w-full max-w-md mx-auto bg-background rounded-lg p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-center">인증하기</h1>
+      <h1 className="text-2xl font-bold text-center">{data.form.title}</h1>
       <p className="text-center text-muted-foreground">
-        귀하의 이름과 전화번호를 입력하여 추천 링크를 받으세요.
+        {data.form.description}
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -47,7 +48,7 @@ export default function Verify() {
             htmlFor="name"
             className="block text-sm font-medium text-muted-foreground"
           >
-            이름
+            Name
           </label>
           <Input
             type="text"
@@ -62,7 +63,7 @@ export default function Verify() {
             htmlFor="phone"
             className="block text-sm font-medium text-muted-foreground"
           >
-            전화번호
+            Phone
           </label>
           <Input
             type="tel"
@@ -73,7 +74,7 @@ export default function Verify() {
           />
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
-        <Button type="submit">인증하기</Button>
+        <Button type="submit">Verify</Button>
       </form>
     </div>
   );

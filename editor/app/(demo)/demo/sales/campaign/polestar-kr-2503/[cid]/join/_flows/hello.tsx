@@ -7,6 +7,7 @@ import { CampaignData } from "../../../data";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { PolestarTypeLogo } from "@/components/logos";
+import { ACME } from "@/components/logos/acme";
 
 export default function Hello({
   data,
@@ -32,7 +33,8 @@ export default function Hello({
       {/* Content Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent">
         <div className="container mx-auto px-4 pt-8">
-          <PolestarTypeLogo className="text-white" />
+          {/* <PolestarTypeLogo className="text-white" /> */}
+          <ACME className="text-white" />
 
           {/* Hero Content */}
           <div className="mt-[20vh] max-w-xl space-y-4">

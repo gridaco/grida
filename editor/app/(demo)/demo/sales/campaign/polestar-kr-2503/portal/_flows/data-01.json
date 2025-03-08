@@ -1,0 +1,15 @@
+{
+  "media": {
+    "src": "https://www.polestar.com/dato-assets/11286/1725964311-pak_home_image-card_pc.jpeg?q=35&dpr=2&w=542",
+    "alt": "Polestar 4"
+  },
+  "title": "폴스타 추천 이벤트",
+  "description": "폴스타 오너님을 위한 특별한 추천 이벤트에 참여하세요. 친구나 가족에게 폴스타를 소개하고 특별한 혜택을 받으세요.",
+  "trigger": {
+    "label": "인증 및 링크 받기"
+  },
+  "form": {
+    "title": "인증하기",
+    "description": "귀하의 이름과 전화번호를 입력하여 추천 링크를 받으세요."
+  }
+}

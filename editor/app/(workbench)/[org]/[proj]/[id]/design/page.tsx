@@ -21,7 +21,7 @@ import _002 from "@/theme/templates/formstart/002/page";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import TMP_Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/component";
+import Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/main";
 import Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/page";
 import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/step-verify";
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
@@ -85,7 +85,7 @@ function CustomComponent__Invite(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <TMP_Invite params={{ cid: "00000000" }} />
+      <Invite params={{ cid: "00000000" }} />
     </div>
   );
 }

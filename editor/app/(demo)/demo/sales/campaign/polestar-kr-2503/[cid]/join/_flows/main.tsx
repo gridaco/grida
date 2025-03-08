@@ -11,30 +11,30 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { PolestarTypeLogo } from "@/components/logos";
-
-const EXT_FORM_LINK =
-  "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
+import data from "./data.json";
+import Link from "next/link";
+import { ACME } from "@/components/logos/acme";
 
 export default function Main() {
   return (
     <div>
       {/* Header */}
       <header className="py-4 flex items-center justify-center">
-        <PolestarTypeLogo className="text-black" />
+        {/* PolestarTypeLogo */}
+        <ACME className="text-foreground" />
       </header>
 
       {/* Hero Section */}
       <div className="relative w-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://www.polestar.com/dato-assets/11286/1725964311-pak_home_image-card_pc.jpeg?q=35&dpr=2&w=542"
-          alt="Polestar 4"
-          className="object-cover aspect-square select-none pointer-events-none"
+          src={data.hero.media.src}
+          alt={data.hero.media.alt}
+          className="object-cover aspect-square @4xl:aspect-video select-none pointer-events-none w-full"
         />
         <div className="absolute bottom-8 left-8">
           <h2 className="text-2xl text-white">
-            Polestar 4<br />
-            시승 신청하고 경품을 받아보세요
+            <span dangerouslySetInnerHTML={{ __html: data.hero.title }} />
           </h2>
         </div>
       </div>
@@ -46,63 +46,33 @@ export default function Main() {
 
       {/* Stats Grid */}
       <Card className="mx-4 py-4 px-6 grid grid-cols-3">
-        <div className="text-center it">
-          <p className="text-xl font-medium">1명</p>
-          <p className="text-sm font-light mt-2 text-muted-foreground">
-            Polestar 4
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-xl font-medium">20명</p>
-          <p className="text-sm font-light mt-2 text-muted-foreground">
-            iPad Air 11
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-xl font-medium">100%</p>
-          <p className="text-sm font-light mt-2 text-muted-foreground">
-            스타벅스 아메리카노
-          </p>
-        </div>
+        {data.perks.map((perk, index) => (
+          <div key={index} className="text-center">
+            <p className="text-xl font-medium">{perk.value}</p>
+            <p className="text-sm font-light mt-2 text-muted-foreground">
+              {perk.label}
+            </p>
+          </div>
+        ))}
       </Card>
 
       {/* Info Section */}
-      <div className="px-6 pt-12 pb-8 space-y-2">
-        <p className="flex items-start space-x-2">
-          <span className="text-gray-600">✓</span>
-          <span>1인 당 중복 신청은 불가합니다.</span>
-        </p>
-        <p className="flex items-start space-x-2">
-          <span className="text-gray-600">✓</span>
-          <span>
-            시승 초대를 한 고객과, 초대 링크를 통해 시승 신청을 한 고객 모두에게
-            경품을 드립니다.
-          </span>
-        </p>
-        <p className="flex items-start space-x-2">
-          <span className="text-gray-600">✓</span>
-          <span>무료 시승입니다.</span>
-        </p>
-        <p className="flex items-start space-x-2">
-          <span className="text-gray-600">✓</span>
-          <span>시승 전 약 15분의 차량 설명 시간이 있습니다.</span>
-        </p>
+      <div className="pt-12 pb-8 space-y-2">
+        <article className="prose prose-sm dark:prose-invert">
+          <span dangerouslySetInnerHTML={{ __html: data.info }} />
+        </article>
       </div>
       <div className="flex justify-center items-center pb-8 px-4">
         <AccordionDemo />
       </div>
 
       {/* CTA Button */}
-      <footer className="bottom-0 left-0 right-0 bg-white p-4 shadow-t">
-        <Button
-          onClick={() => {
-            window.open(EXT_FORM_LINK, "_blank");
-          }}
-          className="w-full bg-black text-white hover:bg-gray-800 rounded-none py-6"
-          size="lg"
-        >
-          시승 신청하기
-        </Button>
+      <footer className="bottom-0 left-0 right-0 bg-background p-4 shadow-t">
+        <Link href={data.cta.link} target="_blank">
+          <Button className="w-full" size="lg">
+            {data.cta.label}
+          </Button>
+        </Link>
       </footer>
     </div>
   );
@@ -113,7 +83,7 @@ function AccordionDemo() {
     <Accordion type="single" collapsible className="w-full">
       <AccordionItem value="item-1">
         <AccordionTrigger className="text-base font-normal">
-          Polestar Space
+          Spaces
         </AccordionTrigger>
         <AccordionContent>
           {" "}
@@ -122,7 +92,7 @@ function AccordionDemo() {
       </AccordionItem>
       <AccordionItem value="item-2">
         <AccordionTrigger className="text-base font-normal">
-          이벤트 안내 사항
+          About this Campaign
         </AccordionTrigger>
         <AccordionContent className="text-sm font-normal">
           1. 시승이 완료된 후 경품이 지급됩니다. <br /> 2. 시승 신청자 본인에
