@@ -250,7 +250,7 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Rotate</PropertyLineLabel>
               <RotateControl
-                value={rotation!.value}
+                value={rotation?.value}
                 onValueChange={change.rotation}
               />
             </PropertyLine>
@@ -450,7 +450,7 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
-                value={opacity!.value}
+                value={opacity?.value}
                 onValueChange={change.opacity}
               />
             </PropertyLine>

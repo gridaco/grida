@@ -22,8 +22,10 @@ import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import TMP_Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/component";
-import TMP_Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/component";
+import Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/page";
+import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/step-verify";
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import Main from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/main";
 
 export default function SiteDeisngPage() {
   return (
@@ -41,7 +43,9 @@ function CurrentPageCanvas() {
       templates={{
         "tmp-2503-invite": CustomComponent__Invite,
         "tmp-2503-join": CustomComponent__Join,
+        "tmp-2503-join-hello": CustomComponent__Join_Hello,
         "tmp-2503-portal": CustomComponent__Portal,
+        "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
       }}
     >
       <div className="flex w-full h-full">
@@ -77,8 +81,6 @@ function CustomComponent__Invite(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        minWidth: 375,
-        minHeight: 812,
         ...props.style,
       }}
       {...queryattributes(props)}
@@ -93,8 +95,20 @@ function CustomComponent__Join(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        minWidth: 375,
-        minHeight: 812,
+        ...props.style,
+      }}
+      {...queryattributes(props)}
+    >
+      <Main />
+    </div>
+  );
+}
+
+function CustomComponent__Join_Hello(props: any) {
+  return (
+    <div
+      className="rounded shadow border"
+      style={{
         ...props.style,
       }}
       {...queryattributes(props)}
@@ -109,13 +123,25 @@ function CustomComponent__Portal(props: any) {
     <div
       className="rounded shadow border"
       style={{
-        minWidth: 375,
-        minHeight: 812,
         ...props.style,
       }}
       {...queryattributes(props)}
     >
-      <TMP_Portal />
+      <Portal />
+    </div>
+  );
+}
+
+function CustomComponent__Portal_Verify(props: any) {
+  return (
+    <div
+      className="rounded shadow border"
+      style={{
+        ...props.style,
+      }}
+      {...queryattributes(props)}
+    >
+      <Verify />
     </div>
   );
 }

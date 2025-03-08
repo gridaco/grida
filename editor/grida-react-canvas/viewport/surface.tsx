@@ -787,7 +787,7 @@ function SelectionGroupOverlay({
             offset={16}
             size={size}
             rect={{ ...boundingSurfaceRect, x: 0, y: 0 }}
-            className="bg-workbench-accent-sky text-white"
+            className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
       </LayerOverlay>
@@ -821,7 +821,7 @@ function NodeOverlay({
   const { node, style, size } = data;
 
   const { is_component_consumer, is_flex_parent } = node.meta;
-  readonly = readonly || is_component_consumer;
+  // readonly = readonly || is_component_consumer;
 
   const measurement_rect = {
     x: 0,
@@ -881,7 +881,7 @@ function NodeOverlay({
             offset={16}
             size={size}
             rect={{ ...measurement_rect, x: 0, y: 0 }}
-            className="bg-workbench-accent-sky text-white"
+            className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
       </LayerOverlay>

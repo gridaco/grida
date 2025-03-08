@@ -31,39 +31,6 @@ function Resizable({
   const [internalSize, setInternalSize] = useState(initial);
   const currentSize = value || internalSize;
 
-  useEffect(() => {
-    if (containerSize.width === null || containerSize.height === null) return;
-    if (!value) {
-      setInternalSize((prev) => ({
-        width: Math.max(min.width, prev.width),
-        height: Math.max(min.height, prev.height),
-      }));
-    }
-  }, [containerSize.width, containerSize.height, value]);
-
-  useEffect(() => {
-    if (containerSize.width === null || containerSize.height === null) return;
-    if (!value) {
-      const timeout = setTimeout(() => {
-        setInternalSize((prev) => ({
-          width: cmath.quantize(
-            cmath.clamp(prev.width, min.width, containerSize.width ?? Infinity),
-            step
-          ),
-          height: cmath.quantize(
-            cmath.clamp(
-              prev.height,
-              min.height,
-              containerSize.height ?? Infinity
-            ),
-            step
-          ),
-        }));
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [containerSize.width, containerSize.height, value]);
-
   const updateSize = (newSize: Partial<Size>) => {
     const updated = { ...currentSize, ...newSize };
     if (onValueChange) {
@@ -72,6 +39,39 @@ function Resizable({
       setInternalSize(updated);
     }
   };
+
+  // Trigger value change on container/window resize
+  useEffect(() => {
+    if (containerSize.width == null || containerSize.height == null) return;
+    const timeout = setTimeout(() => {
+      const newWidth = cmath.quantize(
+        cmath.clamp(
+          currentSize.width,
+          min.width,
+          containerSize.width ?? Infinity
+        ),
+        step
+      );
+      const newHeight = cmath.quantize(
+        cmath.clamp(
+          currentSize.height,
+          min.height,
+          containerSize.height ?? Infinity
+        ),
+        step
+      );
+      if (newWidth !== currentSize.width || newHeight !== currentSize.height) {
+        updateSize({ width: newWidth, height: newHeight });
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [
+    containerSize.width,
+    containerSize.height,
+    currentSize.width,
+    currentSize.height,
+    step,
+  ]);
 
   const bindHorizontalLeft = useGesture(
     {
