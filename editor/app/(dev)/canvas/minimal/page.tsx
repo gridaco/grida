@@ -12,7 +12,7 @@ import {
 } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
@@ -91,7 +91,7 @@ export default function CanvasPlayground() {
                         <ViewportRoot className="relative w-full h-full overflow-hidden">
                           <EditorSurface />
                           <AutoInitialFitTransformer>
-                            <StandaloneDocumentContent />
+                            <StandaloneSceneContent />
                           </AutoInitialFitTransformer>
                           <ToolbarPosition>
                             <Toolbar />

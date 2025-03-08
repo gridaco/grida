@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { Spinner } from "@/components/spinner";
 import {
   EditorSurface,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
   ViewportRoot,
 } from "@/grida-react-canvas";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
@@ -98,7 +98,7 @@ function Ready() {
                 <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                   <EditorSurface />
                   <AutoInitialFitTransformer>
-                    <StandaloneDocumentContent />
+                    <StandaloneSceneContent />
                   </AutoInitialFitTransformer>
                   <ToolbarPosition>
                     <Toolbar />

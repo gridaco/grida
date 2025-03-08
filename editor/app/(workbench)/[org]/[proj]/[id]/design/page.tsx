@@ -4,7 +4,7 @@ import React from "react";
 import {
   ViewportRoot,
   EditorSurface,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
 } from "@/grida-react-canvas";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
@@ -43,7 +43,7 @@ function CurrentPageCanvas() {
               <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                 <EditorSurface />
                 <AutoInitialFitTransformer>
-                  <StandaloneDocumentContent
+                  <StandaloneSceneContent
                     templates={{
                       "tmp-2503-invite": CustomComponent__Invite,
                       "tmp-2503-join": CustomComponent__Join,

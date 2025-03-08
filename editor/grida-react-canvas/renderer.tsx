@@ -24,22 +24,69 @@ export interface StandaloneDocumentContentProps {
    * custom templates to render
    */
   templates?: Record<string, CustomReactRenderer>;
+
+  /**
+   * when primary, it sets the id of the view - this is essential for the editor to work
+   * multiple primary contents will cause an error
+   *
+   * @deprecated FIXME: this needs to be removed and handled differently - do not rely on id.
+   *
+   * @default true
+   */
+  primary?: boolean;
 }
 
 export function StandaloneSceneContent({
+  primary = true,
   templates,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
-  const ref = useRef<HTMLDivElement>(null);
   const { children } = useCurrentScene();
 
   return (
-    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
+    <div
+      id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
+      {...props}
+    >
       {/* <DebugPointer position={pointer.position} /> */}
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
         {children.map((id) => (
           <NodeElement key={id} node_id={id} />
         ))}
+      </UserDocumentCustomRendererContext.Provider>
+    </div>
+  );
+}
+
+export function StandaloneRootNodeContent({
+  primary = false,
+  templates,
+  node_id,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> &
+  StandaloneDocumentContentProps & {
+    node_id: string;
+  }) {
+  return (
+    <div
+      id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
+      {...props}
+    >
+      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
+        <NodeElement
+          node_id={node_id}
+          override={{
+            style: {
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: "100%",
+              height: "100%",
+            },
+          }}
+        />
       </UserDocumentCustomRendererContext.Provider>
     </div>
   );

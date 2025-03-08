@@ -11,7 +11,7 @@ import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
 import { grida } from "@/grida";
-import { StandaloneDocumentContent } from "@/grida-react-canvas";
+import { StandaloneSceneContent } from "@/grida-react-canvas";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
@@ -108,10 +108,8 @@ export namespace FormStartPage {
 
     return (
       <FormCampaignStartPageContextProvider value={meta}>
-        <I18nextProvider
-          i18n={i18n}
-        >
-          <StandaloneDocumentContent
+        <I18nextProvider i18n={i18n}>
+          <StandaloneSceneContent
             templates={{
               [name]: template.component,
             }}
