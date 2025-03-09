@@ -1,11 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Image from "next/image";
-
+import React from "react";
 import {
   ScreenGrid,
-  ScreenGridPosition,
   ScreenDecorations,
   ScreenBackground,
   ScreenRootBackground,
@@ -14,8 +11,6 @@ import {
   CameraCrossDecoration,
   LinearBoxScaleDecoration,
   Header,
-  HeaderLogoImage,
-  CardBackgroundGradientBlur,
   Timer,
   digit2,
   HeaderLogo,
@@ -41,13 +36,12 @@ import {
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import type { grida } from "@/grida";
+import { ACME } from "@/components/logos/acme";
 
 const userprops =
   {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
-
-// https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4
 
 export default function _002() {
   return (
@@ -55,7 +49,8 @@ export default function _002() {
       <ScreenMobileFrame>
         <Header>
           <HeaderLogo>
-            <PolestarTypeLogo className="w-20" />
+            {/* <PolestarTypeLogo className="w-20" /> */}
+            <ACME />
           </HeaderLogo>
         </Header>
         <ScreenGrid columns={8} rows={16}>
@@ -88,7 +83,7 @@ export default function _002() {
                             />
                           </Avatar>
                           <span className="text-xs hover:underline">
-                            정우주 / 폴스타 서울
+                            Alice from ACME
                           </span>
                         </div>
                       </ModeratorDrawer>
@@ -107,7 +102,7 @@ export default function _002() {
                               <span>{digit2(m)}</span>
                               <span>:</span>
                               <span>{digit2(s)}</span>
-                              <span>남음</span>
+                              <span>Left</span>
                             </div>
                           </>
                         )}
@@ -117,7 +112,7 @@ export default function _002() {
                           variant="outline"
                           className="border-foreground bg-transparent rounded-none"
                         >
-                          <span>시승 예약 하기</span>
+                          <span>Register Now</span>
                           <ArrowRightIcon className="ms-2 w-4 h-4 text-orange-400" />
                         </Button>
                       </Link>
@@ -158,16 +153,15 @@ export default function _002() {
               className="w-full h-full"
             >
               <img
-                src="https://sdl-assets.ams3.cdn.digitaloceanspaces.com/sdl/2021/08/sdl-polestar-interior-steering-2000x1333.jpg"
+                src={data.background.src}
                 alt=""
                 width={1080}
                 height={1920}
                 className="w-full h-full object-cover"
               />
             </motion.div>
-            {/* https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4 */}
             <video
-              src="https://www.polestar.com/dato-assets/11286/1717510114-ps3-homepage-video-d.mp4"
+              src={data.video.src}
               width="100%"
               height="100%"
               muted
@@ -187,7 +181,7 @@ export default function _002() {
       </ScreenMobileFrame>
       <ScreenRootBackground>
         <img
-          src="https://sdl-assets.ams3.cdn.digitaloceanspaces.com/sdl/2021/08/sdl-polestar-interior-steering-2000x1333.jpg"
+          src={data.background.src}
           alt=""
           width={1080}
           height={1920}

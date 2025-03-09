@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { Spinner } from "@/components/spinner";
 import {
   EditorSurface,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
   ViewportRoot,
 } from "@/grida-react-canvas";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
@@ -24,6 +24,7 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 
 function useSync(document: grida.program.document.Document | undefined) {
   const [{ document_id }, dispatch] = useEditorState();
@@ -91,26 +92,28 @@ function Ready() {
   return (
     <>
       <div className="flex w-full h-full">
-        <EditorSurfaceClipboardSyncProvider>
-          <EditorSurfaceDropzone>
-            <EditorSurfaceContextMenu>
-              <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-                  <EditorSurface />
-                  <AutoInitialFitTransformer>
-                    <StandaloneDocumentContent />
-                  </AutoInitialFitTransformer>
-                  <ToolbarPosition>
-                    <Toolbar />
-                  </ToolbarPosition>
-                </ViewportRoot>
-              </StandaloneSceneBackground>
-            </EditorSurfaceContextMenu>
-          </EditorSurfaceDropzone>
-        </EditorSurfaceClipboardSyncProvider>
-        <aside className="hidden lg:flex h-full">
-          <SideControl />
-        </aside>
+        <PreviewProvider>
+          <EditorSurfaceClipboardSyncProvider>
+            <EditorSurfaceDropzone>
+              <EditorSurfaceContextMenu>
+                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                  <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                    <EditorSurface />
+                    <AutoInitialFitTransformer>
+                      <StandaloneSceneContent />
+                    </AutoInitialFitTransformer>
+                    <ToolbarPosition>
+                      <Toolbar />
+                    </ToolbarPosition>
+                  </ViewportRoot>
+                </StandaloneSceneBackground>
+              </EditorSurfaceContextMenu>
+            </EditorSurfaceDropzone>
+          </EditorSurfaceClipboardSyncProvider>
+          <aside className="hidden lg:flex h-full">
+            <SideControl />
+          </aside>
+        </PreviewProvider>
       </div>
     </>
   );

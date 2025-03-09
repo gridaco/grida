@@ -15,7 +15,7 @@ import {
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
@@ -110,7 +110,7 @@ export function GridaCanvasFormField() {
                     <ViewportRoot className="relative w-full h-full overflow-hidden">
                       <EditorSurface />
                       <AutoInitialFitTransformer>
-                        <StandaloneDocumentContent />
+                        <StandaloneSceneContent />
                       </AutoInitialFitTransformer>
                       <ToolbarPosition>
                         <Toolbar />

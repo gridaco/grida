@@ -2,7 +2,7 @@ import React from "react";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 import { mock } from "../../data";
 import { notFound } from "next/navigation";
-import TMP_Join from "./component";
+import Join from "./_flows/page";
 
 type Params = {
   cid: string;
@@ -18,7 +18,7 @@ export default async function BPage({ params }: { params: Promise<Params> }) {
 
   return (
     <ScreenWindowRoot>
-      <TMP_Join params={await params} />
+      <Join params={await params} />
     </ScreenWindowRoot>
   );
 }

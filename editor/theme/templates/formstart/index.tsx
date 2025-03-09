@@ -11,10 +11,11 @@ import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
 import { grida } from "@/grida";
-import { StandaloneDocumentContent } from "@/grida-react-canvas";
+import { StandaloneSceneContent } from "@/grida-react-canvas";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
+import { UserCustomTemplatesProvider } from "@/grida-react-canvas/renderer";
 
 export namespace FormStartPage {
   type ClientTemplateDefinition =
@@ -108,15 +109,14 @@ export namespace FormStartPage {
 
     return (
       <FormCampaignStartPageContextProvider value={meta}>
-        <I18nextProvider
-          i18n={i18n}
-        >
-          <StandaloneDocumentContent
+        <I18nextProvider i18n={i18n}>
+          <UserCustomTemplatesProvider
             templates={{
               [name]: template.component,
             }}
-            className="w-full h-full"
-          />
+          >
+            <StandaloneSceneContent className="w-full h-full" />
+          </UserCustomTemplatesProvider>
         </I18nextProvider>
       </FormCampaignStartPageContextProvider>
     );

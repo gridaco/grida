@@ -8,7 +8,7 @@ import { iosvg } from "@/grida-io-svg";
 import {
   EditorSurface,
   initDocumentEditorState,
-  StandaloneDocumentContent,
+  StandaloneSceneContent,
   StandaloneDocumentEditor,
   standaloneDocumentReducer,
   ViewportRoot,
@@ -168,7 +168,7 @@ export default function IOSVGPage() {
                     <ViewportRoot className="relative w-full h-full p-4">
                       <EditorSurface />
                       <AutoInitialFitTransformer>
-                        <StandaloneDocumentContent className="w-full h-full" />
+                        <StandaloneSceneContent className="w-full h-full" />
                       </AutoInitialFitTransformer>
                     </ViewportRoot>
                   </StandaloneDocumentEditor>
