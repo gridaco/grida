@@ -676,6 +676,12 @@ importers:
       cmdk:
         specifier: ^1.0.0
         version: 1.0.4(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      color-name:
+        specifier: ^2.0.0
+        version: 2.0.0
+      color-parse:
+        specifier: ^2.0.2
+        version: 2.0.2
       console-feed:
         specifier: ^3.6.0
         version: 3.8.0(jquery@3.7.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -929,6 +935,9 @@ importers:
       '@testing-library/react':
         specifier: ^11.2.7
         version: 11.2.7(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@types/color-name':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/core-js':
         specifier: ^2.5.8
         version: 2.5.8
@@ -7751,6 +7760,9 @@ packages:
   '@types/cacheable-request@6.0.3':
     resolution: {integrity: sha512-IQ3EbTzGxIigb1I3qPZc1rWJnH0BmSKv5QYTalEwweFvyBDLSAe24zP0le/hyi7ecGfZVlIVAg4BZqb8WBwKqw==}
 
+  '@types/color-name@2.0.0':
+    resolution: {integrity: sha512-63mTjolMJv75upGaUbT6J3lRDWl6pETPQsaWni9w3dMArhNBpgtHkX8ISb9zLV3YYLPA/SMk8ZGALa3k9WY/aQ==}
+
   '@types/connect-history-api-fallback@1.5.4':
     resolution: {integrity: sha512-n6Cr2xS1h4uAulPRdlw6Jl6s1oG8KrVilPN2yUITEs+K48EzMJJ3W1xy8K5eWuFvjp3R74AOIGSmp2UfBJ8HFw==}
 
@@ -9926,6 +9938,13 @@ packages:
 
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
+
+  color-name@2.0.0:
+    resolution: {integrity: sha512-SbtvAMWvASO5TE2QP07jHBMXKafgdZz8Vrsrn96fiL+O92/FN/PLARzUW5sKt013fjAprK2d2iCn2hk2Xb5oow==}
+    engines: {node: '>=12.20'}
+
+  color-parse@2.0.2:
+    resolution: {integrity: sha512-eCtOz5w5ttWIUcaKLiktF+DxZO1R9KLNY/xhbV6CkhM7sR3GhVghmt6X6yOnzeaM24po+Z9/S1apbXMwA3Iepw==}
 
   color-string@1.9.1:
     resolution: {integrity: sha512-shrVawQFojnZv6xM40anx4CkoDP+fZsw/ZerEMsW/pyzsRbElpsL/DBVW7q3ExxwusdNXI3lXpuhEZkzs8p5Eg==}
@@ -29749,6 +29768,8 @@ snapshots:
       '@types/node': 22.13.4
       '@types/responselike': 1.0.3
 
+  '@types/color-name@2.0.0': {}
+
   '@types/connect-history-api-fallback@1.5.4':
     dependencies:
       '@types/express-serve-static-core': 5.0.6
@@ -32635,6 +32656,12 @@ snapshots:
   color-name@1.1.3: {}
 
   color-name@1.1.4: {}
+
+  color-name@2.0.0: {}
+
+  color-parse@2.0.2:
+    dependencies:
+      color-name: 2.0.0
 
   color-string@1.9.1:
     dependencies:
