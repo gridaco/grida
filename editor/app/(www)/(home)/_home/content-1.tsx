@@ -115,7 +115,7 @@ function Trigger({
       className={cn(
         "text-sm md:text-base rounded-lg bg-background flex py-3 md:py-4 items-center justify-center transition-all group select-none cursor-pointer",
         selected
-          ? "bg-transparent dark:bg-slate-950 dark:text-white text-black border border-slate-100 dark:border-slate-700 shadow-md shadow-slate-200 dark:shadow-none"
+          ? "bg-white dark:bg-slate-950 dark:text-white text-black border border-slate-100 dark:border-slate-700 shadow-md shadow-slate-200 dark:shadow-none"
           : "bg-transparent text-muted-foreground"
       )}
     >
