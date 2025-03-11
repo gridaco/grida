@@ -87,7 +87,7 @@ export default async function DownloadsPage() {
                   target="_blank"
                   className="underline"
                 >
-                  View all release on GitHub
+                  View all releases on GitHub
                 </Link>
               </p>
             </div>
@@ -106,7 +106,7 @@ export default async function DownloadsPage() {
       </main>
       <div className="h-32" />
       <div className="container w-full items-center">
-        <h1 className="text-center text-3xl font-semibold mb-6">
+        <h1 className="text-center text-p3xl font-semibold mb-6">
           Get Grida for Windows & more
         </h1>
         <p className="text-center text-base text-muted-foreground mb-12">
@@ -119,7 +119,7 @@ export default async function DownloadsPage() {
             target="_blank"
             className="underline"
           >
-            View all release on GitHub
+            View all releases on GitHub
           </Link>
         </p>
       </div>
