@@ -32,6 +32,7 @@ export function PricingCard({
       data-highlight={highlight}
       className="
         bg-background
+        dark:bg-white/5
         flex-1 flex flex-col p-8 border gap-4 rounded-lg
         md:h-[570px]
         data-[highlight='true']:border-2
