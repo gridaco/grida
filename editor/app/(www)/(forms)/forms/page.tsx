@@ -14,7 +14,15 @@ import { Button } from "@/components/ui/button";
 import Header from "../header";
 import Footer from "@/www/footer";
 import { FAQ } from "./_sections/faq";
-import Bento from "./_sections/bento";
+import { type Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Grida Forms",
+  description:
+    "Grida Forms is a form builder that helps you create forms with ease.",
+  keywords:
+    "form builder, free form, form maker, headless forms, free forms api , json form builder, shadcn ui form builder",
+};
 
 export default function Home() {
   return (
