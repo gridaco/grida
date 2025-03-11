@@ -312,28 +312,23 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                   scope="col"
                   key={plan.name}
                 >
-                  <span className="flex flex-col px-6 pr-2 pt-2 gap-1.5">
-                    <span className="flex flex-col xl:flex-row xl:items-end gap-1">
-                      <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal flex items-center">
+                  <span className="flex flex-col px-6 pr-2 pt-2 gap-1 items-start">
+                    <div className="flex flex-row items-center gap-2">
+                      <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal">
                         {plan.name}
                       </h3>
-                      <p
-                        className={clsx(
-                          "text-foreground-lighter -my-1 xl:m-0",
-                          plan.name === "Enterprise" && "xl:opacity-0"
-                        )}
-                      >
-                        <span className="text-foreground-lighter font-mono text-xl mr-1 tracking-tighter">
-                          {plan.name !== "Enterprise" && "$"}
-                          {plan.priceMonthly}
+                      <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
+                        {plan.name !== "Enterprise" && "$"}
+                        {plan.priceMonthly}
+                      </span>
+                    </div>
+                    <div className="h-5">
+                      {["Free", "Pro", "Team"].includes(plan.name) && (
+                        <span className="text-[13px] opacity-50 leading-4">
+                          {plan.costUnit}
                         </span>
-                        {["Free", "Pro", "Team"].includes(plan.name) && (
-                          <span className="text-[13px] opacity-50 leading-4 mt-1">
-                            {plan.costUnit}
-                          </span>
-                        )}
-                      </p>
-                    </span>
+                      )}
+                    </div>
                     <Link href={plan.href} className="w-full">
                       <Button className="mt-2 w-full">{plan.cta}</Button>
                     </Link>
