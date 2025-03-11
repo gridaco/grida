@@ -85,7 +85,7 @@ export default async function DownloadsPage() {
                   target="_blank"
                   className="underline"
                 >
-                  View all release on GitHub
+                  View all releases on GitHub
                 </Link>
               </p>
             </div>
@@ -117,7 +117,7 @@ export default async function DownloadsPage() {
             target="_blank"
             className="underline"
           >
-            View all release on GitHub
+            View all releases on GitHub
           </Link>
         </p>
       </div>

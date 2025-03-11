@@ -31,7 +31,7 @@ export function Pricing() {
             </span>
           </label>
         </div>
-        <div className="columns-1 lg:columns-2 2xl:columns-4 gap-10 space-y-10 w-full">
+        <div className="columns-1 md:columns-2 xl:columns-4 gap-6 space-y-10 w-full">
           {plans.map((plan) => (
             <PricingCard
               key={plan.id}
