@@ -2,17 +2,12 @@ import { compile, serialize, stringify } from "stylis";
 
 export namespace CustomCSS {
   /**
+   * Compiles nested CSS using Stylis.
    *
-   * converts nested scss to css
-   *
-   * @param css nested scss (stylis)
-   * @param scope wrapper class .<scope>
-   * @returns
+   * @param css The nested CSS string.
+   * @returns The compiled CSS string.
    */
-  export function vanilla(css: string, scope?: string): string {
-    if (scope) {
-      css = `.${scope} { ${css} }`;
-    }
+  export function vanilla(css: string): string {
     css = serialize(compile(css), stringify);
     return css;
   }

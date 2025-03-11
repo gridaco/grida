@@ -16,7 +16,7 @@ export function CustomCSSProvider({
   scope?: string;
 }) {
   const compiledcss = useMemo(
-    () => (css ? CustomCSS.vanilla(css, scope) : undefined),
+    () => (css ? CustomCSS.vanilla(css) : undefined),
     [css, scope]
   );
 
