@@ -11,16 +11,19 @@ export type Database = {
     Tables: {
       canvas_document: {
         Row: {
+          __schema_version: string
           created_at: string
           data: Json
           id: string
         }
         Insert: {
+          __schema_version?: string
           created_at?: string
           data: Json
           id: string
         }
         Update: {
+          __schema_version?: string
           created_at?: string
           data?: Json
           id?: string
@@ -2281,6 +2284,7 @@ export type Database = {
           created_at: string
           description: string | null
           display_name: string
+          display_plan: Database["public"]["Enums"]["pricing_tier"]
           email: string | null
           id: number
           name: string
@@ -2292,6 +2296,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_name?: string
+          display_plan?: Database["public"]["Enums"]["pricing_tier"]
           email?: string | null
           id?: number
           name: string
@@ -2303,6 +2308,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_name?: string
+          display_plan?: Database["public"]["Enums"]["pricing_tier"]
           email?: string | null
           id?: number
           name?: string
@@ -2559,6 +2565,7 @@ export type Database = {
         | "ar"
         | "hi"
         | "nl"
+      pricing_tier: "free" | "v0_pro" | "v0_team" | "v0_enterprise"
     }
     CompositeTypes: {
       [_ in never]: never
