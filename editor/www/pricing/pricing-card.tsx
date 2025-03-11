@@ -33,11 +33,14 @@ export function PricingCard({
       className="
         bg-background
         flex-1 flex flex-col p-5 border gap-8 rounded-lg
+        md:h-[550px]
         data-[highlight='true']:border-2
         data-[highlight='true']:border-foreground
         hover:scale-[1.02]
+        duration-300
         transition-all
         shadow
+         justify-between
         "
     >
       <div className="flex flex-col gap-1">
