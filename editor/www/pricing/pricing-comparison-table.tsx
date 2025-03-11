@@ -94,7 +94,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <MobileHeader
               plan="Free"
               price={"0"}
-              priceDescription={"/month"}
+              priceDescription={""}
               description={"Perfect for hobby projects and experiments"}
             />
             <PricingTableRowMobile
@@ -144,7 +144,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               plan="Pro"
               from={false}
               price={"20"}
-              priceDescription={"/month"}
+              priceDescription={"per seat/months"}
               description={
                 "Everything you need to scale your project into production"
               }
@@ -194,7 +194,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               plan="Team"
               from={false}
               price={"60"}
-              priceDescription={"/month"}
+              priceDescription={"per seat/month"}
               description={
                 "Collaborate with different permissions and access patterns"
               }
