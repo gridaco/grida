@@ -16,6 +16,7 @@ import { DownloadIcon } from "@radix-ui/react-icons";
 export const metadata: Metadata = {
   title: "Downloads",
   description: "Download Grida",
+  keywords: "Grida, download, desktop, design, tool, editor",
 };
 
 const oslabel = {
@@ -55,20 +56,17 @@ export default async function DownloadsPage() {
       <Header />
       <div className="h-60" />
       <main className="container items-center">
-        <section className="container bg-white max-w-xl lg:max-w-7xl mx-auto py-8 px-12 lg:px-16 lg:py-10 xl:py-2 text-left border rounded-lg flex flex-col-reverse lg:flex-row items-center justify-between overflow-hidden">
+        <section className="container bg-background max-w-xl lg:max-w-7xl mx-auto py-8 px-12 lg:px-16 lg:py-10 xl:py-2 text-left border rounded-lg flex flex-col-reverse lg:flex-row items-center justify-between overflow-hidden">
           <div className="max-w-lg text-center lg:text-left">
             <h1 className="text-black text-4xl md:text-6xl font-bold mb-16 lg:mb-24">
               Download <br />
-              Grida Desktop app
+              Grida for Desktop
             </h1>
             <div>
               <div className="flex justify-center lg:justify-start space-x-4">
                 {os ? (
                   <Link href={links.default!.url}>
-                    <Button
-                      size="lg"
-                      className="bg-black text-white hover:bg-black/70"
-                    >
+                    <Button size="lg">
                       <OSIcon os={os} className="mr-2 size-4" /> Download for{" "}
                       {oslabel[os]}
                     </Button>
@@ -93,21 +91,21 @@ export default async function DownloadsPage() {
             </div>
           </div>
 
-          <div className="w-full md:w-1/2 flex justify-center md:justify-end mt-10 md:mt-0">
+          <div className="w-full h-full md:w-1/2 flex justify-center md:justify-end mt-10 md:mt-0">
             <Image
               src="/images/download.png"
               width={600}
-              height={600}
+              height={400}
               alt="download"
-              className="overflow-hidden hover:scale-110 transition-all duration-300"
+              className="object-contain hover:scale-110 transition-all duration-300"
             />
           </div>
         </section>
       </main>
       <div className="h-32" />
       <div className="container w-full items-center">
-        <h1 className="text-center text-p3xl font-semibold mb-6">
-          Get Grida for Windows & more
+        <h1 className="text-center text-3xl font-semibold mb-6">
+          Download Grida for desktop
         </h1>
         <p className="text-center text-base text-muted-foreground mb-12">
           A faster, more focused experience awaits.

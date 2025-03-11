@@ -6,7 +6,7 @@ import { grida } from "@/grida";
 import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
-import { useUserDocumentCustomRenderer } from "../renderer";
+import { useUserCustomTemplates } from "../renderer";
 import { css } from "@/grida/css";
 
 class RendererNotFound extends Error {
@@ -20,6 +20,9 @@ interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
   component?: TemplateComponent;
   style?: grida.program.css.ExplicitlySupportedCSSProperties;
+  override?: {
+    style?: React.CSSProperties;
+  };
   zIndex?: number;
   position?: "absolute" | "relative";
   left?: number;
@@ -41,8 +44,9 @@ export function NodeElement<P extends Record<string, any>>({
   height: DEFAULT_HEIGHT,
   fill: DEFAULT_FILL,
   style,
+  override,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
-  const user_registered_renderers = useUserDocumentCustomRenderer();
+  const user_registered_renderers = useUserCustomTemplates();
   const { state: document, selection } = useDocument();
 
   const node = useNode(node_id);
@@ -186,6 +190,7 @@ export function NodeElement<P extends Record<string, any>>({
               document.content_edit_mode.node_id === node_id
                 ? "hidden"
                 : undefined,
+            ...override?.style,
           } satisfies React.CSSProperties,
         } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren

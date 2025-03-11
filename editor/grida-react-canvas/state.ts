@@ -580,6 +580,7 @@ interface ISurfaceEventTargetConfig {
  */
 export const DEFAULT_SCENE_STATE: IScenePersistenceState & ISceneSurfaceState =
   {
+    dragging: false,
     active_duplication: null,
     content_edit_mode: undefined,
     dropzone: undefined,
@@ -618,6 +619,13 @@ interface ISceneSurfaceState {
    * @default idle
    */
   gesture: GestureState;
+
+  /**
+   * whether the surface is dragging (by the raw event)
+   *
+   * triggered by the "ondragstart" / "ondragend" event
+   */
+  dragging: boolean;
 
   /**
    * the latest snap result from the gesture
@@ -685,6 +693,10 @@ interface IDocumentEditorEventTargetState
   extends ISurfaceEventTargetConfig,
     ISceneSurfaceState {
   pointer: {
+    /**
+     * [clientX, clientY] - browser pointer event position
+     */
+    client: cmath.Vector2;
     position: cmath.Vector2;
     last: cmath.Vector2;
     // position_snap: cmath.Vector2;
@@ -741,6 +753,16 @@ interface IEditorConfig {
    * - `throw` - throw an error
    */
   when_not_removable: "ignore" | "deactivate" | "force" | "throw";
+
+  features: {
+    /**
+     * enable / disable the brush feature
+     * - brush / eraser tool
+     *
+     * @default "off"
+     */
+    __unstable_brush_tool: "on" | "off";
+  };
 }
 
 interface IEditorGoogleFontsState {
@@ -859,6 +881,7 @@ interface __TMP_HistoryExtension {
 
 export interface IDocumentEditorInit
   extends Pick<IEditorConfig, "editable" | "debug">,
+    Partial<Pick<IEditorConfig, "features">>,
     grida.program.document.IDocumentTemplatesRepository {
   document: Pick<
     grida.program.document.Document,
@@ -911,6 +934,7 @@ export function initDocumentEditorState({
     transform: cmath.transform.identity,
     debug: debug ?? false,
     pointer: {
+      client: cmath.vector2.zero,
       position: cmath.vector2.zero,
       last: cmath.vector2.zero,
     },
@@ -931,6 +955,9 @@ export function initDocumentEditorState({
     tool: { type: "cursor" },
     brush: DEFAULT_BRUSH,
     scene_id: doc.entry_scene_id ?? Object.keys(doc.scenes)[0] ?? undefined,
+    features: {
+      __unstable_brush_tool: "off",
+    },
     ...DEFAULT_SCENE_STATE,
     ...init,
     document: doc,

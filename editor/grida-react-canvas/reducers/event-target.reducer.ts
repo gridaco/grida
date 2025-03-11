@@ -76,7 +76,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
       const {
-        position: { x, y },
+        position_canvas: { x, y },
+        position_client,
       } = <EditorEventTarget_PointerMove>action;
 
       const surface_space_pointer_position: cmath.Vector2 = [x, y];
@@ -88,6 +89,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         draft.pointer = {
+          client: [position_client.x, position_client.y],
           position: canvas_space_pointer_position,
           last: draft.pointer.position,
         };
@@ -403,10 +405,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "event-target/event/on-drag-start": {
       const { shiftKey } = <EditorEventTarget_DragStart>action;
 
-      // if there is already a gesture, ignore
-      if (state.gesture.type !== "idle") return state;
-
       return produce(state, (draft) => {
+        draft.dragging = true;
+
+        // if there is already a gesture, ignore
+        if (state.gesture.type !== "idle") return;
+
         // clear all trasform state
         draft.marquee = undefined;
         draft.dropzone = undefined;
@@ -637,6 +641,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
+        draft.dragging = false;
+
         switch (draft.tool.type) {
           case "draw":
             // keep if pencil mode
@@ -706,12 +712,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const {
         event: { movement, delta },
       } = <EditorEventTarget_Drag>action;
-      if (state.marquee) {
-        return produce(state, (draft) => {
+
+      return produce(state, (draft) => {
+        if (state.marquee) {
           draft.marquee!.b = state.pointer.position;
-        });
-      } else {
-        return produce(state, (draft) => {
+        } else {
           if (draft.gesture.type === "idle") return;
           if (draft.gesture.type === "nudge") return;
 
@@ -1052,8 +1057,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
             }
           }
-        });
-      }
+        }
+      });
 
       break;
     }

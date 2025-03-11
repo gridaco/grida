@@ -45,7 +45,7 @@ export function ScenesGroup() {
   const { createScene } = useDocument();
 
   return (
-    <SidebarGroup>
+    <SidebarGroup onContextMenu={(e) => e.preventDefault()}>
       <SidebarGroupLabel>
         Scenes
         <SidebarGroupAction onClick={() => createScene()}>
@@ -221,7 +221,7 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyGroup() {
   return (
-    <SidebarGroup>
+    <SidebarGroup className="flex-1" onContextMenu={(e) => e.preventDefault()}>
       <SidebarGroupLabel>Layers</SidebarGroupLabel>
       <SidebarGroupContent>
         <NodeHierarchyList />
@@ -261,7 +261,7 @@ export function NodeHierarchyList() {
               hovered={hovered}
               level={depth}
               selected={selected}
-              onSelect={(e) => {
+              onPointerDown={(e) => {
                 if (e.metaKey || e.ctrlKey) {
                   select("selection", [id]);
                 } else {

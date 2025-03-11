@@ -64,7 +64,7 @@ export const Knob = React.forwardRef(function Knob(
       ref={ref}
       data-layer-is-component-consumer={isComponentConsumer}
       className={cn(
-        "border bg-white border-workbench-accent-sky data-[layer-is-component-consumer='true']:border-workbench-accent-violet absolute z-10 pointer-events-auto",
+        "border bg-white border-workbench-accent-sky group-data-[layer-is-component-consumer='true']:border-workbench-accent-violet data-[layer-is-component-consumer='true']:border-workbench-accent-violet absolute z-10 pointer-events-auto",
         className
       )}
       style={{

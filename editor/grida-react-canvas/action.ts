@@ -407,7 +407,12 @@ export type EditorEventTarget_PointerMove = {
   /**
    * position in canvas space - need to pass a resolved value
    */
-  position: {
+  position_canvas: {
+    x: number;
+    y: number;
+  };
+
+  position_client: {
     x: number;
     y: number;
   };

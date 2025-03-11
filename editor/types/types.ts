@@ -5,6 +5,12 @@ import { grida } from "@/grida";
 
 type UUID = string;
 
+export type PlatformPricingTier =
+  | "free"
+  | "v0_pro"
+  | "v0_team"
+  | "v0_enterprise";
+
 export type JSONValue =
   | string
   | number
@@ -475,9 +481,17 @@ export interface Organization {
   blog: string | null;
   description: string | null;
   display_name: string;
+  display_plan: PlatformPricingTier;
   id: number;
   name: string;
   owner_id: string;
+}
+
+export interface OrganizationMember {
+  id: number;
+  user_id: string;
+  created_at: string;
+  organization_id: number;
 }
 
 export interface Project {

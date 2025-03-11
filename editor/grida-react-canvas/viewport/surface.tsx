@@ -55,6 +55,7 @@ import {
   FloatingBarTitle,
 } from "./ui/floating-bar";
 import { grida } from "@/grida";
+import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
 
 const DRAG_THRESHOLD = 2;
 
@@ -133,6 +134,7 @@ function SurfaceGroup({
 }
 
 export function EditorSurface() {
+  useEdgeScrolling({ enabled: true });
   const isWindowResizing = useIsWindowResizing();
   const { transform } = useTransform();
   const {
@@ -155,6 +157,7 @@ export function EditorSurface() {
     pointerUp,
     click,
     doubleClick,
+    setTool,
     drag,
     dragStart,
     dragEnd,
@@ -198,8 +201,26 @@ export function EditorSurface() {
       });
   }, [eventTargetRef.current]);
 
+  const __hand_tool_triggered_by_aux_button = useRef(false);
+
   const bind = useSurfaceGesture(
     {
+      onMouseDown: ({ event }) => {
+        if (event.defaultPrevented) return;
+        if (event.button === 1) {
+          __hand_tool_triggered_by_aux_button.current = true;
+          setTool({ type: "hand" });
+        }
+      },
+      onMouseUp: ({ event }) => {
+        if (event.defaultPrevented) return;
+        if (event.button === 1) {
+          if (__hand_tool_triggered_by_aux_button.current) {
+            __hand_tool_triggered_by_aux_button.current = false;
+            setTool({ type: "cursor" });
+          }
+        }
+      },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
         pointerDown(event);
@@ -243,9 +264,11 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
+        pointer: {
+          buttons: [1, 4], // Primary button (1) // Aux button (4)
+          keys: false, // disable drag gesture with arrow keys
+        },
         threshold: DRAG_THRESHOLD,
-        // disable drag gesture with arrow keys
-        keyboardDisplacement: 0,
       },
     }
   );
@@ -764,7 +787,7 @@ function SelectionGroupOverlay({
             offset={16}
             size={size}
             rect={{ ...boundingSurfaceRect, x: 0, y: 0 }}
-            className="bg-workbench-accent-sky text-white"
+            className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
       </LayerOverlay>
@@ -798,7 +821,7 @@ function NodeOverlay({
   const { node, style, size } = data;
 
   const { is_component_consumer, is_flex_parent } = node.meta;
-  readonly = readonly || is_component_consumer;
+  // readonly = readonly || is_component_consumer;
 
   const measurement_rect = {
     x: 0,
@@ -858,7 +881,7 @@ function NodeOverlay({
             offset={16}
             size={size}
             rect={{ ...measurement_rect, x: 0, y: 0 }}
-            className="bg-workbench-accent-sky text-white"
+            className="bg-workbench-accent-sky group-data-[layer-is-component-consumer='true']:bg-workbench-accent-violet text-white"
           />
         )}
       </LayerOverlay>

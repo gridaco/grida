@@ -1,6 +1,6 @@
 import React from "react";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
-import TMP_Invite from "./component";
+import Invite from "./main";
 
 type Params = {
   cid: string;
@@ -9,7 +9,7 @@ type Params = {
 export default async function Page({ params }: { params: Promise<Params> }) {
   return (
     <ScreenWindowRoot>
-      <TMP_Invite params={await params} />
+      <Invite params={await params} />
     </ScreenWindowRoot>
   );
 }

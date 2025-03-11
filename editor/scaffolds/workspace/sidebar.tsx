@@ -32,15 +32,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Progress } from "@/components/ui/progress";
 import {
   OrganizationWithAvatar,
+  OrganizationWithMembers,
   useWorkspace,
   WorkspaceState,
 } from "@/scaffolds/workspace";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
-import Link from "next/link";
-import { GDocument } from "@/types";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
@@ -48,8 +48,14 @@ import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { usePathname } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
-import "core-js/features/object/group-by";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
+import { Badge } from "@/components/ui/badge";
+import { Labels } from "@/k/labels";
+import { Button } from "@/components/ui/button";
+import { ShineBorder } from "@/www/ui/shine-border";
+import type { GDocument, PlatformPricingTier } from "@/types";
+import Link from "next/link";
+import "core-js/features/object/group-by";
 
 function SidebarMenuLinkButton({
   href,
@@ -175,10 +181,88 @@ export default function WorkspaceSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavProjects orgname={organization.name} projects={tree} allowNew />
-        <NavSecondary items={navSecondary} className="mt-auto" />
+        <SidebarGroup className="mt-auto">
+          <PricingTierCard organization={organization} />
+        </SidebarGroup>
+        <NavSecondary items={navSecondary} />
       </SidebarContent>
       {/* <SidebarRail /> */}
     </Sidebar>
+  );
+}
+
+function PricingTierCard({
+  organization,
+}: {
+  organization: OrganizationWithAvatar & OrganizationWithMembers;
+}) {
+  const { display_plan: tier, members } = organization;
+  const ENTERPRISE_DEFAULT_SEATS = 5;
+  const label = Labels.priceTier(tier);
+  const isFree = tier === "free";
+  const isEnterprise = tier === "v0_enterprise";
+  const isTeam = tier === "v0_team";
+  const canUpgrade = !isEnterprise && !isTeam;
+
+  const tierMessages: Record<PlatformPricingTier, string> = {
+    free: "You're currently on the Free Plan. Upgrade to unlock premium features!",
+    v0_pro:
+      "Thanks for being a Pro user! You're accessing advanced capabilities.",
+    v0_team: "You're on our Team plan, optimized for collaboration.",
+    v0_enterprise:
+      "You're on Enterprise Plan—thank you for your continued partnership",
+  };
+
+  const message = tierMessages[tier] ?? `Thanks for subscribing to ${label}!`;
+
+  return (
+    <div className="relative rounded-lg border p-3">
+      {!canUpgrade && (
+        <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+      )}
+      <div className="flex items-center justify-between mb-2">
+        {canUpgrade && <h3 className="text-sm font-semibold">Current Plan</h3>}
+        <Badge variant="outline">{label}</Badge>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">{message}</p>
+      {canUpgrade && (
+        <Link href={sitemap.links.pricing} target="_blank">
+          <Button size="xs" variant="outline">
+            Upgrade Plan
+          </Button>
+        </Link>
+      )}
+      {isEnterprise && (
+        <Link href={sitemap.links.contact} target="_blank">
+          <Button size="xs" variant="outline">
+            Arrange Dedicated Support
+          </Button>
+        </Link>
+      )}
+      {isEnterprise && (
+        <div className="mt-3 grid gap-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <label>Seats</label>
+            <label
+              data-state={
+                members.length >= ENTERPRISE_DEFAULT_SEATS ? "over" : "under"
+              }
+              className="data-[state=over]:text-workbench-accent-orange"
+            >
+              ({members.length}/{ENTERPRISE_DEFAULT_SEATS})
+            </label>
+          </div>
+          <div className="w-full">
+            <Progress
+              value={Math.min(
+                (members.length / ENTERPRISE_DEFAULT_SEATS) * 100,
+                100
+              )}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -321,6 +405,12 @@ function OrganizationSwitcher({
                     alt={org.display_name}
                   />
                   {org.display_name}
+                  <Badge
+                    variant="outline"
+                    className="ms-auto text-xs px-1.5 py-0.5 font-normal text-muted-foreground"
+                  >
+                    {Labels.priceTier(org.display_plan)}
+                  </Badge>
                 </DropdownMenuItem>
               </Link>
             ))}

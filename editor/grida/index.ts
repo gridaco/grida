@@ -1765,6 +1765,7 @@ export namespace grida.program.nodes {
       i.IMouseCursor,
       i.ISceneNode,
       i.IPositioning,
+      i.ICSSDimension,
       i.IProperties,
       i.IProps,
       // TODO: migration required - remove me - use global override table instead
@@ -1802,6 +1803,8 @@ export namespace grida.program.nodes {
         userdata: {},
         overrides: cloneWithUndefinedValues(nodes),
         template_id: def.name,
+        width: "auto",
+        height: "auto",
         ...seed,
       };
       //

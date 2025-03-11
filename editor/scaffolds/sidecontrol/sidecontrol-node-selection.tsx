@@ -213,9 +213,9 @@ function SelectionMixedProperties() {
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockOpen1Icon className="w-3 h-3" />
-                ) : (
                   <LockClosedIcon className="w-3 h-3" />
+                ) : (
+                  <LockOpen1Icon className="w-3 h-3" />
                 )}
               </Toggle>
               {/* <small className="ms-2 font-mono">{id}</small> */}
@@ -250,7 +250,7 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Rotate</PropertyLineLabel>
               <RotateControl
-                value={rotation!.value}
+                value={rotation?.value}
                 onValueChange={change.rotation}
               />
             </PropertyLine>
@@ -450,7 +450,7 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
-                value={opacity!.value}
+                value={opacity?.value}
                 onValueChange={change.opacity}
               />
             </PropertyLine>
@@ -707,9 +707,9 @@ function SelectedNodeProperties() {
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockOpen1Icon className="w-3 h-3" />
-                ) : (
                   <LockClosedIcon className="w-3 h-3" />
+                ) : (
+                  <LockOpen1Icon className="w-3 h-3" />
                 )}
               </Toggle>
             </PropertyLine>

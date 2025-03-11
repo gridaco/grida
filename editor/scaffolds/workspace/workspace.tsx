@@ -2,11 +2,20 @@
 
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import produce from "immer";
-import type { GDocument, Organization, Project } from "@/types";
+import type {
+  GDocument,
+  Organization,
+  OrganizationMember,
+  Project,
+} from "@/types";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import useSWR from "swr";
 import { EditorApiResponse } from "@/types/private/api";
+
+export type OrganizationWithMembers = Organization & {
+  members: OrganizationMember[];
+};
 
 export type OrganizationWithAvatar = Organization & {
   avatar_url: string | null;
@@ -14,7 +23,7 @@ export type OrganizationWithAvatar = Organization & {
 
 export interface WorkspaceState {
   loading: boolean;
-  organization: OrganizationWithAvatar;
+  organization: OrganizationWithAvatar & OrganizationWithMembers;
   organizations: OrganizationWithAvatar[];
   projects: Project[];
   documents: GDocument[];
@@ -64,7 +73,7 @@ export function Workspace({
   children,
   organization,
 }: React.PropsWithChildren<{
-  organization: Organization;
+  organization: OrganizationWithMembers;
 }>) {
   const supabase = createClientWorkspaceClient();
 

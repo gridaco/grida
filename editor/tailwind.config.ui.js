@@ -107,6 +107,19 @@ module.exports = {
           to: { transform: "translateY(calc(-100% - var(--gap)))" },
         },
         // #endregion
+        // #region shine https://magicui.design/docs/components/shine-border
+        shine: {
+          "0%": {
+            "background-position": "0% 0%",
+          },
+          "50%": {
+            "background-position": "100% 100%",
+          },
+          to: {
+            "background-position": "0% 0%",
+          },
+        },
+        // #endregion
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -114,6 +127,9 @@ module.exports = {
         // #region marquee https://magicui.design/docs/components/marquee
         marquee: "marquee var(--duration) linear infinite",
         "marquee-vertical": "marquee-vertical var(--duration) linear infinite",
+        // #endregion
+        // #region shine https://magicui.design/docs/components/shine-border
+        shine: "shine var(--duration) infinite linear",
         // #endregion
       },
     },

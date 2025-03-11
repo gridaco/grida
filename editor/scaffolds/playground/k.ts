@@ -51,6 +51,10 @@ export const canvas_examples = [
     name: "Globals 01",
     url: `/examples/canvas/globals-01.grida`,
   },
+  {
+    id: "with-templates/002",
+    name: "Template 02",
+  },
 ];
 
 export const forms_examples = [
