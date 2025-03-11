@@ -60,64 +60,68 @@ export default function Invite({
     <ScreenRoot>
       <ScreenMobileFrame>
         <ScreenScrollable>
-          <div>
-            {/* Header */}
-            <header className="py-4 flex items-center justify-center">
-              {/* PolestarTypeLogo */}
-              <ACME className="text-foreground" />
-            </header>
+          <main className="bg-background">
+            <div>
+              {/* Header */}
+              <header className="py-4 flex items-center justify-center">
+                {/* PolestarTypeLogo */}
+                <ACME className="text-foreground" />
+              </header>
 
-            {/* Hero Section */}
-            <div className="relative w-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={data.hero.media.src}
-                alt={data.hero.media.alt}
-                className="object-cover aspect-square @4xl:aspect-video select-none pointer-events-none w-full"
-              />
-              <div className="absolute bottom-8 left-8">
-                <h2 className="text-2xl text-white">
-                  <span dangerouslySetInnerHTML={{ __html: data.hero.title }} />
-                </h2>
-              </div>
-            </div>
-
-            {/* Countdown Timer */}
-            <div className="flex justify-center items-center py-12 px-4">
-              <CountdownTimer />
-            </div>
-
-            {/* Stats Grid */}
-            <Card className="mx-4 py-4 px-6 grid grid-cols-3">
-              {data.perks.map((perk, index) => (
-                <div key={index} className="text-center">
-                  <p className="text-xl font-medium">{perk.value}</p>
-                  <p className="text-sm font-light mt-2 text-muted-foreground">
-                    {perk.label}
-                  </p>
+              {/* Hero Section */}
+              <div className="relative w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.hero.media.src}
+                  alt={data.hero.media.alt}
+                  className="object-cover aspect-square @4xl:aspect-video select-none pointer-events-none w-full"
+                />
+                <div className="absolute bottom-8 left-8">
+                  <h2 className="text-2xl text-white">
+                    <span
+                      dangerouslySetInnerHTML={{ __html: data.hero.title }}
+                    />
+                  </h2>
                 </div>
-              ))}
-            </Card>
+              </div>
 
-            {/* Info Section */}
-            <div className="pt-12 pb-8 space-y-2">
-              <article className="prose prose-sm dark:prose-invert">
-                <span dangerouslySetInnerHTML={{ __html: data.info }} />
-              </article>
-            </div>
-            <div className="flex justify-center items-center pb-8 px-4">
-              <AccordionDemo />
-            </div>
+              {/* Countdown Timer */}
+              <div className="flex justify-center items-center py-12 px-4">
+                <CountdownTimer />
+              </div>
 
-            {/* CTA Button */}
-            <footer className="bottom-0 left-0 right-0 bg-background p-4 shadow-t">
-              <Link href={data.cta.link} target="_blank">
-                <Button className="w-full" size="lg">
-                  {data.cta.label}
-                </Button>
-              </Link>
-            </footer>
-          </div>
+              {/* Stats Grid */}
+              <Card className="mx-4 py-4 px-6 grid grid-cols-3">
+                {data.perks.map((perk, index) => (
+                  <div key={index} className="text-center">
+                    <p className="text-xl font-medium">{perk.value}</p>
+                    <p className="text-sm font-light mt-2 text-muted-foreground">
+                      {perk.label}
+                    </p>
+                  </div>
+                ))}
+              </Card>
+
+              {/* Info Section */}
+              <div className="pt-12 pb-8 space-y-2">
+                <article className="prose prose-sm dark:prose-invert">
+                  <span dangerouslySetInnerHTML={{ __html: data.info }} />
+                </article>
+              </div>
+              <div className="flex justify-center items-center pb-8 px-4">
+                <AccordionDemo />
+              </div>
+
+              {/* CTA Button */}
+              <footer className="bottom-0 left-0 right-0 bg-background p-4 shadow-t">
+                <Link href={data.cta.link} target="_blank">
+                  <Button className="w-full" size="lg">
+                    {data.cta.label}
+                  </Button>
+                </Link>
+              </footer>
+            </div>
+          </main>
         </ScreenScrollable>
       </ScreenMobileFrame>
     </ScreenRoot>

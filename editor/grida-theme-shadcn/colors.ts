@@ -1,305 +1,252 @@
-export interface ColorToken {
-  css: string;
+export interface SchemedColorToken {
+  /**
+   * css variable name (including `--`)
+   */
+  name: string;
   description: string;
-  default: {
-    light: string;
-    dark: string;
-  };
+
+  /**
+   * value for light (default) theme
+   */
+  light: string;
+
+  /**
+   * value for dark theme
+   */
+  dark: string;
 }
 
 /**
  * @see https://ui.shadcn.com/docs/theming#list-of-variables
  */
 export interface ThemeColors {
-  background: ColorToken;
-  foreground: ColorToken;
-  card: ColorToken;
-  "card-foreground": ColorToken;
-  popover: ColorToken;
-  "popover-foreground": ColorToken;
-  primary: ColorToken;
-  "primary-foreground": ColorToken;
-  secondary: ColorToken;
-  "secondary-foreground": ColorToken;
-  muted: ColorToken;
-  "muted-foreground": ColorToken;
-  accent: ColorToken;
-  "accent-foreground": ColorToken;
-  destructive: ColorToken;
-  "destructive-foreground": ColorToken;
-  border: ColorToken;
-  input: ColorToken;
-  ring: ColorToken;
-  "chart-1": ColorToken;
-  "chart-2": ColorToken;
-  "chart-3": ColorToken;
-  "chart-4": ColorToken;
-  "chart-5": ColorToken;
-  sidebar: ColorToken;
-  "sidebar-foreground": ColorToken;
-  "sidebar-primary": ColorToken;
-  "sidebar-primary-foreground": ColorToken;
-  "sidebar-accent": ColorToken;
-  "sidebar-accent-foreground": ColorToken;
-  "sidebar-border": ColorToken;
-  "sidebar-ring": ColorToken;
+  background: SchemedColorToken;
+  foreground: SchemedColorToken;
+  card: SchemedColorToken;
+  "card-foreground": SchemedColorToken;
+  popover: SchemedColorToken;
+  "popover-foreground": SchemedColorToken;
+  primary: SchemedColorToken;
+  "primary-foreground": SchemedColorToken;
+  secondary: SchemedColorToken;
+  "secondary-foreground": SchemedColorToken;
+  muted: SchemedColorToken;
+  "muted-foreground": SchemedColorToken;
+  accent: SchemedColorToken;
+  "accent-foreground": SchemedColorToken;
+  destructive: SchemedColorToken;
+  "destructive-foreground": SchemedColorToken;
+  border: SchemedColorToken;
+  input: SchemedColorToken;
+  ring: SchemedColorToken;
+  "chart-1": SchemedColorToken;
+  "chart-2": SchemedColorToken;
+  "chart-3": SchemedColorToken;
+  "chart-4": SchemedColorToken;
+  "chart-5": SchemedColorToken;
+  // sidebar: SchemedColorToken;
+  // "sidebar-foreground": SchemedColorToken;
+  // "sidebar-primary": SchemedColorToken;
+  // "sidebar-primary-foreground": SchemedColorToken;
+  // "sidebar-accent": SchemedColorToken;
+  // "sidebar-accent-foreground": SchemedColorToken;
+  // "sidebar-border": SchemedColorToken;
+  // "sidebar-ring": SchemedColorToken;
 }
+
+const hsl = (value: string) => `hsl(${value})`;
 
 export const defaultThemeColors: ThemeColors = {
   background: {
-    css: "--background",
+    name: "--background",
     description: "Background color",
-    default: {
-      light: "oklch(1 0 0)",
-      dark: "oklch(0.145 0 0)",
-    },
+    // light: "oklch(1 0 0)",
+    // dark: "oklch(0.145 0 0)",
+    light: hsl("0 0% 100%"),
+    dark: hsl("240 10% 3.9%"),
   },
   foreground: {
-    css: "--foreground",
+    name: "--foreground",
     description: "Foreground (Text) color",
-    default: {
-      light: "oklch(0.145 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.145 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 10% 3.9%"),
+    dark: hsl("0 0% 98%"),
   },
   card: {
-    css: "--card",
+    name: "--card",
     description: "Card background color",
-    default: {
-      light: "oklch(1 0 0)",
-      dark: "oklch(0.145 0 0)",
-    },
+    // light: "oklch(1 0 0)",
+    // dark: "oklch(0.145 0 0)",
+    light: hsl("0 0% 100%"),
+    dark: hsl("240 10% 3.9%"),
   },
   "card-foreground": {
-    css: "--card-foreground",
+    name: "--card-foreground",
     description: "Card text color",
-    default: {
-      light: "oklch(0.145 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.145 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 10% 3.9%"),
+    dark: hsl("0 0% 98%"),
   },
   popover: {
-    css: "--popover",
+    name: "--popover",
     description: "Popover background color",
-    default: {
-      light: "oklch(1 0 0)",
-      dark: "oklch(0.145 0 0)",
-    },
+    // light: "oklch(1 0 0)",
+    // dark: "oklch(0.145 0 0)",
+    light: hsl("0 0% 100%"),
+    dark: hsl("240 10% 3.9%"),
   },
   "popover-foreground": {
-    css: "--popover-foreground",
+    name: "--popover-foreground",
     description: "Popover text color",
-    default: {
-      light: "oklch(0.145 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.145 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 10% 3.9%"),
+    dark: hsl("0 0% 98%"),
   },
   primary: {
-    css: "--primary",
+    name: "--primary",
     description: "Primary color",
-    default: {
-      light: "oklch(0.205 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.205 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 5.9% 10%"),
+    dark: hsl("0 0% 98%"),
   },
   "primary-foreground": {
-    css: "--primary-foreground",
+    name: "--primary-foreground",
     description: "Primary text color",
-    default: {
-      light: "oklch(0.985 0 0)",
-      dark: "oklch(0.205 0 0)",
-    },
+    // light: "oklch(0.985 0 0)",
+    // dark: "oklch(0.205 0 0)",
+    light: hsl("0 0% 98%"),
+    dark: hsl("240 5.9% 10%"),
   },
   secondary: {
-    css: "--secondary",
+    name: "--secondary",
     description: "Secondary color",
-    default: {
-      light: "oklch(0.97 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
+    // light: "oklch(0.97 0 0)",
+    // dark: "oklch(0.269 0 0)",
+    light: hsl("240 4.8% 95.9%"),
+    dark: hsl("240 3.7% 15.9%"),
   },
   "secondary-foreground": {
-    css: "--secondary-foreground",
+    name: "--secondary-foreground",
     description: "Secondary text color",
-    default: {
-      light: "oklch(0.205 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.205 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 5.9% 10%"),
+    dark: hsl("0 0% 98%"),
   },
   muted: {
-    css: "--muted",
+    name: "--muted",
     description: "Muted background color",
-    default: {
-      light: "oklch(0.97 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
+    // light: "oklch(0.97 0 0)",
+    // dark: "oklch(0.269 0 0)",
+    light: hsl("240 4.8% 95.9%"),
+    dark: hsl("240 3.7% 15.9%"),
   },
   "muted-foreground": {
-    css: "--muted-foreground",
+    name: "--muted-foreground",
     description: "Muted text color",
-    default: {
-      light: "oklch(0.556 0 0)",
-      dark: "oklch(0.708 0 0)",
-    },
+    // light: "oklch(0.556 0 0)",
+    // dark: "oklch(0.708 0 0)",
+    light: hsl("240 3.8% 46.1%"),
+    dark: hsl("240 5% 64.9%"),
   },
   accent: {
-    css: "--accent",
+    name: "--accent",
     description: "Accent color",
-    default: {
-      light: "oklch(0.97 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
+    // light: "oklch(0.97 0 0)",
+    // dark: "oklch(0.269 0 0)",
+    light: hsl("240 4.8% 95.9%"),
+    dark: hsl("240 3.7% 15.9%"),
   },
   "accent-foreground": {
-    css: "--accent-foreground",
+    name: "--accent-foreground",
     description: "Accent text color",
-    default: {
-      light: "oklch(0.205 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
+    // light: "oklch(0.205 0 0)",
+    // dark: "oklch(0.985 0 0)",
+    light: hsl("240 5.9% 10%"),
+    dark: hsl("0 0% 98%"),
   },
   destructive: {
-    css: "--destructive",
+    name: "--destructive",
     description: "Destructive color",
-    default: {
-      light: "oklch(0.577 0.245 27.325)",
-      dark: "oklch(0.396 0.141 25.723)",
-    },
+    // light: "oklch(0.577 0.245 27.325)",
+    // dark: "oklch(0.396 0.141 25.723)",
+    light: hsl("0 84.2% 60.2%"),
+    dark: hsl("0 62.8% 30.6%"),
   },
   "destructive-foreground": {
-    css: "--destructive-foreground",
+    name: "--destructive-foreground",
     description: "Destructive text color",
-    default: {
-      light: "oklch(0.577 0.245 27.325)",
-      dark: "oklch(0.637 0.237 25.331)",
-    },
+    // light: "oklch(0.577 0.245 27.325)",
+    // dark: "oklch(0.637 0.237 25.331)",
+    light: hsl("0 0% 98%"),
+    dark: hsl("0 0% 98%"),
   },
   border: {
-    css: "--border",
+    name: "--border",
     description: "Border color",
-    default: {
-      light: "oklch(0.922 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
+    // light: "oklch(0.922 0 0)",
+    // dark: "oklch(0.269 0 0)",
+    light: hsl("240 5.9% 90%"),
+    dark: hsl("240 3.7% 15.9%"),
   },
   input: {
-    css: "--input",
+    name: "--input",
     description: "Input background color",
-    default: {
-      light: "oklch(0.922 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
+    // light: "oklch(0.922 0 0)",
+    // dark: "oklch(0.269 0 0)",
+    light: hsl("240 5.9% 90%"),
+    dark: hsl("240 3.7% 15.9%"),
   },
   ring: {
-    css: "--ring",
+    name: "--ring",
     description: "Ring color for focus states",
-    default: {
-      light: "oklch(0.708 0 0)",
-      dark: "oklch(0.556 0 0)",
-    },
+    // light: "oklch(0.708 0 0)",
+    // dark: "oklch(0.556 0 0)",
+    light: hsl("240 5.9% 10%"),
+    dark: hsl("240 4.9% 83.9%"),
   },
   "chart-1": {
-    css: "--chart-1",
+    name: "--chart-1",
     description: "Chart color 1",
-    default: {
-      light: "oklch(0.646 0.222 41.116)",
-      dark: "oklch(0.488 0.243 264.376)",
-    },
+    // light: "oklch(0.646 0.222 41.116)",
+    // dark: "oklch(0.488 0.243 264.376)",
+    light: hsl("12 76% 61%"),
+    dark: hsl("220 70% 50%"),
   },
   "chart-2": {
-    css: "--chart-2",
+    name: "--chart-2",
     description: "Chart color 2",
-    default: {
-      light: "oklch(0.6 0.118 184.704)",
-      dark: "oklch(0.696 0.17 162.48)",
-    },
+    // light: "oklch(0.6 0.118 184.704)",
+    // dark: "oklch(0.696 0.17 162.48)",
+    light: hsl("173 58% 39%"),
+    dark: hsl("160 60% 45%"),
   },
   "chart-3": {
-    css: "--chart-3",
+    name: "--chart-3",
     description: "Chart color 3",
-    default: {
-      light: "oklch(0.398 0 227.392)",
-      dark: "oklch(0.769 0.188 70.08)",
-    },
+    // light: "oklch(0.398 0 227.392)",
+    // dark: "oklch(0.769 0.188 70.08)",
+    light: hsl("197 37% 24%"),
+    dark: hsl("30 80% 55%"),
   },
   "chart-4": {
-    css: "--chart-4",
+    name: "--chart-4",
     description: "Chart color 4",
-    default: {
-      light: "oklch(0.828 0.189 84.429)",
-      dark: "oklch(0.627 0.265 303.9)",
-    },
+    // light: "oklch(0.828 0.189 84.429)",
+    // dark: "oklch(0.627 0.265 303.9)",
+    light: hsl("43 74% 66%"),
+    dark: hsl("280 65% 60%"),
   },
   "chart-5": {
-    css: "--chart-5",
+    name: "--chart-5",
     description: "Chart color 5",
-    default: {
-      light: "oklch(0.769 0.188 70.08)",
-      dark: "oklch(0.645 0.246 16.439)",
-    },
-  },
-  sidebar: {
-    css: "--sidebar",
-    description: "Sidebar background",
-    default: {
-      light: "oklch(0.985 0 0)",
-      dark: "oklch(0.205 0 0)",
-    },
-  },
-  "sidebar-foreground": {
-    css: "--sidebar-foreground",
-    description: "Sidebar text color",
-    default: {
-      light: "oklch(0.145 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
-  },
-  "sidebar-primary": {
-    css: "--sidebar-primary",
-    description: "Sidebar primary color",
-    default: {
-      light: "oklch(0.205 0 0)",
-      dark: "oklch(0.488 0.243 264.376)",
-    },
-  },
-  "sidebar-primary-foreground": {
-    css: "--sidebar-primary-foreground",
-    description: "Sidebar primary text color",
-    default: {
-      light: "oklch(0.985 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
-  },
-  "sidebar-accent": {
-    css: "--sidebar-accent",
-    description: "Sidebar accent color",
-    default: {
-      light: "oklch(0.97 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
-  },
-  "sidebar-accent-foreground": {
-    css: "--sidebar-accent-foreground",
-    description: "Sidebar accent text color",
-    default: {
-      light: "oklch(0.205 0 0)",
-      dark: "oklch(0.985 0 0)",
-    },
-  },
-  "sidebar-border": {
-    css: "--sidebar-border",
-    description: "Sidebar border color",
-    default: {
-      light: "oklch(0.922 0 0)",
-      dark: "oklch(0.269 0 0)",
-    },
-  },
-  "sidebar-ring": {
-    css: "--sidebar-ring",
-    description: "Sidebar ring color",
-    default: {
-      light: "oklch(0.708 0 0)",
-      dark: "oklch(0.439 0 0)",
-    },
+    // light: "oklch(0.769 0.188 70.08)",
+    // dark: "oklch(0.645 0.246 16.439)",
+    light: hsl("27 87% 67%"),
+    dark: hsl("340 75% 55%"),
   },
 };

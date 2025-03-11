@@ -899,6 +899,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/properties/define":
     case "document/properties/rename":
     case "document/properties/update":
+    case "document/properties/put":
     case "document/properties/delete": {
       return produce(state, (draft) => {
         // TODO:

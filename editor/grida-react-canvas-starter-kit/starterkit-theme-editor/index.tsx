@@ -1,16 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   AirplayIcon,
   BracesIcon,
-  Globe,
-  Home,
-  Keyboard,
-  Menu,
   Paintbrush,
   PyramidIcon,
-  Settings,
+  TelescopeIcon,
   TypeIcon,
 } from "lucide-react";
 import {
@@ -32,10 +28,12 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { ColorToken, defaultThemeColors } from "@/grida-theme-shadcn/colors";
+import {
+  SchemedColorToken,
+  defaultThemeColors,
+} from "@/grida-theme-shadcn/colors";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { CardsDemo } from "@/grida-theme-shadcn/example/cards";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
@@ -44,21 +42,80 @@ import {
   SectionHeaderDescription,
   SectionHeaderTitle,
 } from "./components/section-header";
-import { cn } from "@/utils";
 import colors, { ColorPalette } from "@/k/tailwindcolors";
-
-const ThemeEditorStateContext = React.createContext({});
+import { Badge } from "@/components/ui/badge";
+import { useTheme } from "next-themes";
+import { ThemeEditorProvider, ThemeEditorState, useThemeEditor } from "./state";
+import { ColorPickerChip } from "./components/color-chip";
 
 const nav = [
   { value: "colors", name: "Colors", icon: Paintbrush },
   { value: "typography", name: "Typography", icon: TypeIcon },
-  // { value: "icons", name: "Icons", icon: PyramidIcon },
+  {
+    value: "icons",
+    name: "Icons",
+    icon: PyramidIcon,
+    disabled: true,
+    badge: "soon",
+  },
   { value: "advanced", name: "Advanced", icon: BracesIcon },
   { value: "preview", name: "Preview", icon: AirplayIcon },
+  {
+    value: "explore",
+    name: "Explore",
+    icon: TelescopeIcon,
+    disabled: true,
+    badge: "soon",
+  },
 ];
 
-export function ThemeEditor() {
-  const [tab, setTab] = React.useState("colors");
+export const constraints = {
+  min: {
+    width: 640,
+    height: 320,
+  },
+  max: {
+    width: 1440,
+    height: 900,
+  },
+  default: {
+    width: 800,
+    height: 600,
+  },
+};
+
+export function ThemeEditor({
+  onChange,
+}: {
+  onChange?: (theme: ThemeEditorState) => void;
+}) {
+  const { resolvedTheme } = useTheme();
+  const isdark = resolvedTheme ? resolvedTheme === "dark" : false;
+  const colorscheme = isdark ? "dark" : "light";
+
+  return (
+    <ThemeEditorProvider
+      onChange={onChange}
+      colorscheme={colorscheme}
+      initialState={{
+        theme: {
+          colors: defaultThemeColors as unknown as Record<
+            string,
+            SchemedColorToken
+          >,
+          palletes: colors,
+        },
+      }}
+    >
+      <Body />
+    </ThemeEditorProvider>
+  );
+}
+
+function Body() {
+  const { setTheme } = useTheme();
+  const { colorscheme } = useThemeEditor();
+  const [tab, setTab] = useState("colors");
 
   return (
     <SidebarProvider className="items-start h-full min-h-0">
@@ -70,11 +127,15 @@ export function ThemeEditor() {
                 {nav.map((item) => (
                   <SidebarMenuItem key={item.name}>
                     <SidebarMenuButton
+                      disabled={item.disabled}
                       isActive={item.value === tab}
                       onClick={() => setTab(item.value)}
                     >
                       <item.icon />
                       <span>{item.name}</span>
+                      {item.badge && (
+                        <Badge variant="outline">{item.badge}</Badge>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -83,9 +144,9 @@ export function ThemeEditor() {
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <main className="flex flex-1 flex-col overflow-hidden max-h-full h-full">
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-          <div className="flex-1 flex items-center gap-2 px-4">
+      <main className="flex flex-1 flex-col overflow-hidden max-h-full h-full bg-background">
+        <header className="flex h-16 px-4 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex-1 flex items-center gap-2">
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
@@ -98,8 +159,13 @@ export function ThemeEditor() {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="flex-1 flex justify-center">
-            <ToggleGroup type="single" className="w-min">
+          <div className="flex-1 flex justify-end">
+            <ToggleGroup
+              type="single"
+              value={colorscheme}
+              onValueChange={(v) => v && setTheme(v)}
+              className="w-min"
+            >
               <ToggleGroupItem value="light" title="Light">
                 <SunIcon />
               </ToggleGroupItem>
@@ -108,11 +174,10 @@ export function ThemeEditor() {
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div className="flex-1" />
         </header>
         <Tabs
           value={tab}
-          className="px-4 pb-10 flex-1 max-h-full overflow-auto"
+          className="px-4 pb-10 flex-1 max-h-full overflow-y-auto overflow-x-hidden"
         >
           <TabsContent value={"colors"}>
             <Colors />
@@ -136,25 +201,23 @@ export function ThemeEditor() {
 }
 
 function Colors() {
+  const { colorscheme, theme, updateSchemeColor } = useThemeEditor();
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-20">
       <section>
         <SectionHeader>
-          <SectionHeaderTitle>Themed Colors</SectionHeaderTitle>
+          <SectionHeaderTitle>Variable Colors</SectionHeaderTitle>
           <SectionHeaderDescription>
             Customize your theme colors
           </SectionHeaderDescription>
         </SectionHeader>
         <div>
           <div className="divide-y space-y-2">
-            {Object.entries(defaultThemeColors).map(
-              ([
-                key,
-                {
-                  description,
-                  default: { light, dark },
-                },
-              ]: [string, ColorToken]) => {
+            {Object.entries(theme.colors).map(
+              ([key, { description, ...schemes }]: [
+                string,
+                SchemedColorToken,
+              ]) => {
                 return (
                   <div key={key} className="flex items-center gap-2 py-4">
                     <div className="flex-1">
@@ -163,9 +226,13 @@ function Colors() {
                         {description}
                       </p>
                     </div>
-                    <div className="flex-1 flex flex-wrap gap-2">
-                      <ColorChip color={light} />
-                      <ColorChip color={dark} />
+                    <div className="flex-1 flex flex-wrap justify-end gap-2">
+                      <ColorPickerChip
+                        value={schemes[colorscheme]}
+                        onValueChange={(value) =>
+                          updateSchemeColor(colorscheme, key, value)
+                        }
+                      />
                     </div>
                   </div>
                 );
@@ -176,14 +243,14 @@ function Colors() {
       </section>
       <section>
         <SectionHeader>
-          <SectionHeaderTitle>System Colors</SectionHeaderTitle>
+          <SectionHeaderTitle>Static Colors</SectionHeaderTitle>
           <SectionHeaderDescription>
-            System Colors (read-only, tailwind v3 colors)
+            Static Colors (read-only, tailwind v3 colors)
           </SectionHeaderDescription>
         </SectionHeader>
         <div>
           <div className="divide-y space-y-2">
-            {Object.entries(colors).map(
+            {Object.entries(theme.palletes).map(
               ([key, palette]: [string, ColorPalette]) => {
                 return (
                   <div key={key} className="flex items-center gap-2 py-4">
@@ -193,16 +260,17 @@ function Colors() {
                         {palette[500]}
                       </p>
                     </div>
-                    <div className="flex-1 flex flex-wrap gap-2">
+                    <div className="flex-1 flex flex-wrap justify-end gap-2">
                       {(
                         [
                           50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950,
                         ] as const
                       ).map((level) => (
-                        <ColorChip
+                        <ColorPickerChip
                           key={level}
-                          color={palette[level]}
+                          value={palette[level]}
                           className="size-8"
+                          disabled
                         />
                       ))}
                     </div>
@@ -214,23 +282,6 @@ function Colors() {
         </div>
       </section>
     </div>
-  );
-}
-
-function ColorChip({
-  color,
-  className,
-}: {
-  className?: string;
-  color: string;
-}) {
-  return (
-    <div
-      className={cn("size-10 border-2 border-ring rounded-md", className)}
-      style={{
-        backgroundColor: color,
-      }}
-    />
   );
 }
 
@@ -385,7 +436,13 @@ function Icons() {
 function Advanced() {
   return (
     <div className="w-full h-full">
-      <ThemedMonacoEditor />
+      <SectionHeader>
+        <SectionHeaderTitle>Custom CSS</SectionHeaderTitle>
+        <SectionHeaderDescription>
+          Customize your theme with custom CSS
+        </SectionHeaderDescription>
+      </SectionHeader>
+      <ThemedMonacoEditor width="100%" height="100%" language="css" />
     </div>
   );
 }

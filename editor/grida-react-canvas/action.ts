@@ -828,7 +828,8 @@ export type SchemaAction =
   | DocumentSchemaDefinePropertyAction
   | DocumentSchemaDeletePropertyAction
   | DocumentSchemaRenamePropertyAction
-  | DocumentSchemaUpdatePropertyAction;
+  | DocumentSchemaUpdatePropertyAction
+  | DocumentSchemaPutPropertyAction;
 
 export interface DocumentSchemaDefinePropertyAction {
   type: "document/properties/define";
@@ -838,6 +839,12 @@ export interface DocumentSchemaDefinePropertyAction {
 
 export interface DocumentSchemaUpdatePropertyAction {
   type: "document/properties/update";
+  key: string;
+  definition: grida.program.schema.PropertyDefinition;
+}
+
+export interface DocumentSchemaPutPropertyAction {
+  type: "document/properties/put";
   key: string;
   definition: grida.program.schema.PropertyDefinition;
 }
