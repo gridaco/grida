@@ -58,7 +58,7 @@ export default async function PoeplesPage({
     <main className="container mx-auto max-w-screen-md mt-20 mb-40 grid gap-40">
       {/*  */}
       <h1 className="text-2xl font-bold mb-5">{data.display_name} Members</h1>
-      <MemberList members={members} canEdit={iamowner} />
+      <MemberList org={data} members={members} canEdit={iamowner} />
     </main>
   );
 }
