@@ -32,8 +32,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Progress } from "@/components/ui/progress";
 import {
   OrganizationWithAvatar,
+  OrganizationWithMembers,
   useWorkspace,
   WorkspaceState,
 } from "@/scaffolds/workspace";
@@ -180,7 +182,7 @@ export default function WorkspaceSidebar({
       <SidebarContent>
         <NavProjects orgname={organization.name} projects={tree} allowNew />
         <SidebarGroup className="mt-auto">
-          <PricingTierCard tier={organization.display_plan} />
+          <PricingTierCard organization={organization} />
         </SidebarGroup>
         <NavSecondary items={navSecondary} />
       </SidebarContent>
@@ -189,7 +191,13 @@ export default function WorkspaceSidebar({
   );
 }
 
-function PricingTierCard({ tier }: { tier: PlatformPricingTier }) {
+function PricingTierCard({
+  organization,
+}: {
+  organization: OrganizationWithAvatar & OrganizationWithMembers;
+}) {
+  const { display_plan: tier, members } = organization;
+  const ENTERPRISE_DEFAULT_SEATS = 5;
   const label = Labels.priceTier(tier);
   const isFree = tier === "free";
   const isEnterprise = tier === "v0_enterprise";
@@ -230,6 +238,29 @@ function PricingTierCard({ tier }: { tier: PlatformPricingTier }) {
             Arrange Dedicated Support
           </Button>
         </Link>
+      )}
+      {isEnterprise && (
+        <div className="mt-3 grid gap-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <label>Seats</label>
+            <label
+              data-state={
+                members.length >= ENTERPRISE_DEFAULT_SEATS ? "over" : "under"
+              }
+              className="data-[state=over]:text-workbench-accent-orange"
+            >
+              ({members.length}/{ENTERPRISE_DEFAULT_SEATS})
+            </label>
+          </div>
+          <div className="w-full">
+            <Progress
+              value={Math.min(
+                (members.length / ENTERPRISE_DEFAULT_SEATS) * 100,
+                100
+              )}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

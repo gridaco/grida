@@ -487,6 +487,13 @@ export interface Organization {
   owner_id: string;
 }
 
+export interface OrganizationMember {
+  id: number;
+  user_id: string;
+  created_at: string;
+  organization_id: number;
+}
+
 export interface Project {
   id: number;
   name: string;

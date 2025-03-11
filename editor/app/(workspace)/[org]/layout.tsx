@@ -32,7 +32,12 @@ export default async function Layout({
 
   const { data: organization, error: err } = await wsclient
     .from("organization")
-    .select(`*`)
+    .select(
+      `
+      *,
+      members:organization_member(*)
+    `
+    )
     .eq("name", org)
     .single();
 
