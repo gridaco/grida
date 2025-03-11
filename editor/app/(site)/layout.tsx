@@ -4,6 +4,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToasterWithMax } from "@/components/toaster";
 import "../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -28,6 +29,7 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        <ToasterWithMax position="bottom-center" max={5} />
       </body>
       {process.env.NEXT_PUBLIC_GAID && (
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
