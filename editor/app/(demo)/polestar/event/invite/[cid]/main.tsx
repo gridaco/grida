@@ -30,7 +30,7 @@ const mkshare = (d: CampaignData) => {
     text: `${d.user.name}님의 Polestar 2 시승 초대 이벤트`,
     url:
       process.env.NODE_ENV === "production"
-        ? `https://app.grida.co/polestar/event/join/${d.cid}`
+        ? `https://demo.grida.co/polestar/event/join/${d.cid}`
         : `http://localhost:3000/polestar/event/join/${d.cid}`,
   };
 };
