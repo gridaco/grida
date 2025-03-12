@@ -8,16 +8,17 @@ import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { PolestarTypeLogo } from "@/components/logos";
 import { ACME } from "@/components/logos/acme";
+import { DialogClose } from "@radix-ui/react-dialog";
 
 export default function Hello({
   data,
-  onNext,
+  onOpenChange,
 }: {
   data: CampaignData;
-  onNext?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <div className="relative min-h-screen w-full">
+    <div className="relative min-h-screen w-full overflow-hidden">
       {/* Background Image */}
       <ScreenBackground>
         <motion.img
@@ -33,8 +34,8 @@ export default function Hello({
       {/* Content Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent">
         <div className="container mx-auto px-4 pt-8">
-          {/* <PolestarTypeLogo className="text-white" /> */}
-          <ACME className="text-white" />
+          <PolestarTypeLogo className="text-white" />
+          {/* <ACME className="text-white" /> */}
 
           {/* Hero Content */}
           <div className="mt-[20vh] max-w-xl space-y-4">
@@ -51,8 +52,8 @@ export default function Hello({
               </p>
             </div>
 
+            {/* <DialogClose asChild> */}
             <FancyButton
-              onClick={onNext}
               effect="expandIcon"
               className="flex group bg-transparent outline rounded-none hover:bg-transparent hover:text-orange-500"
               icon={ArrowRight}
@@ -60,6 +61,7 @@ export default function Hello({
             >
               <span>내용 확인하기</span>
             </FancyButton>
+            {/* </DialogClose> */}
           </div>
         </div>
       </div>

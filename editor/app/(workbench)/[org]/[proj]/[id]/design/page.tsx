@@ -28,6 +28,8 @@ import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_fl
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import Main from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/main";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import Hello from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/hello";
 
 export default function SiteDeisngPage() {
   return (
@@ -39,6 +41,7 @@ export default function SiteDeisngPage() {
 
 function CurrentPageCanvas() {
   useEditorHotKeys();
+  useDisableSwipeBack();
 
   const { state } = useDocument();
 
@@ -126,7 +129,15 @@ function CustomComponent__Join_Hello(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <_002 />
+      {/* <_002 /> */}
+      <Hello
+        data={{
+          cid: "",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }
