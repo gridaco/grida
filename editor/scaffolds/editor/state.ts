@@ -25,7 +25,7 @@ import type {
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
 import type { IDocumentEditorState } from "@/grida-react-canvas/state";
-import type { grida } from "@/grida";
+import type { DataGridLocalFilter } from "../data-table";
 import type { MenuGroup, MenuItem } from "./menu";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 
@@ -113,12 +113,6 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_title: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
-}
-
-export interface DataGridLocalFilter {
-  // localsearch?: string; // local search uses fuse.js to available data
-  masking_enabled: boolean;
-  empty_data_hidden: boolean;
 }
 
 type GDocTableBase = {

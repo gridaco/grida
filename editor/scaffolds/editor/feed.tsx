@@ -8,8 +8,16 @@ import {
   createClientFormsClient,
   createClientWorkspaceClient,
 } from "@/lib/supabase/client";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
+import type {
+  PostgrestError,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
+import type {
+  Customer,
+  FormResponse,
+  FormResponseField,
+  GridaXSupabase,
+} from "@/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
@@ -23,13 +31,15 @@ import {
 } from "./state";
 import PQueue from "p-queue";
 import assert from "assert";
+import type { Data } from "@/lib/data";
+import { useCustomerFeed } from "@/scaffolds/platform/customer/use-customer-feed";
 
 type RealtimeTableChangeData = {
   id: string;
   [key: string]: any;
 };
 
-const useDebouncedDatagridQuery = () => {
+const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
   const [state] = useEditorState();
   const [q, setQ] = useState(state.datagrid_query);
   const { datagrid_query } = state;
@@ -658,42 +668,26 @@ export function CustomerFeedProvider({
     datagrid_table_id,
   } = state;
 
-  const client = useMemo(() => createClientWorkspaceClient(), []);
-
   const datagrid_query = useDebouncedDatagridQuery();
-
   const setLoading = useChangeDatagridLoading();
 
-  useEffect(() => {
-    if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
-      return;
-
-    if (!datagrid_query) return;
-
-    setLoading(true);
-    client
-      .from("customer")
-      .select()
-      .order("last_seen_at", { ascending: false })
-      .limit(datagrid_query?.q_page_limit)
-      .eq("project_id", project_id)
-      .then(({ data, error }) => {
-        setLoading(false);
-        if (data) {
-          dispatch({
-            type: "editor/customers/feed",
-            data: data,
-          });
-        }
-      });
-  }, [
-    dispatch,
-    setLoading,
-    datagrid_table_id,
-    datagrid_query,
+  useCustomerFeed(
     project_id,
-    client,
-  ]);
+    {
+      enabled:
+        datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+      query: datagrid_query,
+    },
+    {
+      onLoadingChange: setLoading,
+      onFeed: (data) => {
+        dispatch({
+          type: "editor/customers/feed",
+          data: data,
+        });
+      },
+    }
+  );
 
   return <>{children}</>;
 }
