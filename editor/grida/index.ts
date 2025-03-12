@@ -1372,6 +1372,18 @@ export namespace grida.program.nodes {
   > &
     TNew;
 
+  // type ConnectorPoint = {
+  //   type: "position";
+  //   x: number;
+  //   y: number;
+  // };
+
+  // export interface ConnectorNode {
+  //   readonly type: "connector";
+  //   a: ConnectorPoint;
+  //   b: ConnectorPoint;
+  // }
+
   // /**
   //  * @deprecated - not ready - do not use in production
   //  */

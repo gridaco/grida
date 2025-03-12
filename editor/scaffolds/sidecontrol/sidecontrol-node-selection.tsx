@@ -777,7 +777,7 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+        {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -787,7 +787,7 @@ function SelectedNodeProperties() {
               onValueChange={actions.component}
             />
           </SidebarMenuSectionContent>
-        </SidebarSection>
+        </SidebarSection> */}
         <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>

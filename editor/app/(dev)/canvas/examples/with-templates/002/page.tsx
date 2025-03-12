@@ -1,8 +1,8 @@
 "use client";
 
+import React from "react";
 import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import Editor from "../../../editor";
-import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
 import Invite from "@/app/(demo)/polestar/event/invite/[cid]/main";
