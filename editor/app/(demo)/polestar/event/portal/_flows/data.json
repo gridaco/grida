@@ -9,7 +9,7 @@
     "label": "Verify & Get Link"
   },
   "form": {
-    "title": "Verification",
-    "description": "Enter your name and phone number to receive your personalized referral link."
+    "title": "차주 인증",
+    "description": "차주 인증을 완료하시면 이벤트 링크를 받아보실 수 있습니다."
   }
 }

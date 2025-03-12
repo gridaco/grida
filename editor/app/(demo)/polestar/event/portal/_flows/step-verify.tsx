@@ -48,11 +48,12 @@ export default function Verify() {
             htmlFor="name"
             className="block text-sm font-medium text-muted-foreground"
           >
-            Name
+            성한
           </label>
           <Input
             type="text"
             id="name"
+            placeholder="홍길동"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -63,18 +64,19 @@ export default function Verify() {
             htmlFor="phone"
             className="block text-sm font-medium text-muted-foreground"
           >
-            Phone
+            휴대번호
           </label>
           <Input
             type="tel"
             id="phone"
             value={phone}
+            placeholder="01012345678"
             onChange={(e) => setPhone(e.target.value)}
             required
           />
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}
-        <Button type="submit">Verify</Button>
+        <Button type="submit">인증하기</Button>
       </form>
     </div>
   );

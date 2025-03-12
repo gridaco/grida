@@ -5,10 +5,10 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import _002 from "@/theme/templates/formstart/002/page";
-import Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/main";
-import Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/page";
-import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/step-verify";
-import Main from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/main";
+import Portal from "@/app/(demo)/polestar/event/portal/_flows/page";
+import Verify from "@/app/(demo)/polestar/event/portal/_flows/step-verify";
+import Main from "@/app/(demo)/polestar/event/join/[cid]/_flows/main";
+import Invite from "@/app/(demo)/polestar/event/invite/[cid]/main";
 
 export default function FileExamplePage() {
   return (
@@ -204,7 +204,14 @@ function CustomComponent__Join(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Main />
+      <Main
+        data={{
+          cid: "00000000",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }
