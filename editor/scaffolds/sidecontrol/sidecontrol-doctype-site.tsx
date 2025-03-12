@@ -14,27 +14,44 @@ import { Portal } from "@radix-ui/react-portal";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useDocument } from "@/grida-react-canvas";
 import parsecolor from "color-parse";
+import { PreviewButton } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import { cn } from "@/utils";
+import { WorkbenchUI } from "@/components/workbench";
 export function SideControlDoctypeSite() {
   const [open, setOpen] = React.useState(false);
 
   return (
     <>
-      <SidebarSection className="mb-4 px-2 flex justify-end">
-        <Zoom />
-      </SidebarSection>
+      <header className="h-11 flex items-center px-2 justify-end gap-2">
+        <Zoom
+          className={cn(
+            WorkbenchUI.inputVariants({
+              variant: "input",
+              size: "xs",
+            }),
+            "w-auto"
+          )}
+        />
+        <PreviewButton />
+      </header>
+      {/* <SidebarSection className="mb-4 px-2 flex justify-end">
+      </SidebarSection> */}
       <Align />
       <hr />
       <Selection
         empty={
           <div className="mt-4 mb-10">
             <DocumentProperties />
-            <Button
-              onClick={() => setOpen(true)}
-              size="sm"
-              className="mx-2 mt-4"
-            >
-              Customize
-            </Button>
+            <div className="mx-2 ">
+              <Button
+                onClick={() => setOpen(true)}
+                size="sm"
+                variant="outline"
+                className="mt-4 w-full"
+              >
+                Customize Theme
+              </Button>
+            </div>
           </div>
         }
       />
