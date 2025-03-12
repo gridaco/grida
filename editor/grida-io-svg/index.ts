@@ -347,12 +347,20 @@ export namespace iosvg {
           return { type: "solid", color: context.currentColor };
         default:
           const namedcolor = (
-            css.namedcolors as Record<string, string | undefined>
+            css.namedcolors as Record<
+              string,
+              [number, number, number] | undefined
+            >
           )[paint];
           if (namedcolor) {
             return {
               type: "solid",
-              color: grida.program.cg.hex_to_rgba8888(namedcolor),
+              color: {
+                r: namedcolor[0],
+                g: namedcolor[1],
+                b: namedcolor[2],
+                a: 255,
+              },
             };
           }
 

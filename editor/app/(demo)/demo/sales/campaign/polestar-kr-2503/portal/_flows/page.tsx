@@ -9,7 +9,7 @@ import {
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
 import Verify from "./step-verify";
-import data from "./data.json";
+import data from "./data-01.json";
 import { ACME } from "@/components/logos/acme";
 
 export default function Portal() {
@@ -27,8 +27,8 @@ export default function Portal() {
                   className="object-cover aspect-square select-none pointer-events-none rounded-t-lg"
                 />
                 <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-center">
-                  {/* <PolestarTypeLogo className="absolute top-7 left-1/2 transform -translate-x-1/2 h-[20px] w-auto" /> */}
-                  <ACME />
+                  <PolestarTypeLogo />
+                  {/* <ACME /> */}
                 </div>
               </div>
               <div className="flex flex-col gap-3 px-4">

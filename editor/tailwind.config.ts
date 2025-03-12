@@ -12,6 +12,7 @@ const config: Config = {
     "./scaffolds/**/*.{js,ts,jsx,tsx,mdx}",
     "./grida-react-canvas/**/*.{js,ts,jsx,tsx,mdx}",
     "./grida-react-canvas-starter-kit/**/*.{js,ts,jsx,tsx,mdx}",
+    "./grida-theme-shadcn/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

@@ -11,17 +11,31 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { PolestarTypeLogo } from "@/components/logos";
-import data from "./data.json";
+// import data from "./data.json";
+import data from "./data-01.json";
 import Link from "next/link";
 import { ACME } from "@/components/logos/acme";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Main() {
   return (
     <div>
       {/* Header */}
       <header className="py-4 flex items-center justify-center">
-        {/* PolestarTypeLogo */}
-        <ACME className="text-foreground" />
+        <PolestarTypeLogo />
+        {/* <ACME className="text-foreground" /> */}
       </header>
 
       {/* Hero Section */}
@@ -67,12 +81,57 @@ export default function Main() {
       </div>
 
       {/* CTA Button */}
-      <footer className="bottom-0 left-0 right-0 bg-background p-4 shadow-t">
-        <Link href={data.cta.link} target="_blank">
-          <Button className="w-full" size="lg">
-            {data.cta.label}
-          </Button>
-        </Link>
+      <footer className="sticky border-t bottom-0 left-0 right-0 bg-background p-4 shadow-t">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button className="w-full" size="lg">
+              {data.cta.label}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>시승 신청하러 가기</AlertDialogTitle>
+              {/* <AlertDialogDescription>
+                이메일 주소를 입력해 주세요
+              </AlertDialogDescription> */}
+              <form className="py-10 grid gap-5">
+                <div className="grid gap-1.5">
+                  <label className="text-sm">
+                    이메일 주소를 입력해 주세요.
+                  </label>
+                  <Input type="email" required placeholder="alice@gmail.com" />
+                  <label className="text-xs text-muted-foreground">
+                    폴스타 시승 신청 페이지에도 동일한 이메일 주소를 입력해
+                    주셔야 응모에 참여됩니다.
+                  </label>
+                </div>
+                <label className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow">
+                  <Checkbox required />
+                  <div className="space-y-1 leading-none">
+                    <span className="text-sm">
+                      개인정보 수집에 동의합니다. (응모자 식별 정보: 이메일)
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      폴스타 시승 신청 페이지로 이동후, 반드시 동일한 이메일로
+                      시승 신청을 완료해 주세요. 이메일 주소는 응모자 식별
+                      이외로 사용하지 않습니다.
+                    </p>
+                  </div>
+                </label>
+              </form>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button variant="ghost">나중에 하기</Button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Link href={data.cta.link} target="_blank">
+                  신청하러 가기
+                </Link>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </footer>
     </div>
   );
@@ -112,13 +171,13 @@ function AccordionDemo() {
 function PolestarLocation() {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 p-4 w-[250px] border border-slate-300 rounded-md">
+      <div className="flex flex-col gap-2 p-4 w-[250px] border rounded-md">
         <p className="font-medium">Polestar 경기</p>
         <span className="text-xs text-muted-foreground">
           대한민국 경기도 하남시 신장동 미사대로 750
         </span>
       </div>
-      <div className="flex flex-col gap-2 p-4 w-[250px] border border-slate-300 rounded-md">
+      <div className="flex flex-col gap-2 p-4 w-[250px] border rounded-md">
         <p className="font-medium">Polestar 부산</p>
         <span className="text-xs text-muted-foreground">
           대한민국 부산광역시 해운대구 센텀4로 15 센텀시티 몰 1층

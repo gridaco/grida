@@ -30,6 +30,12 @@ export default function schemaReducer(
     }
     case "document/properties/update": {
       return produce(state, (draft) => {
+        if (!draft[action.key]) return;
+        draft[action.key] = action.definition;
+      });
+    }
+    case "document/properties/put": {
+      return produce(state, (draft) => {
         draft[action.key] = action.definition;
       });
     }
