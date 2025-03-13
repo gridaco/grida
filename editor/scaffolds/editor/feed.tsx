@@ -33,6 +33,7 @@ import PQueue from "p-queue";
 import assert from "assert";
 import type { Data } from "@/lib/data";
 import { useCustomerFeed } from "@/scaffolds/platform/customer/use-customer-feed";
+import { useTableSubscription } from "@/lib/supabase/realtime";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -84,44 +85,20 @@ const useSubscription = ({
 }) => {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
-  useEffect(() => {
-    if (!form_id) return;
-    if (!enabled) return;
-
-    const channelname = `table-filter-changes-${table}-${form_id}`;
-
-    const changes = supabase
-      .channel(channelname)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "grida_forms",
-          table,
-          filter: `form_id=eq.${form_id}`,
-        },
-        async (
-          payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
-        ) => {
-          const { old, new: _new } = payload;
-          const old_id = (old as RealtimeTableChangeData).id;
-          const new_id = (_new as RealtimeTableChangeData).id;
-
-          if (new_id && old_id) {
-            onUpdate?.(_new as RealtimeTableChangeData);
-          } else if (new_id) {
-            onInsert?.(_new as RealtimeTableChangeData);
-          } else {
-            onDelete?.(old);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      changes.unsubscribe();
-    };
-  }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
+  useTableSubscription({
+    client: supabase,
+    channel: `table-filter-changes-${table}-${form_id}`,
+    enabled,
+    filter: {
+      event: "*",
+      schema: "grida_forms",
+      table: table,
+      filter: `form_id=eq.${form_id}`,
+    },
+    onDelete,
+    onUpdate,
+    onInsert,
+  });
 };
 
 function useFetchSchemaTableRows(table_id: string) {
