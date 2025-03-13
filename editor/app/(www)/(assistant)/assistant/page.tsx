@@ -1,8 +1,6 @@
-"use client";
-
 import Header from "@/www/header";
 import Footer from "@/www/footer";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import { Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,10 +17,10 @@ export default function AssistantPage() {
   );
 }
 
-export function Hero() {
+function Hero() {
   return (
     <main className="relative min-h-screen flex flex-col items-center justify-center text-center p-4 md:p-8">
-      <BgSvg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 blur-[80px] z-[-1]" />
+      <BgSvg className="absolute inset-0 w-full h-full object-cover blur-[70px] md:blur-[100px] z-[-1] overflow-hidden" />
       <div className="max-w-3xl mx-auto">
         <p className="text-white font-medium text-lg md:text-xl mb-4">
           Early Access
@@ -68,16 +66,16 @@ export function Hero() {
   );
 }
 
-export function WaitlistCard() {
+function WaitlistCard() {
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <Card className="w-full max-w-5xl shadow-lg relative overflow-hidden">
+      <Card className="w-full max-w-md lg:max-w-5xl shadow-lg relative overflow-hidden dark:bg-white/10">
         <CardContent className="p-8 md:p-12 flex flex-col items-center text-center relative">
           <h1 className="text-4xl md:text-5xl font-bold mb-8">
             Join the waitlist
           </h1>
 
-          <p className="text-lg text-gray-700 max-w-lg mb-10">
+          <p className="text-lg  text-foreground max-w-lg mb-10">
             AI Powered Assistant is available to invited users at this moment.
             Join our waitlist for the full access.
           </p>
@@ -88,7 +86,7 @@ export function WaitlistCard() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Button className="bg-black hover:bg-black/90 text-white h-auto text-base">
+              <Button className="hover:bg-black/90 h-auto text-base">
                 Join the waitlist
               </Button>
             </a>
