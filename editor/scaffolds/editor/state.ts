@@ -27,7 +27,8 @@ import type { Data } from "@/lib/data";
 import type { IDocumentEditorState } from "@/grida-react-canvas/state";
 import type { DataGridLocalFilter } from "../data-table";
 import type { MenuGroup, MenuItem } from "./menu";
-import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
+import { EditorSymbols } from "./symbols";
+import { DataFormat } from "../data-format";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -339,8 +340,8 @@ interface ICustomerEditorState {
 }
 
 interface IEditorDateContextState {
-  dateformat: "date" | "time" | "datetime";
-  datetz: typeof SYM_LOCALTZ | string;
+  dateformat: DataFormat.DateFormat;
+  datetz: DataFormat.DateTZ;
 }
 
 interface IEditorSidebarState {

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type {
+  RealtimeChannel,
   RealtimePostgresChangesFilter,
   RealtimePostgresChangesPayload,
   SupabaseClient,
@@ -13,10 +14,56 @@ type RealtimeTableChangeData = {
 
 type TableSubscriptionFilter = RealtimePostgresChangesFilter<"*">;
 
-export const useTableSubscription = <
-  SchemaName extends string & keyof Database = "public" extends keyof Database
+export function subscribeTable<
+  _Database = Database,
+  SchemaName extends string & keyof _Database = "public" extends keyof _Database
     ? "public"
-    : string & keyof Database,
+    : string & keyof _Database,
+>(
+  client: SupabaseClient<_Database, SchemaName>,
+  channel: string,
+  filter: TableSubscriptionFilter,
+  callbacks: {
+    onUpdate?: (data: RealtimeTableChangeData) => void;
+    onInsert?: (data: RealtimeTableChangeData) => void;
+    onDelete?: (data: RealtimeTableChangeData | {}) => void;
+  }
+): RealtimeChannel {
+  return client
+    .channel(channel)
+    .on(
+      "postgres_changes",
+      filter,
+      async (
+        payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
+      ) => {
+        const { old, new: _new, eventType } = payload;
+        console.log("RealtimeTableChangeData", payload);
+        switch (eventType) {
+          case "INSERT": {
+            callbacks.onInsert?.(_new);
+            break;
+          }
+          case "UPDATE": {
+            callbacks.onUpdate?.(_new);
+            break;
+          }
+          case "DELETE":
+            callbacks.onDelete?.(old);
+            break;
+        }
+      }
+    )
+    .subscribe((status, err: any) => {
+      if (err) console.error(err.message);
+    });
+}
+
+export const useTableSubscription = <
+  _Database = Database,
+  SchemaName extends string & keyof _Database = "public" extends keyof _Database
+    ? "public"
+    : string & keyof _Database,
 >({
   channel,
   client,
@@ -27,7 +74,7 @@ export const useTableSubscription = <
   enabled,
 }: {
   channel: string;
-  client: SupabaseClient<Database, SchemaName>;
+  client: SupabaseClient<_Database, SchemaName>;
   filter: TableSubscriptionFilter;
   onUpdate?: (data: RealtimeTableChangeData) => void;
   onInsert?: (data: RealtimeTableChangeData) => void;
@@ -38,35 +85,14 @@ export const useTableSubscription = <
     () => {
       if (!enabled) return;
 
-      const changes = client
-        .channel(channel, {
-          config: {
-            private: true,
-          },
-        })
-        .on(
-          "postgres_changes",
-          filter,
-          async (
-            payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
-          ) => {
-            const { old, new: _new } = payload;
-            const old_id = (old as RealtimeTableChangeData).id;
-            const new_id = (_new as RealtimeTableChangeData).id;
-
-            if (new_id && old_id) {
-              onUpdate?.(_new as RealtimeTableChangeData);
-            } else if (new_id) {
-              onInsert?.(_new as RealtimeTableChangeData);
-            } else {
-              onDelete?.(old);
-            }
-          }
-        )
-        .subscribe();
+      const sub = subscribeTable(client, channel, filter, {
+        onUpdate,
+        onInsert,
+        onDelete,
+      });
 
       return () => {
-        changes.unsubscribe();
+        sub.unsubscribe();
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

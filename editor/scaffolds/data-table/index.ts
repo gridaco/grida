@@ -37,12 +37,16 @@ type DataResponse<T> =
       count: null;
     };
 
-interface TableSpaceInstanceInit<T, ID = string | number, I = any>
+type SubscriptionDisposer = () => void;
+
+interface TableSpaceInstanceInit<T>
   extends Pick<TableSpaceInstance<T>, "identifier" | "readonly" | "realtime"> {
   fetcher: (query: Data.Relation.QueryState) => Promise<DataResponse<T>>;
-  insert?: (data: I) => Promise<DataResponse<T>>;
-  update?: (id: ID, data: I) => Promise<DataResponse<T>>;
-  delete?: (id: ID) => Promise<DataResponse<T>>;
+  subscriber?: (callbacks: {
+    onInsert?: (data: T) => void;
+    onUpdate?: (data: T) => void;
+    onDelete?: (data: T | { [key: string]: any }) => void;
+  }) => SubscriptionDisposer;
 }
 
 export function useTableSpaceInstance<T>(
@@ -57,17 +61,55 @@ export function useTableSpaceInstance<T>(
     estimated_count: estimated_count,
   });
 
-  useEffect(() => {
-    setLoading(true);
-    init.fetcher(query).then(({ data, error, count }) => {
-      setLoading(false);
+  useEffect(
+    () => {
+      setLoading(true);
+      init.fetcher(query).then(({ data, error, count }) => {
+        setLoading(false);
 
-      if (data) {
-        setCount(count);
-        setStream(data);
-      }
-    });
-  }, [query]);
+        if (data) {
+          setCount(count);
+          setStream(data);
+        }
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query]
+  );
+
+  useEffect(
+    () => {
+      if (!init.realtime) return;
+      if (!init.subscriber) return;
+      const disposable = init.subscriber({
+        onInsert: (data) => {
+          setStream((prev) => (prev ? [data, ...prev] : [data]));
+        },
+        onDelete: (data) => {
+          setStream((prev) => {
+            if (!prev) return prev;
+            return prev.filter(
+              (item) => item[init.identifier] !== (data as any)[init.identifier]
+            );
+          });
+        },
+        onUpdate: (data) => {
+          setStream((prev) => {
+            if (!prev) return prev;
+            return prev.map((item) =>
+              item[init.identifier] === data[init.identifier] ? data : item
+            );
+          });
+        },
+      });
+
+      return () => {
+        disposable();
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [init.realtime]
+  );
 
   return {
     stream,

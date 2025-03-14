@@ -34,6 +34,7 @@ import assert from "assert";
 import type { Data } from "@/lib/data";
 import { useCustomerFeed } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSubscription } from "@/lib/supabase/realtime";
+import type { Database } from "@/database.types";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -85,7 +86,7 @@ const useSubscription = ({
 }) => {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
-  useTableSubscription({
+  useTableSubscription<Database, "grida_forms">({
     client: supabase,
     channel: `table-filter-changes-${table}-${form_id}`,
     enabled,
