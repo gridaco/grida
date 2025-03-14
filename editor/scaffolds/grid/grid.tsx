@@ -45,8 +45,6 @@ import {
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
-import { toZonedTime } from "date-fns-tz";
-import { tztostr } from "../editor/symbols";
 import toast from "react-hot-toast";
 import { FormValue } from "@/services/form";
 import {
@@ -62,8 +60,9 @@ import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./grid-empty-state";
 import { cn } from "@/utils";
 import {
-  DataGridStateProvider,
+  StandaloneDataGridStateProvider,
   useCellRootProps,
+  useDateFormatting,
   useDataGridState,
   useFileRefs,
   useMasking,
@@ -252,11 +251,13 @@ export function DataGrid({
   };
 
   return (
-    <DataGridStateProvider
+    <StandaloneDataGridStateProvider
       masking_enabled={state.datagrid_local_filter.masking_enabled}
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
       highlightTokens={highlightTokens}
+      dateformat={state.dateformat}
+      datetz={state.datetz}
     >
       <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
         <RDG
@@ -326,7 +327,7 @@ export function DataGrid({
           }}
         />
       </CreateNewAttributeProvider>
-    </DataGridStateProvider>
+    </StandaloneDataGridStateProvider>
   );
 }
 
@@ -371,7 +372,7 @@ function DefaultPropertyDateCell({
 }: RenderCellProps<RenderingRow>) {
   const date = row.__gf_created_at;
 
-  const formatDate = useFormatDate();
+  const formatDate = useDateFormatting();
 
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 
@@ -382,43 +383,8 @@ function DefaultPropertyDateCell({
   return <CellRoot {...rootprops}>{formatDate(date)}</CellRoot>;
 }
 
-function useFormatDate() {
-  const [state] = useEditorState();
-  const { dateformat, datetz } = state;
-
-  return useCallback(
-    (date: Date | string) => {
-      return fmtdate(date, dateformat, tztostr(datetz));
-    },
-    [dateformat, datetz]
-  );
-}
-
 function fmtdatetimelocal(date: Date | string) {
   return format(date, "yyyy-MM-dd'T'HH:mm");
-}
-
-function fmtdate(
-  date: Date | string,
-  format: "date" | "time" | "datetime",
-  tz?: string
-) {
-  if (typeof date === "string") {
-    date = new Date(date);
-  }
-
-  if (tz) {
-    date = toZonedTime(date, tz);
-  }
-
-  switch (format) {
-    case "date":
-      return date.toLocaleDateString();
-    case "time":
-      return date.toLocaleTimeString();
-    case "datetime":
-      return date.toLocaleString();
-  }
 }
 
 function DefaultPropertyCustomerCell({
@@ -483,7 +449,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
 
   const { highlightTokens } = useDataGridState();
 
-  const formatDate = useFormatDate();
+  const formatDate = useDateFormatting();
 
   const def = useTableDefinition();
   const fk = def?.fks.find((fk) => fk.referencing_column === column.name);

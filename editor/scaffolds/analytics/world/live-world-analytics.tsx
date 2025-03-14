@@ -1,35 +1,28 @@
 "use client";
 
 import { fmtnum } from "@/scaffolds/analytics/stats";
-import { useEditorState } from "@/scaffolds/editor";
-import {
-  FormResponseFeedProvider,
-  FormResponseSessionFeedProvider,
-} from "@/scaffolds/editor/feed";
 import { MapGL } from "@/components/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
 import { MapProvider, useMap } from "react-map-gl";
 import { useDarkMode } from "usehooks-ts";
 import { useWindowSize } from "@uidotdev/usehooks";
-// import type { CircleLayer, MapRef } from "react-map-gl";
-import type {CircleLayerSpecification} from "mapbox-gl";
 import { Source, Layer } from "react-map-gl";
-import type { FeatureCollection } from "geojson";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import TimeSeriesChart from "@/scaffolds/analytics/charts/timeseries";
-import {
-  getRandomDisplacement,
-  useUxInitialTransform,
-  useUxMapFocus,
-} from "./use-ux-map-focus";
-import { serialize } from "../charts/serialize";
 import { format } from "date-fns";
-import { EditorSymbols } from "@/scaffolds/editor/symbols";
+import { useUxInitialTransform, useUxMapFocus } from "./use-ux-map-focus";
+import { useUxMapDisplacement } from "./use-ux-map-displacement";
+import type { CircleLayerSpecification } from "mapbox-gl";
+import type { FeatureCollection } from "geojson";
+import { Analytics } from "@/lib/analytics";
 
-const layerstyles: { light: CircleLayerSpecification; dark: CircleLayerSpecification } = {
+const layerstyles: {
+  light: CircleLayerSpecification;
+  dark: CircleLayerSpecification;
+} = {
   light: {
     id: "point",
-    source:'my-data',
+    source: "my-data",
     type: "circle",
     paint: {
       "circle-radius": 10,
@@ -43,7 +36,7 @@ const layerstyles: { light: CircleLayerSpecification; dark: CircleLayerSpecifica
   },
   dark: {
     id: "point",
-    source:'my-data',
+    source: "my-data",
     type: "circle",
     paint: {
       "circle-radius": 10,
@@ -57,7 +50,7 @@ const layerstyles: { light: CircleLayerSpecification; dark: CircleLayerSpecifica
   },
 };
 
-const DisableSwipeBack = ({ children }: React.PropsWithChildren<{}>) => {
+const useOverscrollBehaviourXNone = () => {
   useEffect(() => {
     document.body.style.overscrollBehaviorX = "none";
 
@@ -65,39 +58,65 @@ const DisableSwipeBack = ({ children }: React.PropsWithChildren<{}>) => {
       document.body.style.overscrollBehaviorX = "";
     };
   }, []);
-
-  return <>{children}</>;
 };
 
-export default function LiveWorldAnalytics() {
+export default function LiveWorldAnalytics({
+  eventStreams,
+  tickInterval = 1000 * 15, // updates every 15 seconds
+}: {
+  eventStreams: Analytics.EventStream[];
+  tickInterval?: number;
+}) {
+  useOverscrollBehaviourXNone();
   return (
-    <DisableSwipeBack>
-      <FormResponseFeedProvider>
-        <FormResponseSessionFeedProvider forceEnableRealtime>
-          <MapProvider>
-            <View />
-          </MapProvider>
-        </FormResponseSessionFeedProvider>
-      </FormResponseFeedProvider>
-    </DisableSwipeBack>
+    <MapProvider>
+      <View eventStreams={eventStreams} tickInterval={tickInterval} />
+    </MapProvider>
   );
 }
 
-const RECENT_N = 50;
-
-interface Response {
-  id: string;
-  at: Date;
-  latitude: number;
-  longitude: number;
+function useCurrentTime(tickInterval: number): Date {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), tickInterval);
+    return () => clearInterval(timer);
+  }, [tickInterval]);
+  return now;
 }
 
-function View() {
+function View({
+  eventStreams,
+  tickInterval,
+}: {
+  eventStreams: Analytics.EventStream[];
+  tickInterval: number;
+}) {
   const { isDarkMode } = useDarkMode();
   const { map } = useMap();
   const size = useWindowSize();
-  const [recent, setRecent] = useState<Response[]>([]);
-  const [displaced, setDisplaced] = useState<Response[]>([]);
+  const now = useCurrentTime(tickInterval);
+
+  const geoData = useMemo(() => {
+    return eventStreams
+      .filter((stream) => stream.showonmap)
+      .flatMap((stream) =>
+        stream.data
+          .filter((r) => r.geo !== null)
+          .map((r) => ({
+            id: r.id,
+            latitude: r.geo!.latitude,
+            longitude: r.geo!.longitude,
+          }))
+      );
+  }, [eventStreams]);
+
+  const geoPoints = useUxMapDisplacement(geoData, 0.005);
+
+  const lastGeoPoint: (typeof geoPoints)[number] | undefined = useMemo(
+    () => geoPoints[geoPoints.length - 1],
+    [geoPoints]
+  );
+
   const mapPadding = useMemo(
     () => ({
       top: 0,
@@ -108,99 +127,49 @@ function View() {
     [size.width]
   );
 
+  const geojson: FeatureCollection = useMemo(
+    () => ({
+      type: "FeatureCollection",
+      features: geoPoints.map((r) => ({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [r.longitude, r.latitude],
+        },
+        properties: { id: r.id },
+      })),
+    }),
+    [geoPoints]
+  );
+
   useUxInitialTransform(map, size);
   // const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
   const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 5000, 10); // Adjust intervals and threshold as needed
 
-  const [state] = useEditorState();
-
-  const response_stream =
-    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
-      .stream;
-  const session_stream =
-    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]
-      .stream;
-
-  const geojson: FeatureCollection = useMemo(
-    () => ({
-      type: "FeatureCollection",
-      features: displaced.map((r) => ({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [r.longitude, r.latitude] },
-        properties: { id: r.id },
-      })),
-    }),
-    [displaced]
-  );
-
-  useEffect(() => {
-    if (response_stream && response_stream?.length > 0) {
-      const sorted = response_stream
-        .slice()
-        .sort((a, b) => a.meta.local_index - b.meta.local_index);
-
-      const recent = sorted.slice(-RECENT_N).map((r) => {
-        return {
-          id: r.id,
-          at: new Date(r.meta.created_at),
-          latitude: Number(r.meta.geo?.latitude) || 0,
-          longitude: Number(r.meta.geo?.longitude) || 0,
-        };
-      });
-      setRecent(recent);
-    }
-  }, [response_stream]);
-
-  useEffect(() => {
-    if (recent.length === 0) return;
-    const _displaced = recent.map((r) => {
-      // if already displaced, skip
-      const done = displaced.find((d) => d.id === r.id);
-      if (done) {
-        return done;
-      }
-
-      const { latitude, longitude } = getRandomDisplacement(
+  const charts: Analytics.EventStreamSerialChart[] = useMemo(() => {
+    return eventStreams.flatMap((stream) => {
+      const series = Analytics.serialize(
+        stream.data.map((e) => ({ ...e, at: e.at })),
         {
-          latitude: r.latitude,
-          longitude: r.longitude,
-        },
-        0.005 // approx 500m
+          dateKey: "at",
+          from: new Date(now.getTime() - 15 * 60 * 1000),
+          to: now,
+          intervalMs: 15 * 1000,
+        }
       );
-
       return {
-        ...r,
-        latitude: latitude,
-        longitude: longitude,
-      };
+        name: stream.name,
+        description: stream.description,
+        data: series,
+      } satisfies Analytics.EventStreamSerialChart;
     });
+  }, [eventStreams, now]);
 
-    setDisplaced(_displaced);
-
-    const last = _displaced[_displaced.length - 1];
-
-    debounceFlyTo(last.longitude, last.latitude);
-  }, [debounceFlyTo, recent]);
-
-  const responseChartData = useMemo(() => {
-    return serialize(response_stream?.map((r) => r.meta) || [], {
-      dateKey: "created_at",
-      // last 15 minutes
-      from: new Date(new Date().getTime() - 15 * 60 * 1000),
-      to: new Date(),
-      intervalMs: 15 * 1000, // 15 seconds
-    });
-  }, [response_stream]);
-
-  const sessionChartData = useMemo(() => {
-    return serialize(session_stream || [], {
-      dateKey: "created_at",
-      // last 15 minutes
-      from: new Date(new Date().getTime() - 15 * 60 * 1000),
-      to: new Date(),
-      intervalMs: 15 * 1000, // 15 seconds
-    });
-  }, [session_stream]);
+  useEffect(() => {
+    if (lastGeoPoint) {
+      debounceFlyTo(lastGeoPoint.longitude, lastGeoPoint.latitude);
+    }
+  }, [lastGeoPoint]);
 
   return (
     <main className="relative p-4 w-full h-full">
@@ -222,53 +191,35 @@ function View() {
         </div>
       </div>
       <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-0 pointer-events-none">
-        <div className="pointer-events-auto">
-          <Responses data={responseChartData} />
-        </div>
-        <div className="pointer-events-auto">
-          <Sessions data={sessionChartData} />
-        </div>
+        {charts.map((chart) => (
+          <div key={chart.name} className="pointer-events-auto">
+            <EventStreamChartCard
+              title={chart.name}
+              subtitle={chart.description}
+              data={chart.data}
+            />
+          </div>
+        ))}
       </div>
     </main>
   );
 }
 
-function Responses({ data }: { data: { count: number; date: Date }[] }) {
+function EventStreamChartCard({
+  title,
+  subtitle,
+  data,
+}: {
+  title: string;
+  subtitle: string;
+  data: { count: number; date: Date }[];
+}) {
   return (
     <Card className="overflow-hidden bg-white/10 dark:bg-black/10 backdrop-blur-lg">
       <CardHeader>
         <header>
-          <h1 className="text-lg font-semibold">Responses</h1>
-          <h6 className="text-sm text-muted-foreground">
-            Responses in Last 15 Minutes
-          </h6>
-        </header>
-        <div className="mt-4 flex items-center space-x-2">
-          <span className="text-3xl font-bold">
-            {fmtnum(data.reduce((sum, item) => sum + item.count, 0))}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <TimeSeriesChart
-          data={data}
-          type="step"
-          datefmt={(date) => format(date, "HH:mm:ss.SSS")}
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
-function Sessions({ data }: { data: { count: number; date: Date }[] }) {
-  return (
-    <Card className="overflow-hidden bg-white/10 dark:bg-black/10 backdrop-blur-lg">
-      <CardHeader>
-        <header>
-          <h1 className="text-lg font-semibold">Sessions</h1>
-          <h6 className="text-sm text-muted-foreground">
-            Sessions in Last 15 Minutes
-          </h6>
+          <h1 className="text-lg font-semibold">{title}</h1>
+          <h6 className="text-sm text-muted-foreground">{subtitle}</h6>
         </header>
         <div className="mt-4 flex items-center space-x-2">
           <span className="text-3xl font-bold">

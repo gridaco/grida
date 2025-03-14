@@ -2123,11 +2123,13 @@ export type Database = {
         Row: {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
+          description: string | null
           email: string | null
           email_provisional: string[]
           is_email_verified: boolean
           is_phone_verified: boolean
           last_seen_at: string
+          name: string | null
           name_provisional: string[]
           phone: string | null
           phone_provisional: string[]
@@ -2139,11 +2141,13 @@ export type Database = {
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          name?: string | null
           name_provisional?: string[]
           phone?: string | null
           phone_provisional?: string[]
@@ -2155,11 +2159,13 @@ export type Database = {
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          name?: string | null
           name_provisional?: string[]
           phone?: string | null
           phone_provisional?: string[]
@@ -2518,6 +2524,12 @@ export type Database = {
         Returns: boolean
       }
       rls_organization: {
+        Args: {
+          p_organization_id: number
+        }
+        Returns: boolean
+      }
+      rls_organization_owner: {
         Args: {
           p_organization_id: number
         }

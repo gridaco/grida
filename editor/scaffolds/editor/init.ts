@@ -19,7 +19,7 @@ import type {
   SchemaMayVaryDocument,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
-import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
+import { EditorSymbols } from "./symbols";
 import {
   FormFieldDefinition,
   FormStartPageSchema,
@@ -37,6 +37,7 @@ import {
 } from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
 import { grida } from "@/grida";
+import { DataFormat } from "../data-format";
 // import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -97,7 +98,7 @@ function initialBaseDocumentEditorState(
       open: false,
     },
     dateformat: "datetime",
-    datetz: SYM_LOCALTZ,
+    datetz: DataFormat.SYM_LOCALTZ,
   };
 }
 

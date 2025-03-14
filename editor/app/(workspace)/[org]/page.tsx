@@ -27,7 +27,7 @@ import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { editorlink } from "@/lib/forms/url";
 
-export default function DashboardProjectsPage({
+export default function OrganizationDashboardPage({
   params,
   searchParams,
 }: {

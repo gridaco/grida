@@ -17,7 +17,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { serialize } from "../charts/serialize";
+import { Analytics } from "@/lib/analytics";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -205,7 +205,7 @@ export function Sessions({
       } else {
         // Process data to count new customers per day
         setData(
-          serialize(data || [], {
+          Analytics.serialize(data || [], {
             from,
             to,
             dateKey: "created_at",
@@ -277,7 +277,7 @@ export function Customers({
       } else {
         // Process data to count new customers per day
         setData(
-          serialize(data || [], {
+          Analytics.serialize(data || [], {
             from,
             to,
             dateKey: "created_at",
@@ -349,7 +349,7 @@ export function Responses({
       } else {
         // Process data to count new responses per day
         setData(
-          serialize(data || [], {
+          Analytics.serialize(data || [], {
             from,
             to,
             dateKey: "created_at",

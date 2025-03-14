@@ -1,12 +1,3 @@
-export const SYM_LOCALTZ = Symbol("localtz");
-
-export function tztostr(
-  tz?: typeof SYM_LOCALTZ | string,
-  replacelocaltzwith?: string
-): string | undefined {
-  return tz === SYM_LOCALTZ ? replacelocaltzwith || undefined : tz;
-}
-
 export namespace EditorSymbols {
   export namespace Table {
     export const SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR = Symbol(

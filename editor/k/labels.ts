@@ -23,4 +23,11 @@ export namespace Labels {
   export function priceTier(tier: PlatformPricingTier) {
     return price_tier_labels[tier];
   }
+
+  /**
+   * may the fourth be with you
+   *
+   * (used for example date)
+   */
+  export const starwarsday = new Date(new Date().getFullYear(), 4, 4);
 }

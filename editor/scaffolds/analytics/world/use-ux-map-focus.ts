@@ -2,37 +2,6 @@ import { useEffect, useCallback, useRef } from "react";
 import type { MapRef } from "react-map-gl";
 import type { PaddingOptions } from "mapbox-gl";
 
-/**
- *
- * @param latitude
- * @param longitude
- * @param maxDisplacement 1 = 111km (1 degree of latitude)
- * @returns
- */
-export function getRandomDisplacement(
-  point: { latitude: number; longitude: number },
-  maxDisplacement = 0.1
-) {
-  const { latitude, longitude } = point;
-  const randomOffset = () => (Math.random() - 0.5) * 2 * maxDisplacement;
-
-  let newLatitude = latitude + randomOffset();
-  let newLongitude = longitude + randomOffset();
-
-  // Ensure the latitude stays within the range of -90 to 90
-  if (newLatitude > 90) newLatitude = 90;
-  if (newLatitude < -90) newLatitude = -90;
-
-  // Ensure the longitude stays within the range of -180 to 180
-  if (newLongitude > 180) newLongitude = 180;
-  if (newLongitude < -180) newLongitude = -180;
-
-  return {
-    latitude: newLatitude,
-    longitude: newLongitude,
-  };
-}
-
 function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
   callback: T,
   interval: number
