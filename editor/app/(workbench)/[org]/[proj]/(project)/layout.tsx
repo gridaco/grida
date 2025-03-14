@@ -52,7 +52,7 @@ export default async function Layout({
                           <SidebarMenuItem>
                             <SidebarMenuButton>
                               <ArrowLeftIcon />
-                              Back to Project
+                              Back to Dashboard
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         </Link>
@@ -64,17 +64,23 @@ export default async function Layout({
                           <SidebarMenu>
                             <Link href={`/${org}/${proj}/customers`}>
                               <SidebarMenuItem>
-                                <SidebarMenuButton>Customers</SidebarMenuButton>
+                                <SidebarMenuButton size="sm">
+                                  Customers
+                                </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
                             <Link href={`/${org}/${proj}/analytics`}>
                               <SidebarMenuItem>
-                                <SidebarMenuButton>Analytics</SidebarMenuButton>
+                                <SidebarMenuButton size="sm">
+                                  Analytics
+                                </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            <Link href={`/${org}/${proj}/campaigns`}>
+                            <Link href={`/${org}/${proj}/token-chain`}>
                               <SidebarMenuItem>
-                                <SidebarMenuButton>Campaigns</SidebarMenuButton>
+                                <SidebarMenuButton size="sm">
+                                  Token Exchange
+                                </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
                           </SidebarMenu>
