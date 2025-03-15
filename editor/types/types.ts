@@ -489,6 +489,14 @@ export interface Organization {
   owner_id: string;
 }
 
+export type OrganizationWithMembers = Organization & {
+  members: OrganizationMember[];
+};
+
+export type OrganizationWithAvatar = Organization & {
+  avatar_url: string | null;
+};
+
 export interface OrganizationMember {
   id: number;
   user_id: string;

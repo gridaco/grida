@@ -46,9 +46,7 @@ export default function ProjectDashboardPage({
     layout?: "grid" | "list";
   };
 }) {
-  const { state } = useWorkspace();
-
-  const { loading, organization, projects, documents } = state;
+  const { loading, projects, documents } = useWorkspace();
   const { org: organization_name, proj: project_name } = params;
 
   const layout = searchParams.layout ?? "list";

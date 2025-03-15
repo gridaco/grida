@@ -42,8 +42,7 @@ export default function OrganizationDashboardPage({
 }) {
   const layout = searchParams.layout ?? "list";
 
-  const { state } = useWorkspace();
-  const { loading, organization, projects, documents } = state;
+  const { loading, organization, projects, documents } = useWorkspace();
 
   return (
     <main className="w-full h-full overflow-y-scroll">

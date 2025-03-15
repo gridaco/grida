@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/sidebar";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
-import "../../../../editor.css";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import "../../../../editor.css";
+import { ProjectLoaded } from "@/scaffolds/workspace";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -91,7 +92,7 @@ export default async function Layout({
                   <div className="flex flex-col overflow-hidden w-full h-full">
                     <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area"></header>
                     <div className="w-full h-full overflow-x-hidden">
-                      {children}
+                      <ProjectLoaded>{children}</ProjectLoaded>
                     </div>
                   </div>
                 </div>

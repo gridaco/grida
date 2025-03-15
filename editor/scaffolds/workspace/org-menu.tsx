@@ -21,10 +21,8 @@ export function WorkspaceMenu({
 }: React.PropsWithChildren<{
   current?: number;
 }>) {
-  const { state } = useWorkspace();
+  const { organizations } = useWorkspace();
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
-
-  const { organizations } = state;
 
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {

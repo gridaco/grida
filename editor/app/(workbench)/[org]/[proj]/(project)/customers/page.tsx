@@ -4,11 +4,9 @@ import { CustomerGrid } from "@/scaffolds/grid/wellknown/customer-grid";
 import { provisional } from "@/services/customer/utils";
 import {
   GridQueryLimitSelect,
-  GridViewSettings,
   GridRefreshButton,
   DataQueryTextSearch,
   GridQueryCount,
-  TableViews,
   GridQueryPaginationControl,
   GridLoadingProgressLine,
 } from "@/scaffolds/grid-editor/components";
@@ -24,7 +22,7 @@ import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { StandaloneDataQueryProvider } from "@/scaffolds/data-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/utils";
 import {
   DropdownMenu,
@@ -36,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon, GearIcon, UploadIcon } from "@radix-ui/react-icons";
-import { useWorkspace } from "@/scaffolds/workspace";
+import { useProject } from "@/scaffolds/workspace";
 import CreateCustomerDialog from "@/scaffolds/platform/customer/create-customer-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportCSVDialog } from "@/scaffolds/platform/customer/import-csv-dialog";
@@ -58,11 +56,12 @@ export default function Customers() {
 }
 
 function Body() {
+  const project = useProject();
+  const project_id = project.id;
   const router = useRouter();
   const pathname = usePathname();
   const client = useMemo(() => createClientWorkspaceClient(), []);
 
-  const project_id = 2; // FIXME:
   const tablespace = useTableSpaceInstance<Customer>({
     identifier: "uid",
     readonly: false,
@@ -149,6 +148,8 @@ function Body() {
 }
 
 function NewButton() {
+  const project = useProject();
+  const project_id = project.id;
   const client = useMemo(() => createClientWorkspaceClient(), []);
   const createCustomerDialog = useDialogState("create-customer", {
     refreshkey: true,
@@ -172,7 +173,6 @@ function NewButton() {
         {...createCustomerDialog.props}
         key={createCustomerDialog.refreshkey}
         onSubmit={async (data) => {
-          const project_id = 2; // FIXME:
           const { error } = await insertCustomer(client, project_id, data);
           if (error) {
             console.error("Failed to create customer", error);
