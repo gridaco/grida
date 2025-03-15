@@ -51,15 +51,25 @@ function Hero() {
         </a>
 
         <div className="flex items-center justify-center gap-8">
-          <div className="flex items-center text-white gap-2">
+          <a
+            href="https://github.com/gridaco/assistant"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center text-white gap-2"
+          >
             <Github className="h-5 w-5" />
-            <span>400 Stars</span>
-          </div>
+            <span>600 Stars</span>
+          </a>
 
-          <div className="flex items-center text-white gap-2">
+          <a
+            href="https://www.figma.com/community/plugin/896445082033423994/assistant-by-grida"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center text-white gap-2"
+          >
             <span className="text-lg">⚡</span>
             <span>14K Installs</span>
-          </div>
+          </a>
         </div>
       </div>
     </main>
