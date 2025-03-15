@@ -28,6 +28,7 @@ const features: Item[] = [
   sitemap.items.forms,
   sitemap.items.database,
   sitemap.items.figmaci,
+  sitemap.items.figmaassistant,
 ];
 
 const resources: Item[] = [

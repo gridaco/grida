@@ -19,7 +19,7 @@ export default function AssistantPage() {
 
 function Hero() {
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center text-center p-4 md:p-8">
+    <section className="relative min-h-screen flex flex-col items-center justify-center text-center p-4 md:p-8">
       <BgSvg className="absolute inset-0 w-full h-full object-cover blur-[70px] md:blur-[100px] z-[-1] overflow-hidden" />
       <div className="max-w-3xl mx-auto">
         <p className="text-white font-medium text-lg md:text-xl mb-4">
@@ -72,7 +72,7 @@ function Hero() {
           </a>
         </div>
       </div>
-    </main>
+    </section>
   );
 }
 
@@ -92,7 +92,7 @@ function WaitlistCard() {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <a
-              href="https://docs.google.com/forms/d/e/1FAIpQLSdM4Bte6pA1Tql0GhEPXyRwIE88V-bNKNsS7aUrkLjgvvL_dg/viewform"
+              href="https://app.grida.co/d/e/0f9dbc73-a7c6-494d-b233-6e992e9bf916"
               target="_blank"
               rel="noopener noreferrer"
             >
