@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +74,7 @@ export default function NewOrganizationSetupPage({
   return (
     <main className="max-w-md mx-auto p-4 md:p-0">
       <Nav />
+      <div className="h-40" />
       <header className="text-center py-20">
         <span className="text-muted-foreground text-sm">
           Tell us about your organization
