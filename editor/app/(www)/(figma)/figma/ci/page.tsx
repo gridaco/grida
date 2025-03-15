@@ -4,7 +4,7 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Image from "next/image";
 import React, { useState } from "react";
-import { Github, Redo2Icon } from "lucide-react";
+import { ArrowDown, Github, Redo2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckIcon } from "lucide-react";
@@ -67,19 +67,32 @@ function Demo1() {
       <h2 className="text-4xl font-bold max-w-2xl">
         One command to add designs as a module to your existing projects.
       </h2>
-      <div className="relative mt-12">
-        <Image
-          src="/images/abstract-placeholder.jpg"
-          alt="Figma to Code Demo"
-          width={320}
-          height={180}
-          className="w-80"
-        />
+      <div className="flex flex-col gap-2">
+        <div className="relative mt-12">
+          <Image
+            src="/images/top-design.png"
+            alt="Figma to Code Demo"
+            width={320}
+            height={180}
+            className="w-40"
+          />
+        </div>
+
+        <div className="relative">
+          <Image
+            src="/images/bottom-code.png"
+            alt="Figma to Code Demo"
+            width={320}
+            height={180}
+            className="w-40"
+          />
+        </div>
       </div>
       <h3 className="text-xl font-semibold mt-12">Be the Maestro.</h3>
       <p className=" text-muted-foreground max-w-lg mt-4">
         You can import your design like a well-coded library, with full
-        documentations. We play the details // you play the orchestra.
+        documentations. <br />
+        We play the details // you play the orchestra.
       </p>
 
       <div className="absolute bottom-8">
