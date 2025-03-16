@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,10 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
+import { PhoneInput } from "@/components/extension/phone-input";
 
 interface CreateCustomerInsert {
   name: string | null;
   email: string | null;
+  phone: string | null;
   description: string | null;
 }
 
@@ -28,6 +30,7 @@ export default function CreateCustomerDialog({
   onSubmit?: (data: CreateCustomerInsert) => Promise<boolean>;
 }) {
   const {
+    control,
     register,
     handleSubmit,
     formState: { isSubmitting },
@@ -35,6 +38,7 @@ export default function CreateCustomerDialog({
     defaultValues: {
       name: "",
       email: "",
+      phone: "",
       description: "",
     },
   });
@@ -44,8 +48,11 @@ export default function CreateCustomerDialog({
     const transformedData: CreateCustomerInsert = {
       name: data.name?.trim() || null,
       email: data.email?.trim() || null,
+      phone: data.phone?.trim() || null,
       description: data.description?.trim() || null,
     };
+
+    console.log("Create customer form submitted with data:", transformedData);
 
     await onSubmit?.(transformedData).then((success) => {
       if (success) props.onOpenChange?.(false);
@@ -84,7 +91,18 @@ export default function CreateCustomerDialog({
                 placeholder="alice@acme.com"
                 pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$"
                 {...register("email")}
+                min={5}
                 max={255}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Account Phone Number</Label>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput {...field} value={field.value as any} />
+                )}
               />
             </div>
             <div className="space-y-2">

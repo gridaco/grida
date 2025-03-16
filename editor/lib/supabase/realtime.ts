@@ -38,7 +38,7 @@ export function subscribeTable<
         payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
       ) => {
         const { old, new: _new, eventType } = payload;
-        console.log("RealtimeTableChangeData", payload);
+
         switch (eventType) {
           case "INSERT": {
             callbacks.onInsert?.(_new);
