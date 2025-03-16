@@ -18,13 +18,13 @@ export default function Hello({
   onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden">
       {/* Background Image */}
       <ScreenBackground>
         <motion.img
           src="https://www.polestar.com/dato-assets/11286/1717404259-12-polestar-4-overview-interior-end-kr-d.png?q=80&dpr=2&w=1920"
           alt="Polestar 4"
-          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+          className="w-full h-full object-cover select-none pointer-events-none"
           initial={{ opacity: 0.5, scale: 1.05 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 3.5, ease: "easeOut" }}
@@ -57,6 +57,7 @@ export default function Hello({
               effect="expandIcon"
               className="flex group bg-transparent outline rounded-none hover:bg-transparent hover:text-orange-500"
               icon={ArrowRight}
+              onClick={() => onOpenChange?.(false)}
               iconPlacement="right"
             >
               <span>내용 확인하기</span>

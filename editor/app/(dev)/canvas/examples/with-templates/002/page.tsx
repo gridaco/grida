@@ -4,28 +4,12 @@ import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
-import _002 from "@/theme/templates/formstart/002/page";
-import Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/main";
-import Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/page";
-import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/step-verify";
-import Main from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/main";
 
-export default function FileExamplePage() {
-  return (
-    <main className="w-screen h-screen overflow-hidden">
-      <Editor
-        document={document}
-        templates={{
-          "tmp-2503-invite": CustomComponent__Invite,
-          "tmp-2503-join": CustomComponent__Join,
-          "tmp-2503-join-hello": CustomComponent__Join_Hello,
-          "tmp-2503-portal": CustomComponent__Portal,
-          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
-        }}
-      />
-    </main>
-  );
-}
+import Invite from "@/app/(demo)/polestar/event/invite/[cid]/main";
+import Portal from "@/app/(demo)/polestar/event/portal/_flows/page";
+import Verify from "@/app/(demo)/polestar/event/portal/_flows/step-verify";
+import Main from "@/app/(demo)/polestar/event/join/[cid]/_flows/main";
+import Hello from "@/app/(demo)/polestar/event/join/[cid]/_flows/hello";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -49,9 +33,26 @@ const document: IDocumentEditorInit = {
       },
       join: {
         id: "join",
-        name: "Join Page",
         type: "template_instance",
-        template_id: "tmp-2503-join",
+        name: "Page",
+        position: "absolute",
+        template_id: "tabs",
+        removable: false,
+        active: true,
+        locked: false,
+        width: 375,
+        height: 812,
+        properties: {},
+        props: {},
+        overrides: {},
+        top: -400,
+        left: 0,
+      },
+      join_main: {
+        id: "join_main",
+        name: "Join Page (TabsContent)",
+        type: "template_instance",
+        template_id: "tmp-2503-join-main",
         position: "absolute",
         removable: false,
         active: true,
@@ -66,7 +67,7 @@ const document: IDocumentEditorInit = {
       },
       join_hello: {
         id: "join_hello",
-        name: "Join Hello (Overlay)",
+        name: "Join Hello (TabsContent)",
         type: "template_instance",
         template_id: "tmp-2503-join-hello",
         position: "absolute",
@@ -133,7 +134,7 @@ const document: IDocumentEditorInit = {
         type: "scene",
         id: "join",
         name: "Join",
-        children: ["join", "join_hello"],
+        children: ["join", "join_main", "join_hello"],
         guides: [],
         constraints: {
           children: "multiple",
@@ -170,6 +171,14 @@ const document: IDocumentEditorInit = {
       version: "0.0.0",
       nodes: {},
     },
+    ["tmp-2503-join-main"]: {
+      name: "Join",
+      type: "template",
+      properties: {},
+      default: {},
+      version: "0.0.0",
+      nodes: {},
+    },
     ["tmp-2503-portal"]: {
       name: "Portal",
       type: "template",
@@ -180,6 +189,24 @@ const document: IDocumentEditorInit = {
     },
   },
 };
+
+export default function FileExamplePage() {
+  return (
+    <main className="w-screen h-screen overflow-hidden">
+      <Editor
+        document={document}
+        templates={{
+          tabs: CustomComponent__Tabs,
+          "tmp-2503-invite": CustomComponent__Invite,
+          "tmp-2503-join-main": CustomComponent__Join_Main,
+          "tmp-2503-join-hello": CustomComponent__Join_Hello,
+          "tmp-2503-portal": CustomComponent__Portal,
+          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
+        }}
+      />
+    </main>
+  );
+}
 
 function CustomComponent__Invite(props: any) {
   return (
@@ -195,7 +222,7 @@ function CustomComponent__Invite(props: any) {
   );
 }
 
-function CustomComponent__Join(props: any) {
+function CustomComponent__Tabs(props: any) {
   return (
     <div
       className="rounded shadow border"
@@ -204,7 +231,28 @@ function CustomComponent__Join(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Main />
+      {/*  */}
+    </div>
+  );
+}
+
+function CustomComponent__Join_Main(props: any) {
+  return (
+    <div
+      className="rounded shadow border"
+      style={{
+        ...props.style,
+      }}
+      {...queryattributes(props)}
+    >
+      <Main
+        data={{
+          cid: "00000000",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }
@@ -218,7 +266,15 @@ function CustomComponent__Join_Hello(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <_002 />
+      {/* <_002 /> */}
+      <Hello
+        data={{
+          cid: "",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }
