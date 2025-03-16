@@ -2129,6 +2129,7 @@ export type Database = {
           is_email_verified: boolean
           is_phone_verified: boolean
           last_seen_at: string
+          metadata: Json | null
           name: string | null
           name_provisional: string[]
           phone: string | null
@@ -2147,6 +2148,7 @@ export type Database = {
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          metadata?: Json | null
           name?: string | null
           name_provisional?: string[]
           phone?: string | null
@@ -2165,6 +2167,7 @@ export type Database = {
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          metadata?: Json | null
           name?: string | null
           name_provisional?: string[]
           phone?: string | null
@@ -2477,6 +2480,55 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      citext:
+        | {
+            Args: {
+              "": boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              "": string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: string
+          }
+      citext_hash: {
+        Args: {
+          "": string
+        }
+        Returns: number
+      }
+      citextin: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      citextout: {
+        Args: {
+          "": string
+        }
+        Returns: unknown
+      }
+      citextrecv: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      citextsend: {
+        Args: {
+          "": string
+        }
+        Returns: string
+      }
       generate_combinations:
         | {
             Args: {

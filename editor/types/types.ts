@@ -48,6 +48,7 @@ export type UserProfile = {
 };
 
 export interface Customer {
+  project_id: number;
   uid: string;
   created_at: string;
   last_seen_at: string;
@@ -58,6 +59,7 @@ export interface Customer {
   phone_provisional: string[];
   description: string | null;
   uuid: string | null;
+  metadata: unknown | null;
 }
 
 /**
