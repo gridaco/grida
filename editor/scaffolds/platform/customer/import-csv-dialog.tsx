@@ -93,7 +93,7 @@ export function ImportCSVDialog({
         {step === "upload" && (
           <div className="space-y-6 py-4">
             <Link
-              href="/objects/template-grida-customer-upload-csv-example.csv"
+              href="/objects/template-grida-customer-upload-csv-example/insert-example-with-metadata.csv"
               download
             >
               <Button variant="outline">

@@ -1,6 +1,0 @@
-name,email,phone,description
-John Doe,john.doe@example.com,+1-555-1234,"High-value customer interested in premium plans"
-Jane Smith,jane.smith@example.com,+1-555-5678,"New customer; follow up in 30 days"
-Bob Johnson,bob.j@example.com,,""
-,anonymous@example.com,,"Anonymous signup"
-Alice,alice@example.com,,""

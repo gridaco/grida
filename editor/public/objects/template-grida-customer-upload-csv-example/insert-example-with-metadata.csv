@@ -1,0 +1,6 @@
+name,email,phone,description,metadata.my_custom_field_1,metadata.my_custom_field_2
+John Doe,john.doe@example.com,+1-555-1234,"High-value customer interested in premium plans",value1,value2
+Jane Smith,jane.smith@example.com,+1-555-5678,"New customer; follow up in 30 days",,
+Bob Johnson,bob.j@example.com,,"",,
+,anonymous@example.com,,"Anonymous signup",,
+Alice,alice@example.com,,"",,

@@ -58,6 +58,11 @@ value 1,value 2
 
 > **IMPORTANT**: We do not support partial update of `metadata`. in all operations, you must provide the full metadata with the previous values included.
 
+### Phone
+
+`phone` is a phone number of the customer in E.164 format. If you don't know how to format the phone number properly, you can use the
+[Grida E.164 tool](https://app.grida.co/tools/e164) to format the phone number.
+
 ## Inserting
 
 When inserting data, you should not provide any other field than the ones mentioned below.
