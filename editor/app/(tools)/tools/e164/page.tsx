@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import PhoneNumberTool from "./_page";
+import Header from "@/www/header";
+import Footer from "@/www/footer";
 
 export const metadata: Metadata = {
   title: "E.164 Phone Number Tool",
@@ -9,5 +11,13 @@ export const metadata: Metadata = {
 };
 
 export default function PhoneNumberToolPage() {
-  return <PhoneNumberTool />;
+  return (
+    <main>
+      <Header />
+      <div className="py-40 min-h-screen flex flex-col items-center justify-center">
+        <PhoneNumberTool />
+      </div>
+      <Footer />
+    </main>
+  );
 }
