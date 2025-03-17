@@ -23,7 +23,7 @@ import "../grid.css";
 const customer_columns = [
   {
     key: "uid",
-    name: "ID",
+    name: "UID",
     width: 64,
     frozen: true,
     sensitive: true,
@@ -45,6 +45,7 @@ const customer_columns = [
     key: "phone",
     name: "Phone",
     sensitive: true,
+    format: "phone" as DataFormat.Format,
   },
   {
     key: "created_at",

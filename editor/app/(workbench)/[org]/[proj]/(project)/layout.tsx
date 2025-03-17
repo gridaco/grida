@@ -70,20 +70,20 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            <Link href={`/${org}/${proj}/analytics`}>
-                              <SidebarMenuItem>
-                                <SidebarMenuButton size="sm">
-                                  Analytics
-                                </SidebarMenuButton>
-                              </SidebarMenuItem>
-                            </Link>
-                            <Link href={`/${org}/${proj}/token-chain`}>
-                              <SidebarMenuItem>
-                                <SidebarMenuButton size="sm">
-                                  Token Exchange
-                                </SidebarMenuButton>
-                              </SidebarMenuItem>
-                            </Link>
+                            {/* <Link href={`/${org}/${proj}/analytics`}> */}
+                            <SidebarMenuItem>
+                              <SidebarMenuButton size="sm" disabled>
+                                Analytics
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            {/* </Link> */}
+                            {/* <Link href={`/${org}/${proj}/token-chain`}> */}
+                            <SidebarMenuItem>
+                              <SidebarMenuButton size="sm" disabled>
+                                Token Exchange
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            {/* </Link> */}
                           </SidebarMenu>
                         </SidebarGroupContent>
                       </SidebarGroup>

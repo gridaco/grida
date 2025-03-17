@@ -2194,6 +2194,47 @@ export type Database = {
           },
         ]
       }
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Insert: {
+          challenges: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Update: {
+          challenges?: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name?: string
+          project_id?: number
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_auth_policy_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document: {
         Row: {
           created_at: string
@@ -2556,6 +2597,12 @@ export type Database = {
           user_id: string
         }
         Returns: number[]
+      }
+      jsonb_array_objects_only: {
+        Args: {
+          arr: Json[]
+        }
+        Returns: boolean
       }
       rls_asset: {
         Args: {

@@ -90,6 +90,19 @@ export namespace Authentication {
 
   /**
    * Represents a Knowledge-Based Authentication (KBA) challenge containing an array of questions.
+   *
+   * @example
+   * ```json
+   * {
+   *    "type": "kba",
+   *    "identifier": "phone",
+   *    "questions": {
+   *      "phone": { "required": true },
+   *      "email": { "required": true },
+   *      "name": { "required": true }
+   *    }
+   * }
+   * ```
    */
   type KnowledgeBaseAuthChallenge = {
     type: "kba";

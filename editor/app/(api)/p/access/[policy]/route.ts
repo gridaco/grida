@@ -23,27 +23,6 @@ type Context = {
   params: Promise<Params>;
 };
 
-// TODO:
-const mockpolicies = {
-  test: {
-    project_id: 2,
-    challenge: {
-      type: "passcode",
-    } satisfies Authentication.Challenge,
-  },
-  polestar: {
-    project_id: 2,
-    challenge: {
-      type: "kba",
-      identifier: "phone",
-      questions: {
-        phone: { required: true },
-        name: { required: true },
-      },
-    } satisfies Authentication.Challenge,
-  },
-};
-
 async function reqformdata(
   req: NextRequest,
   contenttype: HeaderContentType
@@ -73,14 +52,29 @@ export async function POST(req: NextRequest, context: Context) {
   const formdata = await reqformdata(req, contenttype);
   const { policy: policyid } = await context.params;
 
-  const policy = mockpolicies[policyid as keyof typeof mockpolicies];
+  const { data: policy, error: policy_fetch_err } = await workspaceclient
+    .from("customer_auth_policy")
+    .select("*")
+    .eq("id", policyid)
+    .single();
+
+  if (policy_fetch_err) {
+    console.error("Failed to fetch policy", policy_fetch_err);
+    return notFound();
+  }
+
+  // const policy = mockpolicies[policyid as keyof typeof mockpolicies];
 
   if (!policy) {
     console.error("policy not found", policyid);
     return notFound();
   }
 
-  const { project_id, challenge } = policy;
+  const { project_id, challenges } = policy;
+
+  // FIXME: only supports 1 challenge for now
+  assert(challenges.length === 1);
+  const challenge = challenges[0] as Authentication.Challenge;
 
   const recaptcha = formdata.get("recaptcha");
   if (recaptcha) {

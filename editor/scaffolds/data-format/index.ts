@@ -2,7 +2,15 @@ import { format, startOfDay, addSeconds } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 export namespace DataFormat {
-  export type Format = "uuid" | "email" | "timestamptz";
+  export type Format =
+    // uuidv4
+    | "uuid"
+    // email format
+    | "email"
+    // E.164 phone number
+    | "phone"
+    // timestamptz
+    | "timestamptz";
 
   export type DateFormat = "date" | "time" | "datetime";
 
