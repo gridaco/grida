@@ -265,7 +265,7 @@ function ApplicantForm({
       <hr className="my-4" />
       <div className="flex flex-col gap-1">
         <div className="flex gap-2 items-center">
-          <label className="flex items-center gap-2">
+          <label className="flex items-start gap-2">
             <Checkbox
               checked={agreed1}
               onCheckedChange={(checked) => setAgreed1(!!checked)}
@@ -282,7 +282,7 @@ function ApplicantForm({
               onCheckedChange={(checked) => setAgreed2(!!checked)}
             />
             <span className="text-sm text-muted-foreground">
-              반드시 전에 입력하신 시승 신청자 정보와 동일한 <br /> &quot;이름과
+              반드시 현재 입력하신 시승 신청자 정보와 동일한 <br /> &quot;이름과
               핸드폰 번호&quot;로 시승 예약을 해야 이벤트 참여가 인정됩니다.
             </span>
           </label>
