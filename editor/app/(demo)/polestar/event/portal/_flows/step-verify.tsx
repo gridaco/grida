@@ -1,38 +1,41 @@
 "use client";
 import React from "react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/extension/phone-input";
 import data from "./data.json";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+
+interface KBA {
+  name: string;
+  phone: string;
+}
 
 export default function Verify() {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [error, setError] = useState("");
   const router = useRouter();
+  const { control, register, handleSubmit } = useForm<KBA>({
+    defaultValues: { name: "", phone: "" },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    try {
-      const response = await fetch("/api/verify", {
+  const onSubmit = async (formData: KBA) => {
+    const response = await fetch(
+      "/p/access/cd2ed862-246d-453b-a48f-4d8da11c4fae",
+      {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, phone }),
-      });
-
-      if (response.ok) {
-        const { referralLink } = await response.json();
-        router.push(`/success?link=${encodeURIComponent(referralLink)}`);
-      } else {
-        setError("인증에 실패했습니다. 다시 시도해 주세요.");
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       }
-    } catch (err) {
-      setError("오류가 발생했습니다. 나중에 다시 시도해 주세요.");
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(result);
+      const tid = result.data.customer.metadata["polestar-transaction-id"];
+      router.replace(`https://demo.grida.co/polestar/event/invite/${tid}`);
+    } else {
+      toast.error("인증 실패");
     }
   };
 
@@ -42,23 +45,21 @@ export default function Verify() {
       <p className="text-center text-muted-foreground">
         {data.form.description}
       </p>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
         <div>
           <label
             htmlFor="name"
             className="block text-sm font-medium text-muted-foreground"
           >
-            성한
+            성함
           </label>
           <Input
-            type="text"
             id="name"
             placeholder="홍길동"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
+            {...register("name", { required: true })}
           />
         </div>
+
         <div>
           <label
             htmlFor="phone"
@@ -66,16 +67,22 @@ export default function Verify() {
           >
             휴대번호
           </label>
-          <Input
-            type="tel"
-            id="phone"
-            value={phone}
-            placeholder="01012345678"
-            onChange={(e) => setPhone(e.target.value)}
-            required
+          <Controller
+            name="phone"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => (
+              <PhoneInput
+                id="phone"
+                defaultCountry="KR"
+                placeholder="01012345678"
+                required
+                {...field}
+              />
+            )}
           />
         </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
+
         <Button type="submit">인증하기</Button>
       </form>
     </div>

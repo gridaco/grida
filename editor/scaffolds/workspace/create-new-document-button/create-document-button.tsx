@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  ChevronDownIcon,
-  InfoCircledIcon,
-  PlusIcon,
-} from "@radix-ui/react-icons";
+import React, { useState } from "react";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,12 +27,10 @@ import {
   DialogHeader,
   DialogDescription,
 } from "@/components/ui/dialog";
-import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
-import { EditorApiResponse } from "@/types/private/api";
 import { Spinner } from "@/components/spinner";
 import {
   NewDocumentRequest,
@@ -67,9 +62,7 @@ export function CreateNewDocumentButton({
   project_id: number;
 }>) {
   const {
-    state: {
-      organization: { name: organization_name },
-    },
+    organization: { name: organization_name },
   } = useWorkspace();
 
   const newDatabaseDialog = useDialogState();
@@ -308,11 +301,6 @@ function CreateNewDatabaseDialog({
   project_name: string;
 }) {
   const router = useRouter();
-  const {
-    state: {
-      organization: { name: organization_name },
-    },
-  } = useWorkspace();
   const [resourceType, setResourceType] = useState<"database" | "table">(
     "database"
   );

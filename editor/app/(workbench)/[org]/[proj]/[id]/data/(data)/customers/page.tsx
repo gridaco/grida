@@ -56,6 +56,7 @@ export default function Customers() {
     const rows =
       (filtered as Customer[])?.map((customer: Customer) => ({
         uid: customer.uid,
+        name: customer.name,
         email: provisional(customer.email, customer.email_provisional).join(
           ", "
         ),

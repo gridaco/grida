@@ -23,7 +23,7 @@ import { useWorkspace } from "../workspace";
 import Head from "next/head";
 
 function useGAAuthenticatedUserIDTelemetry() {
-  const { state } = useWorkspace();
+  const { organization } = useWorkspace();
   const [uid, setUid] = useState<string>();
 
   const supabase = useMemo(
@@ -42,10 +42,10 @@ function useGAAuthenticatedUserIDTelemetry() {
     if (process.env.NEXT_PUBLIC_GAID) {
       window.dataLayer?.push({ user_id: uid });
       sendGAEvent("event", "workspace", {
-        org: state.organization.name,
+        org: organization.name,
       });
     }
-  }, [uid, state.organization.name]);
+  }, [uid, organization.name]);
 }
 
 function AnimatedAvatar() {

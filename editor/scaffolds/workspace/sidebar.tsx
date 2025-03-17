@@ -33,12 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import {
-  OrganizationWithAvatar,
-  OrganizationWithMembers,
-  useWorkspace,
-  WorkspaceState,
-} from "@/scaffolds/workspace";
+import { useWorkspace, WorkspaceState } from "@/scaffolds/workspace";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
@@ -53,7 +48,12 @@ import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui/button";
 import { ShineBorder } from "@/www/ui/shine-border";
-import type { GDocument, PlatformPricingTier } from "@/types";
+import type {
+  GDocument,
+  OrganizationWithAvatar,
+  OrganizationWithMembers,
+  PlatformPricingTier,
+} from "@/types";
 import Link from "next/link";
 import "core-js/features/object/group-by";
 
@@ -138,13 +138,14 @@ export function projectstree(
 export default function WorkspaceSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useWorkspace();
-  const { loading, organization, organizations, projects, documents } = state;
+  const workspace = useWorkspace();
+  const { loading, organization, organizations, projects, documents } =
+    workspace;
 
   const pathName = usePathname();
 
   const tree = useMemo(() => {
-    return projectstree(state, { pathName });
+    return projectstree(workspace, { pathName });
   }, [documents, projects, organization.name, pathName]);
 
   const settings = {

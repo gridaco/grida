@@ -3,7 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import {
+  AvatarIcon,
   ChevronDownIcon,
+  DotsHorizontalIcon,
+  FileIcon,
+  ImageIcon,
   PlusIcon,
   ViewGridIcon,
   ViewHorizontalIcon,
@@ -19,8 +23,16 @@ import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export default function FormsDashboardPage({
+export default function ProjectDashboardPage({
   params,
   searchParams,
 }: {
@@ -34,9 +46,7 @@ export default function FormsDashboardPage({
     layout?: "grid" | "list";
   };
 }) {
-  const { state } = useWorkspace();
-
-  const { loading, organization, projects, documents } = state;
+  const { loading, projects, documents } = useWorkspace();
   const { org: organization_name, proj: project_name } = params;
 
   const layout = searchParams.layout ?? "list";
@@ -59,8 +69,32 @@ export default function FormsDashboardPage({
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               {project_name}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="ghost">
+                    <DotsHorizontalIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="bottom">
+                  <DropdownMenuItem disabled>
+                    <FileIcon className="me-2" />
+                    Documents
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    <ImageIcon className="me-2" />
+                    Assets
+                  </DropdownMenuItem>
+                  <Link
+                    href={`/${organization_name}/${project_name}/customers`}
+                  >
+                    <DropdownMenuItem>
+                      <AvatarIcon className="me-2" />
+                      Customers
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </span>
-            <span className="font-mono opacity-50">{organization_name}</span>
           </div>
           {project && (
             <div>
@@ -77,6 +111,7 @@ export default function FormsDashboardPage({
             </div>
           )}
         </header>
+
         {loading ? (
           <>
             <div>

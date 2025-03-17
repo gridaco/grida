@@ -27,7 +27,7 @@ import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { editorlink } from "@/lib/forms/url";
 
-export default function DashboardProjectsPage({
+export default function OrganizationDashboardPage({
   params,
   searchParams,
 }: {
@@ -42,8 +42,7 @@ export default function DashboardProjectsPage({
 }) {
   const layout = searchParams.layout ?? "list";
 
-  const { state } = useWorkspace();
-  const { loading, organization, projects, documents } = state;
+  const { loading, organization, projects, documents } = useWorkspace();
 
   return (
     <main className="w-full h-full overflow-y-scroll">

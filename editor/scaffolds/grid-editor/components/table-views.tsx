@@ -20,8 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function TableViews() {
-  const [state, dispatch] = useEditorState();
-
   const tb = useDatagridTable();
 
   if (!tb) {
