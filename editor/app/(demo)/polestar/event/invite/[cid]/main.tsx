@@ -21,8 +21,20 @@ import { ACME } from "@/components/logos/acme";
 // import data from "./data.json";
 import data from "./data-01.json";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import toast from "react-hot-toast"; // Import toast
+
 import { PolestarTypeLogo } from "@/components/logos";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog"; // Adjust import according to your UI library
+import { Checkbox } from "@/components/ui/checkbox"; // Adjust import according to your UI library
 
 const mkshare = (d: CampaignData) => {
   return {
@@ -43,18 +55,20 @@ export default function Invite({
   };
 }) {
   const [supply, setSupply] = React.useState(10);
+  const [confirmed, setConfirmed] = React.useState(false);
   const d = mock.find((c) => c.cid === params.cid);
   if (!d) {
     return notFound();
   }
 
   const onshareclick = () => {
+    // Added onshareclick function
     if (!navigator.share) return;
     navigator
       .share(mkshare(d))
       .then(() => {
         setSupply((supply) => supply - 1);
-        alert("Thanks for sharing!");
+        toast.success("초대권이 발급되었습니다!"); // Updated alert to toast
       })
       .catch((e) => {
         console.log("error while sharing", e);
@@ -87,36 +101,42 @@ export default function Invite({
                   {/* <span
                       dangerouslySetInnerHTML={{ __html: data.hero.title }}
                     /> */}
-                  안녕하세요 {d.user.name}님, <br />
+                  {d.user.name}님을 <br />
                   Polestar 4 시승 초대 이벤트에 <br />
-                  초대합니다.
+                  초대드립니다.
                 </h2>
               </div>
             </div>
 
-            {/* Stats Grid */}
-            <Card className="mt-10 mx-4 py-4 px-6 grid grid-cols-3">
-              {data.perks.map((perk, index) => (
-                <div key={index} className="text-center">
-                  <p className="text-xl font-medium">{perk.value}</p>
-                  <p className="text-sm font-light mt-2 text-muted-foreground">
-                    {perk.label}
-                  </p>
-                </div>
-              ))}
+            <Card className="mt-12 mx-4 py-6 px-6">
+              <div className="text-center">
+                <p className=" font-medium">Polestar 시승 완료 시 혜택</p>
+                <p className="text-xl font-semibold">
+                  TMAP EV 충전 포인트 10만원 <br />
+                  (시승 완료자 1인당 10만원권 / 최대 3인까지)
+                </p>
+
+                <p className="text-sm font-light mt-2 text-muted-foreground">
+                  • 대상 : 2025년 출고 고객
+                  <br /> 초대권을 통해 지인의 시승 완료 시, <br />
+                  출고 고객과 시승자 본인 모두 혜택 제공 (최대 3인까지 제공)
+                </p>
+              </div>
             </Card>
 
             <div className="mt-10 mx-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>{d.user.name}님 의 초대권</CardTitle>
+                  <CardTitle>{d.user.name}님의 초대권</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-lg font-bold">{supply}장 남음</span>
                   <hr className="my-4" />
                   <p className="text-sm text-muted-foreground">
-                    초대권을 사용해 지인에게 시승 이벤트를 공유하세요.{" "}
-                    {d.user.name}님과 참여자분 모두에게 경품이 지급됩니다.
+                    {d.user.name}님께 제공된 초대권을 사용해 지인에게 시승
+                    이벤트를 공유하세요. <br />
+                    시승 완료 시 {d.user.name}님과 시승 완료자 모두에게 특별한
+                    혜택이 제공됩니다.
                   </p>
                 </CardContent>
               </Card>
@@ -135,9 +155,49 @@ export default function Invite({
             <div className="flex-1" />
             {/* CTA Button */}
             <footer className="sticky bottom-0 mt-auto left-0 right-0 bg-background p-4 border-t">
-              <Button className="w-full" size="lg" onClick={onshareclick}>
-                {data.cta.label}
-              </Button>
+              <AlertDialog
+                onOpenChange={(isOpen) => !isOpen && setConfirmed(false)}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button className="w-full" size="lg">
+                    {data.cta.label}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      시승 초대 전 꼭 확인해주세요
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm text-muted-foreground">
+                      • 시승 초대하기가 완료되면 초대권 1장이 차감되며, <br />
+                      차감된 초대권은 복구되지 않습니다. <br />• 3명 이상이
+                      시승을 완료해도 최대 3명까지만 인정되어 <br />
+                      혜택이 제공됩니다. <br />• 본 이벤트 페이지를 통해 초대된
+                      고객이 <br />
+                      시승을 완료해야만 참여로 인정됩니다.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="py-4 flex flex-col gap-4">
+                    <label className="flex items-center gap-2">
+                      <Checkbox
+                        id="confirm-check"
+                        onCheckedChange={(checked) => setConfirmed(!!checked)}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        위 내용을 확인하였습니다
+                      </span>
+                    </label>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel asChild>
+                      <Button variant="ghost">뒤로가기</Button>
+                    </AlertDialogCancel>
+                    <Button onClick={onshareclick} disabled={!confirmed}>
+                      링크 공유하기
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </footer>
           </main>
         </ScreenScrollable>
