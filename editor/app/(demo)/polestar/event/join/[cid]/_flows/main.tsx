@@ -12,22 +12,31 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { PolestarTypeLogo } from "@/components/logos";
 // import data from "./data.json";
 import data from "./data-01.json";
 import Link from "next/link";
-import { ACME } from "@/components/logos/acme";
+import { Minus, Plus } from "lucide-react";
+import { Bar, BarChart, ResponsiveContainer } from "recharts";
+
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -200,10 +209,8 @@ function ApplicantForm({
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [agreed1, setAgreed1] = useState(false);
-  const [agreed2, setAgreed2] = useState(false);
-  const isFormValid =
-    name.trim() !== "" && phone.trim() !== "" && agreed1 && agreed2;
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const isFormValid = name.trim() !== "" && phone.trim() !== "";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,7 +254,7 @@ function ApplicantForm({
 
       <div className="grid grid-cols-[80px_1fr] items-center gap-4">
         <Label htmlFor="phone" className="text-base font-medium">
-          휴대폰 번호
+          핸드폰 번호
         </Label>
         <div className="grid gap-2">
           <Input
@@ -263,39 +270,108 @@ function ApplicantForm({
         </div>
       </div>
       <hr className="my-4" />
-      <div className="flex flex-col gap-1">
-        <div className="flex gap-2 items-center">
-          <label className="flex items-start gap-2">
-            <Checkbox
-              checked={agreed1}
-              onCheckedChange={(checked) => setAgreed1(!!checked)}
-            />
-            <span className="text-sm text-muted-foreground">
-              개인정보 수집에 동의합니다. (응모자 식별 정보: 이름, 연락처)
-            </span>
-          </label>
-        </div>
-        <div className="flex gap-2 items-center">
-          <label className="flex items-start gap-2">
-            <Checkbox
-              checked={agreed2}
-              onCheckedChange={(checked) => setAgreed2(!!checked)}
-            />
-            <span className="text-sm text-muted-foreground">
-              반드시 현재 입력하신 시승 신청자 정보와 동일한 <br /> &quot;이름과
-              핸드폰 번호&quot;로 시승 예약을 해야 이벤트 참여가 인정됩니다.
-            </span>
-          </label>
-        </div>
-      </div>
+
       <Button
-        type="submit"
+        type="button"
         className="w-full"
         size="lg"
         disabled={!isFormValid}
+        onClick={() => {
+          if (isFormValid) {
+            setIsDrawerOpen(true);
+          }
+        }}
       >
         시승 신청하기
       </Button>
+      <DrawerDialogDemo open={isDrawerOpen} setOpen={setIsDrawerOpen} />
     </form>
+  );
+}
+
+function DrawerDialogDemo({
+  open,
+  setOpen,
+}: {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}) {
+  const [checkedItems, setCheckedItems] = React.useState({
+    first: false,
+    second: false,
+  });
+
+  const handleCheckboxChange = (key: "first" | "second") => {
+    setCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const allChecked = checkedItems.first && checkedItems.second;
+
+  return (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerContent>
+        <DrawerHeader className="text-left">
+          <DrawerTitle>시승 예약 전 꼭 확인해주세요</DrawerTitle>
+          <DrawerDescription>
+            모든 내용 확인 시 시승 예약이 가능합니다
+          </DrawerDescription>
+        </DrawerHeader>
+        <ChecklistForm
+          onCheckboxChange={handleCheckboxChange}
+          checkedItems={checkedItems}
+          className="p-4"
+        />
+        <DrawerFooter className="pt-2">
+          <Button
+            onClick={() => {
+              if (allChecked) {
+                window.location.href =
+                  "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
+              }
+            }}
+            disabled={!allChecked}
+          >
+            다음으로
+          </Button>
+          <DrawerClose asChild>
+            <Button variant="outline">이전으로</Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+function ChecklistForm({
+  className = "",
+  onCheckboxChange,
+  checkedItems,
+}: {
+  className?: string;
+  onCheckboxChange: (key: "first" | "second") => void;
+  checkedItems: { first: boolean; second: boolean };
+}) {
+  return (
+    <div className={`${className} grid gap-4`}>
+      <label className="flex items-start gap-2">
+        <Checkbox
+          checked={checkedItems.first}
+          onCheckedChange={() => onCheckboxChange("first")}
+        />
+        <span className="text-sm text-muted-foreground">
+          개인정보 수집에 동의합니다. (응모자 식별 정보: 이름, 연락처)
+        </span>
+      </label>
+      <label className="flex items-start gap-2">
+        <Checkbox
+          checked={checkedItems.second}
+          onCheckedChange={() => onCheckboxChange("second")}
+        />
+        <span className="text-sm text-muted-foreground">
+          반드시 현재 입력하신 시승 신청자 정보와 동일한 <br /> &quot;이름과
+          핸드폰 번호&quot;로 시승 예약을 해야 이벤트 참여가 인정됩니다.
+        </span>
+      </label>
+    </div>
   );
 }
