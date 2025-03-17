@@ -67,7 +67,7 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="m@example.com"
+                    placeholder="insiders@grida.co"
                     required
                   />
                 </div>
@@ -75,7 +75,7 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
                   <Input
                     id="password"
                     name="password"
-                    placeholder="Password"
+                    placeholder="password"
                     type="password"
                     required
                   />
