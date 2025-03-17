@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
 import { PhoneInput } from "@/components/extension/phone-input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface CreateCustomerInsert {
   name: string | null;
@@ -107,7 +108,11 @@ export default function CreateCustomerDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Input id="description" {...register("description")} max={400} />
+              <Textarea
+                id="description"
+                {...register("description")}
+                maxLength={400}
+              />
             </div>
           </div>
         </form>
