@@ -1,5 +1,15 @@
 create extension if not exists "citext" with schema "public" version '1.6';
 
+CREATE DOMAIN email AS citext
+  CHECK (
+    VALUE ~ '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+  );
+
+CREATE DOMAIN phone AS citext
+  CHECK (
+    VALUE ~ '^\+[1-9][0-9]{7,14}$'
+  );
+
 create type "public"."pricing_tier" as enum ('free', 'v0_pro', 'v0_team', 'v0_enterprise');
 
 alter table "public"."customer" add column "description" text;
