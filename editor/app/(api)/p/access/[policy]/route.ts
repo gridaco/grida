@@ -13,6 +13,7 @@ import {
   HeaderContentType,
 } from "@/utils/h";
 import { flatten } from "flat";
+import { Platform } from "@/lib/platform";
 
 type Params = {
   policy: string;
@@ -20,24 +21,6 @@ type Params = {
 
 type Context = {
   params: Promise<Params>;
-};
-
-const wellknown = {
-  email: {
-    type: "string",
-    format: "email",
-    required: false,
-  },
-  name: {
-    type: "string",
-    format: "text",
-    required: false,
-  },
-  phone: {
-    type: "string",
-    format: "phone",
-    required: false,
-  },
 };
 
 // TODO:
@@ -134,7 +117,7 @@ export async function POST(req: NextRequest, context: Context) {
 
         for (const [key, value] of Object.entries(submission.answers)) {
           if (key === challenge.identifier) continue; // skip the identifier as it's already queried
-          if (key in wellknown) {
+          if (key in Platform.Customer.challenges) {
             query.eq(key, value);
           } else {
             // TODO: support metadata jsonb subquery

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import Papa from "papaparse";
+
 import {
   Dialog,
   DialogContent,
@@ -11,46 +13,73 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, File } from "lucide-react";
-import { CSVPreview } from "./csv-preview";
+import { SimpleCSVTable } from "@/components/table/simple-csv-table";
 import { Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useProject } from "@/scaffolds/workspace";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import toast from "react-hot-toast";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
 export function ImportCSVDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
+  const project = useProject();
+  const [mode, setMode] = useState<"insert" | "update">("insert");
+  const [datachecked, setDataChecked] = useState(false);
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [csv, setCsv] = useState<any[]>([]);
+  const [sample, setSample] = useState<any[]>([]);
 
   const handleFileSelected = (selectedFile: File) => {
     setFile(selectedFile);
-    // In a real implementation, you would parse the CSV here
-    // and set the preview data
-    setPreviewData([
-      {
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+1 (555) 123-4567",
-        status: "Active",
+    Papa.parse(selectedFile, {
+      header: true,
+      skipEmptyLines: true,
+      comments: "#",
+      complete: (results) => {
+        setCsv(results.data);
+        setSample(results.data.slice(0, Math.min(results.data.length, 100)));
+        setStep("preview");
       },
-      {
-        name: "Jane Smith",
-        email: "jane@example.com",
-        phone: "+1 (555) 987-6543",
-        status: "Inactive",
+      error: (err) => {
+        console.error("CSV parse error:", err);
       },
-      // More preview rows would be shown here
-    ]);
-    setStep("preview");
+    });
   };
 
   const handleImport = () => {
     setStep("importing");
+
+    const formdata = new FormData();
+    formdata.append("csv", file as Blob);
+
+    const methods = {
+      insert: "POST",
+      update: "PATCH",
+    };
+
+    fetch(`/private/customers/${project.id}/with-csv`, {
+      method: methods[mode],
+      body: formdata,
+    }).then((res) => {
+      if (res.ok) {
+        setStep("complete");
+      } else {
+        setStep("error");
+        res.json().then((res) => {
+          toast.error(res.error);
+          console.error("Import error:", res.error);
+        });
+      }
+    });
 
     // Simulate import progress
     let currentProgress = 0;
@@ -60,7 +89,6 @@ export function ImportCSVDialog({
 
       if (currentProgress >= 100) {
         clearInterval(interval);
-        setStep("complete");
       }
     }, 300);
 
@@ -70,7 +98,7 @@ export function ImportCSVDialog({
   const resetImport = () => {
     setFile(null);
     setProgress(0);
-    setPreviewData([]);
+    setSample([]);
     setStep("upload");
   };
 
@@ -82,57 +110,81 @@ export function ImportCSVDialog({
 
   return (
     <Dialog {...props}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
             Upload a CSV file to import customers into your CRM.
+            <br />
+            <Link
+              href="/docs/platform/customers/working-with-csv"
+              target="_blank"
+              className="underline"
+            >
+              <OpenInNewWindowIcon className="me-2 inline" />
+              Read the docs
+            </Link>
           </DialogDescription>
         </DialogHeader>
+
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as "insert" | "update")}
+        >
+          <TabsList>
+            <TabsTrigger value="insert">Insert</TabsTrigger>
+            <TabsTrigger value="update">Update</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {step === "upload" && (
           <div className="space-y-6 py-4">
             <Link
-              href="/objects/template-grida-customer-upload-csv-example/insert-example-with-metadata.csv"
+              href="/objects/template-grida-customer-upload-csv-example.zip"
               download
             >
               <Button variant="outline">
                 <Download className="size-4 me-2" />
-                Download CSV Template
+                Download Template
               </Button>
             </Link>
 
             <FileUploader onFileSelected={handleFileSelected} />
-
-            <div className="prose prose-sm dark:prose-invert">
-              <p>Your CSV file should include the following columns:</p>
-              <ul>
-                <li>{"name - Customer's full name"}</li>
-                <li>{"email - Customer's email address"}</li>
-                <li>{"phone - Customer's phone number"}</li>
-                <li>{"status - Customer's status (Active/Inactive)"}</li>
-              </ul>
-            </div>
           </div>
         )}
 
         {step === "preview" && (
-          <div className="space-y-6 py-4">
+          <div className="flex flex-col space-y-6 py-4 max-w-full">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Preview Import Data</h3>
               <div className="text-sm text-muted-foreground">
-                {file?.name} ({previewData.length} records)
+                {file?.name} (first {sample.length} records of {csv.length})
               </div>
             </div>
 
-            <CSVPreview data={previewData} />
+            <div className="flex-1 rounded-md border overflow-hidden">
+              {/* FIX MY STYLE */}
+              <div className="max-h-[300px] overflow-auto max-w-xl">
+                <SimpleCSVTable data={sample} />
+              </div>
+            </div>
 
             <Alert>
               <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Review your data</AlertTitle>
               <AlertDescription>
-                Please review the data before importing. This will add new
-                customers to your CRM.
+                Please review the data before importing. This action cannot be
+                undone.
               </AlertDescription>
+              <label className="flex items-center space-x-2 cursor-pointer mt-2">
+                <Checkbox
+                  checked={datachecked}
+                  onCheckedChange={(s) => setDataChecked(s === true)}
+                />
+                <span>
+                  I've reviewed the data and want to import these customers
+                </span>
+              </label>
             </Alert>
           </div>
         )}
@@ -160,8 +212,7 @@ export function ImportCSVDialog({
               </div>
               <h3 className="text-lg font-medium mb-2">Import Complete</h3>
               <p className="text-sm text-muted-foreground">
-                Successfully imported {previewData.length} customers to your
-                CRM.
+                Successfully imported {csv.length} customers to your CRM.
               </p>
             </div>
           </div>
@@ -193,7 +244,9 @@ export function ImportCSVDialog({
               <Button variant="outline" onClick={resetImport}>
                 Back
               </Button>
-              <Button onClick={handleImport}>Import Customers</Button>
+              <Button disabled={!datachecked} onClick={handleImport}>
+                Import Customers
+              </Button>
             </>
           )}
 
@@ -273,7 +326,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         <p className="mb-1 font-medium">
           <span className="text-primary">Click to upload</span> or drag and drop
         </p>
-        <p className="text-muted-foreground">CSV files only (max 10MB)</p>
+        <p className="text-muted-foreground">CSV files only (max 3MB)</p>
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">
