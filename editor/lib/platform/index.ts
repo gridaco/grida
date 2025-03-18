@@ -1,3 +1,4 @@
+import type { DataFormat } from "@/scaffolds/data-format";
 import { unflatten } from "flat";
 
 export namespace Platform {}
@@ -6,6 +7,26 @@ export namespace Platform {}
  * the supported csv features and implementations
  */
 export namespace Platform.CSV {
+  /**
+   * default csv parser configuration
+   *
+   * - header: true
+   * - skipEmptyLines: true
+   * - comments: "#"
+   * - transform:
+   *   - if value is empty "", return undefined
+   *
+   */
+  export const parser_config = {
+    header: true,
+    skipEmptyLines: true,
+    comments: "#",
+    transform: (value: string, field: string) => {
+      if (value === "") return undefined;
+      return value;
+    },
+  };
+
   /**
    * Validates a CSV row against the provided model specification.
    *
@@ -53,6 +74,13 @@ export namespace Platform.CSV {
 }
 
 export namespace Platform.Customer {
+  export interface Property {
+    type: "string" | "number" | "integer" | "boolean" | "array" | "object";
+    format?: DataFormat.Format;
+    required: boolean;
+    default?: string | number | boolean | null;
+  }
+
   /**
    * well known customer properties
    */
@@ -61,36 +89,46 @@ export namespace Platform.Customer {
       type: "string",
       format: "uuid",
       required: true,
-    },
+    } satisfies Property,
     uuid: {
       type: "string",
       format: "uuid",
       required: false,
-    },
+    } satisfies Property,
     email: {
       type: "string",
       format: "email",
       required: false,
-    },
+    } satisfies Property,
     name: {
       type: "string",
       format: "text",
       required: false,
-    },
+    } satisfies Property,
     phone: {
       type: "string",
       format: "phone",
       required: false,
-    },
+    } satisfies Property,
     description: {
       type: "string",
       format: "text",
       required: false,
-    },
+    } satisfies Property,
     metadata: {
       type: "object",
       required: false,
-    },
+    } satisfies Property,
+    created_at: {
+      type: "string",
+      format: "timestamptz",
+      required: true,
+    } satisfies Property,
+    last_seen_at: {
+      type: "string",
+      format: "timestamptz",
+      required: false,
+    } satisfies Property,
   } as const;
 
   /**

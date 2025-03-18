@@ -18,46 +18,54 @@ import { mask } from "../grid-text-mask";
 import Highlight from "@/components/highlight";
 import { CellRoot } from "../cells";
 import { DataFormat } from "@/scaffolds/data-format";
+import { Platform } from "@/lib/platform";
 import "../grid.css";
 
-const customer_columns = [
+const customer_columns: (Platform.Customer.Property & {
+  key: keyof DGCustomerRow;
+  name: string;
+  width?: number;
+  frozen?: boolean;
+  sensitive?: boolean;
+})[] = [
   {
     key: "uid",
     name: "UID",
     width: 64,
     frozen: true,
     sensitive: true,
-    format: "uuid" as DataFormat.Format,
+    ...Platform.Customer.properties["uid"],
   },
   {
     key: "name",
     name: "Name",
     frozen: true,
     sensitive: true,
+    ...Platform.Customer.properties["name"],
   },
   {
     key: "email",
     name: "Email",
     sensitive: true,
-    format: "email" as DataFormat.Format,
+    ...Platform.Customer.properties["email"],
   },
   {
     key: "phone",
     name: "Phone",
     sensitive: true,
-    format: "phone" as DataFormat.Format,
+    ...Platform.Customer.properties["phone"],
   },
   {
     key: "created_at",
     name: "Created At",
     sensitive: false,
-    format: "timestamptz" as DataFormat.Format,
+    ...Platform.Customer.properties["created_at"],
   },
   {
     key: "last_seen_at",
     name: "Last Seen At",
     sensitive: false,
-    format: "timestamptz" as DataFormat.Format,
+    ...Platform.Customer.properties["last_seen_at"],
   },
 ];
 
