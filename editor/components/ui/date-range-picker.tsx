@@ -91,9 +91,7 @@ const PRESETS: Preset[] = [
 ];
 
 /** The DateRangePicker component allows a user to select a range of dates */
-export const DateRangePicker: FC<DateRangePickerProps> & {
-  filePath: string;
-} = ({
+export const DateRangePicker: FC<DateRangePickerProps> = ({
   initialDateFrom = new Date(new Date().setHours(0, 0, 0, 0)),
   initialDateTo,
   initialCompareFrom,
@@ -305,18 +303,17 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
     isSelected: boolean;
   }): JSX.Element => (
     <Button
-      className={cn(isSelected && "pointer-events-none")}
+      size="sm"
       variant="ghost"
       onClick={() => {
         setPreset(preset);
       }}
+      className={cn(
+        "w-full justify-start px-2 py-1.5 h-min font-normal text-muted-foreground",
+        isSelected && "bg-accent text-accent-foreground"
+      )}
     >
-      <>
-        <span className={cn("pr-2 opacity-0", isSelected && "opacity-70")}>
-          <CheckIcon width={18} height={18} />
-        </span>
-        {label}
-      </>
+      {label}
     </Button>
   );
 
@@ -348,7 +345,7 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
       }}
     >
       <PopoverTrigger asChild>
-        <Button size={"lg"} variant="outline">
+        <Button variant="outline">
           <div className="text-right">
             <div className="py-1">
               <div>{`${formatDate(range.from, locale)}${
@@ -377,9 +374,23 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
       </PopoverTrigger>
       <PopoverContent align={align} className="w-auto">
         <div className="flex py-2">
+          {!isSmallScreen && (
+            <div className="flex flex-col items-start gap-1 pr-6 pl-2 pb-6">
+              <div className="flex w-full flex-col items-start gap-2">
+                {PRESETS.map((preset) => (
+                  <PresetButton
+                    key={preset.name}
+                    preset={preset.name}
+                    label={preset.label}
+                    isSelected={selectedPreset === preset.name}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex">
             <div className="flex flex-col">
-              <div className="flex flex-col lg:flex-row gap-2 px-3 justify-end items-center lg:items-start pb-4 lg:pb-0">
+              <div className="flex flex-col lg:flex-row gap-2 px-3 justify-start items-center lg:items-start pb-4 lg:pb-0">
                 {showCompare && (
                   <div className="flex items-center space-x-2 pr-4 py-1">
                     <Switch
@@ -530,32 +541,20 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
               </div>
             </div>
           </div>
-          {!isSmallScreen && (
-            <div className="flex flex-col items-end gap-1 pr-2 pl-6 pb-6">
-              <div className="flex w-full flex-col items-end gap-1 pr-2 pl-6 pb-6">
-                {PRESETS.map((preset) => (
-                  <PresetButton
-                    key={preset.name}
-                    preset={preset.name}
-                    label={preset.label}
-                    isSelected={selectedPreset === preset.name}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-        <div className="flex justify-end gap-2 py-2 pr-4">
+        <div className="flex justify-end gap-2">
           <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setIsOpen(false);
               resetValues();
             }}
-            variant="ghost"
           >
             Cancel
           </Button>
           <Button
+            size="sm"
             onClick={() => {
               setIsOpen(false);
               if (
@@ -566,7 +565,7 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
               }
             }}
           >
-            Update
+            Apply
           </Button>
         </div>
       </PopoverContent>
@@ -575,5 +574,3 @@ export const DateRangePicker: FC<DateRangePickerProps> & {
 };
 
 DateRangePicker.displayName = "DateRangePicker";
-DateRangePicker.filePath =
-  "libs/shared/ui-kit/src/lib/date-range-picker/date-range-picker.tsx";
