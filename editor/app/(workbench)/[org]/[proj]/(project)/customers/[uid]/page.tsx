@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import useSWR, { mutate } from "swr";
 import { Spinner } from "@/components/spinner";
-import { Link2Icon } from "@radix-ui/react-icons";
+import { Link2Icon, Pencil2Icon } from "@radix-ui/react-icons";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,10 +31,9 @@ import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-
-// function useCustomerDetails() {
-//   //
-// }
+import CustomerEditDialog, {
+  CustomerEditDialogDTO,
+} from "@/scaffolds/platform/customer/customer-edit-dialog";
 
 type Params = {
   uid: string;
@@ -54,10 +53,14 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
 
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
-  const updateCustomerMetadata = async (metadata: any) => {
-    const { data, error } = await supabase
+  const editCustomerDialog = useDialogState("edit-customer", {
+    refreshkey: true,
+  });
+
+  const updateCustomer = async (data: CustomerEditDialogDTO) => {
+    const { error } = await supabase
       .from("customer")
-      .update({ metadata })
+      .update(data)
       .eq("uid", uid)
       .select("*")
       .single();
@@ -67,13 +70,27 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
       return false;
     }
 
-    if (data) {
-      mutate(key);
-      toast.success("Metadata updated");
-      return true;
+    mutate(key);
+    toast.success("Metadata updated");
+    return true;
+  };
+
+  const updateCustomerMetadata = async (metadata: any) => {
+    const { error } = await supabase
+      .from("customer")
+      .update({ metadata })
+      .eq("uid", uid)
+      .select("*")
+      .single();
+
+    if (error) {
+      toast.error("Failed to update customer");
+      return false;
     }
 
-    return false;
+    mutate(key);
+    toast.success("Customer updated");
+    return true;
   };
 
   if (!customer) {
@@ -86,6 +103,13 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
 
   return (
     <div className="container mx-auto py-6 max-w-5xl">
+      <CustomerEditDialog
+        key={editCustomerDialog.refreshkey}
+        {...editCustomerDialog.props}
+        operation="update"
+        onSubmit={updateCustomer}
+        default={customer}
+      />
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Customer</h1>
         <p className="text-muted-foreground">
@@ -96,24 +120,36 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
       <div className="grid gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarFallback className="text-lg">
-                  {customer.name?.charAt(0) || "?"}
-                </AvatarFallback>
-              </Avatar>
+            <div className="flex justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback className="text-lg">
+                    {customer.name?.charAt(0) || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle
+                    data-unnamed={!customer.name}
+                    className="text-xl data-[unnamed=true]:text-muted-foreground data-[unnamed=true]:underline data-[unnamed=true]:decoration-dashed"
+                  >
+                    {customer.name || "Unnamed Customer"}
+                  </CardTitle>
+                  <CardDescription>
+                    <pre className="text-muted-foreground overflow-ellipsis text-xs">
+                      {customer.uid}
+                    </pre>
+                  </CardDescription>
+                </div>
+              </div>
               <div>
-                <CardTitle
-                  data-unnamed={!customer.name}
-                  className="text-xl data-[unnamed=true]:text-muted-foreground data-[unnamed=true]:underline data-[unnamed=true]:decoration-dashed"
+                <Button
+                  title="Edit"
+                  variant="outline"
+                  size="icon"
+                  onClick={editCustomerDialog.openDialog}
                 >
-                  {customer.name || "Unnamed Customer"}
-                </CardTitle>
-                <CardDescription>
-                  <pre className="text-muted-foreground overflow-ellipsis text-xs">
-                    {customer.uid}
-                  </pre>
-                </CardDescription>
+                  <Pencil2Icon />
+                </Button>
               </div>
             </div>
           </CardHeader>

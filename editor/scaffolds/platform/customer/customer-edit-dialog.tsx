@@ -17,43 +17,52 @@ import { Spinner } from "@/components/spinner";
 import { PhoneInput } from "@/components/extension/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 
-interface CreateCustomerInsert {
+export interface CustomerEditDialogDTO {
   name: string | null;
   email: string | null;
   phone: string | null;
   description: string | null;
 }
 
-export default function CreateCustomerDialog({
+const t_operation_action_label = {
+  insert: "create",
+  update: "update",
+} as const;
+
+export default function CustomerEditDialog({
+  default: defaultValues = {
+    name: "",
+    email: "",
+    phone: "",
+    description: "",
+  },
+  operation,
   onSubmit,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onSubmit?: (data: CreateCustomerInsert) => Promise<boolean>;
+  operation: "insert" | "update";
+  default?: CustomerEditDialogDTO;
+  onSubmit?: (data: CustomerEditDialogDTO) => Promise<boolean>;
 }) {
   const {
     control,
     register,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<CreateCustomerInsert>({
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      description: "",
-    },
+  } = useForm<CustomerEditDialogDTO>({
+    defaultValues: defaultValues,
   });
 
-  const onFormSubmit = async (data: CreateCustomerInsert) => {
+  const t_action_label = t_operation_action_label[operation];
+
+  const onFormSubmit = async (data: CustomerEditDialogDTO) => {
     // Transform falsy (empty) values to null.
-    const transformedData: CreateCustomerInsert = {
+    const transformedData: CustomerEditDialogDTO = {
       name: data.name?.trim() || null,
       email: data.email?.trim() || null,
       phone: data.phone?.trim() || null,
       description: data.description?.trim() || null,
     };
-
-    console.log("Create customer form submitted with data:", transformedData);
 
     await onSubmit?.(transformedData).then((success) => {
       if (success) props.onOpenChange?.(false);
@@ -64,7 +73,9 @@ export default function CreateCustomerDialog({
     <Dialog {...props}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Create customer</DialogTitle>
+          <DialogTitle className="capitalize">
+            {t_action_label} customer
+          </DialogTitle>
         </DialogHeader>
         <form
           id="create-customer"
@@ -122,8 +133,12 @@ export default function CreateCustomerDialog({
               Cancel
             </Button>
           </DialogClose>
-          <Button form="create-customer" disabled={isSubmitting}>
-            {isSubmitting ? <Spinner /> : "Add customer"}
+          <Button
+            form="create-customer"
+            disabled={isSubmitting}
+            className="capitalize"
+          >
+            {isSubmitting ? <Spinner /> : `${t_action_label} customer`}
           </Button>
         </DialogFooter>
       </DialogContent>
