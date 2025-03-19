@@ -16,11 +16,11 @@ You can use the CSV file to bulk insert or update data into the Grida customer o
 | description | Description of the customer            | No       | -      | A shofrt description of the customer    | Yes    | No                |
 | metadata    | K:V Metadata of the customer           | No       | json   | `{"my_custom_field_1" : "value", ... }` | Yes    | No                |
 
-### UID
+### `uid`
 
 `uid` is the system generated `uuidv4` unique identifier of the customer. this cannot be modified or provided by the user.
 
-### UUID
+### `uuid`
 
 `uuid` is a `uuidv4` format unique identifier of the customer. this can be provided by the user.
 this is useful when the customer is created in another system and you want to keep the sync between the two systems.
@@ -32,7 +32,7 @@ For example,
 - customer from your database
 - customer from salesforce
 
-### Metadata
+### `metadata`
 
 Set of key-value pairs that you can attach to a customer. This can be
 useful for storing additional information about the object in a
@@ -58,7 +58,7 @@ value 1,value 2
 
 > **IMPORTANT**: We do not support partial update of `metadata`. in all operations, you must provide the full metadata with the previous values included.
 
-### Phone
+### `phone`
 
 `phone` is a phone number of the customer in E.164 format. If you don't know how to format the phone number properly, you can use the
 [Grida E.164 tool](https://app.grida.co/tools/e164) to format the phone number.
