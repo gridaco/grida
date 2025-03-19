@@ -1,3 +1,5 @@
+// https://magicui.design/docs/components/confetti
+
 "use client";
 
 import type {

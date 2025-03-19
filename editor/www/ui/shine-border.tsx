@@ -1,3 +1,5 @@
+// https://magicui.design/docs/components/shine-border
+
 "use client";
 
 import { cn } from "@/utils";
