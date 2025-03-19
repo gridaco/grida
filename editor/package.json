@@ -69,6 +69,7 @@
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.43.5",
+    "@tanstack/react-table": "^8.21.2",
     "@tanstack/react-virtual": "^3.10.9",
     "@tiptap/core": "^2.9.1",
     "@tiptap/extension-color": "^2.9.1",
