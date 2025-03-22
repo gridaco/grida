@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import toast from "react-hot-toast";
+import { Platform } from "@/lib/platform";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
@@ -41,9 +42,7 @@ export function ImportCSVDialog({
   const handleFileSelected = (selectedFile: File) => {
     setFile(selectedFile);
     Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      comments: "#",
+      ...Platform.CSV.parser_config,
       complete: (results) => {
         setCsv(results.data);
         setSample(results.data.slice(0, Math.min(results.data.length, 100)));
