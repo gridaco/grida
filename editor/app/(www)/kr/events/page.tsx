@@ -8,6 +8,7 @@ import { Solutions2 } from "./solution-2";
 import { ShowCase } from "./showcase";
 import { Demo } from "./demo";
 import Footer from "@/www/footer";
+import Link from "next/link";
 
 export default function PartnerPOC() {
   return (
@@ -16,16 +17,18 @@ export default function PartnerPOC() {
         <header className="absolute top-0 left-0 right-0 z-50">
           <div className="py-10 px-20 w-full">
             <div className="flex justify-end w-full">
-              <button className="px-8 py-2 rounded bg-black font-semibold text-white dark:invert">
-                시작하기
-              </button>
+              <Link href={"/forms"}>
+                <button className="px-8 py-2 rounded bg-black font-semibold text-white dark:invert">
+                  시작하기
+                </button>
+              </Link>
             </div>
           </div>
         </header>
         <Hero />
         <section className="container my-40">
           <div className="gap-10 flex flex-col items-center justify-center">
-            <h2 className=" text-lg font-bold">POC와 함께한 브랜드</h2>
+            <h2 className=" text-lg font-bold">우리와 함께한 브랜드</h2>
             <Logos />
           </div>
         </section>
@@ -40,9 +43,11 @@ export default function PartnerPOC() {
             <br />
             문화를 만듭니다.
           </h2>
-          <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white dark:invert">
-            POC 문의하기
-          </button>
+          <Link href="/contact">
+            <button className="px-8 py-2 rounded-full bg-black font-semibold text-white dark:invert">
+              문의하기
+            </button>
+          </Link>
         </div>
       </div>
       <Footer />

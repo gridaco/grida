@@ -62,7 +62,7 @@ export function Solutions2() {
           <aside className="md:flex-1 py-32 content-center">
             <div className="flex flex-col sm:px-32">
               <h2 className=" text-4xl font-bold text-center lg:text-left">
-                POC와 함께라면
+                Grida forms와 함께라면
                 <br />
                 정말 쉬운 이벤트 준비
               </h2>
@@ -82,7 +82,7 @@ export function Solutions2() {
               오직 여기서만 가능한.
             </h2>
             <p className=" text-muted-foreground mt-6 text-center sm:text-left">
-              오직 POC와 Grida Forms에서만 가능한 것을 체험해보세요.
+              오직 Grida Forms에서만 가능한 것을 체험해보세요.
               <br />
               머릿 속에 그리는 것을 현실로 만들어드립니다.
             </p>
