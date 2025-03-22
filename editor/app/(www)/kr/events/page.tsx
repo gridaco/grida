@@ -17,9 +17,11 @@ export default function PartnerPOC() {
         <header className="absolute top-0 left-0 right-0 z-50">
           <div className="py-10 px-20 w-full">
             <div className="flex justify-end w-full">
-              <button className="px-8 py-2 rounded bg-black font-semibold text-white dark:invert">
-                시작하기
-              </button>
+              <Link href={"/forms"}>
+                <button className="px-8 py-2 rounded bg-black font-semibold text-white dark:invert">
+                  시작하기
+                </button>
+              </Link>
             </div>
           </div>
         </header>
