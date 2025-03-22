@@ -1,10 +1,12 @@
 "use client";
 
+import { motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Image from "next/image";
-import React, { useState } from "react";
-import { ArrowDown, Github, Redo2Icon } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { ArrowDown, Github, Redo2Icon, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckIcon } from "lucide-react";
@@ -67,7 +69,7 @@ function Demo1() {
       <h2 className="text-4xl font-bold max-w-2xl">
         One command to add designs as a module to your existing projects.
       </h2>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-6 items-center">
         <div className="relative mt-12">
           <Image
             src="/images/top-design.png"
@@ -77,7 +79,17 @@ function Demo1() {
             className="w-40"
           />
         </div>
-
+        <div className="flex items-center gap-2 bg-white rounded-xl shadow-lg px-4 py-3 font-mono max-w-full">
+          <span className=" text-muted-foreground">→</span>
+          <span className="font-bold text-xs text-black whitespace-nowrap">
+            grida add
+          </span>
+          <div className="overflow-x-auto max-w-[300px] no-scrollbar">
+            <span className="text-gray-600 text-xs  whitespace-nowrap block ">
+              https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
+            </span>
+          </div>
+        </div>
         <div className="relative">
           <Image
             src="/images/bottom-code.png"
@@ -105,18 +117,7 @@ function Demo1() {
 function Demo2() {
   return (
     <section className="flex flex-col gap-12 bg-gray-50 py-40 ">
-      <div className="flex items-center justify-center">
-        <Image
-          src="/images/abstract-placeholder.jpg"
-          alt="Demo"
-          width={600}
-          height={300}
-        />
-      </div>
-      <div className="flex items-center gap-2 justify-center">
-        <p className="text-black text-center font-medium text-lg">replay</p>
-        <Redo2Icon className="text-black" />
-      </div>
+      <TerminalAnimation />
     </section>
   );
 }
@@ -198,5 +199,208 @@ function Demo3() {
         </h4>
       </div>
     </section>
+  );
+}
+
+function TerminalAnimation() {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const [key, setKey] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const terminalText = `➜ ~/ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
+➜ ~/ Fetching desing...
+➜ ~/ Generating code
+➜ ~/ Fetching assets..
+➜ ~/ Module added to ./src/grida/home.tsx
+➜ ~/ To use this module, import..
+
+     \`\`\`
+     import React from "react";
+     import { Home } from "./grida/home";
+     \`\`\`
+
+➜ ~/`;
+
+  // Calculate and set the maximum width needed for the content
+  useEffect(() => {
+    // Create a hidden element with the full text to measure its width
+    if (contentRef.current) {
+      const hiddenElement = document.createElement("pre");
+      hiddenElement.style.visibility = "hidden";
+      hiddenElement.style.position = "absolute";
+      hiddenElement.style.fontFamily = "monospace";
+      hiddenElement.style.fontSize = "0.875rem"; // text-sm
+      hiddenElement.style.whiteSpace = "pre-wrap";
+      hiddenElement.style.padding = "1rem"; // p-4
+      hiddenElement.style.maxWidth = "48rem"; // max-w-3xl
+      hiddenElement.textContent = terminalText;
+      document.body.appendChild(hiddenElement);
+
+      // Get the computed width and set it as a minimum width
+      const computedWidth = hiddenElement.offsetWidth;
+      contentRef.current.style.minWidth = `${computedWidth}px`;
+
+      document.body.removeChild(hiddenElement);
+    }
+  }, []);
+
+  // Function to handle the typing animation
+  useEffect(() => {
+    if (!isAnimating) return;
+
+    let currentIndex = 0;
+    const textLength = terminalText.length;
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < textLength) {
+        setDisplayedText(terminalText.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setIsComplete(true);
+      }
+    }, 20); // Adjust typing speed here
+
+    return () => clearInterval(typingInterval);
+  }, [isAnimating, key]);
+
+  // Reset animation function
+  const handleReplay = () => {
+    setDisplayedText("");
+    setIsComplete(false);
+    setKey((prev) => prev + 1);
+    setIsAnimating(true);
+  };
+
+  // Function to apply syntax highlighting
+  const formatWithSyntaxHighlighting = (text: string) => {
+    // Split the text into lines for processing
+    const lines = text.split("\n");
+
+    return lines
+      .map((line, lineIndex) => {
+        // Handle command lines with arrows
+        if (line.startsWith("➜ ~/")) {
+          // Special case for the line with node-id
+          if (line.includes("node-id=")) {
+            const parts = line.split("node-id=");
+            return (
+              <span key={lineIndex}>
+                <span className="text-gray-700">➜ ~/ </span>
+                {parts[0].substring(5)}
+                <span className="text-teal-500">node-id={parts[1]}</span>
+              </span>
+            );
+          }
+          return (
+            <span key={lineIndex}>
+              <span className="text-gray-700">➜ ~/ </span>
+              <span>{line.substring(5)}</span>
+            </span>
+          );
+        }
+
+        // Handle import statements
+        if (line.includes("import")) {
+          // Match the import React from "react" pattern
+          if (line.includes("import React from")) {
+            return (
+              <span key={lineIndex}>
+                <span>import </span>
+                <span className="text-teal-500">React</span>
+                <span> </span>
+                <span className="text-cyan-500">from</span>
+                <span> </span>
+                <span className="text-teal-500">&quot;react&quot;</span>
+                <span>;</span>
+              </span>
+            );
+          }
+
+          // Match the import { Home } from "./grida/home" pattern
+          if (line.includes("import { Home }")) {
+            return (
+              <span key={lineIndex}>
+                <span>import &#123; </span>
+                <span className="text-teal-500">Home</span>
+                <span> &#125; </span>
+                <span className="text-cyan-500">from</span>
+                <span> </span>
+                <span className="text-teal-500">&quot;./grida/home&quot;</span>
+                <span>;</span>
+              </span>
+            );
+          }
+        }
+
+        // Return other lines unchanged
+        return <span key={lineIndex}>{line}</span>;
+      })
+      .reduce((acc: React.ReactNode[], element, index) => {
+        return [...acc, element, <br key={`br-${index}`} />];
+      }, [])
+      .slice(0, -1); // Remove the last <br/>
+  };
+
+  // Create a non-animated version of the full text with syntax highlighting
+  const fullFormattedText = formatWithSyntaxHighlighting(terminalText);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[500px] p-4 md:p-8">
+      <div
+        ref={containerRef}
+        className="w-full max-w-3xl bg-white rounded-lg overflow-hidden shadow-xl  border border-neutral-150"
+      >
+        {/* Terminal header */}
+        <div className="flex items-center px-4 py-2 bg-gray-100 border-b">
+          <div className="flex space-x-2">
+            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-red-400"></div>
+            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
+            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-green-400"></div>
+          </div>
+          <div className="mx-auto text-sm text-gray-500">
+            ~/projects/my-react-app -- zsh
+          </div>
+        </div>
+
+        {/* Terminal content */}
+        <div
+          ref={contentRef}
+          className="p-4 h-[300px] overflow-auto font-mono text-sm bg-white relative"
+        >
+          {/* Invisible full formatted text to maintain width and structure */}
+          <div className="whitespace-pre-wrap invisible absolute">
+            {fullFormattedText}
+          </div>
+
+          {/* Visible animated text with syntax highlighting */}
+          <div className="whitespace-pre-wrap text-gray-500">
+            {isAnimating && displayedText
+              ? formatWithSyntaxHighlighting(displayedText)
+              : null}
+            {!isComplete && isAnimating && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.7 }}
+                className="inline-block w-2 h-4 ml-1 bg-gray-800"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Button
+        onClick={handleReplay}
+        variant="outline"
+        className="mt-6 flex items-center gap-2 px-4 py-2 transition-all duration-300 border border-gray-300 rounded-full hover:bg-gray-100"
+      >
+        <RefreshCw className="w-4 h-4" />
+        <span>replay</span>
+      </Button>
+    </div>
   );
 }
