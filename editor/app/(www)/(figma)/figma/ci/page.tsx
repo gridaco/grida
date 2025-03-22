@@ -205,9 +205,10 @@ function Demo3() {
 function TerminalAnimation() {
   const [displayedText, setDisplayedText] = useState("");
   const [isComplete, setIsComplete] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [key, setKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const terminalText = `➜ ~/ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
@@ -262,7 +263,7 @@ function TerminalAnimation() {
         clearInterval(typingInterval);
         setIsComplete(true);
       }
-    }, 20); // Adjust typing speed here
+    }, 30); // Adjust typing speed here
 
     return () => clearInterval(typingInterval);
   }, [isAnimating, key]);
@@ -347,9 +348,29 @@ function TerminalAnimation() {
 
   // Create a non-animated version of the full text with syntax highlighting
   const fullFormattedText = formatWithSyntaxHighlighting(terminalText);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsAnimating(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[500px] p-4 md:p-8">
+    <div
+      ref={observerRef}
+      className="flex flex-col items-center justify-center min-h-[500px] p-4 md:p-8"
+    >
       <div
         ref={containerRef}
         className="w-full max-w-3xl bg-white rounded-lg overflow-hidden shadow-xl  border border-neutral-150"
@@ -385,7 +406,7 @@ function TerminalAnimation() {
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.7 }}
+                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.2 }}
                 className="inline-block w-2 h-4 ml-1 bg-gray-800"
               />
             )}
