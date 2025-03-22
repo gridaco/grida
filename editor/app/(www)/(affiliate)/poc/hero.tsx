@@ -54,8 +54,8 @@ export function Hero() {
               <GridaLogo />
               <span className="font-bold text-lg">Affiliate</span>
             </div>
-            <h1 className="text-4xl font-extrabold text-start">
-              POC와 함께하는 <br />
+            <h1 className="text-4xl font-bold text-start">
+              Grida forms로 <br />
               편리한 이벤트 준비
             </h1>
             <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white dark:invert">

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import React from "react";
+import Link from "next/link";
 import { CaretRightIcon, CheckIcon } from "@radix-ui/react-icons";
 
 export function Solutions() {
@@ -9,7 +10,7 @@ export function Solutions() {
     <section className="container mx-auto my-40">
       <div className="flex flex-col gap-4">
         <div className="flex flex-row items-center justify-center gap-2">
-          <span className="font-bold text-lg">POC만의 솔루션</span>
+          <span className="font-bold text-lg">Grida forms만의 솔루션</span>
         </div>
         <h2 className="text-4xl font-extrabold text-center">
           행사 기획부터 현장 관리까지
@@ -19,40 +20,46 @@ export function Solutions() {
         <span className="text-center font-medium text-muted-foreground">
           오프라인 행사를 기획 중이신가요?
           <br />
-          도움이 필요한 순간에 POC가 옆에서 도와드립니다.
+          도움이 필요한 순간에 Grida forms가 옆에서 도와드립니다.
         </span>
       </div>
       <div className="flex flex-col flex-wrap items-center justify-center md:flex-row gap-10 mt-20">
-        <SolutionCard
-          cover="/affiliate/poc/images/solution-card-cover-1.png"
-          alt="solution 1"
-          title={
-            <>
-              특별한 행사를 위한 <br />
-              기획하기
-            </>
-          }
-        />
-        <SolutionCard
-          cover="/affiliate/poc/images/solution-card-cover-2.png"
-          alt="solution 2"
-          title={
-            <>
-              오프라인 행사 <br />
-              공간 찾기
-            </>
-          }
-        />
-        <SolutionCard
-          cover="/affiliate/poc/images/solution-card-cover-3.png"
-          alt="solution 3"
-          title={
-            <>
-              행사를 빛내줄 <br />
-              협력사 찾기
-            </>
-          }
-        />
+        <Link href={"/forms"}>
+          <SolutionCard
+            cover="/affiliate/poc/images/solution-card-cover-1.png"
+            alt="solution 1"
+            title={
+              <>
+                특별한 행사를 위한 <br />
+                기획하기
+              </>
+            }
+          />
+        </Link>
+        <Link href={"/forms"}>
+          <SolutionCard
+            cover="/affiliate/poc/images/solution-card-cover-2.png"
+            alt="solution 2"
+            title={
+              <>
+                오프라인 행사 <br />
+                공간 찾기
+              </>
+            }
+          />
+        </Link>
+        <Link href={"/forms"}>
+          <SolutionCard
+            cover="/affiliate/poc/images/solution-card-cover-3.png"
+            alt="solution 3"
+            title={
+              <>
+                행사를 빛내줄 <br />
+                협력사 찾기
+              </>
+            }
+          />
+        </Link>
       </div>
     </section>
   );
