@@ -72,7 +72,7 @@ function Demo1() {
       <div className="flex flex-col gap-6 items-center">
         <div className="relative mt-12">
           <Image
-            src="/images/top-design.png"
+            src="/www/.figma/ci/top-design.png"
             alt="Figma to Code Demo"
             width={320}
             height={180}
@@ -92,7 +92,7 @@ function Demo1() {
         </div>
         <div className="relative">
           <Image
-            src="/images/bottom-code.png"
+            src="/www/.figma/ci/bottom-code.png"
             alt="Figma to Code Demo"
             width={320}
             height={180}
@@ -202,16 +202,7 @@ function Demo3() {
   );
 }
 
-function TerminalAnimation() {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [key, setKey] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  const terminalText = `➜ ~/ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
+const terminalText = `➜ ~/ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
 ➜ ~/ Fetching desing...
 ➜ ~/ Generating code
 ➜ ~/ Fetching assets..
@@ -225,28 +216,14 @@ function TerminalAnimation() {
 
 ➜ ~/`;
 
-  // Calculate and set the maximum width needed for the content
-  useEffect(() => {
-    // Create a hidden element with the full text to measure its width
-    if (contentRef.current) {
-      const hiddenElement = document.createElement("pre");
-      hiddenElement.style.visibility = "hidden";
-      hiddenElement.style.position = "absolute";
-      hiddenElement.style.fontFamily = "monospace";
-      hiddenElement.style.fontSize = "0.875rem"; // text-sm
-      hiddenElement.style.whiteSpace = "pre-wrap";
-      hiddenElement.style.padding = "1rem"; // p-4
-      hiddenElement.style.maxWidth = "48rem"; // max-w-3xl
-      hiddenElement.textContent = terminalText;
-      document.body.appendChild(hiddenElement);
-
-      // Get the computed width and set it as a minimum width
-      const computedWidth = hiddenElement.offsetWidth;
-      contentRef.current.style.minWidth = `${computedWidth}px`;
-
-      document.body.removeChild(hiddenElement);
-    }
-  }, []);
+function TerminalAnimation() {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [key, setKey] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Function to handle the typing animation
   useEffect(() => {
