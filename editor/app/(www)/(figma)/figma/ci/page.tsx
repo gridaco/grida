@@ -167,8 +167,8 @@ function Demo3() {
       </div>
 
       <div className="absolute lg:w-[1000px] sm:w-[600px] w-[400px] bottom-[-400px] left-1/2 transform -translate-x-1/2">
-        <Card className="px-20 md:px-40 py-24 flex flex-col gap-20 shadow-lg bg-white text-black border-gray-200">
-          <h3 className="text-3xl md:text-5xl font-semibold text-center">
+        <Card className="px-20 md:px-40 py-24 flex flex-col gap-20 shadow-lg bg-white dark:bg-neutral-800 text-black border-gray-200 dark:border-neutral-700">
+          <h3 className="dark:text-white text-3xl md:text-5xl font-semibold text-center">
             CI your design.
           </h3>
           <div className="flex gap-4 mt-4 items-center justify-center">
@@ -373,10 +373,10 @@ function TerminalAnimation() {
     >
       <div
         ref={containerRef}
-        className="w-full max-w-3xl bg-white rounded-lg overflow-hidden shadow-xl  border border-neutral-150"
+        className="w-full max-w-3xl bg-white rounded-lg overflow-hidden shadow-xl border border-gray-200"
       >
         {/* Terminal header */}
-        <div className="flex items-center px-4 py-2 bg-gray-100 border-b">
+        <div className="flex items-center px-4 py-2 bg-gray-100 border-b-gray-200">
           <div className="flex space-x-2">
             <div className="w-4 h-4 rounded-full border border-neutral-200 bg-red-400"></div>
             <div className="w-4 h-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
@@ -417,7 +417,7 @@ function TerminalAnimation() {
       <Button
         onClick={handleReplay}
         variant="outline"
-        className="mt-6 flex items-center gap-2 px-4 py-2 transition-all duration-300 border border-gray-300 rounded-full hover:bg-gray-100"
+        className="mt-6 flex items-center gap-2 px-4 py-2 transition-all duration-300 border border-gray-200 rounded-full bg-white text-black"
       >
         <RefreshCw className="w-4 h-4" />
         <span>replay</span>
