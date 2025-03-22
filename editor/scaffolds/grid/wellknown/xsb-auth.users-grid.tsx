@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
 import { cn } from "@/utils";
 import {
-  DataGridStateProvider,
+  StandaloneDataGridStateProvider,
   useDataGridState,
   useMasking,
 } from "../providers";
@@ -196,7 +196,7 @@ export function XSBAuthUsersGrid({
   onRowDoubleClick?: (row: XSBUserRow) => void;
 }) {
   return (
-    <DataGridStateProvider
+    <StandaloneDataGridStateProvider
       masking_enabled={mask}
       highlightTokens={highlightTokens}
     >
@@ -221,7 +221,7 @@ export function XSBAuthUsersGrid({
           onRowDoubleClick?.(row);
         }}
       />
-    </DataGridStateProvider>
+    </StandaloneDataGridStateProvider>
   );
 }
 

@@ -79,22 +79,28 @@ export default function Footer() {
                   Grida Studios
                 </Link>
                 <Link
-                  href={sitemap.links.corssh}
-                  className="text-xs md:text-sm text-muted-foreground"
-                >
-                  CORS.SH
-                </Link>
-                <Link
                   href={sitemap.links.thebundle}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
                   The Bundle
                 </Link>
                 <Link
-                  href={sitemap.links.blog}
+                  href={sitemap.links.corssh}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
-                  Blog
+                  CORS.SH
+                </Link>
+                <Link
+                  href={sitemap.links.figma_assistant}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Figma Assistant
+                </Link>
+                <Link
+                  href={sitemap.links.figma_ci}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Figma Ci
                 </Link>
               </FooterColumn>
               <FooterColumn>
@@ -122,6 +128,12 @@ export default function Footer() {
                   className="text-xs md:text-sm text-muted-foreground"
                 >
                   Github
+                </Link>
+                <Link
+                  href={sitemap.links.blog}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Blog
                 </Link>
               </FooterColumn>
               <FooterColumn>

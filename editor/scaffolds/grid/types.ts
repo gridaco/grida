@@ -100,7 +100,7 @@ export type DGResponseRow = {
 export type DGCustomerRow = {
   uid: string;
   email: string | null;
-  // name: string;
+  name: string | null;
   phone: string | null;
   // address: string;
   created_at: string;

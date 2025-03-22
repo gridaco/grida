@@ -25,7 +25,6 @@ export function SideControl() {
     <SidebarRoot side="right">
       <FontFamilyListProvider fonts={fonts}>
         <SrcUploaderProvider uploader={srcUploader}>
-          <div className="h-5" />
           {doctype === "v0_form" && <SideControlDoctypeForm />}
           {doctype === "v0_site" && <SideControlDoctypeSite />}
           {doctype === "v0_canvas" && <SideControlDoctypeCanvas />}

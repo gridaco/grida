@@ -1931,6 +1931,17 @@ export function useDocument() {
     [dispatch]
   );
 
+  const schemaPutProperty = useCallback(
+    (name: string, definition: grida.program.schema.PropertyDefinition) => {
+      dispatch({
+        type: "document/properties/put",
+        key: name,
+        definition: definition,
+      });
+    },
+    [dispatch]
+  );
+
   const schemaDeleteProperty = useCallback(
     (name: string) => {
       dispatch({ type: "document/properties/delete", key: name });
@@ -1993,6 +2004,7 @@ export function useDocument() {
       schemaDefineProperty,
       schemaRenameProperty,
       schemaUpdateProperty,
+      schemaPutProperty,
       schemaDeleteProperty,
     };
   }, [
@@ -2048,6 +2060,7 @@ export function useDocument() {
     schemaDefineProperty,
     schemaRenameProperty,
     schemaUpdateProperty,
+    schemaPutProperty,
     schemaDeleteProperty,
   ]);
 }

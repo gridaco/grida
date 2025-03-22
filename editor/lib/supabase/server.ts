@@ -4,6 +4,9 @@ import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase
 import { createClient } from "@supabase/supabase-js";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const workspaceclient = createClient<Database, "public">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -14,6 +17,9 @@ export const workspaceclient = createClient<Database, "public">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_forms_client = createClient<Database, "grida_forms">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -24,6 +30,9 @@ export const grida_forms_client = createClient<Database, "grida_forms">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_storage_client = createClient<Database, "grida_storage">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -34,6 +43,9 @@ export const grida_storage_client = createClient<Database, "grida_storage">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_canvas_client = createClient<Database, "grida_canvas">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -44,6 +56,9 @@ export const grida_canvas_client = createClient<Database, "grida_canvas">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_sites_client = createClient<Database, "grida_sites">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -54,6 +69,9 @@ export const grida_sites_client = createClient<Database, "grida_sites">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_commerce_client = createClient<Database, "grida_commerce">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
@@ -64,6 +82,9 @@ export const grida_commerce_client = createClient<Database, "grida_commerce">(
   }
 );
 
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_xsupabase_client = createClient<
   Database,
   "grida_x_supabase"

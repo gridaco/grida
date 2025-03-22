@@ -11,9 +11,8 @@ export default function Header() {
           <Link href="/">
             <GridaLogo className="w-5 h-5" />
           </Link>
-          <SlashIcon width={20} height={20} />
           <Link href="/forms">
-            <span className="text-xl font-bold">Grida Forms</span>
+            <span className="text-lg font-bold">Grida Forms</span>
           </Link>
         </span>
       </div>

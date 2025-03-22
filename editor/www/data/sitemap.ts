@@ -18,7 +18,8 @@ export namespace sitemap {
     cta: "/dashboard/new?plan=free",
     thebundle: "/bundle",
     playground: "/playground",
-    figma: "/figma", // FIXME: <DEADLINK> no link
+    figma_ci: "/figma/ci",
+    figma_assistant: "/figma/assistant",
     book30: "https://cal.com/universe-from-grida/30min",
     studio: "https://grida.studio",
     corssh: "https://cors.sh",
@@ -49,10 +50,15 @@ export namespace sitemap {
       href: links.canvas,
       description: "Design Components and Websites",
     } satisfies Item,
-    figmaci: {
+    figma_ci: {
       title: "Figma CI",
-      href: links.figma,
+      href: links.figma_ci,
       description: "CI for Figma Designs",
+    } satisfies Item,
+    figma_assistant: {
+      title: "Figma Assistant",
+      href: links.figma_assistant,
+      description: "AI powered Design Assistant",
     } satisfies Item,
     studio: {
       title: "Grida Studios",

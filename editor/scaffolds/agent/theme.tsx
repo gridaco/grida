@@ -10,8 +10,8 @@ import { fonts } from "@/theme/font-family";
 import type { NextFont } from "@next/font/dist/types";
 import type { FormPageBackgroundSchema } from "@/types";
 import { cn } from "@/utils";
-import { CustomCSS } from "@/theme/customcss";
 import { useTheme } from "next-themes";
+import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -44,37 +44,6 @@ function BackgroundProvider({
       {background && (
         <FormPageBackground {...(background as FormPageBackgroundSchema)} />
       )}
-    </>
-  );
-}
-
-function CustomCSSProvider({
-  css,
-  children,
-}: React.PropsWithChildren<{ css?: string }>) {
-  const compiledcss = useMemo(
-    () => (css ? CustomCSS.vanilla(css) : undefined),
-    [css]
-  );
-
-  const iscustomized = !!compiledcss;
-
-  const props = {
-    [CustomCSS.DATA_CUSTOM_CSS_KEY]: iscustomized,
-  };
-
-  return (
-    <>
-      {iscustomized && (
-        <style
-          key="customcss"
-          id="customcss"
-          dangerouslySetInnerHTML={{ __html: compiledcss }}
-        />
-      )}
-      <div {...props} className="w-full h-full">
-        {children}
-      </div>
     </>
   );
 }

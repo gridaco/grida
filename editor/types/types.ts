@@ -48,14 +48,18 @@ export type UserProfile = {
 };
 
 export interface Customer {
+  project_id: number;
   uid: string;
   created_at: string;
   last_seen_at: string;
+  name: string | null;
   email: string | null;
   email_provisional: string[];
   phone: string | null;
   phone_provisional: string[];
+  description: string | null;
   uuid: string | null;
+  metadata: unknown | null;
 }
 
 /**
@@ -486,6 +490,14 @@ export interface Organization {
   name: string;
   owner_id: string;
 }
+
+export type OrganizationWithMembers = Organization & {
+  members: OrganizationMember[];
+};
+
+export type OrganizationWithAvatar = Organization & {
+  avatar_url: string | null;
+};
 
 export interface OrganizationMember {
   id: number;

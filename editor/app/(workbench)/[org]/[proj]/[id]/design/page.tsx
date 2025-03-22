@@ -5,6 +5,7 @@ import {
   ViewportRoot,
   EditorSurface,
   StandaloneSceneContent,
+  useDocument,
 } from "@/grida-react-canvas";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
@@ -21,11 +22,14 @@ import _002 from "@/theme/templates/formstart/002/page";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import Invite from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/invite/main";
-import Portal from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/page";
-import Verify from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/portal/_flows/step-verify";
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
-import Main from "@/app/(demo)/demo/sales/campaign/polestar-kr-2503/[cid]/join/_flows/main";
+import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import Invite from "@/app/(demo)/polestar/event/invite/[cid]/main";
+import Portal from "@/app/(demo)/polestar/event/portal/_flows/page";
+import Verify from "@/app/(demo)/polestar/event/portal/_flows/step-verify";
+import Main from "@/app/(demo)/polestar/event/join/[cid]/_flows/main";
+import Hello from "@/app/(demo)/polestar/event/join/[cid]/_flows/hello";
 
 export default function SiteDeisngPage() {
   return (
@@ -37,18 +41,25 @@ export default function SiteDeisngPage() {
 
 function CurrentPageCanvas() {
   useEditorHotKeys();
+  useDisableSwipeBack();
+
+  const { state } = useDocument();
+
+  const customcss = state.document.properties["user-custom-css"];
+
+  // console.log("customcss", customcss);
 
   return (
-    <UserCustomTemplatesProvider
-      templates={{
-        "tmp-2503-invite": CustomComponent__Invite,
-        "tmp-2503-join": CustomComponent__Join,
-        "tmp-2503-join-hello": CustomComponent__Join_Hello,
-        "tmp-2503-portal": CustomComponent__Portal,
-        "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
-      }}
-    >
-      <div className="flex w-full h-full">
+    <div className="flex w-full h-full">
+      <UserCustomTemplatesProvider
+        templates={{
+          "tmp-2503-invite": CustomComponent__Invite,
+          "tmp-2503-join": CustomComponent__Join,
+          "tmp-2503-join-hello": CustomComponent__Join_Hello,
+          "tmp-2503-portal": CustomComponent__Portal,
+          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
+        }}
+      >
         <PreviewProvider>
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
@@ -57,7 +68,12 @@ function CurrentPageCanvas() {
                   <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                     <EditorSurface />
                     <AutoInitialFitTransformer>
-                      <StandaloneSceneContent />
+                      <CustomCSSProvider
+                        scope="custom"
+                        css={customcss?.default}
+                      >
+                        <StandaloneSceneContent />
+                      </CustomCSSProvider>
                     </AutoInitialFitTransformer>
                     <ToolbarPosition>
                       <Toolbar />
@@ -67,12 +83,12 @@ function CurrentPageCanvas() {
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>
+          <aside className="hidden lg:flex h-full">
+            <SideControl />
+          </aside>
         </PreviewProvider>
-        <aside className="hidden lg:flex h-full">
-          <SideControl />
-        </aside>
-      </div>
-    </UserCustomTemplatesProvider>
+      </UserCustomTemplatesProvider>
+    </div>
   );
 }
 
@@ -99,7 +115,14 @@ function CustomComponent__Join(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Main />
+      <Main
+        data={{
+          cid: "00000000",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }
@@ -113,7 +136,15 @@ function CustomComponent__Join_Hello(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <_002 />
+      {/* <_002 /> */}
+      <Hello
+        data={{
+          cid: "",
+          user: {
+            name: "DUMMY",
+          },
+        }}
+      />
     </div>
   );
 }

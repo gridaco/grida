@@ -2,14 +2,14 @@ import { compile, serialize, stringify } from "stylis";
 
 export namespace CustomCSS {
   /**
+   * Compiles nested CSS using Stylis.
    *
-   * converts nested scss to css
-   *
-   * @param css nested scss (stylis)
-   * @returns
+   * @param css The nested CSS string.
+   * @returns The compiled CSS string.
    */
   export function vanilla(css: string): string {
-    return serialize(compile(css), stringify);
+    css = serialize(compile(css), stringify);
+    return css;
   }
 
   export const DATA_CUSTOM_CSS_KEY = "data-custom-css";
