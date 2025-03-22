@@ -50,12 +50,12 @@ export namespace sitemap {
       href: links.canvas,
       description: "Design Components and Websites",
     } satisfies Item,
-    figmaci: {
+    figma_ci: {
       title: "Figma CI",
       href: links.figma_ci,
       description: "CI for Figma Designs",
     } satisfies Item,
-    figmaassistant: {
+    figma_assistant: {
       title: "Figma Assistant",
       href: links.figma_assistant,
       description: "AI powered Design Assistant",
