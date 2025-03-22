@@ -22,7 +22,7 @@ import type {
 import type { tokens } from "@grida/tokens";
 import type { DataQueryAction } from "../data-query";
 import type { CanvasAction } from "@/grida-react-canvas";
-import type { SYM_LOCALTZ } from "./symbols";
+import type { DataFormat } from "../data-format";
 import { grida } from "@/grida";
 
 export type EditorAction =
@@ -249,7 +249,7 @@ export interface DataGridDateFormatAction {
 
 export interface DataGridDateTZAction {
   type: "editor/data-grid/tz";
-  tz: typeof SYM_LOCALTZ | string;
+  tz: DataFormat.DateTZ;
 }
 
 export type DataGridTableAction = {

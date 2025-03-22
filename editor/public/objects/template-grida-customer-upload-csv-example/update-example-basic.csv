@@ -1,0 +1,8 @@
+# see https://app.grida.co/docs/platform/customers/working-with-csv
+
+uuid,name,email,phone,description
+2c6041d3-51fb-42f9-8bcd-528239e9a369,John Doe,john.doe@example.com,+15551234,"High-value customer interested in premium plans"
+643873b6-726d-43f9-9949-0bd850983015,Jane Smith,jane.smith@example.com,+15555678,"New customer; follow up in 30 days"
+20202135-2e15-4084-92ee-d5bae4959238,Bob Johnson,bob.j@example.com,,""
+2fad31ea-dd54-4858-a398-389ac5979775,,anonymous@example.com,,"Anonymous signup"
+6c60d90d-374c-439c-b977-676c646636e2,Alice,alice@example.com,,""

@@ -2123,11 +2123,14 @@ export type Database = {
         Row: {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
+          description: string | null
           email: string | null
           email_provisional: string[]
           is_email_verified: boolean
           is_phone_verified: boolean
           last_seen_at: string
+          metadata: Json | null
+          name: string | null
           name_provisional: string[]
           phone: string | null
           phone_provisional: string[]
@@ -2139,11 +2142,14 @@ export type Database = {
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          metadata?: Json | null
+          name?: string | null
           name_provisional?: string[]
           phone?: string | null
           phone_provisional?: string[]
@@ -2155,11 +2161,14 @@ export type Database = {
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          metadata?: Json | null
+          name?: string | null
           name_provisional?: string[]
           phone?: string | null
           phone_provisional?: string[]
@@ -2178,6 +2187,47 @@ export type Database = {
           },
           {
             foreignKeyName: "public_customer_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_auth_policy: {
+        Row: {
+          challenges: Json[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Insert: {
+          challenges: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name: string
+          project_id: number
+          scopes: string[]
+        }
+        Update: {
+          challenges?: Json[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          name?: string
+          project_id?: number
+          scopes?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_auth_policy_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
@@ -2471,6 +2521,55 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      citext:
+        | {
+            Args: {
+              "": boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              "": string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: string
+          }
+      citext_hash: {
+        Args: {
+          "": string
+        }
+        Returns: number
+      }
+      citextin: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      citextout: {
+        Args: {
+          "": string
+        }
+        Returns: unknown
+      }
+      citextrecv: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      citextsend: {
+        Args: {
+          "": string
+        }
+        Returns: string
+      }
       generate_combinations:
         | {
             Args: {
@@ -2499,6 +2598,12 @@ export type Database = {
         }
         Returns: number[]
       }
+      jsonb_array_objects_only: {
+        Args: {
+          arr: Json[]
+        }
+        Returns: boolean
+      }
       rls_asset: {
         Args: {
           p_asset_id: string
@@ -2518,6 +2623,12 @@ export type Database = {
         Returns: boolean
       }
       rls_organization: {
+        Args: {
+          p_organization_id: number
+        }
+        Returns: boolean
+      }
+      rls_organization_owner: {
         Args: {
           p_organization_id: number
         }

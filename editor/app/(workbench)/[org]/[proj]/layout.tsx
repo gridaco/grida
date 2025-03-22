@@ -8,7 +8,7 @@ import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-type Params = { org: string };
+type Params = { org: string; proj: string };
 
 export default async function Layout({
   params,
@@ -17,7 +17,7 @@ export default async function Layout({
   children: React.ReactNode;
   params: Promise<Params>;
 }>) {
-  const { org } = await params;
+  const { org, proj } = await params;
 
   // in local dev, the vercel insights script is not loaded, will hit this route
   if (org === "_vercel") return notFound();
@@ -52,7 +52,9 @@ export default async function Layout({
 
   return (
     <PlatformProvider {...platform}>
-      <Workspace organization={organization}>{children}</Workspace>
+      <Workspace organization={organization} project={proj}>
+        {children}
+      </Workspace>
     </PlatformProvider>
   );
 }
