@@ -1,6 +1,6 @@
 "use client";
 import Header from "@/www/header";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "framer-motion";
@@ -11,9 +11,11 @@ import { Section, SectionHeader } from "@/www/ui/section";
 import { GridaLogo } from "@/components/grida-logo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/utils";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FooterWithCTA from "@/www/footer-with-cta";
+import { FormPageBackground } from "@/scaffolds/e/form/background";
 
 export default function A() {
   return (
@@ -26,6 +28,11 @@ export default function A() {
         <SectionMainDemo />
       </Section>
       <div className="h-96" />
+      <FormPageBackground
+        type="background"
+        element="iframe"
+        src="https://bg.grida.co/embed/dots"
+      />
       <FooterWithCTA />
     </main>
   );
@@ -110,6 +117,13 @@ function SectionMainDemo() {
   const [index, setIndex] = useState<number>(0);
 
   const data = tabs[index];
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % tabs.length);
+    }, 3000); // 3초마다 변경
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <motion.div
@@ -137,22 +151,36 @@ function SectionMainDemo() {
             />
           </motion.div>
         </Card>
-        <Tabs
-          value={index + ""}
-          onValueChange={(s) => {
-            setIndex(parseInt(s));
-          }}
-          className="w-min mx-auto mt-4"
-        >
-          <TabsList>
-            {tabs.map(({ name }, i) => (
-              <TabsTrigger key={i} value={i + ""}>
-                {name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex justify-center mt-8 gap-2">
+          {tabs.map(({ name }, i) => (
+            <div key={i} onClick={() => setIndex(i)} className="cursor-pointer">
+              <Trigger label={name} selected={index === i} />
+            </div>
+          ))}
+        </div>
       </div>
     </motion.div>
+  );
+}
+
+function Trigger({
+  label,
+  selected,
+}: {
+  label: React.ReactNode;
+  selected?: boolean;
+}) {
+  return (
+    <div
+      data-selected={selected}
+      className={cn(
+        "text-sm md:text-base rounded-lg bg-background flex py-2 px-4 items-center justify-center transition-all group select-none",
+        selected
+          ? "bg-white dark:bg-slate-950 dark:text-white text-black border border-slate-100 dark:border-slate-700 shadow-md shadow-slate-200 dark:shadow-none"
+          : "bg-transparent text-muted-foreground hover:bg-accent"
+      )}
+    >
+      <span className="text-center">{label}</span>
+    </div>
   );
 }
