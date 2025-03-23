@@ -47,6 +47,7 @@ npx supabase gen types typescript --local \
   --schema grida_forms_secure \
   --schema grida_forms \
   --schema grida_storage \
+  --schema grida_west \
   > database.types.ts
 ```
 
@@ -64,6 +65,7 @@ npx supabase gen types typescript \
   --schema grida_forms_secure \
   --schema grida_forms \
   --schema grida_storage \
+  --schema grida_west \
   > database.types.ts
 ```
 
