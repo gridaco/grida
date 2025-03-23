@@ -58,7 +58,9 @@ CREATE TABLE grida_west.campaign (
   scheduling_tz text null,
   metadata JSONB DEFAULT '{}'::jsonb,                                          -- Flexible additional data for the series
 
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()                               -- Creation timestamp
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),                               -- Creation timestamp
+
+  CONSTRAINT unique_campaign_id_project_id UNIQUE (id, project_id)
 );
 
 -- [rls] campaign:
@@ -90,7 +92,7 @@ CREATE TABLE grida_west.participant (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     metadata JSONB CHECK (jsonb_typeof(metadata) = 'object'),
 
-    CONSTRAINT unique_participant_series_id_role_customer_id unique (series_id, role, customer_id)
+    CONSTRAINT unique_participant_series_id_role_customer_id unique (series_id, role, customer_id),
     CONSTRAINT fk_participant_series_project FOREIGN KEY (series_id, project_id) REFERENCES grida_west.campaign(id, project_id),
     CONSTRAINT fk_participant_customer_project FOREIGN KEY (customer_id, project_id) REFERENCES public.customer(uid, project_id)
 );

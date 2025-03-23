@@ -11,16 +11,19 @@ export type Database = {
     Tables: {
       canvas_document: {
         Row: {
+          __schema_version: string
           created_at: string
           data: Json
           id: string
         }
         Insert: {
+          __schema_version?: string
           created_at?: string
           data: Json
           id: string
         }
         Update: {
+          __schema_version?: string
           created_at?: string
           data?: Json
           id?: string
@@ -1979,27 +1982,42 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
+          is_host_participant_name_exposed_to_public_dangerously: boolean
           metadata: Json | null
           name: string
           project_id: number
+          scheduling_close_at: string | null
+          scheduling_open_at: string | null
+          scheduling_tz: string | null
+          type: Database["grida_west"]["Enums"]["campaign_type"]
         }
         Insert: {
           created_at?: string
           description?: string | null
           enabled?: boolean
           id?: string
+          is_host_participant_name_exposed_to_public_dangerously?: boolean
           metadata?: Json | null
           name: string
           project_id: number
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+          type: Database["grida_west"]["Enums"]["campaign_type"]
         }
         Update: {
           created_at?: string
           description?: string | null
           enabled?: boolean
           id?: string
+          is_host_participant_name_exposed_to_public_dangerously?: boolean
           metadata?: Json | null
           name?: string
           project_id?: number
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+          type?: Database["grida_west"]["Enums"]["campaign_type"]
         }
         Relationships: []
       }
@@ -2009,6 +2027,7 @@ export type Database = {
           customer_id: string
           id: string
           metadata: Json | null
+          project_id: number
           role: Database["grida_west"]["Enums"]["participant_role"]
           series_id: string
         }
@@ -2017,6 +2036,7 @@ export type Database = {
           customer_id: string
           id?: string
           metadata?: Json | null
+          project_id: number
           role: Database["grida_west"]["Enums"]["participant_role"]
           series_id: string
         }
@@ -2025,10 +2045,18 @@ export type Database = {
           customer_id?: string
           id?: string
           metadata?: Json | null
+          project_id?: number
           role?: Database["grida_west"]["Enums"]["participant_role"]
           series_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_participant_series_project"
+            columns: ["series_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id", "project_id"]
+          },
           {
             foreignKeyName: "participant_series_id_fkey"
             columns: ["series_id"]
@@ -2171,10 +2199,18 @@ export type Database = {
           metadata: Json | null
           name: string | null
           phone: string | null
+          project_id: number | null
           role: Database["grida_west"]["Enums"]["participant_role"] | null
           series_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_participant_series_project"
+            columns: ["series_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id", "project_id"]
+          },
           {
             foreignKeyName: "participant_series_id_fkey"
             columns: ["series_id"]
@@ -2270,6 +2306,7 @@ export type Database = {
       }
     }
     Enums: {
+      campaign_type: "referral"
       participant_role: "host" | "guest"
       token_type: "mintable" | "redeemable"
     }

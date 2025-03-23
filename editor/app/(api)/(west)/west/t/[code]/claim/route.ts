@@ -28,14 +28,26 @@ export async function POST(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const { data: campaign, error: campaign_fetch_err } = await grida_west_client
+    .from("campaign")
+    .select()
+    .eq("id", series_id)
+    .single();
+
+  if (campaign_fetch_err) {
+    console.error(campaign_fetch_err);
+    return NextResponse.json({ error: campaign_fetch_err }, { status: 500 });
+  }
+
   // create participant for customer
   const { data: participant, error: participant_upsertion_err } =
     await grida_west_client
       .from("participant")
       .upsert({
+        series_id: campaign.id,
+        project_id: campaign.project_id,
         customer_id: customer_id,
         role: "guest",
-        series_id: series_id,
       })
       .select("id")
       .single();
