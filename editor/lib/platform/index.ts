@@ -74,6 +74,8 @@ export namespace Platform.CSV {
 }
 
 export namespace Platform.Customer {
+  export const TYPE = "grida.platform.customer";
+
   export interface Property {
     type: "string" | "number" | "integer" | "boolean" | "array" | "object";
     format?: DataFormat.Format;
@@ -167,4 +169,124 @@ export namespace Platform.Customer {
     email: properties.email,
     phone: properties.phone,
   } as const;
+}
+
+export namespace Platform.WEST {
+  export interface ImportParticipantsRequestBody {
+    role: "host";
+    customer_ids: string[];
+  }
+
+  export type TokenSeries = {
+    id: string;
+    name: string;
+    description: string | null;
+    metadata: Record<string, string> | unknown;
+    created_at: string;
+    project_id: number;
+    enabled: boolean;
+  };
+
+  export type TokenEvent = {
+    time: string;
+    name: string;
+    token_id: string;
+    data: Record<string, string>;
+  };
+
+  export type Participant = {
+    id: string;
+    series_id: string;
+    customer_id: string;
+    created_at: string;
+    metadata: Record<string, string> | unknown;
+  };
+
+  export type ParticipantCustomer = Participant & {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+
+  //
+  export type Token<
+    P extends unknown | Record<string, unknown> | null = unknown,
+  > = {
+    id: string;
+    series_id: string;
+    owner_id: string;
+    code: string;
+    parent_id: string;
+    public: P;
+    created_at: string;
+    token_type: "mintable" | "redeemable";
+    max_supply: number | null;
+    count: number;
+    is_claimed: boolean;
+    is_burned: boolean;
+  };
+
+  export class WestClient<
+    P extends unknown | Record<string, unknown> | null = unknown,
+  > {
+    constructor(readonly series_id: string) {}
+
+    read(code: string): Promise<{ data: Token<P> }> {
+      return fetch(`/west/t/${code}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-grida-west-series": this.series_id,
+        },
+      }).then((res) => res.json());
+    }
+
+    mint(code: string, secret?: string): Promise<{ data: Token<P> }> {
+      return fetch(`/west/t/${code}/mint`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-grida-west-series": this.series_id,
+          "x-grida-west-token-secret": secret ?? "",
+        },
+      }).then((res) => res.json());
+    }
+
+    claim(code: string, owner_id: string) {
+      return fetch(`/west/t/${code}/claim`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-grida-west-series": this.series_id,
+          "x-grida-customer-id": owner_id,
+        },
+      }).then((res) => {
+        return res.ok;
+      });
+    }
+
+    redeem(code: string): Promise<boolean> {
+      return fetch(`/west/t/${code}/redeem`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }).then((res) => {
+        return res.ok;
+      });
+    }
+
+    track(code: string, name: string, data?: Record<string, string>) {
+      fetch(`/west/t/${code}/track`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: name,
+          data,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-grida-west-series": this.series_id,
+        },
+      });
+      //
+    }
+  }
 }

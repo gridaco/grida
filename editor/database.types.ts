@@ -11,19 +11,16 @@ export type Database = {
     Tables: {
       canvas_document: {
         Row: {
-          __schema_version: string
           created_at: string
           data: Json
           id: string
         }
         Insert: {
-          __schema_version?: string
           created_at?: string
           data: Json
           id: string
         }
         Update: {
-          __schema_version?: string
           created_at?: string
           data?: Json
           id?: string
@@ -1974,6 +1971,312 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_west: {
+    Tables: {
+      campaign: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          metadata: Json | null
+          name: string
+          project_id: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          metadata?: Json | null
+          name: string
+          project_id: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          metadata?: Json | null
+          name?: string
+          project_id?: number
+        }
+        Relationships: []
+      }
+      participant: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          metadata: Json | null
+          role: Database["grida_west"]["Enums"]["participant_role"]
+          series_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          metadata?: Json | null
+          role: Database["grida_west"]["Enums"]["participant_role"]
+          series_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          metadata?: Json | null
+          role?: Database["grida_west"]["Enums"]["participant_role"]
+          series_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      token: {
+        Row: {
+          code: string
+          count: number
+          created_at: string
+          id: string
+          is_burned: boolean
+          is_claimed: boolean
+          max_supply: number | null
+          owner_id: string | null
+          parent_id: string | null
+          public: Json | null
+          secret: string | null
+          series_id: string
+          token_type: Database["grida_west"]["Enums"]["token_type"]
+        }
+        Insert: {
+          code: string
+          count?: number
+          created_at?: string
+          id?: string
+          is_burned?: boolean
+          is_claimed?: boolean
+          max_supply?: number | null
+          owner_id?: string | null
+          parent_id?: string | null
+          public?: Json | null
+          secret?: string | null
+          series_id: string
+          token_type: Database["grida_west"]["Enums"]["token_type"]
+        }
+        Update: {
+          code?: string
+          count?: number
+          created_at?: string
+          id?: string
+          is_burned?: boolean
+          is_claimed?: boolean
+          max_supply?: number | null
+          owner_id?: string | null
+          parent_id?: string | null
+          public?: Json | null
+          secret?: string | null
+          series_id?: string
+          token_type?: Database["grida_west"]["Enums"]["token_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "participant"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "participant_customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "token"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      token_event: {
+        Row: {
+          data: Json | null
+          name: string
+          series_id: string
+          time: string
+          token_id: string
+        }
+        Insert: {
+          data?: Json | null
+          name: string
+          series_id: string
+          time?: string
+          token_id: string
+        }
+        Update: {
+          data?: Json | null
+          name?: string
+          series_id?: string
+          time?: string
+          token_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_event_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_event_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "token"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      participant_customer: {
+        Row: {
+          created_at: string | null
+          customer_created_at: string | null
+          customer_description: string | null
+          customer_id: string | null
+          customer_last_seen_at: string | null
+          customer_metadata: Json | null
+          email: string | null
+          id: string | null
+          is_email_verified: boolean | null
+          is_phone_verified: boolean | null
+          metadata: Json | null
+          name: string | null
+          phone: string | null
+          role: Database["grida_west"]["Enums"]["participant_role"] | null
+          series_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      analyze: {
+        Args: {
+          p_series_id: string
+          p_names?: string[]
+          p_time_from?: string
+          p_time_to?: string
+          p_interval?: unknown
+        }
+        Returns: {
+          bucket: string
+          name: string
+          count: number
+        }[]
+      }
+      claim_token: {
+        Args: {
+          p_series_id: string
+          p_code: string
+          p_owner_id: string
+          p_secret?: string
+        }
+        Returns: {
+          code: string
+          count: number
+          created_at: string
+          id: string
+          is_burned: boolean
+          is_claimed: boolean
+          max_supply: number | null
+          owner_id: string | null
+          parent_id: string | null
+          public: Json | null
+          secret: string | null
+          series_id: string
+          token_type: Database["grida_west"]["Enums"]["token_type"]
+        }
+      }
+      mint_token: {
+        Args: {
+          p_series_id: string
+          p_code: string
+          p_secret?: string
+          p_next_code?: string
+          p_next_public?: Json
+        }
+        Returns: {
+          code: string
+          count: number
+          created_at: string
+          id: string
+          is_burned: boolean
+          is_claimed: boolean
+          max_supply: number | null
+          owner_id: string | null
+          parent_id: string | null
+          public: Json | null
+          secret: string | null
+          series_id: string
+          token_type: Database["grida_west"]["Enums"]["token_type"]
+        }
+      }
+      redeem_token: {
+        Args: {
+          p_token_id: string
+        }
+        Returns: undefined
+      }
+      rls_campaign: {
+        Args: {
+          p_campaign_id: string
+        }
+        Returns: boolean
+      }
+      track: {
+        Args: {
+          p_series_id: string
+          p_code: string
+          p_name: string
+          p_data?: Json
+        }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      participant_role: "host" | "guest"
+      token_type: "mintable" | "redeemable"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_x_supabase: {
     Tables: {
       supabase_project: {
@@ -2521,6 +2824,201 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_compression_policy: {
+        Args: {
+          hypertable: unknown
+          compress_after: unknown
+          if_not_exists?: boolean
+          schedule_interval?: unknown
+          initial_start?: string
+          timezone?: string
+        }
+        Returns: number
+      }
+      add_continuous_aggregate_policy: {
+        Args: {
+          continuous_aggregate: unknown
+          start_offset: unknown
+          end_offset: unknown
+          schedule_interval: unknown
+          if_not_exists?: boolean
+          initial_start?: string
+          timezone?: string
+        }
+        Returns: number
+      }
+      add_data_node: {
+        Args: {
+          node_name: unknown
+          host: string
+          database?: unknown
+          port?: number
+          if_not_exists?: boolean
+          bootstrap?: boolean
+          password?: string
+        }
+        Returns: {
+          node_name: unknown
+          host: string
+          port: number
+          database: unknown
+          node_created: boolean
+          database_created: boolean
+          extension_created: boolean
+        }[]
+      }
+      add_dimension: {
+        Args: {
+          hypertable: unknown
+          column_name: unknown
+          number_partitions?: number
+          chunk_time_interval?: unknown
+          partitioning_func?: unknown
+          if_not_exists?: boolean
+        }
+        Returns: {
+          dimension_id: number
+          schema_name: unknown
+          table_name: unknown
+          column_name: unknown
+          created: boolean
+        }[]
+      }
+      add_job: {
+        Args: {
+          proc: unknown
+          schedule_interval: unknown
+          config?: Json
+          initial_start?: string
+          scheduled?: boolean
+          check_config?: unknown
+          fixed_schedule?: boolean
+          timezone?: string
+        }
+        Returns: number
+      }
+      add_reorder_policy: {
+        Args: {
+          hypertable: unknown
+          index_name: unknown
+          if_not_exists?: boolean
+          initial_start?: string
+          timezone?: string
+        }
+        Returns: number
+      }
+      add_retention_policy: {
+        Args: {
+          relation: unknown
+          drop_after: unknown
+          if_not_exists?: boolean
+          schedule_interval?: unknown
+          initial_start?: string
+          timezone?: string
+        }
+        Returns: number
+      }
+      alter_data_node: {
+        Args: {
+          node_name: unknown
+          host?: string
+          database?: unknown
+          port?: number
+          available?: boolean
+        }
+        Returns: {
+          node_name: unknown
+          host: string
+          port: number
+          database: unknown
+          available: boolean
+        }[]
+      }
+      alter_job: {
+        Args: {
+          job_id: number
+          schedule_interval?: unknown
+          max_runtime?: unknown
+          max_retries?: number
+          retry_period?: unknown
+          scheduled?: boolean
+          config?: Json
+          next_start?: string
+          if_exists?: boolean
+          check_config?: unknown
+        }
+        Returns: {
+          job_id: number
+          schedule_interval: unknown
+          max_runtime: unknown
+          max_retries: number
+          retry_period: unknown
+          scheduled: boolean
+          config: Json
+          next_start: string
+          check_config: string
+        }[]
+      }
+      approximate_row_count: {
+        Args: {
+          relation: unknown
+        }
+        Returns: number
+      }
+      attach_data_node: {
+        Args: {
+          node_name: unknown
+          hypertable: unknown
+          if_not_attached?: boolean
+          repartition?: boolean
+        }
+        Returns: {
+          hypertable_id: number
+          node_hypertable_id: number
+          node_name: unknown
+        }[]
+      }
+      attach_tablespace: {
+        Args: {
+          tablespace: unknown
+          hypertable: unknown
+          if_not_attached?: boolean
+        }
+        Returns: undefined
+      }
+      chunk_compression_stats: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: {
+          chunk_schema: unknown
+          chunk_name: unknown
+          compression_status: string
+          before_compression_table_bytes: number
+          before_compression_index_bytes: number
+          before_compression_toast_bytes: number
+          before_compression_total_bytes: number
+          after_compression_table_bytes: number
+          after_compression_index_bytes: number
+          after_compression_toast_bytes: number
+          after_compression_total_bytes: number
+          node_name: unknown
+        }[]
+      }
+      chunks_detailed_size: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: {
+          chunk_schema: unknown
+          chunk_name: unknown
+          table_bytes: number
+          index_bytes: number
+          toast_bytes: number
+          total_bytes: number
+          node_name: unknown
+        }[]
+      }
       citext:
         | {
             Args: {
@@ -2570,6 +3068,133 @@ export type Database = {
         }
         Returns: string
       }
+      compress_chunk: {
+        Args: {
+          uncompressed_chunk: unknown
+          if_not_compressed?: boolean
+        }
+        Returns: unknown
+      }
+      create_distributed_hypertable: {
+        Args: {
+          relation: unknown
+          time_column_name: unknown
+          partitioning_column?: unknown
+          number_partitions?: number
+          associated_schema_name?: unknown
+          associated_table_prefix?: unknown
+          chunk_time_interval?: unknown
+          create_default_indexes?: boolean
+          if_not_exists?: boolean
+          partitioning_func?: unknown
+          migrate_data?: boolean
+          chunk_target_size?: string
+          chunk_sizing_func?: unknown
+          time_partitioning_func?: unknown
+          replication_factor?: number
+          data_nodes?: unknown[]
+        }
+        Returns: {
+          hypertable_id: number
+          schema_name: unknown
+          table_name: unknown
+          created: boolean
+        }[]
+      }
+      create_distributed_restore_point: {
+        Args: {
+          name: string
+        }
+        Returns: {
+          node_name: unknown
+          node_type: string
+          restore_point: unknown
+        }[]
+      }
+      create_hypertable: {
+        Args: {
+          relation: unknown
+          time_column_name: unknown
+          partitioning_column?: unknown
+          number_partitions?: number
+          associated_schema_name?: unknown
+          associated_table_prefix?: unknown
+          chunk_time_interval?: unknown
+          create_default_indexes?: boolean
+          if_not_exists?: boolean
+          partitioning_func?: unknown
+          migrate_data?: boolean
+          chunk_target_size?: string
+          chunk_sizing_func?: unknown
+          time_partitioning_func?: unknown
+          replication_factor?: number
+          data_nodes?: unknown[]
+          distributed?: boolean
+        }
+        Returns: {
+          hypertable_id: number
+          schema_name: unknown
+          table_name: unknown
+          created: boolean
+        }[]
+      }
+      decompress_chunk: {
+        Args: {
+          uncompressed_chunk: unknown
+          if_compressed?: boolean
+        }
+        Returns: unknown
+      }
+      delete_data_node: {
+        Args: {
+          node_name: unknown
+          if_exists?: boolean
+          force?: boolean
+          repartition?: boolean
+          drop_database?: boolean
+        }
+        Returns: boolean
+      }
+      delete_job: {
+        Args: {
+          job_id: number
+        }
+        Returns: undefined
+      }
+      detach_data_node: {
+        Args: {
+          node_name: unknown
+          hypertable?: unknown
+          if_attached?: boolean
+          force?: boolean
+          repartition?: boolean
+          drop_remote_data?: boolean
+        }
+        Returns: number
+      }
+      detach_tablespace: {
+        Args: {
+          tablespace: unknown
+          hypertable?: unknown
+          if_attached?: boolean
+        }
+        Returns: number
+      }
+      detach_tablespaces: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: number
+      }
+      drop_chunks: {
+        Args: {
+          relation: unknown
+          older_than?: unknown
+          newer_than?: unknown
+          verbose?: boolean
+        }
+        Returns: string[]
+      }
       generate_combinations:
         | {
             Args: {
@@ -2598,11 +3223,153 @@ export type Database = {
         }
         Returns: number[]
       }
+      get_telemetry_report: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      hypertable_compression_stats: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: {
+          total_chunks: number
+          number_compressed_chunks: number
+          before_compression_table_bytes: number
+          before_compression_index_bytes: number
+          before_compression_toast_bytes: number
+          before_compression_total_bytes: number
+          after_compression_table_bytes: number
+          after_compression_index_bytes: number
+          after_compression_toast_bytes: number
+          after_compression_total_bytes: number
+          node_name: unknown
+        }[]
+      }
+      hypertable_detailed_size: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: {
+          table_bytes: number
+          index_bytes: number
+          toast_bytes: number
+          total_bytes: number
+          node_name: unknown
+        }[]
+      }
+      hypertable_index_size: {
+        Args: {
+          index_name: unknown
+        }
+        Returns: number
+      }
+      hypertable_size: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: number
+      }
+      interpolate:
+        | {
+            Args: {
+              value: number
+              prev?: Record<string, unknown>
+              next?: Record<string, unknown>
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              value: number
+              prev?: Record<string, unknown>
+              next?: Record<string, unknown>
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              value: number
+              prev?: Record<string, unknown>
+              next?: Record<string, unknown>
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              value: number
+              prev?: Record<string, unknown>
+              next?: Record<string, unknown>
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              value: number
+              prev?: Record<string, unknown>
+              next?: Record<string, unknown>
+            }
+            Returns: number
+          }
       jsonb_array_objects_only: {
         Args: {
           arr: Json[]
         }
         Returns: boolean
+      }
+      locf: {
+        Args: {
+          value: unknown
+          prev?: unknown
+          treat_null_as_missing?: boolean
+        }
+        Returns: unknown
+      }
+      move_chunk: {
+        Args: {
+          chunk: unknown
+          destination_tablespace: unknown
+          index_destination_tablespace?: unknown
+          reorder_index?: unknown
+          verbose?: boolean
+        }
+        Returns: undefined
+      }
+      remove_compression_policy: {
+        Args: {
+          hypertable: unknown
+          if_exists?: boolean
+        }
+        Returns: boolean
+      }
+      remove_continuous_aggregate_policy: {
+        Args: {
+          continuous_aggregate: unknown
+          if_not_exists?: boolean
+          if_exists?: boolean
+        }
+        Returns: undefined
+      }
+      remove_reorder_policy: {
+        Args: {
+          hypertable: unknown
+          if_exists?: boolean
+        }
+        Returns: undefined
+      }
+      remove_retention_policy: {
+        Args: {
+          relation: unknown
+          if_exists?: boolean
+        }
+        Returns: undefined
+      }
+      reorder_chunk: {
+        Args: {
+          chunk: unknown
+          index?: unknown
+          verbose?: boolean
+        }
+        Returns: undefined
       }
       rls_asset: {
         Args: {
@@ -2638,6 +3405,260 @@ export type Database = {
         Args: {
           project_id: number
         }
+        Returns: boolean
+      }
+      set_adaptive_chunking: {
+        Args: {
+          hypertable: unknown
+          chunk_target_size: string
+        }
+        Returns: Record<string, unknown>
+      }
+      set_chunk_time_interval: {
+        Args: {
+          hypertable: unknown
+          chunk_time_interval: unknown
+          dimension_name?: unknown
+        }
+        Returns: undefined
+      }
+      set_integer_now_func: {
+        Args: {
+          hypertable: unknown
+          integer_now_func: unknown
+          replace_if_exists?: boolean
+        }
+        Returns: undefined
+      }
+      set_number_partitions: {
+        Args: {
+          hypertable: unknown
+          number_partitions: number
+          dimension_name?: unknown
+        }
+        Returns: undefined
+      }
+      set_replication_factor: {
+        Args: {
+          hypertable: unknown
+          replication_factor: number
+        }
+        Returns: undefined
+      }
+      show_chunks: {
+        Args: {
+          relation: unknown
+          older_than?: unknown
+          newer_than?: unknown
+        }
+        Returns: unknown[]
+      }
+      show_tablespaces: {
+        Args: {
+          hypertable: unknown
+        }
+        Returns: unknown[]
+      }
+      time_bucket:
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              offset: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              offset: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              offset: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              offset: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              offset: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              offset: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              origin: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              origin: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              origin: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              timezone: string
+              origin?: string
+              offset?: unknown
+            }
+            Returns: string
+          }
+      time_bucket_gapfill:
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              start?: string
+              finish?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              start?: string
+              finish?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              start?: string
+              finish?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              bucket_width: unknown
+              ts: string
+              timezone: string
+              start?: string
+              finish?: string
+            }
+            Returns: string
+          }
+      timescaledb_fdw_handler: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
+      }
+      timescaledb_post_restore: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      timescaledb_pre_restore: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       workspace_documents: {
@@ -2780,3 +3801,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
