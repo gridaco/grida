@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CountdownTimer } from "../../../timer";
+import { CountdownTimer } from "../../../../timer";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,21 +12,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { PolestarTypeLogo } from "@/components/logos";
 // import data from "./data.json";
-import data from "./data-01.json";
-import Link from "next/link";
-import { Minus, Plus } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer } from "recharts";
-
+import t from "./data-01.json";
 import {
   Drawer,
   DrawerClose,
@@ -35,7 +23,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,21 +30,63 @@ import {
   ScreenMobileFrame,
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
-import { CampaignData } from "../../../data";
+import { Platform } from "@/lib/platform";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { TicketCheckIcon } from "lucide-react";
+import { ShineBorder } from "@/www/ui/shine-border";
+import Link from "next/link";
 
-export default function Main({ data: d }: { data: CampaignData }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [agreed, setAgreed] = useState(false);
+interface TokenPublicData {
+  host: {
+    name: string;
+  };
+}
 
-  // Check if all fields are filled to enable the button
-  const isFormValid = name.trim() !== "" && phone.trim() !== "" && agreed;
+interface GuestForm {
+  name: string;
+  phone: string;
+}
 
-  const handleSubmit = () => {
-    if (isFormValid) {
-      window.location.href = data.cta.link; // Redirect to external page
+const external_link =
+  "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
+
+export default function Main({
+  token,
+}: {
+  token: Platform.WEST.Token<TokenPublicData>;
+}) {
+  const router = useRouter();
+  const referrername = token.public.host.name;
+
+  const onClaim = async (geust: GuestForm) => {
+    // FIXME:
+    const formid = "d040b4d2-4a48-460d-afb0-b425f63d6a63";
+    const formdata = new FormData();
+    formdata.append("name", geust.name);
+    formdata.append("phone", geust.phone);
+    const submission = await fetch(`/submit/${formid}`, {
+      method: "POST",
+      body: formdata,
+    }).then((res) => {
+      return res.json();
+    });
+
+    const customer_id = submission.data.customer_id;
+
+    const client = new Platform.WEST.WestClient(token.series_id);
+    const ok = await client.claim(token.code, customer_id);
+    if (ok) {
+      toast.success("이벤트 참여가 완료되었습니다.");
+      router.replace(external_link);
+    } else {
+      toast.error("이벤트 참여에 실패했습니다.");
     }
   };
+
+  if (token.is_burned) {
+    return <>Already used.</>;
+  }
 
   return (
     <ScreenMobileFrame>
@@ -73,60 +102,101 @@ export default function Main({ data: d }: { data: CampaignData }) {
           <div className="relative w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={data.hero.media.src}
-              alt={data.hero.media.alt}
+              src={t.hero.media.src}
+              alt={t.hero.media.alt}
               className="object-cover aspect-square @4xl:aspect-video select-none pointer-events-none w-full"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-8 left-8">
               <h2 className="text-2xl text-white">
-                <span dangerouslySetInnerHTML={{ __html: data.hero.title }} />
+                <span dangerouslySetInnerHTML={{ __html: t.hero.title }} />
               </h2>
             </div>
           </div>
 
           {/* Countdown Timer */}
-          <div className="flex justify-center items-center py-12 px-4">
-            <CountdownTimer />
-          </div>
-
-          {/* Stats Grid */}
-          <Card className="mx-4 py-6 px-6">
-            {/* {data.perks.map((perk, index) => ( */}
-            {/* <div key={index} className="text-center"> */}
-            <div className="text-center">
-              <p className=" font-medium">Polestar 시승 완료 시 혜택</p>
-              <p className="text-xl font-semibold">
-                TMAP EV 충전 포인트 10만원
-              </p>
-
-              <p className="text-sm font-light mt-2 text-muted-foreground">
-                시승 신청자 본인에 한함 <br />
-                이벤트 기간 : 2025년 00월 00일까지
-              </p>
+          {!token.is_claimed && (
+            <div className="flex justify-center items-center py-12 px-4">
+              <CountdownTimer />
             </div>
-            <hr className="my-8" />
-            <ApplicantForm />
-          </Card>
-          <div className="mt-10 mx-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>{d.user.name}님의 초대</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {d.user.name}님으로부터 초대를 받았습니다. <br />
-                  이벤트 참여 시 {d.user.name}님과 이벤트 참여자 모두에게 경품이
-                  지급됩니다.
+          )}
+
+          {!token.is_claimed && (
+            <div className="my-10 mx-4">
+              <Card className="relative overflow-hidden">
+                <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TicketCheckIcon className="size-5" />
+                    {referrername}님의 초대{" "}
+                    {token.is_claimed ? "(수락 완료)" : ""}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    {referrername}님으로부터 초대를 받았습니다. <br />
+                    이벤트 참여 시 {referrername}님과 이벤트 참여자 모두에게
+                    경품이 지급됩니다.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {!token.is_claimed && (
+            <Card className="mx-4 py-6 px-6">
+              {/* {data.perks.map((perk, index) => ( */}
+              {/* <div key={index} className="text-center"> */}
+              <div className="text-center">
+                <p className=" font-medium">Polestar 시승 완료 시 혜택</p>
+                <p className="text-xl font-semibold">
+                  TMAP EV 충전 포인트 10만원
                 </p>
-              </CardContent>
+
+                <p className="text-sm font-light mt-2 text-muted-foreground">
+                  시승 신청자 본인에 한함 <br />
+                  이벤트 기간 : 2025년 00월 00일까지
+                </p>
+              </div>
+              <hr className="my-8" />
+              <ApplicantForm
+                onSubmit={(guest) => {
+                  onClaim(guest);
+                }}
+              />
             </Card>
-          </div>
+          )}
+
+          {token.is_claimed && !token.is_burned && (
+            <div className="my-10 mx-4">
+              <Card className="relative overflow-hidden">
+                <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TicketCheckIcon className="size-5" />
+                    시승 확인중
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    이벤트 참여가 완료되었습니다. 폴스타에서 시승을 완료해
+                    주세요. 이후 문자를 통해 안내 드리겠습니다.
+                    <br />
+                    <br />
+                    시승 신청을 완료하지 못하였나요?{" "}
+                    <Link href={external_link} className="underline">
+                      다시 신청하기
+                    </Link>
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Info Section */}
           <div className="pt-12 pb-8 space-y-2 px-2">
             <article className="prose prose-sm dark:prose-invert">
-              <span dangerouslySetInnerHTML={{ __html: data.info }} />
+              <span dangerouslySetInnerHTML={{ __html: t.info }} />
             </article>
           </div>
           <div className="flex justify-center items-center pb-8 px-4">
@@ -219,51 +289,32 @@ function ApplicantForm({
     }
   };
 
-  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
-
-    // Format as 010-0000-0000
-    if (value.length > 3 && value.length <= 7) {
-      value = `${value.slice(0, 3)}-${value.slice(3)}`;
-    } else if (value.length > 7) {
-      value = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
-    }
-
-    setPhone(value);
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form id="application" onSubmit={handleSubmit} className="space-y-6">
       <h2 className="text-lg font-semibold mb-6 text-center">
         시승 신청자 정보를 입력해주세요
       </h2>
 
-      <div className="grid grid-cols-[80px_1fr] items-center gap-4">
-        <Label htmlFor="name" className="text-base font-medium">
-          이름
-        </Label>
+      <div className="grid gap-2">
+        <Label htmlFor="name">이름</Label>
         <Input
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="border-gray-300"
           placeholder="홍길동"
           required
         />
       </div>
 
-      <div className="grid grid-cols-[80px_1fr] items-center gap-4">
-        <Label htmlFor="phone" className="text-base font-medium">
-          핸드폰 번호
-        </Label>
+      <div className="grid gap-2">
+        <Label htmlFor="phone">핸드폰 번호</Label>
         <div className="grid gap-2">
           <Input
             id="phone"
             value={phone}
-            onChange={handlePhoneInput}
-            className="border-gray-300"
+            onChange={(e) => setPhone(e.target.value)}
             maxLength={13}
-            inputMode="numeric"
+            type="tel"
             required
             placeholder="번호를 입력해주세요"
           />
@@ -284,12 +335,12 @@ function ApplicantForm({
       >
         시승 신청하기
       </Button>
-      <DrawerDialogDemo open={isDrawerOpen} setOpen={setIsDrawerOpen} />
+      <FinalConfirm open={isDrawerOpen} setOpen={setIsDrawerOpen} />
     </form>
   );
 }
 
-function DrawerDialogDemo({
+function FinalConfirm({
   open,
   setOpen,
 }: {
@@ -322,15 +373,7 @@ function DrawerDialogDemo({
           className="p-4"
         />
         <DrawerFooter className="pt-2">
-          <Button
-            onClick={() => {
-              if (allChecked) {
-                window.location.href =
-                  "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
-              }
-            }}
-            disabled={!allChecked}
-          >
+          <Button form="application" type="submit" disabled={!allChecked}>
             다음으로
           </Button>
           <DrawerClose asChild>

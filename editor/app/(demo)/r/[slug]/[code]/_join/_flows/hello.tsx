@@ -3,18 +3,29 @@
 import React from "react";
 import { Button as FancyButton } from "@/www/ui/button";
 import { ScreenBackground } from "@/theme/templates/kit/components";
-import { CampaignData } from "../../../data";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { PolestarTypeLogo } from "@/components/logos";
 import { ACME } from "@/components/logos/acme";
 import { DialogClose } from "@radix-ui/react-dialog";
+import { ScratchToReveal } from "@/www/ui/scratch-to-reveal";
+import { ShineBorder } from "@/www/ui/shine-border";
 
 export default function Hello({
   data,
   onOpenChange,
 }: {
-  data: CampaignData;
+  data: { referrer: string };
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return <BBB data={data} onOpenChange={onOpenChange} />;
+}
+
+function AAA({
+  data,
+  onOpenChange,
+}: {
+  data: { referrer: string };
   onOpenChange?: (open: boolean) => void;
 }) {
   return (
@@ -41,7 +52,7 @@ export default function Hello({
           <div className="mt-[20vh] max-w-xl space-y-4">
             <div className="flex flex-col gap-4">
               <h2 className="text-3xl font-medium text-white">
-                {data.user.name}님이 추천하는
+                {data.referrer}님이 추천하는
                 <br /> Polestar 4
               </h2>
               {/* <p className="text-xl text-white">
@@ -67,5 +78,49 @@ export default function Hello({
         </div>
       </div>
     </div>
+  );
+}
+
+function BBB({
+  data,
+  onOpenChange,
+}: {
+  data: { referrer: string };
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return (
+    <main className="w-dvw h-dvh flex flex-col items-center justify-center">
+      <header className="flex flex-col gap-4 items-center justify-center px-4">
+        <PolestarTypeLogo />
+        <h2 className="text-2xl font-medium">
+          {data.referrer} 님 께서 초대장을 보냈습니다.
+        </h2>
+      </header>
+
+      <section className="flex flex-col gap-4 items-center justify-center px-4 mt-10">
+        <ScratchToReveal
+          width={400}
+          height={250}
+          minScratchPercentage={80}
+          onComplete={() => onOpenChange?.(false)}
+          className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-background border shadow-lg"
+          gradientColors={["#000", "#333", "#666"]}
+        >
+          {/* <ShineBorder
+            borderWidth={4}
+            shineColor={["#E0762D", "#F38CB8", "#FDCC92"]}
+          /> */}
+          <div className="w-full h-full p-6">
+            <h6 className="text-2xl font-bold">₩100,000 EV 충전 포인트</h6>
+            <hr />
+            <p>
+              Polestar 4 시승 이벤트 에 참여하고 10만원 상당의 TMAP EV 충전
+              포인트를 받아가세요
+            </p>
+          </div>
+        </ScratchToReveal>
+        <p>👆 카드를 손가락으로 긁어 주세요</p>
+      </section>
+    </main>
   );
 }
