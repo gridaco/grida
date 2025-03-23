@@ -80,8 +80,8 @@ export default function IntegrationsPage() {
               Need a custom integration?
             </h2>
             <p className="text-muted-foreground">
-              Don't see what you're looking for? Request a custom integration
-              for your specific needs.
+              Don&apos;t see what you&apos;re looking for? Request a custom
+              integration for your specific needs.
             </p>
           </div>
           <Link href={sitemap.links.contact} target="_blank">

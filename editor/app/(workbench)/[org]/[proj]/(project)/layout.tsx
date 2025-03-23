@@ -17,8 +17,9 @@ import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
-import "../../../../editor.css";
 import { ProjectLoaded } from "@/scaffolds/workspace";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import "../../../../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -66,24 +67,47 @@ export default async function Layout({
                             <Link href={`/${org}/${proj}/customers`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="customer"
+                                    className="size-4"
+                                  />
                                   Customers
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
                             {/* <Link href={`/${org}/${proj}/analytics`}> */}
                             <SidebarMenuItem>
-                              <SidebarMenuButton size="sm" disabled>
+                              <SidebarMenuButton size="sm">
+                                <ResourceTypeIcon
+                                  type="chart"
+                                  className="size-4"
+                                />
                                 Analytics
                               </SidebarMenuButton>
                             </SidebarMenuItem>
                             {/* </Link> */}
-                            {/* <Link href={`/${org}/${proj}/token-chain`}> */}
-                            <SidebarMenuItem>
-                              <SidebarMenuButton size="sm" disabled>
-                                Token Exchange
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {/* </Link> */}
+                            <Link href={`/${org}/${proj}/campaigns`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="campaign"
+                                    className="size-4"
+                                  />
+                                  Campaigns
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                            <Link href={`/${org}/${proj}/integrations`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="connect"
+                                    className="size-4"
+                                  />
+                                  Connections
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                           </SidebarMenu>
                         </SidebarGroupContent>
                       </SidebarGroup>

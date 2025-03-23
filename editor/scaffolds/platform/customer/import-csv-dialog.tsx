@@ -24,6 +24,7 @@ import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import toast from "react-hot-toast";
 import { Platform } from "@/lib/platform";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
@@ -109,7 +110,7 @@ export function ImportCSVDialog({
 
   return (
     <Dialog {...props}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
@@ -161,12 +162,9 @@ export function ImportCSVDialog({
               </div>
             </div>
 
-            <div className="flex-1 rounded-md border overflow-hidden">
-              {/* FIX MY STYLE */}
-              <div className="max-h-[300px] overflow-auto max-w-xl">
-                <SimpleCSVTable data={sample} />
-              </div>
-            </div>
+            <ScrollArea className="max-h-[400px] rounded-md border ">
+              <SimpleCSVTable data={sample} />
+            </ScrollArea>
 
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -195,9 +193,9 @@ export function ImportCSVDialog({
               <p className="text-sm text-muted-foreground mb-4">
                 Please wait while we import your customers...
               </p>
-              <Progress value={progress} className="h-2 w-full" />
+              <Progress indeterminate className="h-2 w-full" />
               <p className="text-sm text-muted-foreground mt-2">
-                {Math.round(progress)}% complete
+                Importing {csv.length} customers
               </p>
             </div>
           </div>
@@ -206,8 +204,8 @@ export function ImportCSVDialog({
         {step === "complete" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-green-100 mb-4">
+                <CheckCircle2 className="size-10 text-green-600" />
               </div>
               <h3 className="text-lg font-medium mb-2">Import Complete</h3>
               <p className="text-sm text-muted-foreground">
@@ -220,8 +218,8 @@ export function ImportCSVDialog({
         {step === "error" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-red-100 mb-4">
+                <AlertCircle className="size-10 text-red-600" />
               </div>
               <h3 className="text-lg font-medium mb-2">Import Failed</h3>
               <p className="text-sm text-muted-foreground">

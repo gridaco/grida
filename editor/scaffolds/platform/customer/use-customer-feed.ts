@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import type { Data } from "@/lib/data";
 import type { Customer } from "@/types";
@@ -34,6 +34,27 @@ export async function fetchCustomers(
     .order("last_seen_at", { ascending: false })
     .range(q_page_index * q_page_limit, (q_page_index + 1) * q_page_limit - 1)
     .eq("project_id", project_id);
+}
+
+export function useCustomers(
+  project_id: number,
+  query: Data.Relation.QueryState
+) {
+  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    fetchCustomers(client, project_id, query).then(({ data, error }) => {
+      if (data) {
+        setCustomers(data);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project_id, query.q_refresh_key]);
+
+  return customers;
+
+  //
 }
 
 // TODO: does not support realtime subscription

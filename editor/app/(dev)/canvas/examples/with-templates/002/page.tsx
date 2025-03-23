@@ -5,11 +5,11 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-import Invite from "@/app/(demo)/polestar/event/invite/[cid]/main";
-import Portal from "@/app/(demo)/polestar/event/portal/_flows/page";
-import Verify from "@/app/(demo)/polestar/event/portal/_flows/step-verify";
-import Main from "@/app/(demo)/polestar/event/join/[cid]/_flows/main";
-import Hello from "@/app/(demo)/polestar/event/join/[cid]/_flows/hello";
+import Invite from "@/app/(demo)/r/[slug]/[code]/_invite";
+import Portal from "@/app/(demo)/r/[slug]/(portal)/_flows/page";
+import Verify from "@/app/(demo)/r/[slug]/(portal)/_flows/step-verify";
+import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
+import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -217,7 +217,7 @@ function CustomComponent__Invite(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Invite params={{ cid: "00000000" }} />
+      {/* <Invite params={{ code: "00000000" }} /> */}
     </div>
   );
 }
@@ -245,14 +245,14 @@ function CustomComponent__Join_Main(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Main
+      {/* <Main
         data={{
           cid: "00000000",
           user: {
             name: "DUMMY",
           },
         }}
-      />
+      /> */}
     </div>
   );
 }
@@ -267,14 +267,14 @@ function CustomComponent__Join_Hello(props: any) {
       {...queryattributes(props)}
     >
       {/* <_002 /> */}
-      <Hello
+      {/* <Hello
         data={{
           cid: "",
           user: {
             name: "DUMMY",
           },
         }}
-      />
+      /> */}
     </div>
   );
 }
