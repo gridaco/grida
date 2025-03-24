@@ -1,7 +1,7 @@
 import { createRouteHandlerWestClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { SeriesCard } from "./series-card";
+import { CampaignCard } from "./campaign-card";
 import EmptyWelcome from "@/components/empty";
 
 type Params = {
@@ -37,7 +37,7 @@ export default async function ChainsPage({
         {series.map((s) => {
           return (
             <Link key={s.id} href={`/${org}/${proj}/campaigns/${s.id}`}>
-              <SeriesCard data={s} />
+              <CampaignCard data={s} />
             </Link>
           );
         })}

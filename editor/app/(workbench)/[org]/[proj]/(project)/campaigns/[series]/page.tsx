@@ -33,6 +33,7 @@ import { TokensTable } from "./tokens-table";
 import LogsTable from "./logs-table";
 import { ParticipantsTable } from "./participants-table";
 import { QuestsTable } from "./quests-table";
+import CampaignSettings from "./settings";
 
 type Params = {
   org: string;
@@ -129,13 +130,16 @@ export default function CampaignsPage({ params }: { params: Params }) {
           <ParticipantsTable series_id={series_id} />
         </TabsContent>
         <TabsContent value="quests">
-          <QuestsTable />
+          <QuestsTable series_id={series_id} />
         </TabsContent>
         <TabsContent value="tokens">
           <TokensTable series_id={series_id} />
         </TabsContent>
         <TabsContent value="logs">
           <LogsTable series_id={series_id} />
+        </TabsContent>
+        <TabsContent value="settings">
+          <CampaignSettings series_id={series_id} />
         </TabsContent>
       </Tabs>
     </main>

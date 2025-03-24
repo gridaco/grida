@@ -36,11 +36,13 @@ import toast from "react-hot-toast";
 import { TicketCheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
 import Link from "next/link";
+import {
+  SYSTEM_GF_CUSTOMER_NAME_KEY,
+  SYSTEM_GF_CUSTOMER_PHONE_KEY,
+} from "@/k/system";
 
-interface TokenPublicData {
-  host: {
-    name: string;
-  };
+interface CampaignPublicData {
+  "signup-form-id": string;
 }
 
 interface GuestForm {
@@ -52,19 +54,19 @@ const external_link =
   "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
 
 export default function Main({
-  token,
+  data,
 }: {
-  token: Platform.WEST.Token<TokenPublicData>;
+  data: Platform.WEST.TokenPublicRead;
 }) {
+  const { campaign, parent, token } = data;
   const router = useRouter();
-  const referrername = token.public.host.name;
+  const referrername = parent!.owner?.name;
 
   const onClaim = async (geust: GuestForm) => {
-    // FIXME:
-    const formid = "d040b4d2-4a48-460d-afb0-b425f63d6a63";
+    const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
     const formdata = new FormData();
-    formdata.append("name", geust.name);
-    formdata.append("phone", geust.phone);
+    formdata.append(SYSTEM_GF_CUSTOMER_NAME_KEY, geust.name);
+    formdata.append(SYSTEM_GF_CUSTOMER_PHONE_KEY, geust.phone);
     const submission = await fetch(`/submit/${formid}`, {
       method: "POST",
       body: formdata,
@@ -77,7 +79,7 @@ export default function Main({
     const client = new Platform.WEST.WestClient(token.series_id);
     const ok = await client.claim(token.code, customer_id);
     if (ok) {
-      toast.success("이벤트 참여가 완료되었습니다.");
+      toast.success("이벤트 참여신청이 완료되었습니다.");
       router.replace(external_link);
     } else {
       toast.error("이벤트 참여에 실패했습니다.");

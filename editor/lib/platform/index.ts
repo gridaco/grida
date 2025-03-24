@@ -185,6 +185,7 @@ export namespace Platform.WEST {
     description: string | null;
     enabled: boolean;
     is_participant_name_exposed_to_public_dangerously: boolean;
+    max_supply_init_for_new_mint_token: number | null;
     name: string;
     project_id: number;
     scheduling_close_at: string | null;

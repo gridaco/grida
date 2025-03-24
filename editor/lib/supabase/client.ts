@@ -40,7 +40,7 @@ export const createClientWorkspaceClient = () =>
     isSingleton: false,
   });
 
-export const createClientTokensClient = () =>
+export const createClientWestClient = () =>
   createClientComponentClient<Database, "grida_west">({
     options: {
       db: {

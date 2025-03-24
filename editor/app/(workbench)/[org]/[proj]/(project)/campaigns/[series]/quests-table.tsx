@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -37,63 +37,103 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Platform } from "@/lib/platform";
+import { createClientWestClient } from "@/lib/supabase/client";
 
-// Mock data for demonstration
-const mockQuests = Array.from({ length: 10 }).map((_, i) => ({
-  id: `quest-${i + 1}`,
-  player: {
-    id: `player-${i + 1}`,
-    name: `Player ${i + 1}`,
-    email: `player${i + 1}@example.com`,
-    avatar: `/placeholder.svg?height=40&width=40`,
-  },
-  questName: "Referral Campaign",
-  progress: Math.floor(Math.random() * 100),
-  invitedCount: Math.floor(Math.random() * 11), // 0-10 invites
-  maxInvites: 10,
-  status: ["active", "completed", "expired"][Math.floor(Math.random() * 3)],
-  startDate: new Date(
-    Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-  )
-    .toISOString()
-    .split("T")[0],
-  challenges: Array.from({ length: Math.floor(Math.random() * 5) + 1 }).map(
-    (_, j) => ({
-      id: `challenge-${i}-${j}`,
-      invitee: `Friend ${j + 1}`,
-      email: `friend${j + 1}@example.com`,
-      steps: [
-        {
-          id: `step-${i}-${j}-1`,
-          name: "Sign Up",
-          completed: Math.random() > 0.3,
-          date: new Date(
-            Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000
-          )
-            .toISOString()
-            .split("T")[0],
-        },
-        {
-          id: `step-${i}-${j}-2`,
-          name: "Submit Form",
-          completed: Math.random() > 0.6,
-          date:
-            Math.random() > 0.6
-              ? new Date(
-                  Date.now() -
-                    Math.floor(Math.random() * 5) * 24 * 60 * 60 * 1000
-                )
-                  .toISOString()
-                  .split("T")[0]
-              : null,
-        },
-      ],
-    })
-  ),
-}));
+const QUESTNAME = "Referral Campaign";
 
-export function QuestsTable() {
+// // Mock data for demonstration
+// const mockQuests = Array.from({ length: 10 }).map((_, i) => ({
+//   id: `quest-${i + 1}`,
+//   player: {
+//     id: `player-${i + 1}`,
+//     name: `Player ${i + 1}`,
+//     email: `player${i + 1}@example.com`,
+//     avatar: `/placeholder.svg?height=40&width=40`,
+//   },
+//   questName: "Referral Campaign",
+//   progress: Math.floor(Math.random() * 100),
+//   invitedCount: Math.floor(Math.random() * 11), // 0-10 invites
+//   maxInvites: 10,
+//   status: ["active", "completed", "expired"][Math.floor(Math.random() * 3)],
+//   startDate: new Date(
+//     Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
+//   )
+//     .toISOString()
+//     .split("T")[0],
+//   challenges: Array.from({ length: Math.floor(Math.random() * 5) + 1 }).map(
+//     (_, j) => ({
+//       id: `challenge-${i}-${j}`,
+//       invitee: `Friend ${j + 1}`,
+//       email: `friend${j + 1}@example.com`,
+//       steps: [
+//         {
+//           id: `step-${i}-${j}-1`,
+//           name: "Sign Up",
+//           completed: Math.random() > 0.3,
+//           date: new Date(
+//             Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000
+//           )
+//             .toISOString()
+//             .split("T")[0],
+//         },
+//         {
+//           id: `step-${i}-${j}-2`,
+//           name: "Submit Form",
+//           completed: Math.random() > 0.6,
+//           date:
+//             Math.random() > 0.6
+//               ? new Date(
+//                   Date.now() -
+//                     Math.floor(Math.random() * 5) * 24 * 60 * 60 * 1000
+//                 )
+//                   .toISOString()
+//                   .split("T")[0]
+//               : null,
+//         },
+//       ],
+//     })
+//   ),
+// }));
+
+type QuestToken = Platform.WEST.Token & {
+  owner: Platform.WEST.ParticipantCustomer | null;
+  children: (Platform.WEST.Token & {
+    owner: Platform.WEST.ParticipantCustomer | null;
+  })[];
+};
+
+function useQuestTokens(series_id: string) {
+  const [tokens, setTokens] = useState<QuestToken[] | null>(null);
+  const client = useMemo(() => createClientWestClient(), []);
+
+  useEffect(() => {
+    client
+      .from("token")
+      .select(
+        `
+        *,
+        owner:participant_customer!owner_id(*),
+        children:token(*, owner:participant_customer!owner_id(*))
+      `
+      )
+      .eq("series_id", series_id)
+      .eq("token_type", "mintable")
+      .then(({ data, error }) => {
+        if (error) return;
+        setTokens(data as QuestToken[]);
+      });
+  }, [client, series_id]);
+
+  return { tokens };
+}
+
+export function QuestsTable({ series_id }: { series_id: string }) {
   const [expandedQuests, setExpandedQuests] = useState<string[]>([]);
+
+  const { tokens } = useQuestTokens(series_id);
+
+  console.log("tokens", tokens);
 
   const toggleQuestExpand = (questId: string) => {
     setExpandedQuests((prev) =>
@@ -103,7 +143,7 @@ export function QuestsTable() {
     );
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: "active" | "completed" | "expired") => {
     switch (status) {
       case "active":
         return (
@@ -137,6 +177,10 @@ export function QuestsTable() {
     }
   };
 
+  if (!tokens) {
+    return null;
+  }
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -155,7 +199,7 @@ export function QuestsTable() {
             </Select>
           </div>
           <div className="text-sm text-muted-foreground">
-            Showing <strong>{mockQuests.length}</strong> quests
+            Showing <strong>{tokens.length}</strong> quests
           </div>
         </div>
 
@@ -173,7 +217,7 @@ export function QuestsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockQuests.map((quest) => (
+            {tokens.map((quest) => (
               <>
                 <TableRow key={quest.id} className="group">
                   <TableCell>
@@ -194,36 +238,47 @@ export function QuestsTable() {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 rounded-full">
                         <AvatarFallback>
-                          {quest.player.name[0].toUpperCase()}
+                          {quest.owner?.name?.[0].toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{quest.player.name}</div>
+                        <div className="font-medium">{quest.owner?.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {quest.player.email}
+                          {quest.owner?.email}
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{quest.questName}</TableCell>
+                  <TableCell>{QUESTNAME}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="text-xs text-muted-foreground">
-                        {quest.progress}%
+                        0000%
+                        {/* {quest.progress}% */}
                       </div>
-                      <Progress value={quest.progress} className="h-2" />
+                      <Progress
+                        value={
+                          0
+                          // quest.progress
+                        }
+                        className="h-2"
+                      />
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span>
-                        {quest.invitedCount}/{quest.maxInvites}
+                        0/0
+                        {/* {quest.invitedCount}/{quest.maxInvites} */}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>{getStatusBadge(quest.status)}</TableCell>
-                  <TableCell>{quest.startDate}</TableCell>
+                  <TableCell>{getStatusBadge("active")}</TableCell>
+                  <TableCell>
+                    {/* {quest.startDate} */}
+                    2020-01-01
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -246,7 +301,7 @@ export function QuestsTable() {
                     <TableCell colSpan={8} className="p-0">
                       <div className="p-4">
                         <h3 className="text-sm font-medium mb-2">
-                          Challenges ({quest.challenges.length})
+                          Challenges ({quest.children.length})
                         </h3>
                         <div className="bg-background rounded-md border">
                           <Table>
@@ -261,20 +316,20 @@ export function QuestsTable() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {quest.challenges.map((challenge) => (
+                              {quest.children.map((challenge) => (
                                 <TableRow key={challenge.id}>
                                   <TableCell>
                                     <div>
                                       <div className="font-medium">
-                                        {challenge.invitee}
+                                        {challenge.owner?.name}
                                       </div>
                                       <div className="text-xs text-muted-foreground">
-                                        {challenge.email}
+                                        {challenge.owner?.email}
                                       </div>
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    {challenge.steps[0].completed ? (
+                                    {/* {challenge.steps[0].completed ? (
                                       <div className="flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                                         <span>{challenge.steps[0].date}</span>
@@ -284,10 +339,10 @@ export function QuestsTable() {
                                         <Clock className="h-4 w-4 text-amber-500" />
                                         <span>Pending</span>
                                       </div>
-                                    )}
+                                    )} */}
                                   </TableCell>
                                   <TableCell>
-                                    {challenge.steps[1].completed ? (
+                                    {/* {challenge.steps[1].completed ? (
                                       <div className="flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                                         <span>{challenge.steps[1].date}</span>
@@ -304,10 +359,10 @@ export function QuestsTable() {
                                           Not Started
                                         </span>
                                       </div>
-                                    )}
+                                    )} */}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    {challenge.steps.every(
+                                    {/* {challenge.steps.every(
                                       (step) => step.completed
                                     ) ? (
                                       <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -323,11 +378,11 @@ export function QuestsTable() {
                                       <Badge variant="outline">
                                         Not Started
                                       </Badge>
-                                    )}
+                                    )} */}
                                   </TableCell>
                                 </TableRow>
                               ))}
-                              {quest.invitedCount < quest.maxInvites && (
+                              {/* {quest.invitedCount < quest.maxInvites && (
                                 <TableRow>
                                   <TableCell colSpan={4}>
                                     <Button
@@ -342,7 +397,7 @@ export function QuestsTable() {
                                     </Button>
                                   </TableCell>
                                 </TableRow>
-                              )}
+                              )} */}
                             </TableBody>
                           </Table>
                         </div>

@@ -7,18 +7,14 @@ import Main from "./_flows/main";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Platform } from "@/lib/platform";
 
-interface TokenPublicData {
-  host: {
-    name: string;
-  };
-}
-
 export default function Join({
-  token,
+  data,
 }: {
-  token: Platform.WEST.Token<TokenPublicData>;
+  data: Platform.WEST.TokenPublicRead;
 }) {
+  const { token, parent } = data;
   const is_first_time = !(token.is_claimed || token.is_burned);
+  const referrer_name = parent!.owner.name;
   const [open, setOpen] = React.useState(is_first_time);
 
   return (
@@ -34,14 +30,14 @@ export default function Join({
             </DialogPrimitive.Description>
             <Hello
               data={{
-                referrer: token.public.host.name,
+                referrer: referrer_name ?? "Unknown",
               }}
               onOpenChange={setOpen}
             />
           </DialogPrimitive.DialogContent>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
-      <Main token={token} />
+      <Main data={data} />
     </ScreenRoot>
   );
 }

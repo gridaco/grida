@@ -13,22 +13,16 @@ type Params = {
   slug: string;
 };
 
-interface TokenPublicData {
-  host: {
-    name: string;
-  };
-}
-
 export default function RoutingPage({ params }: { params: Params }) {
   const client = useMemo(
-    () => new Platform.WEST.WestClient<TokenPublicData>(params.slug),
+    () => new Platform.WEST.WestClient(params.slug),
     [params.slug]
   );
 
   const { code, slug } = params;
 
   const { data, isLoading } = useSWR<{
-    data: Platform.WEST.Token<TokenPublicData>;
+    data: Platform.WEST.TokenPublicRead;
   }>(
     code,
     async (code) => {
@@ -43,7 +37,7 @@ export default function RoutingPage({ params }: { params: Params }) {
   useEffect(() => {
     //
     const client = new Platform.WEST.WestClient(slug);
-    client.track(code, "view");
+    client.track(code, "page_view");
   }, [code, slug]);
 
   if (isLoading || !data) {
@@ -56,17 +50,19 @@ export default function RoutingPage({ params }: { params: Params }) {
     );
   }
 
-  switch (data.data.token_type) {
+  const { token, children } = data.data;
+
+  switch (token.token_type) {
     case "mintable":
       return (
         <ScreenWindowRoot>
-          <Invite token={data.data} />
+          <Invite data={data.data} />
         </ScreenWindowRoot>
       );
     case "redeemable":
       return (
         <ScreenWindowRoot>
-          <Join token={data.data} />
+          <Join data={data.data} />
         </ScreenWindowRoot>
       );
 

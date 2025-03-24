@@ -3,13 +3,13 @@
 import React from "react";
 import { Button as FancyButton } from "@/www/ui/button";
 import { ScreenBackground } from "@/theme/templates/kit/components";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, GiftIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { PolestarTypeLogo } from "@/components/logos";
-import { ACME } from "@/components/logos/acme";
 import { DialogClose } from "@radix-ui/react-dialog";
 import { ScratchToReveal } from "@/www/ui/scratch-to-reveal";
 import { ShineBorder } from "@/www/ui/shine-border";
+import { Badge } from "@/components/ui/badge";
 
 export default function Hello({
   data,
@@ -92,9 +92,9 @@ function BBB({
     <main className="w-dvw h-dvh flex flex-col items-center justify-center">
       <header className="flex flex-col gap-4 items-center justify-center px-4">
         <PolestarTypeLogo />
-        <h2 className="text-2xl font-medium">
+        <Badge variant="outline">
           {data.referrer} 님 께서 초대장을 보냈습니다.
-        </h2>
+        </Badge>
       </header>
 
       <section className="flex flex-col gap-4 items-center justify-center px-4 mt-10">
@@ -111,15 +111,22 @@ function BBB({
             shineColor={["#E0762D", "#F38CB8", "#FDCC92"]}
           /> */}
           <div className="w-full h-full p-6">
-            <h6 className="text-2xl font-bold">₩100,000 EV 충전 포인트</h6>
-            <hr />
+            <Badge variant="outline" className="text-xl font-bold">
+              ₩100,000 EV 충전 포인트
+            </Badge>
+            {/* <h6 className="text-xl font-bold">₩100,000 EV 충전 포인트</h6> */}
+            <hr className="my-2" />
             <p>
               Polestar 4 시승 이벤트 에 참여하고 10만원 상당의 TMAP EV 충전
               포인트를 받아가세요
             </p>
+            {/* absolute icon */}
+            <div className="absolute -bottom-6 -right-6">
+              <GiftIcon className="size-32 text-muted-foreground" />
+            </div>
           </div>
         </ScratchToReveal>
-        <p>👆 카드를 손가락으로 긁어 주세요</p>
+        <p className="underline">👆 카드를 손가락으로 긁어 주세요</p>
       </section>
     </main>
   );

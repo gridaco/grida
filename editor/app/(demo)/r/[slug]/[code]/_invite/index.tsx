@@ -14,8 +14,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ACME } from "@/components/logos/acme";
-// import data from "./data.json";
 import t from "./data-01.json";
 import toast from "react-hot-toast"; // Import toast
 import { PolestarTypeLogo } from "@/components/logos";
@@ -33,47 +31,56 @@ import {
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ShineBorder } from "@/www/ui/shine-border";
 import NumberFlow from "@number-flow/react";
+import { motion } from "motion/react";
+import { Badge } from "@/components/ui/badge";
+import { Check, Gift } from "lucide-react";
+import { Spinner } from "@/components/spinner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { mutate } from "swr";
 
-interface TokenPublicData {
-  host: {
-    name: string;
-  };
-}
-
-async function mkshare(token: Platform.WEST.Token<TokenPublicData>) {
+async function mkshare(token: Platform.WEST.TokenPublicRead["token"]) {
   const client = new Platform.WEST.WestClient(token.series_id);
   const { data: next } = await client.mint(token.code);
 
   return {
     title: "Polestar 2",
-    text: `${token.public.host.name}`,
+    text: `${token.owner.name}`,
     url: `${window.location.origin}/r/${next.series_id}/${next.code}`,
   };
 }
 
+async function reshare(
+  owner: Platform.WEST.TokenPublicRead["token"]["owner"],
+  token: Platform.WEST.TokenPublicRead["children"][0]
+) {
+  return {
+    title: "Polestar 2",
+    text: `${owner.name}`,
+    url: `${window.location.origin}/r/${token.series_id}/${token.code}`,
+  };
+}
+
 export default function Invite({
-  token,
+  data,
 }: {
-  token: Platform.WEST.Token<TokenPublicData>;
+  data: Platform.WEST.TokenPublicRead;
 }) {
   const confirmDialog = useDialogState("confirm");
-  const { public: publicdata, max_supply, count } = token;
+  const { token, children: subtokens } = data;
+
+  const { max_supply, count, owner } = token;
+
   const available_count = (max_supply ?? 0) - count;
   const is_available = available_count > 0;
-  const {
-    host: { name: host_name },
-  } = publicdata;
 
-  const triggerShare = () => {
+  const triggerShare = async () => {
     // Added onshareclick function
     if (!navigator.share) {
       toast.error("이 기능은 현재 사용중인 브라우저에서 지원되지 않습니다.");
       return;
     }
 
-    mkshare(token).then((sharable) => {
-      // revalidate swr
-
+    return mkshare(token).then((sharable) => {
       navigator
         .share(sharable)
         .then(() => {
@@ -82,6 +89,11 @@ export default function Invite({
         })
         .catch((e) => {
           console.log("error while sharing", e);
+        })
+        .finally(() => {
+          const code = token.code;
+          mutate(code);
+          confirmDialog.closeDialog();
         });
     });
   };
@@ -112,18 +124,36 @@ export default function Invite({
                   {/* <span
                       dangerouslySetInnerHTML={{ __html: data.hero.title }}
                     /> */}
-                  {host_name}님을 <br />
+                  {owner.name}님을 <br />
                   Polestar 4 시승 초대 이벤트에 <br />
                   초대드립니다.
                 </h2>
               </div>
             </div>
 
+            <Card className="mt-12 mx-4 py-6 px-6">
+              <div className="space-y-4">
+                <Badge variant="outline">Polestar 시승 완료 시 혜택</Badge>
+                <p className="text-xl font-semibold">
+                  TMAP EV 충전 포인트 10만원 <br />
+                  <span className="text-sm text-muted-foreground">
+                    (시승 완료자 1인당 10만원권 / 최대 3인까지)
+                  </span>
+                </p>
+
+                <p className="text-sm font-light text-muted-foreground">
+                  • 대상 : 2025년 출고 고객
+                  <br /> 초대권을 통해 지인의 시승 완료 시, 출고 고객과 시승자
+                  본인 모두 혜택 제공 (최대 3인까지 제공)
+                </p>
+              </div>
+            </Card>
+
             <div className="mt-10 mx-4">
               <Card className="relative overflow-hidden">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <CardHeader>
-                  <CardTitle>{host_name}님의 초대권</CardTitle>
+                  <CardTitle>{owner.name}님의 초대권</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-lg font-bold">
@@ -140,29 +170,76 @@ export default function Invite({
                   </span>
                   <hr className="my-4" />
                   <p className="text-sm text-muted-foreground">
-                    {host_name}님께 제공된 초대권을 사용해 지인에게 시승
-                    이벤트를 공유하세요. 시승 완료 시 {host_name}님과 시승
+                    {owner.name}님께 제공된 초대권을 사용해 지인에게 시승
+                    이벤트를 공유하세요. 시승 완료 시 {owner.name}님과 시승
                     완료자 모두에게 특별한 혜택이 제공됩니다.
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            <Card className="mt-12 mx-4 py-6 px-6">
-              <div className="text-center">
-                <p className=" font-medium">Polestar 시승 완료 시 혜택</p>
-                <p className="text-xl font-semibold">
-                  TMAP EV 충전 포인트 10만원 <br />
-                  (시승 완료자 1인당 10만원권 / 최대 3인까지)
-                </p>
-
-                <p className="text-sm font-light mt-2 text-muted-foreground">
-                  • 대상 : 2025년 출고 고객
-                  <br /> 초대권을 통해 지인의 시승 완료 시, <br />
-                  출고 고객과 시승자 본인 모두 혜택 제공 (최대 3인까지 제공)
-                </p>
-              </div>
-            </Card>
+            <div className="mt-12 mx-4 space-y-2">
+              {subtokens.map((subtoken, index) => (
+                <motion.div
+                  key={subtoken.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card className="overflow-hidden transition-all border">
+                    <CardContent className="px-4 py-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium truncate max-w-[180px]">
+                            {"#" + (index + 1)}
+                          </div>
+                          {subtoken.owner ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar>
+                                <AvatarFallback>
+                                  {subtoken.owner?.name?.charAt(0) ?? "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-semibold">
+                                {subtoken.owner?.name}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Avatar>
+                                <AvatarFallback>?</AvatarFallback>
+                              </Avatar>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  //
+                                  reshare(owner, subtoken).then((sharable) => {
+                                    navigator
+                                      .share(sharable)
+                                      .then(() => {
+                                        toast.success(
+                                          "초대권이 재전송 되었습니다!"
+                                        );
+                                      })
+                                      .catch((e) => {
+                                        console.log("error while sharing", e);
+                                      });
+                                  });
+                                }}
+                              >
+                                다시 전송
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        <StatusIndicator invitation={subtoken} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
 
             {/* Info Section */}
             <div className="pt-12 pb-8 space-y-2">
@@ -171,7 +248,7 @@ export default function Invite({
               </article>
             </div>
             <div className="flex justify-center items-center pb-8 px-4">
-              <AccordionDemo />
+              <FaQ />
             </div>
 
             <div className="flex-1" />
@@ -195,7 +272,7 @@ export default function Invite({
   );
 }
 
-function AccordionDemo() {
+function FaQ() {
   return (
     <Accordion type="single" collapsible className="w-full">
       <AccordionItem value="item-2">
@@ -232,9 +309,17 @@ function ConfirmDrawer({
   onConfirm,
   ...props
 }: React.ComponentProps<typeof Drawer> & {
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
 }) {
   const [confirmed, setConfirmed] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+
+  const onConfirmClick = async () => {
+    setBusy(true);
+    onConfirm().finally(() => {
+      setBusy(false);
+    });
+  };
 
   return (
     <Drawer {...props}>
@@ -274,7 +359,8 @@ function ConfirmDrawer({
             </div>
           </section>
           <DrawerFooter className="pt-2">
-            <Button onClick={onConfirm} disabled={!confirmed}>
+            <Button onClick={onConfirmClick} disabled={!confirmed || busy}>
+              {busy && <Spinner />}
               초대장 보내기
             </Button>
             <DrawerClose asChild>
@@ -284,5 +370,38 @@ function ConfirmDrawer({
         </div>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function StatusIndicator({
+  invitation,
+}: {
+  invitation: {
+    is_burned: boolean;
+    is_claimed: boolean;
+  };
+}) {
+  if (invitation.is_burned) {
+    return (
+      <Badge className="bg-white text-amber-600 hover:bg-white flex items-center gap-1 font-medium">
+        <Gift className="h-3 w-3" />
+        미션 완료
+      </Badge>
+    );
+  }
+
+  if (invitation.is_claimed) {
+    return (
+      <Badge className="bg-white text-green-600 hover:bg-white flex items-center gap-1 font-medium">
+        <Check className="h-3 w-3" />
+        초대 수락
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="bg-white/80 text-blue-600 hover:bg-white flex items-center gap-1 font-medium">
+      초대 완료
+    </Badge>
   );
 }

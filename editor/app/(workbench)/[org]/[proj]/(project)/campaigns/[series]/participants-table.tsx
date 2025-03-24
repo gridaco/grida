@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState } from "react";
-import { createClientTokensClient } from "@/lib/supabase/client";
+import { createClientWestClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
@@ -105,7 +105,7 @@ function useParticipants(series_id: string) {
   const [tokens, setTokens] = useState<
     Platform.WEST.ParticipantCustomer[] | null
   >(null);
-  const client = useMemo(() => createClientTokensClient(), []);
+  const client = useMemo(() => createClientWestClient(), []);
 
   useEffect(() => {
     client

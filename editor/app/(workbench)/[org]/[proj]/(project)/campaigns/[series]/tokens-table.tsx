@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState } from "react";
-import { createClientTokensClient } from "@/lib/supabase/client";
+import { createClientWestClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
@@ -138,12 +138,17 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
 
 function useTokens(series_id: string) {
   const [tokens, setTokens] = useState<Platform.WEST.Token[] | null>(null);
-  const client = useMemo(() => createClientTokensClient(), []);
+  const client = useMemo(() => createClientWestClient(), []);
 
   useEffect(() => {
     client
       .from("token")
-      .select("*")
+      .select(
+        `
+        *,
+        owner:participant_customer!owner_id(*)
+      `
+      )
       .eq("series_id", series_id)
       .then(({ data, error }) => {
         if (error) return;
@@ -156,6 +161,7 @@ function useTokens(series_id: string) {
 
 export function TokensTable({ series_id }: { series_id: string }) {
   const { tokens } = useTokens(series_id);
+
   //
 
   return <DataTable columns={columns} data={tokens ?? []} />;

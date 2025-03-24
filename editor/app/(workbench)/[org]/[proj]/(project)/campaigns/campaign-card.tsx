@@ -14,19 +14,15 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Platform } from "@/lib/platform";
 
-export function SeriesCard({ data }: { data: Platform.WEST.TokenSeries }) {
+export function CampaignCard({ data }: { data: Platform.WEST.Campaign }) {
   // This would normally be passed as props
   const campaign = {
     id: data.id,
     name: data.name,
     description: data.description ?? "(No description)",
     status: data.enabled ? "active" : "paused",
-    startDate: "2023-06-01",
-    endDate: "2023-08-31",
-    referrals: 128,
-    goal: 500,
-    conversion: 24,
-    reward: "$25 Gift Card",
+    open_at: data.scheduling_open_at,
+    close_at: data.scheduling_close_at,
   };
 
   return (
@@ -45,35 +41,20 @@ export function SeriesCard({ data }: { data: Platform.WEST.TokenSeries }) {
       <CardContent className="p-4">
         <div className="space-y-4">
           <div className="flex justify-between text-sm">
-            <div className="flex items-center gap-1">
+            {/* <div className="flex items-center gap-1">
               <Users className="h-4 w-4 text-muted-foreground" />
               <span>{campaign.referrals} referrals</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-              <span>{campaign.conversion}% conversion</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span>Progress</span>
-              <span>
-                {Math.round((campaign.referrals / campaign.goal) * 100)}%
-              </span>
-            </div>
-            <Progress
-              value={(campaign.referrals / campaign.goal) * 100}
-              className="h-2"
-            />
+            </div> */}
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>
-                Started {new Date(campaign.startDate).toLocaleDateString()}
-              </span>
-            </div>
-            <div>Reward: {campaign.reward}</div>
+            {campaign.open_at && (
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>
+                  Started {new Date(campaign.open_at).toLocaleDateString()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
