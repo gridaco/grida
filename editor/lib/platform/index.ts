@@ -177,14 +177,31 @@ export namespace Platform.WEST {
     customer_ids: string[];
   }
 
-  export type TokenSeries = {
+  export type Campaign = {
     id: string;
-    name: string;
-    description: string | null;
-    metadata: Record<string, string> | unknown;
+    type: "referral";
+    public: Record<string, string> | unknown;
     created_at: string;
-    project_id: number;
+    description: string | null;
     enabled: boolean;
+    is_participant_name_exposed_to_public_dangerously: boolean;
+    name: string;
+    project_id: number;
+    scheduling_close_at: string | null;
+    scheduling_open_at: string | null;
+    scheduling_tz: string | null;
+  };
+
+  export type CampaignPublic = {
+    id: string;
+    type: "referral";
+    public: Record<string, string> | unknown;
+    created_at: string;
+    enabled: boolean;
+    name: string;
+    scheduling_close_at: string | null;
+    scheduling_open_at: string | null;
+    scheduling_tz: string | null;
   };
 
   export type TokenEvent = {
@@ -208,6 +225,13 @@ export namespace Platform.WEST {
     phone: string | null;
   };
 
+  export type ParticipantPublic = {
+    id: string;
+    series_id: string;
+    role: "host" | "participant";
+    name: string | null;
+  };
+
   //
   export type Token<
     P extends unknown | Record<string, unknown> | null = unknown,
@@ -226,17 +250,28 @@ export namespace Platform.WEST {
     is_burned: boolean;
   };
 
+  export type TokenPublicRead = {
+    token: Token & { owner: ParticipantPublic };
+    campaign: CampaignPublic;
+    parent: {
+      owner: ParticipantPublic;
+    } | null;
+    children: (Token & { owner: ParticipantPublic })[];
+  };
+
   export class WestClient<
     P extends unknown | Record<string, unknown> | null = unknown,
   > {
     constructor(readonly series_id: string) {}
 
-    read(code: string): Promise<{ data: Token<P> }> {
+    read(code: string): Promise<{
+      data: TokenPublicRead;
+    }> {
       return fetch(`/west/t/${code}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-series": this.series_id,
+          "x-grida-west-campaign-id": this.series_id,
         },
       }).then((res) => res.json());
     }
@@ -246,7 +281,7 @@ export namespace Platform.WEST {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-series": this.series_id,
+          "x-grida-west-campaign-id": this.series_id,
           "x-grida-west-token-secret": secret ?? "",
         },
       }).then((res) => res.json());
@@ -257,7 +292,7 @@ export namespace Platform.WEST {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-series": this.series_id,
+          "x-grida-west-campaign-id": this.series_id,
           "x-grida-customer-id": owner_id,
         },
       }).then((res) => {
@@ -283,7 +318,7 @@ export namespace Platform.WEST {
         }),
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-series": this.series_id,
+          "x-grida-west-campaign-id": this.series_id,
         },
       });
       //

@@ -1982,10 +1982,11 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
-          is_host_participant_name_exposed_to_public_dangerously: boolean
-          metadata: Json | null
+          is_participant_name_exposed_to_public_dangerously: boolean
+          max_supply_init_for_new_mint_token: number | null
           name: string
           project_id: number
+          public: Json | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
@@ -1996,10 +1997,11 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
-          is_host_participant_name_exposed_to_public_dangerously?: boolean
-          metadata?: Json | null
+          is_participant_name_exposed_to_public_dangerously?: boolean
+          max_supply_init_for_new_mint_token?: number | null
           name: string
           project_id: number
+          public?: Json | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
@@ -2010,10 +2012,11 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
-          is_host_participant_name_exposed_to_public_dangerously?: boolean
-          metadata?: Json | null
+          is_participant_name_exposed_to_public_dangerously?: boolean
+          max_supply_init_for_new_mint_token?: number | null
           name?: string
           project_id?: number
+          public?: Json | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
@@ -2062,6 +2065,13 @@ export type Database = {
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2128,6 +2138,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "token_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "participant_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "token_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -2139,6 +2156,13 @@ export type Database = {
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "token_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2174,6 +2198,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "token_event_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "token_event_token_id_fkey"
             columns: ["token_id"]
             isOneToOne: false
@@ -2184,18 +2215,45 @@ export type Database = {
       }
     }
     Views: {
+      campaign_public: {
+        Row: {
+          enabled: boolean | null
+          id: string | null
+          name: string | null
+          public: Json | null
+          scheduling_close_at: string | null
+          scheduling_open_at: string | null
+          scheduling_tz: string | null
+          type: Database["grida_west"]["Enums"]["campaign_type"] | null
+        }
+        Insert: {
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          public?: Json | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+          type?: Database["grida_west"]["Enums"]["campaign_type"] | null
+        }
+        Update: {
+          enabled?: boolean | null
+          id?: string | null
+          name?: string | null
+          public?: Json | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+          type?: Database["grida_west"]["Enums"]["campaign_type"] | null
+        }
+        Relationships: []
+      }
       participant_customer: {
         Row: {
           created_at: string | null
-          customer_created_at: string | null
-          customer_description: string | null
           customer_id: string | null
-          customer_last_seen_at: string | null
-          customer_metadata: Json | null
           email: string | null
           id: string | null
-          is_email_verified: boolean | null
-          is_phone_verified: boolean | null
           metadata: Json | null
           name: string | null
           phone: string | null
@@ -2216,6 +2274,37 @@ export type Database = {
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participant_public: {
+        Row: {
+          id: string | null
+          name: string | null
+          role: Database["grida_west"]["Enums"]["participant_role"] | null
+          series_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
         ]
