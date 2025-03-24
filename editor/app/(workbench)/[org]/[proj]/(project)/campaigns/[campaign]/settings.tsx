@@ -162,6 +162,7 @@ export default function CampaignSettings({
 
   return (
     <Body
+      campaign_id={campaign_id}
       defaultValues={campaign as Partial<CampaignFormValues>}
       onSubmit={update}
     />
@@ -169,9 +170,11 @@ export default function CampaignSettings({
 }
 
 function Body({
+  campaign_id,
   defaultValues,
   onSubmit,
 }: {
+  campaign_id: string;
   defaultValues: Partial<CampaignFormValues>;
   onSubmit: (data: CampaignFormValues) => Promise<boolean>;
 }) {
@@ -205,6 +208,8 @@ function Body({
         </CardDescription>
       </CardHeader>
 
+      <hr className="mb-4" />
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
           <CardContent className="space-y-8">
@@ -214,7 +219,16 @@ function Body({
               <p className="text-sm text-muted-foreground mb-4">
                 Configure the basic settings for your campaign.
               </p>
-              <div className="space-y-4">
+              <div className="space-y-8">
+                <FormItem>
+                  <FormLabel>Campaign ID</FormLabel>
+                  <Input readOnly disabled value={campaign_id} />
+                  <FormDescription>
+                    Your campaign's unique identifier.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+
                 <FormField
                   control={form.control}
                   name="name"
@@ -318,7 +332,7 @@ function Body({
               <p className="text-sm text-muted-foreground mb-4">
                 Set the start and end dates for your campaign.
               </p>
-              <div className="space-y-4">
+              <div className="space-y-8">
                 <FormField
                   control={form.control}
                   name="scheduling_open_at"
@@ -434,7 +448,7 @@ function Body({
               <p className="text-sm text-muted-foreground mb-4">
                 Configure advanced options for your campaign.
               </p>
-              <div className="space-y-4">
+              <div className="space-y-8">
                 <FormField
                   control={form.control}
                   name="max_supply_init_for_new_mint_token"

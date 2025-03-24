@@ -10,6 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
@@ -17,6 +18,7 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { ProjectLoaded } from "@/scaffolds/workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import { AboutGridaWestCard } from "./about-west-card";
 import "../../../../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -110,6 +112,9 @@ export default async function Layout({
                         </SidebarGroupContent>
                       </SidebarGroup>
                     </SidebarContent>
+                    <SidebarFooter>
+                      <AboutGridaWestCard />
+                    </SidebarFooter>
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">
                     <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area"></header>

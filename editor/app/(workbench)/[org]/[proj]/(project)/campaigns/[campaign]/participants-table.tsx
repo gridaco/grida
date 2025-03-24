@@ -151,7 +151,10 @@ export function ParticipantsTable({ campaign_id }: { campaign_id: string }) {
         {...importCustomersDialog.props}
         onImport={onImport}
       />
-      <Button onClick={importCustomersDialog.openDialog}>Import</Button>
+      <header className="w-full flex justify-between items-center mb-4">
+        <div />
+        <Button onClick={importCustomersDialog.openDialog}>Import</Button>
+      </header>
       <DataTable columns={columns} data={tokens ?? []} />
     </div>
   );

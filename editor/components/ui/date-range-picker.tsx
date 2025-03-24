@@ -348,14 +348,14 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
     >
       <PopoverTrigger asChild>
         <Button variant="outline">
-          <div className="text-right">
+          <div className="text-right font-normal">
             <div className="py-1">
-              <div>{`${formatDate(range.from, locale)}${
+              <span className="text-sm">{`${formatDate(range.from, locale)}${
                 range.to != null ? " - " + formatDate(range.to, locale) : ""
-              }`}</div>
+              }`}</span>
             </div>
             {rangeCompare != null && (
-              <div className="opacity-60 text-xs -mt-1">
+              <div className="opacity-60 text-xs  -mt-1">
                 <>
                   vs. {formatDate(rangeCompare.from, locale)}
                   {rangeCompare.to != null

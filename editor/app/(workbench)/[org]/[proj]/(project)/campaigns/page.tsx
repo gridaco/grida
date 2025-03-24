@@ -24,7 +24,11 @@ export default async function ChainsPage({
   }
 
   return (
-    <main>
+    <main className="container mx-auto my-10">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
+      </header>
+      <hr className="my-4" />
       {series.length === 0 && (
         <EmptyWelcome
           title={"No Campaigns"}
@@ -33,7 +37,7 @@ export default async function ChainsPage({
           }
         />
       )}
-      <div className="p-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {series.map((s) => {
           return (
             <Link key={s.id} href={`/${org}/${proj}/campaigns/${s.id}`}>

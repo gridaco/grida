@@ -59,9 +59,7 @@ export function CampaignCard({ data }: { data: Platform.WEST.Campaign }) {
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0 flex justify-between">
-        <Button size="sm" asChild>
-          <Link href={`/campaigns/${campaign.id}`}>View Details</Link>
-        </Button>
+        <Button size="sm">View Details</Button>
       </CardFooter>
     </Card>
   );

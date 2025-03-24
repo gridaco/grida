@@ -40,7 +40,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
 import { createClientWestClient } from "@/lib/supabase/client";
 
-const QUESTNAME = "Referral Campaign";
+const QUESTNAME = "refer-a-friend";
 
 // // Mock data for demonstration
 // const mockQuests = Array.from({ length: 10 }).map((_, i) => ({
@@ -249,18 +249,16 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{QUESTNAME}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{QUESTNAME}</Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="text-xs text-muted-foreground">
-                        0000%
-                        {/* {quest.progress}% */}
+                        {(quest.count / (quest.max_supply ?? 0)) * 100}%
                       </div>
                       <Progress
-                        value={
-                          0
-                          // quest.progress
-                        }
+                        value={(quest.count / (quest.max_supply ?? 0)) * 100}
                         className="h-2"
                       />
                     </div>
@@ -269,12 +267,15 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span>
-                        0/0
-                        {/* {quest.invitedCount}/{quest.maxInvites} */}
+                        {quest.count} / {quest.max_supply ?? "∞"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>{getStatusBadge("active")}</TableCell>
+                  <TableCell>
+                    {getStatusBadge(
+                      quest.count === quest.max_supply ? "completed" : "active"
+                    )}
+                  </TableCell>
                   <TableCell>
                     {/* {quest.startDate} */}
                     2020-01-01
@@ -307,9 +308,12 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Invitee</TableHead>
-                                <TableHead>Step 1: Sign Up</TableHead>
+                                <TableHead>Guest</TableHead>
+                                <TableHead>Step 1: Claim</TableHead>
                                 <TableHead>Step 2: Submit Form</TableHead>
+                                <TableHead>
+                                  Step 3: Complete Test Drive
+                                </TableHead>
                                 <TableHead className="text-right">
                                   Status
                                 </TableHead>
@@ -321,47 +325,43 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                                   <TableCell>
                                     <div>
                                       <div className="font-medium">
-                                        {challenge.owner?.name}
+                                        {challenge.owner?.name ?? "-"}
                                       </div>
                                       <div className="text-xs text-muted-foreground">
-                                        {challenge.owner?.email}
+                                        {challenge.owner?.email ??
+                                          challenge.owner?.phone ??
+                                          "-"}
                                       </div>
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    {/* {challenge.steps[0].completed ? (
+                                    {challenge.is_claimed ? (
                                       <div className="flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        <span>{challenge.steps[0].date}</span>
+                                        {/* <span>{challenge.steps[0].date}</span> */}
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-2">
                                         <Clock className="h-4 w-4 text-amber-500" />
                                         <span>Pending</span>
                                       </div>
-                                    )} */}
+                                    )}
                                   </TableCell>
                                   <TableCell>
-                                    {/* {challenge.steps[1].completed ? (
-                                      <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        <span>{challenge.steps[1].date}</span>
-                                      </div>
-                                    ) : challenge.steps[0].completed ? (
-                                      <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-amber-500" />
-                                        <span>In Progress</span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground">
-                                          Not Started
-                                        </span>
-                                      </div>
-                                    )} */}
+                                    <div className="flex items-center gap-2">
+                                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-muted-foreground">
+                                        Not Started
+                                      </span>
+                                    </div>
                                   </TableCell>
+                                  <TableCell></TableCell>
                                   <TableCell className="text-right">
+                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                      {challenge.is_claimed
+                                        ? "claimed"
+                                        : "not claimed"}
+                                    </Badge>
                                     {/* {challenge.steps.every(
                                       (step) => step.completed
                                     ) ? (

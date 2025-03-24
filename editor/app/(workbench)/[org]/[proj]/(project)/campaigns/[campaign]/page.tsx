@@ -84,9 +84,6 @@ export default function CampaignsPage({ params }: { params: Params }) {
           <p className="text-muted-foreground">
             Track your marketing campaign performance in real-time
           </p>
-          <span className="font-mono text-xs text-muted-foreground">
-            {campaign_id}
-          </span>
         </div>
       </div>
       <Tabs defaultValue="overview" className="mt-6">
