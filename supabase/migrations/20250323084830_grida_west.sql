@@ -1,14 +1,14 @@
--- 
--- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░░▒▓███████▓▒░▒▓████████▓▒░                           -- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                               -- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                               -- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░  ░▒▓██████▓▒░   ░▒▓█▓▒░                               -- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                               -- 
---                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                               -- 
---                         ░▒▓█████████████▓▒░░▒▓████████▓▒░▒▓███████▓▒░   ░▒▓█▓▒░                               -- 
---
---                                                            --  
+--                                                                                                               --
+--                                                                                                               --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░░▒▓███████▓▒░▒▓████████▓▒░                           --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                               --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░         ░▒▓█▓▒░                               --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░  ░▒▓██████▓▒░   ░▒▓█▓▒░                               --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                               --
+--                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░  ░▒▓█▓▒░                               --
+--                         ░▒▓█████████████▓▒░░▒▓████████▓▒░▒▓███████▓▒░   ░▒▓█▓▒░                               --
+--                                                                                                               --
+--                                                                                                               --
 
 
 
@@ -50,13 +50,14 @@ CREATE TABLE grida_west.campaign (
   name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 40),                    -- Series name (e.g., "Spring 2025 Campaign")
   description TEXT,                                                            -- Series description
 
-  is_host_participant_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,     -- Expose participant name to public
+  is_participant_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,     -- Expose participant name to public
+  max_supply_init_for_new_mint_token INTEGER DEFAULT NULL,                                     -- Maximum number of tokens per host
 
   enabled BOOLEAN NOT NULL DEFAULT true,                                        -- Enable/disable the series
   scheduling_open_at timestamp with time zone null,
   scheduling_close_at timestamp with time zone null,
   scheduling_tz text null,
-  metadata JSONB DEFAULT '{}'::jsonb,                                          -- Flexible additional data for the series
+  public JSONB DEFAULT '{}'::jsonb,                                          -- Flexible additional data for the series
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),                               -- Creation timestamp
 
@@ -66,6 +67,20 @@ CREATE TABLE grida_west.campaign (
 -- [rls] campaign:
 ALTER TABLE grida_west.campaign enable row level security;
 CREATE POLICY "access_based_on_project_membership" ON grida_west.campaign USING (public.rls_project(project_id));
+
+CREATE OR REPLACE VIEW grida_west.campaign_public AS
+SELECT
+  id,
+  type,
+  name,
+  enabled,
+  scheduling_open_at,
+  scheduling_close_at,
+  scheduling_tz,
+  public
+FROM grida_west.campaign;
+
+GRANT SELECT ON grida_west.campaign_public TO anon, authenticated, service_role;
 
 -- grida_west rls functions
 CREATE OR REPLACE FUNCTION grida_west.rls_campaign(p_campaign_id UUID)
@@ -97,25 +112,34 @@ CREATE TABLE grida_west.participant (
     CONSTRAINT fk_participant_customer_project FOREIGN KEY (customer_id, project_id) REFERENCES public.customer(uid, project_id)
 );
 
+ALTER TABLE grida_west.participant enable row level security;
 CREATE POLICY "access_based_on_series_project_membership"
 ON grida_west.participant
 USING (grida_west.rls_campaign(series_id));
 
+CREATE OR REPLACE VIEW grida_west.participant_public AS
+SELECT
+  p.id,
+  p.series_id,
+  p.role,
+  CASE
+    WHEN c.is_participant_name_exposed_to_public_dangerously THEN cust.name
+    ELSE NULL
+  END AS name
+FROM grida_west.participant p
+JOIN grida_west.campaign c ON p.series_id = c.id
+JOIN public.customer cust ON p.customer_id = cust.uid;
+GRANT SELECT ON grida_west.participant_public TO anon, authenticated, service_role;
 
-CREATE OR REPLACE VIEW grida_west.participant_customer AS
+CREATE OR REPLACE VIEW grida_west.participant_customer WITH (security_barrier=true) AS
 SELECT
   p.*,
   c.email,
   c.phone,
-  c.name,
-  c.description AS customer_description,
-  c.metadata AS customer_metadata,
-  c.created_at AS customer_created_at,
-  c.last_seen_at AS customer_last_seen_at,
-  c.is_email_verified,
-  c.is_phone_verified
+  c.name
 FROM grida_west.participant p
-JOIN public.customer c ON p.customer_id = c.uid;
+JOIN public.customer c ON p.customer_id = c.uid
+WHERE grida_west.rls_campaign(p.series_id);
 
 
 ---------------------------------------------------------------------
@@ -159,13 +183,7 @@ CREATE TABLE grida_west.token (
 ALTER TABLE grida_west.token enable row level security;
 CREATE POLICY "access_based_on_series_project_membership"
 ON grida_west.token
-USING (
-  EXISTS (
-    SELECT 1 FROM grida_west.campaign ts
-    WHERE ts.id = grida_west.token.series_id
-      AND public.rls_project(ts.project_id)
-  )
-);
+USING (grida_west.rls_campaign(series_id));
 
 
 ---------------------------------------------------------------------
@@ -179,6 +197,8 @@ CREATE TABLE grida_west.token_event (
     data JSONB DEFAULT NULL CHECK (jsonb_typeof(data) = 'object' AND pg_column_size(data) <= 1024),
     PRIMARY KEY (time, token_id, name)
 );
+
+ALTER TABLE grida_west.token_event enable row level security;
 
 -- Convert to hypertable
 SELECT create_hypertable('grida_west.token_event', 'time', chunk_time_interval => INTERVAL '7 days');
@@ -261,8 +281,10 @@ EXECUTE FUNCTION grida_west.set_claimed_status();
 CREATE OR REPLACE FUNCTION grida_west.track_token_created_event()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO grida_west.token_event(token_id, series_id, name, time, data)
-  VALUES (NEW.id, NEW.series_id, 'create', NOW(), 
+  PERFORM grida_west.track(
+    NEW.series_id,
+    NEW.code,
+    'create', 
     -- if parent, include parent_id
     CASE WHEN NEW.parent_id IS NOT NULL THEN jsonb_build_object('from', NEW.parent_id) ELSE NULL END
   );
@@ -285,32 +307,26 @@ RETURNS TRIGGER AS $$
 DECLARE
     new_token grida_west.token%ROWTYPE;
     customer_rec public.customer%ROWTYPE;
-    public_data JSONB := '{}';
-    dangerously_expose_name BOOLEAN;
+    
 BEGIN
     IF NEW.role <> 'host' THEN
         RETURN NEW;
     END IF;
     SELECT * INTO customer_rec FROM public.customer WHERE uid = NEW.customer_id;
-    SELECT is_host_participant_name_exposed_to_public_dangerously INTO dangerously_expose_name FROM grida_west.campaign WHERE id = NEW.series_id;
-
-    IF dangerously_expose_name THEN
-        public_data := jsonb_build_object('host', jsonb_build_object('name', customer_rec.name));
-    END IF;
 
     INSERT INTO grida_west.token (
         series_id,
         owner_id,
         token_type,
         is_claimed,
-        public
+        max_supply
     )
     VALUES (
         NEW.series_id,
         NEW.id,
         'mintable',
         true,
-        public_data
+        (SELECT max_supply_init_for_new_mint_token FROM grida_west.campaign WHERE id = NEW.series_id)
     )
     RETURNING * INTO new_token;
 
@@ -532,4 +548,9 @@ BEGIN
     GROUP BY bucket, token_event.name
     ORDER BY bucket ASC, count DESC;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- analyze bypasses rls, but only can be called by service_role (this is for query efficiency)
+
+REVOKE EXECUTE ON FUNCTION grida_west.analyze FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION grida_west.analyze TO service_role;
