@@ -21,8 +21,10 @@ import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
-const columns: ColumnDef<Platform.WEST.Token>[] = [
+const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -46,59 +48,34 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "code",
-    header: "Code",
+    accessorKey: "role",
+    header: "Role",
     cell: ({ row }) => (
       <div>
-        <Badge className="font-mono text-xs" variant="outline">
-          {row.getValue("code")}
-        </Badge>
+        <Badge variant="outline">{row.getValue("role")}</Badge>
       </div>
     ),
   },
   {
-    accessorKey: "token_type",
-    header: () => <div>Type</div>,
-    cell: ({ row }) => <div>{row.getValue("token_type")}</div>,
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => <div>{row.getValue("name")}</div>,
   },
   {
-    accessorKey: "owner_id",
-    header: () => <div>Owner</div>,
-    cell: ({ row }) => <div>{row.getValue("owner_id")}</div>,
+    accessorKey: "email",
+    header: "Email",
+    cell: ({ row }) => <div>{row.getValue("email")}</div>,
   },
   {
-    accessorKey: "is_claimed",
-    header: "Claimed",
-    cell: ({ row }) => (
-      <div>
-        <Checkbox disabled checked={row.getValue("is_claimed")} />
-      </div>
-    ),
-  },
-  {
-    accessorKey: "is_burned",
-    header: "Burned",
-    cell: ({ row }) => (
-      <div>
-        <Checkbox disabled checked={row.getValue("is_burned")} />
-      </div>
-    ),
-  },
-  {
-    accessorKey: "max_supply",
-    header: () => <div>Max</div>,
-    cell: ({ row }) => <div>{row.getValue("max_supply")}</div>,
-  },
-  {
-    accessorKey: "count",
-    header: () => <div>Mint</div>,
-    cell: ({ row }) => <div>{row.getValue("count")}</div>,
+    accessorKey: "phone",
+    header: "Phone",
+    cell: ({ row }) => <div>{row.getValue("phone")}</div>,
   },
   {
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const token = row.original;
+      const item = row.original;
 
       return (
         <DropdownMenu>
@@ -112,21 +89,13 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => {
-                toast.success("Copied token ID to clipboard");
-                navigator.clipboard.writeText(token.id);
+                toast.success("Copied ID to clipboard");
+                navigator.clipboard.writeText(item.id);
               }}
             >
               Copy ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                open(`/r/${token.series_id}/${token.code}`, "_blank");
-              }}
-            >
-              <OpenInNewWindowIcon className="size-4 me-2" />
-              Open URL
-            </DropdownMenuItem>
             <DropdownMenuItem>View owner</DropdownMenuItem>
             <DropdownMenuItem>View details</DropdownMenuItem>
           </DropdownMenuContent>
@@ -136,33 +105,56 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
   },
 ];
 
-function useTokens(series_id: string) {
-  const [tokens, setTokens] = useState<Platform.WEST.Token[] | null>(null);
+function useParticipants(series_id: string) {
+  const [tokens, setTokens] = useState<
+    Platform.WEST.ParticipantCustomer[] | null
+  >(null);
   const client = useMemo(() => createClientWestClient(), []);
 
   useEffect(() => {
     client
-      .from("token")
-      .select(
-        `
-        *,
-        owner:participant_customer!owner_id(*)
-      `
-      )
+      .from("participant_customer")
+      .select("*")
       .eq("series_id", series_id)
       .then(({ data, error }) => {
         if (error) return;
-        setTokens(data as Platform.WEST.Token[]);
+        setTokens(data as Platform.WEST.ParticipantCustomer[]);
       });
   }, [client, series_id]);
 
   return { tokens };
 }
 
-export function TokensTable({ series_id }: { series_id: string }) {
-  const { tokens } = useTokens(series_id);
-
+export function ParticipantsTable({ campaign_id }: { campaign_id: string }) {
+  const importCustomersDialog = useDialogState("import-customers", {
+    refreshkey: true,
+  });
+  const { tokens } = useParticipants(campaign_id);
   //
 
-  return <DataTable columns={columns} data={tokens ?? []} />;
+  const onImport = async (ids: string[]) => {
+    return await fetch(`/west/s/${campaign_id}/participants/import`, {
+      method: "POST",
+      body: JSON.stringify({
+        role: "host",
+        customer_ids: ids,
+      } satisfies Platform.WEST.ImportParticipantsRequestBody),
+    }).then((res) => {
+      return res.ok;
+    });
+  };
+
+  return (
+    <div>
+      <ImportFromCustomersDialog
+        key={importCustomersDialog.refreshkey}
+        {...importCustomersDialog.props}
+        onImport={onImport}
+      />
+      <Button onClick={importCustomersDialog.openDialog}>Import</Button>
+      <DataTable columns={columns} data={tokens ?? []} />
+    </div>
+  );
 }
+
+// function ImportParticipants()

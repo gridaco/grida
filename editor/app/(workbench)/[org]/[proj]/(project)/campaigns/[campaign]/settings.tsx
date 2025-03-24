@@ -145,8 +145,12 @@ function useCampaign(id: string) {
   return { campaign, update };
 }
 
-export default function CampaignSettings({ series_id }: { series_id: string }) {
-  const { campaign, update } = useCampaign(series_id);
+export default function CampaignSettings({
+  campaign_id,
+}: {
+  campaign_id: string;
+}) {
+  const { campaign, update } = useCampaign(campaign_id);
 
   if (!campaign) {
     return (

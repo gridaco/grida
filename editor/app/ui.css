@@ -106,3 +106,9 @@
     scrollbar-width: none; /* Firefox */
   }
 }
+
+/* sr-only causes scrolling issue - this is not a good fix, but works for now. */
+.sr-only {
+  top: 0;
+  left: 0;
+}

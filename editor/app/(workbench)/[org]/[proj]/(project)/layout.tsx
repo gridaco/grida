@@ -1,17 +1,15 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from "@/components/ui/sidebar";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
 } from "@/components/ui/sidebar";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
@@ -115,7 +113,7 @@ export default async function Layout({
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">
                     <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area"></header>
-                    <div className="w-full h-full overflow-x-hidden">
+                    <div className="w-full h-full overflow-x-hidden overflow-y-auto">
                       <ProjectLoaded>{children}</ProjectLoaded>
                     </div>
                   </div>

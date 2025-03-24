@@ -38,7 +38,7 @@ import CampaignSettings from "./settings";
 type Params = {
   org: string;
   proj: string;
-  series: string;
+  campaign: string;
 };
 
 interface DateRange {
@@ -47,7 +47,7 @@ interface DateRange {
 }
 
 export default function CampaignsPage({ params }: { params: Params }) {
-  const { series: series_id } = params;
+  const { campaign: campaign_id } = params;
   const { id: project_id } = useProject();
 
   const [range, setRange] = useState<DateRange>({
@@ -66,7 +66,7 @@ export default function CampaignsPage({ params }: { params: Params }) {
   }, [range, interval]);
 
   const { data } = useSWR(
-    `/private/tokens/${project_id}/series/${series_id}/events/analyze?${qs}`,
+    `/private/west/campaigns/${campaign_id}/events/analyze?${qs}`,
     async (url) => {
       const res = await fetch(url);
       return res.json();
@@ -80,12 +80,13 @@ export default function CampaignsPage({ params }: { params: Params }) {
     <main className="container mx-auto my-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Campaign <span className="font-mono text-sm">{series_id}</span>
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Campaign</h1>
           <p className="text-muted-foreground">
             Track your marketing campaign performance in real-time
           </p>
+          <span className="font-mono text-xs text-muted-foreground">
+            {campaign_id}
+          </span>
         </div>
       </div>
       <Tabs defaultValue="overview" className="mt-6">
@@ -127,19 +128,19 @@ export default function CampaignsPage({ params }: { params: Params }) {
           {data ? <Chart data={data.data} /> : null}
         </TabsContent>
         <TabsContent value="participants">
-          <ParticipantsTable series_id={series_id} />
+          <ParticipantsTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="quests">
-          <QuestsTable series_id={series_id} />
+          <QuestsTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="tokens">
-          <TokensTable series_id={series_id} />
+          <TokensTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="logs">
-          <LogsTable series_id={series_id} />
+          <LogsTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="settings">
-          <CampaignSettings series_id={series_id} />
+          <CampaignSettings campaign_id={campaign_id} />
         </TabsContent>
       </Tabs>
     </main>

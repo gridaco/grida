@@ -10,14 +10,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import useSWR from "swr";
-import { useProject } from "@/scaffolds/workspace";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
 
-export default function LogsTable({ series_id }: { series_id: string }) {
-  const { id: project_id } = useProject();
+export default function LogsTable({ campaign_id }: { campaign_id: string }) {
   const { data, isLoading } = useSWR<{ data: Platform.WEST.TokenEvent[] }>(
-    `/private/tokens/${project_id}/series/${series_id}/events`,
+    `/private/west/campaigns/${campaign_id}/events`,
     async (url) => {
       const res = await fetch(url);
       return res.json();

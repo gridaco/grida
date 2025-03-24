@@ -7,8 +7,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  project_id: string;
-  series: string;
+  campaign: string;
 };
 
 type Context = {
@@ -16,7 +15,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const { series: series_id } = await context.params;
+  const { campaign: campaign_id } = await context.params;
 
   const cookieStore = cookies();
   const client = createRouteHandlerWestClient(cookieStore);
@@ -25,7 +24,7 @@ export async function GET(req: NextRequest, context: Context) {
   const { error } = await client
     .from("campaign")
     .select("id")
-    .eq("id", series_id);
+    .eq("id", campaign_id);
 
   if (error) {
     return notFound();
@@ -35,7 +34,7 @@ export async function GET(req: NextRequest, context: Context) {
   const { data, error: fetch_err } = await grida_west_client
     .from("token_event")
     .select("*")
-    .eq("series_id", series_id)
+    .eq("series_id", campaign_id)
     .order("time", { ascending: false })
     .limit(1000);
 

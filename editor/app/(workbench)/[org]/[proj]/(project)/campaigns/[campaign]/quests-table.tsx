@@ -128,10 +128,10 @@ function useQuestTokens(series_id: string) {
   return { tokens };
 }
 
-export function QuestsTable({ series_id }: { series_id: string }) {
+export function QuestsTable({ campaign_id }: { campaign_id: string }) {
   const [expandedQuests, setExpandedQuests] = useState<string[]>([]);
 
-  const { tokens } = useQuestTokens(series_id);
+  const { tokens } = useQuestTokens(campaign_id);
 
   console.log("tokens", tokens);
 
