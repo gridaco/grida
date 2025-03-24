@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { code } = await context.params;
   //
   const headersList = await headers();
-  const series_id = headersList.get("x-grida-west-series");
+  const series_id = headersList.get("x-grida-west-campaign-id");
   const secret = headersList.get("x-grida-west-token-secret");
 
   if (!series_id) {

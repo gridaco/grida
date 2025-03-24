@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { code } = await context.params;
   const headersList = await headers();
   // TODO: not good. should be using cookie session
-  const series_id = headersList.get("x-grida-west-series");
+  const series_id = headersList.get("x-grida-west-campaign-id");
   const customer_id = headersList.get("x-grida-customer-id");
 
   if (!series_id) {

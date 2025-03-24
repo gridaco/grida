@@ -1,3 +1,4 @@
+import { Platform } from "@/lib/platform";
 import { grida_west_client } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +16,7 @@ type Context = {
 export async function GET(req: NextRequest, context: Context) {
   const { code } = await context.params;
   const headersList = await headers();
-  const series_id = headersList.get("x-grida-west-series");
+  const series_id = headersList.get("x-grida-west-campaign-id");
 
   if (!series_id) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -23,7 +24,20 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: token, error: token_test_err } = await grida_west_client
     .from("token")
-    .select()
+    .select(
+      `
+      *,
+      campaign:campaign_public!series_id (*),
+      owner:participant_public!owner_id (*),
+      parent:parent_id(
+        owner:participant_public!owner_id (*)
+      ),
+      children:token!parent_id (
+        *,
+        owner:participant_public!owner_id (*)
+      )
+    `
+    )
     .eq("code", code)
     .eq("series_id", series_id)
     .single();
@@ -33,8 +47,15 @@ export async function GET(req: NextRequest, context: Context) {
     return NextResponse.json({ error: token_test_err }, { status: 404 });
   }
 
+  const { campaign, parent, children, ..._token } = token;
+
   return NextResponse.json({
-    data: token,
+    data: {
+      token: _token,
+      campaign,
+      parent,
+      children,
+    } as unknown as Platform.WEST.TokenPublicRead,
     error: null,
   });
 }

@@ -19,8 +19,19 @@ export async function POST(
   const body =
     (await req.json()) as Platform.WEST.ImportParticipantsRequestBody;
 
+  const { data: campaign, error: campaign_fetch_err } = await supabase
+    .from("campaign")
+    .select()
+    .eq("id", series)
+    .single();
+  if (campaign_fetch_err) {
+    console.error("error while fetching campaign", campaign_fetch_err);
+    return NextResponse.json({ error: campaign_fetch_err }, { status: 500 });
+  }
+
   const upsertions = body.customer_ids.map((customer_id) => {
     return {
+      project_id: campaign.project_id,
       series_id: series,
       customer_id,
       role: body.role,

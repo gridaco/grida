@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { code } = await context.params;
   const { name, data } = await req.json();
   const headersList = await headers();
-  const series_id = headersList.get("x-grida-west-series");
+  const series_id = headersList.get("x-grida-west-campaign-id");
 
   if (!series_id) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });

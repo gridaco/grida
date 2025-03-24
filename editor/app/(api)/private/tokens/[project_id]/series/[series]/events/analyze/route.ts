@@ -1,5 +1,9 @@
-import { createRouteHandlerWestClient } from "@/lib/supabase/server";
+import {
+  createRouteHandlerWestClient,
+  grida_west_client,
+} from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
@@ -18,9 +22,22 @@ export async function GET(req: NextRequest, context: Context) {
   const interval = req.nextUrl.searchParams.get("interval") || undefined;
 
   const cookieStore = cookies();
-  const client = createRouteHandlerWestClient(cookieStore);
+  const rlsclient = createRouteHandlerWestClient(cookieStore);
 
-  const { data, error: analyze_err } = await client.rpc("analyze", {
+  // !!!
+  // [analyze] bypasses rls for query efficiency. we need to explicitly check the ownership.
+  // !!!
+  const { data: campaign } = await rlsclient
+    .from("campaign")
+    .select("id")
+    .eq("id", series_id)
+    .single();
+
+  if (!campaign) {
+    return notFound();
+  }
+
+  const { data, error: analyze_err } = await grida_west_client.rpc("analyze", {
     p_series_id: series_id,
     p_time_from: from,
     p_time_to: to,
@@ -29,7 +46,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   if (analyze_err) {
     console.error("analyze", analyze_err);
-    return new NextResponse("error", { status: 400 });
+    return NextResponse.json({ error: analyze_err }, { status: 500 });
   }
 
   return NextResponse.json({
