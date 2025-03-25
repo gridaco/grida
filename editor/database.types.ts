@@ -3027,13 +3027,33 @@ export type Database = {
     Views: {
       customer_with_tags: {
         Row: {
+          _fp_fingerprintjs_visitorid: string | null
+          created_at: string | null
+          description: string | null
           email: string | null
+          email_provisional: string[] | null
+          is_email_verified: boolean | null
+          is_phone_verified: boolean | null
+          last_seen_at: string | null
+          metadata: Json | null
           name: string | null
+          name_provisional: string[] | null
+          phone: string | null
+          phone_provisional: string[] | null
           project_id: number | null
           tags: string[] | null
           uid: string | null
+          uuid: string | null
+          visitor_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "customer_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: true
+            referencedRelation: "visitor"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "public_customer_project_id_fkey"
             columns: ["project_id"]

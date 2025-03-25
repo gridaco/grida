@@ -47,17 +47,14 @@ USING (public.rls_project(project_id));
 -- View: public.customer_with_tags
 -- Facilitates bulk insertion and retrieval of customers along with their tags
 CREATE VIEW public.customer_with_tags 
-WITH(security_invoker = true)
+WITH (security_invoker = true)
 AS
 SELECT
-  c.uid,
-  c.project_id,
-  c.email,
-  c.name,
+  c.*,
   array_remove(array_agg(ct.tag_name), NULL) AS tags
 FROM public.customer c
 LEFT JOIN public.customer_tag ct ON c.uid = ct.customer_uid
-GROUP BY c.uid, c.project_id, c.email, c.name;
+GROUP BY c.uid;
 
 -- Trigger Function: public.insert_customer_with_tags
 -- Handles bulk insertions of customers and their tags via the customer_with_tags view
