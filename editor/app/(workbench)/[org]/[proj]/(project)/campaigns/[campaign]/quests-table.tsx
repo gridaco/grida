@@ -284,8 +284,7 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {/* {quest.startDate} */}
-                    2020-01-01
+                    {new Date(quest.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
