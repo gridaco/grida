@@ -1,8 +1,6 @@
-# CSV Bulk insert / update operations for Grida Customer Object
+# Customers
 
-You can use the CSV file to bulk insert or update data into the Grida customer object.
-
-> We don't support upsert with csv file. you'll need to use api for upsertion.
+This object represents a customer of your business. Use it to create recurring charges, save payment and contact information, and track payments that belong to the same customer.
 
 ## Customer Object
 
@@ -32,6 +30,38 @@ For example,
 - customer from your database
 - customer from salesforce
 
+### `phone`
+
+`phone` is a phone number of the customer in E.164 format. If you don't know how to format the phone number properly, you can use the
+[Grida E.164 tool](https://app.grida.co/tools/e164) to format the phone number.
+
+### `tags`
+
+A list of tags associated with the customer. Tags are managed per project, can have descriptions, and are useful for categorization, segmentation, and quick filtering.
+
+Tags have the following structure:
+
+| Field Name  | Description                          | Required | format | Example       |
+| ----------- | ------------------------------------ | -------- | ------ | ------------- |
+| name        | The unique name of the tag           | Yes      | string | "premium"     |
+| color       | Hex color code for visual indication | No       | hex    | "#ff0000"     |
+| description | Optional description of the tag      | No       | string | "VIP clients" |
+
+Tags are created automatically if they don't already exist when provided during customer creation or update operations.
+
+Example:
+
+```json
+{
+  "tags": ["premium", "vip", "new-customer"]
+}
+```
+
+- Tags are project-scoped and uniquely identified by their `name`.
+- Renaming a tag automatically updates all customer-tag associations.
+
+Learn more about [tags](../tags/).
+
 ### `metadata`
 
 Set of key-value pairs that you can attach to a customer. This can be
@@ -58,12 +88,15 @@ value 1,value 2
 
 > **IMPORTANT**: We do not support partial update of `metadata`. in all operations, you must provide the full metadata with the previous values included.
 
-### `phone`
+---
 
-`phone` is a phone number of the customer in E.164 format. If you don't know how to format the phone number properly, you can use the
-[Grida E.164 tool](https://app.grida.co/tools/e164) to format the phone number.
+## Working with CSV
 
-## Inserting
+You can use the CSV file to bulk insert or update data into the Grida customer object.
+
+> We don't support upsert with csv file. you'll need to use api for upsertion.
+
+### Inserting
 
 When inserting data, you should not provide any other field than the ones mentioned below.
 
@@ -81,7 +114,7 @@ While the `uuid` is optional, if you wish to update the customer later, you must
 - [Learn more about `uuid`](#uuid)
 - [Learn more about `metadata`](#metadata)
 
-## Updating
+### Updating
 
 To upsert data, you need to provide the `uid` or `uuid` field in the CSV file.
 

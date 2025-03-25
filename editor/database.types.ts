@@ -2664,6 +2664,49 @@ export type Database = {
           },
         ]
       }
+      customer_tag: {
+        Row: {
+          created_at: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Insert: {
+          created_at?: string
+          customer_uid: string
+          project_id: number
+          tag_name: string
+        }
+        Update: {
+          created_at?: string
+          customer_uid?: string
+          project_id?: number
+          tag_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_tag_customer_uid_fkey"
+            columns: ["customer_uid"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["uid"]
+          },
+          {
+            foreignKeyName: "customer_tag_customer_uid_fkey"
+            columns: ["customer_uid"]
+            isOneToOne: false
+            referencedRelation: "customer_with_tags"
+            referencedColumns: ["uid"]
+          },
+          {
+            foreignKeyName: "customer_tag_project_id_tag_name_fkey"
+            columns: ["project_id", "tag_name"]
+            isOneToOne: false
+            referencedRelation: "tag"
+            referencedColumns: ["project_id", "name"]
+          },
+        ]
+      }
       document: {
         Row: {
           created_at: string
@@ -2863,6 +2906,41 @@ export type Database = {
           },
         ]
       }
+      tag: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: number
+          name: string
+          project_id: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          name: string
+          project_id: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: number
+          name?: string
+          project_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profile: {
         Row: {
           avatar_path: string | null
@@ -2947,7 +3025,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customer_with_tags: {
+        Row: {
+          email: string | null
+          name: string | null
+          project_id: number | null
+          tags: string[] | null
+          uid: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_customer_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_compression_policy: {
