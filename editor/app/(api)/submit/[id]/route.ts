@@ -2,6 +2,9 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_CUSTOMER_EMAIL_KEY,
+  SYSTEM_GF_CUSTOMER_PHONE_KEY,
+  SYSTEM_GF_CUSTOMER_NAME_KEY,
 } from "@/k/system";
 // TODO: need RLS?
 import {
@@ -134,10 +137,11 @@ async function submit({
   }
 
   // check if form exists
-  const { data: form_reference } = await grida_forms_client
-    .from("form")
-    .select(
-      `
+  const { data: form_reference, error: form_reference_err } =
+    await grida_forms_client
+      .from("form")
+      .select(
+        `
         *,
         fields:attribute(
           *,
@@ -150,11 +154,12 @@ async function submit({
         store_connection:connection_commerce_store(*),
         supabase_connection:connection_supabase(*)
       `
-    )
-    .eq("id", form_id)
-    .single();
+      )
+      .eq("id", form_id)
+      .single();
 
   if (!form_reference) {
+    console.error("form not found", form_id, form_reference_err);
     return error(404, { form_id }, meta);
   }
 
@@ -205,6 +210,18 @@ async function submit({
     formdata.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
   );
 
+  const _gf_customer_email: string | null = qval(
+    formdata.get(SYSTEM_GF_CUSTOMER_EMAIL_KEY) as string
+  );
+
+  const _gf_customer_phone: string | null = qval(
+    formdata.get(SYSTEM_GF_CUSTOMER_PHONE_KEY) as string
+  );
+
+  const _gf_customer_name: string | null = qval(
+    formdata.get(SYSTEM_GF_CUSTOMER_NAME_KEY) as string
+  );
+
   const _fp_fingerprintjs_visitorid: string | null = formdata.get(
     SYSTEM_GF_FINGERPRINT_VISITORID_KEY
   ) as string;
@@ -216,6 +233,9 @@ async function submit({
     uuid: _gf_customer_uuid,
     hints: {
       _fp_fingerprintjs_visitorid,
+      email: _gf_customer_email || undefined,
+      phone: _gf_customer_phone || undefined,
+      name: _gf_customer_name || undefined,
     },
   });
 

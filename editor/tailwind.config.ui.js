@@ -97,6 +97,12 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // https://github.com/shadcn-ui/ui/issues/700#issuecomment-2221528928
+        progress: {
+          "0%": { transform: "translateX(0) scaleX(0)" },
+          "40%": { transform: "translateX(0) scaleX(0.4)" },
+          "100%": { transform: "translateX(100%) scaleX(0.5)" },
+        },
         // #region marquee https://magicui.design/docs/components/marquee
         marquee: {
           from: { transform: "translateX(0)" },
@@ -124,6 +130,8 @@ module.exports = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        // https://github.com/shadcn-ui/ui/issues/700#issuecomment-2221528928
+        progress: "progress 1s infinite linear",
         // #region marquee https://magicui.design/docs/components/marquee
         marquee: "marquee var(--duration) linear infinite",
         "marquee-vertical": "marquee-vertical var(--duration) linear infinite",

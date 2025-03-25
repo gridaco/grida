@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon, GearIcon, UploadIcon } from "@radix-ui/react-icons";
 import { useProject } from "@/scaffolds/workspace";
-import CreateCustomerDialog from "@/scaffolds/platform/customer/create-customer-dialog";
+import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportCSVDialog } from "@/scaffolds/platform/customer/import-csv-dialog";
 import { usePathname, useRouter } from "next/navigation";
@@ -169,9 +169,10 @@ function NewButton() {
 
   return (
     <div className="flex items-center gap-1">
-      <CreateCustomerDialog
+      <CustomerEditDialog
         {...createCustomerDialog.props}
         key={createCustomerDialog.refreshkey}
+        operation="insert"
         onSubmit={async (data) => {
           const { error } = await insertCustomer(client, project_id, data);
           if (error) {

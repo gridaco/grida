@@ -34,15 +34,7 @@ async function parse_customers_csv(
 
   const { data: rows, errors: csv_parse_errors } = Papa.parse<
     Record<string, string>
-  >(csvt, {
-    header: true,
-    skipEmptyLines: true,
-    comments: "#",
-    transform: (value, field) => {
-      if (value === "") return undefined;
-      return value;
-    },
-  });
+  >(csvt, Platform.CSV.parser_config);
 
   if (csv_parse_errors.length > 0) {
     return {
@@ -120,13 +112,14 @@ export async function POST(
   if (dryrun) {
     return NextResponse.json({ message: "CSV is valid" });
   } else {
-    console.log("inserting", data);
+    console.log("with-csv::inserting", data);
     const { count, error } = await supabase
       .from("customer")
       .insert(data!, { count: "exact" })
       .select("uid");
 
     if (error) {
+      console.error("error while inserting customers", error);
       return NextResponse.json(
         { error: "Failed to insert customers", details: error },
         { status: 400 }
@@ -183,13 +176,17 @@ export async function PATCH(
   if (dryrun) {
     return NextResponse.json({ message: "CSV is valid" });
   } else {
-    console.log("upserting", data);
+    console.log("with-csv::upserting", data);
     const { count, error } = await supabase
       .from("customer")
-      .upsert(data!, { count: "exact" })
+      .upsert(data!, {
+        onConflict: "project_id, uuid",
+        count: "exact",
+      })
       .select("uid");
 
     if (error) {
+      console.error("error while upserting customers", error);
       return NextResponse.json(
         { error: "Failed to insert customers", details: error },
         { status: 400 }

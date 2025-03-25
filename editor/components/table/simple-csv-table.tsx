@@ -24,7 +24,7 @@ export function SimpleCSVTable({ data }: CSVPreviewProps) {
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="sticky top-0 bg-secondary">
         <TableRow>
           {allKeys.map((key) => (
             <TableHead key={key}>{key}</TableHead>
