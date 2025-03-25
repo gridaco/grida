@@ -76,6 +76,13 @@ export default async function SigninPage({
                     redirect_uri={redirect_uri}
                   />
                 </Suspense>
+                <hr />
+                <Link
+                  href="/sign-in/email"
+                  className="flex items-center gap-1 hover:underline text-sm text-muted-foreground"
+                >
+                  Continue with Email →
+                </Link>
               </div>
             </div>
             <div className="sm:text-center">
