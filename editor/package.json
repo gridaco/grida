@@ -136,6 +136,7 @@
     "i18next": "^23.7.9",
     "immer": "^9.0.3",
     "inline-style-parser": "^0.2.4",
+    "input-otp": "^1.4.2",
     "libphonenumber-js": "^1.12.6",
     "lucide-react": "^0.367.0",
     "mapbox-gl": "^3.4.0",
