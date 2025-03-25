@@ -50,16 +50,18 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
     header: "Code",
     cell: ({ row }) => (
       <div>
-        <Badge className="font-mono text-xs" variant="outline">
-          {row.getValue("code")}
-        </Badge>
+        <Badge className="font-mono text-xs">{row.getValue("code")}</Badge>
       </div>
     ),
   },
   {
     accessorKey: "token_type",
     header: () => <div>Type</div>,
-    cell: ({ row }) => <div>{row.getValue("token_type")}</div>,
+    cell: ({ row }) => (
+      <div>
+        <Badge variant="outline">{row.getValue("token_type")}</Badge>
+      </div>
+    ),
   },
   {
     accessorKey: "owner_id",
@@ -127,8 +129,8 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
               <OpenInNewWindowIcon className="size-4 me-2" />
               Open URL
             </DropdownMenuItem>
-            <DropdownMenuItem>View owner</DropdownMenuItem>
-            <DropdownMenuItem>View details</DropdownMenuItem>
+            <DropdownMenuItem disabled>View owner</DropdownMenuItem>
+            <DropdownMenuItem disabled>View details</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );

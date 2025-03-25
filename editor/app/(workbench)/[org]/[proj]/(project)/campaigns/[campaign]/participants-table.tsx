@@ -23,6 +23,7 @@ import toast from "react-hot-toast";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import Link from "next/link";
 
 const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
   {
@@ -96,8 +97,12 @@ const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
               Copy ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View owner</DropdownMenuItem>
-            <DropdownMenuItem>View details</DropdownMenuItem>
+            <Link href={`../customers/${item.customer_id}`}>
+              <DropdownMenuItem>View customer details</DropdownMenuItem>
+            </Link>
+            <DropdownMenuItem disabled>
+              View participant details
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );

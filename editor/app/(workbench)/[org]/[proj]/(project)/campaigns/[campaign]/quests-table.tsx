@@ -39,6 +39,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
 import { createClientWestClient } from "@/lib/supabase/client";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 
 const QUESTNAME = "refer-a-friend";
 
@@ -192,9 +193,15 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Quests</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem disabled value="active">
+                  Active
+                </SelectItem>
+                <SelectItem disabled value="completed">
+                  Completed
+                </SelectItem>
+                <SelectItem disabled value="expired">
+                  Expired
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -289,9 +296,24 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Quest</DropdownMenuItem>
-                        <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            open(
+                              `/r/${quest.series_id}/${quest.code}`,
+                              "_blank"
+                            );
+                          }}
+                        >
+                          <OpenInNewWindowIcon className="size-4 me-2" />
+                          Open URL
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>Edit Quest</DropdownMenuItem>
+                        <DropdownMenuItem disabled>
+                          Send Reminder
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
