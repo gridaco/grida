@@ -21,11 +21,15 @@ import {
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Step = "email" | "otp";
 
 export default function AuthContinueWithEmailPage() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const redirect_uri = searchParams.get("redirect_uri");
+
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
@@ -78,7 +82,13 @@ export default function AuthContinueWithEmailPage() {
       return;
     }
 
-    router.replace("/dashboard");
+    if (next) {
+      router.replace(next);
+    } else if (redirect_uri) {
+      router.replace(redirect_uri);
+    } else {
+      router.replace("/dashboard");
+    }
   };
 
   return (
@@ -87,9 +97,6 @@ export default function AuthContinueWithEmailPage() {
         <Card className="w-full max-w-md border-none bg-transparent shadow-none">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-            <CardDescription>
-              Enter your email to receive a magic link
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleEmail} className="space-y-4">

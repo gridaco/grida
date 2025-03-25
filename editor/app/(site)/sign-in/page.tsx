@@ -24,9 +24,9 @@ export default async function SigninPage({
   searchParams: Promise<SearchParams>;
 }) {
   const { next, redirect_uri } = await searchParams;
+  const q = new URLSearchParams(await searchParams).toString();
 
   if (process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1") {
-    const q = new URLSearchParams(await searchParams).toString();
     return redirect("/insiders/auth/basic" + (q ? "?" + q : ""));
   }
 
@@ -78,7 +78,7 @@ export default async function SigninPage({
                 </Suspense>
                 <hr />
                 <Link
-                  href="/sign-in/email"
+                  href={`/sign-in/email?${q}`}
                   className="flex items-center gap-1 hover:underline text-sm text-muted-foreground"
                 >
                   Continue with Email →
