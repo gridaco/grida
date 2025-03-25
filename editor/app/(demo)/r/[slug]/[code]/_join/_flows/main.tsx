@@ -40,6 +40,7 @@ import {
   SYSTEM_GF_CUSTOMER_NAME_KEY,
   SYSTEM_GF_CUSTOMER_PHONE_KEY,
 } from "@/k/system";
+import { PhoneInput } from "@/components/extension/phone-input";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -311,14 +312,12 @@ function ApplicantForm({
       <div className="grid gap-2">
         <Label htmlFor="phone">핸드폰 번호</Label>
         <div className="grid gap-2">
-          <Input
+          <PhoneInput
             id="phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            maxLength={13}
-            type="tel"
+            defaultCountry="KR"
+            placeholder="01012345678"
             required
-            placeholder="번호를 입력해주세요"
+            onChange={(phone) => setPhone(phone)}
           />
         </div>
       </div>

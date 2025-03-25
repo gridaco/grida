@@ -21,7 +21,7 @@ export default function Join({
     <ScreenRoot>
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.DialogContent className="absolute inset-0 p-0 border-none outline-none bg-background data-[state=closed]:animate-out data-[state=closed]:fade-out-0 z-10">
+          <DialogPrimitive.DialogContent className="fixed inset-0 p-0 border-none outline-none bg-background data-[state=closed]:animate-out data-[state=closed]:fade-out-0 z-10">
             <DialogPrimitive.Title className="sr-only">
               Overlay
             </DialogPrimitive.Title>
