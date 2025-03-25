@@ -73,6 +73,12 @@ export const ScratchToReveal: React.FC<ScratchToRevealProps> = ({
       checkCompletion();
     };
 
+    const preventScroll = (e: TouchEvent) => {
+      if (canvasRef.current?.contains(e.target as Node)) {
+        e.preventDefault();
+      }
+    };
+
     document.addEventListener("mousedown", handleDocumentMouseMove);
     document.addEventListener("mousemove", handleDocumentMouseMove);
     document.addEventListener("touchstart", handleDocumentTouchMove);
@@ -80,6 +86,7 @@ export const ScratchToReveal: React.FC<ScratchToRevealProps> = ({
     document.addEventListener("mouseup", handleDocumentMouseUp);
     document.addEventListener("touchend", handleDocumentTouchEnd);
     document.addEventListener("touchcancel", handleDocumentTouchEnd);
+    document.addEventListener("touchmove", preventScroll, { passive: false });
 
     return () => {
       document.removeEventListener("mousedown", handleDocumentMouseMove);
@@ -89,6 +96,7 @@ export const ScratchToReveal: React.FC<ScratchToRevealProps> = ({
       document.removeEventListener("mouseup", handleDocumentMouseUp);
       document.removeEventListener("touchend", handleDocumentTouchEnd);
       document.removeEventListener("touchcancel", handleDocumentTouchEnd);
+      document.removeEventListener("touchmove", preventScroll);
     };
   }, [isScratching]);
 

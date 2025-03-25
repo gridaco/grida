@@ -121,7 +121,7 @@ function BBB({
               포인트를 받아가세요
             </p>
             {/* absolute icon */}
-            <div className="absolute -bottom-6 -right-6">
+            <div className="absolute -bottom-6 -right-6 pointer-events-none">
               <GiftIcon className="size-32 text-muted-foreground" />
             </div>
           </div>
