@@ -224,7 +224,7 @@ function Body({
                   <FormLabel>Campaign ID</FormLabel>
                   <Input readOnly disabled value={campaign_id} />
                   <FormDescription>
-                    Your campaign's unique identifier.
+                    Your campaign&apos;s unique identifier.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
