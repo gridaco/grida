@@ -82,7 +82,7 @@ async function parse_customers_csv(
  * [insert]
  * inserting customers with user uploaded csv
  *
- * @see https://app.grida.co/docs/platform/customers/working-with-csv
+ * @see https://grida.co/docs/platform/customers/working-with-csv
  *
  * - set dryrun=1 to validate the CSV without inserting
  */
@@ -134,7 +134,7 @@ export async function POST(
  * [update]
  * updating customers with user uploaded csv
  *
- * @see https://app.grida.co/docs/platform/customers/working-with-csv
+ * @see https://grida.co/docs/platform/customers/working-with-csv
  *
  * - set dryrun=1 to validate the CSV without inserting
  */

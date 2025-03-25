@@ -1,4 +1,4 @@
-# see https://app.grida.co/docs/platform/customers/working-with-csv
+# see https://grida.co/docs/platform/customers/working-with-csv
 
 name,email,phone,description
 John Doe,john.doe@example.com,+15551234,"High-value customer interested in premium plans"

@@ -103,7 +103,7 @@ const nextConfig = withMDX()({
       },
       {
         source: "/figma",
-        destination: "https://grida.co",
+        destination: "https://legacy.grida.co",
         permanent: false,
       },
       // Static redirects
