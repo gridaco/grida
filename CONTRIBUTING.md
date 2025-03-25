@@ -48,14 +48,14 @@ npx supabase gen types typescript --local \
   --schema grida_forms \
   --schema grida_storage \
   --schema grida_west \
-  > database.types.ts
+  > database-generated.types.ts
 ```
 
 or (if you are a tier 1 contributor)
 
 ```bash
 npx supabase gen types typescript \
-  --project-id "mozagqllybnbytfcmvdh" \
+  --project-id $PROJECT_REF \
   --schema public \
   --schema grida_g11n \
   --schema grida_x_supabase \
@@ -66,7 +66,7 @@ npx supabase gen types typescript \
   --schema grida_forms \
   --schema grida_storage \
   --schema grida_west \
-  > database.types.ts
+  > database-generated.types.ts
 ```
 
 ## Support

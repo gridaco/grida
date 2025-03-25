@@ -922,6 +922,9 @@ importers:
       timezones-list:
         specifier: ^3.0.3
         version: 3.1.0
+      type-fest:
+        specifier: ^4.38.0
+        version: 4.38.0
       ua-parser-js:
         specifier: ^1.0.38
         version: 1.0.40
@@ -1196,7 +1199,7 @@ importers:
         version: 6.5.16(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@storybook/react':
         specifier: ^6.3.8
-        version: 6.5.16(@babel/core@7.26.9)(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@8.57.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.34.1)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)
+        version: 6.5.16(@babel/core@7.26.9)(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@8.57.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.38.0)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)
       '@types/cookie':
         specifier: ^0.6.0
         version: 0.6.0
@@ -1428,7 +1431,7 @@ importers:
         version: 6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3)
       '@storybook/react':
         specifier: ^6.5.13
-        version: 6.5.16(@babel/core@7.26.9)(@storybook/builder-webpack4@6.5.16(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@storybook/manager-webpack4@6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.34.1)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)
+        version: 6.5.16(@babel/core@7.26.9)(@storybook/builder-webpack4@6.5.16(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@storybook/manager-webpack4@6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.38.0)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)
       '@storybook/testing-library':
         specifier: ^0.0.13
         version: 0.0.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -19247,8 +19250,8 @@ packages:
     resolution: {integrity: sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==}
     engines: {node: '>=12.20'}
 
-  type-fest@4.34.1:
-    resolution: {integrity: sha512-6kSc32kT0rbwxD6QL1CYe8IqdzN/J/ILMrNK+HMQCKH3insCDRY/3ITb0vcBss0a3t72fzh2YSzj8ko1HgwT3g==}
+  type-fest@4.38.0:
+    resolution: {integrity: sha512-2dBz5D5ycHIoliLYLi0Q2V7KRaDlH0uWIvmk7TYlAg5slqwiPv1ezJdZm1QEM0xgk29oYWMCbIG7E6gHpvChlg==}
     engines: {node: '>=16'}
 
   type-is@1.6.18:
@@ -25354,7 +25357,7 @@ snapshots:
       react-number-format: 5.4.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-remove-scroll: 2.6.3(@types/react@18.2.58)(react@18.3.1)
       react-textarea-autosize: 8.5.6(@types/react@18.2.58)(react@18.3.1)
-      type-fest: 4.34.1
+      type-fest: 4.38.0
     transitivePeerDependencies:
       - '@types/react'
 
@@ -25875,7 +25878,7 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.34.1)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)':
+  '@pmmmwh/react-refresh-webpack-plugin@0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.38.0)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)':
     dependencies:
       ansi-html: 0.0.9
       core-js-pure: 3.40.0
@@ -25888,7 +25891,7 @@ snapshots:
       webpack: 4.47.0
     optionalDependencies:
       '@types/webpack': 4.41.40
-      type-fest: 4.34.1
+      type-fest: 4.38.0
       webpack-dev-server: 4.15.2(webpack@4.47.0)
       webpack-hot-middleware: 2.26.1
 
@@ -28897,11 +28900,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/react@6.5.16(@babel/core@7.26.9)(@storybook/builder-webpack4@6.5.16(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@storybook/manager-webpack4@6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.34.1)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)':
+  '@storybook/react@6.5.16(@babel/core@7.26.9)(@storybook/builder-webpack4@6.5.16(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@storybook/manager-webpack4@6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3))(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.38.0)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)':
     dependencies:
       '@babel/preset-flow': 7.25.9(@babel/core@7.26.9)
       '@babel/preset-react': 7.26.3(@babel/core@7.26.9)
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.34.1)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.38.0)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)
       '@storybook/addons': 6.5.16(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@storybook/client-logger': 6.5.16
       '@storybook/core': 6.5.16(encoding@0.1.13)(eslint@9.20.1(jiti@2.4.2))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3)(webpack@4.47.0)
@@ -28960,11 +28963,11 @@ snapshots:
       - webpack-hot-middleware
       - webpack-plugin-serve
 
-  '@storybook/react@6.5.16(@babel/core@7.26.9)(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@8.57.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.34.1)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)':
+  '@storybook/react@6.5.16(@babel/core@7.26.9)(@types/webpack@4.41.40)(encoding@0.1.13)(eslint@8.57.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(require-from-string@2.0.2)(type-fest@4.38.0)(typescript@5.7.3)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)':
     dependencies:
       '@babel/preset-flow': 7.25.9(@babel/core@7.26.9)
       '@babel/preset-react': 7.26.3(@babel/core@7.26.9)
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.34.1)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(@types/webpack@4.41.40)(react-refresh@0.11.0)(type-fest@4.38.0)(webpack-dev-server@4.15.2(webpack@4.47.0))(webpack-hot-middleware@2.26.1)(webpack@4.47.0)
       '@storybook/addons': 6.5.16(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@storybook/client-logger': 6.5.16
       '@storybook/core': 6.5.16(encoding@0.1.13)(eslint@8.57.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.7.3)(webpack@4.47.0)
@@ -44798,7 +44801,7 @@ snapshots:
 
   type-fest@2.19.0: {}
 
-  type-fest@4.34.1: {}
+  type-fest@4.38.0: {}
 
   type-is@1.6.18:
     dependencies:
