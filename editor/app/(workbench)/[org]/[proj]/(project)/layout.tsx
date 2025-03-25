@@ -20,6 +20,7 @@ import { ProjectLoaded } from "@/scaffolds/workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { AboutGridaWestCard } from "./about-west-card";
 import "../../../../editor.css";
+import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -113,7 +114,9 @@ export default async function Layout({
                       </SidebarGroup>
                     </SidebarContent>
                     <SidebarFooter>
-                      <AboutGridaWestCard />
+                      <Suspense>
+                        <AboutGridaWestCard />
+                      </Suspense>
                     </SidebarFooter>
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">
