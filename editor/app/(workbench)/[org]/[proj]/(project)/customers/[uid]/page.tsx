@@ -9,6 +9,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import useSWR, { mutate } from "swr";
@@ -68,6 +78,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TagInput } from "@/components/tag";
 import { useProject } from "@/scaffolds/workspace";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/utils";
 
 type Params = {
   uid: string;
@@ -136,6 +149,30 @@ function useCustomer(project_id: number, uid: string) {
     return true;
   };
 
+  const _update_marketing = async ({
+    email,
+    sms,
+  }: {
+    email: boolean;
+    sms: boolean;
+  }) => {
+    const { error } = await supabase
+      .from("customer")
+      .update({
+        is_marketing_email_subscribed: email,
+        is_marketing_sms_subscribed: sms,
+      })
+      .eq("uid", uid)
+      .select("*")
+      .single();
+
+    if (error) {
+      return false;
+    }
+
+    return true;
+  };
+
   const _update_tags = async (tags: string[]) => {
     const { error } = await supabase.rpc("update_customer_tags", {
       p_customer_uid: uid,
@@ -157,8 +194,27 @@ function useCustomer(project_id: number, uid: string) {
       update_metadata: _update_metadata,
       update_description: _update_description,
       update_tags: _update_tags,
+      update_marketing: _update_marketing,
     }),
     [uid, supabase]
+  );
+}
+
+function MarketingStatusDot({
+  value,
+  className,
+}: {
+  value: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      data-state={value ? "on" : "off"}
+      className={cn(
+        "w-2 h-2 rounded-full data-[state=on]:bg-green-700 data-[state=off]:bg-yellow-700",
+        className
+      )}
+    />
   );
 }
 
@@ -187,6 +243,10 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
   });
 
   const editMetadataDialog = useDialogState("edit-metadata", {
+    refreshkey: true,
+  });
+
+  const editMarketingDialog = useDialogState("edit-marketing", {
     refreshkey: true,
   });
 
@@ -234,6 +294,15 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
 
   const onUpdateCustomerDescription = async (description: string) => {
     const success = await actions.update_description(description);
+    mutate(key);
+    return success;
+  };
+
+  const onUpdateCustomerMarketing = async (pref: {
+    email: boolean;
+    sms: boolean;
+  }) => {
+    const success = await actions.update_marketing(pref);
     mutate(key);
     return success;
   };
@@ -293,6 +362,15 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
         defaultValue={customer.description}
         onSave={onUpdateCustomerDescription}
       />
+      <MarketingConsentEditDialog
+        key={editMarketingDialog.refreshkey}
+        {...editMarketingDialog.props}
+        defaultValue={{
+          email: customer.is_marketing_email_subscribed,
+          sms: customer.is_marketing_sms_subscribed,
+        }}
+        onSave={onUpdateCustomerMarketing}
+      />
       <TagsEditDialog
         key={editTagsDialog.refreshkey}
         {...editTagsDialog.props}
@@ -322,8 +400,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
               {customer.name || "Unnamed Customer"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Customer for {customer_since_relative} / Last seen{" "}
-              {customer_last_seen_relative}
+              Customer for {customer_since_relative}
             </p>
           </div>
         </div>
@@ -363,9 +440,9 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2/3 width) */}
-        <aside className="md:col-span-2 space-y-6">
+        <aside className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="responses">
             <TabsList>
               <TabsTrigger value="responses">Forms</TabsTrigger>
@@ -457,7 +534,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
           {/* Customer Info Card */}
           <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-base">Customer</h2>
+              <h2 className="font-medium text-sm">Customer</h2>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -468,7 +545,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
                   <DropdownMenuItem onSelect={editCustomerDialog.openDialog}>
                     Edit contact information
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled>
+                  <DropdownMenuItem onSelect={editMarketingDialog.openDialog}>
                     Edit marketing settings
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -478,22 +555,32 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
             <div className="space-y-6">
               {/* Contact Information */}
               <div>
-                <h3 className="text-sm font-medium mb-2">
+                <h3 className="text-xs font-medium mb-2">
                   Contact information
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <p
                       aria-description="email"
-                      className="text-sm text-blue-600"
+                      className="text-xs text-blue-600"
                     >
                       {customer.email || "-"}
                     </p>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                    {customer.email && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          navigator.clipboard.writeText(customer.email!);
+                          toast.success("Copied email to clipboard");
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <p aria-description="phone" className="text-sm">
+                  <p aria-description="phone" className="text-xs">
                     {customer.phone || "-"}
                   </p>
                 </div>
@@ -501,46 +588,57 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
 
               {/* Customer since */}
               <div>
-                <h3 className="text-sm font-medium mb-2">Customer since</h3>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <h3 className="text-xs font-medium mb-2">Customer since</h3>
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
                   <ClockIcon />
                   {customer_since_absolute}
                 </p>
               </div>
 
+              <div>
+                <h3 className="text-xs font-medium mb-2">Last seen</h3>
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <ClockIcon />
+                  {customer_last_seen_relative}
+                </p>
+              </div>
+
               {/* Marketing */}
               <div>
-                <h3 className="text-sm font-medium mb-2">Marketing</h3>
+                <h3 className="text-xs font-medium mb-2">Marketing</h3>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <p className="text-sm">Email subscribed</p>
+                    <MarketingStatusDot
+                      value={customer.is_marketing_email_subscribed}
+                    />
+                    <p className="text-xs">
+                      Email{" "}
+                      {customer.is_marketing_email_subscribed
+                        ? "subscribed"
+                        : "not subscribed"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <p className="text-sm">SMS subscribed</p>
+                    <MarketingStatusDot
+                      value={customer.is_marketing_sms_subscribed}
+                    />
+                    <p className="text-xs">
+                      SMS{" "}
+                      {customer.is_marketing_email_subscribed
+                        ? "subscribed"
+                        : "not subscribed"}
+                    </p>
                   </div>
                 </div>
               </div>
               {/* Identifiers */}
-              <div>
-                <h3 className="text-sm font-medium mb-2">Identities</h3>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm">{customer.uid}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm">{customer.uuid}</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </Card>
 
           {/* Tags Card */}
           <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-base">Tags</h2>
+              <h2 className="font-medium text-sm">Tags</h2>
               <Button
                 variant="ghost"
                 size="icon"
@@ -569,7 +667,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
           {/* Notes Card */}
           <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-base">Notes</h2>
+              <h2 className="font-medium text-sm">Notes</h2>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -588,10 +686,45 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
             </article>
           </Card>
 
+          {/* Identities Card */}
+          <Card className="p-4 overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-medium text-sm">Identities</h2>
+            </div>
+            <Table className="max-w-full overflow-hidden">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">type</TableHead>
+                  <TableHead>id</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">uid</TableCell>
+                  <TableCell>
+                    <pre className="truncate">
+                      <code>{customer.uid}</code>
+                    </pre>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">
+                    <code>uuid</code>
+                  </TableCell>
+                  <TableCell>
+                    <pre>
+                      <code>{customer.uuid ?? "N/A"}</code>
+                    </pre>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Card>
+
           {/* Metadata Card */}
           <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-base">Metadata</h2>
+              <h2 className="font-medium text-sm">Metadata</h2>
               <Button
                 variant="ghost"
                 size="icon"
@@ -755,6 +888,85 @@ function TagsEditDialog({
           <Button
             onClick={() => {
               onSave(__tags.map((t) => t.text));
+              props.onOpenChange?.(false);
+            }}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MarketingConsentEditDialog({
+  defaultValue,
+  onSave,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  defaultValue: { email: boolean; sms: boolean };
+  onSave: (value: { email: boolean; sms: boolean }) => Promise<boolean>;
+}) {
+  const [email, setEmail] = useState(defaultValue.email);
+  const [sms, setSms] = useState(defaultValue.sms);
+
+  const changed = email !== defaultValue.email || sms !== defaultValue.sms;
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit marketing status</DialogTitle>
+          <DialogDescription>
+            Ensure you have received explicit consent from your customers before
+            enrolling them in marketing email or SMS campaigns.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 my-4">
+          <div className="flex flex-row items-start space-x-3 space-y-0">
+            <Checkbox
+              id="email"
+              checked={email}
+              onCheckedChange={(s) => setEmail(s === true)}
+            />
+
+            <div className="space-y-1 leading-none">
+              <Label htmlFor="email">
+                The customer has opted in to receive marketing emails.
+              </Label>
+              <p className="text-[0.8rem] text-muted-foreground">
+                Please check with caution
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-row items-start space-x-3 space-y-0">
+            <Checkbox
+              id="sms"
+              checked={sms}
+              onCheckedChange={(s) => setSms(s === true)}
+            />
+
+            <div className="space-y-1 leading-none">
+              <Label htmlFor="sms">
+                The customer has opted in to receive SMS marketing messages.
+              </Label>
+              <p className="text-[0.8rem] text-muted-foreground">
+                Please check with caution
+              </p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Close</Button>
+          </DialogClose>
+          <Button
+            disabled={!changed}
+            onClick={() => {
+              onSave({
+                email,
+                sms,
+              });
               props.onOpenChange?.(false);
             }}
           >

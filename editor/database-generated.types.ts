@@ -2556,6 +2556,8 @@ export type Database = {
           email: string | null
           email_provisional: string[]
           is_email_verified: boolean
+          is_marketing_email_subscribed: boolean
+          is_marketing_sms_subscribed: boolean
           is_phone_verified: boolean
           last_seen_at: string
           metadata: Json | null
@@ -2575,6 +2577,8 @@ export type Database = {
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
+          is_marketing_email_subscribed?: boolean
+          is_marketing_sms_subscribed?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
           metadata?: Json | null
@@ -2594,6 +2598,8 @@ export type Database = {
           email?: string | null
           email_provisional?: string[]
           is_email_verified?: boolean
+          is_marketing_email_subscribed?: boolean
+          is_marketing_sms_subscribed?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
           metadata?: Json | null
@@ -3033,6 +3039,8 @@ export type Database = {
           email: string | null
           email_provisional: string[] | null
           is_email_verified: boolean | null
+          is_marketing_email_subscribed: boolean | null
+          is_marketing_sms_subscribed: boolean | null
           is_phone_verified: boolean | null
           last_seen_at: string | null
           metadata: Json | null

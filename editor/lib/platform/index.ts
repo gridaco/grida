@@ -156,6 +156,8 @@ export namespace Platform.Customer {
     description: string | null;
     uuid: string | null;
     metadata: unknown | null;
+    is_marketing_email_subscribed: boolean;
+    is_marketing_sms_subscribed: boolean;
   }
 
   export interface CustomerInsertion {
