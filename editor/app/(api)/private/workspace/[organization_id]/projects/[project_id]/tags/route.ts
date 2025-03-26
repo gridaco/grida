@@ -31,7 +31,7 @@ export async function GET(
 
   const tagsWithUsage = tags?.map((tag) => ({
     ...tag,
-    usage_count: tag.customer_tag[0].count,
+    usage_count: tag.customer_tag[0]?.count || 0,
   })) satisfies Platform.Tag.TagWithUsageCount[];
 
   return NextResponse.json({

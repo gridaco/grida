@@ -626,7 +626,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
                     />
                     <p className="text-xs">
                       SMS{" "}
-                      {customer.is_marketing_email_subscribed
+                      {customer.is_marketing_sms_subscribed
                         ? "subscribed"
                         : "not subscribed"}
                     </p>
