@@ -102,6 +102,8 @@ CREATE OR REPLACE FUNCTION public.update_customer_tags(
   p_tags text[]
 )
 RETURNS void AS $$
+DECLARE
+  tag text;
 BEGIN
   -- Delete existing tag associations for the customer in the given project
   DELETE FROM public.customer_tag

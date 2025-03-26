@@ -12,7 +12,7 @@ type Params = {
   uid: string;
 };
 
-export interface FormCustomerDetail extends Platform.Customer.Customer {
+export interface FormCustomerDetail extends Platform.Customer.CustomerWithTags {
   responses: (FormResponse & { form: Form })[];
 }
 
@@ -28,7 +28,7 @@ export async function GET(
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: customer } = await wsclient
-    .from("customer")
+    .from("customer_with_tags")
     .select("*")
     .eq("uid", uid)
     .single();
