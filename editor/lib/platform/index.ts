@@ -118,6 +118,12 @@ export namespace Platform.Tag {
     color: string;
   };
 
+  export type TagNameAndColorAndDescription = {
+    name: string;
+    color: string;
+    description: string | null;
+  };
+
   export type Tag = {
     id: number;
     project_id: number;
@@ -137,6 +143,10 @@ export namespace Platform.Tag {
      */
     color: string;
     created_at: string;
+  };
+
+  export type TagWithUsageCount = Tag & {
+    usage_count: number;
   };
 }
 

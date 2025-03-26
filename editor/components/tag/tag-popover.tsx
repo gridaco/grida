@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { TagInputStyleClassesProps, type Tag as TagType } from "./tag-input";
@@ -92,6 +94,7 @@ export const TagPopover: React.FC<TagPopoverProps> = ({
         setIsPopoverOpen(open);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [inputFocused]
   );
 

@@ -75,6 +75,17 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
+                            <Link href={`/${org}/${proj}/tags`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="tag"
+                                    className="size-4"
+                                  />
+                                  Tags
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                             <Link href={`/${org}/${proj}/analytics`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">

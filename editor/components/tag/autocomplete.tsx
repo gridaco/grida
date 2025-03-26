@@ -91,6 +91,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
         setIsPopoverOpen(open);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [inputFocused]
   );
 

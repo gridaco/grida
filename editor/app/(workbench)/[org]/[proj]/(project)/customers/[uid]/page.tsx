@@ -196,6 +196,7 @@ function useCustomer(project_id: number, uid: string) {
       update_tags: _update_tags,
       update_marketing: _update_marketing,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [uid, supabase]
   );
 }
@@ -999,8 +1000,8 @@ function ConfirmDeleteCustomerDialog({
         <div>
           <p className="text-sm">
             Are you sure you want to delete the customer{" "}
-            <strong>{customer.name || "(Unnamed Customer)"}</strong>? This can't
-            be undone.
+            <strong>{customer.name || "(Unnamed Customer)"}</strong>? This
+            can&apos;t be undone.
           </p>
         </div>
         <AlertDialogFooter>

@@ -163,9 +163,7 @@ const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
       (maxTags !== undefined && maxTags < 0) ||
       (props.minTags !== undefined && props.minTags < 0)
     ) {
-      console.warn("maxTags and minTags cannot be less than 0");
-      // error
-      return null;
+      throw new Error("maxTags and minTags cannot be less than 0");
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
