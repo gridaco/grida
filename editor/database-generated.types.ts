@@ -3902,6 +3902,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      update_customer_tags: {
+        Args: {
+          p_customer_uid: string
+          p_project_id: number
+          p_tags: string[]
+        }
+        Returns: undefined
+      }
       workspace_documents: {
         Args: {
           p_organization_id: number

@@ -94,3 +94,30 @@ CREATE TRIGGER insert_customer_with_tags_instead
 INSTEAD OF INSERT ON public.customer_with_tags
 FOR EACH ROW
 EXECUTE FUNCTION public.insert_customer_with_tags();
+
+-- rpc function for update (synchronize) customer tags
+CREATE OR REPLACE FUNCTION public.update_customer_tags(
+  p_customer_uid uuid,
+  p_project_id bigint,
+  p_tags text[]
+)
+RETURNS void AS $$
+BEGIN
+  -- Delete existing tag associations for the customer in the given project
+  DELETE FROM public.customer_tag
+  WHERE customer_uid = p_customer_uid AND project_id = p_project_id;
+
+  -- Loop through each tag in the provided array
+  FOREACH tag IN ARRAY p_tags LOOP
+    -- Insert the tag into the tag table if it doesn't exist
+    INSERT INTO public.tag (project_id, name)
+    VALUES (p_project_id, tag)
+    ON CONFLICT (project_id, name) DO NOTHING;
+    
+    -- Insert the new association in the customer_tag table
+    INSERT INTO public.customer_tag (customer_uid, project_id, tag_name)
+    VALUES (p_customer_uid, p_project_id, tag)
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
