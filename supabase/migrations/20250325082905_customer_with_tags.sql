@@ -7,7 +7,11 @@ CREATE DOMAIN public.color_hex AS TEXT
 CREATE TABLE public.tag (
     id SERIAL PRIMARY KEY,
     project_id BIGINT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
-    name TEXT NOT NULL CHECK (char_length(trim(name)) > 0 AND char_length(name) <= 100),
+    name TEXT NOT NULL CHECK (
+      char_length(trim(name)) > 0 
+      AND char_length(name) <= 100 
+      AND name NOT LIKE '%,%'
+    ),
     color public.color_hex NOT NULL DEFAULT '#ffffff',
     description TEXT NULL CHECK (description IS NULL OR char_length(description) <= 500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
