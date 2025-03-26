@@ -12,9 +12,7 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -37,7 +35,6 @@ import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +77,7 @@ import { TagInput } from "@/components/tag";
 import { useProject } from "@/scaffolds/workspace";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useTags } from "@/scaffolds/workspace";
 import { cn } from "@/utils";
 
 type Params = {
@@ -224,6 +222,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
 
   const router = useRouter();
   const { id: project_id } = useProject();
+  const { tags: allTags, refresh: refreshAllTags } = useTags();
   const actions = useCustomer(project_id, uid);
 
   const key = `/private/editor/customers/${uid}`;
@@ -311,6 +310,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
   const onUpdateCustomerTags = async (tags: string[]) => {
     const success = await actions.update_tags(tags);
     mutate(key);
+    refreshAllTags();
 
     if (success) {
       toast.success("Customer updated");
@@ -376,6 +376,7 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
         key={editTagsDialog.refreshkey}
         {...editTagsDialog.props}
         defaultValue={customer.tags}
+        options={allTags.map((t) => t.name)}
         onSave={onUpdateCustomerTags}
       />
       <CustomerEditDialog

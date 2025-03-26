@@ -12,8 +12,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Platform } from "@/lib/platform";
+import { useTags } from "@/scaffolds/workspace";
 import toast from "react-hot-toast";
-import { useTags } from "./context";
 
 interface DeleteTagDialogProps {
   tag: Platform.Tag.TagWithUsageCount;

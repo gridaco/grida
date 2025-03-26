@@ -20,9 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { EditTagDialog } from "./edit-tag-dialog";
 import { DeleteTagDialog } from "./delete-tag-dialog";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { useTags } from "./context";
-import { Platform } from "@/lib/platform";
-// import { getTags } from "@/lib/actions/tag-actions";
+import { useTags } from "@/scaffolds/workspace";
+import type { Platform } from "@/lib/platform";
 
 function getContrastColor(hexColor: string) {
   const hex = hexColor.replace("#", "");
