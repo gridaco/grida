@@ -25,6 +25,7 @@ import {
   FoldersIcon,
   MegaphoneIcon,
   PlugIcon,
+  TagIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -32,6 +33,7 @@ export type ResourceTypeIconName =
   | "folder"
   | "file"
   | "setting"
+  | "tag"
   | "home"
   | "ai"
   | "dev"
@@ -74,6 +76,8 @@ export function ResourceTypeIcon({
   };
 
   switch (type) {
+    case "tag":
+      return <TagIcon {...props} />;
     case "ai":
       return <SparkleIcon {...props} />;
     case "dev":

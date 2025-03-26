@@ -5,20 +5,22 @@ import React, {
   useContext,
   useReducer,
   useEffect,
+  useCallback,
   useMemo,
 } from "react";
-import produce from "immer";
+import useSWR, { mutate } from "swr";
+import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { PublicUrls } from "@/services/public-urls";
+import { EditorApiResponse } from "@/types/private/api";
+import { Spinner } from "@/components/spinner";
 import type {
   GDocument,
   OrganizationWithAvatar,
   OrganizationWithMembers,
   Project,
 } from "@/types";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { PublicUrls } from "@/services/public-urls";
-import useSWR from "swr";
-import { EditorApiResponse } from "@/types/private/api";
-import { Spinner } from "@/components/spinner";
+import type { Platform } from "@/lib/platform";
+import produce from "immer";
 import assert from "assert";
 
 export interface WorkspaceState {
@@ -169,4 +171,131 @@ export function ProjectLoaded({
   const { project } = useWorkspace();
   if (!project) return loading;
   return <>{children}</>;
+}
+
+interface ProjectTagsState {
+  isLoading: boolean;
+  tags: Platform.Tag.TagWithUsageCount[];
+  createTag: (
+    tag: Platform.Tag.TagNameAndColorAndDescription
+  ) => Promise<boolean>;
+  deleteTag: (id: number) => Promise<boolean>;
+  updateTag: (
+    id: number,
+    tag: Platform.Tag.TagNameAndColorAndDescription
+  ) => Promise<boolean>;
+  refresh: () => void;
+}
+
+const ProjectTagsContext = createContext<ProjectTagsState | null>(null);
+
+export function ProjectTagsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { id: project_id, organization_id } = useProject();
+
+  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+
+  const key = `/private/workspace/${organization_id}/projects/${project_id}/tags`;
+
+  const { data, isLoading } = useSWR<
+    EditorApiResponse<Platform.Tag.TagWithUsageCount[]>
+  >(key, async (url: string) => {
+    const res = await fetch(url);
+    return res.json();
+  });
+
+  const __createTag = useCallback(
+    async (tag: Platform.Tag.TagNameAndColorAndDescription) => {
+      return await supabase
+        .from("tag")
+        .insert({
+          project_id,
+          ...tag,
+        })
+        .select("*")
+        .single();
+    },
+    [supabase, project_id]
+  );
+
+  const createTag = useCallback(
+    async (
+      tag: Platform.Tag.TagNameAndColorAndDescription
+    ): Promise<boolean> => {
+      const { data, error } = await __createTag(tag);
+      if (error || !data) {
+        console.error("Failed to create tag", error);
+        return false;
+      }
+
+      mutate(key);
+
+      return true;
+    },
+    [__createTag]
+  );
+
+  const deleteTag = useCallback(
+    async (tagId: number): Promise<boolean> => {
+      const { error } = await supabase.from("tag").delete().eq("id", tagId);
+      if (error) {
+        console.error("Failed to delete tag", error);
+        return false;
+      }
+
+      mutate(key);
+
+      return true;
+    },
+    [supabase]
+  );
+
+  const updateTag = useCallback(
+    async (
+      id: number,
+      tag: Platform.Tag.TagNameAndColorAndDescription
+    ): Promise<boolean> => {
+      const { error } = await supabase.from("tag").update(tag).eq("id", id);
+      if (error) {
+        console.error("Failed to update tag", error);
+        return false;
+      }
+
+      mutate(key);
+
+      return true;
+    },
+    [supabase]
+  );
+
+  const refresh = useCallback(() => {
+    mutate(key);
+  }, [key]);
+
+  return (
+    <ProjectTagsContext.Provider
+      value={{
+        tags: data?.data || [],
+        isLoading,
+        createTag,
+        deleteTag,
+        updateTag,
+        refresh,
+      }}
+    >
+      {children}
+    </ProjectTagsContext.Provider>
+  );
+}
+
+export function useTags() {
+  const context = useContext(ProjectTagsContext);
+  if (!context) {
+    throw new Error("useTags must be used within a ProjectTagsProvider");
+  }
+
+  return context;
 }

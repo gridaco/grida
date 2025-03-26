@@ -16,11 +16,10 @@ import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
-import { ProjectLoaded } from "@/scaffolds/workspace";
+import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { AboutGridaWestCard } from "./about-west-card";
 import "../../../../editor.css";
-import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -76,17 +75,28 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            {/* <Link href={`/${org}/${proj}/analytics`}> */}
-                            <SidebarMenuItem>
-                              <SidebarMenuButton size="sm">
-                                <ResourceTypeIcon
-                                  type="chart"
-                                  className="size-4"
-                                />
-                                Analytics
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {/* </Link> */}
+                            <Link href={`/${org}/${proj}/tags`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="tag"
+                                    className="size-4"
+                                  />
+                                  Tags
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                            <Link href={`/${org}/${proj}/analytics`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="chart"
+                                    className="size-4"
+                                  />
+                                  Analytics
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                             <Link href={`/${org}/${proj}/campaigns`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
@@ -114,15 +124,15 @@ export default async function Layout({
                       </SidebarGroup>
                     </SidebarContent>
                     <SidebarFooter>
-                      <Suspense>
-                        <AboutGridaWestCard />
-                      </Suspense>
+                      <AboutGridaWestCard />
                     </SidebarFooter>
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">
                     <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area"></header>
                     <div className="w-full h-full overflow-x-hidden overflow-y-auto">
-                      <ProjectLoaded>{children}</ProjectLoaded>
+                      <ProjectLoaded>
+                        <ProjectTagsProvider>{children}</ProjectTagsProvider>
+                      </ProjectLoaded>
                     </div>
                   </div>
                 </div>

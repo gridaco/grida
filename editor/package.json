@@ -185,6 +185,7 @@
     "swr": "^2.2.5",
     "tailwind-merge": "^2.2.2",
     "timezones-list": "^3.0.3",
+    "type-fest": "^4.38.0",
     "ua-parser-js": "^1.0.38",
     "use-file-picker": "^2.1.1",
     "usehooks-ts": "^3.1.0",

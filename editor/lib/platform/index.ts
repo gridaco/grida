@@ -1,5 +1,6 @@
 import type { DataFormat } from "@/scaffolds/data-format";
 import { unflatten } from "flat";
+import Papa from "papaparse";
 
 export namespace Platform {}
 
@@ -17,7 +18,7 @@ export namespace Platform.CSV {
    *   - if value is empty "", return undefined
    *
    */
-  export const parser_config = {
+  export const parser_config: Papa.ParseConfig = {
     header: true,
     skipEmptyLines: true,
     comments: "#",
@@ -26,6 +27,13 @@ export namespace Platform.CSV {
       return value;
     },
   };
+
+  export function parse(txt: string) {
+    return Papa.parse<Record<string, string | undefined>>(
+      txt,
+      Platform.CSV.parser_config
+    );
+  }
 
   /**
    * Validates a CSV row against the provided model specification.
@@ -39,18 +47,22 @@ export namespace Platform.CSV {
    * @param checkformat - A function to validate a field against a specified format. Defaults to a function that always returns true.
    * @returns `true` if the row is valid according to the model; otherwise, `false`.
    */
-  export function validate_row(
-    row: Record<string, string>,
+  export function validate_row<T = unknown>(
+    row: Record<string, string | undefined>,
     model: Record<
       string,
       {
-        type: "string" | "number" | "boolean" | "object";
+        type: "string" | "number" | "boolean" | "object" | "array";
         format?: string;
         required: boolean;
+        items?: {
+          type: "string" | "number" | "boolean";
+          format?: string;
+        };
       }
     >,
     checkformat: (value: string, format: string) => boolean = () => true
-  ): boolean {
+  ): false | T {
     const obj = unflatten(row) as Record<string, unknown>;
 
     // Reject if any top-level key is not defined in the model.
@@ -60,21 +72,121 @@ export namespace Platform.CSV {
 
     // Ensure required fields are present and that values with formats are valid.
     for (const key in model) {
-      if (model[key].required && obj[key] === undefined) return false;
-      if (
-        obj[key] !== undefined &&
-        model[key].format &&
-        typeof obj[key] === "string"
-      ) {
-        if (!checkformat(obj[key], model[key].format)) return false;
+      const spec = model[key];
+      const value = obj[key];
+
+      // required field check
+      if (spec.required && value === undefined) return false;
+
+      // array check
+      if (spec.type === "array") {
+        if (value === undefined) {
+          obj[key] = undefined;
+        } else if (typeof value === "string") {
+          const arrayValues = value
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0);
+          if (
+            spec.format &&
+            !(spec.items?.format
+              ? arrayValues.every((v) => checkformat(v, spec.items!.format!))
+              : true)
+          ) {
+            return false;
+          }
+
+          obj[key] = arrayValues;
+        } else {
+          return false;
+        }
+      }
+
+      // primitive type check
+      if (value !== undefined && spec.format && typeof value === "string") {
+        if (!checkformat(value, spec.format)) return false;
       }
     }
-    return true;
+
+    return obj as T;
   }
+}
+
+export namespace Platform.Tag {
+  export type TagNameAndColor = {
+    name: string;
+    color: string;
+  };
+
+  export type TagNameAndColorAndDescription = {
+    name: string;
+    color: string;
+    description: string | null;
+  };
+
+  export type Tag = {
+    id: number;
+    project_id: number;
+
+    /**
+     * the name (label) of the tag
+     */
+    name: string;
+
+    /**
+     * optional description for this tag
+     */
+    description: string | null;
+
+    /**
+     * hex color code
+     */
+    color: string;
+    created_at: string;
+  };
+
+  export type TagWithUsageCount = Tag & {
+    usage_count: number;
+  };
 }
 
 export namespace Platform.Customer {
   export const TYPE = "grida.platform.customer";
+
+  export interface Customer {
+    project_id: number;
+    uid: string;
+    created_at: string;
+    last_seen_at: string;
+    name: string | null;
+    email: string | null;
+    email_provisional: string[];
+    phone: string | null;
+    phone_provisional: string[];
+    description: string | null;
+    uuid: string | null;
+    metadata: unknown | null;
+    is_marketing_email_subscribed: boolean;
+    is_marketing_sms_subscribed: boolean;
+  }
+
+  export interface CustomerInsertion {
+    project_id: number;
+    uuid?: string | null;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    description?: string | null;
+    metadata?: unknown | null;
+  }
+
+  export interface CustomerWithTags extends Customer {
+    tags: string[];
+  }
+
+  export interface CustomerInsertionWithTags extends CustomerInsertion {
+    tags: string[];
+  }
 
   export interface Property {
     type: "string" | "number" | "integer" | "boolean" | "array" | "object";
@@ -131,6 +243,10 @@ export namespace Platform.Customer {
       format: "timestamptz",
       required: false,
     } satisfies Property,
+    tags: {
+      type: "array",
+      required: true,
+    },
   } as const;
 
   /**
@@ -143,6 +259,7 @@ export namespace Platform.Customer {
     phone: properties.phone,
     description: properties.description,
     metadata: properties.metadata,
+    tags: { ...properties.tags, required: false },
   } as const;
 
   /**

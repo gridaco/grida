@@ -117,7 +117,7 @@ export function ImportCSVDialog({
             Upload a CSV file to import customers into your CRM.
             <br />
             <Link
-              href="/docs/platform/customers/working-with-csv"
+              href="/docs/platform/customers#working-with-csv"
               target="_blank"
               className="underline"
             >
@@ -179,7 +179,7 @@ export function ImportCSVDialog({
                   onCheckedChange={(s) => setDataChecked(s === true)}
                 />
                 <span>
-                  I've reviewed the data and want to import these customers
+                  I&apos;ve reviewed the data and want to import these customers
                 </span>
               </label>
             </Alert>
@@ -323,7 +323,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         <p className="mb-1 font-medium">
           <span className="text-primary">Click to upload</span> or drag and drop
         </p>
-        <p className="text-muted-foreground">CSV files only (max 3MB)</p>
+        <p className="text-muted-foreground">CSV files only</p>
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">

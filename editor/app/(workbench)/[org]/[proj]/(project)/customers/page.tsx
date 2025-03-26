@@ -1,7 +1,6 @@
 "use client";
 
 import { CustomerGrid } from "@/scaffolds/grid/wellknown/customer-grid";
-import { provisional } from "@/services/customer/utils";
 import {
   GridQueryLimitSelect,
   GridRefreshButton,
@@ -12,7 +11,6 @@ import {
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { useMemo } from "react";
-import { Customer } from "@/types";
 import {
   fetchCustomers,
   insertCustomer,
@@ -23,7 +21,6 @@ import { StandaloneDataQueryProvider } from "@/scaffolds/data-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/utils";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -35,15 +32,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon, GearIcon, UploadIcon } from "@radix-ui/react-icons";
 import { useProject } from "@/scaffolds/workspace";
-import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportCSVDialog } from "@/scaffolds/platform/customer/import-csv-dialog";
 import { usePathname, useRouter } from "next/navigation";
-import toast from "react-hot-toast";
 import { subscribeTable } from "@/lib/supabase/realtime";
 import { Badge } from "@/components/ui/badge";
 import { DateFormatRadioGroup } from "@/scaffolds/data-format/ui/date-format";
 import { DateTimeZoneRadioGroup } from "@/scaffolds/data-format/ui/date-timezone";
+import { cn } from "@/utils";
+import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
+import toast from "react-hot-toast";
+import type { Platform } from "@/lib/platform";
 
 export default function Customers() {
   return (
@@ -62,7 +61,7 @@ function Body() {
   const pathname = usePathname();
   const client = useMemo(() => createClientWorkspaceClient(), []);
 
-  const tablespace = useTableSpaceInstance<Customer>({
+  const tablespace = useTableSpaceInstance<Platform.Customer.CustomerWithTags>({
     identifier: "uid",
     readonly: false,
     realtime: true,

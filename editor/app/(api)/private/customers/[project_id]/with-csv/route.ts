@@ -8,7 +8,8 @@ import { unflatten } from "flat";
 import { qboolean } from "@/utils/qs";
 import type { Database } from "@/database.types";
 
-type PGCustomerInsert = Database["public"]["Tables"]["customer"]["Insert"];
+type PGCustomerInsert =
+  Database["public"]["Views"]["customer_with_tags"]["Row"];
 
 type Params = {
   project_id: number;
@@ -22,59 +23,62 @@ async function parse_customers_csv(
   | {
       data: PGCustomerInsert[];
       error: null;
-      details: any;
     }
   | {
       data: null;
       error: unknown;
-      details: any;
     }
 > {
   const csvt = await csvf.text();
 
-  const { data: rows, errors: csv_parse_errors } = Papa.parse<
-    Record<string, string>
-  >(csvt, Platform.CSV.parser_config);
+  const { data: rows, errors: csv_parse_errors } = Platform.CSV.parse(csvt);
 
   if (csv_parse_errors.length > 0) {
     return {
       data: null,
-      error: "CSV parse error",
-      details: csv_parse_errors,
+      error: {
+        code: "CSV parse error",
+        hint: "Check the CSV file for errors",
+        details: csv_parse_errors,
+      },
     };
   }
 
   const csv_validation_errors: string[] = [];
-  const customers = rows.map((row, idx) => {
-    if (!Platform.CSV.validate_row(row, spec)) {
-      csv_validation_errors.push(
-        `Row ${idx + 1} contains non-allowed fields or missing required data.`
-      );
-    }
+  const customers = rows
+    .map((row, idx) => {
+      const data = Platform.CSV.validate_row<
+        Omit<PGCustomerInsert, "project_id">
+      >(row, spec);
 
-    const data = unflatten(row) as unknown as Omit<
-      PGCustomerInsert,
-      "project_id"
-    >;
+      if (!data) {
+        csv_validation_errors.push(
+          `Row ${idx + 1} contains non-allowed fields or missing required data.`
+        );
+        return null;
+      }
 
-    return {
-      ...data,
-      project_id,
-    } as PGCustomerInsert;
-  });
+      return {
+        ...data,
+        project_id,
+      } as PGCustomerInsert;
+    })
+    .filter(Boolean) as PGCustomerInsert[];
 
   if (csv_validation_errors.length > 0) {
     return {
       data: null,
-      error: "CSV validation error",
-      details: csv_validation_errors,
+      error: {
+        code: "CSV validation error",
+        hint: "Check the CSV file for errors",
+        details: csv_validation_errors,
+      },
     };
   }
 
   return {
     data: customers,
     error: null,
-    details: null,
   };
 }
 
@@ -82,7 +86,7 @@ async function parse_customers_csv(
  * [insert]
  * inserting customers with user uploaded csv
  *
- * @see https://grida.co/docs/platform/customers/working-with-csv
+ * @see https://grida.co/docs/platform/customers#working-with-csv
  *
  * - set dryrun=1 to validate the CSV without inserting
  */
@@ -99,23 +103,32 @@ export async function POST(
   const csvf = formdata.get("csv") as File;
   assert(csvf, "CSV file is required");
 
-  const {
-    data,
-    error: parse_error,
-    details,
-  } = await parse_customers_csv(csvf, project_id, Platform.Customer.insert);
+  const { data, error: parse_error } = await parse_customers_csv(
+    csvf,
+    project_id,
+    Platform.Customer.insert
+  );
 
   if (parse_error) {
-    return NextResponse.json({ error: parse_error, details }, { status: 400 });
+    console.error("error while parsing csv", parse_error);
+    return NextResponse.json({ error: parse_error }, { status: 400 });
   }
 
   if (dryrun) {
     return NextResponse.json({ message: "CSV is valid" });
   } else {
-    console.log("with-csv::inserting", data);
+    console.log("with-csv::inserting", {
+      length: data?.length,
+      summary: data?.slice(0, 5),
+    });
     const { count, error } = await supabase
-      .from("customer")
-      .insert(data!, { count: "exact" })
+      .from("customer_with_tags")
+      .insert(
+        data! satisfies Platform.Customer.CustomerInsertionWithTags[] as any,
+        {
+          count: "exact",
+        }
+      )
       .select("uid");
 
     if (error) {
@@ -134,7 +147,7 @@ export async function POST(
  * [update]
  * updating customers with user uploaded csv
  *
- * @see https://grida.co/docs/platform/customers/working-with-csv
+ * @see https://grida.co/docs/platform/customers#working-with-csv
  *
  * - set dryrun=1 to validate the CSV without inserting
  */
@@ -151,14 +164,14 @@ export async function PATCH(
   const csvf = formdata.get("csv") as File;
   assert(csvf, "CSV file is required");
 
-  const {
-    data,
-    error: parse_error,
-    details,
-  } = await parse_customers_csv(csvf, project_id, Platform.Customer.update);
+  const { data, error: parse_error } = await parse_customers_csv(
+    csvf,
+    project_id,
+    Platform.Customer.update
+  );
 
   if (parse_error) {
-    return NextResponse.json({ error: parse_error, details }, { status: 400 });
+    return NextResponse.json({ error: parse_error }, { status: 400 });
   }
 
   // the bulk [update] can be done with [upsert]

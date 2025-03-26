@@ -47,21 +47,6 @@ export type UserProfile = {
   avatar_path: string | null;
 };
 
-export interface Customer {
-  project_id: number;
-  uid: string;
-  created_at: string;
-  last_seen_at: string;
-  name: string | null;
-  email: string | null;
-  email_provisional: string[];
-  phone: string | null;
-  phone_provisional: string[];
-  description: string | null;
-  uuid: string | null;
-  metadata: unknown | null;
-}
-
 /**
  * user facing page language
  */
