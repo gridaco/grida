@@ -323,7 +323,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         <p className="mb-1 font-medium">
           <span className="text-primary">Click to upload</span> or drag and drop
         </p>
-        <p className="text-muted-foreground">CSV files only (max 3MB)</p>
+        <p className="text-muted-foreground">CSV files only</p>
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">

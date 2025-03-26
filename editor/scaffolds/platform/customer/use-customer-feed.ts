@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import type { Data } from "@/lib/data";
-import type { Customer } from "@/types";
 import type { PostgrestError } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/database.types";
+import type { Platform } from "@/lib/platform";
 
 export async function insertCustomer(
   client: SupabaseClient<Database, "public">,
   project_id: number,
-  data: Partial<Pick<Customer, "name" | "email" | "phone" | "description">>
+  data: Partial<
+    Pick<Platform.Customer.Customer, "name" | "email" | "phone" | "description">
+  >
 ) {
   return await client
     .from("customer")
@@ -29,7 +31,7 @@ export async function fetchCustomers(
   // TODO: does not fully support all queries
   const { q_page_limit, q_page_index } = query;
   return await client
-    .from("customer")
+    .from("customer_with_tags")
     .select("*", { count: "estimated" })
     .order("last_seen_at", { ascending: false })
     .range(q_page_index * q_page_limit, (q_page_index + 1) * q_page_limit - 1)
@@ -41,7 +43,9 @@ export function useCustomers(
   query: Data.Relation.QueryState
 ) {
   const client = useMemo(() => createClientWorkspaceClient(), []);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<
+    Platform.Customer.CustomerWithTags[]
+  >([]);
 
   useEffect(() => {
     fetchCustomers(client, project_id, query).then(({ data, error }) => {
@@ -69,7 +73,7 @@ export function useCustomerFeed(
   },
   callbacks?: {
     onLoadingChange?: (loading: boolean) => void;
-    onFeed?: (data: Customer[]) => void;
+    onFeed?: (data: Platform.Customer.CustomerWithTags[]) => void;
     onError?: (error: PostgrestError) => void;
   }
 ) {

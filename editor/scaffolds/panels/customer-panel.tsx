@@ -1,29 +1,24 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
-  SheetTitle,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { Customer, FormResponse } from "@/types";
-import useSWR from "swr";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import { fmt_local_index } from "@/utils/fmt";
-import Link from "next/link";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Skeleton } from "@/components/ui/skeleton";
-import clsx from "clsx";
 import { provisional } from "@/services/customer/utils";
 import { useEditorState } from "../editor";
+import type { Platform } from "@/lib/platform";
+import useSWR from "swr";
+import { cn } from "@/utils";
 
 export function CustomerEditPanel({
   customer_id,
@@ -49,10 +44,10 @@ export function CustomerEditPanel({
           {/* <SheetTitle>{title}</SheetTitle> */}
           {/* <SheetDescription></SheetDescription> */}
         </SheetHeader>
-        <div className={clsx("py-4", !customer ? "block" : "hidden")}>
+        <div className={cn("py-4", !customer ? "block" : "hidden")}>
           <Loading />
         </div>
-        <div className={clsx("grid gap-4 py-4", !customer && "hidden")}>
+        <div className={cn("grid gap-4 py-4", !customer && "hidden")}>
           <div className="grid grid-cols-4 items-center gap-4">
             <Avatar className="w-24 h-24">
               {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
@@ -153,7 +148,7 @@ export function CustomerEditPanel({
   );
 }
 
-function avatar_txt(customer: Customer) {
+function avatar_txt(customer: Platform.Customer.Customer) {
   if (customer.email) {
     return customer.email.split("@")[0];
   }

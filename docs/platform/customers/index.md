@@ -4,15 +4,16 @@ This object represents a customer of your business. Use it to create recurring c
 
 ## Customer Object
 
-| Field Name  | Description                            | Required | format | Example                                 | update | unique            |
-| ----------- | -------------------------------------- | -------- | ------ | --------------------------------------- | ------ | ----------------- |
-| uid         | system customer id                     | Yes      | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx    | No     | Yes               |
-| uuid        | Your Unique identifier of the customer | No       | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx    | Yes    | Yes (if provided) |
-| name        | Name of the customer                   | No       | -      | John Doe                                | Yes    | No                |
-| email       | Email of the customer                  | No       | email  | user+1@example.com                      | Yes    | No                |
-| phone       | Phone of the customer                  | No       | E.164  | +14155552671                            | Yes    | No                |
-| description | Description of the customer            | No       | -      | A shofrt description of the customer    | Yes    | No                |
-| metadata    | K:V Metadata of the customer           | No       | json   | `{"my_custom_field_1" : "value", ... }` | Yes    | No                |
+| Field Name  | Description                               | Required | format | Example                                 | update | unique            |
+| ----------- | ----------------------------------------- | -------- | ------ | --------------------------------------- | ------ | ----------------- |
+| uid         | system customer id                        | Yes      | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx    | No     | Yes               |
+| uuid        | Your Unique identifier of the customer    | No       | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx    | Yes    | Yes (if provided) |
+| name        | Name of the customer                      | No       | -      | John Doe                                | Yes    | No                |
+| email       | Email of the customer                     | No       | email  | user+1@example.com                      | Yes    | No                |
+| phone       | Phone of the customer                     | No       | E.164  | +14155552671                            | Yes    | No                |
+| description | Description of the customer               | No       | -      | A shofrt description of the customer    | Yes    | No                |
+| tags        | List of tags associated with the customer | No       | text[] | `["premium", "vip", "new-customer"]`    | Yes    | No                |
+| metadata    | K:V Metadata of the customer              | No       | json   | `{"my_custom_field_1" : "value", ... }` | Yes    | No                |
 
 ### `uid`
 
@@ -60,6 +61,8 @@ Example:
 - Tags are project-scoped and uniquely identified by their `name`.
 - Renaming a tag automatically updates all customer-tag associations.
 
+> **CSV Note:** When providing the `tags` within the CSV file, you should provide comma separated text (for example, `"tag1,tag2,tag3"`). The list of tags must be wrapped in quotation marks.
+
 Learn more about [tags](../tags/).
 
 ### `metadata`
@@ -68,7 +71,7 @@ Set of key-value pairs that you can attach to a customer. This can be
 useful for storing additional information about the object in a
 structured format.
 
-When providing the meatadata within the CSV file, you should provide the flat JSON object.
+> **CSV Note:** When providing the `meatadata.*` within the CSV file, you should provide the flat JSON object.
 
 For example, you want to upload
 
@@ -96,25 +99,38 @@ You can use the CSV file to bulk insert or update data into the Grida customer o
 
 > We don't support upsert with csv file. you'll need to use api for upsertion.
 
+### Description of the customer CSV file
+
+| Field Name  | Description                                             | Required | format | Example                              |
+| ----------- | ------------------------------------------------------- | -------- | ------ | ------------------------------------ |
+| uuid        | Your Unique identifier of the customer                  | No       | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx |
+| name        | Name of the customer                                    | No       | -      | John Doe                             |
+| email       | Email of the customer                                   | No       | email  | user+1@example.com                   |
+| phone       | Phone of the customer                                   | No       | E.164  | +14155552671                         |
+| description | Description of the customer                             | No       | -      | A shofrt description of the customer |
+| tags        | A comma-separated list of tags used to tag the customer | No       | -      | "tag1,tag2,tag3"                     |
+| metadata.\* | Metadata of the customer                                | No       | -      | value                                |
+
 ### Inserting
 
 When inserting data, you should not provide any other field than the ones mentioned below.
 
-| Field Name  | Description                            | Required | format | Example                              |
-| ----------- | -------------------------------------- | -------- | ------ | ------------------------------------ |
-| uuid        | Your Unique identifier of the customer | No       | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx |
-| name        | Name of the customer                   | No       | -      | John Doe                             |
-| email       | Email of the customer                  | No       | email  | user+1@example.com                   |
-| phone       | Phone of the customer                  | No       | E.164  | +14155552671                         |
-| description | Description of the customer            | No       | -      | A shofrt description of the customer |
-| metadata.\* | Metadata of the customer               | No       | -      | value                                |
+| Field Name  | Description                                             | Required | format | Example                              |
+| ----------- | ------------------------------------------------------- | -------- | ------ | ------------------------------------ |
+| uuid        | Your Unique identifier of the customer                  | No       | uuidv4 | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx |
+| name        | Name of the customer                                    | No       | -      | John Doe                             |
+| email       | Email of the customer                                   | No       | email  | user+1@example.com                   |
+| phone       | Phone of the customer                                   | No       | E.164  | +14155552671                         |
+| description | Description of the customer                             | No       | -      | A shofrt description of the customer |
+| tags        | A comma-separated list of tags used to tag the customer | No       | -      | "tag1,tag2,tag3"                     |
+| metadata.\* | Metadata of the customer                                | No       | -      | value                                |
 
 While the `uuid` is optional, if you wish to update the customer later, you must provide it.
 
 - [Learn more about `uuid`](#uuid)
 - [Learn more about `metadata`](#metadata)
 
-### Updating
+### Updating (Unstable)
 
 To upsert data, you need to provide the `uid` or `uuid` field in the CSV file.
 
@@ -125,11 +141,14 @@ To upsert data, you need to provide the `uid` or `uuid` field in the CSV file.
 | email       | Email of the customer       | No       | email  | user+1@example.com                   |
 | phone       | Phone of the customer       | No       | E.164  | +14155552671                         |
 | description | Description of the customer | No       | -      | A shofrt description of the customer |
-| metadata.\* | Metadata of the customer    | No       | -      | value                                |
+
+| metadata.\* | Metadata of the customer | No | - | value |
 
 When updating, the non-provided fields will not be updated.
 
 **Important**: For [`metadata`](#metadata), once provided, it will be replaced with the new metadata.
+
+**Important**: Tags cannot be updated using the CSV file. - [Contact support](https://grida.co/contact) for more information.
 
 - [Learn more about `uuid`](#uuid)
 - [Learn more about `metadata`](#metadata)

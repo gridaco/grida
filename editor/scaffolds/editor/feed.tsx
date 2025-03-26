@@ -4,20 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import useSWR from "swr";
-import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
-} from "@/lib/supabase/client";
-import type {
-  PostgrestError,
-  RealtimePostgresChangesPayload,
-} from "@supabase/supabase-js";
-import type {
-  Customer,
-  FormResponse,
-  FormResponseField,
-  GridaXSupabase,
-} from "@/types";
+import { createClientFormsClient } from "@/lib/supabase/client";
+import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";

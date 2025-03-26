@@ -2,9 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { CrossCircledIcon } from "@radix-ui/react-icons";
-import { useLocalStorage } from "@uidotdev/usehooks";
 import Image from "next/image";
 import toast from "react-hot-toast";
 

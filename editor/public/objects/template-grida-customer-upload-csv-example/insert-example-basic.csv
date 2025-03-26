@@ -1,8 +1,8 @@
 # see https://grida.co/docs/platform/customers#working-with-csv
 
-name,email,phone,description
-John Doe,john.doe@example.com,+15551234,"High-value customer interested in premium plans"
-Jane Smith,jane.smith@example.com,+15555678,"New customer; follow up in 30 days"
-Bob Johnson,bob.j@example.com,,""
-,anonymous@example.com,,"Anonymous signup"
-Alice,alice@example.com,,""
+name,email,phone,description,tags
+John Doe,john.doe@example.com,+15551234,"High-value customer interested in premium plans","premium, high-value"
+Jane Smith,jane.smith@example.com,+15555678,"New customer; follow up in 30 days","new"
+Bob Johnson,bob.j@example.com,,"",""
+,anonymous@example.com,,"Anonymous signup",""
+Alice,alice@example.com,,"",""

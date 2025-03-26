@@ -1,8 +1,9 @@
+import type { Platform } from "@/lib/platform";
 import {
   createRouteHandlerClient,
   createRouteHandlerWorkspaceClient,
 } from "@/lib/supabase/server";
-import { Customer, Form, FormResponse } from "@/types";
+import { Form, FormResponse } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,7 +12,7 @@ type Params = {
   uid: string;
 };
 
-export interface FormCustomerDetail extends Customer {
+export interface FormCustomerDetail extends Platform.Customer.Customer {
   responses: (FormResponse & { form: Form })[];
 }
 

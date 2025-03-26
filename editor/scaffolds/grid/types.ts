@@ -1,4 +1,5 @@
 import type { Data } from "@/lib/data";
+import type { Platform } from "@/lib/platform";
 import type {
   FormFieldStorageSchema,
   FormInputType,
@@ -102,6 +103,7 @@ export type DGCustomerRow = {
   email: string | null;
   name: string | null;
   phone: string | null;
+  tags: string[];
   // address: string;
   created_at: string;
   last_seen_at: string;

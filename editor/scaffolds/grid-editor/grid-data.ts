@@ -1,5 +1,4 @@
 import {
-  type Customer,
   type FormFieldDefinition,
   type FormResponse,
   type FormResponseField,
@@ -29,6 +28,7 @@ import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import type { Data } from "@/lib/data";
+import type { Platform } from "@/lib/platform";
 
 export namespace GridData {
   type DataGridFilterInput = {
@@ -62,7 +62,7 @@ export namespace GridData {
         filter: DataGridFilterInput;
         table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
-          rows: Customer[];
+          rows: Platform.Customer.CustomerWithTags[];
         };
       }
     | (
@@ -272,7 +272,7 @@ export namespace GridData {
     | {
         type: "customer";
         inputlength: number;
-        filtered: Customer[];
+        filtered: Platform.Customer.CustomerWithTags[];
       };
 
   function toLocalFilter(input: DataGridFilterInput): GridFilter.LocalFilter {

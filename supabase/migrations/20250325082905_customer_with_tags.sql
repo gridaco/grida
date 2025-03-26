@@ -65,8 +65,8 @@ DECLARE
   inserted_project_id bigint;
   tag text;
 BEGIN
-  INSERT INTO public.customer (email, project_id, name)
-  VALUES (NEW.email, NEW.project_id, NEW.name)
+  INSERT INTO public.customer (project_id, uuid, email, name, phone, description, metadata)
+  VALUES (NEW.project_id, NEW.uuid, NEW.email, NEW.name, NEW.phone, NEW.description, NEW.metadata)
   RETURNING uid, project_id INTO inserted_uid, inserted_project_id;
 
   IF NEW.tags IS NOT NULL THEN

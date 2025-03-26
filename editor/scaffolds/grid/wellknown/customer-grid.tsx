@@ -20,6 +20,7 @@ import { CellRoot } from "../cells";
 import { DataFormat } from "@/scaffolds/data-format";
 import { Platform } from "@/lib/platform";
 import "../grid.css";
+import { Badge } from "@/components/ui/badge";
 
 const customer_columns: (Platform.Customer.Property & {
   key: keyof DGCustomerRow;
@@ -54,6 +55,12 @@ const customer_columns: (Platform.Customer.Property & {
     name: "Phone",
     sensitive: true,
     ...Platform.Customer.properties["phone"],
+  },
+  {
+    key: "tags",
+    name: "Tags",
+    sensitive: false,
+    ...Platform.Customer.properties["tags"],
   },
   {
     key: "created_at",
@@ -99,25 +106,35 @@ export function CustomerGrid({
         renderHeaderCell: HeaderCell,
         renderCell: ({ row, column }: RenderCellProps<any>) => {
           const val = row[col.key as keyof DGCustomerRow];
-          const nonnull = val ?? "—";
 
-          let display = nonnull.toString();
-
-          if (masked && col.sensitive) {
-            display = mask(display);
-          } else if (col.format === "timestamptz") {
-            display = DataFormat.fmtdate(display, dateformat, datetz);
+          if (col.type === "array") {
+            return (
+              <CellRoot className="flex items-center gap-1">
+                {(val as string[]).map((v, i) => (
+                  <Badge key={v} variant="outline">
+                    {v}
+                  </Badge>
+                ))}
+              </CellRoot>
+            );
+          } else {
+            const nonnull = val ?? "—";
+            let display = nonnull.toString();
+            if (masked && col.sensitive) {
+              display = mask(display);
+            } else if (col.format === "timestamptz") {
+              display = DataFormat.fmtdate(display, dateformat, datetz);
+            }
+            return (
+              <CellRoot>
+                <Highlight
+                  text={display}
+                  tokens={tokens}
+                  highlightClassName="bg-foreground text-background"
+                />
+              </CellRoot>
+            );
           }
-
-          return (
-            <CellRoot>
-              <Highlight
-                text={display}
-                tokens={tokens}
-                highlightClassName="bg-foreground text-background"
-              />
-            </CellRoot>
-          );
         },
       }) as Column<any>
   );
@@ -125,6 +142,11 @@ export function CustomerGrid({
   const rows: DGCustomerRow[] = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
       const val = row[k as keyof DGCustomerRow];
+
+      if (Array.isArray(val)) {
+        return { ...acc, [k]: val };
+      }
+
       if (val !== null && typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }

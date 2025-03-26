@@ -20,7 +20,6 @@ import { ProjectLoaded } from "@/scaffolds/workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { AboutGridaWestCard } from "./about-west-card";
 import "../../../../editor.css";
-import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -76,17 +75,17 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            {/* <Link href={`/${org}/${proj}/analytics`}> */}
-                            <SidebarMenuItem>
-                              <SidebarMenuButton size="sm">
-                                <ResourceTypeIcon
-                                  type="chart"
-                                  className="size-4"
-                                />
-                                Analytics
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {/* </Link> */}
+                            <Link href={`/${org}/${proj}/analytics`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="chart"
+                                    className="size-4"
+                                  />
+                                  Analytics
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                             <Link href={`/${org}/${proj}/campaigns`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
@@ -114,9 +113,7 @@ export default async function Layout({
                       </SidebarGroup>
                     </SidebarContent>
                     <SidebarFooter>
-                      <Suspense>
-                        <AboutGridaWestCard />
-                      </Suspense>
+                      <AboutGridaWestCard />
                     </SidebarFooter>
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">

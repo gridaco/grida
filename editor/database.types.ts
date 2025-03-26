@@ -9,8 +9,10 @@ export type Database = MergeDeep<
   {
     public: {
       Views: {
-        customer_with_tags: DatabaseGenerated["public"]["Tables"]["customer"] & {
-          tags: string[] | null;
+        customer_with_tags: {
+          Row: DatabaseGenerated["public"]["Tables"]["customer"]["Row"] & {
+            tags: string[];
+          };
         };
       };
     };
