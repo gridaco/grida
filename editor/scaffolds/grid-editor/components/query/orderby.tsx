@@ -191,7 +191,7 @@ function DataQueryAddOrderbyMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        {attributes.length === 0 && (
+        {(attributes.length === 0 || unusedkeys.length === 0) && (
           <div className="p-4 border border-dashed">
             <span className="text-xs text-muted-foreground">
               No attributes found

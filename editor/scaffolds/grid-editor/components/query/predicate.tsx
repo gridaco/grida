@@ -170,7 +170,7 @@ export function DataQueryPredicatesMenu({
                             onValueChange={(v) => onchange({ value: v })}
                           />
                         ) : (
-                          <>N/A</>
+                          <>only works with x-supabase</>
                         )}
                       </div>
                     </div>
@@ -319,9 +319,13 @@ export function DataQueryPredicateChip({
     [onChange]
   );
 
-  useEffect(() => {
-    onChange({ value: debouncedSearch });
-  }, [onChange, debouncedSearch]);
+  useEffect(
+    () => {
+      onChange({ value: debouncedSearch });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [debouncedSearch]
+  );
 
   const allowed_ops = Predicate.K.get_operators_by_format(format);
 
@@ -438,7 +442,7 @@ export function DataQueryPredicateChip({
                 onValueChange={(v) => setSearch(v)}
               />
             ) : (
-              <>N/A</>
+              <>only works with x-supabase</>
             )}
           </>
         )}

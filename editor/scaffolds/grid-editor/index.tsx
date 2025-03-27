@@ -84,6 +84,7 @@ import {
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import type { FormFieldDefinition } from "@/types";
+import { TableQueryChips } from "./components/query/query-chips";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -328,7 +329,7 @@ export function GridEditor({
                   <ScrollArea>
                     <ScrollBar orientation="horizontal" className="invisible" />
                     <div className="px-2">
-                      <TableQueryChips />
+                      <TableQueryChips {...query} />
                     </div>
                   </ScrollArea>
                 </GridLayout.HeaderLine>
@@ -612,32 +613,6 @@ function TableQueryToggles() {
         </>
       )}
     </GridLayout.HeaderMenuItems>
-  );
-}
-
-function TableQueryChips() {
-  const [state] = useEditorState();
-  const query = useDataGridQuery();
-  const { predicates, orderby, isOrderbySet } = query;
-
-  return (
-    <div className="flex gap-2">
-      {isOrderbySet && (
-        <>
-          <DataQueryOrderbyChip {...query} />
-          <GridLayout.HeaderSeparator />
-        </>
-      )}
-      {predicates.map((predicate, i) => (
-        <DataQueryPredicateChip key={i} index={i} {...query} />
-      ))}
-      <DataQueryPrediateAddMenu {...query}>
-        <Button variant="ghost" size="xs" className="text-muted-foreground">
-          <PlusIcon className="w-3 h-3 me-2" />
-          Add filter
-        </Button>
-      </DataQueryPrediateAddMenu>
-    </div>
   );
 }
 
