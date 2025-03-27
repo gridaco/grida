@@ -38,4 +38,4 @@ When associating tags with a resource, use the following structure:
 
 Currently, tags are supported for the following resources:
 
-- [**Customer**](../customers/): Organize, segment, and manage your customers efficiently using tags.
+- [**Customer**](/platform/customers/index.md): Organize, segment, and manage your customers efficiently using tags.

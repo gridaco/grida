@@ -56,7 +56,7 @@ Example:
 
 > **CSV Note:** When providing the `tags` within the CSV file, you should provide comma separated text (for example, `"tag1,tag2,tag3"`). The list of tags must be wrapped in quotation marks.
 
-Learn more about [tags](../tags/index.md).
+Learn more about [tags](/platform/tags/index.md).
 
 ### `metadata`
 
