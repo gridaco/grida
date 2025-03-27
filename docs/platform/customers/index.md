@@ -40,14 +40,6 @@ For example,
 
 A list of tags associated with the customer. Tags are managed per project, can have descriptions, and are useful for categorization, segmentation, and quick filtering.
 
-Tags have the following structure:
-
-| Field Name  | Description                          | Required | format | Example       |
-| ----------- | ------------------------------------ | -------- | ------ | ------------- |
-| name        | The unique name of the tag           | Yes      | string | "premium"     |
-| color       | Hex color code for visual indication | No       | hex    | "#ff0000"     |
-| description | Optional description of the tag      | No       | string | "VIP clients" |
-
 Tags are created automatically if they don't already exist when provided during customer creation or update operations.
 
 Example:
@@ -58,12 +50,13 @@ Example:
 }
 ```
 
-- Tags are project-scoped and uniquely identified by their `name`.
+- Tags are project-scoped and uniquely identified by their name.
 - Renaming a tag automatically updates all customer-tag associations.
+- Deleting a tag removes all customer-tag associations. (does not delete the customer)
 
 > **CSV Note:** When providing the `tags` within the CSV file, you should provide comma separated text (for example, `"tag1,tag2,tag3"`). The list of tags must be wrapped in quotation marks.
 
-Learn more about [tags](../tags/).
+Learn more about [tags](../tags/index.md).
 
 ### `metadata`
 
@@ -141,8 +134,7 @@ To upsert data, you need to provide the `uid` or `uuid` field in the CSV file.
 | email       | Email of the customer       | No       | email  | user+1@example.com                   |
 | phone       | Phone of the customer       | No       | E.164  | +14155552671                         |
 | description | Description of the customer | No       | -      | A shofrt description of the customer |
-
-| metadata.\* | Metadata of the customer | No | - | value |
+| metadata.\* | Metadata of the customer    | No       | -      | value                                |
 
 When updating, the non-provided fields will not be updated.
 
