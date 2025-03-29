@@ -28,8 +28,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
 export function ImportCSVDialog({
+  onImportComplete,
   ...props
-}: React.ComponentProps<typeof Dialog>) {
+}: React.ComponentProps<typeof Dialog> & {
+  onImportComplete?: () => void;
+}) {
   const project = useProject();
   const [mode, setMode] = useState<"insert" | "update">("insert");
   const [datachecked, setDataChecked] = useState(false);
@@ -71,6 +74,7 @@ export function ImportCSVDialog({
     }).then((res) => {
       if (res.ok) {
         setStep("complete");
+        onImportComplete?.();
       } else {
         setStep("error");
         res.json().then((res) => {

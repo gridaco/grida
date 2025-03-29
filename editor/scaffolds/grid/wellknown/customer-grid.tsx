@@ -109,7 +109,7 @@ export function CustomerGrid({
           if (col.type === "array") {
             return (
               <CellRoot className="flex items-center gap-1">
-                {(val as string[]).map((v, i) => (
+                {(val as string[] | undefined)?.map((v, i) => (
                   <Badge key={v} variant="outline">
                     {v}
                   </Badge>

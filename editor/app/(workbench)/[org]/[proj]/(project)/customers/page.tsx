@@ -87,6 +87,7 @@ function Body() {
     setSelection(new Set());
   };
 
+  // TODO: remove the realtime - or at least disable when importing from csv (swr will be enough)
   const tablespace = useTableSpaceInstance<Platform.Customer.CustomerWithTags>({
     identifier: "uid",
     readonly: false,
@@ -227,7 +228,11 @@ function Body() {
                 </GridLayout.HeaderMenus>
                 <GridLayout.HeaderMenus>
                   {/* <ViewSettings /> */}
-                  <NewButton />
+                  <NewButton
+                    onNewData={() => {
+                      tablespace.onRefresh();
+                    }}
+                  />
                 </GridLayout.HeaderMenus>
               </GridLayout.HeaderLine>
               {(tablespace.isPredicatesSet || tablespace.isOrderbySet) && (
@@ -285,7 +290,7 @@ function Body() {
   );
 }
 
-function NewButton() {
+function NewButton({ onNewData }: { onNewData?: () => void }) {
   const project = useProject();
   const project_id = project.id;
   const client = useMemo(() => createClientWorkspaceClient(), []);
@@ -324,6 +329,9 @@ function NewButton() {
       <ImportCSVDialog
         {...importCSVDialog.props}
         key={importCSVDialog.refreshkey}
+        onImportComplete={() => {
+          onNewData?.();
+        }}
       />
       <div role="group" className="inline-flex rounded-md shadow-sm">
         <button
