@@ -43,6 +43,9 @@ export function SelectColumnCell({
         onClick={(event) => {
           event.stopPropagation();
         }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+        }}
       />
       {expandable && (
         <Tooltip.Root delayDuration={0}>

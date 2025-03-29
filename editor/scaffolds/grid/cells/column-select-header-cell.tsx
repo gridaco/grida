@@ -36,6 +36,9 @@ export function SelectColumnHeaderCell({
       onClick={(event) => {
         event.stopPropagation();
       }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+      }}
     />
   );
 }
