@@ -5,7 +5,7 @@ import random
 import uuid
 import re
 
-fake = Faker()
+fake = Faker(['en_US', 'ko_KR', 'ja_JP', 'es_ES', 'fr_FR'])
 Faker.seed(42)
 
 TAGS_POOL = ["premium", "vip", "new-customer", "churned", "b2b", "internal"]
