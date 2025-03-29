@@ -339,6 +339,9 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
     }
   );
 
+  const customer_fallback_display_name =
+    customer.name || customer.email || customer.phone;
+
   const customer_since_absolute = new Date(
     customer.created_at
   ).toLocaleDateString();
@@ -396,10 +399,10 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
           </Link>
           <div>
             <h1
-              data-unnamed={!customer.name}
+              data-unnamed={!customer_fallback_display_name}
               className="text-xl font-semibold data-[unnamed=true]:text-muted-foreground data-[unnamed=true]:underline data-[unnamed=true]:decoration-dashed"
             >
-              {customer.name || "Unnamed Customer"}
+              {customer_fallback_display_name || "Unnamed Customer"}
             </h1>
             <p className="text-sm text-muted-foreground">
               Customer for {customer_since_relative}

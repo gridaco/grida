@@ -1,35 +1,50 @@
 "use client";
 
-// Note: This code is originally from supabase/studio (Apache-2.0 License)
-
+import React, { SyntheticEvent } from "react";
 import {
   CalculatedColumn,
   RenderCellProps,
-  RenderGroupCellProps,
   RenderHeaderCellProps,
   useRowSelection,
 } from "react-data-grid";
-import {
-  ChangeEvent,
-  InputHTMLAttributes,
-  SyntheticEvent,
-  useCallback,
-} from "react";
-import { DGResponseRow } from "../types";
-import * as Tooltip from "@radix-ui/react-tooltip";
-import { EnterFullScreenIcon } from "@radix-ui/react-icons";
-import { useEditorState } from "@/scaffolds/editor";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CheckedState } from "@radix-ui/react-checkbox";
+import { type DGResponseRow } from "../types";
 import { CellRoot } from "../cells";
 import { useCellRootProps } from "../providers";
+import { SelectColumnHeaderCell } from "../cells/column-select-header-cell";
+import { SelectColumnCell } from "../cells/column-select-cell";
+
+type ExpandRowContextState<TRow> = {
+  onExpandClick?: (row: TRow) => void;
+};
+
+const ExpandRowContext = React.createContext<ExpandRowContextState<any> | null>(
+  {
+    onExpandClick: () => {},
+  }
+);
+
+export function ExpandRowProvider<TRow>({
+  onExpandClick,
+  children,
+}: React.PropsWithChildren<ExpandRowContextState<TRow>>) {
+  return (
+    <ExpandRowContext.Provider value={{ onExpandClick }}>
+      {children}
+    </ExpandRowContext.Provider>
+  );
+}
+
+function useExpandRow<TRow>() {
+  const context = React.useContext(ExpandRowContext);
+  return context as ExpandRowContextState<TRow>;
+}
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
 }
 
 export const SelectColumn: CalculatedColumn<any, any> = {
-  key: "__gf_select",
+  key: "__rdg__select",
   name: "",
   idx: 0,
   width: 65,
@@ -45,7 +60,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
 
     return (
       <CellRoot {...rootprops} className="border-t-0">
-        <SelectCellHeader
+        <SelectColumnHeaderCell
           aria-label="Select All"
           tabIndex={props.tabIndex}
           value={isRowSelected}
@@ -58,16 +73,21 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   },
   renderCell: (props: RenderCellProps<DGResponseRow>) => {
     const { column, row } = props;
+    const { onExpandClick } = useExpandRow<DGResponseRow>();
+
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
     const rootprops = useCellRootProps(row.__gf_id, column.key);
     return (
       <CellRoot {...rootprops} className="group">
-        <SelectCellFormatter
+        <SelectColumnCell
           aria-label="Select"
           tabIndex={props.tabIndex}
           value={isRowSelected}
-          row={props.row}
+          expandable={row ? true : false}
+          onExpandClick={() => {
+            onExpandClick?.(row);
+          }}
           onChange={(checked, isShiftClick) => {
             onRowSelectionChange({
               type: "ROW",
@@ -87,112 +107,3 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   minWidth: 0,
   draggable: false,
 };
-
-type SharedInputProps = Pick<
-  InputHTMLAttributes<HTMLInputElement>,
-  "disabled" | "tabIndex" | "onClick" | "aria-label" | "aria-labelledby"
->;
-
-interface SelectCellFormatterProps extends SharedInputProps {
-  value: boolean;
-  row?: DGResponseRow;
-  onChange: (value: boolean, isShiftClick: boolean) => void;
-}
-
-function SelectCellFormatter({
-  row,
-  value,
-  tabIndex,
-  disabled,
-  onChange,
-  "aria-label": ariaLabel,
-  "aria-labelledby": ariaLabelledBy,
-}: SelectCellFormatterProps) {
-  const id = row?.__gf_id;
-  const [state, dispatch] = useEditorState();
-
-  function handleChange(checked: CheckedState) {
-    onChange(checked === true, false);
-  }
-
-  const onEnterFullScreenClick = useCallback(() => {
-    dispatch({
-      type: "editor/panels/record-edit",
-      response_id: id,
-      refresh: true,
-    });
-  }, [dispatch, id]);
-
-  return (
-    <>
-      <Checkbox
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        tabIndex={tabIndex}
-        className="rdg-row__select-column__select-action"
-        disabled={disabled}
-        checked={value}
-        onCheckedChange={handleChange}
-        onClick={stopPropagation}
-      />
-      {row && (
-        <Tooltip.Root delayDuration={0}>
-          <Tooltip.Trigger asChild>
-            <button
-              className="rdg-row__select-column__edit-action"
-              onClick={onEnterFullScreenClick}
-              style={{
-                padding: 3,
-              }}
-            >
-              <EnterFullScreenIcon />
-            </button>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content side="bottom">
-              <Tooltip.Arrow />
-              <div
-                className={
-                  "bg-background rounded border py-1 px-2 leading-none shadow"
-                }
-              >
-                <span className="text-xs text-foreground">Expand row</span>
-              </div>
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
-      )}
-    </>
-  );
-}
-
-interface SelectCellHeaderProps extends SharedInputProps {
-  value: boolean;
-  onChange: (value: boolean, isShiftClick: boolean) => void;
-}
-
-function SelectCellHeader({
-  disabled,
-  tabIndex,
-  value,
-  onChange,
-  "aria-label": ariaLabel,
-  "aria-labelledby": ariaLabelledBy,
-}: SelectCellHeaderProps) {
-  function handleChange(checked: CheckedState) {
-    onChange(checked === true, false);
-  }
-
-  return (
-    <Checkbox
-      aria-label={ariaLabel}
-      aria-labelledby={ariaLabelledBy}
-      tabIndex={tabIndex}
-      className="rdg-row__select-column__select-action"
-      disabled={disabled}
-      checked={value}
-      onCheckedChange={handleChange}
-      onClick={stopPropagation}
-    />
-  );
-}
