@@ -59,7 +59,7 @@ export async function fetchCustomers(
     });
   } else {
     // fallback orderby
-    q.order("last_seen_at", { ascending: false });
+    q.order("uid", { ascending: false });
   }
 
   // predicates
