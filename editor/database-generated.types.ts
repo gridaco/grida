@@ -3452,6 +3452,12 @@ export type Database = {
         }
         Returns: string[]
       }
+      flatten_jsonb_object_values: {
+        Args: {
+          obj: Json
+        }
+        Returns: string
+      }
       generate_combinations:
         | {
             Args: {
