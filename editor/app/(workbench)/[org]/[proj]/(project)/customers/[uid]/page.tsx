@@ -739,7 +739,10 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
               </Button>
             </div>
             {customer.metadata ? (
-              <></>
+              <KVTable
+                data={customer.metadata}
+                className="max-h-[300px] overflow-auto"
+              />
             ) : (
               <div className="flex items-center justify-center aspect-video border border-dashed border-muted">
                 <span className="text-muted-foreground text-sm">
@@ -751,6 +754,33 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
         </aside>
       </div>
     </div>
+  );
+}
+
+function KVTable({
+  data,
+  className,
+}: {
+  data: Record<string, any>;
+  className?: string;
+}) {
+  return (
+    <Table className={cn("w-full", className)}>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Key</TableHead>
+          <TableHead>Value</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {Object.entries(data).map(([key, value]) => (
+          <TableRow key={key}>
+            <TableCell className="font-medium">{key}</TableCell>
+            <TableCell>{JSON.stringify(value)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
