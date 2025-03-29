@@ -85,6 +85,7 @@ import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import type { FormFieldDefinition } from "@/types";
 import { TableQueryChips } from "./components/query/query-chips";
+import { DeleteSelectionButton } from "./components/delete";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -798,32 +799,13 @@ function DeleteSelectedRowsButton({
   ]);
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" {...props} className={className}>
-          <TrashIcon />
-          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogTitle>
-          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
-        </AlertDialogTitle>
-        <AlertDialogDescription>
-          Deleting this record will remove all data associated with it. Are you
-          sure you want to delete this record?
-        </AlertDialogDescription>
-        <div className="flex justify-end gap-2 p-2">
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className={buttonVariants({ variant: "destructive" })}
-            onClick={onDeleteSelection}
-          >
-            Delete
-          </AlertDialogAction>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteSelectionButton
+      count={datagrid_selected_rows.size}
+      keyword={row_keyword}
+      onDeleteClick={onDeleteSelection}
+      className={className}
+      {...props}
+    />
   );
 }
 

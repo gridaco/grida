@@ -23,6 +23,22 @@ export async function insertCustomer(
     .single();
 }
 
+export async function deleteCustomers(
+  client: SupabaseClient<Database, "public">,
+  project_id: number,
+  ids: string[]
+) {
+  const { count, error } = await client
+    .from("customer")
+    .delete({ count: "exact" })
+    .eq("project_id", project_id)
+    .in("uid", ids);
+
+  if (error) throw error;
+  if (count !== ids.length) throw new Error("failed");
+  return count;
+}
+
 export async function fetchCustomers(
   client: SupabaseClient<Database, "public">,
   project_id: number,

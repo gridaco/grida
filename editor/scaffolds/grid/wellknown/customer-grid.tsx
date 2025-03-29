@@ -79,6 +79,8 @@ export function CustomerGrid({
   dateformat = "datetime",
   datetz,
   onCellDoubleClick,
+  onSelectedRowsChange,
+  selectedRows,
 }: {
   rows: DGCustomerRow[];
   tokens?: string[];
@@ -87,6 +89,8 @@ export function CustomerGrid({
   dateformat?: DataFormat.DateFormat;
   loading?: boolean;
   onCellDoubleClick?: (row: DGCustomerRow, column: string) => void;
+  onSelectedRowsChange?: (rows: Set<string>) => void;
+  selectedRows?: ReadonlySet<string>;
 }) {
   const columns = column_keys.map(
     (col) =>
@@ -157,6 +161,10 @@ export function CustomerGrid({
       <DataGrid<DGCustomerRow>
         className="flex-grow select-none text-xs text-foreground/80"
         columns={columns}
+        selectedRows={selectedRows}
+        onSelectedRowsChange={(rows) => {
+          onSelectedRowsChange?.(rows as Set<string>);
+        }}
         rows={rows}
         renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
         rowKeyGetter={(row) => (row as DGCustomerRow)["uid"]}

@@ -14,8 +14,9 @@ import {
   DataQueryOrderbyMenuTriggerButton,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  deleteCustomers,
   fetchCustomers,
   insertCustomer,
 } from "@/scaffolds/platform/customer/use-customer-feed";
@@ -29,7 +30,7 @@ import {
 } from "@/scaffolds/data-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -39,7 +40,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDownIcon, GearIcon, UploadIcon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  Cross2Icon,
+  GearIcon,
+  UploadIcon,
+} from "@radix-ui/react-icons";
 import { useProject } from "@/scaffolds/workspace";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportCSVDialog } from "@/scaffolds/platform/customer/import-csv-dialog";
@@ -54,6 +60,8 @@ import toast from "react-hot-toast";
 import { Platform } from "@/lib/platform";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TableQueryChips } from "@/scaffolds/grid-editor/components/query/query-chips";
+import { txt_n_plural } from "@/utils/plural";
+import { DeleteSelectionButton } from "@/scaffolds/grid-editor/components/delete";
 
 export default function Customers() {
   return (
@@ -71,6 +79,13 @@ function Body() {
   const router = useRouter();
   const pathname = usePathname();
   const client = useMemo(() => createClientWorkspaceClient(), []);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+
+  const has_selected_rows = selection.size > 0;
+
+  const onClearSelection = () => {
+    setSelection(new Set());
+  };
 
   const tablespace = useTableSpaceInstance<Platform.Customer.CustomerWithTags>({
     identifier: "uid",
@@ -100,6 +115,22 @@ function Body() {
     },
   });
 
+  const onDeleteCustomers = (ids: string[]) => {
+    const task = deleteCustomers(client, project_id, ids);
+    toast.promise(task, {
+      loading: "Deleting customers...",
+      success: "Customers deleted",
+      error: (err) => {
+        console.error("Failed to delete customers", err);
+        return "Failed to delete customers";
+      },
+    });
+    task.finally(() => {
+      onClearSelection();
+      tablespace.onRefresh();
+    });
+  };
+
   return (
     <DataPlatformProvider
       platform={{
@@ -112,46 +143,90 @@ function Body() {
             <GridLayout.Header>
               <GridLayout.HeaderLine>
                 <GridLayout.HeaderMenus>
-                  <Tabs defaultValue="default">
-                    <TabsList>
-                      <TabsTrigger value="default">
-                        <ResourceTypeIcon
-                          type={"user"}
-                          className="inline align-middle w-4 min-w-4 h-4 me-2"
+                  {has_selected_rows ? (
+                    <div
+                      className={cn(
+                        "flex items-center",
+                        !has_selected_rows ? "hidden" : ""
+                      )}
+                    >
+                      <div className="flex gap-2 items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="w-7 h-7"
+                            onClick={onClearSelection}
+                          >
+                            <Cross2Icon />
+                          </Button>
+                          <span
+                            className="text-sm font-norma text-muted-foreground"
+                            aria-label="selected responses"
+                          >
+                            {txt_n_plural(selection.size, "customer")} selected
+                          </span>
+                        </div>
+                        <GridLayout.HeaderSeparator />
+                        {/* <SelectionExport /> */}
+                        {/* <GridLayout.HeaderSeparator /> */}
+                        <DeleteSelectionButton
+                          count={selection.size}
+                          keyword={"customer"}
+                          onDeleteClick={() => {
+                            onDeleteCustomers(
+                              Array.from(selection.values()).map((v) => v)
+                            );
+                          }}
                         />
-                        Customer
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <GridLayout.HeaderMenuItems>
-                    <DataQueryPredicatesMenu {...tablespace}>
-                      <DataQueryPredicatesMenuTriggerButton
-                        active={tablespace.isPredicatesSet}
-                      />
-                    </DataQueryPredicatesMenu>
-                    <DataQueryOrderByMenu {...tablespace}>
-                      <DataQueryOrderbyMenuTriggerButton
-                        active={tablespace.isOrderbySet}
-                      />
-                    </DataQueryOrderByMenu>
-                    <DataQueryTextSearch
-                      placeholder="Type to search"
-                      onValueChange={(v) => {
-                        if (v.trim()) {
-                          tablespace.onTextSearch(
-                            Platform.Customer.TABLE_SEARCH_TEXT,
-                            v.trim()
-                          );
-                        } else {
-                          tablespace.onTextSearchClear();
-                        }
-                      }}
-                      debounce={500}
-                    />
-                  </GridLayout.HeaderMenuItems>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                        <Tabs defaultValue="default">
+                          <TabsList>
+                            <TabsTrigger value="default">
+                              <ResourceTypeIcon
+                                type={"user"}
+                                className="inline align-middle w-4 min-w-4 h-4 me-2"
+                              />
+                              Customer
+                            </TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                        <GridLayout.HeaderMenuItems>
+                          <DataQueryPredicatesMenu {...tablespace}>
+                            <DataQueryPredicatesMenuTriggerButton
+                              active={tablespace.isPredicatesSet}
+                            />
+                          </DataQueryPredicatesMenu>
+                          <DataQueryOrderByMenu {...tablespace}>
+                            <DataQueryOrderbyMenuTriggerButton
+                              active={tablespace.isOrderbySet}
+                            />
+                          </DataQueryOrderByMenu>
+                          <DataQueryTextSearch
+                            placeholder="Type to search"
+                            onValueChange={(v) => {
+                              if (v.trim()) {
+                                tablespace.onTextSearch(
+                                  Platform.Customer.TABLE_SEARCH_TEXT,
+                                  v.trim()
+                                );
+                              } else {
+                                tablespace.onTextSearchClear();
+                              }
+                            }}
+                            debounce={500}
+                          />
+                        </GridLayout.HeaderMenuItems>
+                      </div>
+                    </>
+                  )}
                 </GridLayout.HeaderMenus>
                 <GridLayout.HeaderMenus>
-                  <ViewSettings />
+                  {/* <ViewSettings /> */}
                   <NewButton />
                 </GridLayout.HeaderMenus>
               </GridLayout.HeaderLine>
@@ -175,9 +250,12 @@ function Body() {
                     ? [tablespace.q_text_search?.query]
                     : []
                 }
+                // TODO:
                 // masked={state.datagrid_local_filter.masking_enabled}
                 // dateformat=""
                 // datetz=''
+                selectedRows={new Set(selection)}
+                onSelectedRowsChange={setSelection}
                 rows={tablespace.stream || []}
                 onCellDoubleClick={(row) => {
                   router.push(`${pathname}/${row.uid}`);
