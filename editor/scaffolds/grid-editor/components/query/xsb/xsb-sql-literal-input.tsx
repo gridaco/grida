@@ -16,24 +16,36 @@ export function XSBSQLLiteralInput({
     supabase_schema_name: string;
   };
 }) {
+  const fksearchComponent = React.useMemo(() => {
+    return ({
+      value,
+      onValueChange,
+      relation,
+      className,
+    }: {
+      value: any;
+      onValueChange: (value: any) => void;
+      relation: any;
+      className?: string;
+    }) => (
+      <XSBSQLForeignKeySearchInput
+        value={value}
+        onValueChange={onValueChange}
+        relation={relation}
+        supabase_project_id={supabase.supabase_project_id}
+        supabase_schema_name={supabase.supabase_schema_name}
+        className={className}
+      />
+    );
+  }, [supabase.supabase_project_id, supabase.supabase_schema_name]);
+
   return (
     <SQLLiteralInput
       value={value}
       onValueChange={onValueChange}
       config={config}
       autoFocus={autoFocus}
-      components={{
-        fksearch: ({ value, onValueChange, relation, className }) => (
-          <XSBSQLForeignKeySearchInput
-            value={value}
-            onValueChange={(value) => onValueChange?.(value)}
-            relation={relation}
-            supabase_project_id={supabase.supabase_project_id}
-            supabase_schema_name={supabase.supabase_schema_name}
-            className={className}
-          />
-        ),
-      }}
+      components={{ fksearch: fksearchComponent }}
     />
   );
 }
