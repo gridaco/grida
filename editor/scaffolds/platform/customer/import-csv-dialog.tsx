@@ -22,21 +22,23 @@ import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import toast from "react-hot-toast";
 import { Platform } from "@/lib/platform";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
 export function ImportCSVDialog({
+  onImportComplete,
   ...props
-}: React.ComponentProps<typeof Dialog>) {
+}: React.ComponentProps<typeof Dialog> & {
+  onImportComplete?: () => void;
+}) {
   const project = useProject();
   const [mode, setMode] = useState<"insert" | "update">("insert");
   const [datachecked, setDataChecked] = useState(false);
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<unknown | null>(null);
   const [csv, setCsv] = useState<any[]>([]);
   const [sample, setSample] = useState<any[]>([]);
 
@@ -72,32 +74,19 @@ export function ImportCSVDialog({
     }).then((res) => {
       if (res.ok) {
         setStep("complete");
+        onImportComplete?.();
       } else {
         setStep("error");
         res.json().then((res) => {
-          toast.error(res.error);
+          setError(res.error);
           console.error("Import error:", res.error);
         });
       }
     });
-
-    // Simulate import progress
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 10;
-      setProgress(currentProgress);
-
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-      }
-    }, 300);
-
-    // In a real implementation, you would call your import function here
   };
 
   const resetImport = () => {
     setFile(null);
-    setProgress(0);
     setSample([]);
     setStep("upload");
   };
@@ -154,7 +143,7 @@ export function ImportCSVDialog({
         )}
 
         {step === "preview" && (
-          <div className="flex flex-col space-y-6 py-4 max-w-full">
+          <div className="flex flex-col space-y-6 py-4 max-w-full overflow-hidden">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Preview Import Data</h3>
               <div className="text-sm text-muted-foreground">
@@ -162,8 +151,8 @@ export function ImportCSVDialog({
               </div>
             </div>
 
-            <ScrollArea className="max-h-[400px] rounded-md border ">
-              <SimpleCSVTable data={sample} />
+            <ScrollArea className="max-h-[400px] rounded-md border overflow-scroll">
+              <SimpleCSVTable data={sample} count={csv.length} />
             </ScrollArea>
 
             <Alert>
@@ -225,6 +214,13 @@ export function ImportCSVDialog({
               <p className="text-sm text-muted-foreground">
                 There was an error importing your customers. Please try again.
               </p>
+              <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
+                <p className="text-xs text-start text-destructive font-mono">
+                  <pre>
+                    {error ? JSON.stringify(error, null, 2) : "Unknown error"}
+                  </pre>
+                </p>
+              </div>
             </div>
           </div>
         )}

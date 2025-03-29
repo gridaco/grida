@@ -84,6 +84,8 @@ import {
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import type { FormFieldDefinition } from "@/types";
+import { TableQueryChips } from "./components/query/query-chips";
+import { DeleteSelectionButton } from "./components/delete";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -328,7 +330,7 @@ export function GridEditor({
                   <ScrollArea>
                     <ScrollBar orientation="horizontal" className="invisible" />
                     <div className="px-2">
-                      <TableQueryChips />
+                      <TableQueryChips {...query} />
                     </div>
                   </ScrollArea>
                 </GridLayout.HeaderLine>
@@ -615,32 +617,6 @@ function TableQueryToggles() {
   );
 }
 
-function TableQueryChips() {
-  const [state] = useEditorState();
-  const query = useDataGridQuery();
-  const { predicates, orderby, isOrderbySet } = query;
-
-  return (
-    <div className="flex gap-2">
-      {isOrderbySet && (
-        <>
-          <DataQueryOrderbyChip {...query} />
-          <GridLayout.HeaderSeparator />
-        </>
-      )}
-      {predicates.map((predicate, i) => (
-        <DataQueryPredicateChip key={i} index={i} {...query} />
-      ))}
-      <DataQueryPrediateAddMenu {...query}>
-        <Button variant="ghost" size="xs" className="text-muted-foreground">
-          <PlusIcon className="w-3 h-3 me-2" />
-          Add filter
-        </Button>
-      </DataQueryPrediateAddMenu>
-    </div>
-  );
-}
-
 function TableMod() {
   const [state, dispatch] = useEditorState();
 
@@ -823,32 +799,13 @@ function DeleteSelectedRowsButton({
   ]);
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" {...props} className={className}>
-          <TrashIcon />
-          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogTitle>
-          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
-        </AlertDialogTitle>
-        <AlertDialogDescription>
-          Deleting this record will remove all data associated with it. Are you
-          sure you want to delete this record?
-        </AlertDialogDescription>
-        <div className="flex justify-end gap-2 p-2">
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className={buttonVariants({ variant: "destructive" })}
-            onClick={onDeleteSelection}
-          >
-            Delete
-          </AlertDialogAction>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteSelectionButton
+      count={datagrid_selected_rows.size}
+      keyword={row_keyword}
+      onDeleteClick={onDeleteSelection}
+      className={className}
+      {...props}
+    />
   );
 }
 

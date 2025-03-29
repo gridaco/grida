@@ -1,3 +1,4 @@
+import type { Data } from "@/lib/data";
 import type { DataFormat } from "@/scaffolds/data-format";
 import { unflatten } from "flat";
 import Papa from "papaparse";
@@ -35,6 +36,12 @@ export namespace Platform.CSV {
     );
   }
 
+  export interface CSVValidationError {
+    details: string;
+    hint: string;
+    code: string;
+  }
+
   /**
    * Validates a CSV row against the provided model specification.
    *
@@ -62,12 +69,20 @@ export namespace Platform.CSV {
       }
     >,
     checkformat: (value: string, format: string) => boolean = () => true
-  ): false | T {
+  ): { data: T; error: null } | { data: null; error: CSVValidationError } {
     const obj = unflatten(row) as Record<string, unknown>;
 
     // Reject if any top-level key is not defined in the model.
     for (const key in obj) {
-      if (!(key in model)) return false;
+      if (!(key in model))
+        return {
+          error: {
+            code: "INVALID_KEY",
+            details: `Key "${key}" is not defined in the model.`,
+            hint: "Remove the invalid key",
+          },
+          data: null,
+        };
     }
 
     // Ensure required fields are present and that values with formats are valid.
@@ -76,7 +91,15 @@ export namespace Platform.CSV {
       const value = obj[key];
 
       // required field check
-      if (spec.required && value === undefined) return false;
+      if (spec.required && value === undefined)
+        return {
+          error: {
+            code: "MISSING_REQUIRED_FIELD",
+            details: `Missing required field: ${key}`,
+            hint: "Check the CSV file for missing required fields",
+          },
+          data: null,
+        };
 
       // array check
       if (spec.type === "array") {
@@ -93,22 +116,44 @@ export namespace Platform.CSV {
               ? arrayValues.every((v) => checkformat(v, spec.items!.format!))
               : true)
           ) {
-            return false;
+            return {
+              error: {
+                code: "INVALID_ARRAY_VALUE",
+                details: `Invalid array value for field: ${key}`,
+                hint: "Check the CSV file for invalid array values",
+              },
+              data: null,
+            };
           }
 
           obj[key] = arrayValues;
         } else {
-          return false;
+          return {
+            error: {
+              code: "INVALID_ARRAY_TYPE",
+              details: `Invalid array type for field: ${key}`,
+              hint: "Check the CSV file for invalid array types",
+            },
+            data: null,
+          };
         }
       }
 
       // primitive type check
       if (value !== undefined && spec.format && typeof value === "string") {
-        if (!checkformat(value, spec.format)) return false;
+        if (!checkformat(value, spec.format))
+          return {
+            error: {
+              code: "INVALID_FORMAT",
+              details: `Invalid format for field: ${key}`,
+              hint: "Check the CSV file for invalid formats",
+            },
+            data: null,
+          };
       }
     }
 
-    return obj as T;
+    return { data: obj as T, error: null };
   }
 }
 
@@ -152,6 +197,204 @@ export namespace Platform.Tag {
 
 export namespace Platform.Customer {
   export const TYPE = "grida.platform.customer";
+
+  /**
+   * text search, filtering
+   */
+  export const TABLE_SEARCH_TEXT = "search_text";
+
+  /**
+   * websearch
+   */
+  export const TABLE_SEARCH_TSV = "search_tsv";
+
+  export const TABLE: Data.Relation.TableDefinition = {
+    name: "customer",
+    pks: ["uid"],
+    fks: [
+      {
+        referencing_column: "visitor_id",
+        referenced_table: "visitor",
+        referenced_column: "id",
+      },
+      {
+        referencing_column: "project_id",
+        referenced_table: "project",
+        referenced_column: "id",
+      },
+    ],
+    properties: {
+      created_at: {
+        name: "created_at",
+        description: "creation timestamp",
+        type: "string",
+        format: "timestamptz",
+        scalar_format: "timestamptz",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "now()",
+      },
+      uid: {
+        name: "uid",
+        description: "customer uid",
+        type: "string",
+        format: "uuid",
+        scalar_format: "uuid",
+        enum: undefined,
+        array: false,
+        pk: true,
+        fk: false,
+        null: false,
+        default: "gen_random_uuid()",
+      },
+      email: {
+        name: "email",
+        description: "customer email",
+        type: "string",
+        format: "citext",
+        scalar_format: "citext",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      last_seen_at: {
+        name: "last_seen_at",
+        description: "last seen timestamp",
+        type: "string",
+        format: "timestamptz",
+        scalar_format: "timestamptz",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "now()",
+      },
+      uuid: {
+        name: "uuid",
+        description: "secondary uuid",
+        type: "string",
+        format: "uuid",
+        scalar_format: "uuid",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      phone: {
+        name: "phone",
+        description: "customer phone",
+        type: "string",
+        format: "citext",
+        scalar_format: "citext",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      is_email_verified: {
+        name: "is_email_verified",
+        description: "email verification status",
+        type: "boolean",
+        format: "boolean",
+        scalar_format: "boolean",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "false",
+      },
+      is_phone_verified: {
+        name: "is_phone_verified",
+        description: "phone verification status",
+        type: "boolean",
+        format: "boolean",
+        scalar_format: "boolean",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "false",
+      },
+      description: {
+        name: "description",
+        description: "customer description",
+        type: "string",
+        format: "text",
+        scalar_format: "text",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      metadata: {
+        name: "metadata",
+        description: "metadata",
+        type: undefined,
+        format: "jsonb",
+        scalar_format: "jsonb",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      name: {
+        name: "name",
+        description: "customer name",
+        type: "string",
+        format: "text",
+        scalar_format: "text",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: true,
+        default: undefined,
+      },
+      is_marketing_email_subscribed: {
+        name: "is_marketing_email_subscribed",
+        description: "email marketing subscription",
+        type: "boolean",
+        format: "boolean",
+        scalar_format: "boolean",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "false",
+      },
+      is_marketing_sms_subscribed: {
+        name: "is_marketing_sms_subscribed",
+        description: "sms marketing subscription",
+        type: "boolean",
+        format: "boolean",
+        scalar_format: "boolean",
+        enum: undefined,
+        array: false,
+        pk: false,
+        fk: false,
+        null: false,
+        default: "false",
+      },
+    },
+  };
 
   export interface Customer {
     project_id: number;

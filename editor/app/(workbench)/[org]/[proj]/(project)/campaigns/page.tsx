@@ -1,26 +1,46 @@
-import { createRouteHandlerWestClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+"use client";
 import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
 import EmptyWelcome from "@/components/empty";
+import { createClientWestClient } from "@/lib/supabase/client";
+import { useProject } from "@/scaffolds/workspace";
+import useSWR from "swr";
+import { Spinner } from "@/components/spinner";
+import { Platform } from "@/lib/platform";
 
 type Params = {
   org: string;
   proj: string;
 };
 
-export default async function ChainsPage({
-  params,
-}: {
-  params: Promise<Params>;
-}) {
-  const { org, proj } = await params;
-  const cookieStore = cookies();
-  const client = createRouteHandlerWestClient(cookieStore);
+export default function ChainsPage({ params }: { params: Params }) {
+  const client = createClientWestClient();
+  const { id: project_id } = useProject();
 
-  const { data: series, error } = await client.from("campaign").select("*");
-  if (error) {
-    return <div>Error: {error.message}</div>;
+  const { data: campaigns, isLoading } = useSWR<Platform.WEST.Campaign[]>(
+    [project_id],
+    {
+      fetcher: async () => {
+        const { data: series, error } = await client
+          .from("campaign")
+          .select("*")
+          .eq("project_id", project_id);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        return series;
+      },
+    }
+  );
+
+  if (!campaigns) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
   }
 
   return (
@@ -29,7 +49,7 @@ export default async function ChainsPage({
         <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
       </header>
       <hr className="my-4" />
-      {series.length === 0 && (
+      {campaigns.length === 0 && (
         <EmptyWelcome
           title={"No Campaigns"}
           paragraph={
@@ -38,9 +58,9 @@ export default async function ChainsPage({
         />
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {series.map((s) => {
+        {campaigns.map((s) => {
           return (
-            <Link key={s.id} href={`/${org}/${proj}/campaigns/${s.id}`}>
+            <Link key={s.id} href={`./campaigns/${s.id}`}>
               <CampaignCard data={s} />
             </Link>
           );

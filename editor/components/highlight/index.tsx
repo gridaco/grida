@@ -14,15 +14,20 @@ const Highlight: React.FC<HighlightProps> = ({
   className,
 }) => {
   const regex = useMemo(() => {
-    if (!tokens || tokens.length === 0) {
+    try {
+      if (!tokens || tokens.length === 0) {
+        return null;
+      }
+
+      if (typeof tokens === "string") {
+        return new RegExp(`(${tokens})`, "gi");
+      }
+
+      return new RegExp(`(${tokens.join("|")})`, "gi");
+    } catch (e) {
+      console.error("Error creating regex:", e);
       return null;
     }
-
-    if (typeof tokens === "string") {
-      return new RegExp(`(${tokens})`, "gi");
-    }
-
-    return new RegExp(`(${tokens.join("|")})`, "gi");
   }, [tokens]);
 
   const parts: string[] = useMemo(() => {

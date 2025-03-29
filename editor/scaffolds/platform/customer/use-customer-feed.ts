@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import type { Data } from "@/lib/data";
+import { Data } from "@/lib/data";
+import { Platform } from "@/lib/platform";
 import type { PostgrestError } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/database.types";
-import type { Platform } from "@/lib/platform";
 
 export async function insertCustomer(
   client: SupabaseClient<Database, "public">,
@@ -23,19 +23,63 @@ export async function insertCustomer(
     .single();
 }
 
+export async function deleteCustomers(
+  client: SupabaseClient<Database, "public">,
+  project_id: number,
+  ids: string[]
+) {
+  const { count, error } = await client
+    .from("customer")
+    .delete({ count: "exact" })
+    .eq("project_id", project_id)
+    .in("uid", ids);
+
+  if (error) throw error;
+  if (count !== ids.length) throw new Error("failed");
+  return count;
+}
+
 export async function fetchCustomers(
   client: SupabaseClient<Database, "public">,
   project_id: number,
   query: Data.Relation.QueryState
 ) {
-  // TODO: does not fully support all queries
-  const { q_page_limit, q_page_index } = query;
-  return await client
+  const { q_page_limit, q_page_index, q_orderby, q_predicates, q_text_search } =
+    query;
+  const q = client
     .from("customer_with_tags")
     .select("*", { count: "estimated" })
-    .order("last_seen_at", { ascending: false })
     .range(q_page_index * q_page_limit, (q_page_index + 1) * q_page_limit - 1)
     .eq("project_id", project_id);
+
+  if (Object.keys(q_orderby).length > 0) {
+    // orderby
+    Object.entries(q_orderby).forEach(([key, orderby]) => {
+      q.order(key, orderby);
+    });
+  } else {
+    // fallback orderby
+    q.order("uid", { ascending: false });
+  }
+
+  // predicates
+  const valid_predicates = q_predicates
+    ?.map(Data.Query.Predicate.Extension.encode)
+    ?.filter(Data.Query.Predicate.is_predicate_fulfilled);
+  valid_predicates.forEach((predicate) => {
+    q.filter(predicate.column, predicate.op, predicate.value);
+  });
+
+  // text search (filter)
+  if (q_text_search && q_text_search.query) {
+    q.filter(
+      Platform.Customer.TABLE_SEARCH_TEXT,
+      "ilike",
+      `%${q_text_search.query}%`
+    );
+  }
+
+  return await q;
 }
 
 export function useCustomers(

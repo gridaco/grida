@@ -40,6 +40,7 @@ import type {
 import {
   SelectColumn,
   CreateNewAttributeColumn,
+  ExpandRowProvider,
   CreateNewAttributeProvider,
 } from "./columns";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
@@ -121,6 +122,17 @@ export function DataGrid({
 }) {
   const [state, dispatch] = useEditorState();
   const { datagrid_selected_rows: selected_responses } = state;
+
+  const onExpandClick = useCallback(
+    (row: DGResponseRow) => {
+      dispatch({
+        type: "editor/panels/record-edit",
+        response_id: row.__gf_id,
+        refresh: true,
+      });
+    },
+    [dispatch]
+  );
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({
@@ -259,74 +271,76 @@ export function DataGrid({
       dateformat={state.dateformat}
       datetz={state.datetz}
     >
-      <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
-        <RDG
-          className={cn(
-            "flex-grow select-none text-xs text-foreground/80",
-            className
-          )}
-          rowKeyGetter={rowKeyGetter}
-          columns={allcolumns}
-          rows={rows}
-          rowHeight={32}
-          headerRowHeight={36}
-          onCellDoubleClick={({ column, row }) => {
-            if (readonly) {
-              //
-              toast("This table is readonly", { icon: "🔒" });
-              return;
-            }
+      <ExpandRowProvider onExpandClick={onExpandClick}>
+        <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
+          <RDG
+            className={cn(
+              "flex-grow select-none text-xs text-foreground/80",
+              className
+            )}
+            rowKeyGetter={rowKeyGetter}
+            columns={allcolumns}
+            rows={rows}
+            rowHeight={32}
+            headerRowHeight={36}
+            onCellDoubleClick={({ column, row }) => {
+              if (readonly) {
+                //
+                toast("This table is readonly", { icon: "🔒" });
+                return;
+              }
 
-            const coldata = columns.find((c) => c.key === column.key);
-            if (coldata?.readonly) {
-              toast(`'${coldata.name}' is readonly`, { icon: "🔒" });
-              return;
-            }
-          }}
-          onColumnsReorder={onColumnsReorder}
-          selectedRows={selectionDisabled ? undefined : selected_responses}
-          onCopy={onCopy}
-          onSelectedCellChange={(cell) => {
-            if (cell.rowIdx === -1) {
-              const column = cell.column.key;
-              onSelectedCellChange?.({
-                pk: -1,
-                column,
-              });
-            } else {
-              const pk = cell.row.__gf_id;
-              const column = cell.column.key;
-              onSelectedCellChange?.({
-                pk,
-                column,
-              });
-            }
-          }}
-          onRowsChange={(rows, data) => {
-            if (readonly) return;
-            const key = data.column.key;
-            const indexes = data.indexes;
+              const coldata = columns.find((c) => c.key === column.key);
+              if (coldata?.readonly) {
+                toast(`'${coldata.name}' is readonly`, { icon: "🔒" });
+                return;
+              }
+            }}
+            onColumnsReorder={onColumnsReorder}
+            selectedRows={selectionDisabled ? undefined : selected_responses}
+            onCopy={onCopy}
+            onSelectedCellChange={(cell) => {
+              if (cell.rowIdx === -1) {
+                const column = cell.column.key;
+                onSelectedCellChange?.({
+                  pk: -1,
+                  column,
+                });
+              } else {
+                const pk = cell.row.__gf_id;
+                const column = cell.column.key;
+                onSelectedCellChange?.({
+                  pk,
+                  column,
+                });
+              }
+            }}
+            onRowsChange={(rows, data) => {
+              if (readonly) return;
+              const key = data.column.key;
+              const indexes = data.indexes;
 
-            for (const i of indexes) {
-              const row = rows[i];
-              const field = row.fields[key];
+              for (const i of indexes) {
+                const row = rows[i];
+                const field = row.fields[key];
 
-              onCellChange?.(row, key, field);
+                onCellChange?.(row, key, field);
+              }
+            }}
+            onSelectedRowsChange={
+              selectionDisabled ? undefined : onSelectedRowsChange
             }
-          }}
-          onSelectedRowsChange={
-            selectionDisabled ? undefined : onSelectedRowsChange
-          }
-          renderers={{
-            noRowsFallback: (
-              <EmptyRowsRenderer
-                loading={loading}
-                hasPredicates={hasPredicates}
-              />
-            ),
-          }}
-        />
-      </CreateNewAttributeProvider>
+            renderers={{
+              noRowsFallback: (
+                <EmptyRowsRenderer
+                  loading={loading}
+                  hasPredicates={hasPredicates}
+                />
+              ),
+            }}
+          />
+        </CreateNewAttributeProvider>
+      </ExpandRowProvider>
     </StandaloneDataGridStateProvider>
   );
 }

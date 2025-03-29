@@ -121,6 +121,7 @@ function useParticipants(series_id: string) {
       .from("participant_customer")
       .select("*")
       .eq("series_id", series_id)
+      .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) return;
         setTokens(data as Platform.WEST.ParticipantCustomer[]);

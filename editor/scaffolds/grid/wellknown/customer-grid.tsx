@@ -13,16 +13,18 @@ import {
   CalendarIcon,
   EnvelopeClosedIcon,
 } from "@radix-ui/react-icons";
-import { PhoneIcon } from "lucide-react";
+import { PhoneIcon, TagIcon } from "lucide-react";
 import { mask } from "../grid-text-mask";
 import Highlight from "@/components/highlight";
 import { CellRoot } from "../cells";
 import { DataFormat } from "@/scaffolds/data-format";
 import { Platform } from "@/lib/platform";
-import "../grid.css";
 import { Badge } from "@/components/ui/badge";
+import { SelectColumn } from "../columns";
+import { StandaloneDataGridStateProvider } from "../providers";
+import "../grid.css";
 
-const customer_columns: (Platform.Customer.Property & {
+const column_keys: (Platform.Customer.Property & {
   key: keyof DGCustomerRow;
   name: string;
   width?: number;
@@ -30,18 +32,11 @@ const customer_columns: (Platform.Customer.Property & {
   sensitive?: boolean;
 })[] = [
   {
-    key: "uid",
-    name: "UID",
-    width: 64,
-    frozen: true,
-    sensitive: true,
-    ...Platform.Customer.properties["uid"],
-  },
-  {
     key: "name",
     name: "Name",
     frozen: true,
     sensitive: true,
+    width: 200,
     ...Platform.Customer.properties["name"],
   },
   {
@@ -64,13 +59,13 @@ const customer_columns: (Platform.Customer.Property & {
   },
   {
     key: "created_at",
-    name: "Created At",
+    name: "Created",
     sensitive: false,
     ...Platform.Customer.properties["created_at"],
   },
   {
     key: "last_seen_at",
-    name: "Last Seen At",
+    name: "Last Seen",
     sensitive: false,
     ...Platform.Customer.properties["last_seen_at"],
   },
@@ -84,6 +79,8 @@ export function CustomerGrid({
   dateformat = "datetime",
   datetz,
   onCellDoubleClick,
+  onSelectedRowsChange,
+  selectedRows,
 }: {
   rows: DGCustomerRow[];
   tokens?: string[];
@@ -92,8 +89,10 @@ export function CustomerGrid({
   dateformat?: DataFormat.DateFormat;
   loading?: boolean;
   onCellDoubleClick?: (row: DGCustomerRow, column: string) => void;
+  onSelectedRowsChange?: (rows: Set<string>) => void;
+  selectedRows?: ReadonlySet<string>;
 }) {
-  const columns = customer_columns.map(
+  const columns = column_keys.map(
     (col) =>
       ({
         key: col.key,
@@ -110,7 +109,7 @@ export function CustomerGrid({
           if (col.type === "array") {
             return (
               <CellRoot className="flex items-center gap-1">
-                {(val as string[]).map((v, i) => (
+                {(val as string[] | undefined)?.map((v, i) => (
                   <Badge key={v} variant="outline">
                     {v}
                   </Badge>
@@ -139,6 +138,8 @@ export function CustomerGrid({
       }) as Column<any>
   );
 
+  columns.unshift(SelectColumn);
+
   const rows: DGCustomerRow[] = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
       const val = row[k as keyof DGCustomerRow];
@@ -156,18 +157,24 @@ export function CustomerGrid({
   });
 
   return (
-    <DataGrid<DGCustomerRow>
-      className="flex-grow select-none text-xs text-foreground/80"
-      columns={columns}
-      rows={rows}
-      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-      rowKeyGetter={(row) => (row as DGCustomerRow)["uid"]}
-      onCellDoubleClick={({ row, column }) => {
-        onCellDoubleClick?.(row, column.key);
-      }}
-      rowHeight={32}
-      headerRowHeight={36}
-    />
+    <StandaloneDataGridStateProvider>
+      <DataGrid<DGCustomerRow>
+        className="flex-grow select-none text-xs text-foreground/80"
+        columns={columns}
+        selectedRows={selectedRows}
+        onSelectedRowsChange={(rows) => {
+          onSelectedRowsChange?.(rows as Set<string>);
+        }}
+        rows={rows}
+        renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+        rowKeyGetter={(row) => (row as DGCustomerRow)["uid"]}
+        onCellDoubleClick={({ row, column }) => {
+          onCellDoubleClick?.(row, column.key);
+        }}
+        rowHeight={32}
+        headerRowHeight={36}
+      />
+    </StandaloneDataGridStateProvider>
   );
 }
 
@@ -176,7 +183,7 @@ function HeaderCell({ column }: RenderHeaderCellProps<any>) {
 
   return (
     <CellRoot className="flex items-center gap-1.5">
-      <CustomerPropertyIcon property={key as any} className="w-4 h-4" />
+      <CustomerPropertyIcon property={key as any} className="size-3.5" />
       <span className="font-normal">{name}</span>
     </CellRoot>
   );
@@ -199,6 +206,8 @@ function CustomerPropertyIcon({
       return <EnvelopeClosedIcon {...props} />;
     case "phone":
       return <PhoneIcon {...props} />;
+    case "tags":
+      return <TagIcon {...props} />;
     case "created_at":
     case "last_seen_at":
       return <CalendarIcon {...props} />;

@@ -23,6 +23,7 @@ import type {
   DataQueryTextSearchClearDispatcher,
   DataQueryTextSearchColumnSetDispatcher,
   DataQueryTextSearchQueryDispatcher,
+  DataQueryTextSearchSetDispatcher,
   IDataQueryGlobalConsumer,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
@@ -267,6 +268,22 @@ export function useStandaloneSchemaDataQueryConsumer(
   // #endregion
 
   // #region text search
+  const onTextSearch: DataQueryTextSearchSetDispatcher = useCallback(
+    (
+      column: string | null,
+      query: string,
+      config?: { type: Data.Query.Predicate.TextSearchQuery["type"] }
+    ) => {
+      dispatch({
+        type: "data/query/textsearch",
+        column,
+        query,
+        config,
+      });
+    },
+    [dispatch]
+  );
+
   const onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher =
     useCallback(
       (column: string | null) => {
@@ -332,6 +349,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       //
       isTextSearchSet,
       isTextSearchValid,
+      onTextSearch,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,
@@ -369,6 +387,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       //
       isTextSearchSet,
       isTextSearchValid,
+      onTextSearch,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,

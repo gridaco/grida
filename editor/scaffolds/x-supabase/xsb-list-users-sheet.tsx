@@ -127,7 +127,11 @@ function XSBSearchTableDataGrid({
           <GridLayout.HeaderLine>
             <GridLayout.HeaderMenus>
               <GridLayout.HeaderMenuItems>
-                <DataQueryTextSearch onValueChange={query.onTextSearchQuery} />
+                <DataQueryTextSearch
+                  placeholder="Search locally"
+                  tooltip="Local search - Search within loaded data"
+                  onValueChange={query.onTextSearchQuery}
+                />
               </GridLayout.HeaderMenuItems>
             </GridLayout.HeaderMenus>
           </GridLayout.HeaderLine>
