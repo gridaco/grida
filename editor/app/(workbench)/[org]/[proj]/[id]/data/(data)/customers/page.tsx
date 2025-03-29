@@ -78,7 +78,11 @@ export default function Customers() {
           <GridLayout.HeaderLine>
             <GridLayout.HeaderMenus>
               <TableViews />
-              <DataQueryTextSearch onValueChange={search} />
+              <DataQueryTextSearch
+                placeholder="Search locally"
+                tooltip="Local search - Search within loaded data"
+                onValueChange={search}
+              />
             </GridLayout.HeaderMenus>
             <GridLayout.HeaderMenus>
               <GridViewSettings />
