@@ -12,6 +12,7 @@ import type {
   DataQueryPredicatesClearAction,
   DataQueryPredicatesRemoveAction,
   DataQueryOrderByRemoveAction,
+  DataQueryTextSearchSetAction,
   DataQueryTextSearchColumnAction,
   DataQueryTextSearchQeuryAction,
   DataQueryTextSearchClearAction,
@@ -109,6 +110,23 @@ export default function reducer(
 
         // Note: pagination reset not required - result can only be smaller
         // ~draft.q_page_index = 0;~
+      });
+    }
+    case "data/query/textsearch": {
+      const {
+        column,
+        query,
+        config = { type: "websearch" },
+      } = <DataQueryTextSearchSetAction>action;
+      return produce(state, (draft) => {
+        draft.q_text_search = {
+          column: column,
+          query: query,
+          type: config.type,
+        };
+
+        // reset the pagination (othersize might throw range error PGRST103)
+        draft.q_page_index = 0;
       });
     }
     case "data/query/textsearch/column": {

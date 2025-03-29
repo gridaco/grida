@@ -198,6 +198,16 @@ export namespace Platform.Tag {
 export namespace Platform.Customer {
   export const TYPE = "grida.platform.customer";
 
+  /**
+   * text search, filtering
+   */
+  export const TABLE_SEARCH_TEXT = "search_text";
+
+  /**
+   * websearch
+   */
+  export const TABLE_SEARCH_TSV = "search_tsv";
+
   export const TABLE: Data.Relation.TableDefinition = {
     name: "customer",
     pks: ["uid"],
@@ -246,36 +256,6 @@ export namespace Platform.Customer {
         type: "string",
         format: "citext",
         scalar_format: "citext",
-        enum: undefined,
-        array: false,
-        pk: false,
-        fk: false,
-        null: true,
-        default: undefined,
-      },
-      project_id: {
-        name: "project_id",
-        description: "associated project id",
-        type: "integer",
-        format: "bigint",
-        scalar_format: "bigint",
-        enum: undefined,
-        array: false,
-        pk: false,
-        fk: {
-          referencing_column: "project_id",
-          referenced_table: "project",
-          referenced_column: "id",
-        },
-        null: false,
-        default: undefined,
-      },
-      _fp_fingerprintjs_visitorid: {
-        name: "_fp_fingerprintjs_visitorid",
-        description: "fingerprintjs visitor id",
-        type: "string",
-        format: "text",
-        scalar_format: "text",
         enum: undefined,
         array: false,
         pk: false,
@@ -347,62 +327,6 @@ export namespace Platform.Customer {
         fk: false,
         null: false,
         default: "false",
-      },
-      visitor_id: {
-        name: "visitor_id",
-        description: "visitor id reference",
-        type: "string",
-        format: "uuid",
-        scalar_format: "uuid",
-        enum: undefined,
-        array: false,
-        pk: false,
-        fk: {
-          referencing_column: "visitor_id",
-          referenced_table: "visitor",
-          referenced_column: "id",
-        },
-        null: true,
-        default: undefined,
-      },
-      email_provisional: {
-        name: "email_provisional",
-        description: "provisional emails",
-        type: "array",
-        format: "text[]",
-        scalar_format: "text",
-        enum: undefined,
-        array: true,
-        pk: false,
-        fk: false,
-        null: false,
-        default: "{}",
-      },
-      phone_provisional: {
-        name: "phone_provisional",
-        description: "provisional phones",
-        type: "array",
-        format: "text[]",
-        scalar_format: "text",
-        enum: undefined,
-        array: true,
-        pk: false,
-        fk: false,
-        null: false,
-        default: "{}",
-      },
-      name_provisional: {
-        name: "name_provisional",
-        description: "provisional names",
-        type: "array",
-        format: "text[]",
-        scalar_format: "text",
-        enum: undefined,
-        array: true,
-        pk: false,
-        fk: false,
-        null: false,
-        default: "{}",
       },
       description: {
         name: "description",

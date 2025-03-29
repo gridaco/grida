@@ -135,10 +135,18 @@ function Body() {
                       />
                     </DataQueryOrderByMenu>
                     <DataQueryTextSearch
+                      placeholder="Type to search"
                       onValueChange={(v) => {
-                        tablespace.onTextSearchQuery(v);
-                        tablespace.onTextSearchColumn(null);
+                        if (v.trim()) {
+                          tablespace.onTextSearch(
+                            Platform.Customer.TABLE_SEARCH_TEXT,
+                            v.trim()
+                          );
+                        } else {
+                          tablespace.onTextSearchClear();
+                        }
                       }}
+                      debounce={500}
                     />
                   </GridLayout.HeaderMenuItems>
                 </GridLayout.HeaderMenus>
