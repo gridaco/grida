@@ -35,7 +35,7 @@ ADD COLUMN search_text text GENERATED ALWAYS AS (
 CREATE INDEX customer_search_text_trgm_idx ON customer USING GIN (search_text gin_trgm_ops);
 
 -- update the customer_with_tags view
-CREATE OR REPLACE VIEW public.customer_with_tags as
+CREATE OR REPLACE VIEW public.customer_with_tags WITH (security_invoker = true) as
 select
   c.created_at,
   c.uid,
