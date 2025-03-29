@@ -84,7 +84,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
           aria-label="Select"
           tabIndex={props.tabIndex}
           value={isRowSelected}
-          expandable={!!!row && !!!onExpandClick ? true : false}
+          expandable={!!row && !!onExpandClick}
           onExpandClick={() => {
             onExpandClick?.(row);
           }}
