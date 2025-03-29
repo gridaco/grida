@@ -36,6 +36,12 @@ export namespace Platform.CSV {
     );
   }
 
+  export interface CSVValidationError {
+    details: string;
+    hint: string;
+    code: string;
+  }
+
   /**
    * Validates a CSV row against the provided model specification.
    *
@@ -63,12 +69,20 @@ export namespace Platform.CSV {
       }
     >,
     checkformat: (value: string, format: string) => boolean = () => true
-  ): false | T {
+  ): { data: T; error: null } | { data: null; error: CSVValidationError } {
     const obj = unflatten(row) as Record<string, unknown>;
 
     // Reject if any top-level key is not defined in the model.
     for (const key in obj) {
-      if (!(key in model)) return false;
+      if (!(key in model))
+        return {
+          error: {
+            code: "INVALID_KEY",
+            details: `Key "${key}" is not defined in the model.`,
+            hint: "Remove the invalid key",
+          },
+          data: null,
+        };
     }
 
     // Ensure required fields are present and that values with formats are valid.
@@ -77,7 +91,15 @@ export namespace Platform.CSV {
       const value = obj[key];
 
       // required field check
-      if (spec.required && value === undefined) return false;
+      if (spec.required && value === undefined)
+        return {
+          error: {
+            code: "MISSING_REQUIRED_FIELD",
+            details: `Missing required field: ${key}`,
+            hint: "Check the CSV file for missing required fields",
+          },
+          data: null,
+        };
 
       // array check
       if (spec.type === "array") {
@@ -94,22 +116,44 @@ export namespace Platform.CSV {
               ? arrayValues.every((v) => checkformat(v, spec.items!.format!))
               : true)
           ) {
-            return false;
+            return {
+              error: {
+                code: "INVALID_ARRAY_VALUE",
+                details: `Invalid array value for field: ${key}`,
+                hint: "Check the CSV file for invalid array values",
+              },
+              data: null,
+            };
           }
 
           obj[key] = arrayValues;
         } else {
-          return false;
+          return {
+            error: {
+              code: "INVALID_ARRAY_TYPE",
+              details: `Invalid array type for field: ${key}`,
+              hint: "Check the CSV file for invalid array types",
+            },
+            data: null,
+          };
         }
       }
 
       // primitive type check
       if (value !== undefined && spec.format && typeof value === "string") {
-        if (!checkformat(value, spec.format)) return false;
+        if (!checkformat(value, spec.format))
+          return {
+            error: {
+              code: "INVALID_FORMAT",
+              details: `Invalid format for field: ${key}`,
+              hint: "Check the CSV file for invalid formats",
+            },
+            data: null,
+          };
       }
     }
 
-    return obj as T;
+    return { data: obj as T, error: null };
   }
 }
 

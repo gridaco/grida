@@ -44,17 +44,15 @@ async function parse_customers_csv(
     };
   }
 
-  const csv_validation_errors: string[] = [];
+  const csv_validation_errors: [number, Platform.CSV.CSVValidationError][] = [];
   const customers = rows
     .map((row, idx) => {
-      const data = Platform.CSV.validate_row<
+      const { data, error } = Platform.CSV.validate_row<
         Omit<PGCustomerInsert, "project_id">
       >(row, spec);
 
-      if (!data) {
-        csv_validation_errors.push(
-          `Row ${idx + 1} contains non-allowed fields or missing required data.`
-        );
+      if (error) {
+        csv_validation_errors.push([idx, error]);
         return null;
       }
 

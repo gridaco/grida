@@ -18,6 +18,7 @@ export default async function ChainsPage({
   const cookieStore = cookies();
   const client = createRouteHandlerWestClient(cookieStore);
 
+  // FIXME: filter by project
   const { data: series, error } = await client.from("campaign").select("*");
   if (error) {
     return <div>Error: {error.message}</div>;

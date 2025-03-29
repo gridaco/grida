@@ -8,6 +8,10 @@ import {
   GridQueryCount,
   GridQueryPaginationControl,
   GridLoadingProgressLine,
+  DataQueryPredicatesMenu,
+  DataQueryPredicatesMenuTriggerButton,
+  DataQueryOrderByMenu,
+  DataQueryOrderbyMenuTriggerButton,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { useMemo } from "react";
@@ -17,7 +21,12 @@ import {
 } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSpaceInstance } from "@/scaffolds/data-table";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { StandaloneDataQueryProvider } from "@/scaffolds/data-query";
+import {
+  DataPlatformProvider,
+  SchemaNameProvider,
+  StandaloneDataQueryProvider,
+  TableDefinitionProvider,
+} from "@/scaffolds/data-query";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { buttonVariants } from "@/components/ui/button";
@@ -42,7 +51,9 @@ import { DateTimeZoneRadioGroup } from "@/scaffolds/data-format/ui/date-timezone
 import { cn } from "@/utils";
 import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
 import toast from "react-hot-toast";
-import type { Platform } from "@/lib/platform";
+import { Platform } from "@/lib/platform";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { TableQueryChips } from "@/scaffolds/grid-editor/components/query/query-chips";
 
 export default function Customers() {
   return (
@@ -90,59 +101,101 @@ function Body() {
   });
 
   return (
-    <GridLayout.Root>
-      <GridLayout.Header>
-        <GridLayout.HeaderLine>
-          <GridLayout.HeaderMenus>
-            <Tabs defaultValue="default">
-              <TabsList>
-                <TabsTrigger value="default">
-                  <ResourceTypeIcon
-                    type={"user"}
-                    className="inline align-middle w-4 min-w-4 h-4 me-2"
-                  />
-                  Customer
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <DataQueryTextSearch onValueChange={tablespace.onTextSearchQuery} />
-          </GridLayout.HeaderMenus>
-          <GridLayout.HeaderMenus>
-            <ViewSettings />
-            <NewButton />
-          </GridLayout.HeaderMenus>
-        </GridLayout.HeaderLine>
-        <GridLoadingProgressLine loading={tablespace.loading} />
-      </GridLayout.Header>
-      <GridLayout.Content>
-        <CustomerGrid
-          loading={tablespace.loading}
-          tokens={
-            tablespace.q_text_search ? [tablespace.q_text_search?.query] : []
-          }
-          // masked={state.datagrid_local_filter.masking_enabled}
-          // dateformat=""
-          // datetz=''
-          rows={tablespace.stream || []}
-          onCellDoubleClick={(row) => {
-            router.push(`${pathname}/${row.uid}`);
-            //
-          }}
-        />
-      </GridLayout.Content>
-      <GridLayout.Footer>
-        <GridQueryPaginationControl {...tablespace} />
-        <GridQueryLimitSelect
-          value={tablespace.limit}
-          onValueChange={tablespace.onLimit}
-        />
-        <GridQueryCount count={tablespace.estimated_count} keyword="customer" />
-        <GridRefreshButton
-          refreshing={tablespace.loading}
-          onRefreshClick={tablespace.onRefresh}
-        />
-      </GridLayout.Footer>
-    </GridLayout.Root>
+    <DataPlatformProvider
+      platform={{
+        provider: "grida",
+      }}
+    >
+      <SchemaNameProvider schema={undefined}>
+        <TableDefinitionProvider definition={Platform.Customer.TABLE}>
+          <GridLayout.Root>
+            <GridLayout.Header>
+              <GridLayout.HeaderLine>
+                <GridLayout.HeaderMenus>
+                  <Tabs defaultValue="default">
+                    <TabsList>
+                      <TabsTrigger value="default">
+                        <ResourceTypeIcon
+                          type={"user"}
+                          className="inline align-middle w-4 min-w-4 h-4 me-2"
+                        />
+                        Customer
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <GridLayout.HeaderMenuItems>
+                    <DataQueryPredicatesMenu {...tablespace}>
+                      <DataQueryPredicatesMenuTriggerButton
+                        active={tablespace.isPredicatesSet}
+                      />
+                    </DataQueryPredicatesMenu>
+                    <DataQueryOrderByMenu {...tablespace}>
+                      <DataQueryOrderbyMenuTriggerButton
+                        active={tablespace.isOrderbySet}
+                      />
+                    </DataQueryOrderByMenu>
+                    <DataQueryTextSearch
+                      onValueChange={(v) => {
+                        tablespace.onTextSearchQuery(v);
+                        tablespace.onTextSearchColumn(null);
+                      }}
+                    />
+                  </GridLayout.HeaderMenuItems>
+                </GridLayout.HeaderMenus>
+                <GridLayout.HeaderMenus>
+                  <ViewSettings />
+                  <NewButton />
+                </GridLayout.HeaderMenus>
+              </GridLayout.HeaderLine>
+              {(tablespace.isPredicatesSet || tablespace.isOrderbySet) && (
+                <GridLayout.HeaderLine className="border-b-0 px-0">
+                  <ScrollArea>
+                    <ScrollBar orientation="horizontal" className="invisible" />
+                    <div className="px-2">
+                      <TableQueryChips {...tablespace} />
+                    </div>
+                  </ScrollArea>
+                </GridLayout.HeaderLine>
+              )}
+              <GridLoadingProgressLine loading={tablespace.loading} />
+            </GridLayout.Header>
+            <GridLayout.Content>
+              <CustomerGrid
+                loading={tablespace.loading}
+                tokens={
+                  tablespace.q_text_search
+                    ? [tablespace.q_text_search?.query]
+                    : []
+                }
+                // masked={state.datagrid_local_filter.masking_enabled}
+                // dateformat=""
+                // datetz=''
+                rows={tablespace.stream || []}
+                onCellDoubleClick={(row) => {
+                  router.push(`${pathname}/${row.uid}`);
+                  //
+                }}
+              />
+            </GridLayout.Content>
+            <GridLayout.Footer>
+              <GridQueryPaginationControl {...tablespace} />
+              <GridQueryLimitSelect
+                value={tablespace.limit}
+                onValueChange={tablespace.onLimit}
+              />
+              <GridQueryCount
+                count={tablespace.estimated_count}
+                keyword="customer"
+              />
+              <GridRefreshButton
+                refreshing={tablespace.loading}
+                onRefreshClick={tablespace.onRefresh}
+              />
+            </GridLayout.Footer>
+          </GridLayout.Root>
+        </TableDefinitionProvider>
+      </SchemaNameProvider>
+    </DataPlatformProvider>
   );
 }
 
