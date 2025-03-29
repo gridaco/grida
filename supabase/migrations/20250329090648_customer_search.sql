@@ -51,12 +51,12 @@ select
   c.email_provisional,
   c.phone_provisional,
   c.name_provisional,
+  c.name,
   c.description,
   c.metadata,
-  c.name,
   c.is_marketing_email_subscribed,
   c.is_marketing_sms_subscribed,
-  array_remove(array_agg(ct.tag_name), null::text) as tags,
+  array_remove(array_agg(ct.tag_name), NULL) AS tags,
   c.search_tsv, -- tsv for search (global search)
   (c.search_text || ' ' || coalesce(string_agg(ct.tag_name, ' '), '')) AS search_text  -- text for filtering
 from
