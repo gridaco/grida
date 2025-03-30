@@ -36,56 +36,58 @@ export default function Verify() {
       const tid = result.data.customer.metadata["polestar-transaction-id"];
       router.replace(`https://demo.grida.co/polestar/event/invite/${tid}`);
     } else {
-      toast.error("인증 실패");
+      toast.error("인증 실패 - 입력하신 정보를 확인해주세요.");
     }
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-background rounded-lg p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-center">{data.form.title}</h1>
-      <p className="text-center text-muted-foreground">
-        {data.form.description}
-      </p>
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-muted-foreground"
-          >
-            성함
-          </label>
-          <Input
-            id="name"
-            placeholder="홍길동"
-            {...register("name", { required: true })}
-          />
-        </div>
+    <div className="w-full h-full flex flex-col items-center justify-center p-4">
+      <div className="w-full space-y-6">
+        <h1 className="text-2xl font-bold text-center">{data.form.title}</h1>
+        <p className="text-center text-muted-foreground">
+          {data.form.description}
+        </p>
+        <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          <div>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-muted-foreground"
+            >
+              성함
+            </label>
+            <Input
+              id="name"
+              placeholder="홍길동"
+              {...register("name", { required: true })}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-muted-foreground"
-          >
-            휴대번호
-          </label>
-          <Controller
-            name="phone"
-            control={control}
-            rules={{ required: true }}
-            render={({ field }) => (
-              <PhoneInput
-                id="phone"
-                defaultCountry="KR"
-                placeholder="01012345678"
-                required
-                {...field}
-              />
-            )}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-muted-foreground"
+            >
+              휴대번호
+            </label>
+            <Controller
+              name="phone"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <PhoneInput
+                  id="phone"
+                  defaultCountry="KR"
+                  placeholder="01012345678"
+                  required
+                  {...field}
+                />
+              )}
+            />
+          </div>
 
-        <Button type="submit">인증하기</Button>
-      </form>
+          <Button type="submit">인증하기</Button>
+        </form>
+      </div>
     </div>
   );
 }
