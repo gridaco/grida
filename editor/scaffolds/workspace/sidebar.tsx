@@ -332,7 +332,9 @@ export function NavProjects({
           if (error) return false;
           if (count === 1) {
             // TODO: need to revalidate as well. (we're using swr for the projects - needs to be mutated manually after delete)
-            router.replace(`/${orgname}`);
+            alert(
+              "Project deleted successfully. Please refresh the page to see the changes."
+            );
             return true;
           }
           return false;
