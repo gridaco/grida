@@ -1,4 +1,6 @@
 import ms from "ms";
+import { format } from "date-fns";
+
 export namespace Analytics {
   export type EventStream<T = any> = {
     name: string;
@@ -52,13 +54,24 @@ export namespace Analytics {
       dateKey,
       interval,
     }: {
-      from: Date;
-      to: Date;
+      from?: Date;
+      to?: Date;
       dateKey: keyof T;
-      interval: ms.StringValue | number;
+      interval: string | ms.StringValue | number;
     }
   ) {
-    const intervalMs = typeof interval === "string" ? ms(interval) : interval;
+    if (!from || !to) {
+      const dates = data
+        .map((item) => new Date(item[dateKey]))
+        .filter((d) => !isNaN(d.getTime()));
+      if (!dates.length) return [];
+      dates.sort((a, b) => a.getTime() - b.getTime());
+      from ??= dates[0];
+      to ??= dates[dates.length - 1];
+    }
+
+    const intervalMs =
+      typeof interval === "string" ? ms(interval as ms.StringValue) : interval;
     if (!intervalMs) throw new Error("Invalid interval value");
 
     // Step 1: Create a map for the new data with the provided dates range
@@ -93,5 +106,26 @@ export namespace Analytics {
     }));
 
     return formattedData;
+  }
+
+  /**
+   * Formats a given date into a human-friendly string based on the provided interval.
+   *
+   * @param date - The Date object to format.
+   * @param interval - Interval as a string (e.g., "1 hour") or number (milliseconds).
+   * @returns A formatted string appropriate to the time granularity.
+   */
+  export function formatDateByInterval(date: Date, interval: string | number) {
+    const intervalMs =
+      typeof interval === "string" ? ms(interval as ms.StringValue) : interval;
+    if (!intervalMs) throw new Error("Invalid interval");
+
+    if (intervalMs >= ms("1 day")) {
+      return format(date, "MMM d, yyyy");
+    } else if (intervalMs >= ms("1 hour")) {
+      return format(date, "MMM d, HH:00");
+    } else {
+      return format(date, "HH:mm");
+    }
   }
 }

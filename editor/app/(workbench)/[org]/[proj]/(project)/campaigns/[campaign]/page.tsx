@@ -17,9 +17,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-
-import { useProject } from "@/scaffolds/workspace";
-import useSWR from "swr";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
   Select,
@@ -30,10 +27,12 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TokensTable } from "./tokens-table";
+import useSWR from "swr";
 import LogsTable from "./logs-table";
 import { ParticipantsTable } from "./participants-table";
 import { QuestsTable } from "./quests-table";
 import CampaignSettings from "./settings";
+import { Analytics } from "@/lib/analytics";
 
 type Params = {
   org: string;
@@ -46,35 +45,17 @@ interface DateRange {
   to: Date | undefined;
 }
 
+interface AnalyzedData {
+  interval: string;
+  events: {
+    bucket: string;
+    name: string;
+    count: number;
+  }[];
+}
+
 export default function CampaignsPage({ params }: { params: Params }) {
   const { campaign: campaign_id } = params;
-  const { id: project_id } = useProject();
-
-  const [range, setRange] = useState<DateRange>({
-    from: new Date(),
-    to: undefined,
-  });
-
-  const [interval, setInterval] = useState<string>("1 minute");
-
-  const qs = useMemo(() => {
-    return new URLSearchParams({
-      from: range.from?.toISOString() || "",
-      to: range.to?.toISOString() || "",
-      interval,
-    }).toString();
-  }, [range, interval]);
-
-  const { data } = useSWR(
-    `/private/west/campaigns/${campaign_id}/events/analyze?${qs}`,
-    async (url) => {
-      const res = await fetch(url);
-      return res.json();
-    },
-    {
-      refreshInterval: 1000 * 30,
-    }
-  );
 
   return (
     <main className="container mx-auto my-10">
@@ -97,32 +78,7 @@ export default function CampaignsPage({ params }: { params: Params }) {
         </TabsList>
         <hr className="mt-2 mb-6" />
         <TabsContent value="overview">
-          <div className="flex items-center gap-2 w-min">
-            <DateRangePicker
-              onUpdate={({ range }) => {
-                setRange(range);
-                //
-              }}
-              align="end"
-            />
-            <Select
-              value={interval}
-              onValueChange={(value) => setInterval(value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1 minute">1 minute</SelectItem>
-                <SelectItem value="1 hour">1 hour</SelectItem>
-                <SelectItem value="1 day">1 day</SelectItem>
-                <SelectItem value="1 week">1 week</SelectItem>
-                <SelectItem value="1 month">1 month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="h-6" />
-          {data ? <Chart data={data.data} /> : null}
+          <Overview campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="participants">
           <ParticipantsTable campaign_id={campaign_id} />
@@ -144,17 +100,72 @@ export default function CampaignsPage({ params }: { params: Params }) {
   );
 }
 
-interface AnalyzedData {
-  interval: string;
-  events: {
-    bucket: string;
-    name: string;
-    count: number;
-  }[];
+function Overview({ campaign_id }: { campaign_id: string }) {
+  const [range, setRange] = useState<DateRange>({
+    // start of the day
+    from: new Date(new Date().setHours(0, 0, 0, 0)),
+    to: undefined,
+  });
+
+  const [interval, setInterval] = useState<string>("1 minute");
+
+  const qs = useMemo(() => {
+    return new URLSearchParams({
+      from: range.from?.toISOString() || "",
+      to: range.to?.toISOString() || "",
+      interval,
+    }).toString();
+  }, [range, interval]);
+
+  const { data } = useSWR<{ data: AnalyzedData }>(
+    `/private/west/campaigns/${campaign_id}/events/analyze?${qs}`,
+    async (url) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {
+      refreshInterval: 1000 * 30,
+    }
+  );
+
+  return (
+    <>
+      <div className="flex items-center gap-2 w-min">
+        <DateRangePicker
+          onUpdate={({ range }) => {
+            setRange(range);
+            //
+          }}
+          align="start"
+        />
+        <Select value={interval} onValueChange={(value) => setInterval(value)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1 minute">1 minute</SelectItem>
+            <SelectItem value="1 hour">1 hour</SelectItem>
+            <SelectItem value="1 day">1 day</SelectItem>
+            <SelectItem value="1 week">1 week</SelectItem>
+            <SelectItem value="1 month">1 month</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="h-6" />
+      {data ? <Chart data={data.data} /> : null}
+    </>
+  );
 }
 
 function Chart({ data }: { data: AnalyzedData }) {
   const [chartData, setChartData] = useState<any[]>([]);
+
+  // const chartdata = Analytics.serialize(data?.data.events || [], {
+  //   dateKey: "bucket",
+  //   from: range.from,
+  //   to: range.to ?? new Date(),
+  //   interval: interval,
+  // });
 
   useEffect(() => {
     processData(data);
@@ -177,9 +188,6 @@ function Chart({ data }: { data: AnalyzedData }) {
           date: date, // Keep the original date for sorting
         });
       }
-
-      const bucketData = bucketMap.get(formattedDate);
-      bucketData[event.name] = event.count;
     });
 
     // Convert map to array and sort by date
@@ -296,6 +304,7 @@ function Chart({ data }: { data: AnalyzedData }) {
                       stroke={`var(--color-${name})`}
                       strokeWidth={2}
                       activeDot={{ r: 6, strokeWidth: 2 }}
+                      dot={false}
                     />
                   ))}
                   <ChartLegend content={<ChartLegendContent />} />
