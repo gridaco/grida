@@ -134,12 +134,8 @@ export default function Invite({
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-8 left-8">
                 <h2 className="text-2xl text-white">
-                  {/* <span
-                      dangerouslySetInnerHTML={{ __html: data.hero.title }}
-                    /> */}
-                  {owner.name}님을 <br />
-                  Polestar 4 시승 초대 이벤트에 <br />
-                  초대드립니다.
+                  {owner.name} 고객님의 <br />
+                  Polestar 4 시승 추천 페이지입니다.
                 </h2>
               </div>
             </div>
