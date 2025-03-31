@@ -52,6 +52,11 @@ export const canvas_examples = [
     url: `/examples/canvas/globals-01.grida`,
   },
   {
+    id: "hero-main-demo",
+    name: "Hero demo",
+    url: `/examples/canvas/hero-main-demo.grida`,
+  },
+  {
     id: "with-templates/002",
     name: "Template 02",
   },

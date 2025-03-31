@@ -91,6 +91,12 @@ export default function Footer() {
                   CORS.SH
                 </Link>
                 <Link
+                  href={sitemap.links.figma_vscode}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Grida VSCode Extension
+                </Link>
+                <Link
                   href={sitemap.links.figma_assistant}
                   className="text-xs md:text-sm text-muted-foreground"
                 >

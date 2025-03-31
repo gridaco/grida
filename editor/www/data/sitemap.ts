@@ -21,6 +21,7 @@ export namespace sitemap {
     playground: "/playground",
     figma_ci: "/figma/ci",
     figma_assistant: "/figma/assistant",
+    figma_vscode: "/figma/vscode",
     book15: "https://cal.com/universe-from-grida/15min",
     book30: "https://cal.com/universe-from-grida/30min",
     studio: "https://grida.studio",
@@ -61,6 +62,11 @@ export namespace sitemap {
       title: "Figma Assistant",
       href: links.figma_assistant,
       description: "AI powered Design Assistant",
+    } satisfies Item,
+    figma_vscode: {
+      title: "Grida VSCode Extension",
+      href: links.figma_vscode,
+      description: "Grida VSCode Extension",
     } satisfies Item,
     studio: {
       title: "Grida Studios",
