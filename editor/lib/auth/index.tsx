@@ -21,6 +21,14 @@ import assert from "assert";
 export namespace Authentication {
   export type ChallengeType = Challenge["type"];
 
+  export const CHALLENGE_TYPE_LABELS: Record<ChallengeType, string> = {
+    passcode: "Passcode",
+    kba: "Knowledge-Based Authentication",
+    basic: "Basic Authentication",
+    otp: "One-Time Password",
+    "magic-link": "Magic Link",
+  };
+
   export type Challenge =
     | PasscodeChallenge
     | BasicAuthChallenge

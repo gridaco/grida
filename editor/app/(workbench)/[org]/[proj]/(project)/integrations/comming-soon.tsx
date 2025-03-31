@@ -35,14 +35,15 @@ export function IntegrationsCommingSoonDialog() {
             Custom Integrations Available
           </DialogTitle>
           <DialogDescription className="text-center pt-2">
-            We're actively expanding our integration ecosystem!
+            We&apos;re actively expanding our integration ecosystem!
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-3">
           <p className="text-center text-sm">
-            While we're building our integration marketplace, we're happy to
-            create custom integrations tailored specifically to your needs.
+            While we&apos;re building our integration marketplace, we&apos;re
+            happy to create custom integrations tailored specifically to your
+            needs.
           </p>
 
           <div className="grid grid-cols-3 gap-4 py-2">

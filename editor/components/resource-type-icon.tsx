@@ -26,10 +26,12 @@ import {
   MegaphoneIcon,
   PlugIcon,
   TagIcon,
+  LockKeyholeIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
 export type ResourceTypeIconName =
+  | "auth"
   | "folder"
   | "file"
   | "setting"
@@ -76,6 +78,8 @@ export function ResourceTypeIcon({
   };
 
   switch (type) {
+    case "auth":
+      return <LockKeyholeIcon {...props} />;
     case "tag":
       return <TagIcon {...props} />;
     case "ai":
