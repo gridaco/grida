@@ -1,5 +1,3 @@
-const with_react = require("./sidebar.with-react");
-
 const _flags_items = [
   {
     type: "category",
@@ -154,7 +152,7 @@ const api = [
       "overflow-layout-scroll",
       //
       "react-jsx-css-line-break",
-    ].map(d => ({
+    ].map((d) => ({
       type: "doc",
       id: `@designto-code/${d}`,
     })),
@@ -241,7 +239,6 @@ const sidebars = {
   flagsSidebar: flags,
   togetherSidebar: together,
   apiSidebar: api,
-  withReactSidebar: with_react,
 };
 
 module.exports = sidebars;

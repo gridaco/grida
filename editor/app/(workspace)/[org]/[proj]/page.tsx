@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export default function ProjectDashboardPage({
   params,
@@ -76,20 +77,26 @@ export default function ProjectDashboardPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="bottom">
-                  <DropdownMenuItem disabled>
-                    <FileIcon className="me-2" />
-                    Documents
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled>
-                    <ImageIcon className="me-2" />
-                    Assets
-                  </DropdownMenuItem>
                   <Link
                     href={`/${organization_name}/${project_name}/customers`}
                   >
                     <DropdownMenuItem>
-                      <AvatarIcon className="me-2" />
+                      <ResourceTypeIcon
+                        type="customer"
+                        className="size-4 me-2"
+                      />
                       Customers
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link
+                    href={`/${organization_name}/${project_name}/campaigns`}
+                  >
+                    <DropdownMenuItem>
+                      <ResourceTypeIcon
+                        type="campaign"
+                        className="size-4 me-2"
+                      />
+                      Campaigns
                     </DropdownMenuItem>
                   </Link>
                 </DropdownMenuContent>

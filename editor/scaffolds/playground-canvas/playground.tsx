@@ -121,6 +121,7 @@ import {
   PreviewButton,
   PreviewProvider,
 } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import { sitemap } from "@/www/data/sitemap";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -397,7 +398,7 @@ export default function CanvasPlayground({
                                       </DropdownMenuSub>
                                       <DropdownMenuSeparator />
                                       <Link
-                                        href="https://github.com/gridaco/grida"
+                                        href={sitemap.links.github}
                                         target="_blank"
                                       >
                                         <DropdownMenuItem className="text-xs">
@@ -406,7 +407,7 @@ export default function CanvasPlayground({
                                         </DropdownMenuItem>
                                       </Link>
                                       <Link
-                                        href="https://grida.co/join-slack"
+                                        href={sitemap.links.slack}
                                         target="_blank"
                                       >
                                         <DropdownMenuItem className="text-xs">

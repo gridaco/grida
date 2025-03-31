@@ -22,28 +22,30 @@ import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProject } from "@/scaffolds/workspace";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import toast from "react-hot-toast";
+import { Platform } from "@/lib/platform";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 
 export function ImportCSVDialog({
+  onImportComplete,
   ...props
-}: React.ComponentProps<typeof Dialog>) {
+}: React.ComponentProps<typeof Dialog> & {
+  onImportComplete?: () => void;
+}) {
   const project = useProject();
   const [mode, setMode] = useState<"insert" | "update">("insert");
   const [datachecked, setDataChecked] = useState(false);
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<unknown | null>(null);
   const [csv, setCsv] = useState<any[]>([]);
   const [sample, setSample] = useState<any[]>([]);
 
   const handleFileSelected = (selectedFile: File) => {
     setFile(selectedFile);
     Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      comments: "#",
+      ...Platform.CSV.parser_config,
       complete: (results) => {
         setCsv(results.data);
         setSample(results.data.slice(0, Math.min(results.data.length, 100)));
@@ -72,32 +74,19 @@ export function ImportCSVDialog({
     }).then((res) => {
       if (res.ok) {
         setStep("complete");
+        onImportComplete?.();
       } else {
         setStep("error");
         res.json().then((res) => {
-          toast.error(res.error);
+          setError(res.error);
           console.error("Import error:", res.error);
         });
       }
     });
-
-    // Simulate import progress
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 10;
-      setProgress(currentProgress);
-
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-      }
-    }, 300);
-
-    // In a real implementation, you would call your import function here
   };
 
   const resetImport = () => {
     setFile(null);
-    setProgress(0);
     setSample([]);
     setStep("upload");
   };
@@ -110,14 +99,14 @@ export function ImportCSVDialog({
 
   return (
     <Dialog {...props}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
             Upload a CSV file to import customers into your CRM.
             <br />
             <Link
-              href="/docs/platform/customers/working-with-csv"
+              href="/docs/platform/customers#working-with-csv"
               target="_blank"
               className="underline"
             >
@@ -154,7 +143,7 @@ export function ImportCSVDialog({
         )}
 
         {step === "preview" && (
-          <div className="flex flex-col space-y-6 py-4 max-w-full">
+          <div className="flex flex-col space-y-6 py-4 max-w-full overflow-hidden">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Preview Import Data</h3>
               <div className="text-sm text-muted-foreground">
@@ -162,12 +151,9 @@ export function ImportCSVDialog({
               </div>
             </div>
 
-            <div className="flex-1 rounded-md border overflow-hidden">
-              {/* FIX MY STYLE */}
-              <div className="max-h-[300px] overflow-auto max-w-xl">
-                <SimpleCSVTable data={sample} />
-              </div>
-            </div>
+            <ScrollArea className="max-h-[400px] rounded-md border overflow-scroll">
+              <SimpleCSVTable data={sample} count={csv.length} />
+            </ScrollArea>
 
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -182,7 +168,7 @@ export function ImportCSVDialog({
                   onCheckedChange={(s) => setDataChecked(s === true)}
                 />
                 <span>
-                  I've reviewed the data and want to import these customers
+                  I&apos;ve reviewed the data and want to import these customers
                 </span>
               </label>
             </Alert>
@@ -196,9 +182,9 @@ export function ImportCSVDialog({
               <p className="text-sm text-muted-foreground mb-4">
                 Please wait while we import your customers...
               </p>
-              <Progress value={progress} className="h-2 w-full" />
+              <Progress indeterminate className="h-2 w-full" />
               <p className="text-sm text-muted-foreground mt-2">
-                {Math.round(progress)}% complete
+                Importing {csv.length} customers
               </p>
             </div>
           </div>
@@ -207,8 +193,8 @@ export function ImportCSVDialog({
         {step === "complete" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-green-100 mb-4">
+                <CheckCircle2 className="size-10 text-green-600" />
               </div>
               <h3 className="text-lg font-medium mb-2">Import Complete</h3>
               <p className="text-sm text-muted-foreground">
@@ -221,13 +207,20 @@ export function ImportCSVDialog({
         {step === "error" && (
           <div className="space-y-6 py-8">
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+              <div className="mx-auto flex w-20 h-20 items-center justify-center rounded-full bg-red-100 mb-4">
+                <AlertCircle className="size-10 text-red-600" />
               </div>
               <h3 className="text-lg font-medium mb-2">Import Failed</h3>
               <p className="text-sm text-muted-foreground">
                 There was an error importing your customers. Please try again.
               </p>
+              <div className="max-h-[400px] rounded-md border mt-4 overflow-scroll p-4">
+                <p className="text-xs text-start text-destructive font-mono">
+                  <pre>
+                    {error ? JSON.stringify(error, null, 2) : "Unknown error"}
+                  </pre>
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -326,7 +319,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         <p className="mb-1 font-medium">
           <span className="text-primary">Click to upload</span> or drag and drop
         </p>
-        <p className="text-muted-foreground">CSV files only (max 3MB)</p>
+        <p className="text-muted-foreground">CSV files only</p>
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">

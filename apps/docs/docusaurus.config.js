@@ -16,19 +16,6 @@ const footer = {
       ],
     },
     {
-      title: "Resources",
-      items: [
-        {
-          label: "Docs",
-          to: "/",
-        },
-        {
-          label: "Together",
-          to: "/together",
-        },
-      ],
-    },
-    {
       title: "Community",
       items: [
         {
@@ -103,13 +90,7 @@ const config = {
             label: "Reference",
           },
           {
-            type: "doc",
-            docId: "together/support",
-            position: "left",
-            label: "Together",
-          },
-          {
-            href: "https://accounts.grida.co/signin?redirect_uri=https://grida.co/docs",
+            href: "https://app.grida.co/sign-in?redirect_uri=https://grida.co/docs",
             position: "left",
             label: "Sign in",
           },

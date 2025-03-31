@@ -12,7 +12,12 @@ import {
 import { useState } from "react";
 import { useDatagridTable, useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
-import { SYSTEM_GF_CUSTOMER_UUID_KEY } from "@/k/system";
+import {
+  SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_CUSTOMER_EMAIL_KEY,
+  SYSTEM_GF_CUSTOMER_PHONE_KEY,
+  SYSTEM_GF_CUSTOMER_NAME_KEY,
+} from "@/k/system";
 import { cn } from "@/utils";
 import {
   Popover,
@@ -142,13 +147,17 @@ export function NameInput({
               )}
               <CommandSeparator />
               <CommandGroup heading="System">
-                <CommandItem
-                  key={SYSTEM_GF_CUSTOMER_UUID_KEY}
-                  onSelect={onSelect}
-                >
-                  <PersonIcon className="mr-2 h-4 w-4" />
-                  <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
-                </CommandItem>
+                {[
+                  SYSTEM_GF_CUSTOMER_UUID_KEY,
+                  SYSTEM_GF_CUSTOMER_EMAIL_KEY,
+                  SYSTEM_GF_CUSTOMER_PHONE_KEY,
+                  SYSTEM_GF_CUSTOMER_NAME_KEY,
+                ].map((key) => (
+                  <CommandItem key={key} onSelect={onSelect}>
+                    <PersonIcon className="mr-2 h-4 w-4" />
+                    <span>{key}</span>
+                  </CommandItem>
+                ))}
               </CommandGroup>
               {x_sb_main_table_connection && (
                 <>

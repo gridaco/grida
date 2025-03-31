@@ -1,1 +1,1 @@
-see https://app.grida.co/docs/platform/customers/working-with-csv
+see https://grida.co/docs/platform/customers#working-with-csv

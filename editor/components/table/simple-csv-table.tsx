@@ -6,13 +6,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 interface CSVPreviewProps {
+  count: number;
   data: any[];
 }
 
-export function SimpleCSVTable({ data }: CSVPreviewProps) {
+export function SimpleCSVTable({ data, count }: CSVPreviewProps) {
   if (!data || data.length === 0) {
     return <div className="text-center py-4">No data to preview</div>;
   }
@@ -24,7 +24,7 @@ export function SimpleCSVTable({ data }: CSVPreviewProps) {
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="sticky top-0 bg-secondary">
         <TableRow>
           {allKeys.map((key) => (
             <TableHead key={key}>{key}</TableHead>
@@ -45,7 +45,7 @@ export function SimpleCSVTable({ data }: CSVPreviewProps) {
               colSpan={allKeys.length}
               className="text-center text-muted-foreground"
             >
-              {data.length - 5} more records not shown in preview
+              {count - 5} more records not shown in preview
             </TableCell>
           </TableRow>
         )}

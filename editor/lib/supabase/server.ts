@@ -85,6 +85,19 @@ export const grida_commerce_client = createClient<Database, "grida_commerce">(
 /**
  * @deprecated - deprecation warning for extra security (not actually deprecated)
  */
+export const grida_west_client = createClient<Database, "grida_west">(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  {
+    db: {
+      schema: "grida_west",
+    },
+  }
+);
+
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
 export const grida_xsupabase_client = createClient<
   Database,
   "grida_x_supabase"
@@ -186,6 +199,20 @@ export const createRouteHandlerWorkspaceClient = (
     {
       options: {
         db: { schema: "public" },
+      },
+    }
+  );
+
+export const createRouteHandlerWestClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createRouteHandlerClient<Database, "grida_west">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_west" },
       },
     }
   );

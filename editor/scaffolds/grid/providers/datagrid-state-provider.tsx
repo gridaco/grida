@@ -52,7 +52,7 @@ export function useDataGridState() {
   const context = React.useContext(Context);
   if (!context) {
     throw new Error(
-      "useDataGridState must be used within a DataGridStateProvider"
+      "useDataGridState must be used within a StandaloneDataGridStateProvider"
     );
   }
 
@@ -135,19 +135,15 @@ function getCellSelection({
 export function useCellSelection(pk: string | -1, column: string) {
   const { selections, local_cursor_id } = useDataGridState();
 
-  assert(local_cursor_id, "local_cursor_id must be defined");
-  assert(selections, "selections must be defined");
-
-  return useMemo(
-    () =>
-      getCellSelection({
-        local_cursor_id,
-        selections,
-        pk,
-        column,
-      }),
-    [local_cursor_id, selections, pk, column]
-  );
+  return useMemo(() => {
+    if (!local_cursor_id || !selections) return undefined;
+    return getCellSelection({
+      local_cursor_id,
+      selections,
+      pk,
+      column,
+    });
+  }, [local_cursor_id, selections, pk, column]);
 }
 
 export function useCellRootProps(

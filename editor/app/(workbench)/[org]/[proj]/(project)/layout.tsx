@@ -1,24 +1,26 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from "@/components/ui/sidebar";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
+  SidebarFooter,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import { AboutGridaWestCard } from "./about-west-card";
 import "../../../../editor.css";
-import { ProjectLoaded } from "@/scaffolds/workspace";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -53,7 +55,7 @@ export default async function Layout({
                           <SidebarMenuItem>
                             <SidebarMenuButton>
                               <ArrowLeftIcon />
-                              Back to Dashboard
+                              Project Console
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         </Link>
@@ -61,38 +63,103 @@ export default async function Layout({
                     </SidebarHeader>
                     <SidebarContent>
                       <SidebarGroup>
+                        <SidebarGroupLabel>Customer</SidebarGroupLabel>
                         <SidebarGroupContent>
                           <SidebarMenu>
                             <Link href={`/${org}/${proj}/customers`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="customer"
+                                    className="size-4"
+                                  />
                                   Customers
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            {/* <Link href={`/${org}/${proj}/analytics`}> */}
-                            <SidebarMenuItem>
-                              <SidebarMenuButton size="sm" disabled>
-                                Analytics
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {/* </Link> */}
-                            {/* <Link href={`/${org}/${proj}/token-chain`}> */}
-                            <SidebarMenuItem>
-                              <SidebarMenuButton size="sm" disabled>
-                                Token Exchange
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {/* </Link> */}
+                            <Link href={`/${org}/${proj}/tags`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="tag"
+                                    className="size-4"
+                                  />
+                                  Tags
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>Marketing</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            <Link href={`/${org}/${proj}/campaigns`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="campaign"
+                                    className="size-4"
+                                  />
+                                  Campaigns
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                            <Link href={`/${org}/${proj}/analytics`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="chart"
+                                    className="size-4"
+                                  />
+                                  Analytics
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>Advanced</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            <Link href={`/${org}/${proj}/customers/policies`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="auth"
+                                    className="size-4"
+                                  />
+                                  Customer Auth
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                            <Link href={`/${org}/${proj}/integrations`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="connect"
+                                    className="size-4"
+                                  />
+                                  Connections
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                           </SidebarMenu>
                         </SidebarGroupContent>
                       </SidebarGroup>
                     </SidebarContent>
+                    <SidebarFooter>
+                      <AboutGridaWestCard />
+                    </SidebarFooter>
                   </Sidebar>
                   <div className="flex flex-col overflow-hidden w-full h-full">
                     <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area"></header>
-                    <div className="w-full h-full overflow-x-hidden">
-                      <ProjectLoaded>{children}</ProjectLoaded>
+                    <div className="w-full h-full overflow-x-hidden overflow-y-auto">
+                      <ProjectLoaded>
+                        <ProjectTagsProvider>{children}</ProjectTagsProvider>
+                      </ProjectLoaded>
                     </div>
                   </div>
                 </div>

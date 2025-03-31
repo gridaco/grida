@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect } from "react";
 import {
   AlertDialog,
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "../spinner";
 
-export function DeleteConfirmationAlertDialog({
+export function DeleteConfirmationAlertDialog<ID = string>({
   title,
   description,
   placeholder,
@@ -26,7 +27,7 @@ export function DeleteConfirmationAlertDialog({
   placeholder?: string;
   match?: string;
   data?: {
-    id: string;
+    id: ID;
   };
   /**
    * trigger when the delete button is clicked
@@ -34,7 +35,7 @@ export function DeleteConfirmationAlertDialog({
    * if the promise resolves to true, the dialog will be closed
    */
   onDelete?: (
-    data: { id: string },
+    data: { id: ID },
     user_confirmation_txt: string
   ) => Promise<boolean>;
 }) {

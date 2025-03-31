@@ -9,20 +9,26 @@ export async function upsert_customer_with({
   project_id: number;
   uuid?: string | null;
   hints?: {
-    email?: string;
     _fp_fingerprintjs_visitorid?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
   };
 }) {
   const pl: {
     uuid?: string | null;
     project_id: number;
-    email?: string;
     _fp_fingerprintjs_visitorid?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
     last_seen_at: string;
   } = {
     uuid: uuid,
     project_id: project_id,
     email: hints?.email,
+    phone: hints?.phone,
+    name: hints?.name,
     _fp_fingerprintjs_visitorid: hints?._fp_fingerprintjs_visitorid,
     last_seen_at: new Date().toISOString(),
   };
@@ -46,6 +52,9 @@ export async function upsert_customer_with({
       }
       return customer;
     } else {
+      // FIXME: we should not be relying on fingerprint for customer identification
+      // this should be replaced with 100% user-configured policy
+      // there is no universal way to idintify a customer (without explicit uuid)
       const { data: customer, error } = await workspaceclient
         .from("customer")
         .upsert(pl, {

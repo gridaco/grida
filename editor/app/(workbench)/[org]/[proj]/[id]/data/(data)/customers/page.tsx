@@ -16,13 +16,13 @@ import { useEditorState } from "@/scaffolds/editor";
 import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
 import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
-import { Customer } from "@/types";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import {
   useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
+import type { Platform } from "@/lib/platform";
 
 export default function Customers() {
   const [state] = useEditorState();
@@ -54,18 +54,18 @@ export default function Customers() {
     });
 
     const rows =
-      (filtered as Customer[])?.map((customer: Customer) => ({
-        uid: customer.uid,
-        name: customer.name,
-        email: provisional(customer.email, customer.email_provisional).join(
-          ", "
-        ),
-        phone: provisional(customer.phone, customer.phone_provisional).join(
-          ", "
-        ),
-        created_at: customer.created_at,
-        last_seen_at: customer.last_seen_at,
-      })) || [];
+      (filtered as Platform.Customer.CustomerWithTags[])?.map(
+        (customer: Platform.Customer.CustomerWithTags) =>
+          ({
+            ...customer,
+            email: provisional(customer.email, customer.email_provisional).join(
+              ", "
+            ),
+            phone: provisional(customer.phone, customer.phone_provisional).join(
+              ", "
+            ),
+          }) satisfies Platform.Customer.CustomerWithTags
+      ) || [];
 
     return rows;
   }, [stream, datagrid_local_filter, datagrid_query?.q_text_search]);
@@ -78,7 +78,11 @@ export default function Customers() {
           <GridLayout.HeaderLine>
             <GridLayout.HeaderMenus>
               <TableViews />
-              <DataQueryTextSearch onValueChange={search} />
+              <DataQueryTextSearch
+                placeholder="Search locally"
+                tooltip="Local search - Search within loaded data"
+                onValueChange={search}
+              />
             </GridLayout.HeaderMenus>
             <GridLayout.HeaderMenus>
               <GridViewSettings />

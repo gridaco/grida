@@ -75,7 +75,11 @@ export default function XAuthUsersTablePage() {
           <GridLayout.HeaderLine>
             <GridLayout.HeaderMenus>
               <TableViews />
-              <DataQueryTextSearch onValueChange={search} />
+              <DataQueryTextSearch
+                placeholder="Search locally"
+                tooltip="Local search - Search within loaded data"
+                onValueChange={search}
+              />
             </GridLayout.HeaderMenus>
             <GridLayout.HeaderMenus>
               <GridViewSettings />

@@ -3,6 +3,7 @@ import { toZonedTime } from "date-fns-tz";
 
 export namespace DataFormat {
   export type Format =
+    | "text"
     // uuidv4
     | "uuid"
     // email format
