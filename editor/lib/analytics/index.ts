@@ -1,3 +1,4 @@
+import ms from "ms";
 export namespace Analytics {
   export type EventStream<T = any> = {
     name: string;
@@ -31,20 +32,35 @@ export namespace Analytics {
     data: { count: number; date: Date }[];
   };
 
+  /**
+   * Fills missing time intervals in event data for chart display.
+   *
+   * @template T - Type of the input data items.
+   * @param data - Array of event data items.
+   * @param options - Configuration for serialization.
+   * @param options.from - Start date of the range.
+   * @param options.to - End date of the range.
+   * @param options.dateKey - Key in each data item representing the date.
+   * @param options.intervalMs - Interval in milliseconds to group data.
+   * @returns Array of objects with `date` and `count`, including zero-count intervals.
+   */
   export function serialize<T extends Record<string, any>>(
     data: Array<T>,
     {
       from,
       to,
       dateKey,
-      intervalMs,
+      interval,
     }: {
       from: Date;
       to: Date;
       dateKey: keyof T;
-      intervalMs: number;
+      interval: ms.StringValue | number;
     }
   ) {
+    const intervalMs = typeof interval === "string" ? ms(interval) : interval;
+    if (!intervalMs) throw new Error("Invalid interval value");
+
     // Step 1: Create a map for the new data with the provided dates range
     const dateMap: Record<string, number> = {};
     let currentDate = new Date(from);
