@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowRightIcon } from "@radix-ui/react-icons";
+import { CodeIcon } from "lucide-react";
+import Editor from "@monaco-editor/react";
 import Image from "next/image";
 
-// Raw Code Snippets
 const codeSnippets = {
-  react: `import styled from "@emotion/styled";
+  react: {
+    src: `import styled from "@emotion/styled";
 import React from "react";
 
 export default function MusicHome() {
@@ -42,8 +43,11 @@ const HeaderPart = () => {
     </SectionHeader>
   );
 };`,
+    language: "typescript",
+  },
 
-  flutter: `Column(
+  flutter: {
+    src: `Column(
   mainAxisSize: MainAxisSize.min,
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
@@ -70,8 +74,11 @@ const HeaderPart = () => {
     ),
   ],
 );`,
+    language: "dart",
+  },
 
-  vanilla: `<!DOCTYPE html>
+  vanilla: {
+    src: `<!DOCTYPE html>
 <html>
   <body>
     <div id="Wrapper">
@@ -84,60 +91,21 @@ const HeaderPart = () => {
     </div>
   </body>
 </html>`,
+    language: "html",
+  },
 };
 
 export default function CodeTabs() {
   const [activeTab, setActiveTab] =
     useState<keyof typeof codeSnippets>("react");
   const [displayedCode, setDisplayedCode] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
 
   const typingSpeed = 5;
   const codeRef = useRef("");
   const charIndexRef = useRef(0);
 
-  const formatCode = (code: string) => {
-    return (
-      code
-        // Escape first
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-
-        // Highlight module keywords
-        .replace(
-          /\b(import|export|from|default)\b/g,
-          '<span style="color:#D48CD5;">$1</span>'
-        )
-
-        // Highlight control keywords
-        .replace(
-          /\b(function|return|const|let|class|if|else|new)\b/g,
-          '<span style="color:#74B7FA;">$1</span>'
-        )
-
-        // Highlight strings
-        .replace(
-          /(&quot;.*?&quot;|&quot;.*?$|'.*?'|'.*?$)/g,
-          '<span style="color:#8FD3FF;">$1</span>'
-        )
-
-        // Highlight PascalCase components with full tag (including angle brackets)
-        .replace(
-          /(&lt;\/?)([A-Z][A-Za-z0-9_]*)(\s*\/?&gt;)/g,
-          '<span style="color:#55E6BF;">$1$2$3</span>'
-        )
-        // Highlight component names (PascalCase)
-        .replace(
-          /\b([A-Z][a-zA-Z0-9_]*)\b(?=\()/g,
-          '<span style="color:#E8E7A0;">$1</span>'
-        )
-    );
-  };
-
   useEffect(() => {
-    setIsTyping(true);
-    codeRef.current = codeSnippets[activeTab];
+    codeRef.current = codeSnippets[activeTab].src;
     charIndexRef.current = 0;
     setDisplayedCode("");
 
@@ -151,11 +119,9 @@ export default function CodeTabs() {
         );
         plainTextIndex += charsToAdd;
         const current = codeRef.current.substring(0, plainTextIndex);
-        const escaped = formatCode(current);
-        setDisplayedCode(escaped);
+        // const escaped = formatCode(current);
+        setDisplayedCode(current);
         requestAnimationFrame(typeCode);
-      } else {
-        setIsTyping(false);
       }
     };
 
@@ -167,13 +133,13 @@ export default function CodeTabs() {
   }, [activeTab]);
 
   const tabs = [
-    { id: "react", label: "React.tsx" },
-    { id: "flutter", label: "Flutter.dart" },
+    { id: "react", label: "react.tsx" },
+    { id: "flutter", label: "flutter.dart" },
     { id: "vanilla", label: "vanilla.html" },
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto rounded-lg overflow-hidden border border-neutral-700 shadow-lg bg-neutral-800 text-white">
+    <div className="w-full max-w-screen-xl mx-auto rounded-lg overflow-hidden border border-neutral-700 shadow-lg bg-neutral-800 text-white">
       {/* Top bar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-neutral-700 border-b border-neutral-600">
         <div className="flex gap-1.5">
@@ -212,19 +178,24 @@ export default function CodeTabs() {
                     : "text-neutral-500 bg-neutral-800 hover:bg-neutral-900"
                 }`}
               >
-                <ArrowRightIcon className="w-4 h-4 mr-2" />
+                <CodeIcon className="w-4 h-4 mr-2" />
                 {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="flex-1 overflow-auto p-4 h-[600px] bg-neutral-900 text-sm leading-snug">
-            <pre
-              className="whitespace-pre-wrap font-mono text-sm leading-snug"
-              style={{ color: "#DF9F85" }}
-              dangerouslySetInnerHTML={{ __html: displayedCode }}
+          <div className="flex-1 h-[600px] overflow-auto">
+            <Editor
+              options={{
+                readOnly: true,
+                padding: {
+                  top: 16,
+                },
+              }}
+              language={codeSnippets[activeTab].language}
+              theme="vs-dark"
+              value={displayedCode}
             />
-            {isTyping && <span className="animate-pulse text-white">|</span>}
           </div>
         </div>
       </div>
