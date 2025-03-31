@@ -430,15 +430,22 @@ export default function CustomerDetailPage({ params }: { params: Params }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* TODO: db cursor navigation */}
           <div className="flex">
             <Button
+              disabled
               variant="outline"
               size="sm"
               className="rounded-r-none border-r-0"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" className="rounded-l-none">
+            <Button
+              disabled
+              variant="outline"
+              size="sm"
+              className="rounded-l-none"
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

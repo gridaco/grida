@@ -25,7 +25,7 @@ export const integrations: Integration[] = [
       "Connect your repositories to sync code and automate workflows.",
     icon: "github",
     categories: ["development"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://docs.github.com/en/rest",
   },
   {
@@ -35,7 +35,7 @@ export const integrations: Integration[] = [
       "Connect your Supabase project to sync data and automate workflows.",
     icon: "github",
     categories: ["development"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://supabase.io/docs",
   },
   {
@@ -45,7 +45,7 @@ export const integrations: Integration[] = [
       "Get notifications and updates directly in your Slack channels.",
     icon: "MessageSquare",
     categories: ["communication"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://api.slack.com/",
   },
   {
@@ -54,7 +54,7 @@ export const integrations: Integration[] = [
     description: "Sync customer data and manage sales processes directly.",
     icon: "Briefcase",
     categories: ["crm"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://developer.salesforce.com/docs",
   },
   {
@@ -82,7 +82,7 @@ export const integrations: Integration[] = [
     description: "Access and manage your Google Drive files directly.",
     icon: "Cloud",
     categories: ["storage"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://developers.google.com/drive",
   },
   {
@@ -100,7 +100,7 @@ export const integrations: Integration[] = [
     description: "Sync events and schedule meetings with Google Calendar.",
     icon: "Calendar",
     categories: ["productivity"],
-    is_popular: true,
+    is_popular: false,
     docs: "https://developers.google.com/calendar",
   },
   {
@@ -127,8 +127,8 @@ export const integrations: Integration[] = [
     description: "Track and analyze user behavior with Google Analytics.",
     icon: "BarChart3",
     categories: ["analytics"],
-    is_popular: true,
-    is_new: true,
+    is_popular: false,
+    is_new: false,
     docs: "https://developers.google.com/analytics",
   },
   {

@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarFooter,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
@@ -54,7 +55,7 @@ export default async function Layout({
                           <SidebarMenuItem>
                             <SidebarMenuButton>
                               <ArrowLeftIcon />
-                              Back to Dashboard
+                              Project Console
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         </Link>
@@ -62,6 +63,7 @@ export default async function Layout({
                     </SidebarHeader>
                     <SidebarContent>
                       <SidebarGroup>
+                        <SidebarGroupLabel>Customer</SidebarGroupLabel>
                         <SidebarGroupContent>
                           <SidebarMenu>
                             <Link href={`/${org}/${proj}/customers`}>
@@ -86,6 +88,24 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>Marketing</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            <Link href={`/${org}/${proj}/campaigns`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="campaign"
+                                    className="size-4"
+                                  />
+                                  Campaigns
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
                             <Link href={`/${org}/${proj}/analytics`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
@@ -97,14 +117,21 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            <Link href={`/${org}/${proj}/campaigns`}>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>Advanced</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            <Link href={`/${org}/${proj}/customers/policies`}>
                               <SidebarMenuItem>
                                 <SidebarMenuButton size="sm">
                                   <ResourceTypeIcon
-                                    type="campaign"
+                                    type="auth"
                                     className="size-4"
                                   />
-                                  Campaigns
+                                  Customer Auth
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>

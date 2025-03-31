@@ -41,6 +41,7 @@ import {
   SYSTEM_GF_CUSTOMER_PHONE_KEY,
 } from "@/k/system";
 import { PhoneInput } from "@/components/extension/phone-input";
+import { Spinner } from "@/components/spinner";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -162,11 +163,7 @@ export default function Main({
                 </p>
               </div>
               <hr className="my-8" />
-              <ApplicantForm
-                onSubmit={(guest) => {
-                  onClaim(guest);
-                }}
-              />
+              <ApplicantForm onSubmit={onClaim} />
             </Card>
           )}
 
@@ -278,17 +275,22 @@ function PolestarLocation() {
 function ApplicantForm({
   onSubmit,
 }: {
-  onSubmit?: (data: { name: string; phone: string }) => void;
+  onSubmit?: (data: { name: string; phone: string }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const isFormValid = name.trim() !== "" && phone.trim() !== "";
+  const [isBusy, setIsBusy] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (onSubmit && isFormValid) {
-      onSubmit({ name, phone });
+      setIsBusy(true);
+      onSubmit({ name, phone }).finally(() => {
+        setIsBusy(false);
+        setIsDrawerOpen(false);
+      });
     }
   };
 
@@ -336,15 +338,21 @@ function ApplicantForm({
       >
         시승 신청하기
       </Button>
-      <FinalConfirm open={isDrawerOpen} setOpen={setIsDrawerOpen} />
+      <FinalConfirm
+        isBusy={isBusy}
+        open={isDrawerOpen}
+        setOpen={setIsDrawerOpen}
+      />
     </form>
   );
 }
 
 function FinalConfirm({
+  isBusy,
   open,
   setOpen,
 }: {
+  isBusy?: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
 }) {
@@ -374,8 +382,19 @@ function FinalConfirm({
           className="p-4"
         />
         <DrawerFooter className="pt-2">
-          <Button form="application" type="submit" disabled={!allChecked}>
-            다음으로
+          <Button
+            form="application"
+            type="submit"
+            disabled={!allChecked || isBusy}
+          >
+            {isBusy ? (
+              <>
+                <Spinner className="me-2" />
+                신청중...
+              </>
+            ) : (
+              <>다음으로</>
+            )}
           </Button>
           <DrawerClose asChild>
             <Button variant="outline">이전으로</Button>

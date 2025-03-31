@@ -15,6 +15,7 @@ import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Integration } from "./data";
 import Link from "next/link";
 import { GridaLogo } from "@/components/grida-logo";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface IntegrationCardProps {
   integration: Integration;
@@ -34,7 +35,11 @@ export function IntegrationCard({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center space-x-2">
-          <GridaLogo className="h-8 w-8" />
+          <Avatar>
+            <AvatarFallback>
+              {integration.name.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <div>
             <CardTitle className="text-xl">{integration.name}</CardTitle>
             <div className="flex gap-2 mt-1">
@@ -88,7 +93,11 @@ export function IntegrationCard({
             </Button>
           </div>
         ) : (
-          <Button className="w-full" disabled={isLoading}>
+          <Button
+            className="w-full"
+            disabled
+            // disabled={isLoading}
+          >
             {isLoading ? "Connecting..." : "Connect"}
           </Button>
         )}

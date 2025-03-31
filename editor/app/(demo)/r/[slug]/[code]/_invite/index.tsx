@@ -43,8 +43,8 @@ async function mkshare(token: Platform.WEST.TokenPublicRead["token"]) {
   const { data: next } = await client.mint(token.code);
 
   return {
-    title: "Polestar 2",
-    text: `${token.owner.name}`,
+    title: "Polestar 시승하고 경품 받아가세요 🎁",
+    text: `${token.owner.name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
     url: `${window.location.origin}/r/${next.series_id}/${next.code}`,
   };
 }
@@ -54,10 +54,28 @@ async function reshare(
   token: Platform.WEST.TokenPublicRead["children"][0]
 ) {
   return {
-    title: "Polestar 2",
-    text: `${owner.name}`,
+    title: "Polestar 시승하고 경품 받아가세요 🎁",
+    text: `${owner.name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
     url: `${window.location.origin}/r/${token.series_id}/${token.code}`,
   };
+}
+
+async function share_or_copy(sharable: {
+  title: string;
+  text: string;
+  url: string;
+}): Promise<{ type: "clipboard" | "share" }> {
+  if (navigator.share) {
+    await navigator.share(sharable);
+    return { type: "share" };
+  } else {
+    const shareUrl = sharable.url;
+    const shareText = sharable.text;
+    const shareTitle = sharable.title;
+    const shareContent = `${shareTitle}\n${shareText}\n${shareUrl}`;
+    await navigator.clipboard.writeText(shareContent);
+    return { type: "clipboard" };
+  }
 }
 
 export default function Invite({
@@ -74,25 +92,20 @@ export default function Invite({
   const is_available = available_count > 0;
 
   const triggerShare = async () => {
-    // Added onshareclick function
-    if (!navigator.share) {
-      toast.error("이 기능은 현재 사용중인 브라우저에서 지원되지 않습니다.");
-      return;
-    }
-
     return mkshare(token).then((sharable) => {
-      navigator
-        .share(sharable)
-        .then(() => {
-          // setSupply((supply) => supply - 1);
-          toast.success("초대권이 발급되었습니다!"); // Updated alert to toast
-        })
-        .catch((e) => {
-          console.log("error while sharing", e);
+      share_or_copy(sharable)
+        .then(({ type }) => {
+          switch (type) {
+            case "share":
+              toast.success("초대권이 발급되었습니다!");
+              break;
+            case "clipboard":
+              toast.success("초대권이 복사되었습니다!");
+              break;
+          }
         })
         .finally(() => {
-          const code = token.code;
-          mutate(code);
+          mutate(token.code);
           confirmDialog.closeDialog();
         });
     });
@@ -121,12 +134,8 @@ export default function Invite({
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-8 left-8">
                 <h2 className="text-2xl text-white">
-                  {/* <span
-                      dangerouslySetInnerHTML={{ __html: data.hero.title }}
-                    /> */}
-                  {owner.name}님을 <br />
-                  Polestar 4 시승 초대 이벤트에 <br />
-                  초대드립니다.
+                  {owner.name} 고객님의 <br />
+                  Polestar 4 시승 추천 페이지입니다.
                 </h2>
               </div>
             </div>
@@ -213,18 +222,22 @@ export default function Invite({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  //
                                   reshare(owner, subtoken).then((sharable) => {
-                                    navigator
-                                      .share(sharable)
-                                      .then(() => {
-                                        toast.success(
-                                          "초대권이 재전송 되었습니다!"
-                                        );
-                                      })
-                                      .catch((e) => {
-                                        console.log("error while sharing", e);
-                                      });
+                                    share_or_copy(sharable).then(({ type }) => {
+                                      //
+                                      switch (type) {
+                                        case "share":
+                                          toast.success(
+                                            "초대권이 재전송 되었습니다!"
+                                          );
+                                          break;
+                                        case "clipboard":
+                                          toast.success(
+                                            "초대권이 복사되었습니다!"
+                                          );
+                                          break;
+                                      }
+                                    });
                                   });
                                 }}
                               >

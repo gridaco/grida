@@ -1,5 +1,6 @@
 import type { Data } from "@/lib/data";
 import type { DataFormat } from "@/scaffolds/data-format";
+import type { Authentication } from "../auth";
 import { unflatten } from "flat";
 import Papa from "papaparse";
 
@@ -529,6 +530,19 @@ export namespace Platform.Customer {
     email: properties.email,
     phone: properties.phone,
   } as const;
+}
+
+export namespace Platform.CustomerAuthPolicy {
+  export interface CustomerAuthPolicy {
+    id: string;
+    created_at: string;
+    project_id: number;
+    challenges: Authentication.Challenge[];
+    description: string | null;
+    name: string;
+    enabled: boolean;
+    scopes: string[];
+  }
 }
 
 export namespace Platform.WEST {
