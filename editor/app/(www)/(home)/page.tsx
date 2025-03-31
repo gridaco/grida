@@ -46,7 +46,6 @@ export default function WWW() {
       <Section container className="mt-32">
         <SectionA />
       </Section>
-      <Section container className="mt-32"></Section>
       <Section container className="mt-32">
         <SectionD />
       </Section>

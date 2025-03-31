@@ -188,7 +188,7 @@ export default function CodeTabs() {
         <div className="w-full md:w-1/2 bg-neutral-800 text-black p-4 overflow-auto">
           <div className="w-full h-[800px] flex items-center justify-center">
             <Image
-              src="/www/.figma/vscode/vscode-mobile.png"
+              src="/www/.figma/vscode/hero-demo.png"
               alt="vscode mobile"
               width={400}
               height={500}

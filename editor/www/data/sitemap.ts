@@ -62,9 +62,9 @@ export namespace sitemap {
       description: "AI powered Design Assistant",
     } satisfies Item,
     figma_vscode: {
-      title: "Grida VSCode Extention",
+      title: "Grida VSCode Extension",
       href: links.figma_vscode,
-      description: "Grida VSCode Extention",
+      description: "Grida VSCode Extension",
     } satisfies Item,
     studio: {
       title: "Grida Studios",
