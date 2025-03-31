@@ -413,6 +413,13 @@ export function NavProjects({
 
                 <CollapsibleContent>
                   <SidebarMenuSub>
+                    {project.children.length === 0 && (
+                      <SidebarMenuSubItem>
+                        <span className="text-xs text-muted-foreground">
+                          No documents inside
+                        </span>
+                      </SidebarMenuSubItem>
+                    )}
                     {project.children.map((page) => (
                       <SidebarMenuSubItem key={page.id}>
                         <SidebarMenuSubButton size="sm" asChild>
