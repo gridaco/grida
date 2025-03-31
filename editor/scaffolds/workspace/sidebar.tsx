@@ -127,7 +127,7 @@ export function projectstree(
     return {
       ...project,
       url: path,
-      selected: pathName?.startsWith(path),
+      selected: pathName === path || pathName?.startsWith(path + "/"),
       children: (groups[project.id] || []).map((doc) => ({
         ...doc,
         url: editorlink(".", {
