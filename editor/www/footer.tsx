@@ -94,7 +94,7 @@ export default function Footer() {
                   href={sitemap.links.figma_vscode}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
-                  Grida VSCode Extention
+                  Grida VSCode Extension
                 </Link>
                 <Link
                   href={sitemap.links.figma_assistant}
