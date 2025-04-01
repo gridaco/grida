@@ -1,11 +1,30 @@
 import { GridaLogo } from "@/components/grida-logo";
+import { createServerComponentWorkspaceClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const mock = {
   project_name: "Project Name",
 };
 
-export default function CustomerPortalSession() {
+type Params = {
+  session: string;
+};
+
+export default async function CustomerPortalSession({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
+  const { session } = await params;
   const { project_name } = mock;
+  const cookieStore = cookies();
+  const client = createServerComponentWorkspaceClient(cookieStore);
+
+  const { data } = await client.auth.getSession();
+  if (!data.session) {
+    return redirect(`../login/${session}`);
+  }
 
   return (
     <main className="flex min-h-screen">

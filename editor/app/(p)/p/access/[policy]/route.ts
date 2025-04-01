@@ -43,6 +43,7 @@ async function reqformdata(
 
 // TODO: add rate limiting
 // TODO: add captcha by polocy
+// TODO: validate the policy
 export async function POST(req: NextRequest, context: Context) {
   const origin = req.nextUrl.origin;
   const next = req.nextUrl.searchParams.get("next");
@@ -75,12 +76,6 @@ export async function POST(req: NextRequest, context: Context) {
   // FIXME: only supports 1 challenge for now
   assert(challenges.length === 1);
   const challenge = challenges[0] as Authentication.Challenge;
-
-  const recaptcha = formdata.get("recaptcha");
-  if (recaptcha) {
-    // TODO: NOT SUPPORTED
-    formdata.delete("recaptcha");
-  }
 
   const data = Object.fromEntries(formdata) as Record<string, string>;
 
