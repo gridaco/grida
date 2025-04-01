@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL){
-  console.warn('[CONTRIBUTER MODE]: Supabase Backedn is not configured - some feature may restricted')
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  console.warn(
+    "[CONTRIBUTER MODE]: Supabase Backedn is not configured - some feature may restricted"
+  );
 }
 
+const __local_test_domain_map: Record<string, string> = {
+  "a.localhost:3000": "/grida",
+  "b.localhost:3000": "/grida",
+};
 
 export async function middleware(req: NextRequest) {
   // #region maintenance mode
@@ -33,6 +38,19 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next();
 
+  // Get hostname of request (e.g. demo.grida.site, demo.localhost:3000)
+  let hostname = req.headers
+    .get("host")!
+    .replace(".localhost:3000", `.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`);
+  const pathname = req.nextUrl.pathname;
+
+  const basePath = __local_test_domain_map[hostname || ""];
+
+  if (basePath) {
+    const rewriteUrl = new URL(`${basePath}${pathname}`, req.url);
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
   // Check if the request path starts with /dev/ and NODE_ENV is not development
   if (
     req.nextUrl.pathname.startsWith("/dev/") &&
@@ -41,9 +59,8 @@ export async function middleware(req: NextRequest) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
-
   // check if dev env (contributor env)
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL){
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return res;
   }
 
