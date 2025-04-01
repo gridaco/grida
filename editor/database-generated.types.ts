@@ -2569,6 +2569,7 @@ export type Database = {
           search_text: string | null
           search_tsv: unknown | null
           uid: string
+          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -2592,6 +2593,7 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown | null
           uid?: string
+          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -2615,6 +2617,7 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown | null
           uid?: string
+          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
