@@ -3,6 +3,20 @@ ADD COLUMN user_id uuid null,
 ADD CONSTRAINT customer_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE SET NULL;
 
 
+CREATE OR REPLACE FUNCTION public.rls_via_customer(p_customer_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.customer c
+        WHERE c.user_id = auth.uid()
+          AND c.uid = p_customer_id
+    );
+END;
+$$;
+
 -- update the customer_with_tags view
 DROP VIEW IF EXISTS public.customer_with_tags;
 CREATE OR REPLACE VIEW public.customer_with_tags WITH (security_invoker = true) as
