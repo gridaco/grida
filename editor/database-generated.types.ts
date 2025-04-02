@@ -1570,6 +1570,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      rls_form: {
+        Args: {
+          p_form_id: string
+        }
+        Returns: boolean
+      }
       rpc_check_max_responses: {
         Args: {
           form_id: string
@@ -3062,6 +3068,7 @@ export type Database = {
           search_tsv: unknown | null
           tags: string[] | null
           uid: string | null
+          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -3700,6 +3707,12 @@ export type Database = {
       rls_project: {
         Args: {
           project_id: number
+        }
+        Returns: boolean
+      }
+      rls_via_customer: {
+        Args: {
+          p_customer_id: string
         }
         Returns: boolean
       }
