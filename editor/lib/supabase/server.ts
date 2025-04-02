@@ -163,6 +163,20 @@ export const createServerComponentCanvasClient = (
     }
   );
 
+export const createServerComponentWestClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createServerComponentClient<Database, "grida_west">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_west" },
+      },
+    }
+  );
+
 export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
   _createRouteHandlerClient<Database, "grida_forms">(
     {

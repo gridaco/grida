@@ -24,11 +24,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (customer_list.length !== 1) {
-    // ensure the customer is unique by email (duplicate email is not supported for portal auth)
     console.error(
-      `[portal]/error while fetching customer by email (${customer_list.length}) found`
+      `[portal]/ignore while fetching customer by email (${customer_list.length}) found`
     );
-    return NextResponse.error();
+    // return ok, cause we don't want to leak if the email is registered or not
+    return NextResponse.json({
+      data: null,
+      error: null,
+      message: "ok",
+    });
   }
 
   const customer = customer_list[0];
