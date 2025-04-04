@@ -29,7 +29,16 @@ interface ConversionStepProps {
   updateData: (data: any) => void;
 }
 
-const currencies = ["XTS", "USD", "EUR", "GBP", "JPY", "Points", "Credits"];
+const currencies = [
+  "XTS",
+  "USD",
+  "EUR",
+  "GBP",
+  "KRW",
+  "JPY",
+  "Points",
+  "Credits",
+];
 
 // Industry benchmark data
 const industryBenchmarks = [

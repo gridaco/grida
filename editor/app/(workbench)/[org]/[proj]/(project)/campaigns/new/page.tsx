@@ -1,10 +1,13 @@
 "use client";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CampaignWizard } from "./campaign-wizard";
 import { useProject } from "@/scaffolds/workspace";
 import toast from "react-hot-toast";
+import WelcomeDialog from "./welcome-dialog";
 
 export default function NewCampaignPage() {
+  const [welcomOpen, setWelcomeOpen] = useState(true);
   const project = useProject();
   const router = useRouter();
 
@@ -38,6 +41,7 @@ export default function NewCampaignPage() {
       {/* <h1 className="text-3xl font-bold mb-8">
         Create a New Referral Campaign
       </h1> */}
+      <WelcomeDialog open={welcomOpen} onOpenChange={setWelcomeOpen} />
       <CampaignWizard onComplete={handleComplete} />
     </div>
   );

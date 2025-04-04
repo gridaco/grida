@@ -20,7 +20,16 @@ interface RewardStepProps {
   updateData: (data: any) => void;
 }
 
-const currencies = ["XTS", "USD", "EUR", "GBP", "JPY", "Points", "Credits"];
+const currencies = [
+  "XTS",
+  "USD",
+  "EUR",
+  "GBP",
+  "KRW",
+  "JPY",
+  "Points",
+  "Credits",
+];
 
 export function RewardStep({ data, updateData }: RewardStepProps) {
   const [limitInvitations, setLimitInvitations] = useState(

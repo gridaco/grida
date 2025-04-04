@@ -38,6 +38,7 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
             id="name"
             placeholder="Spring 2025 Referral Program"
             value={data.name}
+            autoComplete="off"
             onChange={(e) => updateData({ name: e.target.value })}
             maxLength={40}
             required
