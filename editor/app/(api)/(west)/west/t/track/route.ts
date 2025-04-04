@@ -1,4 +1,4 @@
-import { grida_west_client } from "@/lib/supabase/server";
+import { grida_west_referral_client } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -17,14 +17,14 @@ export async function POST(req: NextRequest, context: Context) {
   const { code } = await context.params;
   const { name, data } = await req.json();
   const headersList = await headers();
-  const series_id = headersList.get("x-grida-west-campaign-id");
+  const campaign_id = headersList.get("x-grida-west-campaign-id");
 
-  if (!series_id) {
+  if (!campaign_id) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const { error: track_err } = await grida_west_client.rpc("track", {
-    p_series_id: series_id,
+  const { error: track_err } = await grida_west_referral_client.rpc("track", {
+    p_campaign_id: campaign_id,
     p_code: code,
     p_name: name,
     p_data: data,
