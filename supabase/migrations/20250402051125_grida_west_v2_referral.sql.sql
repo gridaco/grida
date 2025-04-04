@@ -30,6 +30,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_west_referral GRANT A
 ---------------------------------------------------------------------
 -- [Terms & About Grida WEST Referral Campaign] --
 ---------------------------------------------------------------------
+-- [MAJOR CONSIDERATIONS]
+-- - security - the campaign, by nature, needs to expose certain amount of user data to the public, rather they have their own website, or running on our platform, it should "secure by default"
+-- - flexibility - the referrral campaign after all, is a reward-givving campaign that contains 2 parties. considering this, there is no designated use case or logic how the flow works. under the hood, it's a set of utilities with security and useful functions built in.
+-- - intuitive - the campaign contains 2 parties, which leads to complexity. our service aims to provide easy-to-setup easy-to-manage with any integrations.
+-- [Key Features - including external features out-scope of this db schema]
+-- - built-in pages - the campaign gets their own website ready to go with.
+-- - built-in pages with customer portal - the campaign can start with seeded customer, then the customer can visit the portal to get started.
+-- - analyze - gives full log and timeseries of the campaign. visualize, track performance.
+-- - define quests & milestones - easly configure the quests and the milestones how participants will be rewarded.
+-- - track manually - track manually a quest for offline events, or those who don't have a online presence.
+-- [TERMS & SPEC]
 -- - referrer - referrer is a customer-linked entity that has a referrer.code. any invitaition made with this code is linked to the referrer, later used to reward the referrer.
 -- - code - auto generated (8 digit), but can be changed later or be customized (within 1~256).
 -- - the code is identical per campaign, across invitation code and referrer code. (this is a design choice we made, so the url can be clean as e.g. grida.co/t/123456 for both referrer and invitee)
@@ -63,6 +74,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_west_referral GRANT A
 -- - the reward exchange token is a "reward", but as this varies, we call it exchange token, which can be "redeemed"
 --  1. e.g. the exchange token is $1 itself, but will be redeemed when the admin actually gives the $1.
 --  2. e.g. the exchange token can be a "right" to a lucky draw, more ticket you have, more chance you get. (and when drawn, all tickets marked as redeemed - even if they did not win)
+
 
 
 ---------------------------------------------------------------------
