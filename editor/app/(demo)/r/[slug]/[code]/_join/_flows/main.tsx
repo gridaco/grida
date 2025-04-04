@@ -58,11 +58,10 @@ const external_link =
 export default function Main({
   data,
 }: {
-  data: Platform.WEST.TokenPublicRead;
+  data: Platform.WEST.Referral.InvitationPublicRead;
 }) {
-  const { campaign, parent, token } = data;
+  const { code, campaign, referrer_name, is_claimed } = data;
   const router = useRouter();
-  const referrername = parent!.owner?.name;
 
   const onClaim = async (geust: GuestForm) => {
     const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
@@ -78,8 +77,8 @@ export default function Main({
 
     const customer_id = submission.data.customer_id;
 
-    const client = new Platform.WEST.WestClient(token.series_id);
-    const ok = await client.claim(token.code, customer_id);
+    const client = new Platform.WEST.Referral.WestReferralClient(campaign.id);
+    const ok = await client.claim(code, customer_id);
     if (ok) {
       toast.success("이벤트 참여신청이 완료되었습니다.");
       router.replace(external_link);
@@ -88,9 +87,9 @@ export default function Main({
     }
   };
 
-  if (token.is_burned) {
-    return <>Already used.</>;
-  }
+  // if (token.is_burned) {
+  //   return <>Already used.</>;
+  // }
 
   return (
     <ScreenMobileFrame>
@@ -119,27 +118,26 @@ export default function Main({
           </div>
 
           {/* Countdown Timer */}
-          {!token.is_claimed && (
+          {!is_claimed && (
             <div className="flex justify-center items-center py-12 px-4">
               <CountdownTimer />
             </div>
           )}
 
-          {!token.is_claimed && (
+          {!is_claimed && (
             <div className="my-10 mx-4">
               <Card className="relative overflow-hidden">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <TicketCheckIcon className="size-5" />
-                    {referrername}님의 초대{" "}
-                    {token.is_claimed ? "(수락 완료)" : ""}
+                    {referrer_name}님의 초대 {is_claimed ? "(수락 완료)" : ""}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    {referrername}님으로부터 초대를 받았습니다. <br />
-                    이벤트 참여 시 {referrername}님과 이벤트 참여자 모두에게
+                    {referrer_name}님으로부터 초대를 받았습니다. <br />
+                    이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게
                     경품이 지급됩니다.
                   </p>
                 </CardContent>
@@ -147,7 +145,7 @@ export default function Main({
             </div>
           )}
 
-          {!token.is_claimed && (
+          {!is_claimed && (
             <Card className="mx-4 py-6 px-6">
               {/* {data.perks.map((perk, index) => ( */}
               {/* <div key={index} className="text-center"> */}
@@ -167,7 +165,7 @@ export default function Main({
             </Card>
           )}
 
-          {token.is_claimed && !token.is_burned && (
+          {is_claimed && (
             <div className="my-10 mx-4">
               <Card className="relative overflow-hidden">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />

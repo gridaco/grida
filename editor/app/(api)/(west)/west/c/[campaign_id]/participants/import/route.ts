@@ -1,10 +1,10 @@
 import { Platform } from "@/lib/platform";
-import { createRouteHandlerWestClient } from "@/lib/supabase/server";
+import { createRouteHandlerWestReferralClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  series: string;
+  campaign_id: string;
 };
 
 export async function POST(
@@ -14,36 +14,39 @@ export async function POST(
   }
 ) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerWestClient(cookieStore);
-  const { series } = await context.params;
+  const supabase = createRouteHandlerWestReferralClient(cookieStore);
+  const { campaign_id } = await context.params;
   const body =
-    (await req.json()) as Platform.WEST.ImportParticipantsRequestBody;
+    (await req.json()) as Platform.WEST.Referral.ImportParticipantsRequestBody;
+
+  const { role, customer_ids } = body;
+
+  if (role !== "referrer") {
+    return NextResponse.json({ error: "invalid role" }, { status: 400 });
+  }
 
   const { data: campaign, error: campaign_fetch_err } = await supabase
     .from("campaign")
     .select()
-    .eq("id", series)
+    .eq("id", campaign_id)
     .single();
   if (campaign_fetch_err) {
     console.error("error while fetching campaign", campaign_fetch_err);
     return NextResponse.json({ error: campaign_fetch_err }, { status: 500 });
   }
 
-  const upsertions = body.customer_ids.map((customer_id) => {
+  const upsertions = customer_ids.map((customer_id) => {
     return {
       project_id: campaign.project_id,
-      series_id: series,
+      campaign_id: campaign_id,
       customer_id,
-      role: body.role,
     };
   });
 
-  const { error, count } = await supabase
-    .from("participant")
-    .upsert(upsertions, {
-      count: "exact",
-      onConflict: "series_id, customer_id, role",
-    });
+  const { error, count } = await supabase.from("referrer").upsert(upsertions, {
+    count: "exact",
+    onConflict: "campaign_id, customer_id",
+  });
 
   if (error) {
     console.error("error", error);

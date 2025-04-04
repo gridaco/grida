@@ -545,21 +545,23 @@ export namespace Platform.CustomerAuthPolicy {
   }
 }
 
-export namespace Platform.WEST {
+export namespace Platform.WEST.Referral {
+  export type TokenRole = "referrer" | "invitation";
+
   export interface ImportParticipantsRequestBody {
-    role: "host";
+    role: "referrer";
     customer_ids: string[];
   }
 
   export type Campaign = {
     id: string;
-    type: "referral";
     public: Record<string, string> | unknown;
     created_at: string;
     description: string | null;
     enabled: boolean;
-    is_participant_name_exposed_to_public_dangerously: boolean;
-    max_supply_init_for_new_mint_token: number | null;
+    is_invitee_name_exposed_to_public_dangerously: boolean;
+    is_referrer_name_exposed_to_public_dangerously: boolean;
+    max_invitations_per_referrer: number | null;
     name: string;
     project_id: number;
     scheduling_close_at: string | null;
@@ -569,11 +571,13 @@ export namespace Platform.WEST {
 
   export type CampaignPublic = {
     id: string;
-    type: "referral";
+    conversion_currency: string | null;
+    conversion_value: number | null;
+    enabled: boolean | null;
+    max_invitations_per_referrer: number | null;
+    name: string | null;
     public: Record<string, string> | unknown;
-    created_at: string;
-    enabled: boolean;
-    name: string;
+    reward_currency: string | null;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
@@ -586,15 +590,41 @@ export namespace Platform.WEST {
     data: Record<string, string>;
   };
 
-  export type Participant = {
+  export type Referrer = {
     id: string;
-    series_id: string;
+    project_id: number;
+    campaign_id: string;
+    code: string;
     customer_id: string;
     created_at: string;
     metadata: Record<string, string> | unknown;
+    invitation_count: number;
   };
 
-  export type ParticipantCustomer = Participant & {
+  export type Invitation = {
+    campaign_id: string;
+    code: string;
+    created_at: string;
+    customer_id: string | null;
+    id: string;
+    is_claimed: boolean;
+    metadata: Record<string, string> | unknown;
+    referrer_id: string;
+  };
+
+  export type Customer = {
+    uid: string;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+
+  export type Participant = {
+    role: "referrer" | "invitee";
+    campaign_id: string;
+    customer_id: string;
+    metadata: Record<string, string> | unknown;
+    created_at: string;
     name: string | null;
     email: string | null;
     phone: string | null;
@@ -602,62 +632,94 @@ export namespace Platform.WEST {
 
   export type ParticipantPublic = {
     id: string;
-    series_id: string;
+    campaign_id: string;
     role: "host" | "participant";
     name: string | null;
   };
 
   //
-  export type Token<
-    P extends unknown | Record<string, unknown> | null = unknown,
-  > = {
+
+  export type ReferrerPublicRead = {
+    type: "referrer";
     id: string;
-    series_id: string;
-    owner_id: string;
-    code: string;
-    parent_id: string;
-    public: P;
-    created_at: string;
-    token_type: "mintable" | "redeemable";
-    max_supply: number | null;
-    count: number;
-    is_claimed: boolean;
-    is_burned: boolean;
-  };
-
-  export type TokenPublicRead = {
-    token: Token & { owner: ParticipantPublic };
+    code: string | null;
+    referrer_name: string | null;
     campaign: CampaignPublic;
-    parent: {
-      owner: ParticipantPublic;
-    } | null;
-    children: (Token & { owner: ParticipantPublic })[];
+    created_at: string;
+    invitation_count: number;
+    invitations: {
+      id: string;
+      campaign_id: string;
+      is_claimed: boolean;
+      invitee_name: string | null;
+      created_at: string;
+      referrer_id: string;
+    }[];
   };
 
-  export class WestClient<
+  export type InvitationPublicRead = {
+    type: "invitation";
+    id: string;
+    code: string;
+    referrer_id: string;
+    is_claimed: boolean;
+    referrer_name: string | null;
+    campaign: CampaignPublic;
+    created_at: string;
+  };
+
+  // export type TokenPublicRead = {
+  //   token: Token & { owner: ParticipantPublic };
+  //   campaign: CampaignPublic;
+  //   parent: {
+  //     owner: ParticipantPublic;
+  //   } | null;
+  //   children: (Token & { owner: ParticipantPublic })[];
+  // };
+
+  export class WestReferralClient<
     P extends unknown | Record<string, unknown> | null = unknown,
   > {
-    constructor(readonly series_id: string) {}
+    constructor(readonly campaign_id: string) {}
 
-    read(code: string): Promise<{
-      data: TokenPublicRead;
+    read(
+      code: string,
+      type: TokenRole = "referrer"
+    ): Promise<{
+      data: ReferrerPublicRead | InvitationPublicRead;
     }> {
-      return fetch(`/west/t/${code}`, {
+      return fetch(`/west/t`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          "x-grida-west-campaign-id": this.campaign_id,
+          "x-grida-west-token-code": code,
         },
       }).then((res) => res.json());
     }
 
-    mint(code: string, secret?: string): Promise<{ data: Token<P> }> {
-      return fetch(`/west/t/${code}/mint`, {
+    invite(code: string): Promise<{ data: Invitation }> {
+      return fetch(`/west/t/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
-          "x-grida-west-token-secret": secret ?? "",
+          "x-grida-west-campaign-id": this.campaign_id,
+          "x-grida-west-token-code": code,
+        },
+      }).then((res) => res.json());
+    }
+
+    refresh(
+      code: string,
+      invitation_id: string
+    ): Promise<{ data: Invitation }> {
+      return fetch(`/west/t/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-grida-west-campaign-id": this.campaign_id,
+          "x-grida-west-token-code": code,
+          "x-grida-west-invitation-id": invitation_id,
         },
       }).then((res) => res.json());
     }
@@ -667,25 +729,17 @@ export namespace Platform.WEST {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          "x-grida-west-campaign-id": this.campaign_id,
           "x-grida-customer-id": owner_id,
+          "x-grida-west-token-code": code,
         },
       }).then((res) => {
         return res.ok;
       });
     }
 
-    redeem(code: string): Promise<boolean> {
-      return fetch(`/west/t/${code}/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      }).then((res) => {
-        return res.ok;
-      });
-    }
-
     track(code: string, name: string, data?: Record<string, string>) {
-      fetch(`/west/t/${code}/track`, {
+      fetch(`/west/t/track`, {
         method: "POST",
         body: JSON.stringify({
           name: name,
@@ -693,7 +747,8 @@ export namespace Platform.WEST {
         }),
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          "x-grida-west-campaign-id": this.campaign_id,
+          "x-grida-west-token-code": code,
         },
       });
       //

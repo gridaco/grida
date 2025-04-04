@@ -1,8 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
-import {
-  createServerComponentWestClient,
-  createServerComponentWorkspaceClient,
-} from "@/lib/supabase/server";
+import { createServerComponentWorkspaceClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -23,17 +20,12 @@ export default async function CustomerPortalSession({
   const { project_name } = mock;
   const cookieStore = cookies();
   const authclient = createServerComponentWorkspaceClient(cookieStore);
-  const westclient = createServerComponentWestClient(cookieStore);
 
   const { data } = await authclient.auth.getSession();
   // authclient.auth.getUserIdentities
   if (!data.session) {
     return redirect(`../login/${session}`);
   }
-
-  const { data: participants } = await westclient
-    .from("participant_public")
-    .select("*");
 
   return (
     <main className="flex min-h-screen">
@@ -50,7 +42,6 @@ export default async function CustomerPortalSession({
       <aside className="p-10 flex-1">
         <section>Responses</section>
         <section>In-Progress</section>
-        <section>{JSON.stringify(participants)}</section>
       </aside>
     </main>
   );

@@ -1,12 +1,13 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TokensTable } from "./tokens-table";
-import { ParticipantsTable } from "./participants-table";
+import { InvitationsTable } from "./invitations-table";
+import { ReferrersTable } from "./referrers-table";
 import { QuestsTable } from "./quests-table";
 import LogsTable from "./logs-table";
 import CampaignSettings from "./settings";
 import Overview from "./overview";
+import { Badge } from "@/components/ui/badge";
 
 type Params = {
   org: string;
@@ -25,29 +26,31 @@ export default function CampaignsPage({ params }: { params: Params }) {
           <p className="text-muted-foreground">
             Track your marketing campaign performance in real-time
           </p>
+          <Badge variant="outline">referral</Badge>
         </div>
       </div>
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="participants">Participants</TabsTrigger>
           <TabsTrigger value="quests">Quests</TabsTrigger>
-          <TabsTrigger value="tokens">Tokens</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="referres">Referrers</TabsTrigger>
+          <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          <TabsTrigger value="rewards">Rewards</TabsTrigger>
+          <TabsTrigger value="logs">Observability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <hr className="mt-2 mb-6" />
         <TabsContent value="overview">
           <Overview campaign_id={campaign_id} />
         </TabsContent>
-        <TabsContent value="participants">
-          <ParticipantsTable campaign_id={campaign_id} />
+        <TabsContent value="referres">
+          <ReferrersTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="quests">
           <QuestsTable campaign_id={campaign_id} />
         </TabsContent>
-        <TabsContent value="tokens">
-          <TokensTable campaign_id={campaign_id} />
+        <TabsContent value="invitations">
+          <InvitationsTable campaign_id={campaign_id} />
         </TabsContent>
         <TabsContent value="logs">
           <LogsTable campaign_id={campaign_id} />

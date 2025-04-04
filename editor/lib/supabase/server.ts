@@ -85,15 +85,14 @@ export const grida_commerce_client = createClient<Database, "grida_commerce">(
 /**
  * @deprecated - deprecation warning for extra security (not actually deprecated)
  */
-export const grida_west_client = createClient<Database, "grida_west">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_west",
-    },
-  }
-);
+export const grida_west_referral_client = createClient<
+  Database,
+  "grida_west_referral"
+>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
+  db: {
+    schema: "grida_west_referral",
+  },
+});
 
 /**
  * @deprecated - deprecation warning for extra security (not actually deprecated)
@@ -163,16 +162,16 @@ export const createServerComponentCanvasClient = (
     }
   );
 
-export const createServerComponentWestClient = (
+export const createServerComponentWestReferralClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>
-  _createServerComponentClient<Database, "grida_west">(
+  _createServerComponentClient<Database, "grida_west_referral">(
     {
       cookies: () => cookieStore,
     },
     {
       options: {
-        db: { schema: "grida_west" },
+        db: { schema: "grida_west_referral" },
       },
     }
   );
@@ -217,16 +216,16 @@ export const createRouteHandlerWorkspaceClient = (
     }
   );
 
-export const createRouteHandlerWestClient = (
+export const createRouteHandlerWestReferralClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>
-  _createRouteHandlerClient<Database, "grida_west">(
+  _createRouteHandlerClient<Database, "grida_west_referral">(
     {
       cookies: () => cookieStore,
     },
     {
       options: {
-        db: { schema: "grida_west" },
+        db: { schema: "grida_west_referral" },
       },
     }
   );

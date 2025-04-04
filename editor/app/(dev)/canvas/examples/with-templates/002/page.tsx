@@ -5,7 +5,7 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-import Invite from "@/app/(demo)/r/[slug]/[code]/_invite";
+import ReferrerPage from "@/app/(demo)/r/[slug]/[code]/_invite";
 import Portal from "@/app/(demo)/r/[slug]/(portal)/_flows/page";
 import Verify from "@/app/(demo)/r/[slug]/(portal)/_flows/step-verify";
 import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";

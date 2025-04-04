@@ -92,7 +92,7 @@ export function ImportFromCustomersDialog({
     <Dialog {...props}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Import Customers to Campaign</DialogTitle>
+          <DialogTitle>Import Referrers</DialogTitle>
           <DialogDescription>
             Add existing customers as participants to your campaign.
           </DialogDescription>

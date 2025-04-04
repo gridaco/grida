@@ -16,16 +16,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState } from "react";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
-import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import Link from "next/link";
 
-const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
+type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
+  customer: Platform.WEST.Referral.Customer;
+};
+
+const columns: ColumnDef<ReferrerWithCustomer>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -49,28 +52,34 @@ const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "role",
-    header: "Role",
+    accessorKey: "customer.name",
+    header: "Name",
+    cell: ({ row }) => {
+      return (
+        <span>
+          {row.original.customer.name ||
+            row.original.customer.email ||
+            row.original.customer.phone ||
+            "-"}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "code",
+    header: "Code",
     cell: ({ row }) => (
       <div>
-        <Badge variant="outline">{row.getValue("role")}</Badge>
+        <Badge variant="outline">{row.getValue("code")}</Badge>
       </div>
     ),
   },
   {
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => <div>{row.getValue("name")}</div>,
-  },
-  {
-    accessorKey: "email",
+    accessorKey: "customer.email",
     header: "Email",
-    cell: ({ row }) => <div>{row.getValue("email")}</div>,
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-    cell: ({ row }) => <div>{row.getValue("phone")}</div>,
+    cell: ({ row }) => {
+      return <span>{row.original.customer.email || "-"}</span>;
+    },
   },
   {
     id: "actions",
@@ -91,10 +100,10 @@ const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
             <DropdownMenuItem
               onClick={() => {
                 toast.success("Copied ID to clipboard");
-                navigator.clipboard.writeText(item.id);
+                navigator.clipboard.writeText(item.customer_id);
               }}
             >
-              Copy ID
+              Copy Customer ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <Link href={`../customers/${item.customer_id}`}>
@@ -110,41 +119,46 @@ const columns: ColumnDef<Platform.WEST.ParticipantCustomer>[] = [
   },
 ];
 
-function useParticipants(series_id: string) {
-  const [tokens, setTokens] = useState<
-    Platform.WEST.ParticipantCustomer[] | null
+function useReferrers(campaign_id: string) {
+  const [participants, setParticipants] = useState<
+    ReferrerWithCustomer[] | null
   >(null);
-  const client = useMemo(() => createClientWestClient(), []);
+  const client = useMemo(() => createClientWestReferralClient(), []);
 
   useEffect(() => {
     client
-      .from("participant_customer")
-      .select("*")
-      .eq("series_id", series_id)
+      .from("referrer")
+      .select(
+        `
+          *,
+          customer:customer(*)
+        `
+      )
+      .eq("campaign_id", campaign_id)
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) return;
-        setTokens(data as Platform.WEST.ParticipantCustomer[]);
+        setParticipants(data as ReferrerWithCustomer[]);
       });
-  }, [client, series_id]);
+  }, [client, campaign_id]);
 
-  return { tokens };
+  return { tokens: participants };
 }
 
-export function ParticipantsTable({ campaign_id }: { campaign_id: string }) {
+export function ReferrersTable({ campaign_id }: { campaign_id: string }) {
   const importCustomersDialog = useDialogState("import-customers", {
     refreshkey: true,
   });
-  const { tokens } = useParticipants(campaign_id);
+  const { tokens } = useReferrers(campaign_id);
   //
 
   const onImport = async (ids: string[]) => {
-    return await fetch(`/west/s/${campaign_id}/participants/import`, {
+    return await fetch(`/west/c/${campaign_id}/participants/import`, {
       method: "POST",
       body: JSON.stringify({
-        role: "host",
+        role: "referrer",
         customer_ids: ids,
-      } satisfies Platform.WEST.ImportParticipantsRequestBody),
+      } satisfies Platform.WEST.Referral.ImportParticipantsRequestBody),
     }).then((res) => {
       return res.ok;
     });
@@ -165,5 +179,3 @@ export function ParticipantsTable({ campaign_id }: { campaign_id: string }) {
     </div>
   );
 }
-
-// function ImportParticipants()

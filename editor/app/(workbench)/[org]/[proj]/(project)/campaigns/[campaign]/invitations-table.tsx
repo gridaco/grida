@@ -16,13 +16,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState } from "react";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 
-const columns: ColumnDef<Platform.WEST.Token>[] = [
+const columns: ColumnDef<Platform.WEST.Referral.Invitation>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -55,18 +55,9 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
     ),
   },
   {
-    accessorKey: "token_type",
-    header: () => <div>Type</div>,
-    cell: ({ row }) => (
-      <div>
-        <Badge variant="outline">{row.getValue("token_type")}</Badge>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "owner_id",
-    header: () => <div>Owner</div>,
-    cell: ({ row }) => <div>{row.getValue("owner_id")}</div>,
+    accessorKey: "customer_id",
+    header: () => <div>Invitee</div>,
+    cell: ({ row }) => <div>{row.getValue("customer_id")}</div>,
   },
   {
     accessorKey: "is_claimed",
@@ -76,25 +67,6 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
         <Checkbox disabled checked={row.getValue("is_claimed")} />
       </div>
     ),
-  },
-  {
-    accessorKey: "is_burned",
-    header: "Burned",
-    cell: ({ row }) => (
-      <div>
-        <Checkbox disabled checked={row.getValue("is_burned")} />
-      </div>
-    ),
-  },
-  {
-    accessorKey: "max_supply",
-    header: () => <div>Max</div>,
-    cell: ({ row }) => <div>{row.getValue("max_supply")}</div>,
-  },
-  {
-    accessorKey: "count",
-    header: () => <div>Mint</div>,
-    cell: ({ row }) => <div>{row.getValue("count")}</div>,
   },
   {
     id: "actions",
@@ -123,7 +95,7 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                open(`/r/${token.series_id}/${token.code}`, "_blank");
+                open(`/r/${token.campaign_id}/${token.code}`, "_blank");
               }}
             >
               <OpenInNewWindowIcon className="size-4 me-2" />
@@ -138,33 +110,32 @@ const columns: ColumnDef<Platform.WEST.Token>[] = [
   },
 ];
 
-function useTokens(series_id: string) {
-  const [tokens, setTokens] = useState<Platform.WEST.Token[] | null>(null);
-  const client = useMemo(() => createClientWestClient(), []);
+function useInvitations(campaign_id: string) {
+  const [invitations, setInvitations] = useState<
+    Platform.WEST.Referral.Invitation[] | null
+  >(null);
+  const client = useMemo(() => createClientWestReferralClient(), []);
 
   useEffect(() => {
     client
-      .from("token")
+      .from("invitation")
       .select(
         `
-        *,
-        owner:participant_customer!owner_id(*)
+        *
       `
       )
-      .eq("series_id", series_id)
+      .eq("campaign_id", campaign_id)
       .then(({ data, error }) => {
         if (error) return;
-        setTokens(data as Platform.WEST.Token[]);
+        setInvitations(data as Platform.WEST.Referral.Invitation[]);
       });
-  }, [client, series_id]);
+  }, [client, campaign_id]);
 
-  return { tokens };
+  return { invitations };
 }
 
-export function TokensTable({ campaign_id }: { campaign_id: string }) {
-  const { tokens } = useTokens(campaign_id);
+export function InvitationsTable({ campaign_id }: { campaign_id: string }) {
+  const { invitations } = useInvitations(campaign_id);
 
-  //
-
-  return <DataTable columns={columns} data={tokens ?? []} />;
+  return <DataTable columns={columns} data={invitations ?? []} />;
 }

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
 import EmptyWelcome from "@/components/empty";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import useSWR from "swr";
 import { Spinner } from "@/components/spinner";
@@ -14,26 +14,25 @@ type Params = {
 };
 
 export default function ChainsPage({ params }: { params: Params }) {
-  const client = createClientWestClient();
+  const client = createClientWestReferralClient();
   const { id: project_id } = useProject();
 
-  const { data: campaigns, isLoading } = useSWR<Platform.WEST.Campaign[]>(
-    [project_id],
-    {
-      fetcher: async () => {
-        const { data: series, error } = await client
-          .from("campaign")
-          .select("*")
-          .eq("project_id", project_id);
+  const { data: campaigns, isLoading } = useSWR<
+    Platform.WEST.Referral.Campaign[]
+  >([project_id], {
+    fetcher: async () => {
+      const { data: series, error } = await client
+        .from("campaign")
+        .select("*")
+        .eq("project_id", project_id);
 
-        if (error) {
-          throw new Error(error.message);
-        }
+      if (error) {
+        throw new Error(error.message);
+      }
 
-        return series;
-      },
-    }
-  );
+      return series;
+    },
+  });
 
   if (!campaigns) {
     return (
