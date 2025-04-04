@@ -192,8 +192,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 Built-in Platform Selected
               </h4>
               <p className="text-sm text-muted-foreground">
-                You've chosen to use our built-in platform for your referral
-                campaign.
+                You&apos;ve chosen to use our built-in platform for your
+                referral campaign.
               </p>
             </div>
           </div>
@@ -247,8 +247,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 Custom Website Integration
               </h4>
               <p className="text-sm text-muted-foreground">
-                You've chosen to integrate the referral campaign with your own
-                website or app.
+                You&apos;ve chosen to integrate the referral campaign with your
+                own website or app.
               </p>
             </div>
           </div>
@@ -496,7 +496,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 Offline / Manual Tracking
               </h4>
               <p className="text-sm text-muted-foreground">
-                You've chosen to manually track referral goals and triggers.
+                You&apos;ve chosen to manually track referral goals and
+                triggers.
               </p>
             </div>
           </div>

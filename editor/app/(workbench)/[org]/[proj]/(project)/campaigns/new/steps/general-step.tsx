@@ -22,7 +22,7 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
             Welcome to your new referral campaign!
           </h3>
           <p className="text-muted-foreground">
-            Let's start by giving your campaign a name and description.
+            Let&apos;s start by giving your campaign a name and description.
           </p>
         </div>
       </div>
