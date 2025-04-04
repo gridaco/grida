@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
-import EmptyWelcome from "@/components/empty";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
-import useSWR from "swr";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
+import { Button } from "@/components/ui/button";
+import EmptyWelcome from "@/components/empty";
+import useSWR from "swr";
 
 type Params = {
   org: string;
@@ -44,8 +45,11 @@ export default function ChainsPage({ params }: { params: Params }) {
 
   return (
     <main className="container mx-auto my-10">
-      <header>
+      <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
+        <Link href={`./campaigns/new`}>
+          <Button>New Campaign</Button>
+        </Link>
       </header>
       <hr className="my-4" />
       {campaigns.length === 0 && (
