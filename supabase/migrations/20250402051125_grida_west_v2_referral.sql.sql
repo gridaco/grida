@@ -144,7 +144,6 @@ CREATE TABLE grida_west_referral.campaign_wellknown_event (
 );
 
 ALTER TABLE grida_west_referral.campaign_wellknown_event ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_wellknown_event USING (grida_west_referral.rls_campaign(campaign_id));
 
 
@@ -161,6 +160,8 @@ CREATE TABLE grida_west_referral.campaign_challenge (
   description TEXT
 );
 
+ALTER TABLE grida_west_referral.campaign_challenge ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_challenge USING (grida_west_referral.rls_campaign(campaign_id));
 
 ---------------------------------------------------------------------
 -- [Campaign Referrer Milestone Reward] --
@@ -177,6 +178,9 @@ CREATE TABLE grida_west_referral.campaign_referrer_milestone_reward (
   UNIQUE (campaign_id, threshold_count)
 );
 
+ALTER TABLE grida_west_referral.campaign_referrer_milestone_reward ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_referrer_milestone_reward USING (grida_west_referral.rls_campaign(campaign_id));
+
 ---------------------------------------------------------------------
 -- [Campaign Invitee Onboarding Reward] --
 ---------------------------------------------------------------------
@@ -188,6 +192,9 @@ CREATE TABLE grida_west_referral.campaign_invitee_onboarding_reward (
   metadata JSONB NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE grida_west_referral.campaign_invitee_onboarding_reward ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_invitee_onboarding_reward USING (grida_west_referral.rls_campaign(campaign_id));
 
 
 ---------------------------------------------------------------------
@@ -221,6 +228,9 @@ CREATE TABLE grida_west_referral.code (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (campaign_id, code)
 );
+
+ALTER TABLE grida_west_referral.code ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.code USING (grida_west_referral.rls_campaign(campaign_id));
 
 
 ---------------------------------------------------------------------
@@ -351,19 +361,24 @@ CREATE TABLE grida_west_referral.onboarding (
   completed_at TIMESTAMPTZ
 );
 
+ALTER TABLE grida_west_referral.onboarding ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.onboarding USING (grida_west_referral.rls_campaign(campaign_id));
+
 CREATE TRIGGER trg_prevent_update_on_onboarding_complete BEFORE UPDATE ON grida_west_referral.onboarding FOR EACH ROW EXECUTE FUNCTION grida_west_referral.prevent_update(); -- prevents updates on when is_completed is true
 
 
 ---------------------------------------------------------------------
 -- [Onboarding Challenge Flag] --
 ---------------------------------------------------------------------
--- TODO: no write, only service_role
 CREATE TABLE grida_west_referral.onboarding_challenge_flag (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id UUID NOT NULL REFERENCES grida_west_referral.campaign(id) ON DELETE CASCADE,
   invitation_id UUID NOT NULL REFERENCES grida_west_referral.invitation(id) ON DELETE CASCADE,
   ts TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- [only service_role]
+ALTER TABLE grida_west_referral.onboarding_challenge_flag ENABLE ROW LEVEL SECURITY;
 
 CREATE TRIGGER trg_prevent_update_on_onboarding_challenge_flag BEFORE UPDATE ON grida_west_referral.onboarding_challenge_flag FOR EACH ROW EXECUTE FUNCTION grida_west_referral.prevent_update(); -- always prevents updates
 
@@ -380,6 +395,10 @@ CREATE TABLE grida_west_referral.onboarding_referrer_reward (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE grida_west_referral.onboarding_referrer_reward ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.onboarding_referrer_reward USING (grida_west_referral.rls_campaign(campaign_id));
+
+
 ---------------------------------------------------------------------
 -- [Reward / Invitee] --
 ---------------------------------------------------------------------
@@ -392,6 +411,10 @@ CREATE TABLE grida_west_referral.onboarding_invitee_reward (
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE grida_west_referral.onboarding_invitee_reward ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.onboarding_invitee_reward USING (grida_west_referral.rls_campaign(campaign_id));
+
 
 ---------------------------------------------------------------------
 -- [Event Log] --
@@ -407,6 +430,7 @@ CREATE TABLE grida_west_referral.event_log (
     PRIMARY KEY (time, campaign_id, name)
 );
 
+-- [only service_role]
 ALTER TABLE grida_west_referral.event_log enable row level security;
 
 -- Convert to hypertable
@@ -588,9 +612,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ---------------------------------------------------------------------
--- -- [Function: Refresh (Invitation)] --
--- ---------------------------------------------------------------------
+---------------------------------------------------------------------
+-- [Function: Refresh (Invitation)] --
+---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.refresh(
     p_invitation_id UUID,
     p_new_invitation_code VARCHAR(256) DEFAULT NULL
