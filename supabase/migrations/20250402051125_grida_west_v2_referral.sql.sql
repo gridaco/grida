@@ -28,6 +28,44 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_west_referral GRANT A
 
 
 ---------------------------------------------------------------------
+-- [Terms & About Grida WEST Referral Campaign] --
+---------------------------------------------------------------------
+-- - referrer - referrer is a customer-linked entity that has a referrer.code. any invitaition made with this code is linked to the referrer, later used to reward the referrer.
+-- - code - auto generated (8 digit), but can be changed later or be customized (within 1~256).
+-- - the code is identical per campaign, across invitation code and referrer code. (this is a design choice we made, so the url can be clean as e.g. grida.co/t/123456 for both referrer and invitee)
+-- - the reason behind this to provide flexibility over the invitation policy.
+--  1. the referrer code can be a "sharable" code, which anyone enters the referrer code, to get self-invited.
+--  2. the referrer code can be a "private" code, which only the referrer can use to invite, the invitation code is then shared with the invitee.
+--  3. there is no strict service layer logic to enforce either of those, it's purely up the the client to decide if which code to share (expose).
+-- - the invitation.code is always private within the service layer. this is because to provide security over both above modes.
+--  1. for this reason, even the referrer cannot see the invitation code, only the invite() and refresh() function exposes the invitation with code. (the code will refresh when re-sharing the invitation. which does not inherently mean it's expired, but means anyone with the previous code will no longer have any access to the invitation)
+--  2. the refresh() can only be done when the invitation is unclaimed. this is because the invitee now has full ownership over the invitation.
+-- - based on above design, we can provide flexiblity over the campaign logic. things like:
+--  1. each existing referrer can invite limited or unlimited number of invitees, they generate the invitation, and send it to the invitee.
+--  2. each existing referrer can invite limited or unlimited number of invitees, but they don't generate the invitation, they just share the referrer.code, the invitee then generates the invitation (self-invite) and claims it at the same time.
+-- - since the referrer (anyone with the referrer code) can list all underlying invitations, the campaign owner configures the security settings to expose the referrer profile / invitation profile to the public or not.
+--  1. the exposure of the profile is not "extremely" dangerous, as we only expose the name and the avatar, if set to do so.
+--  2. in general, the admin would like to expose the referrer profile (always) and the invitation profile depending on:
+--     1. if it uses the self-invite mode, (invitee knows the referrer code) => the invitation profile better not be exposed.
+--     2. if it uses the referrer-invite mode, (invitee does not know the referrer code / but cannot be assured) => the invitation profile could be considred safe to be exposed.
+-- - the max_invitations_per_referrer is a limit on the number of invitations a referrer.code can generate. (does not inherently mean the "referring person")
+-- - the scheduling provides additional flexibility over the campaign, providing front-end ux. (the logic behind follows the enabled flag [open < now < close = ok]) (ok AND enabled)
+-- - the wellknown event is a "tag / trigger" that defines the certain point of the customer onboarding lifecycle. (e.g. "sign_up", "first_purchase", "first_payment", etc.)
+-- -  1. this can be anything like "user_sign_up_complete_then_visited_the_website_after_within_3_days", and as there is no way to track this on our side, the website can simply let us know, via flag() function.
+-- - the challenge is a collection of events (triggers) that the invitee should emit
+-- - the challenge can be multiple steps, we often call this "quest". quest = a collection of challenges.
+-- - milestone - milestone or `campaign_referrer_milestone_reward` is a definition of the reward givven per complete invitation (when quest is complete).
+-- - milestone can be multiple and often encouraged. e.g. "invite up to 10 people, get up to $30 credit", "from 1st to 5th, get $1 credit", "from 5th to 10th, get $5 credit" => 1~5= $1, 6~10=$5 => $30 max
+-- - onboarding is a track of a quest (a collection of challenges) that the invitation is currently on.
+-- - onboarding reward, unlike the milestone, is a single reward definition when the onboarding is complete.
+--  1. this means => the referrer can get many rewards per invitation, but the invitee only gets one, and cannot be configured by the steps (challenge)
+-- - on each completed quest, both the referrer and the invitee gets a reward (reward exchange token) (based on milestone if referrer)
+-- - the reward exchange token is a "reward", but as this varies, we call it exchange token, which can be "redeemed"
+--  1. e.g. the exchange token is $1 itself, but will be redeemed when the admin actually gives the $1.
+--  2. e.g. the exchange token can be a "right" to a lucky draw, more ticket you have, more chance you get. (and when drawn, all tickets marked as redeemed - even if they did not win)
+
+
+---------------------------------------------------------------------
 -- [generate random short code] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.gen_random_short_code()
