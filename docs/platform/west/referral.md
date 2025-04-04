@@ -1,68 +1,172 @@
-## Working Draft
+# 🤠 Welcome to the Wild WEST - Grida WEST for Referral Campaigns
 
-this is my current db design, I think this is bad for few reasons.
+Your fun, flexible, and powerful referral engine.
 
-1. I intended to write a general model for campaigns, I soon relized that is not possible, at least fully utilizing the db features.
-2. I need to fully utilize the db features, like triggers and constraints, relations, in order to make my service reliable and easy to maintain.
-3. the good example why current model is "bad" can be found in "tokens" - I tried to build a universal system, but the "referral" by nature is just another system that has its own features, that cannot be shared, and raises too many exception with the "quest model"
-4. one example is, the who ever accepts the invitation becomes a participant, but this is a "shared quest" where the inviter relies on progress of invitee's onboarding process.
-
-Here are some extra business logics, specific to referral campaign.
-
-1. admin can choose the mode of the referral campaign.
-   one is "sending an invitation" and one is "joining with referrer code"
-
-"sending an invitation", is host guest creates new invitation per anonymous, then sending that to sms or what ever channels, this can only be claimed once. and linked to who ever claims it.
-
-"joining with referrer code" is a conventional way, less of a game, but a practical and useful for always-running campaign type. it's best suits for saas business, and identical to refer-a-friend how dropbox does it. host shares "my uniqye code", who ever enters that code will (may or may not) be rewarded double-sided.
-
-2. rewarding and milestone
-   admin can set a milestone, per sucessful quest invitation (e.g. simple as accepts an invitation - or with custom events or to complete dedicated steps - e.g. sign up form A)
-
-admin sets a reward per milestone, mapped with a successful number of invitation quest. this can be linear, like 1:$10 2:$10 3:$10 - which means, when host successfully makes the guest complete the quest for 3 times, they will be receiving $30 in total.
-
-to make things easy, there is no milestone for guest, juest yes / no - with flat reward.
-
-3. reward
-   reward can be described with a text, since this cannot be regularized. if this is a random draft event, then the reward will be (at least on our system) be a "ticket" and more ticket the user has, more chances to win, and will be all marked as redeemed, since we only care about our system. (because there is no truly a way to manage all other)
-
-so the reward is a "right to excahnge for certain value"
-
-for dashboard feature, the value can still be described in currency and amount (fixed rate) - so we can show some money values in sum on admin's dashboard - but won't be truely accurate
-
-4. reward token / reward exchange token
-   since the reward can be a virtual product, like a credit, we need this "exchange token" model, to let admin decides and tells our system if the reward is givven and the exchange token is redeemed.
-
-5. event / custom event
-   event is a user-defined custom event (some might be built in) to let us track the progress of the quest. since this requires real-world interaction, perhaps on admin's website, when guest does something over their platform, they should let us know if certain event is triggered, and our db decides if the quest is completed / has progress.
-
-6. quest / progress / quest definition.
-   admin defines the quest, as simple as possible, that requires steps of certain events to be triggered. e.g. signup_complete, form_a_complete, purchase_complete. there cannot be more complex then linear step, like counting. the counting or other complex logics shall be handled on their platform, we will only receive the final events.
-
-by that definition, each quest will have a progress.
+**Grida WEST** is a next-gen referral campaign platform designed to help marketers launch campaigns that grow fast and reward better — without depending on devs. But don’t worry, developers get a fully structured and secure backend to plug into, too.
 
 ---
 
-I want you to answer as a CTO, for building a great db design that is solid, but with room for flexibility to move fast.
+## ✨ What You Can Build
 
-here are some considerations.
+### 🪜 The Milestone Referral
 
-1. general db design principles
-2. knwon limitations
-3. how to handle the campaign confuguration change. - e.g. quest definition change
+_Example: "Invite 5 friends, get $5 credit. Invite 10, get $15 credit."_
 
-<!--  -->
+Create campaigns with increasing rewards. Participants feel progress, and the excitement builds as they reach the next goal. Think gamified referral ladders.
 
-## Referral Campaign Modes
+### 🚀 The Startup Prelaunch Waitlist
 
-1. Fixed referrer code
+_Example: "Refer friends to move up the list."_
 
-When anon uses this code, an invitation will be automatically created. anon will complete the signup process, and this invitation will be claimed.
+Perfect for launches. You get early buzz and viral sharing. Invitees jump the queue by bringing in friends.
 
-2. Manual Invitation
+### 📬 The Newsletter Referral
 
-When referrer creates an invitation, a unique code will be generated with the invitation. Anon will receive this invitation, and when anon uses this code to signup, the invitation will be claimed.
+_Example: "Refer 3 friends and unlock our Pro Series."_
 
-## Knwon limitations (will fix)
+Reward readers with content, coupons, or swag when they share your newsletter. Integrates well with Mailchimp, Beehiiv, etc.
 
-Cannot enforce either policy. who ever has access to the primary referrer code can act as a referrer, thus create new invitation.
+### 🎁 The Viral Giveaway
+
+_Example: "Enter the giveaway. Get more chances by inviting friends."_
+
+Amplify your giveaway reach. Track who referred whom, and boost chances dynamically. Rewards can be lucky draws, digital items, or just bragging rights.
+
+### 🛍️ Shopify Campaigns
+
+_Example: "Refer a friend. You both get 10% off."_
+
+Install WEST on your store and launch a 2-sided referral program that tracks to checkout. Works well with custom logic and rewards (e.g. points, credits, coupons).
+
+### 🤝 The 2-Sided Classic
+
+_Example: "Refer your friend, you get $10, they get $5."_
+
+Invite codes can be public or private. WEST supports both self-invite and referrer-invite flows. You choose who sees what.
+
+---
+
+## 🧰 How It All Works
+
+At the heart of every WEST campaign:
+
+### 🎟️ Referrer
+
+- A customer or user who shares a referral code.
+- Has a unique code tied to the campaign.
+- Can be limited to X invites.
+
+### 📩 Invitation
+
+- A trackable link/code that the invitee uses.
+- Can be refreshed (securely) before it’s claimed.
+- Once claimed, invitee becomes part of the campaign.
+
+### 🪙 Rewards
+
+- **Milestone rewards**: when a referrer hits X invites.
+- **Onboarding rewards**: given to the invitee after completing a quest.
+- All rewards are issued as _exchange tokens_, which are claimable later.
+
+### 🧩 Challenges / Quests
+
+- Define the required actions to complete an onboarding.
+- Examples: "Sign up", "Make a purchase", "Verify email", etc.
+- You can chain these with dependencies.
+
+### 📊 Analytics
+
+- Real-time logs of every tracked event.
+- Visual breakdowns of event frequency, campaign growth, and referral chains.
+
+### 🌐 Built-In Pages
+
+- Landing pages for sharing
+- Customer dashboard to track progress
+- Optional public leaderboards
+
+---
+
+## 🙋 FAQ
+
+### Q: Can anyone start a campaign?
+
+Yes, as long as you’re a project owner. You can create, enable/disable, and manage all campaigns tied to your project.
+
+### Q: Can I hide the invitee's or referrer’s info?
+
+Yes. You control if their name or avatar is exposed. By default, we hide them unless explicitly allowed.
+
+### Q: Can a user invite themselves?
+
+Yes — if you want. In self-invite mode, they use a public code to generate their own invitation.
+
+### Q: What if I want the referrer to create invitations?
+
+You can do that too. That’s the referrer-invite mode. They create the invite and share it directly.
+
+### Q: Can I refresh or regenerate invite links?
+
+Yes. Unclaimed invitations can be refreshed with a new code — old codes become invalid.
+
+### Q: Is this secure?
+
+Yes. All campaign logic is enforced at the database level with Row-Level Security (RLS). Codes are always tied to a campaign context.
+
+---
+
+## 🧠 Advanced Capabilities
+
+WEST is built on PostgreSQL with Supabase, and provides a secure, extensible data model for devs.
+
+### 🛡️ Full RLS Enforcement
+
+Every table has RLS enabled. Access is scoped per campaign/project. Safe for multitenant and public usage.
+
+### 🔗 Unique Code Handling
+
+All codes (referrer or invitee) are guaranteed to be unique within a campaign. They are stored in a dedicated `code` registry table with triggers.
+
+### 📬 Event Hooks via `track()`
+
+Track any user activity by calling the `track()` function. Logs are recorded in `event_log`, a hypertable that supports time-based analytics.
+
+### 📈 Built-in Analysis API
+
+Use `analyze()` to get time-bucketed stats by event name. Great for dashboards and funnel visualization.
+
+### 🧪 Rewards as Exchange Tokens
+
+Reward definitions are decoupled from actual redemption. Think of them as "earned" but not yet "delivered" — useful for managing inventory or prizes.
+
+### 🧱 Invite Flow Functions
+
+All key flows are handled via SQL functions:
+
+- `invite()` – create a new invitation
+- `refresh()` – regenerate invitation code
+- `claim()` – mark an invitation as claimed
+- `flag()` – log progress on quests/challenges
+
+---
+
+## 💼 For Developers / Integration
+
+- Use the SQL functions directly from Supabase or REST/RPC endpoints.
+- Schema: `grida_west_referral`
+- Tables: `campaign`, `referrer`, `invitation`, `onboarding`, `event_log`, etc.
+- Views for public use: `referrer_public_secure`, `invitation_public_secure`, `campaign_public`
+- Docs coming soon on webhook integrations and Zapier-compatible flows.
+
+---
+
+## 🔚 Final Thoughts
+
+Grida WEST gives you the flexibility of a headless referral engine, the safety of a battle-tested schema, and the joy of setting up campaigns without drowning in code.
+
+**Launch your first campaign today.**  
+Track it. Share it. Reward your champions.
+
+The WEST is wild — but now it’s yours.
+
+🧨 Let’s ride.
