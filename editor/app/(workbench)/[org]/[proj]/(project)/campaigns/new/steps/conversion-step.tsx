@@ -34,7 +34,7 @@ const currencies = ["XTS", "USD", "EUR", "GBP", "JPY", "Points", "Credits"];
 // Industry benchmark data
 const industryBenchmarks = [
   {
-    industry: "Software as a Service (SaaS)",
+    industry: "General SaaS",
     metric: "Average Revenue Per Account (ARPA)",
     value: "$100 per month",
   },
@@ -170,7 +170,7 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="px-4 pb-4">
+            <div className="px-4 py-4">
               <p className="text-sm text-muted-foreground mb-3">
                 Here are some industry examples to help you estimate your
                 conversion value:

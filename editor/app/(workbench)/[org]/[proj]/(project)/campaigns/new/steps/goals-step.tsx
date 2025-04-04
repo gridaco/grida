@@ -24,23 +24,14 @@ import {
   Laptop,
   ClipboardList,
 } from "lucide-react";
+import { Platform } from "@/lib/platform";
 
 interface GoalsStepProps {
-  data: any;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
   updateData: (data: any) => void;
 }
 
-// Mock data for triggers - in a real app, these would come from your API
-const mockTriggers = [
-  { id: "1", name: "sign_up" },
-  { id: "2", name: "complete_profile" },
-  { id: "3", name: "first_purchase" },
-  { id: "4", name: "share_on_social" },
-  { id: "5", name: "invite_friend" },
-];
-
 export function GoalsStep({ data, updateData }: GoalsStepProps) {
-  const [triggers, setTriggers] = useState(mockTriggers);
   const [newTriggerName, setNewTriggerName] = useState("");
   const [showNewTriggerForm, setShowNewTriggerForm] = useState(false);
   const [platformType, setPlatformType] = useState(
@@ -70,7 +61,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
         ...data.challenges,
         {
           index: newIndex,
-          event_id: "",
+          trigger_name: "",
           description: "",
           depends_on: null,
         },
@@ -97,12 +88,19 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
   const addNewTrigger = () => {
     if (newTriggerName.trim()) {
       const newTrigger = {
-        id: `new-${Date.now()}`,
         name: newTriggerName.trim(),
+        description: "",
       };
-      setTriggers([...triggers, newTrigger]);
+
+      // without duplicated names.
+      const updatedTriggers = [
+        ...data.triggers.filter((t) => t.name !== newTrigger.name),
+        newTrigger,
+      ];
+
       setNewTriggerName("");
       setShowNewTriggerForm(false);
+      updateData({ triggers: updatedTriggers });
     }
   };
 
@@ -113,7 +111,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
     }
 
     const goalNames = data.challenges.map((goal: any, index: number) => {
-      const trigger = triggers.find((t) => t.id === goal.event_id);
+      const trigger = data.triggers.find((t) => t.name === goal.trigger_name);
       return trigger ? trigger.name : `Goal ${index + 1}`;
     });
 
@@ -127,20 +125,22 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
 
   // Update the trigger display to include icons and delete functionality
   // First, add a function to handle trigger deletion
-  const removeTrigger = (triggerId: string) => {
+  const removeTrigger = (name: string) => {
     // Filter out the trigger with the matching ID
-    const updatedTriggers = triggers.filter((t) => t.id !== triggerId);
-    setTriggers(updatedTriggers);
+    const updatedTriggers = data.triggers.filter((t) => t.name !== name);
 
     // Also update any goals that were using this trigger
     const updatedGoals = data.challenges.map((goal: any) => {
-      if (goal.event_id === triggerId) {
-        return { ...goal, event_id: "" };
+      if (goal.trigger_name === name) {
+        return { ...goal, trigger_name: "" };
       }
       return goal;
     });
 
-    updateData({ challenges: updatedGoals });
+    updateData({
+      challenges: updatedGoals,
+      triggers: updatedTriggers,
+    });
   };
 
   return (
@@ -318,9 +318,9 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {triggers.map((trigger) => (
+              {data.triggers.map((trigger) => (
                 <div
-                  key={trigger.id}
+                  key={trigger.name}
                   className="p-2 border rounded-md text-sm bg-muted/20 flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
@@ -331,7 +331,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removeTrigger(trigger.id)}
+                    onClick={() => removeTrigger(trigger.name)}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="sr-only">Remove trigger</span>
@@ -365,8 +365,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   {data.challenges.map((goal: any, index: number) => {
-                    const trigger = triggers.find(
-                      (t) => t.id === goal.event_id
+                    const trigger = data.triggers.find(
+                      (t) => t.name === goal.trigger_name
                     );
                     return (
                       <div key={index} className="flex items-center">
@@ -412,17 +412,20 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                             Trigger
                           </Label>
                           <Select
-                            value={goal.event_id}
+                            value={goal.trigger_name}
                             onValueChange={(value) =>
-                              updateGoal(index, "event_id", value)
+                              updateGoal(index, "trigger_name", value)
                             }
                           >
                             <SelectTrigger id={`goal-trigger-${index}`}>
                               <SelectValue placeholder="Select trigger" />
                             </SelectTrigger>
                             <SelectContent>
-                              {triggers.map((trigger) => (
-                                <SelectItem key={trigger.id} value={trigger.id}>
+                              {data.triggers.map((trigger) => (
+                                <SelectItem
+                                  key={trigger.name}
+                                  value={trigger.name}
+                                >
                                   {trigger.name}
                                 </SelectItem>
                               ))}
@@ -562,9 +565,9 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {triggers.map((trigger) => (
+              {data.triggers.map((trigger) => (
                 <div
-                  key={trigger.id}
+                  key={trigger.name}
                   className="p-2 border rounded-md text-sm bg-muted/20 flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
@@ -575,7 +578,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removeTrigger(trigger.id)}
+                    onClick={() => removeTrigger(trigger.name)}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="sr-only">Remove trigger</span>
@@ -609,8 +612,8 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   {data.challenges.map((goal: any, index: number) => {
-                    const trigger = triggers.find(
-                      (t) => t.id === goal.event_id
+                    const trigger = data.triggers.find(
+                      (t) => t.name === goal.trigger_name
                     );
                     return (
                       <div key={index} className="flex items-center">
@@ -656,17 +659,20 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                             Trigger
                           </Label>
                           <Select
-                            value={goal.event_id}
+                            value={goal.trigger_name}
                             onValueChange={(value) =>
-                              updateGoal(index, "event_id", value)
+                              updateGoal(index, "trigger_name", value)
                             }
                           >
                             <SelectTrigger id={`goal-trigger-${index}`}>
                               <SelectValue placeholder="Select trigger" />
                             </SelectTrigger>
                             <SelectContent>
-                              {triggers.map((trigger) => (
-                                <SelectItem key={trigger.id} value={trigger.id}>
+                              {data.triggers.map((trigger) => (
+                                <SelectItem
+                                  key={trigger.name}
+                                  value={trigger.name}
+                                >
                                   {trigger.name}
                                 </SelectItem>
                               ))}

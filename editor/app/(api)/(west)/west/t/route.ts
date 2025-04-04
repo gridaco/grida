@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
         )
         .eq("code", code)
         .eq("campaign_id", campaign_id)
+        .order("created_at", { referencedTable: "invitations" })
         .single();
 
       if (error) console.error(error);

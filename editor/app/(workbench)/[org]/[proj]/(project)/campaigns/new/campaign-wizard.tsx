@@ -12,73 +12,39 @@ import { ConversionStep } from "./steps/conversion-step";
 import { SecurityStep } from "./steps/security-step";
 import { FinalStep } from "./steps/final-step";
 import { WizardNav } from "./wizard-nav";
+import { Platform } from "@/lib/platform";
 
-type RewardType = "double-sided" | "referrer-only" | "invitee-only";
-type RewardCurrencyType =
-  | "virtual-currency"
-  | "draw-ticket"
-  | "discount"
-  | "custom";
+const seedTriggers = [
+  { name: "sign_up", description: "User signed up" },
+  { name: "complete_profile", description: "User completed their profile" },
+  { name: "first_purchase", description: "User made their first purchase" },
+  { name: "share_on_social", description: "User shared on social media" },
+  { name: "invite_friend", description: "User invited a friend" },
+];
 
-type CampaignData = {
-  name: string;
-  description: string;
-  reward_strategy_type: RewardType;
-  reward_currency_type: RewardCurrencyType;
-  reward_currency: string;
-  max_invitations_per_referrer: number | null;
-  referrer_milestone_rewards: Array<{
-    threshold: number;
-    description: string;
-    value: number;
-  }>;
-  invitee_onboarding_reward: {
-    description: string;
-    value: number;
-  };
-  __prefers_builtin_platform: boolean;
-  __prefers_offline_manual: boolean;
-  challenges: Array<{
-    index: number;
-    event_id: string;
-    description: string;
-    depends_on: string | null;
-  }>;
-  conversion_currency: string;
-  conversion_value: number | null;
-  is_referrer_name_exposed_to_public_dangerously: boolean;
-  is_invitee_name_exposed_to_public_dangerously: boolean;
-  enabled: boolean;
-  scheduling: {
-    startNow: boolean;
-    openAt: Date | null;
-    closeAt: Date | null;
-    timezone: string | null;
-  };
-};
-
-const initialData: CampaignData = {
+const initialData: Platform.WEST.Referral.Wizard.CampaignData = {
   name: "",
   description: "",
   reward_strategy_type: "double-sided",
   reward_currency_type: "virtual-currency",
-  reward_currency: "XTS",
+  reward_currency: "USD",
+  conversion_currency: "USD",
+  conversion_value: null,
   max_invitations_per_referrer: null,
   referrer_milestone_rewards: [{ threshold: 1, description: "", value: 0 }],
   invitee_onboarding_reward: { description: "", value: 0 },
   __prefers_builtin_platform: true,
   __prefers_offline_manual: false,
   challenges: [],
-  conversion_currency: "XTS",
-  conversion_value: null,
+  triggers: seedTriggers,
   is_referrer_name_exposed_to_public_dangerously: false,
   is_invitee_name_exposed_to_public_dangerously: false,
   enabled: true,
   scheduling: {
-    startNow: true,
-    openAt: null,
-    closeAt: null,
-    timezone: null,
+    __prefers_start_now: true,
+    scheduling_open_at: null,
+    scheduling_close_at: null,
+    scheduling_tz: null,
   },
 };
 
@@ -86,18 +52,21 @@ type Step = {
   title: string;
   description: string;
   component: React.ComponentType<{
-    data: CampaignData;
-    updateData: (data: Partial<CampaignData>) => void;
+    data: Platform.WEST.Referral.Wizard.CampaignData;
+    updateData: (
+      data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+    ) => void;
   }>;
 };
 
 interface CampaignWizardProps {
-  onComplete: (data: CampaignData) => void;
+  onComplete: (data: Platform.WEST.Referral.Wizard.CampaignData) => void;
 }
 
 export function CampaignWizard({ onComplete }: CampaignWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [campaignData, setCampaignData] = useState<CampaignData>(initialData);
+  const [campaignData, setCampaignData] =
+    useState<Platform.WEST.Referral.Wizard.CampaignData>(initialData);
 
   // Define steps based on reward type selection
   const steps: Step[] = useMemo(() => {
@@ -163,7 +132,9 @@ export function CampaignWizard({ onComplete }: CampaignWizardProps) {
     ];
   }, [campaignData.reward_strategy_type]);
 
-  const updateData = (newData: Partial<CampaignData>) => {
+  const updateData = (
+    newData: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => {
     setCampaignData((prev) => ({ ...prev, ...newData }));
   };
 

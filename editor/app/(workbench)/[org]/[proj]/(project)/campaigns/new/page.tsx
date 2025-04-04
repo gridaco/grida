@@ -1,13 +1,36 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { CampaignWizard } from "./campaign-wizard";
+import { useProject } from "@/scaffolds/workspace";
+import toast from "react-hot-toast";
 
 export default function NewCampaignPage() {
+  const project = useProject();
   const router = useRouter();
 
   const handleComplete = async (campaignData: any) => {
-    console.log("Campaign created:", campaignData);
-    alert("TODO: !");
+    console.log("creating campaign..", campaignData);
+    const task = fetch("/private/west/campaigns/new", {
+      method: "POST",
+      body: JSON.stringify(campaignData),
+      headers: {
+        "Content-Type": "application/json",
+        "x-grida-editor-user-current-project-id": project.id.toString(),
+      },
+    });
+
+    task.then(async (res) => {
+      const { data: new_campaign } = await res.json();
+      if (res.ok) {
+        router.push(`./${new_campaign.id}`);
+      }
+    });
+
+    toast.promise(task, {
+      loading: "Creating campaign...",
+      success: "Campaign created successfully!",
+      error: "Failed to create campaign",
+    });
   };
 
   return (

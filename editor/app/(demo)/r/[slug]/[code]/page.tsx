@@ -21,7 +21,7 @@ export default function RoutingPage({ params }: { params: Params }) {
 
   const { code, slug } = params;
 
-  const { data, isLoading } = useSWR<{
+  const { data, isLoading, error } = useSWR<{
     data:
       | Platform.WEST.Referral.ReferrerPublicRead
       | Platform.WEST.Referral.InvitationPublicRead;
@@ -42,6 +42,10 @@ export default function RoutingPage({ params }: { params: Params }) {
     client.track(code, "page_view");
   }, [code, slug]);
 
+  if (error) {
+    return notFound();
+  }
+
   if (isLoading || !data) {
     return (
       <ScreenWindowRoot>
@@ -53,8 +57,6 @@ export default function RoutingPage({ params }: { params: Params }) {
   }
 
   const { type } = data.data;
-
-  console.log("data", data);
 
   switch (type) {
     case "referrer":

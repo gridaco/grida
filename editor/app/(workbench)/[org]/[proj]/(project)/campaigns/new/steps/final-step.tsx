@@ -49,7 +49,7 @@ const timezones = [
 
 export function FinalStep({ data, updateData }: FinalStepProps) {
   const [schedulingType, setSchedulingType] = useState(
-    data.scheduling.startNow ? "now" : "scheduled"
+    data.scheduling.__prefers_start_now ? "now" : "scheduled"
   );
 
   const handleSchedulingTypeChange = (value: string) => {
@@ -57,7 +57,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
     updateData({
       scheduling: {
         ...data.scheduling,
-        startNow: value === "now",
+        __prefers_start_now: value === "now",
       },
     });
   };
@@ -204,8 +204,11 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             disabled={schedulingType !== "scheduled"}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {data.scheduling.openAt ? (
-                              format(new Date(data.scheduling.openAt), "PPP")
+                            {data.scheduling.scheduling_open_at ? (
+                              format(
+                                new Date(data.scheduling.scheduling_open_at),
+                                "PPP"
+                              )
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -215,12 +218,12 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                           <Calendar
                             mode="single"
                             selected={
-                              data.scheduling.openAt
-                                ? new Date(data.scheduling.openAt)
+                              data.scheduling.scheduling_open_at
+                                ? new Date(data.scheduling.scheduling_open_at)
                                 : undefined
                             }
                             onSelect={(date) =>
-                              updateScheduling("openAt", date)
+                              updateScheduling("scheduling_open_at", date)
                             }
                             initialFocus
                           />
@@ -241,8 +244,11 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             disabled={schedulingType !== "scheduled"}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {data.scheduling.closeAt ? (
-                              format(new Date(data.scheduling.closeAt), "PPP")
+                            {data.scheduling.scheduling_close_at ? (
+                              format(
+                                new Date(data.scheduling.scheduling_close_at),
+                                "PPP"
+                              )
                             ) : (
                               <span>No end date</span>
                             )}
@@ -252,18 +258,19 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                           <Calendar
                             mode="single"
                             selected={
-                              data.scheduling.closeAt
-                                ? new Date(data.scheduling.closeAt)
+                              data.scheduling.scheduling_close_at
+                                ? new Date(data.scheduling.scheduling_close_at)
                                 : undefined
                             }
                             onSelect={(date) =>
-                              updateScheduling("closeAt", date)
+                              updateScheduling("scheduling_close_at", date)
                             }
                             initialFocus
                             disabled={(date) => {
                               // Disable dates before the start date
-                              return data.scheduling.openAt
-                                ? date < new Date(data.scheduling.openAt)
+                              return data.scheduling.scheduling_open_at
+                                ? date <
+                                    new Date(data.scheduling.scheduling_open_at)
                                 : false;
                             }}
                           />
@@ -273,21 +280,21 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
+                    <Label htmlFor="scheduling_tz">Timezone</Label>
                     <Select
-                      value={data.scheduling.timezone || "UTC"}
+                      value={data.scheduling.scheduling_tz || "UTC"}
                       onValueChange={(value) =>
-                        updateScheduling("timezone", value)
+                        updateScheduling("scheduling_tz", value)
                       }
                       disabled={schedulingType !== "scheduled"}
                     >
                       <SelectTrigger
-                        id="timezone"
+                        id="scheduling_tz"
                         className={
                           schedulingType !== "scheduled" ? "opacity-50" : ""
                         }
                       >
-                        <SelectValue placeholder="Select timezone" />
+                        <SelectValue placeholder="Select scheduling_tz" />
                       </SelectTrigger>
                       <SelectContent>
                         {timezones.map((tz) => (
@@ -376,8 +383,8 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                 <div className="font-medium">
                   {schedulingType === "now"
                     ? "Immediate"
-                    : data.scheduling.openAt
-                      ? `Scheduled for ${format(new Date(data.scheduling.openAt), "PPP")}`
+                    : data.scheduling.scheduling_open_at
+                      ? `Scheduled for ${format(new Date(data.scheduling.scheduling_open_at), "PPP")}`
                       : "Not scheduled"}
                 </div>
               </div>

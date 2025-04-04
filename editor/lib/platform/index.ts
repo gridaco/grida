@@ -713,7 +713,7 @@ export namespace Platform.WEST.Referral {
       code: string,
       invitation_id: string
     ): Promise<{ data: Invitation }> {
-      return fetch(`/west/t/invite`, {
+      return fetch(`/west/t/refresh`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -754,4 +754,54 @@ export namespace Platform.WEST.Referral {
       //
     }
   }
+}
+
+export namespace Platform.WEST.Referral.Wizard {
+  export type RewardType = "double-sided" | "referrer-only" | "invitee-only";
+  export type RewardCurrencyType =
+    | "virtual-currency"
+    | "draw-ticket"
+    | "discount"
+    | "custom";
+
+  export type CampaignData = {
+    name: string;
+    description: string;
+    reward_strategy_type: RewardType;
+    reward_currency_type: RewardCurrencyType;
+    reward_currency: string;
+    max_invitations_per_referrer: number | null;
+    referrer_milestone_rewards: Array<{
+      threshold: number;
+      description: string;
+      value: number;
+    }>;
+    invitee_onboarding_reward: {
+      description: string;
+      value: number;
+    };
+    __prefers_builtin_platform: boolean;
+    __prefers_offline_manual: boolean;
+    challenges: Array<{
+      index: number;
+      trigger_name: string;
+      description: string;
+      depends_on: string | null;
+    }>;
+    triggers: Array<{
+      name: string;
+      description: string;
+    }>;
+    conversion_currency: string;
+    conversion_value: number | null;
+    is_referrer_name_exposed_to_public_dangerously: boolean;
+    is_invitee_name_exposed_to_public_dangerously: boolean;
+    enabled: boolean;
+    scheduling: {
+      __prefers_start_now: boolean;
+      scheduling_open_at: string | null;
+      scheduling_close_at: string | null;
+      scheduling_tz: string | null;
+    };
+  };
 }

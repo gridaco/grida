@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -86,9 +87,11 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   Double-sided rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Both referrers and invitees receive rewards. Most effective
-                  for viral growth.
+                  Both referrers and invitees receive rewards.
                 </p>
+                <Badge variant="outline" className="w-fit">
+                  Most effective
+                </Badge>
               </div>
             </div>
 
@@ -107,9 +110,11 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   Referrer-only rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Only people who refer others get rewards. Good for
-                  incentivizing existing users.
+                  Only people who refer others get rewards.
                 </p>
+                <Badge variant="outline" className="w-fit">
+                  Good for existing users
+                </Badge>
               </div>
             </div>
 
@@ -128,9 +133,11 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   Invitee-only rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Only people who join through referrals get rewards. Good for
-                  acquisition.
+                  Only people who join through referrals get rewards.
                 </p>
+                <Badge variant="outline" className="w-fit">
+                  Good for acquisition
+                </Badge>
               </div>
             </div>
           </RadioGroup>
