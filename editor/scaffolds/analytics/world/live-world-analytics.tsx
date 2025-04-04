@@ -154,7 +154,7 @@ function View({
           dateKey: "at",
           from: new Date(now.getTime() - 15 * 60 * 1000),
           to: now,
-          intervalMs: 15 * 1000,
+          interval: 15 * 1000,
         }
       );
       return {

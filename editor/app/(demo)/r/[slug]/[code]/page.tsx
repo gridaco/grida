@@ -4,8 +4,8 @@ import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 import useSWR from "swr";
 import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
-import Invite from "./_invite";
-import Join from "./_join";
+import ReferrerPage from "./_invite";
+import InvitationPage from "./_join";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Params = {
@@ -15,14 +15,16 @@ type Params = {
 
 export default function RoutingPage({ params }: { params: Params }) {
   const client = useMemo(
-    () => new Platform.WEST.WestClient(params.slug),
+    () => new Platform.WEST.Referral.WestReferralClient(params.slug),
     [params.slug]
   );
 
   const { code, slug } = params;
 
-  const { data, isLoading } = useSWR<{
-    data: Platform.WEST.TokenPublicRead;
+  const { data, isLoading, error } = useSWR<{
+    data:
+      | Platform.WEST.Referral.ReferrerPublicRead
+      | Platform.WEST.Referral.InvitationPublicRead;
   }>(
     code,
     async (code) => {
@@ -36,9 +38,13 @@ export default function RoutingPage({ params }: { params: Params }) {
 
   useEffect(() => {
     //
-    const client = new Platform.WEST.WestClient(slug);
+    const client = new Platform.WEST.Referral.WestReferralClient(slug);
     client.track(code, "page_view");
   }, [code, slug]);
+
+  if (error) {
+    return notFound();
+  }
 
   if (isLoading || !data) {
     return (
@@ -50,19 +56,19 @@ export default function RoutingPage({ params }: { params: Params }) {
     );
   }
 
-  const { token, children } = data.data;
+  const { type } = data.data;
 
-  switch (token.token_type) {
-    case "mintable":
+  switch (type) {
+    case "referrer":
       return (
         <ScreenWindowRoot>
-          <Invite data={data.data} />
+          <ReferrerPage data={data.data} />
         </ScreenWindowRoot>
       );
-    case "redeemable":
+    case "invitation":
       return (
         <ScreenWindowRoot>
-          <Join data={data.data} />
+          <InvitationPage data={data.data} />
         </ScreenWindowRoot>
       );
 

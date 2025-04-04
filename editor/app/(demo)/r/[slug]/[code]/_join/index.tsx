@@ -7,14 +7,14 @@ import Main from "./_flows/main";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Platform } from "@/lib/platform";
 
-export default function Join({
+export default function InvitationPage({
   data,
 }: {
-  data: Platform.WEST.TokenPublicRead;
+  data: Platform.WEST.Referral.InvitationPublicRead;
 }) {
-  const { token, parent } = data;
-  const is_first_time = !(token.is_claimed || token.is_burned);
-  const referrer_name = parent!.owner.name;
+  const { is_claimed, referrer_name: _referrer_name } = data;
+  const referrer_name = _referrer_name || "?";
+  const is_first_time = !is_claimed;
   const [open, setOpen] = React.useState(is_first_time);
 
   return (

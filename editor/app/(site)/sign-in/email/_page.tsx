@@ -22,6 +22,7 @@ import toast from "react-hot-toast";
 import Link from "next/link";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Spinner } from "@/components/spinner";
 
 type Step = "email" | "otp";
 
@@ -108,6 +109,7 @@ export default function _Page() {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
                   className="w-full"
+                  required
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
@@ -137,32 +139,7 @@ export default function _Page() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InputOTP
-              maxLength={6}
-              inputMode="numeric"
-              onComplete={(otp) => {
-                handleOtp(otp);
-              }}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} />
-              </InputOTPGroup>
-              <InputOTPGroup>
-                <InputOTPSlot index={1} />
-              </InputOTPGroup>
-              <InputOTPGroup>
-                <InputOTPSlot index={2} />
-              </InputOTPGroup>
-              <InputOTPGroup>
-                <InputOTPSlot index={3} />
-              </InputOTPGroup>
-              <InputOTPGroup>
-                <InputOTPSlot index={4} />
-              </InputOTPGroup>
-              <InputOTPGroup>
-                <InputOTPSlot index={5} />
-              </InputOTPGroup>
-            </InputOTP>
+            <OTP onComplete={handleOtp} disabled={isLoading} />
 
             {error && (
               <div className="mt-4">
@@ -174,14 +151,60 @@ export default function _Page() {
               <Button
                 variant="link"
                 className="px-0 text-muted-foreground"
+                disabled={isLoading}
                 onClick={() => setStep("email")}
               >
-                ← Back
+                {isLoading ? (
+                  <>
+                    <Spinner className="me-2" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>← Back</>
+                )}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
     </div>
+  );
+}
+
+function OTP({
+  disabled,
+  onComplete,
+}: {
+  disabled?: boolean;
+  onComplete?: (otp: string) => void;
+}) {
+  return (
+    <InputOTP
+      maxLength={6}
+      disabled={disabled}
+      inputMode="numeric"
+      onComplete={(otp) => {
+        onComplete?.(otp);
+      }}
+    >
+      <InputOTPGroup>
+        <InputOTPSlot index={0} />
+      </InputOTPGroup>
+      <InputOTPGroup>
+        <InputOTPSlot index={1} />
+      </InputOTPGroup>
+      <InputOTPGroup>
+        <InputOTPSlot index={2} />
+      </InputOTPGroup>
+      <InputOTPGroup>
+        <InputOTPSlot index={3} />
+      </InputOTPGroup>
+      <InputOTPGroup>
+        <InputOTPSlot index={4} />
+      </InputOTPGroup>
+      <InputOTPGroup>
+        <InputOTPSlot index={5} />
+      </InputOTPGroup>
+    </InputOTP>
   );
 }

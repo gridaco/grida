@@ -1,6 +1,6 @@
 import {
-  createRouteHandlerWestClient,
-  grida_west_client,
+  createRouteHandlerWestReferralClient,
+  grida_west_referral_client,
 } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, context: Context) {
   const interval = req.nextUrl.searchParams.get("interval") || undefined;
 
   const cookieStore = cookies();
-  const rlsclient = createRouteHandlerWestClient(cookieStore);
+  const rlsclient = createRouteHandlerWestReferralClient(cookieStore);
 
   // !!!
   // [analyze] bypasses rls for query efficiency. we need to explicitly check the ownership.
@@ -36,12 +36,15 @@ export async function GET(req: NextRequest, context: Context) {
     return notFound();
   }
 
-  const { data, error: analyze_err } = await grida_west_client.rpc("analyze", {
-    p_series_id: campaign_id,
-    p_time_from: from,
-    p_time_to: to,
-    p_interval: interval,
-  });
+  const { data, error: analyze_err } = await grida_west_referral_client.rpc(
+    "analyze",
+    {
+      p_campaign_id: campaign_id,
+      p_time_from: from,
+      p_time_to: to,
+      p_interval: interval,
+    }
+  );
 
   if (analyze_err) {
     console.error("analyze", analyze_err);

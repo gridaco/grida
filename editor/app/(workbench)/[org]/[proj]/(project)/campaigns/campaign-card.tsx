@@ -14,7 +14,11 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Platform } from "@/lib/platform";
 
-export function CampaignCard({ data }: { data: Platform.WEST.Campaign }) {
+export function CampaignCard({
+  data,
+}: {
+  data: Platform.WEST.Referral.Campaign;
+}) {
   // This would normally be passed as props
   const campaign = {
     id: data.id,

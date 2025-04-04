@@ -14,7 +14,9 @@ import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
 
 export default function LogsTable({ campaign_id }: { campaign_id: string }) {
-  const { data, isLoading } = useSWR<{ data: Platform.WEST.TokenEvent[] }>(
+  const { data, isLoading } = useSWR<{
+    data: Platform.WEST.Referral.TokenEvent[];
+  }>(
     `/private/west/campaigns/${campaign_id}/events`,
     async (url) => {
       const res = await fetch(url);

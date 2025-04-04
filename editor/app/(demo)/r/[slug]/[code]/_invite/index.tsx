@@ -38,26 +38,64 @@ import { Spinner } from "@/components/spinner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { mutate } from "swr";
 
-async function mkshare(token: Platform.WEST.TokenPublicRead["token"]) {
-  const client = new Platform.WEST.WestClient(token.series_id);
-  const { data: next } = await client.mint(token.code);
-
+function __share_obj({
+  campaign_id,
+  referrer_name,
+  invitation_code,
+}: {
+  campaign_id: string;
+  referrer_name: string;
+  invitation_code: string;
+}) {
   return {
     title: "Polestar 시승하고 경품 받아가세요 🎁",
-    text: `${token.owner.name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${next.series_id}/${next.code}`,
+    text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
+    url: `${window.location.origin}/r/${campaign_id}/${invitation_code}`,
   };
 }
 
-async function reshare(
-  owner: Platform.WEST.TokenPublicRead["token"]["owner"],
-  token: Platform.WEST.TokenPublicRead["children"][0]
-) {
-  return {
-    title: "Polestar 시승하고 경품 받아가세요 🎁",
-    text: `${owner.name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${token.series_id}/${token.code}`,
-  };
+async function mkshare({
+  campaign_id,
+  referrer_code,
+  referrer_name,
+}: {
+  campaign_id: string;
+  referrer_code: string;
+  referrer_name: string;
+}) {
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
+  const { data: invitation } = await client.invite(referrer_code);
+
+  return __share_obj({
+    campaign_id,
+    referrer_name,
+    invitation_code: invitation.code,
+  });
+}
+
+async function reshare({
+  campaign_id,
+  referrer_code,
+  referrer_name,
+  invitation_id,
+}: {
+  campaign_id: string;
+  referrer_code: string;
+  referrer_name: string;
+  invitation_id: string;
+}) {
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
+
+  const { data: invitation } = await client.refresh(
+    referrer_code,
+    invitation_id
+  );
+
+  return __share_obj({
+    campaign_id,
+    referrer_name,
+    invitation_code: invitation.code,
+  });
 }
 
 async function share_or_copy(sharable: {
@@ -78,21 +116,33 @@ async function share_or_copy(sharable: {
   }
 }
 
-export default function Invite({
+export default function ReferrerPage({
   data,
 }: {
-  data: Platform.WEST.TokenPublicRead;
+  data: Platform.WEST.Referral.ReferrerPublicRead;
 }) {
   const confirmDialog = useDialogState("confirm");
-  const { token, children: subtokens } = data;
+  const {
+    code,
+    campaign,
+    referrer_name: _referrer_name,
+    invitation_count,
+    invitations,
+    // children: subtokens,
+  } = data;
+  const referrer_name = _referrer_name || "?";
 
-  const { max_supply, count, owner } = token;
+  const { max_invitations_per_referrer: max_supply } = campaign;
 
-  const available_count = (max_supply ?? 0) - count;
+  const available_count = (max_supply ?? 0) - (invitation_count ?? 0);
   const is_available = available_count > 0;
 
   const triggerShare = async () => {
-    return mkshare(token).then((sharable) => {
+    return mkshare({
+      campaign_id: campaign.id,
+      referrer_code: code!,
+      referrer_name,
+    }).then((sharable) => {
       share_or_copy(sharable)
         .then(({ type }) => {
           switch (type) {
@@ -105,7 +155,7 @@ export default function Invite({
           }
         })
         .finally(() => {
-          mutate(token.code);
+          mutate(code);
           confirmDialog.closeDialog();
         });
     });
@@ -134,7 +184,7 @@ export default function Invite({
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-8 left-8">
                 <h2 className="text-2xl text-white">
-                  {owner.name} 고객님의 <br />
+                  {referrer_name} 고객님의 <br />
                   Polestar 4 시승 추천 페이지입니다.
                 </h2>
               </div>
@@ -162,7 +212,7 @@ export default function Invite({
               <Card className="relative overflow-hidden">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <CardHeader>
-                  <CardTitle>{owner.name}님의 초대권</CardTitle>
+                  <CardTitle>{referrer_name}님의 초대권</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <span className="text-lg font-bold">
@@ -170,7 +220,7 @@ export default function Invite({
                       <span>
                         <NumberFlow value={available_count} suffix="장 남음" />
                         <span className="ms-1 text-xs text-muted-foreground font-normal">
-                          (총 {max_supply}장 중 {count}장 사용)
+                          (총 {max_supply}장 중 {invitation_count}장 사용)
                         </span>
                       </span>
                     ) : (
@@ -179,8 +229,8 @@ export default function Invite({
                   </span>
                   <hr className="my-4" />
                   <p className="text-sm text-muted-foreground">
-                    {owner.name}님께 제공된 초대권을 사용해 지인에게 시승
-                    이벤트를 공유하세요. 시승 완료 시 {owner.name}님과 시승
+                    {referrer_name}님께 제공된 초대권을 사용해 지인에게 시승
+                    이벤트를 공유하세요. 시승 완료 시 {referrer_name}님과 시승
                     완료자 모두에게 특별한 혜택이 제공됩니다.
                   </p>
                 </CardContent>
@@ -188,9 +238,9 @@ export default function Invite({
             </div>
 
             <div className="mt-12 mx-4 space-y-2">
-              {subtokens.map((subtoken, index) => (
+              {invitations?.map((inv, index) => (
                 <motion.div
-                  key={subtoken.id}
+                  key={inv.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
@@ -202,15 +252,15 @@ export default function Invite({
                           <div className="font-medium truncate max-w-[180px]">
                             {"#" + (index + 1)}
                           </div>
-                          {subtoken.owner ? (
+                          {inv.is_claimed ? (
                             <div className="flex items-center gap-2">
                               <Avatar>
                                 <AvatarFallback>
-                                  {subtoken.owner?.name?.charAt(0) ?? "?"}
+                                  {inv.invitee_name?.charAt(0) ?? "?"}
                                 </AvatarFallback>
                               </Avatar>
                               <span className="text-sm font-semibold">
-                                {subtoken.owner?.name}
+                                {inv.invitee_name ?? "?"}
                               </span>
                             </div>
                           ) : (
@@ -222,7 +272,12 @@ export default function Invite({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  reshare(owner, subtoken).then((sharable) => {
+                                  reshare({
+                                    campaign_id: campaign.id,
+                                    referrer_code: code!,
+                                    referrer_name,
+                                    invitation_id: inv.id,
+                                  }).then((sharable) => {
                                     share_or_copy(sharable).then(({ type }) => {
                                       //
                                       switch (type) {
@@ -246,7 +301,7 @@ export default function Invite({
                             </div>
                           )}
                         </div>
-                        <StatusIndicator invitation={subtoken} />
+                        <StatusIndicator invitation={inv} />
                       </div>
                     </CardContent>
                   </Card>
@@ -390,18 +445,17 @@ function StatusIndicator({
   invitation,
 }: {
   invitation: {
-    is_burned: boolean;
     is_claimed: boolean;
   };
 }) {
-  if (invitation.is_burned) {
-    return (
-      <Badge className="bg-white text-amber-600 hover:bg-white flex items-center gap-1 font-medium">
-        <Gift className="h-3 w-3" />
-        미션 완료
-      </Badge>
-    );
-  }
+  // if (invitation.is_burned) {
+  //   return (
+  //     <Badge className="bg-white text-amber-600 hover:bg-white flex items-center gap-1 font-medium">
+  //       <Gift className="h-3 w-3" />
+  //       미션 완료
+  //     </Badge>
+  //   );
+  // }
 
   if (invitation.is_claimed) {
     return (

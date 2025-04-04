@@ -1,6 +1,6 @@
 import {
-  createRouteHandlerWestClient,
-  grida_west_client,
+  createRouteHandlerWestReferralClient,
+  grida_west_referral_client,
 } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, context: Context) {
   const { campaign: campaign_id } = await context.params;
 
   const cookieStore = cookies();
-  const client = createRouteHandlerWestClient(cookieStore);
+  const client = createRouteHandlerWestReferralClient(cookieStore);
 
   // check access
   const { error } = await client
@@ -31,10 +31,10 @@ export async function GET(req: NextRequest, context: Context) {
   }
 
   // SERVICE ROLE ACCESS
-  const { data, error: fetch_err } = await grida_west_client
-    .from("token_event")
+  const { data, error: fetch_err } = await grida_west_referral_client
+    .from("event_log")
     .select("*")
-    .eq("series_id", campaign_id)
+    .eq("campaign_id", campaign_id)
     .order("time", { ascending: false })
     .limit(1000);
 
