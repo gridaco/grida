@@ -18,14 +18,14 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
       name: "Alex Johnson",
       invitees: 3,
       avatar: "AJ",
-      image: "/placeholder.svg?height=40&width=40",
+      image: "/mock/avatars/avatar-01.png",
     },
     {
       id: 2,
       name: "Sam Wilson",
       invitees: 2,
       avatar: "SW",
-      image: "/placeholder.svg?height=40&width=40",
+      image: "/mock/avatars/avatar-02.png",
     },
   ];
 
@@ -35,35 +35,35 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
       referrerId: 1,
       name: "Taylor Smith",
       avatar: "TS",
-      image: "/placeholder.svg?height=32&width=32",
+      image: "/mock/avatars/avatar-03.png",
     },
     {
       id: 2,
       referrerId: 1,
       name: "Jordan Lee",
       avatar: "JL",
-      image: "/placeholder.svg?height=32&width=32",
+      image: "/mock/avatars/avatar-04.png",
     },
     {
       id: 3,
       referrerId: 1,
       name: "Casey Brown",
       avatar: "CB",
-      image: "/placeholder.svg?height=32&width=32",
+      image: "/mock/avatars/avatar-05.png",
     },
     {
       id: 4,
       referrerId: 2,
       name: "Riley Garcia",
       avatar: "RG",
-      image: "/placeholder.svg?height=32&width=32",
+      image: "/mock/avatars/avatar-06.png",
     },
     {
       id: 5,
       referrerId: 2,
       name: "Morgan Chen",
       avatar: "MC",
-      image: "/placeholder.svg?height=32&width=32",
+      image: "/mock/avatars/avatar-07.png",
     },
   ];
 
@@ -212,7 +212,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                       .map((invitee) => (
                         <div
                           key={invitee.id}
-                          className="flex items-center gap-3"
+                          className="flex items-center gap-3 relative"
                         >
                           <ChevronRight className="h-3 w-3 text-muted-foreground absolute -ml-5" />
                           <Avatar className="h-6 w-6">
