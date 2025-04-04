@@ -153,7 +153,7 @@ export function ReferrersTable({ campaign_id }: { campaign_id: string }) {
   //
 
   const onImport = async (ids: string[]) => {
-    return await fetch(`/west/c/${campaign_id}/participants/import`, {
+    return await fetch(`/private/west/${campaign_id}/participants/import`, {
       method: "POST",
       body: JSON.stringify({
         role: "referrer",
