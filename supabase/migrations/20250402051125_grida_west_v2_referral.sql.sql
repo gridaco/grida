@@ -88,22 +88,21 @@ CREATE TABLE grida_west_referral.campaign (
   name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 40),                           -- Campaign name (e.g., "Spring 2025 Campaign") / will be public
   description TEXT,                                                                   -- Campaign description / will NOT be public
 
-  is_referrer_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,      -- Expose referrer name to public
-  is_invitee_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,       -- Expose invitee name to public
+  enabled BOOLEAN NOT NULL DEFAULT true,                                              -- Enable/disable the campaign
   max_invitations_per_referrer INTEGER DEFAULT NULL,                                  -- Maximum number of tokens per host
+  scheduling_open_at timestamp with time zone null,
+  scheduling_close_at timestamp with time zone null,
+  scheduling_tz text null,
 
   reward_currency grida_west_referral.virtual_currency NOT NULL DEFAULT 'XTS',
   conversion_currency grida_west_referral.virtual_currency NOT NULL DEFAULT 'XTS',
   conversion_value NUMERIC(12, 2),
 
-  enabled BOOLEAN NOT NULL DEFAULT true,                                              -- Enable/disable the campaign
-  scheduling_open_at timestamp with time zone null,
-  scheduling_close_at timestamp with time zone null,
-  scheduling_tz text null,
+  is_referrer_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,      -- Expose referrer name to public
+  is_invitee_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,       -- Expose invitee name to public
 
   public JSONB DEFAULT '{}'::jsonb,                                                   -- custom additional public data for the campaign / will be public
   metadata JSONB DEFAULT NULL,                                                        -- Flexible additional private data for the campaign / will NOT be public
-
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),                                      -- timestamp
 
   CONSTRAINT unique_campaign_id_project_id UNIQUE (id, project_id)
@@ -144,7 +143,7 @@ CREATE TABLE grida_west_referral.campaign_wellknown_event (
     UNIQUE (campaign_id, name)
 );
 
-ALTER TABLE public.tag ENABLE ROW LEVEL SECURITY;
+ALTER TABLE grida_west_referral.campaign_wellknown_event ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_wellknown_event USING (grida_west_referral.rls_campaign(campaign_id));
 
@@ -199,6 +198,10 @@ SELECT
   id,
   name,
   enabled,
+  max_invitations_per_referrer,
+  reward_currency,
+  conversion_currency,
+  conversion_value,
   scheduling_open_at,
   scheduling_close_at,
   scheduling_tz,
@@ -231,6 +234,7 @@ CREATE TABLE grida_west_referral.referrer (
     customer_id UUID NOT NULL REFERENCES public.customer(uid) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     metadata JSONB CHECK (jsonb_typeof(metadata) = 'object'),
+    invitation_count INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT unique_referrer_customer_per_campaign UNIQUE (campaign_id, customer_id),
     CONSTRAINT fk_referrer_campaign_project FOREIGN KEY (campaign_id, project_id) REFERENCES grida_west_referral.campaign(id, project_id),
@@ -242,30 +246,48 @@ CREATE TABLE grida_west_referral.referrer (
 );
 
 ALTER TABLE grida_west_referral.referrer enable row level security;
-CREATE POLICY "access_based_on_campaign_project_membership"
-ON grida_west_referral.referrer
-USING (grida_west_referral.rls_campaign(campaign_id));
-
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.referrer USING (grida_west_referral.rls_campaign(campaign_id));
 
 CREATE TRIGGER trg_insert_token_for_referrer BEFORE INSERT ON grida_west_referral.referrer FOR EACH ROW EXECUTE FUNCTION grida_west_referral.insert_with_code();
 
+
+
 ---------------------------------------------------------------------
--- [Referrer (Public)] --
+-- [Referrer Public Secure View] --
 ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW grida_west_referral.referrer_public AS
+CREATE OR REPLACE VIEW grida_west_referral.referrer_public_secure WITH (security_invoker = true) AS
 SELECT
   r.id,
+  r.code,
   r.campaign_id,
+  r.created_at,
+  r.invitation_count,
   CASE
-    WHEN c.is_referrer_name_exposed_to_public_dangerously THEN cus.name
+    WHEN c.is_referrer_name_exposed_to_public_dangerously THEN cust.name
     ELSE NULL
-  END AS name
+  END AS referrer_name
 FROM grida_west_referral.referrer r
 JOIN grida_west_referral.campaign c ON r.campaign_id = c.id
-JOIN public.customer cus ON r.customer_id = cus.uid;
+LEFT JOIN public.customer cust ON r.customer_id = cust.uid;
 
-GRANT SELECT ON grida_west_referral.referrer_public TO anon, authenticated, service_role;
 
+
+---------------------------------------------------------------------
+-- [Refresh Invitation Count] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_west_referral.refresh_invitation_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE grida_west_referral.referrer
+  SET invitation_count = (
+    SELECT COUNT(*) FROM grida_west_referral.invitation i
+    WHERE i.referrer_id = NEW.referrer_id
+  )
+  WHERE id = NEW.referrer_id;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
 
 ---------------------------------------------------------------------
@@ -290,25 +312,31 @@ CREATE TABLE grida_west_referral.invitation (
       ON DELETE CASCADE
 );
 
+ALTER TABLE grida_west_referral.invitation enable row level security;
+CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.invitation USING (grida_west_referral.rls_campaign(campaign_id));
+
+CREATE INDEX idx_invitation_referrer_id ON grida_west_referral.invitation(referrer_id);
 CREATE TRIGGER trg_insert_token_for_invitation BEFORE INSERT ON grida_west_referral.invitation FOR EACH ROW EXECUTE FUNCTION grida_west_referral.insert_with_code();
+CREATE TRIGGER trg_refresh_invitation_count AFTER INSERT OR DELETE ON grida_west_referral.invitation FOR EACH ROW EXECUTE FUNCTION grida_west_referral.refresh_invitation_count();
+
 
 ---------------------------------------------------------------------
--- [Invitation (Public)] --
+-- [Invitation Public Secure View] --
 ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW grida_west_referral.invitation_public AS
+CREATE OR REPLACE VIEW grida_west_referral.invitation_public_secure WITH (security_invoker = true) AS
 SELECT
+  i.id,
   i.campaign_id,
-  i.id AS invitation_id,
   i.referrer_id,
+  i.is_claimed,
+  i.created_at,
   CASE
     WHEN c.is_invitee_name_exposed_to_public_dangerously THEN cust.name
     ELSE NULL
-  END AS name
+  END AS invitee_name
 FROM grida_west_referral.invitation i
 JOIN grida_west_referral.campaign c ON i.campaign_id = c.id
-JOIN public.customer cust ON i.customer_id = cust.uid;
-
-GRANT SELECT ON grida_west_referral.invitation_public TO anon, authenticated, service_role;
+LEFT JOIN public.customer cust ON i.customer_id = cust.uid;
 
 
 
@@ -404,6 +432,46 @@ FROM public.customer;
 
 GRANT SELECT ON grida_west_referral.customer TO anon, authenticated;
 
+
+
+
+---------------------------------------------------------------------
+-- [Function: Lookup] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_west_referral.lookup(
+    p_campaign_id UUID,
+    p_code TEXT
+)
+RETURNS TABLE (
+    campaign_id UUID,
+    code VARCHAR(256),
+    type grida_west_referral.token_role
+) AS $$
+BEGIN
+    -- Try invitation first
+    RETURN QUERY
+    SELECT
+        i.campaign_id,
+        i.code,
+        'invitation'::grida_west_referral.token_role
+    FROM grida_west_referral.invitation i
+    WHERE i.campaign_id = p_campaign_id AND i.code = p_code;
+
+    -- Then try referrer
+    RETURN QUERY
+    SELECT
+        r.campaign_id,
+        r.code,
+        'referrer'::grida_west_referral.token_role
+    FROM grida_west_referral.referrer r
+    WHERE r.campaign_id = p_campaign_id AND r.code = p_code;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+
+
 -----------------------------------------------------------
 -- Function: track  --
 -----------------------------------------------------------
@@ -415,26 +483,56 @@ CREATE OR REPLACE FUNCTION grida_west_referral.track(
 )
 RETURNS VOID AS $$
 DECLARE
-    invitation_record grida_west_referral.invitation%ROWTYPE;
+    ref_id UUID;
+    inv_id UUID;
 BEGIN
-    SELECT * INTO invitation_record FROM grida_west_referral.invitation
+    -- Try to find in invitation
+    SELECT id INTO inv_id
+    FROM grida_west_referral.invitation
     WHERE campaign_id = p_campaign_id AND code = p_code;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'not found';
+    IF FOUND THEN
+        INSERT INTO grida_west_referral.event_log (
+            campaign_id,
+            referrer_id,
+            onboarding_id,
+            customer_id,
+            name,
+            data
+        )
+        SELECT
+            campaign_id,
+            referrer_id,
+            o.id,
+            i.customer_id,
+            p_name,
+            p_data
+        FROM grida_west_referral.invitation i
+        LEFT JOIN grida_west_referral.onboarding o ON i.id = o.invitation_id
+        WHERE i.id = inv_id;
+        RETURN;
     END IF;
 
-    INSERT INTO grida_west_referral.event_log (
-        campaign_id,
-        invitation_id,
-        name,
-        data
-    ) VALUES (
-        invitation_record.campaign_id,
-        invitation_record.id,
-        p_name,
-        p_data
-    );
+    -- Try to find in referrer
+    SELECT id INTO ref_id
+    FROM grida_west_referral.referrer
+    WHERE campaign_id = p_campaign_id AND code = p_code;
+
+    IF FOUND THEN
+        INSERT INTO grida_west_referral.event_log (
+            campaign_id,
+            referrer_id,
+            name,
+            data
+        )
+        VALUES (
+            p_campaign_id,
+            ref_id,
+            p_name,
+            p_data
+        );
+        RETURN;
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -447,7 +545,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION grida_west_referral.invite(
     p_campaign_id UUID,
     p_code VARCHAR(256),
-    p_next_code VARCHAR(256) DEFAULT NULL
+    p_new_invitation_code VARCHAR(256) DEFAULT NULL
 )
 RETURNS grida_west_referral.invitation AS $$
 DECLARE
@@ -477,16 +575,59 @@ BEGIN
         campaign_id, referrer_id, code
     )
     VALUES (
-        parent_record.campaign_id,
-        parent_record.id,
-        p_next_code
+        origin_referrer.campaign_id,
+        origin_referrer.id,
+        COALESCE(p_new_invitation_code, grida_west_referral.gen_random_short_code())
     )
     RETURNING * INTO new_invitation;
 
-    -- TODO: track
-    -- PERFORM grida_west_referral.track(parent_record.series_id, parent_record.code, 'mint');
+    PERFORM grida_west_referral.track(origin_referrer.campaign_id, origin_referrer.code, 'invite');
 
     RETURN new_invitation;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ---------------------------------------------------------------------
+-- -- [Function: Refresh (Invitation)] --
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_west_referral.refresh(
+    p_invitation_id UUID,
+    p_new_invitation_code VARCHAR(256) DEFAULT NULL
+)
+RETURNS grida_west_referral.invitation AS $$
+DECLARE
+    invitation_record grida_west_referral.invitation%ROWTYPE;
+    new_code TEXT;
+BEGIN
+    -- Lock the invitation if unclaimed
+    SELECT * INTO invitation_record
+    FROM grida_west_referral.invitation
+    WHERE id = p_invitation_id AND is_claimed = false
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invitation not found or already claimed';
+    END IF;
+
+    -- Generate or use provided code
+    new_code := COALESCE(p_new_invitation_code, grida_west_referral.gen_random_short_code());
+
+    -- Remove old code from token registry
+    DELETE FROM grida_west_referral.code
+    WHERE campaign_id = invitation_record.campaign_id AND code = invitation_record.code;
+
+    -- Update the invitation code
+    UPDATE grida_west_referral.invitation
+    SET code = new_code
+    WHERE id = p_invitation_id
+    RETURNING * INTO invitation_record;
+
+    -- Insert new token
+    INSERT INTO grida_west_referral.code (campaign_id, code)
+    VALUES (invitation_record.campaign_id, new_code);
+
+    RETURN invitation_record;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -516,14 +657,13 @@ BEGIN
 
     -- Update invitation to claimed state
     UPDATE grida_west_referral.invitation
-    SET owner_id = p_owner_id,
+    SET customer_id = p_customer_id,
         is_claimed = true
     WHERE id = invitation_record.id
     RETURNING * INTO invitation_record;
 
-    -- TODO: track
     -- Track the claim event
-    -- PERFORM grida_west_referral.track(invitation_record.campaign_id, invitation_record.code, 'claim', jsonb_build_object('owner', p_owner_id));
+    PERFORM grida_west_referral.track(invitation_record.campaign_id, invitation_record.code, 'claim', jsonb_build_object('customer_id', p_customer_id));
 
     RETURN invitation_record;
 END;
@@ -585,3 +725,36 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
+
+-----------------------------------------------------------
+-- Function: analyze  --
+-----------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_west_referral.analyze(
+    p_campaign_id UUID,
+    p_names TEXT[] DEFAULT NULL,
+    p_time_from TIMESTAMPTZ DEFAULT NULL,
+    p_time_to TIMESTAMPTZ DEFAULT NULL,
+    p_interval INTERVAL DEFAULT INTERVAL '1 hour'
+)
+RETURNS TABLE(bucket TIMESTAMPTZ, name TEXT, count BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        time_bucket(p_interval, event_log.time) AS bucket,
+        event_log.name AS name,
+        COUNT(*) AS count
+    FROM grida_west_referral.event_log
+    WHERE event_log.campaign_id = p_campaign_id
+        AND (p_names IS NULL OR event_log.name = ANY(p_names))
+        AND (p_time_from IS NULL OR event_log.time >= p_time_from)
+        AND (p_time_to IS NULL OR event_log.time <= p_time_to)
+    GROUP BY bucket, event_log.name
+    ORDER BY bucket ASC, count DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- analyze bypasses rls, but only can be called by service_role (this is for query efficiency)
+
+REVOKE EXECUTE ON FUNCTION grida_west_referral.analyze FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION grida_west_referral.analyze TO service_role;

@@ -2328,7 +2328,7 @@ export type Database = {
             foreignKeyName: "event_log_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
-            referencedRelation: "referrer_public"
+            referencedRelation: "referrer_public_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -2404,7 +2404,7 @@ export type Database = {
             foreignKeyName: "invitation_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
-            referencedRelation: "referrer_public"
+            referencedRelation: "referrer_public_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -2457,8 +2457,8 @@ export type Database = {
             foreignKeyName: "onboarding_invitation_id_fkey"
             columns: ["invitation_id"]
             isOneToOne: true
-            referencedRelation: "invitation_public"
-            referencedColumns: ["invitation_id"]
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2507,8 +2507,8 @@ export type Database = {
             foreignKeyName: "onboarding_challenge_flag_invitation_id_fkey"
             columns: ["invitation_id"]
             isOneToOne: false
-            referencedRelation: "invitation_public"
-            referencedColumns: ["invitation_id"]
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2566,8 +2566,8 @@ export type Database = {
             foreignKeyName: "onboarding_invitee_reward_invitation_id_fkey"
             columns: ["invitation_id"]
             isOneToOne: true
-            referencedRelation: "invitation_public"
-            referencedColumns: ["invitation_id"]
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "onboarding_invitee_reward_onboarding_id_fkey"
@@ -2639,7 +2639,7 @@ export type Database = {
             foreignKeyName: "onboarding_referrer_reward_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
-            referencedRelation: "referrer_public"
+            referencedRelation: "referrer_public_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -2651,6 +2651,7 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          invitation_count: number
           metadata: Json | null
           project_id: number
         }
@@ -2660,6 +2661,7 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          invitation_count?: number
           metadata?: Json | null
           project_id: number
         }
@@ -2669,6 +2671,7 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          invitation_count?: number
           metadata?: Json | null
           project_id?: number
         }
@@ -2714,28 +2717,40 @@ export type Database = {
     Views: {
       campaign_public: {
         Row: {
+          conversion_currency: string | null
+          conversion_value: number | null
           enabled: boolean | null
           id: string | null
+          max_invitations_per_referrer: number | null
           name: string | null
           public: Json | null
+          reward_currency: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
         }
         Insert: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
           enabled?: boolean | null
           id?: string | null
+          max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
+          reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
         }
         Update: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
           enabled?: boolean | null
           id?: string | null
+          max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
+          reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
@@ -2763,11 +2778,13 @@ export type Database = {
         }
         Relationships: []
       }
-      invitation_public: {
+      invitation_public_secure: {
         Row: {
           campaign_id: string | null
-          invitation_id: string | null
-          name: string | null
+          created_at: string | null
+          id: string | null
+          invitee_name: string | null
+          is_claimed: boolean | null
           referrer_id: string | null
         }
         Relationships: [
@@ -2796,18 +2813,28 @@ export type Database = {
             foreignKeyName: "invitation_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
-            referencedRelation: "referrer_public"
+            referencedRelation: "referrer_public_secure"
             referencedColumns: ["id"]
           },
         ]
       }
-      referrer_public: {
+      referrer_public_secure: {
         Row: {
           campaign_id: string | null
+          code: string | null
+          created_at: string | null
           id: string | null
-          name: string | null
+          invitation_count: number | null
+          referrer_name: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "referrer_campaign_id_code_fkey"
+            columns: ["campaign_id", "code"]
+            isOneToOne: false
+            referencedRelation: "code"
+            referencedColumns: ["campaign_id", "code"]
+          },
           {
             foreignKeyName: "referrer_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -2826,6 +2853,20 @@ export type Database = {
       }
     }
     Functions: {
+      analyze: {
+        Args: {
+          p_campaign_id: string
+          p_names?: string[]
+          p_time_from?: string
+          p_time_to?: string
+          p_interval?: unknown
+        }
+        Returns: {
+          bucket: string
+          name: string
+          count: number
+        }[]
+      }
       claim: {
         Args: {
           p_campaign_id: string
@@ -2860,7 +2901,34 @@ export type Database = {
         Args: {
           p_campaign_id: string
           p_code: string
-          p_next_code?: string
+          p_new_invitation_code?: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          is_claimed: boolean
+          metadata: Json | null
+          referrer_id: string
+        }
+      }
+      lookup: {
+        Args: {
+          p_campaign_id: string
+          p_code: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          type: Database["grida_west_referral"]["Enums"]["token_role"]
+        }[]
+      }
+      refresh: {
+        Args: {
+          p_invitation_id: string
+          p_new_invitation_code?: string
         }
         Returns: {
           campaign_id: string
