@@ -637,20 +637,16 @@ BEGIN
     -- Generate or use provided code
     new_code := COALESCE(p_new_invitation_code, grida_west_referral.gen_random_short_code());
 
-    -- Remove old code from token registry
-    DELETE FROM grida_west_referral.code
+    -- Update the code registry
+    UPDATE grida_west_referral.code
+    SET code = new_code
     WHERE campaign_id = invitation_record.campaign_id AND code = invitation_record.code;
 
-    -- Update the invitation code
-    UPDATE grida_west_referral.invitation
-    SET code = new_code
-    WHERE id = p_invitation_id
-    RETURNING * INTO invitation_record;
-
-    -- Insert new token
-    INSERT INTO grida_west_referral.code (campaign_id, code)
-    VALUES (invitation_record.campaign_id, new_code);
-
+    -- Get the updated invitation record
+    SELECT * INTO invitation_record
+    FROM grida_west_referral.invitation
+    WHERE id = p_invitation_id;
+    
     RETURN invitation_record;
 END;
 $$ LANGUAGE plpgsql;
