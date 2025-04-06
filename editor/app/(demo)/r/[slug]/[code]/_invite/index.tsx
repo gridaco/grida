@@ -39,52 +39,52 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { mutate } from "swr";
 
 function __share_obj({
-  campaign_id,
+  campaign_ref,
   referrer_name,
   invitation_code,
 }: {
-  campaign_id: string;
+  campaign_ref: string;
   referrer_name: string;
   invitation_code: string;
 }) {
   return {
     title: "Polestar 시승하고 경품 받아가세요 🎁",
     text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${campaign_id}/${invitation_code}`,
+    url: `${window.location.origin}/r/${campaign_ref}/${invitation_code}`,
   };
 }
 
 async function mkshare({
-  campaign_id,
+  campaign_ref,
   referrer_code,
   referrer_name,
 }: {
-  campaign_id: string;
+  campaign_ref: string;
   referrer_code: string;
   referrer_name: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_ref);
   const { data: invitation } = await client.invite(referrer_code);
 
   return __share_obj({
-    campaign_id,
+    campaign_ref: campaign_ref,
     referrer_name,
     invitation_code: invitation.code,
   });
 }
 
 async function reshare({
-  campaign_id,
+  campaign_ref,
   referrer_code,
   referrer_name,
   invitation_id,
 }: {
-  campaign_id: string;
+  campaign_ref: string;
   referrer_code: string;
   referrer_name: string;
   invitation_id: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_ref);
 
   const { data: invitation } = await client.refresh(
     referrer_code,
@@ -92,7 +92,7 @@ async function reshare({
   );
 
   return __share_obj({
-    campaign_id,
+    campaign_ref: campaign_ref,
     referrer_name,
     invitation_code: invitation.code,
   });
@@ -139,7 +139,7 @@ export default function ReferrerPage({
 
   const triggerShare = async () => {
     return mkshare({
-      campaign_id: campaign.id,
+      campaign_ref: campaign.ref,
       referrer_code: code!,
       referrer_name,
     }).then((sharable) => {
@@ -273,7 +273,7 @@ export default function ReferrerPage({
                                 size="sm"
                                 onClick={() => {
                                   reshare({
-                                    campaign_id: campaign.id,
+                                    campaign_ref: campaign.ref,
                                     referrer_code: code!,
                                     referrer_name,
                                     invitation_id: inv.id,
@@ -428,7 +428,7 @@ function ConfirmDrawer({
           </section>
           <DrawerFooter className="pt-2">
             <Button onClick={onConfirmClick} disabled={!confirmed || busy}>
-              {busy && <Spinner />}
+              {busy && <Spinner className="me-2" />}
               초대장 보내기
             </Button>
             <DrawerClose asChild>

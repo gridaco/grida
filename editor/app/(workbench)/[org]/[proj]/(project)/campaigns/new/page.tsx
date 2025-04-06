@@ -25,7 +25,7 @@ export default function NewCampaignPage() {
     task.then(async (res) => {
       const { data: new_campaign } = await res.json();
       if (res.ok) {
-        router.push(`./${new_campaign.id}`);
+        router.push(`./${new_campaign.ref}`);
       }
     });
 

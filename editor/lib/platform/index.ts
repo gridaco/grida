@@ -554,7 +554,7 @@ export namespace Platform.WEST.Referral {
   }
 
   export type Campaign = {
-    id: string;
+    id: number;
     public: Record<string, string> | unknown;
     created_at: string;
     description: string | null;
@@ -569,8 +569,13 @@ export namespace Platform.WEST.Referral {
     scheduling_tz: string | null;
   };
 
+  export type CampaignWithRef = Campaign & {
+    ref: string;
+  };
+
   export type CampaignPublic = {
-    id: string;
+    id: number;
+    ref: string;
     conversion_currency: string | null;
     conversion_value: number | null;
     enabled: boolean | null;
@@ -593,7 +598,7 @@ export namespace Platform.WEST.Referral {
   export type Referrer = {
     id: string;
     project_id: number;
-    campaign_id: string;
+    campaign_id: number;
     code: string;
     customer_id: string;
     created_at: string;
@@ -602,7 +607,7 @@ export namespace Platform.WEST.Referral {
   };
 
   export type Invitation = {
-    campaign_id: string;
+    campaign_id: number;
     code: string;
     created_at: string;
     customer_id: string | null;
@@ -621,7 +626,7 @@ export namespace Platform.WEST.Referral {
 
   export type Participant = {
     role: "referrer" | "invitee";
-    campaign_id: string;
+    campaign_id: number;
     customer_id: string;
     metadata: Record<string, string> | unknown;
     created_at: string;
@@ -632,7 +637,7 @@ export namespace Platform.WEST.Referral {
 
   export type ParticipantPublic = {
     id: string;
-    campaign_id: string;
+    campaign_id: number;
     role: "host" | "participant";
     name: string | null;
   };
@@ -649,7 +654,7 @@ export namespace Platform.WEST.Referral {
     invitation_count: number;
     invitations: {
       id: string;
-      campaign_id: string;
+      campaign_id: number;
       is_claimed: boolean;
       invitee_name: string | null;
       created_at: string;
@@ -677,10 +682,13 @@ export namespace Platform.WEST.Referral {
   //   children: (Token & { owner: ParticipantPublic })[];
   // };
 
+  const _x_grida_west_campaign_ref = "x-grida-west-campaign-ref";
+  const _x_grida_west_token_code = "x-grida-west-token-code";
+
   export class WestReferralClient<
     P extends unknown | Record<string, unknown> | null = unknown,
   > {
-    constructor(readonly campaign_id: string) {}
+    constructor(readonly campaign_ref: string) {}
 
     read(
       code: string,
@@ -692,8 +700,8 @@ export namespace Platform.WEST.Referral {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.campaign_id,
-          "x-grida-west-token-code": code,
+          [_x_grida_west_campaign_ref]: this.campaign_ref,
+          [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
     }
@@ -703,8 +711,8 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.campaign_id,
-          "x-grida-west-token-code": code,
+          [_x_grida_west_campaign_ref]: this.campaign_ref,
+          [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
     }
@@ -717,8 +725,8 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.campaign_id,
-          "x-grida-west-token-code": code,
+          [_x_grida_west_campaign_ref]: this.campaign_ref,
+          [_x_grida_west_token_code]: code,
           "x-grida-west-invitation-id": invitation_id,
         },
       }).then((res) => res.json());
@@ -729,9 +737,9 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.campaign_id,
+          [_x_grida_west_campaign_ref]: this.campaign_ref,
           "x-grida-customer-id": owner_id,
-          "x-grida-west-token-code": code,
+          [_x_grida_west_token_code]: code,
         },
       }).then((res) => {
         return res.ok;
@@ -747,8 +755,8 @@ export namespace Platform.WEST.Referral {
         }),
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.campaign_id,
-          "x-grida-west-token-code": code,
+          [_x_grida_west_campaign_ref]: this.campaign_ref,
+          [_x_grida_west_token_code]: code,
         },
       });
       //

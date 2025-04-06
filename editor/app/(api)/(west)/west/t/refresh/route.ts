@@ -10,41 +10,23 @@ import { notFound } from "next/navigation";
 export async function POST(req: NextRequest) {
   //
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
+  const campaign_ref = headersList.get("x-grida-west-campaign-ref");
   const code = headersList.get("x-grida-west-token-code");
   const invitation_id = headersList.get("x-grida-west-invitation-id");
 
-  assert(campaign_id, "x-grida-west-campaign-id is required");
+  assert(campaign_ref, "x-grida-west-campaign-ref is required");
   assert(code, "x-grida-west-token-code is required");
   assert(invitation_id, "x-grida-west-invitation-id is required");
 
-  const { data: found, error: not_found_err } = await grida_west_referral_client
-    .from("invitation")
-    .select(
-      `
-        *,
-        referrer!inner (
-          id,
-          campaign_id,
-          code
-        )
-      `
-    )
-    .eq("referrer.code", code)
-    .eq("referrer.campaign_id", campaign_id)
-    .eq("id", invitation_id); // filter invitation directly
-
-  if (not_found_err) console.error("error fetching invitation", not_found_err);
-  if (!found) return notFound();
-
   const { data: next, error: refresh_err } =
     await grida_west_referral_client.rpc("refresh", {
+      p_campaign_ref: campaign_ref,
       p_invitation_id: invitation_id,
     });
 
   if (refresh_err) {
     console.error("error while refreshing", refresh_err);
-    return NextResponse.json({ error: refresh_err }, { status: 500 });
+    return notFound();
   }
 
   return NextResponse.json({

@@ -9,14 +9,14 @@ export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
+  const campaign_ref = headersList.get("x-grida-west-campaign-ref");
   const code = headersList.get("x-grida-west-token-code");
   assert(code, "x-grida-west-token-code is required");
-  assert(campaign_id, "x-grida-west-campaign-id is required");
+  assert(campaign_ref, "x-grida-west-campaign-ref is required");
 
   const { data: ref, error: ref_err } = await grida_west_referral_client
     .rpc("lookup", {
-      p_campaign_id: campaign_id,
+      p_campaign_ref: campaign_ref,
       p_code: code,
     })
     .single();
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
           `
         )
         .eq("code", code)
-        .eq("campaign_id", campaign_id)
+        .eq("campaign_id", ref.campaign_id)
         .order("created_at", { referencedTable: "invitations" })
         .single();
 
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
             `
         )
         .eq("code", code)
-        .eq("campaign_id", campaign_id)
+        .eq("campaign_id", ref.campaign_id)
         .single();
       if (error) console.error(error);
       if (!data) return notFound();

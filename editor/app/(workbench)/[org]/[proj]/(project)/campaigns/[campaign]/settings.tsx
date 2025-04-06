@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
-
+import { useCampaign } from "./store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,7 +83,7 @@ const formSchema = z.object({
 
 type CampaignFormValues = z.infer<typeof formSchema>;
 
-function useCampaign(id: string) {
+function useCampaignData(id: number) {
   const [campaign, setCampaign] =
     useState<Platform.WEST.Referral.Campaign | null>(null);
   const client = useMemo(() => createClientWestReferralClient(), []);
@@ -138,12 +138,9 @@ function useCampaign(id: string) {
   return { campaign, update };
 }
 
-export default function CampaignSettings({
-  campaign_id,
-}: {
-  campaign_id: string;
-}) {
-  const { campaign, update } = useCampaign(campaign_id);
+export default function CampaignSettings() {
+  const { id } = useCampaign();
+  const { campaign, update } = useCampaignData(id);
 
   if (!campaign) {
     return (
@@ -155,7 +152,7 @@ export default function CampaignSettings({
 
   return (
     <Body
-      campaign_id={campaign_id}
+      campaign_id={id}
       defaultValues={campaign as Partial<CampaignFormValues>}
       onSubmit={update}
     />
@@ -167,7 +164,7 @@ function Body({
   defaultValues,
   onSubmit,
 }: {
-  campaign_id: string;
+  campaign_id: number;
   defaultValues: Partial<CampaignFormValues>;
   onSubmit: (data: CampaignFormValues) => Promise<boolean>;
 }) {

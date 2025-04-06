@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Analytics } from "@/lib/analytics";
 import useSWR from "swr";
+import { useCampaign } from "./store";
 
 interface DateRange {
   from: Date;
@@ -41,7 +42,8 @@ interface AnalyzedData {
   }[];
 }
 
-export default function Overview({ campaign_id }: { campaign_id: string }) {
+export default function Overview() {
+  const campaign = useCampaign();
   const [range, setRange] = useState<DateRange>({
     // start of the day
     from: new Date(new Date().setHours(0, 0, 0, 0)),
@@ -59,7 +61,7 @@ export default function Overview({ campaign_id }: { campaign_id: string }) {
   }, [range, interval]);
 
   const { data } = useSWR<{ data: AnalyzedData }>(
-    `/private/west/campaigns/${campaign_id}/events/analyze?${qs}`,
+    `/private/west/campaigns/${campaign.id}/events/analyze?${qs}`,
     async (url) => {
       const res = await fetch(url);
       return res.json();

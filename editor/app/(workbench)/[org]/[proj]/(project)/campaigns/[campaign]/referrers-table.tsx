@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ColumnDef } from "@tanstack/react-table";
+import { ColumnDef, CellContext } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -21,12 +21,54 @@ import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { MoreHorizontal } from "lucide-react";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { useCampaign } from "./store";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
 };
+
+function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
+  const referrer = row.original;
+
+  const { ref } = useCampaign();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open menu</span>
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem
+          onClick={() => {
+            open(`/r/${ref}/${referrer.code}`, "_blank");
+          }}
+        >
+          <OpenInNewWindowIcon className="size-4 me-2" />
+          Open URL
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            toast.success("Copied ID to clipboard");
+            navigator.clipboard.writeText(referrer.customer_id);
+          }}
+        >
+          Copy Customer ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <Link href={`../customers/${referrer.customer_id}`}>
+          <DropdownMenuItem>View customer details</DropdownMenuItem>
+        </Link>
+        <DropdownMenuItem disabled>View participant details</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const columns: ColumnDef<ReferrerWithCustomer>[] = [
   {
@@ -84,50 +126,11 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: ({ row }) => {
-      const referrer = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => {
-                open(`/r/${referrer.campaign_id}/${referrer.code}`, "_blank");
-              }}
-            >
-              <OpenInNewWindowIcon className="size-4 me-2" />
-              Open URL
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                toast.success("Copied ID to clipboard");
-                navigator.clipboard.writeText(referrer.customer_id);
-              }}
-            >
-              Copy Customer ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <Link href={`../customers/${referrer.customer_id}`}>
-              <DropdownMenuItem>View customer details</DropdownMenuItem>
-            </Link>
-            <DropdownMenuItem disabled>
-              View participant details
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
+    cell: ActionsCell,
   },
 ];
 
-function useReferrers(campaign_id: string) {
+function useReferrers(campaign_id: number) {
   const [participants, setParticipants] = useState<
     ReferrerWithCustomer[] | null
   >(null);
@@ -153,16 +156,17 @@ function useReferrers(campaign_id: string) {
   return { tokens: participants };
 }
 
-export function ReferrersTable({ campaign_id }: { campaign_id: string }) {
+export function ReferrersTable() {
+  const campaign = useCampaign();
   const importCustomersDialog = useDialogState("import-customers", {
     refreshkey: true,
   });
-  const { tokens } = useReferrers(campaign_id);
+  const { tokens } = useReferrers(campaign.id);
   //
 
   const onImport = async (ids: string[]) => {
     return await fetch(
-      `/private/west/campaigns/${campaign_id}/participants/import`,
+      `/private/west/campaigns/${campaign.id}/participants/import`,
       {
         method: "POST",
         body: JSON.stringify({

@@ -40,8 +40,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { useCampaign } from "./store";
 
-const QUESTNAME = "refer-a-friend";
+const QUESTNAME = "refer-a-friend"; // TODO:
 
 type ReferrerQuest = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -50,9 +51,10 @@ type ReferrerQuest = Platform.WEST.Referral.Referrer & {
   })[];
 };
 
-function useReferrerQuests(campaign_id: string) {
+function useReferrerQuests(campaign_id: number) {
   const [tokens, setTokens] = useState<ReferrerQuest[] | null>(null);
   const client = useMemo(() => createClientWestReferralClient(), []);
+  const campaign = useCampaign();
 
   useEffect(() => {
     client
@@ -77,10 +79,11 @@ function useReferrerQuests(campaign_id: string) {
   return { tokens };
 }
 
-export function QuestsTable({ campaign_id }: { campaign_id: string }) {
+export function QuestsTable() {
+  const campaign = useCampaign();
   const [expandedQuests, setExpandedQuests] = useState<string[]>([]);
 
-  const { tokens } = useReferrerQuests(campaign_id);
+  const { tokens } = useReferrerQuests(campaign.id);
 
   // FIXME:
   const max_invitations_per_referrer = 10;
@@ -258,10 +261,7 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => {
-                            open(
-                              `/r/${quest.campaign_id}/${quest.code}`,
-                              "_blank"
-                            );
+                            open(`/r/${campaign.ref}/${quest.code}`, "_blank");
                           }}
                         >
                           <OpenInNewWindowIcon className="size-4 me-2" />

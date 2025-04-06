@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  campaign: string;
+  campaign_id: number;
 };
 
 export async function POST(
@@ -15,7 +15,7 @@ export async function POST(
 ) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerWestReferralClient(cookieStore);
-  const { campaign: campaign_id } = await context.params;
+  const { campaign_id: campaign_id } = await context.params;
   const body =
     (await req.json()) as Platform.WEST.Referral.ImportParticipantsRequestBody;
 

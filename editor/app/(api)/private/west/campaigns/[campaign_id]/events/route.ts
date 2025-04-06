@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  campaign: string;
+  campaign_id: number;
 };
 
 type Context = {
@@ -15,7 +15,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const { campaign: campaign_id } = await context.params;
+  const { campaign_id: campaign_id } = await context.params;
 
   const cookieStore = cookies();
   const client = createRouteHandlerWestReferralClient(cookieStore);

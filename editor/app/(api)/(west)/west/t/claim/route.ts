@@ -16,10 +16,10 @@ type Context = {
 export async function POST(req: NextRequest, context: Context) {
   const { code } = await context.params;
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
+  const campaign_ref = headersList.get("x-grida-west-campaign-ref");
   const customer_id = headersList.get("x-grida-customer-id");
 
-  if (!campaign_id) {
+  if (!campaign_ref) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
@@ -27,22 +27,10 @@ export async function POST(req: NextRequest, context: Context) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const { data: campaign, error: campaign_fetch_err } =
-    await grida_west_referral_client
-      .from("campaign")
-      .select()
-      .eq("id", campaign_id)
-      .single();
-
-  if (campaign_fetch_err) {
-    console.error(campaign_fetch_err);
-    return NextResponse.json({ error: campaign_fetch_err }, { status: 500 });
-  }
-
   const { data: next, error: mint_err } = await grida_west_referral_client.rpc(
     "claim",
     {
-      p_campaign_id: campaign_id,
+      p_campaign_ref: campaign_ref,
       p_code: code,
       p_customer_id: customer_id,
     }

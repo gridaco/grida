@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
-import { ColumnDef } from "@tanstack/react-table";
+import React from "react";
+import { ColumnDef, CellContext } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,50 @@ import { useEffect, useMemo, useState } from "react";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
-import toast from "react-hot-toast";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { useCampaign } from "./store";
+import toast from "react-hot-toast";
+
+function ActionsCell({
+  row,
+}: CellContext<Platform.WEST.Referral.Invitation, unknown>) {
+  const token = row.original;
+
+  const campaign = useCampaign();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open menu</span>
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem
+          onClick={() => {
+            toast.success("Copied token ID to clipboard");
+            navigator.clipboard.writeText(token.id);
+          }}
+        >
+          Copy ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            open(`/r/${campaign.ref}/${token.code}`, "_blank");
+          }}
+        >
+          <OpenInNewWindowIcon className="size-4 me-2" />
+          Open URL
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>View owner</DropdownMenuItem>
+        <DropdownMenuItem disabled>View details</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const columns: ColumnDef<Platform.WEST.Referral.Invitation>[] = [
   {
@@ -71,46 +113,11 @@ const columns: ColumnDef<Platform.WEST.Referral.Invitation>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: ({ row }) => {
-      const token = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => {
-                toast.success("Copied token ID to clipboard");
-                navigator.clipboard.writeText(token.id);
-              }}
-            >
-              Copy ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                open(`/r/${token.campaign_id}/${token.code}`, "_blank");
-              }}
-            >
-              <OpenInNewWindowIcon className="size-4 me-2" />
-              Open URL
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>View owner</DropdownMenuItem>
-            <DropdownMenuItem disabled>View details</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
+    cell: ActionsCell,
   },
 ];
 
-function useInvitations(campaign_id: string) {
+function useInvitations(campaign_id: number) {
   const [invitations, setInvitations] = useState<
     Platform.WEST.Referral.Invitation[] | null
   >(null);
@@ -134,8 +141,9 @@ function useInvitations(campaign_id: string) {
   return { invitations };
 }
 
-export function InvitationsTable({ campaign_id }: { campaign_id: string }) {
-  const { invitations } = useInvitations(campaign_id);
+export function InvitationsTable() {
+  const campaign = useCampaign();
+  const { invitations } = useInvitations(campaign.id);
 
   return <DataTable columns={columns} data={invitations ?? []} />;
 }

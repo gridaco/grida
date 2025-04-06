@@ -8,6 +8,7 @@ import LogsTable from "./logs-table";
 import CampaignSettings from "./settings";
 import Overview from "./overview";
 import { Badge } from "@/components/ui/badge";
+import { useCampaign } from "./store";
 
 type Params = {
   org: string;
@@ -16,13 +17,13 @@ type Params = {
 };
 
 export default function CampaignsPage({ params }: { params: Params }) {
-  const { campaign: campaign_id } = params;
+  const campaign = useCampaign();
 
   return (
     <main className="container mx-auto my-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Campaign</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
           <p className="text-muted-foreground">
             Track your marketing campaign performance in real-time
           </p>
@@ -41,22 +42,22 @@ export default function CampaignsPage({ params }: { params: Params }) {
         </TabsList>
         <hr className="mt-2 mb-6" />
         <TabsContent value="overview">
-          <Overview campaign_id={campaign_id} />
+          <Overview />
         </TabsContent>
         <TabsContent value="referres">
-          <ReferrersTable campaign_id={campaign_id} />
+          <ReferrersTable />
         </TabsContent>
         <TabsContent value="quests">
-          <QuestsTable campaign_id={campaign_id} />
+          <QuestsTable />
         </TabsContent>
         <TabsContent value="invitations">
-          <InvitationsTable campaign_id={campaign_id} />
+          <InvitationsTable />
         </TabsContent>
         <TabsContent value="logs">
-          <LogsTable campaign_id={campaign_id} />
+          <LogsTable />
         </TabsContent>
         <TabsContent value="settings">
-          <CampaignSettings campaign_id={campaign_id} />
+          <CampaignSettings />
         </TabsContent>
       </Tabs>
     </main>

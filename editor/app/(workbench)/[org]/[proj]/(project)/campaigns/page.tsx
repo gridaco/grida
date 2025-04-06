@@ -19,11 +19,11 @@ export default function ChainsPage({ params }: { params: Params }) {
   const { id: project_id } = useProject();
 
   const { data: campaigns, isLoading } = useSWR<
-    Platform.WEST.Referral.Campaign[]
+    Platform.WEST.Referral.CampaignWithRef[]
   >([project_id], {
     fetcher: async () => {
-      const { data: series, error } = await client
-        .from("campaign")
+      const { data: campaigns, error } = await client
+        .from("campaign_with_ref")
         .select("*")
         .eq("project_id", project_id);
 
@@ -31,9 +31,11 @@ export default function ChainsPage({ params }: { params: Params }) {
         throw new Error(error.message);
       }
 
-      return series;
+      return campaigns;
     },
   });
+
+  console.log("campaigns", campaigns);
 
   if (!campaigns) {
     return (
@@ -61,10 +63,10 @@ export default function ChainsPage({ params }: { params: Params }) {
         />
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {campaigns.map((s) => {
+        {campaigns.map((c) => {
           return (
-            <Link key={s.id} href={`./campaigns/${s.id}`}>
-              <CampaignCard data={s} />
+            <Link key={c.id} href={`./campaigns/${c.ref}`}>
+              <CampaignCard data={c} />
             </Link>
           );
         })}
