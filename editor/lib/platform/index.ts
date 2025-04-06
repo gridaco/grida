@@ -624,26 +624,6 @@ export namespace Platform.WEST.Referral {
     phone: string | null;
   };
 
-  export type Participant = {
-    role: "referrer" | "invitee";
-    campaign_id: number;
-    customer_id: string;
-    metadata: Record<string, string> | unknown;
-    created_at: string;
-    name: string | null;
-    email: string | null;
-    phone: string | null;
-  };
-
-  export type ParticipantPublic = {
-    id: string;
-    campaign_id: number;
-    role: "host" | "participant";
-    name: string | null;
-  };
-
-  //
-
   export type ReferrerPublicRead = {
     type: "referrer";
     id: string;
@@ -673,21 +653,10 @@ export namespace Platform.WEST.Referral {
     created_at: string;
   };
 
-  // export type TokenPublicRead = {
-  //   token: Token & { owner: ParticipantPublic };
-  //   campaign: CampaignPublic;
-  //   parent: {
-  //     owner: ParticipantPublic;
-  //   } | null;
-  //   children: (Token & { owner: ParticipantPublic })[];
-  // };
-
   const _x_grida_west_campaign_ref = "x-grida-west-campaign-ref";
   const _x_grida_west_token_code = "x-grida-west-token-code";
 
-  export class WestReferralClient<
-    P extends unknown | Record<string, unknown> | null = unknown,
-  > {
+  export class WestReferralClient {
     constructor(readonly campaign_ref: string) {}
 
     read(
@@ -733,7 +702,7 @@ export namespace Platform.WEST.Referral {
     }
 
     claim(code: string, owner_id: string) {
-      return fetch(`/west/t/${code}/claim`, {
+      return fetch(`/west/t/claim`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

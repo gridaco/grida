@@ -1,6 +1,4 @@
-import { GridaLogo } from "@/components/grida-logo";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createServerComponentWorkspaceClient,
   createServerComponentWestReferralClient,
@@ -9,9 +7,6 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
-const mock = {
-  project_name: "Project Name",
-};
 
 type Params = {
   portal: string;
@@ -19,19 +14,28 @@ type Params = {
 
 const dictionary = {
   ko: {
+    now: "지금",
+    past: "지난",
+    upcoming: "예정된",
     campaigns: "참여중인 이벤트",
   },
   en: {
+    now: "Now",
+    past: "Past",
+    upcoming: "Upcoming",
     campaigns: "Participating Events",
   },
 };
+
+type RangeQuery = "now" | "upcoming" | "past";
 
 export default async function CustomerPortalSession({
   params,
 }: {
   params: Promise<Params>;
 }) {
-  const { project_name } = mock;
+  // TODO: bound by project
+
   const cookieStore = cookies();
   const authclient = createServerComponentWorkspaceClient(cookieStore);
   const westclient = createServerComponentWestReferralClient(cookieStore);
@@ -49,7 +53,6 @@ export default async function CustomerPortalSession({
     .from("customer")
     .select()
     .eq("user_id", data.session.user.id)
-    // TODO: project
     .single();
 
   // if (!cus) {
@@ -68,38 +71,55 @@ export default async function CustomerPortalSession({
 
   return (
     <main className="flex min-h-screen">
-      <aside className="flex flex-col p-10 bg-primary text-primary-foreground">
-        <header>{project_name}</header>
-        <div className="flex-1" />
-        <div>
-          <span className="text-xs">Powered by</span>
-          <span className="ml-2">
-            <GridaLogo size={15} className="fill-white" />
-          </span>
-        </div>
-      </aside>
       <aside className="p-10 flex-1">
-        <Tabs defaultValue="campaigns">
-          <TabsList>
-            <TabsTrigger value="campaigns">{t.campaigns}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="campaigns">
-            {iam_referrers?.map((r) => {
-              const link = `/r/${r.campaign_id}/${r.code}`;
-              return (
-                <Link key={link} href={link}>
-                  <CampaignReferrerCard
-                    campaign={r.campaign}
-                    referrer={{
-                      invitation_count: 1,
-                    }}
-                  />
-                </Link>
-              );
-            })}
-          </TabsContent>
-        </Tabs>
+        <header className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground">
+              {cus?.name ?? "Customer Name"}
+            </p>
+          </div>
+          <Tabs defaultValue="now">
+            <TabsList>
+              <TabsTrigger value="now">{t.now}</TabsTrigger>
+              <TabsTrigger value="upcoming">{t.upcoming}</TabsTrigger>
+              <TabsTrigger value="past">{t.past}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </header>
+
+        <section>
+          <header className="my-2">
+            <h2 className="text-xl font-bold tracking-tight">{t.campaigns}</h2>
+          </header>
+          {iam_referrers?.length === 0 && <Empty />}
+          {iam_referrers?.map((r) => {
+            const link = `/r/${r.campaign.ref}/${r.code}`;
+            return (
+              <Link key={link} href={link}>
+                <CampaignReferrerCard
+                  campaign={r.campaign}
+                  referrer={{
+                    invitation_count: 1,
+                  }}
+                />
+              </Link>
+            );
+          })}
+        </section>
       </aside>
     </main>
+  );
+}
+
+function Empty() {
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-full p-10">
+      <h2 className="text-xl font-bold tracking-tight text-muted-foreground">
+        No Upcoming Events
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        You have no upcoming events.
+      </p>
+    </div>
   );
 }
