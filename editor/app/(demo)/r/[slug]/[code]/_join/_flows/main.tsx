@@ -1,18 +1,19 @@
 "use client";
 
 import React from "react";
-import { CountdownTimer } from "../../../../timer";
+// import { CountdownTimer } from "../../timer";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PolestarTypeLogo } from "@/components/logos";
+import NumberFlow from "@number-flow/react";
 // import data from "./data.json";
 import t from "./data-01.json";
 import {
@@ -42,6 +43,8 @@ import {
 } from "@/k/system";
 import { PhoneInput } from "@/components/extension/phone-input";
 import { Spinner } from "@/components/spinner";
+import * as Standard from "../../standard";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -57,11 +60,15 @@ const external_link =
 
 export default function Main({
   data,
+  visible,
 }: {
+  visible: boolean;
   data: Platform.WEST.Referral.InvitationPublicRead;
 }) {
   const { code, campaign, referrer_name, is_claimed } = data;
   const router = useRouter();
+
+  const signupformDialog = useDialogState("signupform");
 
   const onClaim = async (geust: GuestForm) => {
     const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
@@ -91,348 +98,327 @@ export default function Main({
   //   return <>Already used.</>;
   // }
 
+  const reward_value = 100000;
+  const reward_currency = "KRW";
+  const reward_description = "TMAP EV 충전 포인트";
+  const reward_currency_valid = reward_currency.length === 3;
+
   return (
     <ScreenMobileFrame>
       <ScreenScrollable>
         <div>
           {/* Header */}
-          <header className="py-4 flex items-center justify-center">
+          <Standard.Header>
+            {/* <Standard.Logo
+                          srcLight="https://www.polestar.com/w3-assets/favicon-32x32.png"
+                          srcDark="https://www.polestar.com/w3-assets/favicon-32x32.png"
+                          alt="logo"
+                          width={400}
+                          height={200}
+                          className="h-10 w-auto object-contain"
+                        /> */}
             <PolestarTypeLogo />
-            {/* <ACME className="text-foreground" /> */}
-          </header>
+          </Standard.Header>
 
-          {/* Hero Section */}
-          <div className="relative w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={t.hero.media.src}
-              alt={t.hero.media.alt}
-              className="object-cover aspect-square @4xl:aspect-video select-none pointer-events-none w-full"
+          {/* Main Image */}
+          <Standard.Section className="pb-4">
+            <Standard.MainImage src={t.hero.media.src} alt={t.hero.media.alt} />
+          </Standard.Section>
+
+          <Standard.Section className="py-4">
+            <Standard.Title>{t.hero.title}</Standard.Title>
+            <span className="text-sm text-muted-foreground">
+              {referrer_name}님 께서 Polestar 4 를 추천 했습니다.
+            </span>
+            <Standard.BrandHostChip
+              logo={{
+                srcLight:
+                  "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+              }}
+              name="Polestar"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-            <div className="absolute bottom-8 left-8">
-              <h2 className="text-2xl text-white">
-                <span dangerouslySetInnerHTML={{ __html: t.hero.title }} />
-              </h2>
-            </div>
-          </div>
+          </Standard.Section>
 
           {/* Countdown Timer */}
-          {!is_claimed && (
+          {/* {!is_claimed && (
             <div className="flex justify-center items-center py-12 px-4">
               <CountdownTimer />
             </div>
-          )}
+          )} */}
 
-          {!is_claimed && (
-            <div className="my-10 mx-4">
-              <Card className="relative overflow-hidden">
-                <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TicketCheckIcon className="size-5" />
-                    {referrer_name}님의 초대 {is_claimed ? "(수락 완료)" : ""}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {referrer_name}님으로부터 초대를 받았습니다. <br />
-                    이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게
-                    경품이 지급됩니다.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {!is_claimed && (
-            <Card className="mx-4 py-6 px-6">
-              {/* {data.perks.map((perk, index) => ( */}
-              {/* <div key={index} className="text-center"> */}
-              <div className="text-center">
-                <p className=" font-medium">Polestar 시승 완료 시 혜택</p>
-                <p className="text-xl font-semibold">
-                  TMAP EV 충전 포인트 10만원
-                </p>
-
-                <p className="text-sm font-light mt-2 text-muted-foreground">
-                  시승 신청자 본인에 한함 <br />
-                  이벤트 기간 : 2025년 00월 00일까지
-                </p>
+          <Standard.Section>
+            <Card className="relative overflow-hidden rounded-xl">
+              <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+              <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
+                {/* background */}
+                <div className="absolute inset-0 bg-gradient-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
+                <div className="z-10 flex items-center gap-2">
+                  <TicketCheckIcon className="size-5" />
+                  <span className="text-sm font-medium">
+                    {referrer_name}님의 초대
+                  </span>
+                </div>
               </div>
-              <hr className="my-8" />
-              <ApplicantForm onSubmit={onClaim} />
+              <CardHeader className="px-4 py-4">
+                <span>
+                  <span className="text-xl font-bold">
+                    <NumberFlow
+                      value={visible ? reward_value : reward_value * 0.01}
+                      format={{
+                        style: reward_currency_valid ? "currency" : undefined,
+                        currency: reward_currency_valid
+                          ? reward_currency
+                          : undefined,
+                      }}
+                    />
+                    <span className="ms-1 text-xs text-muted-foreground font-normal">
+                      {reward_description}
+                    </span>
+                  </span>
+                </span>
+              </CardHeader>
+              <hr />
+              <CardContent className="px-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  {referrer_name}님으로부터 초대를 받았습니다. <br />
+                  이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게
+                  경품이 지급됩니다.
+                </p>
+              </CardContent>
+              <CardFooter className="px-4 pb-4">
+                {/* CTA Button */}
+                {!is_claimed && (
+                  <Button
+                    onClick={signupformDialog.openDialog}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {t.cta.label}
+                  </Button>
+                )}
+              </CardFooter>
             </Card>
-          )}
 
-          {is_claimed && (
-            <div className="my-10 mx-4">
-              <Card className="relative overflow-hidden">
-                <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TicketCheckIcon className="size-5" />
-                    시승 확인중
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    이벤트 참여가 완료되었습니다. 폴스타에서 시승을 완료해
-                    주세요. 이후 문자를 통해 안내 드리겠습니다.
-                    <br />
-                    <br />
-                    시승 신청을 완료하지 못하였나요?{" "}
-                    <Link href={external_link} className="underline">
-                      다시 신청하기
-                    </Link>
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+            {is_claimed && (
+              <div className="my-10 mx-4">
+                <Card className="relative overflow-hidden">
+                  <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TicketCheckIcon className="size-5" />
+                      시승 확인중
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      이벤트 참여가 완료되었습니다. 폴스타에서 시승을 완료해
+                      주세요. 이후 문자를 통해 안내 드리겠습니다.
+                      <br />
+                      <br />
+                      시승 신청을 완료하지 못하였나요?{" "}
+                      <Link href={external_link} className="underline">
+                        다시 신청하기
+                      </Link>
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </Standard.Section>
 
-          {/* Info Section */}
-          <div className="pt-12 pb-8 space-y-2 px-2">
+          <SignUpForm {...signupformDialog.props} onSubmit={onClaim} />
+
+          <Standard.Section>
+            <header className="border-b py-2 my-4 text-sm text-muted-foreground">
+              이벤트 안내
+            </header>
             <article className="prose prose-sm dark:prose-invert">
               <span dangerouslySetInnerHTML={{ __html: t.info }} />
+              <h6>이벤트 FAQ</h6>
+              <ul>
+                <li>시승이 완료된 후 경품이 지급됩니다. </li>
+                <li>
+                  시승 신청자 본인에 한하여 시승 가능하며, 타인에게 양도할 수
+                  없습니다.
+                </li>
+                <li>
+                  운전면허 소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년
+                  이상의 분들만 참여 가능합니다.
+                </li>
+                <li>
+                  차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.
+                </li>
+                <li>
+                  시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인
+                  부담입니다.
+                </li>
+                <li>시승 신청자에게 휴대폰 문자로 상세 안내 예정입니다.</li>
+              </ul>
             </article>
-          </div>
-          <div className="flex justify-center items-center pb-8 px-4">
-            <AccordionDemo />
-          </div>
-
-          {/* CTA Button */}
-          {/* <footer className="sticky border-t bottom-0 left-0 right-0 bg-background p-4 shadow-t">
-            <Link href={data.cta.link} target="_blank">
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={!isFormValid}
-              >
-                시승 신청하기
-              </Button>
-            </Link>
-          </footer> */}
+          </Standard.Section>
+          <Standard.FooterTemplate
+            logo={{
+              srcLight: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+              srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+            }}
+            privacy="/privacy"
+            instagram="https://www.instagram.com/polestarcars/"
+            paragraph={
+              "폴스타오토모티브코리아 유한회사 사업자등록번호 513-87-02053 / 통신판매업신고번호 2021-서울강남-07017 / 대표 HAM JONG SUNG(함종성) / 주소 서울특별시 강남구 학동로 343, 5층(논현동) / 전화번호 080-360-0100"
+            }
+          />
         </div>
       </ScreenScrollable>
     </ScreenMobileFrame>
   );
 }
 
-function AccordionDemo() {
-  return (
-    <Accordion type="single" collapsible className="w-full">
-      <AccordionItem value="item-1">
-        <AccordionTrigger className="text-base font-normal">
-          위치 안내
-        </AccordionTrigger>
-        <AccordionContent>
-          {" "}
-          <PolestarLocation />{" "}
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="item-2">
-        <AccordionTrigger className="text-base font-normal">
-          이벤트 FAQ
-        </AccordionTrigger>
-        <AccordionContent className="text-sm font-normal">
-          1. 시승이 완료된 후 경품이 지급됩니다. <br /> 2. 시승 신청자 본인에
-          한하여 시승 가능하며, 타인에게 양도할 수 없습니다. <br /> 3. 운전면허
-          소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년 이상의 분들만 참여
-          가능합니다.
-          <br /> 4. 차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.
-          <br /> 5. 시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인
-          부담입니다. <br /> 6. 시승 신청자에게 휴대폰 문자로 상세 안내
-          예정입니다.
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
-}
-
-function PolestarLocation() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 p-4 w-[250px] border rounded-md">
-        <p className="font-medium">Polestar 경기</p>
-        <span className="text-xs text-muted-foreground">
-          대한민국 경기도 하남시 신장동 미사대로 750
-        </span>
-      </div>
-      <div className="flex flex-col gap-2 p-4 w-[250px] border rounded-md">
-        <p className="font-medium">Polestar 부산</p>
-        <span className="text-xs text-muted-foreground">
-          대한민국 부산광역시 해운대구 센텀4로 15 센텀시티 몰 1층
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ApplicantForm({
+function SignUpForm({
   onSubmit,
-}: {
+  ...props
+}: React.ComponentProps<typeof Drawer> & {
   onSubmit?: (data: { name: string; phone: string }) => Promise<void>;
 }) {
+  const [isBusy, setIsBusy] = useState(false);
+  const [step, setStep] = React.useState(0);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const isFormValid = name.trim() !== "" && phone.trim() !== "";
-  const [isBusy, setIsBusy] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (onSubmit && isFormValid) {
-      setIsBusy(true);
-      onSubmit({ name, phone }).finally(() => {
-        setIsBusy(false);
-        setIsDrawerOpen(false);
-      });
-    }
-  };
+  const steps = [
+    { title: "시승 신청자 정보를 입력해주세요" },
+    {
+      title: "시승 예약 전 꼭 확인해주세요",
+      description: "모든 내용 확인 시 시승 예약이 가능합니다",
+    },
+  ];
 
-  return (
-    <form id="application" onSubmit={handleSubmit} className="space-y-6">
-      <h2 className="text-lg font-semibold mb-6 text-center">
-        시승 신청자 정보를 입력해주세요
-      </h2>
-
-      <div className="grid gap-2">
-        <Label htmlFor="name">이름</Label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="홍길동"
-          required
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="phone">핸드폰 번호</Label>
-        <div className="grid gap-2">
-          <PhoneInput
-            id="phone"
-            defaultCountry="KR"
-            placeholder="01012345678"
-            required
-            onChange={(phone) => setPhone(phone)}
-          />
-        </div>
-      </div>
-      <hr className="my-4" />
-
-      <Button
-        type="button"
-        className="w-full"
-        size="lg"
-        disabled={!isFormValid}
-        onClick={() => {
-          if (isFormValid) {
-            setIsDrawerOpen(true);
-          }
-        }}
-      >
-        시승 신청하기
-      </Button>
-      <FinalConfirm
-        isBusy={isBusy}
-        open={isDrawerOpen}
-        setOpen={setIsDrawerOpen}
-      />
-    </form>
-  );
-}
-
-function FinalConfirm({
-  isBusy,
-  open,
-  setOpen,
-}: {
-  isBusy?: boolean;
-  open: boolean;
-  setOpen: (open: boolean) => void;
-}) {
   const [checkedItems, setCheckedItems] = React.useState({
     first: false,
     second: false,
   });
 
-  const handleCheckboxChange = (key: "first" | "second") => {
+  const step1valid = name.trim() !== "" && phone.trim() !== "";
+  const step2valid = checkedItems.first && checkedItems.second;
+
+  const canContinue = (step === 0 && step1valid) || (step === 1 && step2valid);
+
+  const stepdata = steps[step];
+
+  const handleSubmit = () => {
+    if (onSubmit && step1valid && step2valid) {
+      setIsBusy(true);
+      onSubmit({ name, phone }).finally(() => {
+        setIsBusy(false);
+        props.onOpenChange?.(false);
+        setStep(0);
+      });
+    }
+  };
+
+  const onNext = () => {
+    const max = steps.length - 1;
+    if (step < max) {
+      setStep((prev) => prev + 1);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const onPrev = () => {
+    if (step > 0) {
+      setStep((prev) => prev - 1);
+    } else {
+      props.onOpenChange?.(false);
+    }
+  };
+
+  const onCheckboxChange = (key: "first" | "second") => {
     setCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const allChecked = checkedItems.first && checkedItems.second;
-
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer {...props}>
       <DrawerContent>
         <DrawerHeader className="text-left">
-          <DrawerTitle>시승 예약 전 꼭 확인해주세요</DrawerTitle>
-          <DrawerDescription>
-            모든 내용 확인 시 시승 예약이 가능합니다
-          </DrawerDescription>
+          <DrawerTitle>{stepdata.title}</DrawerTitle>
+          <DrawerDescription>{stepdata.description}</DrawerDescription>
         </DrawerHeader>
-        <ChecklistForm
-          onCheckboxChange={handleCheckboxChange}
-          checkedItems={checkedItems}
-          className="p-4"
-        />
+        <div className="px-4 my-4">
+          {step === 0 && (
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">이름</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="홍길동"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">핸드폰 번호</Label>
+                <div className="grid gap-2">
+                  <PhoneInput
+                    id="phone"
+                    defaultCountry="KR"
+                    placeholder="01012345678"
+                    required
+                    onChange={(phone) => setPhone(phone)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="grid gap-4">
+              <label className="flex items-start gap-2">
+                <Checkbox
+                  checked={checkedItems.first}
+                  onCheckedChange={() => onCheckboxChange("first")}
+                />
+                <span className="text-sm text-muted-foreground">
+                  개인정보 수집에 동의합니다. (응모자 식별 정보: 이름, 연락처)
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <Checkbox
+                  checked={checkedItems.second}
+                  onCheckedChange={() => onCheckboxChange("second")}
+                />
+                <span className="text-sm text-muted-foreground">
+                  반드시 현재 입력하신 시승 신청자 정보와 동일한 <br />{" "}
+                  &quot;이름과 핸드폰 번호&quot;로 시승 예약을 해야 이벤트
+                  참여가 인정됩니다.
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
         <DrawerFooter className="pt-2">
-          <Button
-            form="application"
-            type="submit"
-            disabled={!allChecked || isBusy}
-          >
-            {isBusy ? (
-              <>
-                <Spinner className="me-2" />
-                신청중...
-              </>
-            ) : (
-              <>다음으로</>
-            )}
-          </Button>
-          <DrawerClose asChild>
-            <Button variant="outline">이전으로</Button>
-          </DrawerClose>
+          <div className="w-full flex items-center gap-2">
+            <Button variant="outline" onClick={onPrev}>
+              이전으로
+            </Button>
+            <Button
+              onClick={onNext}
+              disabled={!canContinue || isBusy}
+              className="w-full"
+            >
+              {isBusy ? (
+                <>
+                  <Spinner className="me-2" />
+                  신청중...
+                </>
+              ) : (
+                <>다음으로</>
+              )}
+            </Button>
+          </div>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  );
-}
-
-function ChecklistForm({
-  className = "",
-  onCheckboxChange,
-  checkedItems,
-}: {
-  className?: string;
-  onCheckboxChange: (key: "first" | "second") => void;
-  checkedItems: { first: boolean; second: boolean };
-}) {
-  return (
-    <div className={`${className} grid gap-4`}>
-      <label className="flex items-start gap-2">
-        <Checkbox
-          checked={checkedItems.first}
-          onCheckedChange={() => onCheckboxChange("first")}
-        />
-        <span className="text-sm text-muted-foreground">
-          개인정보 수집에 동의합니다. (응모자 식별 정보: 이름, 연락처)
-        </span>
-      </label>
-      <label className="flex items-start gap-2">
-        <Checkbox
-          checked={checkedItems.second}
-          onCheckedChange={() => onCheckboxChange("second")}
-        />
-        <span className="text-sm text-muted-foreground">
-          반드시 현재 입력하신 시승 신청자 정보와 동일한 <br /> &quot;이름과
-          핸드폰 번호&quot;로 시승 예약을 해야 이벤트 참여가 인정됩니다.
-        </span>
-      </label>
-    </div>
   );
 }

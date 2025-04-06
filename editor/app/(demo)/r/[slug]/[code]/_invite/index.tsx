@@ -1,21 +1,18 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ScreenMobileFrame,
   ScreenRoot,
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import t from "./data-01.json";
-import toast from "react-hot-toast"; // Import toast
 import { PolestarTypeLogo } from "@/components/logos";
 import { Checkbox } from "@/components/ui/checkbox"; // Adjust import according to your UI library
 import { Platform } from "@/lib/platform";
@@ -33,10 +30,14 @@ import { ShineBorder } from "@/www/ui/shine-border";
 import NumberFlow from "@number-flow/react";
 import { motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
-import { Check, Gift } from "lucide-react";
+import { Check } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { mutate } from "swr";
+import { TicketCheckIcon } from "lucide-react";
+import toast from "react-hot-toast"; // Import toast
+import * as Standard from "../standard";
+import t from "./data-01.json";
 
 function __share_obj({
   campaign_ref,
@@ -167,57 +168,56 @@ export default function ReferrerPage({
         <ScreenScrollable>
           <main className="bg-background h-full flex flex-col">
             {/* Header */}
-            <header className="py-4 flex items-center justify-center">
+            <Standard.Header>
+              {/* <Standard.Logo
+                srcLight="https://www.polestar.com/w3-assets/favicon-32x32.png"
+                srcDark="https://www.polestar.com/w3-assets/favicon-32x32.png"
+                alt="logo"
+                width={400}
+                height={200}
+                className="h-10 w-auto object-contain"
+              /> */}
               <PolestarTypeLogo />
-              {/* <ACME className="text-foreground" /> */}
-            </header>
-
-            {/* Hero Section */}
-            <div className="relative w-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            </Standard.Header>
+            {/* Main Image */}
+            <Standard.Section className="pb-4">
+              <Standard.MainImage
                 src={t.hero.media.src}
                 alt={t.hero.media.alt}
-                className="object-cover aspect-square select-none pointer-events-none w-full"
               />
-              {/* overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute bottom-8 left-8">
-                <h2 className="text-2xl text-white">
-                  {referrer_name} 고객님의 <br />
-                  Polestar 4 시승 추천 페이지입니다.
-                </h2>
-              </div>
-            </div>
-
-            <Card className="mt-12 mx-4 py-6 px-6">
-              <div className="space-y-4">
-                <Badge variant="outline">Polestar 시승 완료 시 혜택</Badge>
-                <p className="text-xl font-semibold">
-                  TMAP EV 충전 포인트 10만원 <br />
-                  <span className="text-sm text-muted-foreground">
-                    (시승 완료자 1인당 10만원권 / 최대 3인까지)
-                  </span>
-                </p>
-
-                <p className="text-sm font-light text-muted-foreground">
-                  • 대상 : 2025년 출고 고객
-                  <br /> 초대권을 통해 지인의 시승 완료 시, 출고 고객과 시승자
-                  본인 모두 혜택 제공 (최대 3인까지 제공)
-                </p>
-              </div>
-            </Card>
-
-            <div className="mt-10 mx-4">
-              <Card className="relative overflow-hidden">
+            </Standard.Section>
+            <Standard.Section className="py-4">
+              <Standard.Title>시승 초대 하고 경품 받기</Standard.Title>
+              <span className="text-sm text-muted-foreground">
+                {referrer_name} 고객님의 Polestar 4 시승 추천 페이지입니다.
+              </span>
+              <Standard.BrandHostChip
+                logo={{
+                  srcLight:
+                    "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                  srcDark:
+                    "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                }}
+                name="Polestar"
+              />
+            </Standard.Section>
+            <Standard.Section className="py-4">
+              <Card className="relative overflow-hidden rounded-xl">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-                <CardHeader>
-                  <CardTitle>{referrer_name}님의 초대권</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-lg font-bold">
+                <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
+                  {/* background */}
+                  <div className="absolute inset-0 bg-gradient-to-bl from-[#A07CFE] to-[#FFBE7B] opacity-30" />
+                  <div className="z-10 flex items-center gap-2">
+                    <TicketCheckIcon className="size-5" />
+                    <span className="text-sm font-medium">
+                      {referrer_name}님의 초대권
+                    </span>
+                  </div>
+                </div>
+                <CardHeader className="px-4 py-4">
+                  <span>
                     {available_count > 0 ? (
-                      <span>
+                      <span className="text-xl font-bold">
                         <NumberFlow value={available_count} suffix="장 남음" />
                         <span className="ms-1 text-xs text-muted-foreground font-normal">
                           (총 {max_supply}장 중 {invitation_count}장 사용)
@@ -227,17 +227,30 @@ export default function ReferrerPage({
                       <>모두 소진</>
                     )}
                   </span>
-                  <hr className="my-4" />
+                </CardHeader>
+                <hr />
+                <CardContent className="px-4 py-4">
                   <p className="text-sm text-muted-foreground">
                     {referrer_name}님께 제공된 초대권을 사용해 지인에게 시승
-                    이벤트를 공유하세요. 시승 완료 시 {referrer_name}님과 시승
-                    완료자 모두에게 특별한 혜택이 제공됩니다.
+                    이벤트를 공유하세요.
                   </p>
                 </CardContent>
+                <CardFooter className="px-4 pb-4">
+                  {/* CTA Button */}
+                  {is_available && (
+                    <Button
+                      onClick={confirmDialog.openDialog}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {t.cta.label}
+                    </Button>
+                  )}
+                </CardFooter>
               </Card>
-            </div>
+            </Standard.Section>
 
-            <div className="mt-12 mx-4 space-y-2">
+            <div className="mx-4 space-y-2">
               {invitations?.map((inv, index) => (
                 <motion.div
                   key={inv.id}
@@ -249,7 +262,7 @@ export default function ReferrerPage({
                     <CardContent className="px-4 py-2">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <div className="font-medium truncate max-w-[180px]">
+                          <div className="max-w-[180px] font-medium truncate text-muted-foreground">
                             {"#" + (index + 1)}
                           </div>
                           {inv.is_claimed ? (
@@ -309,67 +322,70 @@ export default function ReferrerPage({
               ))}
             </div>
 
-            {/* Info Section */}
-            <div className="pt-12 pb-8 space-y-2">
-              <article className="prose prose-sm dark:prose-invert">
-                <span dangerouslySetInnerHTML={{ __html: t.info }} />
-              </article>
-            </div>
-            <div className="flex justify-center items-center pb-8 px-4">
-              <FaQ />
-            </div>
+            <Standard.Section>
+              <header className="border-b py-2 my-4 text-sm text-muted-foreground">
+                이벤트 안내
+              </header>
 
-            <div className="flex-1" />
-            {/* CTA Button */}
-            {is_available && (
-              <footer className="sticky bottom-0 mt-auto left-0 right-0 bg-background p-4 border-t">
-                <Button
-                  onClick={confirmDialog.openDialog}
-                  className="w-full"
-                  size="lg"
-                >
-                  {t.cta.label}
-                </Button>
-              </footer>
-            )}
+              <article className="prose prose-sm dark:prose-invert">
+                <h2>🏆 Polestar 4 시승 추천 하고 경품 받아게세요</h2>
+                <Card className="py-6 px-6">
+                  <div className="space-y-4">
+                    <Badge variant="outline">Polestar 시승 완료 시 혜택</Badge>
+                    <p className="text-xl font-semibold">
+                      TMAP EV 충전 포인트 10만원 <br />
+                      <span className="text-sm text-muted-foreground">
+                        (시승 완료자 1인당 10만원권 / 최대 3인까지)
+                      </span>
+                    </p>
+
+                    <p className="text-sm font-light text-muted-foreground">
+                      • 대상 : 2025년 출고 고객
+                      <br /> 초대권을 통해 지인의 시승 완료 시, 출고 고객과
+                      시승자 본인 모두 혜택 제공 (최대 3인까지 제공)
+                    </p>
+                  </div>
+                </Card>
+                <span dangerouslySetInnerHTML={{ __html: t.info }} />
+                <h6>이벤트 FAQ</h6>
+                <ul>
+                  <li>시승이 완료된 후 경품이 지급됩니다. </li>
+                  <li>
+                    시승 신청자 본인에 한하여 시승 가능하며, 타인에게 양도할 수
+                    없습니다.
+                  </li>
+                  <li>
+                    운전면허 소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년
+                    이상의 분들만 참여 가능합니다.
+                  </li>
+                  <li>
+                    차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.
+                  </li>
+                  <li>
+                    시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인
+                    부담입니다.
+                  </li>
+                  <li>시승 신청자에게 휴대폰 문자로 상세 안내 예정입니다.</li>
+                </ul>
+              </article>
+            </Standard.Section>
+            <Standard.FooterTemplate
+              logo={{
+                srcLight:
+                  "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+              }}
+              privacy="/privacy"
+              instagram="https://www.instagram.com/polestarcars/"
+              paragraph={
+                "폴스타오토모티브코리아 유한회사 사업자등록번호 513-87-02053 / 통신판매업신고번호 2021-서울강남-07017 / 대표 HAM JONG SUNG(함종성) / 주소 서울특별시 강남구 학동로 343, 5층(논현동) / 전화번호 080-360-0100"
+              }
+            />
           </main>
           <ConfirmDrawer {...confirmDialog.props} onConfirm={triggerShare} />
         </ScreenScrollable>
       </ScreenMobileFrame>
     </ScreenRoot>
-  );
-}
-
-function FaQ() {
-  return (
-    <Accordion type="single" collapsible className="w-full">
-      <AccordionItem value="item-2">
-        <AccordionTrigger className="text-base font-normal">
-          이벤트 FAQ
-        </AccordionTrigger>
-        <AccordionContent className="text-sm font-normal">
-          <article className="prose prose-sm dark:prose-invert">
-            <ol>
-              <li>시승이 완료된 후 경품이 지급됩니다. </li>
-              <li>
-                시승 신청자 본인에 한하여 시승 가능하며, 타인에게 양도할 수
-                없습니다.
-              </li>
-              <li>
-                운전면허 소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년
-                이상의 분들만 참여 가능합니다.
-              </li>
-              <li>차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.</li>
-              <li>
-                시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인
-                부담입니다.
-              </li>
-              <li>시승 신청자에게 휴대폰 문자로 상세 안내 예정입니다.</li>
-            </ol>
-          </article>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
   );
 }
 

@@ -37,7 +37,7 @@ export default function InvitationPage({
           </DialogPrimitive.DialogContent>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
-      <Main data={data} />
+      <Main data={data} visible={!open} />
     </ScreenRoot>
   );
 }
