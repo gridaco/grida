@@ -67,8 +67,8 @@ const timezones = [
 
 // Form schema based on the database structure
 const formSchema = z.object({
-  name: z.string().min(1).max(40, {
-    message: "Campaign name must be between 1 and 40 characters",
+  name: z.string().min(1).max(256, {
+    message: "Campaign name must be between 1 and 256 characters",
   }),
   description: z.string().optional(),
   is_invitee_name_exposed_to_public_dangerously: z.boolean().default(false),

@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,10 +17,12 @@ import { useEffect, useMemo, useState } from "react";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
-import toast from "react-hot-toast";
 import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { MoreHorizontal } from "lucide-react";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -85,7 +85,7 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const item = row.original;
+      const referrer = row.original;
 
       return (
         <DropdownMenu>
@@ -99,14 +99,22 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => {
+                open(`/r/${referrer.campaign_id}/${referrer.code}`, "_blank");
+              }}
+            >
+              <OpenInNewWindowIcon className="size-4 me-2" />
+              Open URL
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
                 toast.success("Copied ID to clipboard");
-                navigator.clipboard.writeText(item.customer_id);
+                navigator.clipboard.writeText(referrer.customer_id);
               }}
             >
               Copy Customer ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <Link href={`../customers/${item.customer_id}`}>
+            <Link href={`../customers/${referrer.customer_id}`}>
               <DropdownMenuItem>View customer details</DropdownMenuItem>
             </Link>
             <DropdownMenuItem disabled>

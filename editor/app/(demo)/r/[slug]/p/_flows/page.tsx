@@ -1,18 +1,18 @@
 "use client";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { PolestarTypeLogo } from "@/components/logos";
 import {
   ScreenMobileFrame,
   ScreenRoot,
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
-import Verify from "./step-verify";
 import data from "./data-01.json";
-import { ACME } from "@/components/logos/acme";
+import Link from "next/link";
 
 export default function Portal() {
+  const portalid = "fixme"; // FIXME:
+
   return (
     <ScreenRoot>
       <ScreenMobileFrame>
@@ -35,20 +35,14 @@ export default function Portal() {
                 <h1 className="text-xl font-semibold text-center">
                   {data.title}
                 </h1>
-
                 <p className="text-center text-sm text-muted-foreground">
                   {data.description}
                 </p>
               </div>
               <div className="flex w-full mx-auto items-center justify-center">
-                <Dialog>
-                  <DialogTrigger>
-                    <Button>{data.trigger.label}</Button>
-                  </DialogTrigger>
-                  <DialogContent className="min-h-screen max-w-none">
-                    <Verify />
-                  </DialogContent>
-                </Dialog>
+                <Link href="/p/[policy]/login" as={`/p/${portalid}/login`}>
+                  <Button>{data.trigger.label}</Button>
+                </Link>
               </div>
             </div>
           </main>

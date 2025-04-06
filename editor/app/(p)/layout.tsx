@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ToasterWithMax } from "@/components/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import "../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Grida Customer Portal",
-};
 
 export default function RootLayout({
   children,

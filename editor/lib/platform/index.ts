@@ -577,7 +577,7 @@ export namespace Platform.WEST.Referral {
     max_invitations_per_referrer: number | null;
     name: string | null;
     public: Record<string, string> | unknown;
-    reward_currency: string | null;
+    reward_currency: string;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
