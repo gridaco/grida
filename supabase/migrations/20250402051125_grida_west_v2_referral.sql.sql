@@ -83,7 +83,7 @@ RETURNS TEXT AS $$
 BEGIN
   RETURN id_encode(
     p_id,
-    'grida_referral_salt_v1',                    -- ok to be public
+    'grida_west_campaign_salt_v1',               -- ok to be public
     8,                                           -- min length
     'abcdefghijklmnopqrstuvwxyz0123456789'       -- lowercase + digits
   );
@@ -92,13 +92,21 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION grida_west_referral.ref_decode(p_ref TEXT)
 RETURNS INTEGER AS $$
+DECLARE
+  decoded INTEGER[];
 BEGIN
-  RETURN id_decode(
+  decoded := id_decode(
     p_ref,
-    'grida_referral_salt_v1',                    -- same salt used in ref_encode
-    8,                                           -- min length (should match encode)
-    'abcdefghijklmnopqrstuvwxyz0123456789'       -- same alphabet used in ref_encode
+    'grida_west_campaign_salt_v1',
+    8,
+    'abcdefghijklmnopqrstuvwxyz0123456789'
   );
+
+  IF array_length(decoded, 1) IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'Invalid campaign ref: %', p_ref;
+  END IF;
+
+  RETURN decoded[1];
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -189,6 +197,17 @@ CREATE POLICY "access_based_on_project_membership" ON grida_west_referral.campai
 
 
 ---------------------------------------------------------------------
+-- [Campaign (Ref)] --
+---------------------------------------------------------------------
+CREATE OR REPLACE VIEW grida_west_referral.campaign_with_ref WITH (security_invoker = true) AS
+SELECT
+  *,
+  grida_west_referral.ref_encode(id) AS ref
+FROM grida_west_referral.campaign;
+
+
+
+---------------------------------------------------------------------
 -- [rls_campaign] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.rls_campaign(p_campaign_id INTEGER)
@@ -272,7 +291,6 @@ CREATE TABLE grida_west_referral.campaign_invitee_onboarding_reward (
 ALTER TABLE grida_west_referral.campaign_invitee_onboarding_reward ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_invitee_onboarding_reward USING (grida_west_referral.rls_campaign(campaign_id));
 
-
 ---------------------------------------------------------------------
 -- [Campaign (Public)] --
 ---------------------------------------------------------------------
@@ -348,6 +366,7 @@ SELECT
   r.id,
   r.code,
   r.campaign_id,
+  grida_west_referral.ref_encode(r.campaign_id) AS campaign_ref,
   r.created_at,
   r.invitation_count,
   CASE
@@ -416,6 +435,7 @@ CREATE OR REPLACE VIEW grida_west_referral.invitation_public_secure WITH (securi
 SELECT
   i.id,
   i.campaign_id,
+  grida_west_referral.ref_encode(i.campaign_id) AS campaign_ref,
   i.referrer_id,
   i.is_claimed,
   i.created_at,
@@ -692,7 +712,7 @@ BEGIN
     )
     RETURNING * INTO new_invitation;
 
-    PERFORM grida_west_referral.track(origin_referrer.campaign_id, origin_referrer.code, 'invite');
+    PERFORM grida_west_referral.track(p_campaign_ref, origin_referrer.code, 'invite');
 
     RETURN new_invitation;
 END;
@@ -775,7 +795,7 @@ BEGIN
     RETURNING * INTO invitation_record;
 
     -- Track the claim event
-    PERFORM grida_west_referral.track(invitation_record.campaign_id, invitation_record.code, 'claim', jsonb_build_object('customer_id', p_customer_id));
+    PERFORM grida_west_referral.track(p_campaign_ref, invitation_record.code, 'claim', jsonb_build_object('customer_id', p_customer_id));
 
     RETURN invitation_record;
 END;
@@ -825,7 +845,8 @@ BEGIN
   END IF;
 
   -- Step 5: insert event and challenge log
-  PERFORM grida_west_referral.track(p_campaign_id, NULL, p_event_name, p_event_data);
+  -- get the campaign.ref
+  PERFORM grida_west_referral.track(grida_west_referral.ref_encode(p_campaign_id), NULL, p_event_name, p_event_data);
 
   INSERT INTO grida_west_referral.onboarding_challenge_flag (
     campaign_id,

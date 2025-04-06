@@ -2086,6 +2086,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_challenge_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "campaign_challenge_depends_on_fkey"
             columns: ["depends_on"]
             isOneToOne: false
@@ -2141,6 +2148,13 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaign_invitee_onboarding_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
         ]
       }
       campaign_referrer_milestone_reward: {
@@ -2186,6 +2200,13 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaign_referrer_milestone_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
         ]
       }
       campaign_wellknown_event: {
@@ -2225,6 +2246,13 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaign_wellknown_event_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
         ]
       }
       code: {
@@ -2259,6 +2287,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "code_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
         ]
@@ -2304,6 +2339,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2390,6 +2432,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invitation_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -2450,6 +2499,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "onboarding_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "onboarding_invitation_id_fkey"
             columns: ["invitation_id"]
             isOneToOne: true
@@ -2497,6 +2553,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_challenge_flag_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2556,6 +2619,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitee_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2625,6 +2695,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "onboarding_referrer_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "onboarding_referrer_reward_onboarding_id_fkey"
             columns: ["onboarding_id"]
             isOneToOne: false
@@ -2687,6 +2764,13 @@ export type Database = {
             referencedColumns: ["id", "project_id"]
           },
           {
+            foreignKeyName: "fk_referrer_campaign_project"
+            columns: ["campaign_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id", "project_id"]
+          },
+          {
             foreignKeyName: "referrer_campaign_id_code_fkey"
             columns: ["campaign_id", "code"]
             isOneToOne: false
@@ -2705,6 +2789,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2763,6 +2854,72 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_with_ref: {
+        Row: {
+          conversion_currency: string | null
+          conversion_value: number | null
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          id: number | null
+          image_path: string | null
+          is_invitee_name_exposed_to_public_dangerously: boolean | null
+          is_referrer_name_exposed_to_public_dangerously: boolean | null
+          max_invitations_per_referrer: number | null
+          metadata: Json | null
+          name: string | null
+          project_id: number | null
+          public: Json | null
+          ref: string | null
+          reward_currency: string | null
+          scheduling_close_at: string | null
+          scheduling_open_at: string | null
+          scheduling_tz: string | null
+        }
+        Insert: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: number | null
+          image_path?: string | null
+          is_invitee_name_exposed_to_public_dangerously?: boolean | null
+          is_referrer_name_exposed_to_public_dangerously?: boolean | null
+          max_invitations_per_referrer?: number | null
+          metadata?: Json | null
+          name?: string | null
+          project_id?: number | null
+          public?: Json | null
+          ref?: never
+          reward_currency?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+        }
+        Update: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: number | null
+          image_path?: string | null
+          is_invitee_name_exposed_to_public_dangerously?: boolean | null
+          is_referrer_name_exposed_to_public_dangerously?: boolean | null
+          max_invitations_per_referrer?: number | null
+          metadata?: Json | null
+          name?: string | null
+          project_id?: number | null
+          public?: Json | null
+          ref?: never
+          reward_currency?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
+        }
+        Relationships: []
+      }
       customer: {
         Row: {
           email: string | null
@@ -2787,6 +2944,7 @@ export type Database = {
       invitation_public_secure: {
         Row: {
           campaign_id: number | null
+          campaign_ref: string | null
           created_at: string | null
           id: string | null
           invitee_name: string | null
@@ -2809,6 +2967,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invitation_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
@@ -2827,6 +2992,7 @@ export type Database = {
       referrer_public_secure: {
         Row: {
           campaign_id: number | null
+          campaign_ref: string | null
           code: string | null
           created_at: string | null
           id: string | null
@@ -2853,6 +3019,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
         ]

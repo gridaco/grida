@@ -18,9 +18,15 @@ export type Database = MergeDeep<
     };
     grida_west_referral: {
       Views: {
+        campaign_with_ref: {
+          Row: DatabaseGenerated["grida_west_referral"]["Tables"]["campaign"]["Row"] & {
+            ref: string;
+          };
+        };
         campaign_public: {
           Row: DatabaseGenerated["grida_west_referral"]["Views"]["campaign_public"]["Row"] & {
-            id: string;
+            id: number;
+            ref: string;
             reward_currency: string;
           };
         };
