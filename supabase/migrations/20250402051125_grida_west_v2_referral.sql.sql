@@ -630,8 +630,8 @@ BEGIN
             data
         )
         SELECT
-            campaign_id,
-            referrer_id,
+            v_campaign_id,
+            i.referrer_id,
             o.id,
             i.customer_id,
             p_name,
