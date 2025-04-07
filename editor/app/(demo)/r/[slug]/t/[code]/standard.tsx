@@ -17,30 +17,28 @@ export function Section({
 }
 
 type LogoData = {
-  srcLight: string;
+  src: string;
   srcDark?: string;
+  width?: number;
+  height?: number;
+  alt?: string;
 };
 
 export function Logo({
-  srcLight,
+  src,
   srcDark,
   alt = "logo",
   width,
   height,
   className,
-}: {
-  srcLight: string;
-  srcDark?: string;
-  alt?: string;
-  width: number;
-  height: number;
+}: LogoData & {
   className?: string;
 }) {
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={srcLight}
+        src={src}
         alt={alt}
         width={width}
         height={height}
@@ -88,7 +86,7 @@ export function BrandHostChip({
   return (
     <div className="flex items-center gap-1.5 mt-4">
       <Logo
-        srcLight={logo.srcLight}
+        src={logo.src}
         srcDark={logo.srcDark}
         alt="brand logo"
         width={40}

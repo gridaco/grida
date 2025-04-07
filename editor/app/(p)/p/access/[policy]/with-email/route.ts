@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { workspaceclient } from "@/lib/supabase/server";
 import { resend } from "@/clients/resend";
 import EmailTemplateCustomerPortalVerification from "@/theme/templates-email/customer-portal-verification/default";
-
+import assert from "assert";
 // TODO: add rate limiting
 export async function POST(req: NextRequest) {
   const jsonbody = await req.json();
@@ -12,7 +12,11 @@ export async function POST(req: NextRequest) {
 
   // TODO: scope by policy / project
   const { data: customer_list, error: customer_list_err } =
-    await workspaceclient.from("customer").select().eq("email", email);
+    await workspaceclient
+      .from("customer")
+      .select()
+      .eq("email", email)
+      .order("uid");
 
   if (customer_list_err) {
     console.error(
@@ -28,19 +32,40 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (customer_list.length !== 1) {
-    console.error(
-      `[portal]/ignore while fetching customer by email (${customer_list.length}) found`
-    );
+  let customer: { uid: string } | null = null;
+  if (customer_list.length === 0) {
     // return ok, cause we don't want to leak if the email is registered or not
     return NextResponse.json({
       data: null,
       error: null,
       message: "ok",
     });
+  } else if (customer_list.length === 1) {
+    customer = customer_list[0];
+  } else if (customer_list.length > 1) {
+    // if multiple customers are found, we..
+    // - use the customer with linked user (if exists)
+    // - if not, its a known issue, we really don't have a good way to handle this
+    const customer_with_linked_user = customer_list.find(
+      (c) => c.user_id !== null
+    );
+
+    if (customer_with_linked_user) {
+      customer = customer_with_linked_user;
+    } else {
+      console.error(
+        `[portal]/ignore while fetching customer by email (${customer_list.length}) found`
+      );
+      // return ok, cause we don't want to leak if the email is registered or not
+      return NextResponse.json({
+        data: null,
+        error: null,
+        message: "ok",
+      });
+    }
   }
 
-  const customer = customer_list[0];
+  assert(customer);
 
   const { data: linkdata, error: linkerror } =
     await workspaceclient.auth.admin.generateLink({

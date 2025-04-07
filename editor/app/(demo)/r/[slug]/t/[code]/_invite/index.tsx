@@ -193,8 +193,7 @@ export default function ReferrerPage({
               </span>
               <Standard.BrandHostChip
                 logo={{
-                  srcLight:
-                    "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                  src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
                   srcDark:
                     "https://www.polestar.com/w3-assets/favicon-32x32.png",
                 }}
@@ -380,8 +379,7 @@ export default function ReferrerPage({
             </Standard.Section>
             <Standard.FooterTemplate
               logo={{
-                srcLight:
-                  "https://www.polestar.com/w3-assets/favicon-32x32.png",
+                src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
                 srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
               }}
               privacy="/privacy"
