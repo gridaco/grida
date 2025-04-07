@@ -28,7 +28,7 @@ const dictionary = {
 };
 
 type RangeQuery = "now" | "upcoming" | "past";
-
+const locale = "ko"; // FIXME:
 export default async function CustomerPortalSession({
   params,
 }: {
@@ -39,7 +39,6 @@ export default async function CustomerPortalSession({
   const cookieStore = cookies();
   const authclient = createServerComponentWorkspaceClient(cookieStore);
   const westclient = createServerComponentWestReferralClient(cookieStore);
-  const locale = "ko"; // FIXME:
 
   const t = dictionary[locale];
 
@@ -75,7 +74,7 @@ export default async function CustomerPortalSession({
         <header className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <p className="text-muted-foreground">
-              {cus?.name ?? "Customer Name"}
+              {cus?.name ?? "Customer Portal"}
             </p>
           </div>
           <Tabs defaultValue="now">

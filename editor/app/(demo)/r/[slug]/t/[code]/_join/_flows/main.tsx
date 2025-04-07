@@ -186,9 +186,9 @@ export default function Main({
                   경품이 지급됩니다.
                 </p>
               </CardContent>
-              <CardFooter className="px-4 pb-4">
-                {/* CTA Button */}
-                {!is_claimed && (
+              {!is_claimed && (
+                <CardFooter className="px-4 pb-4">
+                  {/* CTA Button */}
                   <Button
                     onClick={signupformDialog.openDialog}
                     className="w-full"
@@ -196,12 +196,12 @@ export default function Main({
                   >
                     {t.cta.label}
                   </Button>
-                )}
-              </CardFooter>
+                </CardFooter>
+              )}
             </Card>
 
             {is_claimed && (
-              <div className="my-10 mx-4">
+              <div className="my-4">
                 <Card className="relative overflow-hidden">
                   <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                   <CardHeader>
@@ -365,6 +365,7 @@ function SignUpForm({
                     defaultCountry="KR"
                     placeholder="01012345678"
                     required
+                    value={phone}
                     onChange={(phone) => setPhone(phone)}
                   />
                 </div>

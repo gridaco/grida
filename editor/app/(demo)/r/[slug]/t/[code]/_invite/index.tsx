@@ -215,16 +215,21 @@ export default function ReferrerPage({
                   </div>
                 </div>
                 <CardHeader className="px-4 py-4">
-                  <span>
+                  <span className="text-xl font-bold">
                     {available_count > 0 ? (
-                      <span className="text-xl font-bold">
+                      <span>
                         <NumberFlow value={available_count} suffix="장 남음" />
                         <span className="ms-1 text-xs text-muted-foreground font-normal">
                           (총 {max_supply}장 중 {invitation_count}장 사용)
                         </span>
                       </span>
                     ) : (
-                      <>모두 소진</>
+                      <span>
+                        모두 사용
+                        <span className="ms-1 text-xs text-muted-foreground font-normal">
+                          (총 {max_supply}장 중 {invitation_count}장 사용)
+                        </span>
+                      </span>
                     )}
                   </span>
                 </CardHeader>
@@ -235,9 +240,9 @@ export default function ReferrerPage({
                     이벤트를 공유하세요.
                   </p>
                 </CardContent>
-                <CardFooter className="px-4 pb-4">
-                  {/* CTA Button */}
-                  {is_available && (
+                {is_available && (
+                  <CardFooter className="px-4 pb-4">
+                    {/* CTA Button */}
                     <Button
                       onClick={confirmDialog.openDialog}
                       className="w-full"
@@ -245,82 +250,86 @@ export default function ReferrerPage({
                     >
                       {t.cta.label}
                     </Button>
-                  )}
-                </CardFooter>
+                  </CardFooter>
+                )}
               </Card>
             </Standard.Section>
 
-            <div className="mx-4 space-y-2">
-              {invitations?.map((inv, index) => (
-                <motion.div
-                  key={inv.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card className="overflow-hidden transition-all border">
-                    <CardContent className="px-4 py-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <div className="max-w-[180px] font-medium truncate text-muted-foreground">
-                            {"#" + (index + 1)}
-                          </div>
-                          {inv.is_claimed ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar>
-                                <AvatarFallback>
-                                  {inv.invitee_name?.charAt(0) ?? "?"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm font-semibold">
-                                {inv.invitee_name ?? "?"}
-                              </span>
+            <Standard.Section>
+              <Card className="relative overflow-hidden rounded-xl py-2">
+                {invitations?.map((inv, index) => (
+                  <motion.div
+                    key={inv.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                  >
+                    <div className="overflow-hidden transition-all">
+                      <CardContent className="px-4 py-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="max-w-[180px] font-medium truncate text-muted-foreground">
+                              {"#" + (index + 1)}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Avatar>
-                                <AvatarFallback>?</AvatarFallback>
-                              </Avatar>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  reshare({
-                                    campaign_ref: campaign.ref,
-                                    referrer_code: code!,
-                                    referrer_name,
-                                    invitation_id: inv.id,
-                                  }).then((sharable) => {
-                                    share_or_copy(sharable).then(({ type }) => {
-                                      //
-                                      switch (type) {
-                                        case "share":
-                                          toast.success(
-                                            "초대권이 재전송 되었습니다!"
-                                          );
-                                          break;
-                                        case "clipboard":
-                                          toast.success(
-                                            "초대권이 복사되었습니다!"
-                                          );
-                                          break;
-                                      }
+                            {inv.is_claimed ? (
+                              <div className="flex items-center gap-2">
+                                <Avatar className="size-10">
+                                  <AvatarFallback>
+                                    {inv.invitee_name?.charAt(0) ?? "?"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm font-semibold">
+                                  {inv.invitee_name ?? "?"}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Avatar className="size-10">
+                                  <AvatarFallback>?</AvatarFallback>
+                                </Avatar>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    reshare({
+                                      campaign_ref: campaign.ref,
+                                      referrer_code: code!,
+                                      referrer_name,
+                                      invitation_id: inv.id,
+                                    }).then((sharable) => {
+                                      share_or_copy(sharable).then(
+                                        ({ type }) => {
+                                          //
+                                          switch (type) {
+                                            case "share":
+                                              toast.success(
+                                                "초대권이 재전송 되었습니다!"
+                                              );
+                                              break;
+                                            case "clipboard":
+                                              toast.success(
+                                                "초대권이 복사되었습니다!"
+                                              );
+                                              break;
+                                          }
+                                        }
+                                      );
                                     });
-                                  });
-                                }}
-                              >
-                                다시 전송
-                              </Button>
-                            </div>
-                          )}
+                                  }}
+                                >
+                                  다시 전송
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <StatusIndicator invitation={inv} />
                         </div>
-                        <StatusIndicator invitation={inv} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+                      </CardContent>
+                    </div>
+                  </motion.div>
+                ))}
+              </Card>
+            </Standard.Section>
 
             <Standard.Section>
               <header className="border-b py-2 my-4 text-sm text-muted-foreground">
