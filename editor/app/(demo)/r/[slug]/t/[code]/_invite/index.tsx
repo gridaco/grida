@@ -254,81 +254,83 @@ export default function ReferrerPage({
               </Card>
             </Standard.Section>
 
-            <Standard.Section>
-              <Card className="relative overflow-hidden rounded-xl py-2 border-0">
-                {invitations?.map((inv, index) => (
-                  <motion.div
-                    key={inv.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
-                  >
-                    <div className="overflow-hidden transition-all">
-                      <CardContent className="px-4 py-2">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="max-w-[180px] font-medium truncate text-muted-foreground">
-                              {"#" + (index + 1)}
-                            </div>
-                            {inv.is_claimed ? (
-                              <div className="flex items-center gap-2">
-                                <Avatar className="size-10">
-                                  <AvatarFallback>
-                                    {inv.invitee_name?.charAt(0) ?? "?"}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm font-semibold">
-                                  {inv.invitee_name ?? "?"}
-                                </span>
+            {invitations.length > 0 && (
+              <Standard.Section>
+                <Card className="relative overflow-hidden rounded-xl py-2 border-0">
+                  {invitations?.map((inv, index) => (
+                    <motion.div
+                      key={inv.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <div className="overflow-hidden transition-all">
+                        <CardContent className="px-4 py-2">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <div className="max-w-[180px] font-medium truncate text-muted-foreground">
+                                {"#" + (index + 1)}
                               </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Avatar className="size-10">
-                                  <AvatarFallback>?</AvatarFallback>
-                                </Avatar>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    reshare({
-                                      campaign_slug: campaign.slug,
-                                      referrer_code: code!,
-                                      referrer_name,
-                                      invitation_id: inv.id,
-                                    }).then((sharable) => {
-                                      share_or_copy(sharable).then(
-                                        ({ type }) => {
-                                          //
-                                          switch (type) {
-                                            case "share":
-                                              toast.success(
-                                                "초대권이 재전송 되었습니다!"
-                                              );
-                                              break;
-                                            case "clipboard":
-                                              toast.success(
-                                                "초대권이 복사되었습니다!"
-                                              );
-                                              break;
+                              {inv.is_claimed ? (
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="size-10">
+                                    <AvatarFallback>
+                                      {inv.invitee_name?.charAt(0) ?? "?"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm font-semibold">
+                                    {inv.invitee_name ?? "?"}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="size-10">
+                                    <AvatarFallback>?</AvatarFallback>
+                                  </Avatar>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      reshare({
+                                        campaign_slug: campaign.slug,
+                                        referrer_code: code!,
+                                        referrer_name,
+                                        invitation_id: inv.id,
+                                      }).then((sharable) => {
+                                        share_or_copy(sharable).then(
+                                          ({ type }) => {
+                                            //
+                                            switch (type) {
+                                              case "share":
+                                                toast.success(
+                                                  "초대권이 재전송 되었습니다!"
+                                                );
+                                                break;
+                                              case "clipboard":
+                                                toast.success(
+                                                  "초대권이 복사되었습니다!"
+                                                );
+                                                break;
+                                            }
                                           }
-                                        }
-                                      );
-                                    });
-                                  }}
-                                >
-                                  다시 전송
-                                </Button>
-                              </div>
-                            )}
+                                        );
+                                      });
+                                    }}
+                                  >
+                                    다시 전송
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                            <StatusIndicator invitation={inv} />
                           </div>
-                          <StatusIndicator invitation={inv} />
-                        </div>
-                      </CardContent>
-                    </div>
-                  </motion.div>
-                ))}
-              </Card>
-            </Standard.Section>
+                        </CardContent>
+                      </div>
+                    </motion.div>
+                  ))}
+                </Card>
+              </Standard.Section>
+            )}
 
             <Standard.Section>
               <header className="border-b py-2 my-4 text-sm text-muted-foreground">
