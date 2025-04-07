@@ -12,13 +12,10 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PolestarTypeLogo } from "@/components/logos";
 import NumberFlow from "@number-flow/react";
-// import data from "./data.json";
 import t from "./data-01.json";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
@@ -43,7 +40,7 @@ import {
 } from "@/k/system";
 import { PhoneInput } from "@/components/extension/phone-input";
 import { Spinner } from "@/components/spinner";
-import * as Standard from "../../standard";
+import * as Standard from "@/theme/templates/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 interface CampaignPublicData {
@@ -109,15 +106,14 @@ export default function Main({
         <div>
           {/* Header */}
           <Standard.Header>
-            {/* <Standard.Logo
-                          srcLight="https://www.polestar.com/w3-assets/favicon-32x32.png"
-                          srcDark="https://www.polestar.com/w3-assets/favicon-32x32.png"
-                          alt="logo"
-                          width={400}
-                          height={200}
-                          className="h-10 w-auto object-contain"
-                        /> */}
-            <PolestarTypeLogo />
+            <Standard.Logo
+              src={"/logos/polestar.png"}
+              srcDark={"/logos/polestar-dark.png"}
+              alt="logo"
+              width={320}
+              height={64}
+              className="max-h-8 w-auto object-contain"
+            />
           </Standard.Header>
 
           {/* Main Image */}
@@ -261,7 +257,20 @@ export default function Main({
               src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
               srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
             }}
-            privacy="/privacy"
+            links={[
+              {
+                href: "https://www.polestar.com/kr/legal/privacy-policy/",
+                text: "개인정보 처리방침",
+              },
+              {
+                href: "https://www.polestar.com/kr/legal/terms-and-conditions/",
+                text: "이용약관",
+              },
+              {
+                href: "https://www.polestar.com/kr/legal/terms-and-conditions/#terms-of-use-for-test-drive",
+                text: "시승 이용약관",
+              },
+            ]}
             instagram="https://www.instagram.com/polestarcars/"
             paragraph={
               "폴스타오토모티브코리아 유한회사 사업자등록번호 513-87-02053 / 통신판매업신고번호 2021-서울강남-07017 / 대표 HAM JONG SUNG(함종성) / 주소 서울특별시 강남구 학동로 343, 5층(논현동) / 전화번호 080-360-0100"

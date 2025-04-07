@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { PolestarTypeLogo } from "@/components/logos";
 import {
   ScreenMobileFrame,
   ScreenRoot,
@@ -9,6 +8,7 @@ import {
 } from "@/theme/templates/kit/components";
 import data from "./data-01.json";
 import Link from "next/link";
+import * as Standard from "@/theme/templates/west-referral/standard";
 
 export default function Portal() {
   const portalid = "fixme"; // FIXME:
@@ -27,7 +27,14 @@ export default function Portal() {
                   className="object-cover aspect-square select-none pointer-events-none rounded-t-lg"
                 />
                 <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-center">
-                  <PolestarTypeLogo />
+                  <Standard.Logo
+                    src={"/logos/polestar.png"}
+                    srcDark={"/logos/polestar-dark.png"}
+                    alt="logo"
+                    width={320}
+                    height={64}
+                    className="max-h-8 w-auto object-contain"
+                  />
                   {/* <ACME /> */}
                 </div>
               </div>

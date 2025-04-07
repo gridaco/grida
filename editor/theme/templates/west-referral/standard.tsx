@@ -42,7 +42,7 @@ export function Logo({
         alt={alt}
         width={width}
         height={height}
-        className={cn("hidden dark:block", className)}
+        className={cn("block dark:hidden", className)}
       />
       {srcDark && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -51,7 +51,7 @@ export function Logo({
           alt={alt}
           width={width}
           height={height}
-          className={cn("block dark:hidden", className)}
+          className={cn("hidden dark:block", className)}
         />
       )}
     </>
@@ -67,7 +67,7 @@ export function Header({
     <header
       {...props}
       className={cn(
-        "min-h-16 h-16 flex items-center justify-center",
+        "min-h-16 h-16 py-4 flex items-center justify-center",
         className
       )}
     >
@@ -107,7 +107,7 @@ export function MainImage({
   className,
 }: {
   src: string;
-  alt: string;
+  alt?: string;
   className?: string;
 }) {
   return (
@@ -136,19 +136,25 @@ export function Title({
   );
 }
 
+type LinkData = {
+  href: string;
+  text: string;
+  target?: string;
+};
+
+type Links = LinkData[];
+
 export function FooterTemplate({
   logo,
+  links = [],
   paragraph,
   instagram,
-  privacy,
-  homepage,
 }: {
   logo: LogoData;
+  links?: Links;
   paragraph?: string;
   instagram?: string;
-  privacy: string;
   support?: string;
-  homepage?: string;
 }) {
   return (
     <footer className="grid gap-2 px-4 py-10 border-t mt-10">
@@ -166,9 +172,16 @@ export function FooterTemplate({
         </div>
       </div>
       <div className="text-sm text-muted-foreground flex gap-2">
-        <Link href="/support">고객센터</Link>
-        {privacy && <Link href={privacy}>개인정보</Link>}
-        {homepage && <Link href={homepage}>{homepage}</Link>}
+        {links.map((link, index) => (
+          <Link
+            key={index}
+            href={link.href}
+            target={link.target}
+            className="hover:underline"
+          >
+            {link.text}
+          </Link>
+        ))}
       </div>
       <hr className="my-4" />
       {paragraph && (
