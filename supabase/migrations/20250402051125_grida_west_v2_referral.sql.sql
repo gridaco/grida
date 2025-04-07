@@ -792,6 +792,7 @@ RETURNS VOID AS $$
 DECLARE
   challenge grida_west_referral.campaign_challenge%ROWTYPE;
   dep_met BOOLEAN;
+  v_campaign_slug TEXT;
   v_code TEXT;
 BEGIN
   -- Step 1–2: check challenge is defined for campaign
