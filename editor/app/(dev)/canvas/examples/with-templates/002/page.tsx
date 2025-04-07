@@ -5,10 +5,10 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-import ReferrerPage from "@/app/(demo)/r/[slug]/[code]/_invite";
+import ReferrerPage from "@/app/(demo)/r/[slug]/t/[code]/_invite";
 import Portal from "@/app/(demo)/r/[slug]/p/_flows/page";
-import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
-import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
+import Main from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/main";
+import Hello from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/hello";
 
 const document: IDocumentEditorInit = {
   editable: true,

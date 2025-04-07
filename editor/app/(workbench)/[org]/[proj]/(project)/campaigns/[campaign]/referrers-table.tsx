@@ -46,7 +46,7 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => {
-            open(`/r/${ref}/${referrer.code}`, "_blank");
+            open(`/r/${ref}/t/${referrer.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

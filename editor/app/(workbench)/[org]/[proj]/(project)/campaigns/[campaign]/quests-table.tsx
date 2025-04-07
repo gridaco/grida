@@ -261,7 +261,10 @@ export function QuestsTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => {
-                            open(`/r/${campaign.ref}/${quest.code}`, "_blank");
+                            open(
+                              `/r/${campaign.ref}/t/${quest.code}`,
+                              "_blank"
+                            );
                           }}
                         >
                           <OpenInNewWindowIcon className="size-4 me-2" />

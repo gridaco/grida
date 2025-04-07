@@ -51,7 +51,7 @@ function __share_obj({
   return {
     title: "Polestar 시승하고 경품 받아가세요 🎁",
     text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${campaign_ref}/${invitation_code}`,
+    url: `${window.location.origin}/r/${campaign_ref}/t/${invitation_code}`,
   };
 }
 

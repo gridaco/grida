@@ -51,7 +51,7 @@ function ActionsCell({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            open(`/r/${campaign.ref}/${token.code}`, "_blank");
+            open(`/r/${campaign.ref}/t/${token.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

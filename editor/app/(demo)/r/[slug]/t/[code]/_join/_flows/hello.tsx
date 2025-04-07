@@ -104,7 +104,7 @@ function BBB({
         <ScratchToReveal
           width={350}
           height={350}
-          minScratchPercentage={75}
+          minScratchPercentage={60}
           onComplete={() => onOpenChange?.(false)}
           onStart={() => {
             console.log("started");
