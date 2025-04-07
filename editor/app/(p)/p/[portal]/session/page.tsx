@@ -96,7 +96,7 @@ export default async function CustomerPortalSession({
           </header>
           {iam_referrers?.length === 0 && <Empty />}
           {iam_referrers?.map((r) => {
-            const link = `/r/${r.campaign.ref}/t/${r.code}`;
+            const link = `/r/${r.campaign.slug}/t/${r.code}`;
             return (
               <Link key={link} href={link}>
                 <CampaignReferrerCard

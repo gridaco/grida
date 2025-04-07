@@ -40,52 +40,52 @@ import * as Standard from "../standard";
 import t from "./data-01.json";
 
 function __share_obj({
-  campaign_ref,
+  campaign_slug,
   referrer_name,
   invitation_code,
 }: {
-  campaign_ref: string;
+  campaign_slug: string;
   referrer_name: string;
   invitation_code: string;
 }) {
   return {
     title: "Polestar 시승하고 경품 받아가세요 🎁",
     text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${campaign_ref}/t/${invitation_code}`,
+    url: `${window.location.origin}/r/${campaign_slug}/t/${invitation_code}`,
   };
 }
 
 async function mkshare({
-  campaign_ref,
+  campaign_slug,
   referrer_code,
   referrer_name,
 }: {
-  campaign_ref: string;
+  campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_ref);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
   const { data: invitation } = await client.invite(referrer_code);
 
   return __share_obj({
-    campaign_ref: campaign_ref,
+    campaign_slug: campaign_slug,
     referrer_name,
     invitation_code: invitation.code,
   });
 }
 
 async function reshare({
-  campaign_ref,
+  campaign_slug,
   referrer_code,
   referrer_name,
   invitation_id,
 }: {
-  campaign_ref: string;
+  campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
   invitation_id: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_ref);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
 
   const { data: invitation } = await client.refresh(
     referrer_code,
@@ -93,7 +93,7 @@ async function reshare({
   );
 
   return __share_obj({
-    campaign_ref: campaign_ref,
+    campaign_slug: campaign_slug,
     referrer_name,
     invitation_code: invitation.code,
   });
@@ -140,7 +140,7 @@ export default function ReferrerPage({
 
   const triggerShare = async () => {
     return mkshare({
-      campaign_ref: campaign.ref,
+      campaign_slug: campaign.slug,
       referrer_code: code!,
       referrer_name,
     }).then((sharable) => {
@@ -291,7 +291,7 @@ export default function ReferrerPage({
                                   size="sm"
                                   onClick={() => {
                                     reshare({
-                                      campaign_ref: campaign.ref,
+                                      campaign_slug: campaign.slug,
                                       referrer_code: code!,
                                       referrer_name,
                                       invitation_id: inv.id,

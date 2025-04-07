@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  campaign_id: number;
+  campaign_id: string;
 };
 
 type Context = {

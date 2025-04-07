@@ -159,17 +159,9 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: ref, error: ref_err } = await client
-    .from("campaign_with_ref")
-    .select()
-    .eq("id", campaign_id)
-    .single();
-
-  if (ref_err) console.error(ref_err);
-
   return NextResponse.json(
     {
-      data: { ...new_campaign, ref: ref!.ref },
+      data: { ...new_campaign },
       error: null,
     },
     { status: 200 }

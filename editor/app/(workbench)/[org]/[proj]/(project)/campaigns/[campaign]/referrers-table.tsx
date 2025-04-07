@@ -32,7 +32,7 @@ type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
 function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
   const referrer = row.original;
 
-  const { ref } = useCampaign();
+  const { slug: ref } = useCampaign();
 
   return (
     <DropdownMenu>
@@ -130,7 +130,7 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
   },
 ];
 
-function useReferrers(campaign_id: number) {
+function useReferrers(campaign_id: string) {
   const [participants, setParticipants] = useState<
     ReferrerWithCustomer[] | null
   >(null);

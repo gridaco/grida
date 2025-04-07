@@ -11,14 +11,14 @@ export default async function CampaignLayout({
   children: React.ReactNode;
   params: Promise<Params>;
 }>) {
-  const { org, proj, campaign: campaign_ref } = await params;
+  const { org, proj, campaign: campaign_slug } = await params;
   const cookieStore = await cookies();
   const client = createRouteHandlerWestReferralClient(cookieStore);
 
   const { data, error } = await client
-    .from("campaign_with_ref")
+    .from("campaign")
     .select()
-    .eq("ref", campaign_ref)
+    .eq("slug", campaign_slug)
     .single();
 
   if (error) {

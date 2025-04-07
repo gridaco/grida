@@ -84,7 +84,7 @@ export default function Main({
 
     const customer_id = submission.data.customer_id;
 
-    const client = new Platform.WEST.Referral.WestReferralClient(campaign.ref);
+    const client = new Platform.WEST.Referral.WestReferralClient(campaign.slug);
     const ok = await client.claim(code, customer_id);
     if (ok) {
       toast.success("이벤트 참여신청이 완료되었습니다.");

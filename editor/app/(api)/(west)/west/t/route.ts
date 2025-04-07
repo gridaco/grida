@@ -9,14 +9,14 @@ export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const headersList = await headers();
-  const campaign_ref = headersList.get("x-grida-west-campaign-ref");
+  const campaign_slug = headersList.get("x-grida-west-campaign-slug");
   const code = headersList.get("x-grida-west-token-code");
   assert(code, "x-grida-west-token-code is required");
-  assert(campaign_ref, "x-grida-west-campaign-ref is required");
+  assert(campaign_slug, "x-grida-west-campaign-slug is required");
 
   const { data: ref, error: ref_err } = await grida_west_referral_client
     .rpc("lookup", {
-      p_campaign_ref: campaign_ref,
+      p_campaign_ref: campaign_slug,
       p_code: code,
     })
     .single();

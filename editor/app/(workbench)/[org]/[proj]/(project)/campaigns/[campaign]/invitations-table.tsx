@@ -51,7 +51,7 @@ function ActionsCell({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            open(`/r/${campaign.ref}/t/${token.code}`, "_blank");
+            open(`/r/${campaign.slug}/t/${token.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />
@@ -117,7 +117,7 @@ const columns: ColumnDef<Platform.WEST.Referral.Invitation>[] = [
   },
 ];
 
-function useInvitations(campaign_id: number) {
+function useInvitations(campaign_id: string) {
   const [invitations, setInvitations] = useState<
     Platform.WEST.Referral.Invitation[] | null
   >(null);

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
-  campaign_id: number;
+  campaign_id: string;
 };
 
 export async function POST(

@@ -14,16 +14,16 @@ type Params = {
   proj: string;
 };
 
-export default function ChainsPage({ params }: { params: Params }) {
+export default function CampaignsPage({ params }: { params: Params }) {
   const client = createClientWestReferralClient();
   const { id: project_id } = useProject();
 
   const { data: campaigns, isLoading } = useSWR<
-    Platform.WEST.Referral.CampaignWithRef[]
+    Platform.WEST.Referral.Campaign[]
   >([project_id], {
     fetcher: async () => {
       const { data: campaigns, error } = await client
-        .from("campaign_with_ref")
+        .from("campaign")
         .select("*")
         .eq("project_id", project_id);
 
@@ -65,7 +65,7 @@ export default function ChainsPage({ params }: { params: Params }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {campaigns.map((c) => {
           return (
-            <Link key={c.id} href={`./campaigns/${c.ref}`}>
+            <Link key={c.id} href={`./campaigns/${c.slug}`}>
               <CampaignCard data={c} />
             </Link>
           );

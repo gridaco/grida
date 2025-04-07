@@ -16,12 +16,12 @@ type Context = {
  */
 export async function POST(req: NextRequest, context: Context) {
   const headersList = await headers();
-  const campaign_ref = headersList.get("x-grida-west-campaign-ref");
+  const campaign_slug = headersList.get("x-grida-west-campaign-slug");
   const customer_id = headersList.get("x-grida-customer-id");
   const code = headersList.get("x-grida-west-token-code");
 
-  assert(campaign_ref, "campaign_ref is required");
-  assert(code, "code is required");
+  assert(campaign_slug, "x-grida-west-campaign-slug is required");
+  assert(code, "x-grida-west-token-code is required");
 
   if (!customer_id) {
     return NextResponse.json({ error: "forbidden" }, { status: 400 });
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { data: next, error: claim_err } = await grida_west_referral_client.rpc(
     "claim",
     {
-      p_campaign_ref: campaign_ref,
+      p_campaign_ref: campaign_slug,
       p_code: code,
       p_customer_id: customer_id,
     }

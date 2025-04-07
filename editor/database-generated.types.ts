@@ -1989,7 +1989,7 @@ export type Database = {
           created_at: string
           description: string | null
           enabled: boolean
-          id: number
+          id: string
           image_path: string | null
           is_invitee_name_exposed_to_public_dangerously: boolean
           is_referrer_name_exposed_to_public_dangerously: boolean
@@ -2002,6 +2002,7 @@ export type Database = {
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
+          slug: string
         }
         Insert: {
           conversion_currency?: string
@@ -2009,7 +2010,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
-          id?: number
+          id?: string
           image_path?: string | null
           is_invitee_name_exposed_to_public_dangerously?: boolean
           is_referrer_name_exposed_to_public_dangerously?: boolean
@@ -2022,6 +2023,7 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          slug?: string
         }
         Update: {
           conversion_currency?: string
@@ -2029,7 +2031,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
-          id?: number
+          id?: string
           image_path?: string | null
           is_invitee_name_exposed_to_public_dangerously?: boolean
           is_referrer_name_exposed_to_public_dangerously?: boolean
@@ -2042,12 +2044,13 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          slug?: string
         }
         Relationships: []
       }
       campaign_challenge: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           depends_on: string | null
           description: string | null
           event_id: string
@@ -2055,7 +2058,7 @@ export type Database = {
           index: number
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           depends_on?: string | null
           description?: string | null
           event_id: string
@@ -2063,7 +2066,7 @@ export type Database = {
           index: number
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           depends_on?: string | null
           description?: string | null
           event_id?: string
@@ -2086,13 +2089,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "campaign_challenge_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "campaign_challenge_depends_on_fkey"
             columns: ["depends_on"]
             isOneToOne: false
@@ -2110,7 +2106,7 @@ export type Database = {
       }
       campaign_invitee_onboarding_reward: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           created_at: string | null
           id: string
           metadata: Json | null
@@ -2118,7 +2114,7 @@ export type Database = {
           reward_value: number | null
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2126,7 +2122,7 @@ export type Database = {
           reward_value?: number | null
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2148,18 +2144,11 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "campaign_invitee_onboarding_reward_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: true
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
         ]
       }
       campaign_referrer_milestone_reward: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           created_at: string | null
           id: string
           metadata: Json | null
@@ -2168,7 +2157,7 @@ export type Database = {
           threshold_count: number
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2177,7 +2166,7 @@ export type Database = {
           threshold_count: number
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2200,32 +2189,25 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "campaign_referrer_milestone_reward_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
         ]
       }
       campaign_wellknown_event: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           created_at: string
           description: string | null
           id: string
           name: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           created_at?: string
           description?: string | null
           id?: string
           name: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -2246,30 +2228,23 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "campaign_wellknown_event_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
         ]
       }
       code: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           id: number
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           code?: string
           created_at?: string
           id?: number
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           code?: string
           created_at?: string
           id?: number
@@ -2289,18 +2264,11 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "code_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
         ]
       }
       event_log: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           customer_id: string | null
           data: Json | null
           name: string
@@ -2309,7 +2277,7 @@ export type Database = {
           time: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           customer_id?: string | null
           data?: Json | null
           name: string
@@ -2318,7 +2286,7 @@ export type Database = {
           time?: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           customer_id?: string | null
           data?: Json | null
           name?: string
@@ -2339,13 +2307,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_log_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2380,7 +2341,7 @@ export type Database = {
       }
       invitation: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           customer_id: string | null
@@ -2390,7 +2351,7 @@ export type Database = {
           referrer_id: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           code?: string
           created_at?: string
           customer_id?: string | null
@@ -2400,7 +2361,7 @@ export type Database = {
           referrer_id: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           code?: string
           created_at?: string
           customer_id?: string | null
@@ -2432,13 +2393,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invitation_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "invitation_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -2463,21 +2417,21 @@ export type Database = {
       }
       onboarding: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           completed_at: string | null
           id: string
           invitation_id: string
           is_completed: boolean
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           completed_at?: string | null
           id?: string
           invitation_id: string
           is_completed?: boolean
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           completed_at?: string | null
           id?: string
           invitation_id?: string
@@ -2496,13 +2450,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "onboarding_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2523,19 +2470,19 @@ export type Database = {
       }
       onboarding_challenge_flag: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           id: string
           invitation_id: string
           ts: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           id?: string
           invitation_id: string
           ts?: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           id?: string
           invitation_id?: string
           ts?: string
@@ -2553,13 +2500,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "onboarding_challenge_flag_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2580,7 +2520,7 @@ export type Database = {
       }
       onboarding_invitee_reward: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           created_at: string | null
           id: string
           invitation_id: string
@@ -2589,7 +2529,7 @@ export type Database = {
           reward_description: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           created_at?: string | null
           id?: string
           invitation_id: string
@@ -2598,7 +2538,7 @@ export type Database = {
           reward_description: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           created_at?: string | null
           id?: string
           invitation_id?: string
@@ -2619,13 +2559,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "onboarding_invitee_reward_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2653,7 +2586,7 @@ export type Database = {
       }
       onboarding_referrer_reward: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           created_at: string | null
           id: string
           metadata: Json | null
@@ -2662,7 +2595,7 @@ export type Database = {
           reward_description: string
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2671,7 +2604,7 @@ export type Database = {
           reward_description: string
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           created_at?: string | null
           id?: string
           metadata?: Json | null
@@ -2692,13 +2625,6 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "onboarding_referrer_reward_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id"]
           },
           {
@@ -2726,7 +2652,7 @@ export type Database = {
       }
       referrer: {
         Row: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           customer_id: string
@@ -2736,7 +2662,7 @@ export type Database = {
           project_id: number
         }
         Insert: {
-          campaign_id: number
+          campaign_id: string
           code?: string
           created_at?: string
           customer_id: string
@@ -2746,7 +2672,7 @@ export type Database = {
           project_id: number
         }
         Update: {
-          campaign_id?: number
+          campaign_id?: string
           code?: string
           created_at?: string
           customer_id?: string
@@ -2761,13 +2687,6 @@ export type Database = {
             columns: ["campaign_id", "project_id"]
             isOneToOne: false
             referencedRelation: "campaign"
-            referencedColumns: ["id", "project_id"]
-          },
-          {
-            foreignKeyName: "fk_referrer_campaign_project"
-            columns: ["campaign_id", "project_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
             referencedColumns: ["id", "project_id"]
           },
           {
@@ -2792,13 +2711,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "referrer_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "referrer_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -2814,109 +2726,43 @@ export type Database = {
           conversion_currency: string | null
           conversion_value: number | null
           enabled: boolean | null
-          id: number | null
+          id: string | null
           max_invitations_per_referrer: number | null
           name: string | null
           public: Json | null
-          ref: string | null
           reward_currency: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
+          slug: string | null
         }
         Insert: {
           conversion_currency?: string | null
           conversion_value?: number | null
           enabled?: boolean | null
-          id?: number | null
+          id?: string | null
           max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
-          ref?: never
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          slug?: string | null
         }
         Update: {
           conversion_currency?: string | null
           conversion_value?: number | null
           enabled?: boolean | null
-          id?: number | null
+          id?: string | null
           max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
-          ref?: never
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-        }
-        Relationships: []
-      }
-      campaign_with_ref: {
-        Row: {
-          conversion_currency: string | null
-          conversion_value: number | null
-          created_at: string | null
-          description: string | null
-          enabled: boolean | null
-          id: number | null
-          image_path: string | null
-          is_invitee_name_exposed_to_public_dangerously: boolean | null
-          is_referrer_name_exposed_to_public_dangerously: boolean | null
-          max_invitations_per_referrer: number | null
-          metadata: Json | null
-          name: string | null
-          project_id: number | null
-          public: Json | null
-          ref: string | null
-          reward_currency: string | null
-          scheduling_close_at: string | null
-          scheduling_open_at: string | null
-          scheduling_tz: string | null
-        }
-        Insert: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
-          created_at?: string | null
-          description?: string | null
-          enabled?: boolean | null
-          id?: number | null
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean | null
-          is_referrer_name_exposed_to_public_dangerously?: boolean | null
-          max_invitations_per_referrer?: number | null
-          metadata?: Json | null
-          name?: string | null
-          project_id?: number | null
-          public?: Json | null
-          ref?: never
-          reward_currency?: string | null
-          scheduling_close_at?: string | null
-          scheduling_open_at?: string | null
-          scheduling_tz?: string | null
-        }
-        Update: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
-          created_at?: string | null
-          description?: string | null
-          enabled?: boolean | null
-          id?: number | null
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean | null
-          is_referrer_name_exposed_to_public_dangerously?: boolean | null
-          max_invitations_per_referrer?: number | null
-          metadata?: Json | null
-          name?: string | null
-          project_id?: number | null
-          public?: Json | null
-          ref?: never
-          reward_currency?: string | null
-          scheduling_close_at?: string | null
-          scheduling_open_at?: string | null
-          scheduling_tz?: string | null
+          slug?: string | null
         }
         Relationships: []
       }
@@ -2943,8 +2789,7 @@ export type Database = {
       }
       invitation_public_secure: {
         Row: {
-          campaign_id: number | null
-          campaign_ref: string | null
+          campaign_id: string | null
           created_at: string | null
           id: string | null
           invitee_name: string | null
@@ -2967,13 +2812,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invitation_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "invitation_referrer_id_fkey"
             columns: ["referrer_id"]
             isOneToOne: false
@@ -2991,8 +2829,7 @@ export type Database = {
       }
       referrer_public_secure: {
         Row: {
-          campaign_id: number | null
-          campaign_ref: string | null
+          campaign_id: string | null
           code: string | null
           created_at: string | null
           id: string | null
@@ -3021,20 +2858,13 @@ export type Database = {
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "referrer_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_with_ref"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
     Functions: {
       analyze: {
         Args: {
-          p_campaign_id: number
+          p_campaign_id: string
           p_names?: string[]
           p_time_from?: string
           p_time_to?: string
@@ -3053,7 +2883,7 @@ export type Database = {
           p_customer_id: string
         }
         Returns: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           customer_id: string | null
@@ -3063,9 +2893,15 @@ export type Database = {
           referrer_id: string
         }
       }
+      find_campaign_id_by_slug: {
+        Args: {
+          p_slug: unknown
+        }
+        Returns: string
+      }
       flag: {
         Args: {
-          p_campaign_id: number
+          p_campaign_id: string
           p_invitation_id: string
           p_event_name: string
           p_event_data?: Json
@@ -3083,7 +2919,7 @@ export type Database = {
           p_new_invitation_code?: string
         }
         Returns: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           customer_id: string | null
@@ -3099,22 +2935,10 @@ export type Database = {
           p_code: string
         }
         Returns: {
-          campaign_id: number
+          campaign_id: string
           code: string
           type: Database["grida_west_referral"]["Enums"]["token_role"]
         }[]
-      }
-      ref_decode: {
-        Args: {
-          p_ref: string
-        }
-        Returns: number
-      }
-      ref_encode: {
-        Args: {
-          p_id: number
-        }
-        Returns: string
       }
       refresh: {
         Args: {
@@ -3123,7 +2947,7 @@ export type Database = {
           p_new_invitation_code?: string
         }
         Returns: {
-          campaign_id: number
+          campaign_id: string
           code: string
           created_at: string
           customer_id: string | null
@@ -3135,7 +2959,7 @@ export type Database = {
       }
       rls_campaign: {
         Args: {
-          p_campaign_id: number
+          p_campaign_id: string
         }
         Returns: boolean
       }
@@ -4213,6 +4037,10 @@ export type Database = {
         Args: {
           obj: Json
         }
+        Returns: string
+      }
+      gen_random_slug: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       generate_combinations:

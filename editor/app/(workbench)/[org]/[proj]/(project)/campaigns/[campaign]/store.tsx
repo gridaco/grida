@@ -3,8 +3,8 @@
 import React, { createContext, useContext } from "react";
 
 const CampaignContext = createContext<{
-  id: number;
-  ref: string;
+  id: string;
+  slug: string;
   name: string;
 } | null>(null);
 
@@ -14,8 +14,8 @@ export function CampaignProvider({
 }: {
   children: React.ReactNode;
   campaign: {
-    id: number;
-    ref: string;
+    id: string;
+    slug: string;
     name: string;
   };
 }) {

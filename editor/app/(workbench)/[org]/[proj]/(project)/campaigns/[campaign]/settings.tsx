@@ -83,7 +83,7 @@ const formSchema = z.object({
 
 type CampaignFormValues = z.infer<typeof formSchema>;
 
-function useCampaignData(id: number) {
+function useCampaignData(id: string) {
   const [campaign, setCampaign] =
     useState<Platform.WEST.Referral.Campaign | null>(null);
   const client = useMemo(() => createClientWestReferralClient(), []);
@@ -164,7 +164,7 @@ function Body({
   defaultValues,
   onSubmit,
 }: {
-  campaign_id: number;
+  campaign_id: string;
   defaultValues: Partial<CampaignFormValues>;
   onSubmit: (data: CampaignFormValues) => Promise<boolean>;
 }) {

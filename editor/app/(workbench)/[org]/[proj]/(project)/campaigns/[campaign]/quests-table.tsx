@@ -51,10 +51,9 @@ type ReferrerQuest = Platform.WEST.Referral.Referrer & {
   })[];
 };
 
-function useReferrerQuests(campaign_id: number) {
+function useReferrerQuests(campaign_id: string) {
   const [tokens, setTokens] = useState<ReferrerQuest[] | null>(null);
   const client = useMemo(() => createClientWestReferralClient(), []);
-  const campaign = useCampaign();
 
   useEffect(() => {
     client
@@ -262,7 +261,7 @@ export function QuestsTable() {
                         <DropdownMenuItem
                           onClick={() => {
                             open(
-                              `/r/${campaign.ref}/t/${quest.code}`,
+                              `/r/${campaign.slug}/t/${quest.code}`,
                               "_blank"
                             );
                           }}
