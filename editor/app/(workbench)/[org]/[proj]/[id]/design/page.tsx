@@ -25,11 +25,10 @@ import Toolbar, {
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import Invite from "@/app/(demo)/r/[slug]/[code]/_invite";
-import Portal from "@/app/(demo)/r/[slug]/(portal)/_flows/page";
-import Verify from "@/app/(demo)/r/[slug]/(portal)/_flows/step-verify";
-import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
-import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
+// import ReferrerPage from "@/app/(demo)/r/[slug]/[code]/_invite";
+import Portal from "@/app/(demo)/r/[slug]/p/_flows/page";
+// import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
+// import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
 
 export default function SiteDeisngPage() {
   return (
@@ -57,7 +56,6 @@ function CurrentPageCanvas() {
           "tmp-2503-join": CustomComponent__Join,
           "tmp-2503-join-hello": CustomComponent__Join_Hello,
           "tmp-2503-portal": CustomComponent__Portal,
-          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
         }}
       >
         <PreviewProvider>
@@ -159,20 +157,6 @@ function CustomComponent__Portal(props: any) {
       {...queryattributes(props)}
     >
       <Portal />
-    </div>
-  );
-}
-
-function CustomComponent__Portal_Verify(props: any) {
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...props.style,
-      }}
-      {...queryattributes(props)}
-    >
-      <Verify />
     </div>
   );
 }

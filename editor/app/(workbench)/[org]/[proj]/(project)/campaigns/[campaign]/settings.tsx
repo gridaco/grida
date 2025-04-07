@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
-
+import { useCampaign } from "./store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -49,17 +49,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import toast from "react-hot-toast";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/spinner";
-
-// This would come from your API or database
-const campaignTypes = [
-  { value: "referral", label: "Referral" },
-  { value: "promotion", label: "Promotion" },
-  { value: "seasonal", label: "Seasonal" },
-  { value: "event", label: "Event" },
-];
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Timezone options
 const timezones = [
@@ -74,15 +67,13 @@ const timezones = [
 
 // Form schema based on the database structure
 const formSchema = z.object({
-  name: z.string().min(1).max(40, {
-    message: "Campaign name must be between 1 and 40 characters",
-  }),
-  type: z.string({
-    required_error: "Please select a campaign type",
+  name: z.string().min(1).max(256, {
+    message: "Campaign name must be between 1 and 256 characters",
   }),
   description: z.string().optional(),
-  is_participant_name_exposed_to_public_dangerously: z.boolean().default(false),
-  max_supply_init_for_new_mint_token: z.number().int().nullable(),
+  is_invitee_name_exposed_to_public_dangerously: z.boolean().default(false),
+  is_referrer_name_exposed_to_public_dangerously: z.boolean().default(false),
+  max_invitations_per_referrer: z.number().int().nullable(),
   enabled: z.boolean().default(true),
   scheduling_open_at: z.date().nullable(),
   scheduling_close_at: z.date().nullable(),
@@ -92,9 +83,10 @@ const formSchema = z.object({
 
 type CampaignFormValues = z.infer<typeof formSchema>;
 
-function useCampaign(id: string) {
-  const [campaign, setCampaign] = useState<Platform.WEST.Campaign | null>(null);
-  const client = useMemo(() => createClientWestClient(), []);
+function useCampaignData(id: string) {
+  const [campaign, setCampaign] =
+    useState<Platform.WEST.Referral.Campaign | null>(null);
+  const client = useMemo(() => createClientWestReferralClient(), []);
 
   useEffect(() => {
     client
@@ -104,7 +96,7 @@ function useCampaign(id: string) {
       .single()
       .then(({ data, error }) => {
         if (error) return;
-        if (data) setCampaign(data as Platform.WEST.Campaign);
+        if (data) setCampaign(data as Platform.WEST.Referral.Campaign);
       });
   }, [client, id]);
 
@@ -119,10 +111,11 @@ function useCampaign(id: string) {
           scheduling_tz: data.scheduling_tz,
           scheduling_open_at: data.scheduling_open_at?.toISOString(),
           scheduling_close_at: data.scheduling_close_at?.toISOString(),
-          is_participant_name_exposed_to_public_dangerously:
-            data.is_participant_name_exposed_to_public_dangerously,
-          max_supply_init_for_new_mint_token:
-            data.max_supply_init_for_new_mint_token,
+          is_invitee_name_exposed_to_public_dangerously:
+            data.is_invitee_name_exposed_to_public_dangerously,
+          is_referrer_name_exposed_to_public_dangerously:
+            data.is_referrer_name_exposed_to_public_dangerously,
+          max_invitations_per_referrer: data.max_invitations_per_referrer,
           public: data.public,
         })
         .eq("id", id)
@@ -133,7 +126,7 @@ function useCampaign(id: string) {
       }
 
       if (data) {
-        setCampaign(updated as unknown as Platform.WEST.Campaign);
+        setCampaign(updated as unknown as Platform.WEST.Referral.Campaign);
         return true;
       }
 
@@ -145,12 +138,9 @@ function useCampaign(id: string) {
   return { campaign, update };
 }
 
-export default function CampaignSettings({
-  campaign_id,
-}: {
-  campaign_id: string;
-}) {
-  const { campaign, update } = useCampaign(campaign_id);
+export default function CampaignSettings() {
+  const { id } = useCampaign();
+  const { campaign, update } = useCampaignData(id);
 
   if (!campaign) {
     return (
@@ -162,7 +152,7 @@ export default function CampaignSettings({
 
   return (
     <Body
-      campaign_id={campaign_id}
+      campaign_id={id}
       defaultValues={campaign as Partial<CampaignFormValues>}
       onSubmit={update}
     />
@@ -206,6 +196,17 @@ function Body({
         <CardDescription>
           Configure the settings for your campaign.
         </CardDescription>
+        <Tabs>
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="milestone">Quest Milestone</TabsTrigger>
+            <TabsTrigger value="rewards">Rewards</TabsTrigger>
+            <TabsTrigger value="challenges">Challenges</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
 
       <hr className="mb-4" />
@@ -240,37 +241,6 @@ function Body({
                       </FormControl>
                       <FormDescription>
                         Enter a name for your campaign (1-40 characters).
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Campaign Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a campaign type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {campaignTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Select the type of campaign you want to create.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -451,7 +421,7 @@ function Body({
               <div className="space-y-8">
                 <FormField
                   control={form.control}
-                  name="max_supply_init_for_new_mint_token"
+                  name="max_invitations_per_referrer"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Maximum Supply for New Mint Tokens</FormLabel>
@@ -481,13 +451,52 @@ function Body({
 
                 <FormField
                   control={form.control}
-                  name="is_participant_name_exposed_to_public_dangerously"
+                  name="is_invitee_name_exposed_to_public_dangerously"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
                       <div className="space-y-0.5">
                         <div className="flex items-center">
                           <FormLabel className="text-base mr-2">
-                            Expose Participant Names Publicly
+                            Expose Invitee Names Publicly
+                          </FormLabel>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">
+                                  Warning: This will make participant names
+                                  visible to the public. Use with caution.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <FormDescription className="text-yellow-700 dark:text-yellow-400">
+                          This is potentially dangerous and exposes user data
+                          publicly.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="is_referrer_name_exposed_to_public_dangerously"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center">
+                          <FormLabel className="text-base mr-2">
+                            Expose Referrer Names Publicly
                           </FormLabel>
                           <TooltipProvider>
                             <Tooltip>

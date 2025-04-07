@@ -1,10 +1,9 @@
-import { Resend } from "resend";
 import { EmailTemplate } from "@/theme/templates-email/formcomplete/default";
 import { Bird } from "@/clients/bird";
 import { toArrayOf } from "@/types/utility";
 import { Env } from "@/env";
+import { resend } from "@/clients/resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const bird = new Bird(
   process.env.BIRD_WORKSPACE_ID as string,
   process.env.BIRD_SMS_CHANNEL_ID as string,

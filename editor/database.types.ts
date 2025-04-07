@@ -16,5 +16,36 @@ export type Database = MergeDeep<
         };
       };
     };
+    grida_west_referral: {
+      Views: {
+        campaign_public: {
+          Row: DatabaseGenerated["grida_west_referral"]["Views"]["campaign_public"]["Row"] & {
+            id: number;
+            slug: string;
+            reward_currency: string;
+          };
+        };
+        invitation_public_secure: {
+          Row: DatabaseGenerated["grida_west_referral"]["Views"]["invitation_public_secure"]["Row"] & {
+            id: string;
+            campaign_id: string;
+            created_at: string;
+            invitee_name: string | null;
+            is_claimed: boolean;
+            referrer_id: string;
+          };
+        };
+        referrer_public_secure: {
+          Row: DatabaseGenerated["grida_west_referral"]["Views"]["referrer_public_secure"]["Row"] & {
+            id: string;
+            campaign_id: string;
+            code: string | null;
+            created_at: string;
+            referrer_name: string | null;
+            invitation_count: number;
+          };
+        };
+      };
+    };
   }
 >;

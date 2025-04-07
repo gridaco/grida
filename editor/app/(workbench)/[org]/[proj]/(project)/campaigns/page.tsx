@@ -1,39 +1,41 @@
 "use client";
 import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
-import EmptyWelcome from "@/components/empty";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
-import useSWR from "swr";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
+import { Button } from "@/components/ui/button";
+import EmptyWelcome from "@/components/empty";
+import useSWR from "swr";
 
 type Params = {
   org: string;
   proj: string;
 };
 
-export default function ChainsPage({ params }: { params: Params }) {
-  const client = createClientWestClient();
+export default function CampaignsPage({ params }: { params: Params }) {
+  const client = createClientWestReferralClient();
   const { id: project_id } = useProject();
 
-  const { data: campaigns, isLoading } = useSWR<Platform.WEST.Campaign[]>(
-    [project_id],
-    {
-      fetcher: async () => {
-        const { data: series, error } = await client
-          .from("campaign")
-          .select("*")
-          .eq("project_id", project_id);
+  const { data: campaigns, isLoading } = useSWR<
+    Platform.WEST.Referral.Campaign[]
+  >([project_id], {
+    fetcher: async () => {
+      const { data: campaigns, error } = await client
+        .from("campaign")
+        .select("*")
+        .eq("project_id", project_id);
 
-        if (error) {
-          throw new Error(error.message);
-        }
+      if (error) {
+        throw new Error(error.message);
+      }
 
-        return series;
-      },
-    }
-  );
+      return campaigns;
+    },
+  });
+
+  console.log("campaigns", campaigns);
 
   if (!campaigns) {
     return (
@@ -45,8 +47,11 @@ export default function ChainsPage({ params }: { params: Params }) {
 
   return (
     <main className="container mx-auto my-10">
-      <header>
+      <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
+        <Link href={`./campaigns/new`}>
+          <Button>New Campaign</Button>
+        </Link>
       </header>
       <hr className="my-4" />
       {campaigns.length === 0 && (
@@ -58,10 +63,10 @@ export default function ChainsPage({ params }: { params: Params }) {
         />
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {campaigns.map((s) => {
+        {campaigns.map((c) => {
           return (
-            <Link key={s.id} href={`./campaigns/${s.id}`}>
-              <CampaignCard data={s} />
+            <Link key={c.id} href={`./campaigns/${c.slug}`}>
+              <CampaignCard data={c} />
             </Link>
           );
         })}

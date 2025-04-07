@@ -12,10 +12,14 @@ import {
 import useSWR from "swr";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
+import { useCampaign } from "./store";
 
-export default function LogsTable({ campaign_id }: { campaign_id: string }) {
-  const { data, isLoading } = useSWR<{ data: Platform.WEST.TokenEvent[] }>(
-    `/private/west/campaigns/${campaign_id}/events`,
+export default function LogsTable() {
+  const campaign = useCampaign();
+  const { data, isLoading } = useSWR<{
+    data: Platform.WEST.Referral.TokenEvent[];
+  }>(
+    `/private/west/campaigns/${campaign.id}/events`,
     async (url) => {
       const res = await fetch(url);
       return res.json();

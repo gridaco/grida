@@ -545,21 +545,24 @@ export namespace Platform.CustomerAuthPolicy {
   }
 }
 
-export namespace Platform.WEST {
+export namespace Platform.WEST.Referral {
+  export type TokenRole = "referrer" | "invitation";
+
   export interface ImportParticipantsRequestBody {
-    role: "host";
+    role: "referrer";
     customer_ids: string[];
   }
 
   export type Campaign = {
     id: string;
-    type: "referral";
+    slug: string;
     public: Record<string, string> | unknown;
     created_at: string;
     description: string | null;
     enabled: boolean;
-    is_participant_name_exposed_to_public_dangerously: boolean;
-    max_supply_init_for_new_mint_token: number | null;
+    is_invitee_name_exposed_to_public_dangerously: boolean;
+    is_referrer_name_exposed_to_public_dangerously: boolean;
+    max_invitations_per_referrer: number | null;
     name: string;
     project_id: number;
     scheduling_close_at: string | null;
@@ -569,11 +572,14 @@ export namespace Platform.WEST {
 
   export type CampaignPublic = {
     id: string;
-    type: "referral";
+    slug: string;
+    conversion_currency: string | null;
+    conversion_value: number | null;
+    enabled: boolean | null;
+    max_invitations_per_referrer: number | null;
+    name: string | null;
     public: Record<string, string> | unknown;
-    created_at: string;
-    enabled: boolean;
-    name: string;
+    reward_currency: string;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
@@ -586,106 +592,128 @@ export namespace Platform.WEST {
     data: Record<string, string>;
   };
 
-  export type Participant = {
+  export type Referrer = {
     id: string;
-    series_id: string;
+    project_id: number;
+    campaign_id: string;
+    code: string;
     customer_id: string;
     created_at: string;
     metadata: Record<string, string> | unknown;
+    invitation_count: number;
   };
 
-  export type ParticipantCustomer = Participant & {
+  export type Invitation = {
+    campaign_id: string;
+    code: string;
+    created_at: string;
+    customer_id: string | null;
+    id: string;
+    is_claimed: boolean;
+    metadata: Record<string, string> | unknown;
+    referrer_id: string;
+  };
+
+  export type Customer = {
+    uid: string;
     name: string | null;
     email: string | null;
     phone: string | null;
   };
 
-  export type ParticipantPublic = {
+  export type ReferrerPublicRead = {
+    type: "referrer";
     id: string;
-    series_id: string;
-    role: "host" | "participant";
-    name: string | null;
-  };
-
-  //
-  export type Token<
-    P extends unknown | Record<string, unknown> | null = unknown,
-  > = {
-    id: string;
-    series_id: string;
-    owner_id: string;
-    code: string;
-    parent_id: string;
-    public: P;
-    created_at: string;
-    token_type: "mintable" | "redeemable";
-    max_supply: number | null;
-    count: number;
-    is_claimed: boolean;
-    is_burned: boolean;
-  };
-
-  export type TokenPublicRead = {
-    token: Token & { owner: ParticipantPublic };
+    code: string | null;
+    referrer_name: string | null;
     campaign: CampaignPublic;
-    parent: {
-      owner: ParticipantPublic;
-    } | null;
-    children: (Token & { owner: ParticipantPublic })[];
+    created_at: string;
+    invitation_count: number;
+    invitations: {
+      id: string;
+      campaign_id: string;
+      is_claimed: boolean;
+      invitee_name: string | null;
+      created_at: string;
+      referrer_id: string;
+    }[];
   };
 
-  export class WestClient<
-    P extends unknown | Record<string, unknown> | null = unknown,
-  > {
-    constructor(readonly series_id: string) {}
+  export type InvitationPublicRead = {
+    type: "invitation";
+    id: string;
+    code: string;
+    referrer_id: string;
+    is_claimed: boolean;
+    referrer_name: string | null;
+    campaign: CampaignPublic;
+    created_at: string;
+  };
 
-    read(code: string): Promise<{
-      data: TokenPublicRead;
+  const _x_grida_west_campaign_slug = "x-grida-west-campaign-slug";
+  const _x_grida_west_token_code = "x-grida-west-token-code";
+
+  export class WestReferralClient {
+    constructor(readonly slug: string) {}
+
+    read(
+      code: string,
+      type: TokenRole = "referrer"
+    ): Promise<{
+      data: ReferrerPublicRead | InvitationPublicRead;
     }> {
-      return fetch(`/west/t/${code}`, {
+      return fetch(`/west/t`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
     }
 
-    mint(code: string, secret?: string): Promise<{ data: Token<P> }> {
-      return fetch(`/west/t/${code}/mint`, {
+    invite(code: string): Promise<{ data: Invitation }> {
+      return fetch(`/west/t/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
-          "x-grida-west-token-secret": secret ?? "",
+          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_token_code]: code,
+        },
+      }).then((res) => res.json());
+    }
+
+    refresh(
+      code: string,
+      invitation_id: string
+    ): Promise<{ data: Invitation }> {
+      return fetch(`/west/t/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_token_code]: code,
+          "x-grida-west-invitation-id": invitation_id,
         },
       }).then((res) => res.json());
     }
 
     claim(code: string, owner_id: string) {
-      return fetch(`/west/t/${code}/claim`, {
+      return fetch(`/west/t/claim`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          [_x_grida_west_campaign_slug]: this.slug,
           "x-grida-customer-id": owner_id,
+          [_x_grida_west_token_code]: code,
         },
-      }).then((res) => {
-        return res.ok;
-      });
-    }
-
-    redeem(code: string): Promise<boolean> {
-      return fetch(`/west/t/${code}/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
       }).then((res) => {
         return res.ok;
       });
     }
 
     track(code: string, name: string, data?: Record<string, string>) {
-      fetch(`/west/t/${code}/track`, {
+      fetch(`/west/t/track`, {
         method: "POST",
         body: JSON.stringify({
           name: name,
@@ -693,10 +721,61 @@ export namespace Platform.WEST {
         }),
         headers: {
           "Content-Type": "application/json",
-          "x-grida-west-campaign-id": this.series_id,
+          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_token_code]: code,
         },
       });
       //
     }
   }
+}
+
+export namespace Platform.WEST.Referral.Wizard {
+  export type RewardType = "double-sided" | "referrer-only" | "invitee-only";
+  export type RewardCurrencyType =
+    | "virtual-currency"
+    | "draw-ticket"
+    | "discount"
+    | "custom";
+
+  export type CampaignData = {
+    name: string;
+    description: string;
+    reward_strategy_type: RewardType;
+    reward_currency_type: RewardCurrencyType;
+    reward_currency: string;
+    max_invitations_per_referrer: number | null;
+    referrer_milestone_rewards: Array<{
+      threshold: number;
+      description: string;
+      value: number;
+    }>;
+    invitee_onboarding_reward: {
+      description: string;
+      value: number;
+    };
+    __prefers_builtin_platform: boolean;
+    __prefers_offline_manual: boolean;
+    challenges: Array<{
+      index: number;
+      trigger_name: string;
+      description: string;
+      depends_on: string | null;
+    }>;
+    triggers: Array<{
+      name: string;
+      description: string;
+    }>;
+    conversion_currency: string;
+    conversion_value: number | null;
+    is_referrer_name_exposed_to_public_dangerously: boolean;
+    is_invitee_name_exposed_to_public_dangerously: boolean;
+    enabled: boolean;
+    scheduling: {
+      __prefers_start_now: boolean;
+      scheduling_open_at: string | null;
+      scheduling_close_at: string | null;
+      scheduling_tz: string | null;
+    };
+  };
 }

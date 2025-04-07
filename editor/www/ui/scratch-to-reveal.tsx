@@ -13,6 +13,7 @@ interface ScratchToRevealProps {
   minScratchPercentage?: number;
   className?: string;
   onComplete?: () => void;
+  onStart?: () => void;
   gradientColors?: [string, string, string];
 }
 
@@ -21,11 +22,13 @@ export const ScratchToReveal: React.FC<ScratchToRevealProps> = ({
   height,
   minScratchPercentage = 50,
   onComplete,
+  onStart,
   children,
   className,
   gradientColors = ["#A97CF8", "#F38CB8", "#FDCC92"],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const startedRef = useRef(false);
   const [isScratching, setIsScratching] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
 
@@ -100,9 +103,21 @@ export const ScratchToReveal: React.FC<ScratchToRevealProps> = ({
     };
   }, [isScratching]);
 
-  const handleMouseDown = () => setIsScratching(true);
+  const handleMouseDown = () => {
+    if (!startedRef.current) {
+      onStart?.();
+      startedRef.current = true;
+    }
+    setIsScratching(true);
+  };
 
-  const handleTouchStart = () => setIsScratching(true);
+  const handleTouchStart = () => {
+    if (!startedRef.current) {
+      onStart?.();
+      startedRef.current = true;
+    }
+    setIsScratching(true);
+  };
 
   const scratch = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;

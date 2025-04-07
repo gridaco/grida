@@ -5,11 +5,10 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-import Invite from "@/app/(demo)/r/[slug]/[code]/_invite";
-import Portal from "@/app/(demo)/r/[slug]/(portal)/_flows/page";
-import Verify from "@/app/(demo)/r/[slug]/(portal)/_flows/step-verify";
-import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
-import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
+import ReferrerPage from "@/app/(demo)/r/[slug]/t/[code]/_invite";
+import Portal from "@/app/(demo)/r/[slug]/p/_flows/page";
+import Main from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/main";
+import Hello from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/hello";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -201,7 +200,6 @@ export default function FileExamplePage() {
           "tmp-2503-join-main": CustomComponent__Join_Main,
           "tmp-2503-join-hello": CustomComponent__Join_Hello,
           "tmp-2503-portal": CustomComponent__Portal,
-          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
         }}
       />
     </main>
@@ -289,20 +287,6 @@ function CustomComponent__Portal(props: any) {
       {...queryattributes(props)}
     >
       <Portal />
-    </div>
-  );
-}
-
-function CustomComponent__Portal_Verify(props: any) {
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...props.style,
-      }}
-      {...queryattributes(props)}
-    >
-      <Verify />
     </div>
   );
 }

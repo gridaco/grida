@@ -38,103 +38,54 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
-import { createClientWestClient } from "@/lib/supabase/client";
+import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { useCampaign } from "./store";
 
-const QUESTNAME = "refer-a-friend";
+const QUESTNAME = "refer-a-friend"; // TODO:
 
-// // Mock data for demonstration
-// const mockQuests = Array.from({ length: 10 }).map((_, i) => ({
-//   id: `quest-${i + 1}`,
-//   player: {
-//     id: `player-${i + 1}`,
-//     name: `Player ${i + 1}`,
-//     email: `player${i + 1}@example.com`,
-//     avatar: `/placeholder.svg?height=40&width=40`,
-//   },
-//   questName: "Referral Campaign",
-//   progress: Math.floor(Math.random() * 100),
-//   invitedCount: Math.floor(Math.random() * 11), // 0-10 invites
-//   maxInvites: 10,
-//   status: ["active", "completed", "expired"][Math.floor(Math.random() * 3)],
-//   startDate: new Date(
-//     Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-//   )
-//     .toISOString()
-//     .split("T")[0],
-//   challenges: Array.from({ length: Math.floor(Math.random() * 5) + 1 }).map(
-//     (_, j) => ({
-//       id: `challenge-${i}-${j}`,
-//       invitee: `Friend ${j + 1}`,
-//       email: `friend${j + 1}@example.com`,
-//       steps: [
-//         {
-//           id: `step-${i}-${j}-1`,
-//           name: "Sign Up",
-//           completed: Math.random() > 0.3,
-//           date: new Date(
-//             Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000
-//           )
-//             .toISOString()
-//             .split("T")[0],
-//         },
-//         {
-//           id: `step-${i}-${j}-2`,
-//           name: "Submit Form",
-//           completed: Math.random() > 0.6,
-//           date:
-//             Math.random() > 0.6
-//               ? new Date(
-//                   Date.now() -
-//                     Math.floor(Math.random() * 5) * 24 * 60 * 60 * 1000
-//                 )
-//                   .toISOString()
-//                   .split("T")[0]
-//               : null,
-//         },
-//       ],
-//     })
-//   ),
-// }));
-
-type QuestToken = Platform.WEST.Token & {
-  owner: Platform.WEST.ParticipantCustomer | null;
-  children: (Platform.WEST.Token & {
-    owner: Platform.WEST.ParticipantCustomer | null;
+type ReferrerQuest = Platform.WEST.Referral.Referrer & {
+  customer: Platform.WEST.Referral.Customer;
+  invitations: (Platform.WEST.Referral.Invitation & {
+    customer: Platform.WEST.Referral.Customer | null;
   })[];
 };
 
-function useQuestTokens(series_id: string) {
-  const [tokens, setTokens] = useState<QuestToken[] | null>(null);
-  const client = useMemo(() => createClientWestClient(), []);
+function useReferrerQuests(campaign_id: string) {
+  const [tokens, setTokens] = useState<ReferrerQuest[] | null>(null);
+  const client = useMemo(() => createClientWestReferralClient(), []);
 
   useEffect(() => {
     client
-      .from("token")
+      .from("referrer")
       .select(
         `
-        *,
-        owner:participant_customer!owner_id(*),
-        children:token(*, owner:participant_customer!owner_id(*))
-      `
+          *,
+          customer:customer!customer_id(*),
+          invitations:invitation(
+            *,
+            customer:customer(*)
+          )
+        `
       )
-      .eq("series_id", series_id)
-      .eq("token_type", "mintable")
+      .eq("campaign_id", campaign_id)
       .then(({ data, error }) => {
         if (error) return;
-        setTokens(data as QuestToken[]);
+        setTokens(data as ReferrerQuest[]);
       });
-  }, [client, series_id]);
+  }, [client, campaign_id]);
 
   return { tokens };
 }
 
-export function QuestsTable({ campaign_id }: { campaign_id: string }) {
+export function QuestsTable() {
+  const campaign = useCampaign();
   const [expandedQuests, setExpandedQuests] = useState<string[]>([]);
 
-  const { tokens } = useQuestTokens(campaign_id);
+  const { tokens } = useReferrerQuests(campaign.id);
 
-  console.log("tokens", tokens);
+  // FIXME:
+  const max_invitations_per_referrer = 10;
 
   const toggleQuestExpand = (questId: string) => {
     setExpandedQuests((prev) =>
@@ -245,13 +196,15 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 rounded-full">
                         <AvatarFallback>
-                          {quest.owner?.name?.[0].toUpperCase()}
+                          {quest.customer?.name?.[0].toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{quest.owner?.name}</div>
+                        <div className="font-medium">
+                          {quest.customer?.name}
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          {quest.owner?.email}
+                          {quest.customer?.email}
                         </div>
                       </div>
                     </div>
@@ -262,10 +215,17 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="text-xs text-muted-foreground">
-                        {(quest.count / (quest.max_supply ?? 0)) * 100}%
+                        {(quest.invitation_count /
+                          (max_invitations_per_referrer ?? 0)) *
+                          100}
+                        %
                       </div>
                       <Progress
-                        value={(quest.count / (quest.max_supply ?? 0)) * 100}
+                        value={
+                          (quest.invitation_count /
+                            (max_invitations_per_referrer ?? 0)) *
+                          100
+                        }
                         className="h-2"
                       />
                     </div>
@@ -274,13 +234,16 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span>
-                        {quest.count} / {quest.max_supply ?? "∞"}
+                        {quest.invitation_count} /{" "}
+                        {max_invitations_per_referrer ?? "∞"}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(
-                      quest.count === quest.max_supply ? "completed" : "active"
+                      quest.invitation_count === max_invitations_per_referrer
+                        ? "completed"
+                        : "active"
                     )}
                   </TableCell>
                   <TableCell>
@@ -298,7 +261,7 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                         <DropdownMenuItem
                           onClick={() => {
                             open(
-                              `/r/${quest.series_id}/${quest.code}`,
+                              `/r/${campaign.slug}/t/${quest.code}`,
                               "_blank"
                             );
                           }}
@@ -323,13 +286,13 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                     <TableCell colSpan={8} className="p-0">
                       <div className="p-4">
                         <h3 className="text-sm font-medium mb-2">
-                          Challenges ({quest.children.length})
+                          Invitations ({quest.invitations.length})
                         </h3>
                         <div className="bg-background rounded-md border">
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Guest</TableHead>
+                                <TableHead>Onboarding</TableHead>
                                 <TableHead>Step 1: Claim</TableHead>
                                 <TableHead>Step 2: Submit Form</TableHead>
                                 <TableHead>
@@ -341,16 +304,16 @@ export function QuestsTable({ campaign_id }: { campaign_id: string }) {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {quest.children.map((challenge) => (
+                              {quest.invitations.map((challenge) => (
                                 <TableRow key={challenge.id}>
                                   <TableCell>
                                     <div>
                                       <div className="font-medium">
-                                        {challenge.owner?.name ?? "-"}
+                                        {challenge.customer?.name ?? "-"}
                                       </div>
                                       <div className="text-xs text-muted-foreground">
-                                        {challenge.owner?.email ??
-                                          challenge.owner?.phone ??
+                                        {challenge.customer?.email ??
+                                          challenge.customer?.phone ??
                                           "-"}
                                       </div>
                                     </div>

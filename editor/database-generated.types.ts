@@ -1570,6 +1570,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      rls_form: {
+        Args: {
+          p_form_id: string
+        }
+        Returns: boolean
+      }
       rpc_check_max_responses: {
         Args: {
           form_id: string
@@ -1974,242 +1980,742 @@ export type Database = {
       [_ in never]: never
     }
   }
-  grida_west: {
+  grida_west_referral: {
     Tables: {
       campaign: {
         Row: {
+          conversion_currency: string
+          conversion_value: number | null
           created_at: string
           description: string | null
           enabled: boolean
           id: string
-          is_participant_name_exposed_to_public_dangerously: boolean
-          max_supply_init_for_new_mint_token: number | null
+          image_path: string | null
+          is_invitee_name_exposed_to_public_dangerously: boolean
+          is_referrer_name_exposed_to_public_dangerously: boolean
+          max_invitations_per_referrer: number | null
+          metadata: Json | null
           name: string
           project_id: number
           public: Json | null
+          reward_currency: string
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          type: Database["grida_west"]["Enums"]["campaign_type"]
+          slug: string
         }
         Insert: {
+          conversion_currency?: string
+          conversion_value?: number | null
           created_at?: string
           description?: string | null
           enabled?: boolean
           id?: string
-          is_participant_name_exposed_to_public_dangerously?: boolean
-          max_supply_init_for_new_mint_token?: number | null
+          image_path?: string | null
+          is_invitee_name_exposed_to_public_dangerously?: boolean
+          is_referrer_name_exposed_to_public_dangerously?: boolean
+          max_invitations_per_referrer?: number | null
+          metadata?: Json | null
           name: string
           project_id: number
           public?: Json | null
+          reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          type: Database["grida_west"]["Enums"]["campaign_type"]
+          slug?: string
         }
         Update: {
+          conversion_currency?: string
+          conversion_value?: number | null
           created_at?: string
           description?: string | null
           enabled?: boolean
           id?: string
-          is_participant_name_exposed_to_public_dangerously?: boolean
-          max_supply_init_for_new_mint_token?: number | null
+          image_path?: string | null
+          is_invitee_name_exposed_to_public_dangerously?: boolean
+          is_referrer_name_exposed_to_public_dangerously?: boolean
+          max_invitations_per_referrer?: number | null
+          metadata?: Json | null
           name?: string
           project_id?: number
           public?: Json | null
+          reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          type?: Database["grida_west"]["Enums"]["campaign_type"]
+          slug?: string
         }
         Relationships: []
       }
-      participant: {
+      campaign_challenge: {
         Row: {
-          created_at: string
-          customer_id: string
+          campaign_id: string
+          depends_on: string | null
+          description: string | null
+          event_id: string
           id: string
-          metadata: Json | null
-          project_id: number
-          role: Database["grida_west"]["Enums"]["participant_role"]
-          series_id: string
+          index: number
         }
         Insert: {
-          created_at?: string
-          customer_id: string
+          campaign_id: string
+          depends_on?: string | null
+          description?: string | null
+          event_id: string
           id?: string
-          metadata?: Json | null
-          project_id: number
-          role: Database["grida_west"]["Enums"]["participant_role"]
-          series_id: string
+          index: number
         }
         Update: {
-          created_at?: string
-          customer_id?: string
+          campaign_id?: string
+          depends_on?: string | null
+          description?: string | null
+          event_id?: string
           id?: string
-          metadata?: Json | null
-          project_id?: number
-          role?: Database["grida_west"]["Enums"]["participant_role"]
-          series_id?: string
+          index?: number
         }
         Relationships: [
           {
-            foreignKeyName: "fk_participant_series_project"
-            columns: ["series_id", "project_id"]
+            foreignKeyName: "campaign_challenge_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_challenge_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_challenge_depends_on_fkey"
+            columns: ["depends_on"]
+            isOneToOne: false
+            referencedRelation: "campaign_challenge"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_challenge_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_wellknown_event"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_invitee_onboarding_reward: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          reward_description: string
+          reward_value: number | null
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reward_description: string
+          reward_value?: number | null
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reward_description?: string
+          reward_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_invitee_onboarding_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_invitee_onboarding_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_referrer_milestone_reward: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          reward_description: string
+          reward_value: number | null
+          threshold_count: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reward_description: string
+          reward_value?: number | null
+          threshold_count: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reward_description?: string
+          reward_value?: number | null
+          threshold_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_referrer_milestone_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_referrer_milestone_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_wellknown_event: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_wellknown_event_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_wellknown_event_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      code: {
+        Row: {
+          campaign_id: string
+          code: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          campaign_id: string
+          code?: string
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          campaign_id?: string
+          code?: string
+          created_at?: string
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "code_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_log: {
+        Row: {
+          campaign_id: string
+          customer_id: string | null
+          data: Json | null
+          name: string
+          onboarding_id: string | null
+          referrer_id: string | null
+          time: string
+        }
+        Insert: {
+          campaign_id: string
+          customer_id?: string | null
+          data?: Json | null
+          name: string
+          onboarding_id?: string | null
+          referrer_id?: string | null
+          time?: string
+        }
+        Update: {
+          campaign_id?: string
+          customer_id?: string | null
+          data?: Json | null
+          name?: string
+          onboarding_id?: string | null
+          referrer_id?: string | null
+          time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["uid"]
+          },
+          {
+            foreignKeyName: "event_log_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_log_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_log_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer_public_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitation: {
+        Row: {
+          campaign_id: string
+          code: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          is_claimed: boolean
+          metadata: Json | null
+          referrer_id: string
+        }
+        Insert: {
+          campaign_id: string
+          code?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          is_claimed?: boolean
+          metadata?: Json | null
+          referrer_id: string
+        }
+        Update: {
+          campaign_id?: string
+          code?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          is_claimed?: boolean
+          metadata?: Json | null
+          referrer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitation_campaign_id_code_fkey"
+            columns: ["campaign_id", "code"]
+            isOneToOne: true
+            referencedRelation: "code"
+            referencedColumns: ["campaign_id", "code"]
+          },
+          {
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitation_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["uid"]
+          },
+          {
+            foreignKeyName: "invitation_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitation_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer_public_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding: {
+        Row: {
+          campaign_id: string
+          completed_at: string | null
+          id: string
+          invitation_id: string
+          is_completed: boolean
+        }
+        Insert: {
+          campaign_id: string
+          completed_at?: string | null
+          id?: string
+          invitation_id: string
+          is_completed?: boolean
+        }
+        Update: {
+          campaign_id?: string
+          completed_at?: string | null
+          id?: string
+          invitation_id?: string
+          is_completed?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: true
+            referencedRelation: "invitation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: true
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_challenge_flag: {
+        Row: {
+          campaign_id: string
+          id: string
+          invitation_id: string
+          ts: string
+        }
+        Insert: {
+          campaign_id: string
+          id?: string
+          invitation_id: string
+          ts?: string
+        }
+        Update: {
+          campaign_id?: string
+          id?: string
+          invitation_id?: string
+          ts?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_challenge_flag_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_challenge_flag_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_challenge_flag_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_challenge_flag_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_invitee_reward: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          invitation_id: string
+          metadata: Json | null
+          onboarding_id: string
+          reward_description: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          invitation_id: string
+          metadata?: Json | null
+          onboarding_id: string
+          reward_description: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          invitation_id?: string
+          metadata?: Json | null
+          onboarding_id?: string
+          reward_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_invitee_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitee_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitee_reward_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: true
+            referencedRelation: "invitation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitee_reward_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: true
+            referencedRelation: "invitation_public_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_invitee_reward_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_referrer_reward: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          onboarding_id: string
+          referrer_id: string
+          reward_description: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          onboarding_id: string
+          referrer_id: string
+          reward_description: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          onboarding_id?: string
+          referrer_id?: string
+          reward_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_referrer_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_referrer_reward_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_referrer_reward_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_referrer_reward_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_referrer_reward_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer_public_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrer: {
+        Row: {
+          campaign_id: string
+          code: string
+          created_at: string
+          customer_id: string
+          id: string
+          invitation_count: number
+          metadata: Json | null
+          project_id: number
+        }
+        Insert: {
+          campaign_id: string
+          code?: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          invitation_count?: number
+          metadata?: Json | null
+          project_id: number
+        }
+        Update: {
+          campaign_id?: string
+          code?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          invitation_count?: number
+          metadata?: Json | null
+          project_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_referrer_campaign_project"
+            columns: ["campaign_id", "project_id"]
             isOneToOne: false
             referencedRelation: "campaign"
             referencedColumns: ["id", "project_id"]
           },
           {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "referrer_campaign_id_code_fkey"
+            columns: ["campaign_id", "code"]
+            isOneToOne: false
+            referencedRelation: "code"
+            referencedColumns: ["campaign_id", "code"]
+          },
+          {
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      token: {
-        Row: {
-          code: string
-          count: number
-          created_at: string
-          id: string
-          is_burned: boolean
-          is_claimed: boolean
-          max_supply: number | null
-          owner_id: string | null
-          parent_id: string | null
-          public: Json | null
-          secret: string | null
-          series_id: string
-          token_type: Database["grida_west"]["Enums"]["token_type"]
-        }
-        Insert: {
-          code: string
-          count?: number
-          created_at?: string
-          id?: string
-          is_burned?: boolean
-          is_claimed?: boolean
-          max_supply?: number | null
-          owner_id?: string | null
-          parent_id?: string | null
-          public?: Json | null
-          secret?: string | null
-          series_id: string
-          token_type: Database["grida_west"]["Enums"]["token_type"]
-        }
-        Update: {
-          code?: string
-          count?: number
-          created_at?: string
-          id?: string
-          is_burned?: boolean
-          is_claimed?: boolean
-          max_supply?: number | null
-          owner_id?: string | null
-          parent_id?: string | null
-          public?: Json | null
-          secret?: string | null
-          series_id?: string
-          token_type?: Database["grida_west"]["Enums"]["token_type"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "token_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "participant"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "participant_customer"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "participant_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "token"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "campaign"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "campaign_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      token_event: {
-        Row: {
-          data: Json | null
-          name: string
-          series_id: string
-          time: string
-          token_id: string
-        }
-        Insert: {
-          data?: Json | null
-          name: string
-          series_id: string
-          time?: string
-          token_id: string
-        }
-        Update: {
-          data?: Json | null
-          name?: string
-          series_id?: string
-          time?: string
-          token_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "token_event_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "campaign"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "token_event_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "token_event_token_id_fkey"
-            columns: ["token_id"]
+            foreignKeyName: "referrer_customer_id_fkey"
+            columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "token"
-            referencedColumns: ["id"]
+            referencedRelation: "customer"
+            referencedColumns: ["uid"]
           },
         ]
       }
@@ -2217,92 +2723,137 @@ export type Database = {
     Views: {
       campaign_public: {
         Row: {
+          conversion_currency: string | null
+          conversion_value: number | null
           enabled: boolean | null
           id: string | null
+          max_invitations_per_referrer: number | null
           name: string | null
           public: Json | null
+          reward_currency: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          type: Database["grida_west"]["Enums"]["campaign_type"] | null
+          slug: string | null
         }
         Insert: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
           enabled?: boolean | null
           id?: string | null
+          max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
+          reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          type?: Database["grida_west"]["Enums"]["campaign_type"] | null
+          slug?: string | null
         }
         Update: {
+          conversion_currency?: string | null
+          conversion_value?: number | null
           enabled?: boolean | null
           id?: string | null
+          max_invitations_per_referrer?: number | null
           name?: string | null
           public?: Json | null
+          reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          type?: Database["grida_west"]["Enums"]["campaign_type"] | null
+          slug?: string | null
         }
         Relationships: []
       }
-      participant_customer: {
+      customer: {
         Row: {
-          created_at: string | null
-          customer_id: string | null
           email: string | null
-          id: string | null
-          metadata: Json | null
           name: string | null
           phone: string | null
-          project_id: number | null
-          role: Database["grida_west"]["Enums"]["participant_role"] | null
-          series_id: string | null
+          uid: string | null
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null
+          phone?: string | null
+          uid?: string | null
+        }
+        Update: {
+          email?: string | null
+          name?: string | null
+          phone?: string | null
+          uid?: string | null
+        }
+        Relationships: []
+      }
+      invitation_public_secure: {
+        Row: {
+          campaign_id: string | null
+          created_at: string | null
+          id: string | null
+          invitee_name: string | null
+          is_claimed: boolean | null
+          referrer_id: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "fk_participant_series_project"
-            columns: ["series_id", "project_id"]
-            isOneToOne: false
-            referencedRelation: "campaign"
-            referencedColumns: ["id", "project_id"]
-          },
-          {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "invitation_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invitation_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitation_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referrer_public_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      participant_public: {
+      referrer_public_secure: {
         Row: {
+          campaign_id: string | null
+          code: string | null
+          created_at: string | null
           id: string | null
-          name: string | null
-          role: Database["grida_west"]["Enums"]["participant_role"] | null
-          series_id: string | null
+          invitation_count: number | null
+          referrer_name: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "referrer_campaign_id_code_fkey"
+            columns: ["campaign_id", "code"]
+            isOneToOne: false
+            referencedRelation: "code"
+            referencedColumns: ["campaign_id", "code"]
+          },
+          {
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "participant_series_id_fkey"
-            columns: ["series_id"]
+            foreignKeyName: "referrer_campaign_id_fkey"
+            columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaign_public"
             referencedColumns: ["id"]
@@ -2313,7 +2864,7 @@ export type Database = {
     Functions: {
       analyze: {
         Args: {
-          p_series_id: string
+          p_campaign_id: string
           p_names?: string[]
           p_time_from?: string
           p_time_to?: string
@@ -2325,58 +2876,86 @@ export type Database = {
           count: number
         }[]
       }
-      claim_token: {
+      claim: {
         Args: {
-          p_series_id: string
+          p_campaign_ref: string
           p_code: string
-          p_owner_id: string
-          p_secret?: string
+          p_customer_id: string
         }
         Returns: {
+          campaign_id: string
           code: string
-          count: number
           created_at: string
+          customer_id: string | null
           id: string
-          is_burned: boolean
           is_claimed: boolean
-          max_supply: number | null
-          owner_id: string | null
-          parent_id: string | null
-          public: Json | null
-          secret: string | null
-          series_id: string
-          token_type: Database["grida_west"]["Enums"]["token_type"]
+          metadata: Json | null
+          referrer_id: string
         }
       }
-      mint_token: {
+      find_campaign_id_by_slug: {
         Args: {
-          p_series_id: string
-          p_code: string
-          p_secret?: string
-          p_next_code?: string
-          p_next_public?: Json
+          p_slug: unknown
         }
-        Returns: {
-          code: string
-          count: number
-          created_at: string
-          id: string
-          is_burned: boolean
-          is_claimed: boolean
-          max_supply: number | null
-          owner_id: string | null
-          parent_id: string | null
-          public: Json | null
-          secret: string | null
-          series_id: string
-          token_type: Database["grida_west"]["Enums"]["token_type"]
-        }
+        Returns: string
       }
-      redeem_token: {
+      flag: {
         Args: {
-          p_token_id: string
+          p_campaign_id: string
+          p_invitation_id: string
+          p_event_name: string
+          p_event_data?: Json
         }
         Returns: undefined
+      }
+      gen_random_short_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      invite: {
+        Args: {
+          p_campaign_ref: string
+          p_code: string
+          p_new_invitation_code?: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          is_claimed: boolean
+          metadata: Json | null
+          referrer_id: string
+        }
+      }
+      lookup: {
+        Args: {
+          p_campaign_ref: string
+          p_code: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          type: Database["grida_west_referral"]["Enums"]["token_role"]
+        }[]
+      }
+      refresh: {
+        Args: {
+          p_campaign_ref: string
+          p_invitation_id: string
+          p_new_invitation_code?: string
+        }
+        Returns: {
+          campaign_id: string
+          code: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          is_claimed: boolean
+          metadata: Json | null
+          referrer_id: string
+        }
       }
       rls_campaign: {
         Args: {
@@ -2386,7 +2965,7 @@ export type Database = {
       }
       track: {
         Args: {
-          p_series_id: string
+          p_campaign_ref: string
           p_code: string
           p_name: string
           p_data?: Json
@@ -2395,9 +2974,7 @@ export type Database = {
       }
     }
     Enums: {
-      campaign_type: "referral"
-      participant_role: "host" | "guest"
-      token_type: "mintable" | "redeemable"
+      token_role: "referrer" | "invitation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2569,6 +3146,7 @@ export type Database = {
           search_text: string | null
           search_tsv: unknown | null
           uid: string
+          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -2592,6 +3170,7 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown | null
           uid?: string
+          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -2615,6 +3194,7 @@ export type Database = {
           search_text?: string | null
           search_tsv?: unknown | null
           uid?: string
+          user_id?: string | null
           uuid?: string | null
           visitor_id?: string | null
         }
@@ -3059,6 +3639,7 @@ export type Database = {
           search_tsv: unknown | null
           tags: string[] | null
           uid: string | null
+          user_id: string | null
           uuid: string | null
           visitor_id: string | null
         }
@@ -3458,6 +4039,10 @@ export type Database = {
         }
         Returns: string
       }
+      gen_random_slug: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_combinations:
         | {
             Args: {
@@ -3697,6 +4282,12 @@ export type Database = {
       rls_project: {
         Args: {
           project_id: number
+        }
+        Returns: boolean
+      }
+      rls_via_customer: {
+        Args: {
+          p_customer_id: string
         }
         Returns: boolean
       }
@@ -4444,11 +5035,9 @@ export const Constants = {
   grida_storage: {
     Enums: {},
   },
-  grida_west: {
+  grida_west_referral: {
     Enums: {
-      campaign_type: ["referral"],
-      participant_role: ["host", "guest"],
-      token_type: ["mintable", "redeemable"],
+      token_role: ["referrer", "invitation"],
     },
   },
   grida_x_supabase: {

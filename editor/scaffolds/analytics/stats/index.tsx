@@ -209,7 +209,7 @@ export function Sessions({
             from,
             to,
             dateKey: "created_at",
-            intervalMs: DAY_MS,
+            interval: DAY_MS,
           })
         );
       }
@@ -281,7 +281,7 @@ export function Customers({
             from,
             to,
             dateKey: "created_at",
-            intervalMs: DAY_MS,
+            interval: DAY_MS,
           })
         );
       }
@@ -353,7 +353,7 @@ export function Responses({
             from,
             to,
             dateKey: "created_at",
-            intervalMs: DAY_MS,
+            interval: DAY_MS,
           })
         );
       }
