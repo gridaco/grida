@@ -94,7 +94,7 @@ export function ImportFromCustomersDialog({
         <DialogHeader>
           <DialogTitle>Import Referrers</DialogTitle>
           <DialogDescription>
-            Add existing customers as participants to your campaign.
+            Add existing customers as referrers to your campaign.
           </DialogDescription>
         </DialogHeader>
 

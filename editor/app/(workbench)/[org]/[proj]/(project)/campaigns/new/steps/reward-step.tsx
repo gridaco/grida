@@ -14,10 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Gift, Plus, Trash2, Users } from "lucide-react";
-
+import { Platform } from "@/lib/platform";
 interface RewardStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 const currencies = [
