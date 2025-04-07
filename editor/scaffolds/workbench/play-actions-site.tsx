@@ -8,7 +8,7 @@ import { ClockIcon, GlobeIcon, PlayIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export function SitePlayAction() {
-  const link = "https://dummy-replace-me.grida.site";
+  const link = "https://dummy-fixme.grida.site";
 
   return (
     <>

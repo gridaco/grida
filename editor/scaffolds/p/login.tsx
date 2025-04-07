@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/input-otp";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
+import { template } from "@/utils/template";
 import toast from "react-hot-toast";
 
 type Step = "email" | "otp";
@@ -50,10 +51,6 @@ const dictionary = {
     back: "← 뒤로",
   },
 };
-
-function template(str: string, vars: Record<string, string>) {
-  return str.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
-}
 
 interface CustomerPropsMinimalCustomizationProps {
   locale?: string;
