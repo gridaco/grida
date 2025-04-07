@@ -202,7 +202,7 @@ export default function ReferrerPage({
               />
             </Standard.Section>
             <Standard.Section className="py-4">
-              <Card className="relative overflow-hidden rounded-xl">
+              <Card className="relative overflow-hidden rounded-xl border-0">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
                   {/* background */}
@@ -256,7 +256,7 @@ export default function ReferrerPage({
             </Standard.Section>
 
             <Standard.Section>
-              <Card className="relative overflow-hidden rounded-xl py-2">
+              <Card className="relative overflow-hidden rounded-xl py-2 border-0">
                 {invitations?.map((inv, index) => (
                   <motion.div
                     key={inv.id}

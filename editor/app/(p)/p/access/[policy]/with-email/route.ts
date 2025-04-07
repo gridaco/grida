@@ -15,6 +15,11 @@ export async function POST(req: NextRequest) {
     await workspaceclient.from("customer").select().eq("email", email);
 
   if (customer_list_err) {
+    console.error(
+      "[portal]/error (ok) while fetching customer by email",
+      customer_list_err,
+      email
+    );
     // return ok, cause we don't want to leak if the email is registered or not
     return NextResponse.json({
       data: null,

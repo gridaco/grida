@@ -80,8 +80,12 @@ export default async function CustomerPortalSession({
           <Tabs defaultValue="now">
             <TabsList>
               <TabsTrigger value="now">{t.now}</TabsTrigger>
-              <TabsTrigger value="upcoming">{t.upcoming}</TabsTrigger>
-              <TabsTrigger value="past">{t.past}</TabsTrigger>
+              <TabsTrigger disabled value="upcoming">
+                {t.upcoming}
+              </TabsTrigger>
+              <TabsTrigger disabled value="past">
+                {t.past}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </header>

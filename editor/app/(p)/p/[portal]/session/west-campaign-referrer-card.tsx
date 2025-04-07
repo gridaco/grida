@@ -111,7 +111,7 @@ export default function CampaignReferrerCard({
                     {invitation_count} / {max_invitation}
                   </span>
                 </div>
-                <Progress value={progress} className="h-2" />
+                <Progress value={progress * 100} className="h-2" />
               </div>
             ) : (
               <></>
