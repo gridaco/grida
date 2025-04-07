@@ -12,6 +12,7 @@ export default function InvitationPage({
 }: {
   data: Platform.WEST.Referral.InvitationPublicRead;
 }) {
+  const locale = "ko"; // FIXME:
   const { is_claimed, referrer_name: _referrer_name } = data;
   const referrer_name = _referrer_name || "?";
   const is_first_time = !is_claimed;
@@ -29,6 +30,7 @@ export default function InvitationPage({
               UX Overlay
             </DialogPrimitive.Description>
             <Hello
+              locale={locale}
               data={{
                 referrer: referrer_name ?? "Unknown",
               }}

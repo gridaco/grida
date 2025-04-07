@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { cn } from "@/utils";
 import { InstagramIcon } from "lucide-react";
@@ -111,14 +112,31 @@ export function MainImage({
   className?: string;
 }) {
   return (
-    <div className={cn("w-full flex items-center justify-center", className)}>
+    <div
+      className={cn(
+        "w-full flex items-center justify-center relative z-10",
+        className
+      )}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={alt}
         width={800}
         height={800}
-        className="max-w-[400px] max-h-[400px] aspect-square rounded-xl object-cover overflow-hidden shadow-2xl"
+        className="max-w-[400px] max-h-[400px] aspect-square rounded-xl object-cover shadow-xl overflow-hidden z-10"
+      />
+      {/* Shadow container with blur effect */}
+      <div
+        className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-full h-full
+                     blur-xl opacity-25 scale-100 transition-opacity duration-700 -z-10
+                     `}
+        style={{
+          backgroundImage: `url(${src})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center bottom",
+          filter: "blur(24px) brightness(0.8)",
+        }}
       />
     </div>
   );

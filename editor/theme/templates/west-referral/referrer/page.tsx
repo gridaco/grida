@@ -427,7 +427,7 @@ export default function ReferrerPageTemplate({
 
               <article className="prose prose-sm dark:prose-invert">
                 <span
-                  dangerouslySetInnerHTML={{ __html: design.article.html }}
+                  dangerouslySetInnerHTML={{ __html: design.article?.html }}
                 />
               </article>
             </Standard.Section>

@@ -2,133 +2,16 @@
 
 import React from "react";
 import { Platform } from "@/lib/platform";
-import { useDialogState } from "@/components/hooks/use-dialog-state";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 import t from "./data-01.json";
-
-function __share_obj({
-  campaign_slug,
-  referrer_name,
-  invitation_code,
-}: {
-  campaign_slug: string;
-  referrer_name: string;
-  invitation_code: string;
-}) {
-  return {
-    title: "Polestar 시승하고 경품 받아가세요 🎁",
-    text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    url: `${window.location.origin}/r/${campaign_slug}/t/${invitation_code}`,
-  };
-}
-
-async function mkshare({
-  campaign_slug,
-  referrer_code,
-  referrer_name,
-}: {
-  campaign_slug: string;
-  referrer_code: string;
-  referrer_name: string;
-}) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
-  const { data: invitation } = await client.invite(referrer_code);
-
-  return __share_obj({
-    campaign_slug: campaign_slug,
-    referrer_name,
-    invitation_code: invitation.code,
-  });
-}
-
-async function reshare({
-  campaign_slug,
-  referrer_code,
-  referrer_name,
-  invitation_id,
-}: {
-  campaign_slug: string;
-  referrer_code: string;
-  referrer_name: string;
-  invitation_id: string;
-}) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
-
-  const { data: invitation } = await client.refresh(
-    referrer_code,
-    invitation_id
-  );
-
-  return __share_obj({
-    campaign_slug: campaign_slug,
-    referrer_name,
-    invitation_code: invitation.code,
-  });
-}
-
-async function share_or_copy(sharable: {
-  title: string;
-  text: string;
-  url: string;
-}): Promise<{ type: "clipboard" | "share" }> {
-  if (navigator.share) {
-    await navigator.share(sharable);
-    return { type: "share" };
-  } else {
-    const shareUrl = sharable.url;
-    const shareText = sharable.text;
-    const shareTitle = sharable.title;
-    const shareContent = `${shareTitle}\n${shareText}\n${shareUrl}`;
-    await navigator.clipboard.writeText(shareContent);
-    return { type: "clipboard" };
-  }
-}
 
 export default function ReferrerPage({
   data,
 }: {
   data: Platform.WEST.Referral.ReferrerPublicRead;
 }) {
-  const {
-    code,
-    campaign,
-    referrer_name: _referrer_name,
-    invitation_count,
-    invitations,
-    // children: subtokens,
-  } = data;
+  const { referrer_name: _referrer_name } = data;
   const referrer_name = _referrer_name || "?";
-
-  const confirmDialog = useDialogState("confirm");
-
-  const { max_invitations_per_referrer: max_supply } = campaign;
-
-  // const available_count = (max_supply ?? 0) - (invitation_count ?? 0);
-  // const is_available = available_count > 0;
-
-  // const triggerShare = async () => {
-  //   return mkshare({
-  //     campaign_slug: campaign.slug,
-  //     referrer_code: code!,
-  //     referrer_name,
-  //   }).then((sharable) => {
-  //     share_or_copy(sharable)
-  //       .then(({ type }) => {
-  //         switch (type) {
-  //           case "share":
-  //             toast.success("초대권이 발급되었습니다!");
-  //             break;
-  //           case "clipboard":
-  //             toast.success("초대권이 복사되었습니다!");
-  //             break;
-  //         }
-  //       })
-  //       .finally(() => {
-  //         mutate(code);
-  //         confirmDialog.closeDialog();
-  //       });
-  //   });
-  // };
 
   return (
     <ReferrerPageTemplate

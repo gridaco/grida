@@ -14,7 +14,7 @@ export function CMSRichText({
 }: {
   uploader?: (file: File) => Promise<string>;
   value: Content;
-  onValueChange?: (value: Content) => void;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   autofocus?: boolean;
   disabled?: boolean;
@@ -23,7 +23,7 @@ export function CMSRichText({
     <div className="w-full max-w-full">
       <MinimalTiptapEditor
         value={value}
-        onChange={onValueChange}
+        onChange={(content) => onValueChange?.(content as string)}
         className="w-full"
         editorContentClassName="p-5"
         output="html"

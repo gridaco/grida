@@ -7,24 +7,29 @@ import { Badge } from "@/components/ui/badge";
 import ScratchAnimation from "@/www/ui/scratch-animation";
 import * as Standard from "@/theme/templates/west-referral/standard";
 
-export default function Hello({
-  data,
-  onOpenChange,
-}: {
-  data: { referrer: string };
-  onOpenChange?: (open: boolean) => void;
-}) {
-  return <BBB data={data} onOpenChange={onOpenChange} />;
-}
+const dictionary = {
+  en: {
+    invitedBy: "invited you",
+    instruction: "👆 Scratch the card with your finger",
+  },
+  ko: {
+    invitedBy: "님 께서 초대장을 보냈습니다.",
+    instruction: "👆 카드를 손가락으로 긁어 주세요",
+  },
+};
 
-function BBB({
+export default function Hello({
+  locale,
   data,
   onOpenChange,
 }: {
+  locale: keyof typeof dictionary;
   data: { referrer: string };
   onOpenChange?: (open: boolean) => void;
 }) {
   const [started, setStarted] = React.useState(false);
+
+  const t = dictionary[locale];
 
   return (
     <main className="w-dvw h-dvh flex flex-col items-center justify-center">
@@ -38,7 +43,7 @@ function BBB({
           className="max-h-8 w-auto object-contain"
         />
         <Badge variant="outline">
-          {data.referrer} 님 께서 초대장을 보냈습니다.
+          {data.referrer} {t.invitedBy}
         </Badge>
       </header>
 
@@ -69,7 +74,7 @@ function BBB({
           </div>
         </ScratchToReveal>
         <p className="underline text-sm text-muted-foreground">
-          👆 카드를 손가락으로 긁어 주세요
+          {t.instruction}
         </p>
       </section>
     </main>
