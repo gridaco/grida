@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   if (refresh_err) {
     console.error("error while refreshing", refresh_err);
-    return notFound();
+    return NextResponse.json({ error: refresh_err }, { status: 400 });
   }
 
   return NextResponse.json({

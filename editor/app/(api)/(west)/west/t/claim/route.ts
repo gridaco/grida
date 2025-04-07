@@ -3,18 +3,10 @@ import assert from "assert";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-type Params = {
-  code: string;
-};
-
-type Context = {
-  params: Promise<Params>;
-};
-
 /**
  * [claim]
  */
-export async function POST(req: NextRequest, context: Context) {
+export async function POST(req: NextRequest) {
   const headersList = await headers();
   const campaign_slug = headersList.get("x-grida-west-campaign-slug");
   const customer_id = headersList.get("x-grida-customer-id");

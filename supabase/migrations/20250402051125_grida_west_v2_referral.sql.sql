@@ -792,6 +792,7 @@ RETURNS VOID AS $$
 DECLARE
   challenge grida_west_referral.campaign_challenge%ROWTYPE;
   dep_met BOOLEAN;
+  v_code TEXT;
 BEGIN
   -- Step 1–2: check challenge is defined for campaign
   SELECT c.*
@@ -823,13 +824,18 @@ BEGIN
 
   -- Step 5: insert event and challenge log
   -- get the campaign.ref (slug)
-  SELECT slug INTO campaign_slug
+  SELECT slug INTO v_campaign_slug
   FROM grida_west_referral.campaign
   WHERE id = p_campaign_id;
 
+  -- get the invitation code
+  SELECT code INTO v_code
+  FROM grida_west_referral.invitation
+  WHERE id = p_invitation_id AND campaign_id = p_campaign_id;
+
   PERFORM grida_west_referral.track(
-    campaign_slug,
-    NULL,
+    v_campaign_slug,
+    v_code,
     p_event_name,
     p_event_data
   );

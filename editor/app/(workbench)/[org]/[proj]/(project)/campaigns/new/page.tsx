@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CampaignWizard } from "./campaign-wizard";
 import { useProject } from "@/scaffolds/workspace";
+import { Platform } from "@/lib/platform";
 import toast from "react-hot-toast";
 import WelcomeDialog from "./welcome-dialog";
 
@@ -11,7 +12,9 @@ export default function NewCampaignPage() {
   const project = useProject();
   const router = useRouter();
 
-  const handleComplete = async (campaignData: any) => {
+  const handleComplete = async (
+    campaignData: Platform.WEST.Referral.Wizard.CampaignData
+  ) => {
     console.log("creating campaign..", campaignData);
     const task = fetch("/private/west/campaigns/new", {
       method: "POST",
@@ -25,7 +28,9 @@ export default function NewCampaignPage() {
     task.then(async (res) => {
       const { data: new_campaign } = await res.json();
       if (res.ok) {
-        router.push(`./${new_campaign.slug}`);
+        router.push(
+          `./${(new_campaign as Platform.WEST.Referral.Campaign).slug}`
+        );
       }
     });
 
