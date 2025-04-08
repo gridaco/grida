@@ -119,7 +119,7 @@ export namespace prototypes {
 
   export const video = {
     type: "video",
-    src: "/assets/video.mp4",
+    src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
     width: 320,
     height: 240,
     position: "relative",

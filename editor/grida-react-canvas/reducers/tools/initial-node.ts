@@ -144,7 +144,7 @@ export default function initialNode(
         fill: undefined,
         fit: "cover",
         // TODO: replace with static url
-        src: "/assets/video.mp4",
+        src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
         loop: true,
         muted: true,
         autoplay: true,
