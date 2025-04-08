@@ -128,7 +128,7 @@ export default function initialNode(
         fit: "cover",
         fill: undefined,
         // TODO: replace with static url
-        src: "/assets/image.png",
+        src: "/dummy/image/png/png-square-transparent-1k.png",
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
