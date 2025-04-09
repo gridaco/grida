@@ -121,6 +121,24 @@ export default async function Layout({
                         </SidebarGroupContent>
                       </SidebarGroup>
                       <SidebarGroup>
+                        <SidebarGroupLabel>Site</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            <Link href={`/${org}/${proj}/www`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="v0_site"
+                                    className="size-4"
+                                  />
+                                  Site Settings
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                      <SidebarGroup>
                         <SidebarGroupLabel>Advanced</SidebarGroupLabel>
                         <SidebarGroupContent>
                           <SidebarMenu>
