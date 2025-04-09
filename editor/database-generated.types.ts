@@ -3504,21 +3504,6 @@ export type Database = {
           },
         ]
       }
-      sys_json_schema: {
-        Row: {
-          id: string
-          schema: Json
-        }
-        Insert: {
-          id: string
-          schema: Json
-        }
-        Update: {
-          id?: string
-          schema?: Json
-        }
-        Relationships: []
-      }
       tag: {
         Row: {
           color: string
@@ -4032,10 +4017,6 @@ export type Database = {
       get_projects_for_user: {
         Args: { user_id: string }
         Returns: number[]
-      }
-      get_sys_json_schema: {
-        Args: { id: string }
-        Returns: Json
       }
       get_telemetry_report: {
         Args: Record<PropertyKey, never>

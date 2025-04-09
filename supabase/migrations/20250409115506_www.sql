@@ -1,5 +1,5 @@
 -- seed struct
-INSERT INTO public.sys_json_schema (id, schema)
+INSERT INTO _grida.sys_json_schema (id, schema)
 VALUES (
     'favicon',
     '{
@@ -25,7 +25,7 @@ CREATE TABLE public.project_www (
     favicon JSONB,
     CHECK (
         jsonb_matches_schema(
-            get_sys_json_schema('favicon')::json,
+            _grida.get_sys_json_schema('favicon')::json,
             favicon
         )
     ),
