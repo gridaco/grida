@@ -502,17 +502,11 @@ export type Database = {
     }
     Functions: {
       generate_combinations: {
-        Args: {
-          options: Json
-          index: number
-          current: Json
-        }
+        Args: { options: Json; index: number; current: Json }
         Returns: Json
       }
       get_inventory_items_with_committed: {
-        Args: {
-          p_store_id: number
-        }
+        Args: { p_store_id: number }
         Returns: {
           id: number
           created_at: string
@@ -526,10 +520,7 @@ export type Database = {
         }[]
       }
       get_inventory_with_committed: {
-        Args: {
-          p_store_id: number
-          p_sku: string
-        }
+        Args: { p_store_id: number; p_sku: string }
         Returns: {
           id: number
           created_at: string
@@ -1565,29 +1556,19 @@ export type Database = {
     }
     Functions: {
       core_check_max_responses: {
-        Args: {
-          p_form_id: string
-        }
+        Args: { p_form_id: string }
         Returns: undefined
       }
       rls_form: {
-        Args: {
-          p_form_id: string
-        }
+        Args: { p_form_id: string }
         Returns: boolean
       }
       rpc_check_max_responses: {
-        Args: {
-          form_id: string
-        }
+        Args: { form_id: string }
         Returns: undefined
       }
       set_response_session_field_value: {
-        Args: {
-          session_id: string
-          key: string
-          value: Json
-        }
+        Args: { session_id: string; key: string; value: Json }
         Returns: undefined
       }
     }
@@ -1719,16 +1700,11 @@ export type Database = {
     }
     Functions: {
       create_secret_connection_supabase_service_key: {
-        Args: {
-          p_supabase_project_id: number
-          p_secret: string
-        }
+        Args: { p_supabase_project_id: number; p_secret: string }
         Returns: string
       }
       reveal_secret_connection_supabase_service_key: {
-        Args: {
-          p_supabase_project_id: number
-        }
+        Args: { p_supabase_project_id: number }
         Returns: string
       }
     }
@@ -2877,11 +2853,7 @@ export type Database = {
         }[]
       }
       claim: {
-        Args: {
-          p_campaign_ref: string
-          p_code: string
-          p_customer_id: string
-        }
+        Args: { p_campaign_ref: string; p_code: string; p_customer_id: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2894,9 +2866,7 @@ export type Database = {
         }
       }
       find_campaign_id_by_slug: {
-        Args: {
-          p_slug: unknown
-        }
+        Args: { p_slug: unknown }
         Returns: string
       }
       flag: {
@@ -2930,10 +2900,7 @@ export type Database = {
         }
       }
       lookup: {
-        Args: {
-          p_campaign_ref: string
-          p_code: string
-        }
+        Args: { p_campaign_ref: string; p_code: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2958,9 +2925,7 @@ export type Database = {
         }
       }
       rls_campaign: {
-        Args: {
-          p_campaign_id: string
-        }
+        Args: { p_campaign_id: string }
         Returns: boolean
       }
       track: {
@@ -3498,6 +3463,62 @@ export type Database = {
           },
         ]
       }
+      project_www: {
+        Row: {
+          description: string | null
+          favicon: Json | null
+          keywords: string[] | null
+          lang: string
+          og_image: string | null
+          project_id: number
+          theme: Json | null
+          title: string | null
+        }
+        Insert: {
+          description?: string | null
+          favicon?: Json | null
+          keywords?: string[] | null
+          lang?: string
+          og_image?: string | null
+          project_id: number
+          theme?: Json | null
+          title?: string | null
+        }
+        Update: {
+          description?: string | null
+          favicon?: Json | null
+          keywords?: string[] | null
+          lang?: string
+          og_image?: string | null
+          project_id?: number
+          theme?: Json | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_www_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sys_json_schema: {
+        Row: {
+          id: string
+          schema: Json
+        }
+        Insert: {
+          id: string
+          schema: Json
+        }
+        Update: {
+          id?: string
+          schema?: Json
+        }
+        Relationships: []
+      }
       tag: {
         Row: {
           color: string
@@ -3798,9 +3819,7 @@ export type Database = {
         }[]
       }
       approximate_row_count: {
-        Args: {
-          relation: unknown
-        }
+        Args: { relation: unknown }
         Returns: number
       }
       attach_data_node: {
@@ -3825,9 +3844,7 @@ export type Database = {
         Returns: undefined
       }
       chunk_compression_stats: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           chunk_schema: unknown
           chunk_name: unknown
@@ -3844,9 +3861,7 @@ export type Database = {
         }[]
       }
       chunks_detailed_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           chunk_schema: unknown
           chunk_name: unknown
@@ -3857,60 +3872,32 @@ export type Database = {
           node_name: unknown
         }[]
       }
-      citext:
-        | {
-            Args: {
-              "": boolean
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: string
-          }
+      citext: {
+        Args: { "": string } | { "": boolean } | { "": unknown }
+        Returns: string
+      }
       citext_hash: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: number
       }
       citextin: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       citextout: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: unknown
       }
       citextrecv: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       citextsend: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string
       }
       compress_chunk: {
-        Args: {
-          uncompressed_chunk: unknown
-          if_not_compressed?: boolean
-        }
+        Args: { uncompressed_chunk: unknown; if_not_compressed?: boolean }
         Returns: unknown
       }
       create_distributed_hypertable: {
@@ -3940,9 +3927,7 @@ export type Database = {
         }[]
       }
       create_distributed_restore_point: {
-        Args: {
-          name: string
-        }
+        Args: { name: string }
         Returns: {
           node_name: unknown
           node_type: string
@@ -3977,10 +3962,7 @@ export type Database = {
         }[]
       }
       decompress_chunk: {
-        Args: {
-          uncompressed_chunk: unknown
-          if_compressed?: boolean
-        }
+        Args: { uncompressed_chunk: unknown; if_compressed?: boolean }
         Returns: unknown
       }
       delete_data_node: {
@@ -3994,9 +3976,7 @@ export type Database = {
         Returns: boolean
       }
       delete_job: {
-        Args: {
-          job_id: number
-        }
+        Args: { job_id: number }
         Returns: undefined
       }
       detach_data_node: {
@@ -4019,9 +3999,7 @@ export type Database = {
         Returns: number
       }
       detach_tablespaces: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: number
       }
       drop_chunks: {
@@ -4034,81 +4012,57 @@ export type Database = {
         Returns: string[]
       }
       flatten_jsonb_object_values: {
-        Args: {
-          obj: Json
-        }
+        Args: { obj: Json }
         Returns: string
       }
       gen_random_slug: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      generate_combinations:
-        | {
-            Args: {
-              option_ids: number[]
-              product_id: number
-              store_id: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              product_id: number
-              option_value_combinations: number[]
-            }
-            Returns: undefined
-          }
+      generate_combinations: {
+        Args:
+          | { product_id: number; option_value_combinations: number[] }
+          | { option_ids: number[]; product_id: number; store_id: number }
+        Returns: undefined
+      }
       get_organizations_for_user: {
-        Args: {
-          user_id: string
-        }
+        Args: { user_id: string }
         Returns: number[]
       }
       get_projects_for_user: {
-        Args: {
-          user_id: string
-        }
+        Args: { user_id: string }
         Returns: number[]
+      }
+      get_sys_json_schema: {
+        Args: { id: string }
+        Returns: Json
       }
       get_telemetry_report: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
       gtrgm_compress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_decompress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_in: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_options: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: undefined
       }
       gtrgm_out: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       hypertable_compression_stats: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           total_chunks: number
           number_compressed_chunks: number
@@ -4124,9 +4078,7 @@ export type Database = {
         }[]
       }
       hypertable_detailed_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           table_bytes: number
           index_bytes: number
@@ -4136,62 +4088,44 @@ export type Database = {
         }[]
       }
       hypertable_index_size: {
-        Args: {
-          index_name: unknown
-        }
+        Args: { index_name: unknown }
         Returns: number
       }
       hypertable_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: number
       }
-      interpolate:
-        | {
-            Args: {
+      interpolate: {
+        Args:
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
+        Returns: number
+      }
       jsonb_array_objects_only: {
-        Args: {
-          arr: Json[]
-        }
+        Args: { arr: Json[] }
         Returns: boolean
       }
       locf: {
@@ -4213,10 +4147,7 @@ export type Database = {
         Returns: undefined
       }
       remove_compression_policy: {
-        Args: {
-          hypertable: unknown
-          if_exists?: boolean
-        }
+        Args: { hypertable: unknown; if_exists?: boolean }
         Returns: boolean
       }
       remove_continuous_aggregate_policy: {
@@ -4228,74 +4159,47 @@ export type Database = {
         Returns: undefined
       }
       remove_reorder_policy: {
-        Args: {
-          hypertable: unknown
-          if_exists?: boolean
-        }
+        Args: { hypertable: unknown; if_exists?: boolean }
         Returns: undefined
       }
       remove_retention_policy: {
-        Args: {
-          relation: unknown
-          if_exists?: boolean
-        }
+        Args: { relation: unknown; if_exists?: boolean }
         Returns: undefined
       }
       reorder_chunk: {
-        Args: {
-          chunk: unknown
-          index?: unknown
-          verbose?: boolean
-        }
+        Args: { chunk: unknown; index?: unknown; verbose?: boolean }
         Returns: undefined
       }
       rls_asset: {
-        Args: {
-          p_asset_id: string
-        }
+        Args: { p_asset_id: string }
         Returns: boolean
       }
       rls_document: {
-        Args: {
-          p_document_id: string
-        }
+        Args: { p_document_id: string }
         Returns: boolean
       }
       rls_manifest: {
-        Args: {
-          p_manifest_id: number
-        }
+        Args: { p_manifest_id: number }
         Returns: boolean
       }
       rls_organization: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: boolean
       }
       rls_organization_owner: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: boolean
       }
       rls_project: {
-        Args: {
-          project_id: number
-        }
+        Args: { project_id: number }
         Returns: boolean
       }
       rls_via_customer: {
-        Args: {
-          p_customer_id: string
-        }
+        Args: { p_customer_id: string }
         Returns: boolean
       }
       set_adaptive_chunking: {
-        Args: {
-          hypertable: unknown
-          chunk_target_size: string
-        }
+        Args: { hypertable: unknown; chunk_target_size: string }
         Returns: Record<string, unknown>
       }
       set_chunk_time_interval: {
@@ -4315,9 +4219,7 @@ export type Database = {
         Returns: undefined
       }
       set_limit: {
-        Args: {
-          "": number
-        }
+        Args: { "": number }
         Returns: number
       }
       set_number_partitions: {
@@ -4329,18 +4231,11 @@ export type Database = {
         Returns: undefined
       }
       set_replication_factor: {
-        Args: {
-          hypertable: unknown
-          replication_factor: number
-        }
+        Args: { hypertable: unknown; replication_factor: number }
         Returns: undefined
       }
       show_chunks: {
-        Args: {
-          relation: unknown
-          older_than?: unknown
-          newer_than?: unknown
-        }
+        Args: { relation: unknown; older_than?: unknown; newer_than?: unknown }
         Returns: unknown[]
       }
       show_limit: {
@@ -4348,207 +4243,86 @@ export type Database = {
         Returns: number
       }
       show_tablespaces: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: unknown[]
       }
       show_trgm: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string[]
       }
-      time_bucket:
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
+      time_bucket: {
+        Args:
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | {
               bucket_width: unknown
               ts: string
               timezone: string
               origin?: string
               offset?: unknown
             }
-            Returns: string
-          }
-      time_bucket_gapfill:
-        | {
-            Args: {
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number; offset: number }
+          | { bucket_width: number; ts: number; offset: number }
+          | { bucket_width: number; ts: number; offset: number }
+        Returns: string
+      }
+      time_bucket_gapfill: {
+        Args:
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               timezone: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
+        Returns: number
+      }
       timescaledb_fdw_handler: {
         Args: Record<PropertyKey, never>
         Returns: unknown
@@ -4562,17 +4336,11 @@ export type Database = {
         Returns: boolean
       }
       update_customer_tags: {
-        Args: {
-          p_customer_uid: string
-          p_project_id: number
-          p_tags: string[]
-        }
+        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
         Returns: undefined
       }
       workspace_documents: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: {
           id: string
           created_at: string

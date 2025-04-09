@@ -86,6 +86,11 @@ file_size_limit = "150MiB"
 [storage.image_transformation]
 enabled = true
 
+[storage.buckets.www]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/*", "text/*", "application/xml", "application/json"]
+
 [storage.buckets.avatars]
 public = true
 file_size_limit = "10MiB"
