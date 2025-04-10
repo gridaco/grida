@@ -3085,7 +3085,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           lang: string
-          name: string | null
+          name: string
           og_image: string | null
           project_id: number
           theme: Json | null
@@ -3097,7 +3097,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           lang?: string
-          name?: string | null
+          name?: string
           og_image?: string | null
           project_id: number
           theme?: Json | null
@@ -3109,7 +3109,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           lang?: string
-          name?: string | null
+          name?: string
           og_image?: string | null
           project_id?: number
           theme?: Json | null
