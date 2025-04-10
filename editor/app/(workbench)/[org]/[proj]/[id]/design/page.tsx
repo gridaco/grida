@@ -25,7 +25,7 @@ import Toolbar, {
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import Portal from "@/app/(demo)/r/[slug]/p/_flows/page";
+// import Portal from "@/app/(public)/www/[www]/r/[slug]/p/_flows/page";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 // import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
 // import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
@@ -211,7 +211,7 @@ function CustomComponent__Portal(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Portal />
+      {/* <Portal /> */}
     </div>
   );
 }
