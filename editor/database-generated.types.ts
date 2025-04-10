@@ -2945,6 +2945,87 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_www: {
+    Tables: {
+      project_www: {
+        Row: {
+          description: string | null
+          favicon: Json | null
+          id: string
+          keywords: string[] | null
+          lang: string
+          og_image: string | null
+          project_id: number | null
+          theme: Json | null
+          title: string | null
+        }
+        Insert: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string
+          keywords?: string[] | null
+          lang?: string
+          og_image?: string | null
+          project_id?: number | null
+          theme?: Json | null
+          title?: string | null
+        }
+        Update: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string
+          keywords?: string[] | null
+          lang?: string
+          og_image?: string | null
+          project_id?: number | null
+          theme?: Json | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      project_www_public: {
+        Row: {
+          description: string | null
+          favicon: Json | null
+          id: string | null
+          keywords: string[] | null
+          lang: string | null
+          og_image: string | null
+          title: string | null
+        }
+        Insert: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string | null
+          keywords?: string[] | null
+          lang?: string | null
+          og_image?: string | null
+          title?: string | null
+        }
+        Update: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string | null
+          keywords?: string[] | null
+          lang?: string | null
+          og_image?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_x_supabase: {
     Tables: {
       supabase_project: {
@@ -3459,47 +3540,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organization"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      project_www: {
-        Row: {
-          description: string | null
-          favicon: Json | null
-          keywords: string[] | null
-          lang: string
-          og_image: string | null
-          project_id: number
-          theme: Json | null
-          title: string | null
-        }
-        Insert: {
-          description?: string | null
-          favicon?: Json | null
-          keywords?: string[] | null
-          lang?: string
-          og_image?: string | null
-          project_id: number
-          theme?: Json | null
-          title?: string | null
-        }
-        Update: {
-          description?: string | null
-          favicon?: Json | null
-          keywords?: string[] | null
-          lang?: string
-          og_image?: string | null
-          project_id?: number
-          theme?: Json | null
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_www_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]
@@ -4788,6 +4828,9 @@ export const Constants = {
     Enums: {
       token_role: ["referrer", "invitation"],
     },
+  },
+  grida_www: {
+    Enums: {},
   },
   grida_x_supabase: {
     Enums: {

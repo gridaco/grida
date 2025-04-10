@@ -13,23 +13,25 @@ export type Database = MergeDeep<
   DatabaseGenerated,
   {
     public: {
-      Tables: {
-        project_www: {
-          Row: DatabaseGenerated["public"]["Tables"]["project_www"]["Row"] & {
-            favicon: SystemSchema_Favicon | null;
-          };
-          Insert: DatabaseGenerated["public"]["Tables"]["project_www"]["Insert"] & {
-            favicon?: SystemSchema_Favicon | null;
-          };
-          Update: DatabaseGenerated["public"]["Tables"]["project_www"]["Update"] & {
-            favicon?: SystemSchema_Favicon | null;
-          };
-        };
-      };
       Views: {
         customer_with_tags: {
           Row: DatabaseGenerated["public"]["Tables"]["customer"]["Row"] & {
             tags: string[];
+          };
+        };
+      };
+    };
+    grida_www: {
+      Tables: {
+        project_www: {
+          Row: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Row"] & {
+            favicon: SystemSchema_Favicon | null;
+          };
+          Insert: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Insert"] & {
+            favicon?: SystemSchema_Favicon | null;
+          };
+          Update: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Update"] & {
+            favicon?: SystemSchema_Favicon | null;
           };
         };
       };
