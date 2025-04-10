@@ -9,6 +9,7 @@ import CampaignSettings from "./settings";
 import Overview from "./overview";
 import { Badge } from "@/components/ui/badge";
 import { useCampaign } from "./store";
+import Link from "next/link";
 
 type Params = {
   org: string;
@@ -21,14 +22,9 @@ export default function CampaignsPage({ params }: { params: Params }) {
 
   return (
     <main className="container mx-auto my-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
-          <p className="text-muted-foreground">
-            Track your marketing campaign performance in real-time
-          </p>
-          <Badge variant="outline">referral</Badge>
-        </div>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
+        <Badge variant="outline">referral</Badge>
       </div>
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList>
@@ -39,6 +35,11 @@ export default function CampaignsPage({ params }: { params: Params }) {
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
           <TabsTrigger value="logs">Observability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <Link href={`./${campaign.slug}/design`}>
+            <TabsTrigger onClick={(e) => e.stopPropagation()} value="_design">
+              Design
+            </TabsTrigger>
+          </Link>
         </TabsList>
         <hr className="mt-2 mb-6" />
         <TabsContent value="overview">

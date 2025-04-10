@@ -15,7 +15,6 @@ export default function NewCampaignPage() {
   const handleComplete = async (
     campaignData: Platform.WEST.Referral.Wizard.CampaignData
   ) => {
-    console.log("creating campaign..", campaignData);
     const task = fetch("/private/west/campaigns/new", {
       method: "POST",
       body: JSON.stringify(campaignData),
@@ -28,8 +27,8 @@ export default function NewCampaignPage() {
     task.then(async (res) => {
       const { data: new_campaign } = await res.json();
       if (res.ok) {
-        router.push(
-          `./${(new_campaign as Platform.WEST.Referral.Campaign).slug}`
+        router.replace(
+          `/${project.organization_name}/${project.name}/campaigns/${(new_campaign as Platform.WEST.Referral.Campaign).slug}`
         );
       }
     });

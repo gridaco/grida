@@ -40,7 +40,7 @@ export default async function Layout({
                   <SidebarMenuItem>
                     <SidebarMenuButton>
                       <ArrowLeftIcon />
-                      Project Console
+                      Console
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </Link>
@@ -118,14 +118,6 @@ export default async function Layout({
                 <SidebarGroupLabel>Advanced</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    <Link href={`/${org}/${proj}/customers/policies`}>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton size="sm">
-                          <ResourceTypeIcon type="auth" className="size-4" />
-                          Customer Auth
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    </Link>
                     <Link href={`/${org}/${proj}/integrations`}>
                       <SidebarMenuItem>
                         <SidebarMenuButton size="sm">
