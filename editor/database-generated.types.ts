@@ -2954,6 +2954,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           lang: string
+          name: string | null
           og_image: string | null
           project_id: number | null
           theme: Json | null
@@ -2965,6 +2966,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           lang?: string
+          name?: string | null
           og_image?: string | null
           project_id?: number | null
           theme?: Json | null
@@ -2976,6 +2978,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           lang?: string
+          name?: string | null
           og_image?: string | null
           project_id?: number | null
           theme?: Json | null
@@ -2992,6 +2995,7 @@ export type Database = {
           id: string | null
           keywords: string[] | null
           lang: string | null
+          name: string | null
           og_image: string | null
           title: string | null
         }
@@ -3001,6 +3005,7 @@ export type Database = {
           id?: string | null
           keywords?: string[] | null
           lang?: string | null
+          name?: string | null
           og_image?: string | null
           title?: string | null
         }
@@ -3010,6 +3015,7 @@ export type Database = {
           id?: string | null
           keywords?: string[] | null
           lang?: string | null
+          name?: string | null
           og_image?: string | null
           title?: string | null
         }
@@ -3017,7 +3023,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      rls_project_www: {
+        Args: { p_project_www: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
@@ -3711,11 +3720,12 @@ export type Database = {
       add_compression_policy: {
         Args: {
           hypertable: unknown
-          compress_after: unknown
+          compress_after?: unknown
           if_not_exists?: boolean
           schedule_interval?: unknown
           initial_start?: string
           timezone?: string
+          compress_created_before?: unknown
         }
         Returns: number
       }
@@ -3731,35 +3741,17 @@ export type Database = {
         }
         Returns: number
       }
-      add_data_node: {
-        Args: {
-          node_name: unknown
-          host: string
-          database?: unknown
-          port?: number
-          if_not_exists?: boolean
-          bootstrap?: boolean
-          password?: string
-        }
-        Returns: {
-          node_name: unknown
-          host: string
-          port: number
-          database: unknown
-          node_created: boolean
-          database_created: boolean
-          extension_created: boolean
-        }[]
-      }
       add_dimension: {
-        Args: {
-          hypertable: unknown
-          column_name: unknown
-          number_partitions?: number
-          chunk_time_interval?: unknown
-          partitioning_func?: unknown
-          if_not_exists?: boolean
-        }
+        Args:
+          | {
+              hypertable: unknown
+              column_name: unknown
+              number_partitions?: number
+              chunk_time_interval?: unknown
+              partitioning_func?: unknown
+              if_not_exists?: boolean
+            }
+          | { hypertable: unknown; dimension: unknown; if_not_exists?: boolean }
         Returns: {
           dimension_id: number
           schema_name: unknown
@@ -3794,29 +3786,14 @@ export type Database = {
       add_retention_policy: {
         Args: {
           relation: unknown
-          drop_after: unknown
+          drop_after?: unknown
           if_not_exists?: boolean
           schedule_interval?: unknown
           initial_start?: string
           timezone?: string
+          drop_created_before?: unknown
         }
         Returns: number
-      }
-      alter_data_node: {
-        Args: {
-          node_name: unknown
-          host?: string
-          database?: unknown
-          port?: number
-          available?: boolean
-        }
-        Returns: {
-          node_name: unknown
-          host: string
-          port: number
-          database: unknown
-          available: boolean
-        }[]
       }
       alter_job: {
         Args: {
@@ -3830,6 +3807,9 @@ export type Database = {
           next_start?: string
           if_exists?: boolean
           check_config?: unknown
+          fixed_schedule?: boolean
+          initial_start?: string
+          timezone?: string
         }
         Returns: {
           job_id: number
@@ -3841,24 +3821,14 @@ export type Database = {
           config: Json
           next_start: string
           check_config: string
+          fixed_schedule: boolean
+          initial_start: string
+          timezone: string
         }[]
       }
       approximate_row_count: {
         Args: { relation: unknown }
         Returns: number
-      }
-      attach_data_node: {
-        Args: {
-          node_name: unknown
-          hypertable: unknown
-          if_not_attached?: boolean
-          repartition?: boolean
-        }
-        Returns: {
-          hypertable_id: number
-          node_hypertable_id: number
-          node_name: unknown
-        }[]
       }
       attach_tablespace: {
         Args: {
@@ -3867,6 +3837,22 @@ export type Database = {
           if_not_attached?: boolean
         }
         Returns: undefined
+      }
+      by_hash: {
+        Args: {
+          column_name: unknown
+          number_partitions: number
+          partition_func?: unknown
+        }
+        Returns: unknown
+      }
+      by_range: {
+        Args: {
+          column_name: unknown
+          partition_interval?: unknown
+          partition_func?: unknown
+        }
+        Returns: unknown
       }
       chunk_compression_stats: {
         Args: { hypertable: unknown }
@@ -3922,63 +3908,38 @@ export type Database = {
         Returns: string
       }
       compress_chunk: {
-        Args: { uncompressed_chunk: unknown; if_not_compressed?: boolean }
+        Args: {
+          uncompressed_chunk: unknown
+          if_not_compressed?: boolean
+          recompress?: boolean
+        }
         Returns: unknown
       }
-      create_distributed_hypertable: {
-        Args: {
-          relation: unknown
-          time_column_name: unknown
-          partitioning_column?: unknown
-          number_partitions?: number
-          associated_schema_name?: unknown
-          associated_table_prefix?: unknown
-          chunk_time_interval?: unknown
-          create_default_indexes?: boolean
-          if_not_exists?: boolean
-          partitioning_func?: unknown
-          migrate_data?: boolean
-          chunk_target_size?: string
-          chunk_sizing_func?: unknown
-          time_partitioning_func?: unknown
-          replication_factor?: number
-          data_nodes?: unknown[]
-        }
-        Returns: {
-          hypertable_id: number
-          schema_name: unknown
-          table_name: unknown
-          created: boolean
-        }[]
-      }
-      create_distributed_restore_point: {
-        Args: { name: string }
-        Returns: {
-          node_name: unknown
-          node_type: string
-          restore_point: unknown
-        }[]
-      }
       create_hypertable: {
-        Args: {
-          relation: unknown
-          time_column_name: unknown
-          partitioning_column?: unknown
-          number_partitions?: number
-          associated_schema_name?: unknown
-          associated_table_prefix?: unknown
-          chunk_time_interval?: unknown
-          create_default_indexes?: boolean
-          if_not_exists?: boolean
-          partitioning_func?: unknown
-          migrate_data?: boolean
-          chunk_target_size?: string
-          chunk_sizing_func?: unknown
-          time_partitioning_func?: unknown
-          replication_factor?: number
-          data_nodes?: unknown[]
-          distributed?: boolean
-        }
+        Args:
+          | {
+              relation: unknown
+              time_column_name: unknown
+              partitioning_column?: unknown
+              number_partitions?: number
+              associated_schema_name?: unknown
+              associated_table_prefix?: unknown
+              chunk_time_interval?: unknown
+              create_default_indexes?: boolean
+              if_not_exists?: boolean
+              partitioning_func?: unknown
+              migrate_data?: boolean
+              chunk_target_size?: string
+              chunk_sizing_func?: unknown
+              time_partitioning_func?: unknown
+            }
+          | {
+              relation: unknown
+              dimension: unknown
+              create_default_indexes?: boolean
+              if_not_exists?: boolean
+              migrate_data?: boolean
+            }
         Returns: {
           hypertable_id: number
           schema_name: unknown
@@ -3990,30 +3951,9 @@ export type Database = {
         Args: { uncompressed_chunk: unknown; if_compressed?: boolean }
         Returns: unknown
       }
-      delete_data_node: {
-        Args: {
-          node_name: unknown
-          if_exists?: boolean
-          force?: boolean
-          repartition?: boolean
-          drop_database?: boolean
-        }
-        Returns: boolean
-      }
       delete_job: {
         Args: { job_id: number }
         Returns: undefined
-      }
-      detach_data_node: {
-        Args: {
-          node_name: unknown
-          hypertable?: unknown
-          if_attached?: boolean
-          force?: boolean
-          repartition?: boolean
-          drop_remote_data?: boolean
-        }
-        Returns: number
       }
       detach_tablespace: {
         Args: {
@@ -4027,14 +3967,39 @@ export type Database = {
         Args: { hypertable: unknown }
         Returns: number
       }
+      disable_chunk_skipping: {
+        Args: {
+          hypertable: unknown
+          column_name: unknown
+          if_not_exists?: boolean
+        }
+        Returns: {
+          hypertable_id: number
+          column_name: unknown
+          disabled: boolean
+        }[]
+      }
       drop_chunks: {
         Args: {
           relation: unknown
           older_than?: unknown
           newer_than?: unknown
           verbose?: boolean
+          created_before?: unknown
+          created_after?: unknown
         }
         Returns: string[]
+      }
+      enable_chunk_skipping: {
+        Args: {
+          hypertable: unknown
+          column_name: unknown
+          if_not_exists?: boolean
+        }
+        Returns: {
+          column_stats_id: number
+          enabled: boolean
+        }[]
       }
       flatten_jsonb_object_values: {
         Args: { obj: Json }
@@ -4081,6 +4046,19 @@ export type Database = {
       gtrgm_out: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      hypertable_approximate_detailed_size: {
+        Args: { relation: unknown }
+        Returns: {
+          table_bytes: number
+          index_bytes: number
+          toast_bytes: number
+          total_bytes: number
+        }[]
+      }
+      hypertable_approximate_size: {
+        Args: { hypertable: unknown }
+        Returns: number
       }
       hypertable_compression_stats: {
         Args: { hypertable: unknown }
@@ -4251,12 +4229,22 @@ export type Database = {
         }
         Returns: undefined
       }
-      set_replication_factor: {
-        Args: { hypertable: unknown; replication_factor: number }
+      set_partitioning_interval: {
+        Args: {
+          hypertable: unknown
+          partition_interval: unknown
+          dimension_name?: unknown
+        }
         Returns: undefined
       }
       show_chunks: {
-        Args: { relation: unknown; older_than?: unknown; newer_than?: unknown }
+        Args: {
+          relation: unknown
+          older_than?: unknown
+          newer_than?: unknown
+          created_before?: unknown
+          created_after?: unknown
+        }
         Returns: unknown[]
       }
       show_limit: {
@@ -4343,10 +4331,6 @@ export type Database = {
               finish?: string
             }
         Returns: number
-      }
-      timescaledb_fdw_handler: {
-        Args: Record<PropertyKey, never>
-        Returns: unknown
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

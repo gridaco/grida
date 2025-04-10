@@ -37,7 +37,9 @@ function useSiteSettings() {
   const project = useProject();
   const client = useMemo(() => createClientWWWClient(), []);
 
-  const { data, isLoading, error } = useSWR<ProjectWWW>("site", async () => {
+  const __key = "site";
+
+  const { data, isLoading, error } = useSWR<ProjectWWW>(__key, async () => {
     const { data } = await client
       .from("project_www")
       .select()
@@ -55,7 +57,7 @@ function useSiteSettings() {
         .update(payload)
         .eq("project_id", project.id);
 
-      mutate("site");
+      mutate(__key);
 
       return task;
     },
@@ -112,7 +114,7 @@ function useSiteSettings() {
       if (error) return false;
       return true;
     },
-    [update, data, client, project.id]
+    [update, data, client]
   );
 
   const getPublicUrl = useCallback(
@@ -147,7 +149,9 @@ export default function ProjectWWWSettingsPage() {
     return (
       <div className="container my-20 max-w-screen-md space-y-20">
         <Card>
-          <Skeleton className="h-6 w-[200px]" />
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px]" />
+          </CardHeader>
           <CardContent className="space-y-6">
             <Skeleton className="h-6 w-[200px]" />
             <Skeleton className="h-6 w-[200px]" />

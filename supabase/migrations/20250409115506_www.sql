@@ -30,7 +30,8 @@ VALUES (
 -- [Project WWW] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_www.project_www (
-    id public.slug PRIMARY KEY DEFAULT public.gen_random_slug(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name public.slug UNIQUE DEFAULT public.gen_random_slug(),
     project_id INTEGER UNIQUE REFERENCES public.project(id) ON DELETE CASCADE,
     title TEXT,
     description TEXT,
@@ -51,6 +52,22 @@ ALTER TABLE grida_www.project_www ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_project_membership" ON grida_www.project_www USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));
 
 
+---------------------------------------------------------------------
+-- [rls_project_www] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_www.rls_project_www(p_project_www UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM grida_www.project_www w
+        WHERE w.id = p_project_www
+          AND public.rls_project(w.project_id)
+    );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+
+
 
 ---------------------------------------------------------------------
 -- [Project WWW (Public)] --
@@ -58,6 +75,7 @@ CREATE POLICY "access_based_on_project_membership" ON grida_www.project_www USIN
 CREATE VIEW grida_www.project_www_public AS
 SELECT
   id,
+  name,
   title,
   description,
   keywords,
@@ -99,15 +117,15 @@ CREATE TRIGGER trg_insert_site_for_project AFTER INSERT ON public.project FOR EA
 ---------------------------------------------------------------------
 -- [WWW Bucket Policy] --
 ---------------------------------------------------------------------
-create policy "Allow project authenticated uploads"
+create policy "Allow project authenticated upserts"
 on storage.objects
 for all
 to authenticated
 using (
   bucket_id = 'www' and
-  public.rls_project((storage.foldername(name))[1]::int)
+  grida_www.rls_project_www((storage.foldername(name))[1]::uuid)
 )
 with check (
   bucket_id = 'www' and
-  public.rls_project((storage.foldername(name))[1]::int)
+  grida_www.rls_project_www((storage.foldername(name))[1]::uuid)
 );
