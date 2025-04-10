@@ -23,3 +23,21 @@ CREATE FUNCTION _grida.get_sys_json_schema(id TEXT)
 RETURNS JSONB
 AS $$ SELECT schema FROM _grida.sys_json_schema WHERE _grida.sys_json_schema.id = $1 $$
 LANGUAGE sql STABLE;
+
+
+---------------------------------------------------------------------
+-- [seed - favicon] --
+---------------------------------------------------------------------
+INSERT INTO _grida.sys_json_schema (id, schema)
+VALUES (
+    'favicon',
+    '{
+      "type": "object",
+      "required": ["src"],
+      "properties": {
+        "src": { "type": "string", "minLength": 1 },
+        "srcDark": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }'::jsonb
+);
