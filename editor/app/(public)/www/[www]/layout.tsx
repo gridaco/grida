@@ -35,7 +35,7 @@ export async function generateMetadata({
     ? client.storage.from("www").getPublicUrl(data.og_image).data.publicUrl
     : null;
 
-  const og_images = og_image ? [og_image] : [];
+  const og_images = getOpenGraphImages(og_image);
 
   const favicon = data.favicon?.src
     ? client.storage.from("www").getPublicUrl(data.favicon.src).data.publicUrl
@@ -56,6 +56,20 @@ export async function generateMetadata({
       images: og_images,
     },
   };
+}
+
+function getOpenGraphImages(src: string | null) {
+  const images = [];
+
+  if (src) {
+    images.push({
+      url: src,
+      width: 1200,
+      height: 630,
+    });
+  }
+
+  return images;
 }
 
 function getFavicons(src: string | null, srcDark?: string | null) {
