@@ -22,7 +22,7 @@ export function SocialPreviewSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left column with label and info */}
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Social Preview</h2>
+          <h2 className="text-lg font-semibold">Social Preview</h2>
           <p className="text-sm text-gray-500">1200 × 630 pixels</p>
           <div className="pt-2">
             <Button variant="outline" size="sm" className="w-24" asChild>

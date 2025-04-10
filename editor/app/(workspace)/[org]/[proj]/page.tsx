@@ -99,6 +99,15 @@ export default function ProjectDashboardPage({
                       Campaigns
                     </DropdownMenuItem>
                   </Link>
+                  <Link href={`/${organization_name}/${project_name}/www`}>
+                    <DropdownMenuItem>
+                      <ResourceTypeIcon
+                        type="v0_site"
+                        className="size-4 me-2"
+                      />
+                      Site
+                    </DropdownMenuItem>
+                  </Link>
                 </DropdownMenuContent>
               </DropdownMenu>
             </span>

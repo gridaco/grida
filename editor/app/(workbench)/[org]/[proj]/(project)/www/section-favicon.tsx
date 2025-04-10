@@ -22,7 +22,7 @@ export function FaviconSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left column with label and info */}
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Favicon</h2>
+          <h2 className="text-lg font-semibold">Favicon</h2>
           <p className="text-sm text-gray-500">64 × 64 pixels</p>
         </div>
 
@@ -31,7 +31,7 @@ export function FaviconSection({
           {/* Light Theme Preview */}
           <div className="flex flex-col items-center gap-2">
             <FaviconPreview
-              favicon={favicon?.src ? getPublicUrl(favicon.src) : ""}
+              favicon={favicon?.src ? getPublicUrl(favicon.src) : null}
             />
             <p className="text-sm text-center">Light Theme</p>
             <p className="text-xs text-center text-gray-500">64 × 64 pixels</p>
@@ -62,7 +62,7 @@ export function FaviconSection({
               favicon={
                 favicon?.srcDark || favicon?.src
                   ? getPublicUrl(favicon?.srcDark || favicon?.src)
-                  : ""
+                  : null
               }
             />
             <p className="text-sm text-center">Dark Theme</p>
