@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react";
-// import { CountdownTimer } from "../../timer";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -13,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import NumberFlow from "@number-flow/react";
-import t from "./data-01.json";
 import {
   Drawer,
   DrawerContent,
@@ -42,6 +39,7 @@ import { PhoneInput } from "@/components/extension/phone-input";
 import { Spinner } from "@/components/spinner";
 import * as Standard from "@/theme/templates/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { template } from "@/utils/template";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -55,14 +53,65 @@ interface GuestForm {
 const external_link =
   "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
 
+const dictionary = {
+  ko: {
+    an_anonymous: "익명의 사용자",
+    about_event: "이벤트 안내",
+    event_signup_success: "이벤트 참여신청이 완료되었습니다.",
+    event_signup_fail: "이벤트 참여에 실패했습니다.",
+    invitation_name: "{referrer_name} 님의 초대",
+    invitation_description:
+      "{referrer_name}님으로부터 초대를 받았습니다. 이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게 경품이 지급됩니다.",
+  },
+};
+
+type Props = {
+  logo: {
+    src: string;
+    srcDark?: string;
+    width?: number;
+    height?: number;
+  };
+  image: {
+    src: string;
+    alt?: string;
+  };
+  brand_name: string;
+  title: string;
+  description: string;
+  favicon: {
+    src: string;
+    srcDark?: string;
+  };
+  article: {
+    html: string;
+  };
+  cta: {
+    text: string;
+  };
+  footer: {
+    link_privacy: string;
+    link_instagram: string;
+    paragraph: {
+      html: string;
+    };
+  };
+};
+
 export default function Main({
   data,
   visible,
+  design,
+  locale,
 }: {
   visible: boolean;
+  design: Props;
+  locale: keyof typeof dictionary;
   data: Platform.WEST.Referral.InvitationPublicRead;
 }) {
-  const { code, campaign, referrer_name, is_claimed } = data;
+  const t = dictionary[locale];
+  const { code, campaign, referrer_name: _referrer_name, is_claimed } = data;
+  const referrer_name = _referrer_name || t.an_anonymous;
   const router = useRouter();
 
   const signupformDialog = useDialogState("signupform");
@@ -84,10 +133,10 @@ export default function Main({
     const client = new Platform.WEST.Referral.WestReferralClient(campaign.slug);
     const ok = await client.claim(code, customer_id);
     if (ok) {
-      toast.success("이벤트 참여신청이 완료되었습니다.");
+      toast.success(t.event_signup_success);
       router.replace(external_link);
     } else {
-      toast.error("이벤트 참여에 실패했습니다.");
+      toast.error(t.event_signup_fail);
     }
   };
 
@@ -118,20 +167,17 @@ export default function Main({
 
           {/* Main Image */}
           <Standard.Section className="pb-4">
-            <Standard.MainImage src={t.hero.media.src} alt={t.hero.media.alt} />
+            <Standard.MainImage src={design.image.src} alt={design.image.alt} />
           </Standard.Section>
 
           <Standard.Section className="py-4">
-            <Standard.Title>{t.hero.title}</Standard.Title>
+            <Standard.Title>{design.title}</Standard.Title>
             <span className="text-sm text-muted-foreground">
-              {referrer_name}님 께서 Polestar 4 를 추천 했습니다.
+              {design.description}
             </span>
             <Standard.BrandHostChip
-              logo={{
-                src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-                srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-              }}
-              name="Polestar"
+              logo={design.favicon}
+              name={design.brand_name}
             />
           </Standard.Section>
 
@@ -151,7 +197,9 @@ export default function Main({
                 <div className="z-10 flex items-center gap-2">
                   <TicketCheckIcon className="size-5" />
                   <span className="text-sm font-medium">
-                    {referrer_name}님의 초대
+                    {template(t.invitation_name, {
+                      referrer_name,
+                    })}
                   </span>
                 </div>
               </div>
@@ -176,9 +224,9 @@ export default function Main({
               <hr />
               <CardContent className="px-4 py-4">
                 <p className="text-sm text-muted-foreground">
-                  {referrer_name}님으로부터 초대를 받았습니다. <br />
-                  이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게
-                  경품이 지급됩니다.
+                  {template(t.invitation_description, {
+                    referrer_name,
+                  })}
                 </p>
               </CardContent>
               {!is_claimed && (
@@ -189,7 +237,7 @@ export default function Main({
                     className="w-full"
                     size="lg"
                   >
-                    {t.cta.label}
+                    {design.cta.text}
                   </Button>
                 </CardFooter>
               )}
@@ -226,30 +274,10 @@ export default function Main({
 
           <Standard.Section>
             <header className="border-b py-2 my-4 text-sm text-muted-foreground">
-              이벤트 안내
+              {t.about_event}
             </header>
             <article className="prose prose-sm dark:prose-invert">
-              <span dangerouslySetInnerHTML={{ __html: t.info }} />
-              <h6>이벤트 FAQ</h6>
-              <ul>
-                <li>시승이 완료된 후 경품이 지급됩니다. </li>
-                <li>
-                  시승 신청자 본인에 한하여 시승 가능하며, 타인에게 양도할 수
-                  없습니다.
-                </li>
-                <li>
-                  운전면허 소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년
-                  이상의 분들만 참여 가능합니다.
-                </li>
-                <li>
-                  차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.
-                </li>
-                <li>
-                  시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인
-                  부담입니다.
-                </li>
-                <li>시승 신청자에게 휴대폰 문자로 상세 안내 예정입니다.</li>
-              </ul>
+              <span dangerouslySetInnerHTML={{ __html: design.article.html }} />
             </article>
           </Standard.Section>
           <Standard.FooterTemplate
