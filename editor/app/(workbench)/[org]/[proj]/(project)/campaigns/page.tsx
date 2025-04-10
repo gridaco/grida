@@ -49,7 +49,7 @@ export default function CampaignsPage({ params }: { params: Params }) {
     <main className="container mx-auto my-10">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-        <Link href={`./campaigns/new`}>
+        <Link href={`./new/referral`}>
           <Button>New Campaign</Button>
         </Link>
       </header>
