@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 type ProjectWWW = {
   id: string;
+  name: string;
   project_id: number;
   title: string | null;
   description: string | null;
@@ -93,7 +94,7 @@ function useSiteSettings() {
       if (error) return false;
       return true;
     },
-    [data, update, client, project.id]
+    [data, update, client]
   );
 
   const updateOgImage = useCallback(
@@ -167,6 +168,7 @@ export default function ProjectWWWSettingsPage() {
   return (
     <div className="container my-20 max-w-screen-md space-y-20">
       <FormSiteGeneral
+        url={`${data.name}.grida.site`}
         defaultValues={{
           title: data.title,
           description: data.description,
@@ -206,9 +208,11 @@ export default function ProjectWWWSettingsPage() {
 }
 
 function FormSiteGeneral({
+  url,
   defaultValues,
   update,
 }: {
+  url: string;
   defaultValues: SiteGeneral;
   update: (payload: SiteGeneral) => Promise<any>;
 }) {
@@ -229,6 +233,7 @@ function FormSiteGeneral({
       </CardHeader>
       <CardContent className="space-y-6">
         <SiteGeneralSection
+          url={url}
           disabled={isSubmitting}
           value={form.watch()}
           onValueChange={({ title, description }) => {

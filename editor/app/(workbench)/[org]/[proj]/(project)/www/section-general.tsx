@@ -11,10 +11,12 @@ export type SiteGeneral = {
 };
 
 export function SiteGeneralSection({
+  url,
   value,
   onValueChange,
   disabled,
 }: {
+  url: string;
   value: SiteGeneral;
   onValueChange?: (value: SiteGeneral) => void;
   disabled?: boolean;
@@ -58,7 +60,7 @@ export function SiteGeneralSection({
       <div>
         <h3 className="text-sm font-medium mb-2">Preview</h3>
         <GoogleSearchPreview
-          url="www.example.com"
+          url={url}
           title={value.title || "Site Title"}
           description={value.description || "Site description goes here"}
         />

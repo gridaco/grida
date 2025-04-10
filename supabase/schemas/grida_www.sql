@@ -33,7 +33,7 @@ CHECK (
 ---------------------------------------------------------------------
 CREATE TABLE grida_www.www (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name public.slug UNIQUE DEFAULT public.gen_random_slug(),
+    name public.slug UNIQUE NOT NULL DEFAULT public.gen_random_slug(),
     project_id INTEGER UNIQUE NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
     title TEXT,
     description TEXT,
