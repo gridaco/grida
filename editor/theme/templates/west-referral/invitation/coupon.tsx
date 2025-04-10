@@ -37,7 +37,7 @@ export default function InvitationCouponTemplate({
   onComplete,
 }: {
   locale: keyof typeof dictionary;
-  data: { referrer_name: string };
+  data: { referrer_name: string | null };
   design: Props;
   onComplete?: () => void;
 }) {
@@ -47,7 +47,7 @@ export default function InvitationCouponTemplate({
 
   return (
     <main className="w-full h-full flex flex-col items-center justify-center">
-      <header className="flex flex-col gap-4 items-center justify-center px-4">
+      <Standard.Header className="absolute top-0 z-10">
         <Standard.Logo
           src={design.logo.src}
           srcDark={design.logo.srcDark}
@@ -56,15 +56,15 @@ export default function InvitationCouponTemplate({
           height={64}
           className="max-h-8 w-auto object-contain"
         />
+      </Standard.Header>
+
+      <section className="flex flex-col gap-4 items-center justify-center px-4 mt-10">
         <Badge variant="outline">
           {data.referrer_name} {t.invitedBy}
         </Badge>
-      </header>
-
-      <section className="flex flex-col gap-4 items-center justify-center px-4 mt-10">
         <ScratchToReveal
-          width={350}
-          height={350}
+          width={320}
+          height={320}
           minScratchPercentage={60}
           onComplete={onComplete}
           onStart={() => {

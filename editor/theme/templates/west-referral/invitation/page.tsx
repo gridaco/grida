@@ -41,16 +41,13 @@ import * as Standard from "@/theme/templates/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { template } from "@/utils/template";
 
-interface CampaignPublicData {
-  "signup-form-id": string;
-}
-
 interface GuestForm {
   name: string;
   phone: string;
 }
 
-const external_link =
+// FIXME:
+const fixme_external_link =
   "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
 
 const dictionary = {
@@ -98,16 +95,18 @@ type Props = {
   };
 };
 
-export default function Main({
+export default function InvitationPageTemplate({
   data,
-  visible,
+  visible = true,
   design,
   locale,
 }: {
-  visible: boolean;
+  visible?: boolean;
   design: Props;
   locale: keyof typeof dictionary;
-  data: Platform.WEST.Referral.InvitationPublicRead;
+  data: Platform.WEST.Referral.InvitationPublicRead & {
+    signup_form_id: string;
+  };
 }) {
   const t = dictionary[locale];
   const { code, campaign, referrer_name: _referrer_name, is_claimed } = data;
@@ -117,11 +116,11 @@ export default function Main({
   const signupformDialog = useDialogState("signupform");
 
   const onClaim = async (geust: GuestForm) => {
-    const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
+    // const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
     const formdata = new FormData();
     formdata.append(SYSTEM_GF_CUSTOMER_NAME_KEY, geust.name);
     formdata.append(SYSTEM_GF_CUSTOMER_PHONE_KEY, geust.phone);
-    const submission = await fetch(`/submit/${formid}`, {
+    const submission = await fetch(`/submit/${data.signup_form_id}`, {
       method: "POST",
       body: formdata,
     }).then((res) => {
@@ -134,7 +133,7 @@ export default function Main({
     const ok = await client.claim(code, customer_id);
     if (ok) {
       toast.success(t.event_signup_success);
-      router.replace(external_link);
+      router.replace(fixme_external_link);
     } else {
       toast.error(t.event_signup_fail);
     }
@@ -144,6 +143,7 @@ export default function Main({
   //   return <>Already used.</>;
   // }
 
+  // TODO:
   const reward_value = 100000;
   const reward_currency = "KRW";
   const reward_description = "TMAP EV 충전 포인트";
@@ -156,8 +156,8 @@ export default function Main({
           {/* Header */}
           <Standard.Header>
             <Standard.Logo
-              src={"/logos/polestar.png"}
-              srcDark={"/logos/polestar-dark.png"}
+              src={design.logo.src}
+              srcDark={design.logo.srcDark}
               alt="logo"
               width={320}
               height={64}
@@ -243,6 +243,7 @@ export default function Main({
               )}
             </Card>
 
+            {/* TODO: use challenges */}
             {is_claimed && (
               <div className="my-4">
                 <Card className="relative overflow-hidden">
@@ -260,7 +261,7 @@ export default function Main({
                       <br />
                       <br />
                       시승 신청을 완료하지 못하였나요?{" "}
-                      <Link href={external_link} className="underline">
+                      <Link href={fixme_external_link} className="underline">
                         다시 신청하기
                       </Link>
                     </p>
