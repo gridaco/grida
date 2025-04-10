@@ -5,7 +5,7 @@ import PortalLogin from "@/scaffolds/p/login";
 import { useRouter } from "next/navigation";
 
 type Params = {
-  portal: string;
+  www: string;
 };
 
 export default function CustomerPortalLoginPage({
@@ -13,11 +13,11 @@ export default function CustomerPortalLoginPage({
 }: {
   params: Params;
 }) {
-  const { portal } = params;
+  const { www } = params;
   const router = useRouter();
 
   const onSession = () => {
-    router.replace(`../${portal}/session`);
+    router.replace(`../session`);
   };
 
   const locale = "ko"; // FIXME:
@@ -25,7 +25,7 @@ export default function CustomerPortalLoginPage({
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <PortalLogin locale={locale} policy={portal} onSession={onSession} />
+        <PortalLogin locale={locale} www={www} onSession={onSession} />
       </div>
     </div>
   );
