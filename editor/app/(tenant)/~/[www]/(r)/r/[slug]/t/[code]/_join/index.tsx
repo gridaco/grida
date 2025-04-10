@@ -44,7 +44,7 @@ export default function InvitationPage({
                   src: "/logos/polestar.png",
                   srcDark: "/logos/polestar-dark.png",
                 },
-                image: {
+                coupon: {
                   src: "/mock/coupons/25-percent-off-square.png",
                   alt: "invitation",
                 },

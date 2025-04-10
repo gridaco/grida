@@ -106,17 +106,6 @@ export default async function Layout({
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>
-                            <Link href={`/${org}/${proj}/analytics`}>
-                              <SidebarMenuItem>
-                                <SidebarMenuButton size="sm">
-                                  <ResourceTypeIcon
-                                    type="chart"
-                                    className="size-4"
-                                  />
-                                  Analytics
-                                </SidebarMenuButton>
-                              </SidebarMenuItem>
-                            </Link>
                           </SidebarMenu>
                         </SidebarGroupContent>
                       </SidebarGroup>
@@ -132,6 +121,17 @@ export default async function Layout({
                                     className="size-4"
                                   />
                                   Site Settings
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            </Link>
+                            <Link href={`/${org}/${proj}/analytics`}>
+                              <SidebarMenuItem>
+                                <SidebarMenuButton size="sm">
+                                  <ResourceTypeIcon
+                                    type="chart"
+                                    className="size-4"
+                                  />
+                                  Analytics
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             </Link>

@@ -120,7 +120,7 @@ export function MainImage({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={src || "/images/abstract-placeholder.jpg"}
         alt={alt}
         width={800}
         height={800}

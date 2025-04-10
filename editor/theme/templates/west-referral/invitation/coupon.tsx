@@ -24,7 +24,7 @@ export interface Props {
     width?: number;
     height?: number;
   };
-  image: {
+  coupon: {
     src: string;
     alt?: string;
   };
@@ -75,8 +75,8 @@ export default function InvitationCouponTemplate({
           gradientColors={["#000", "#333", "#666"]}
         >
           <img
-            src={design.image.src}
-            alt={design.image.alt}
+            src={design.coupon.src}
+            alt={design.coupon.alt}
             width={640}
             height={640}
             className="w-full h-full object-cover"

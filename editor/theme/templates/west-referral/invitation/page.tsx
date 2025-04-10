@@ -60,6 +60,15 @@ const dictionary = {
     invitation_description:
       "{referrer_name}님으로부터 초대를 받았습니다. 이벤트 참여 시 {referrer_name}님과 이벤트 참여자 모두에게 경품이 지급됩니다.",
   },
+  en: {
+    an_anonymous: "Anonymous User",
+    about_event: "Event Information",
+    event_signup_success: "Event participation request completed.",
+    event_signup_fail: "Event participation failed.",
+    invitation_name: "{referrer_name} invited you",
+    invitation_description:
+      "You have been invited by {referrer_name}. Both the inviter and invitee will receive a reward upon event participation.",
+  },
 };
 
 type Props = {
@@ -278,7 +287,9 @@ export default function InvitationPageTemplate({
               {t.about_event}
             </header>
             <article className="prose prose-sm dark:prose-invert">
-              <span dangerouslySetInnerHTML={{ __html: design.article.html }} />
+              <span
+                dangerouslySetInnerHTML={{ __html: design.article?.html }}
+              />
             </article>
           </Standard.Section>
           <Standard.FooterTemplate
