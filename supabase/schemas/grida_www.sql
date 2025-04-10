@@ -10,29 +10,31 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_www GRANT ALL ON ROUT
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_www GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 
 
-
--- seed struct
-INSERT INTO _grida.sys_json_schema (id, schema)
-VALUES (
-    'favicon',
-    '{
-      "type": "object",
-      "required": ["src"],
-      "properties": {
-        "src": { "type": "string", "minLength": 1 },
-        "srcDark": { "type": "string", "minLength": 1 }
-      },
-      "additionalProperties": false
-    }'::jsonb
+---------------------------------------------------------------------
+-- [Route Path Type] --
+-- starts with '/', does NOT end with '/'
+-- e.g. '/docs', '/r/[slug]', '/store/products'
+---------------------------------------------------------------------
+CREATE DOMAIN grida_www.base_path AS TEXT
+CHECK (
+  VALUE ~ '^/([a-zA-Z0-9\-_]+)(/[a-zA-Z0-9\-_]+)*$'
 );
+
+-- does NOT start with '/', does NOT end with '/'
+-- e.g. 'a', 'a/b/c', 'guide/[id]/steps'
+CREATE DOMAIN grida_www.sub_path AS TEXT
+CHECK (
+  VALUE ~ '^([a-zA-Z0-9\-_]+)(/[a-zA-Z0-9\-_]+)*$'
+);
+
 
 ---------------------------------------------------------------------
 -- [Project WWW] --
 ---------------------------------------------------------------------
-CREATE TABLE grida_www.project_www (
+CREATE TABLE grida_www.www (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name public.slug UNIQUE DEFAULT public.gen_random_slug(),
-    project_id INTEGER UNIQUE REFERENCES public.project(id) ON DELETE CASCADE,
+    project_id INTEGER UNIQUE NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
     title TEXT,
     description TEXT,
     keywords TEXT[],
@@ -48,19 +50,19 @@ CREATE TABLE grida_www.project_www (
     theme JSONB
 );
 
-ALTER TABLE grida_www.project_www ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "access_based_on_project_membership" ON grida_www.project_www USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));
+ALTER TABLE grida_www.www ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_project_membership" ON grida_www.www USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));
 
 
 ---------------------------------------------------------------------
--- [rls_project_www] --
+-- [rls_www] --
 ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION grida_www.rls_project_www(p_project_www UUID)
+CREATE OR REPLACE FUNCTION grida_www.rls_www(p_www_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
     RETURN EXISTS (
-        SELECT 1 FROM grida_www.project_www w
-        WHERE w.id = p_project_www
+        SELECT 1 FROM grida_www.www w
+        WHERE w.id = p_www_id
           AND public.rls_project(w.project_id)
     );
 END;
@@ -68,11 +70,10 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 
-
 ---------------------------------------------------------------------
 -- [Project WWW (Public)] --
 ---------------------------------------------------------------------
-CREATE VIEW grida_www.project_www_public AS
+CREATE VIEW grida_www.www_public AS
 SELECT
   id,
   name,
@@ -82,19 +83,19 @@ SELECT
   lang,
   favicon,
   og_image
-FROM grida_www.project_www;
+FROM grida_www.www;
 
 
 ---------------------------------------------------------------------
--- [Migration: Seed public.project_www for existing public.project rows] --
+-- [Migration: Seed public.www for existing public.project rows] --
 ---------------------------------------------------------------------
-INSERT INTO grida_www.project_www (project_id, title)
+INSERT INTO grida_www.www (project_id, title)
 SELECT
   p.id,
   p.name
 FROM public.project p
 WHERE NOT EXISTS (
-  SELECT 1 FROM grida_www.project_www s WHERE s.project_id = p.id
+  SELECT 1 FROM grida_www.www s WHERE s.project_id = p.id
 );
 
 
@@ -104,7 +105,7 @@ WHERE NOT EXISTS (
 CREATE OR REPLACE FUNCTION public.insert_www_for_new_project()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO grida_www.project_www (project_id, title)
+  INSERT INTO grida_www.www (project_id, title)
   VALUES (NEW.id, NEW.name);
   RETURN NEW;
 END;
@@ -112,6 +113,77 @@ $$ LANGUAGE plpgsql;
 
 -- [trigger] insert_www_for_new_project
 CREATE TRIGGER trg_insert_site_for_project AFTER INSERT ON public.project FOR EACH ROW EXECUTE FUNCTION public.insert_www_for_new_project();
+
+
+---------------------------------------------------------------------
+-- [www layout] --
+---------------------------------------------------------------------
+CREATE TABLE grida_www.layout (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parent_layout_id UUID REFERENCES grida_www.layout(id) ON DELETE SET NULL,
+    www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
+    base_path grida_www.base_path NULL, -- e.g. '/docs'
+    name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
+    label VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
+    template JSONB,
+    metadata JSONB,
+    version TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(www_id, base_path, name)
+);
+ALTER TABLE grida_www.layout ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_www_editor" ON grida_www.layout USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
+
+---------------------------------------------------------------------
+-- [www page] --
+---------------------------------------------------------------------
+CREATE TABLE grida_www.page (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
+    layout_id UUID NULL REFERENCES grida_www.layout(id) ON DELETE CASCADE,
+    name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
+    label VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
+    body JSONB NOT NULL,
+    metadata JSONB,
+    version TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(www_id, layout_id, name)
+);
+ALTER TABLE grida_www.page ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_www_editor" ON grida_www.page USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
+
+---------------------------------------------------------------------
+-- [Routing Table] --
+---------------------------------------------------------------------
+CREATE VIEW grida_www.routing_table_public AS
+SELECT
+  id,
+  www_id,
+  'layout' AS type,
+  parent_layout_id AS layout_id,
+  (COALESCE(base_path, '') || '/' || name)::TEXT AS route_path,
+  version,
+  metadata
+FROM grida_www.layout
+  UNION ALL
+SELECT
+  id,
+  www_id,
+  'page' AS type,
+  layout_id,
+  ( -- compute full path
+    COALESCE(
+      (SELECT base_path FROM grida_www.layout l WHERE l.id = p.layout_id),
+      ''
+    ) || '/' || p.name
+  )::TEXT AS route_path,
+  version,
+  metadata
+FROM grida_www.page p;
 
 
 ---------------------------------------------------------------------
@@ -123,9 +195,10 @@ for all
 to authenticated
 using (
   bucket_id = 'www' and
-  grida_www.rls_project_www((storage.foldername(name))[1]::uuid)
+  grida_www.rls_www((storage.foldername(name))[1]::uuid)
 )
 with check (
   bucket_id = 'www' and
-  grida_www.rls_project_www((storage.foldername(name))[1]::uuid)
+  grida_www.rls_www((storage.foldername(name))[1]::uuid)
 );
+

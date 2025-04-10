@@ -23,14 +23,14 @@ export type Database = MergeDeep<
     };
     grida_www: {
       Tables: {
-        project_www: {
-          Row: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Row"] & {
+        www: {
+          Row: DatabaseGenerated["grida_www"]["Tables"]["www"]["Row"] & {
             favicon: SystemSchema_Favicon | null;
           };
-          Insert: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Insert"] & {
+          Insert: DatabaseGenerated["grida_www"]["Tables"]["www"]["Insert"] & {
             favicon?: SystemSchema_Favicon | null;
           };
-          Update: DatabaseGenerated["grida_www"]["Tables"]["project_www"]["Update"] & {
+          Update: DatabaseGenerated["grida_www"]["Tables"]["www"]["Update"] & {
             favicon?: SystemSchema_Favicon | null;
           };
         };

@@ -2947,7 +2947,138 @@ export type Database = {
   }
   grida_www: {
     Tables: {
-      project_www: {
+      layout: {
+        Row: {
+          base_path: string | null
+          created_at: string
+          id: string
+          label: string
+          metadata: Json | null
+          name: string
+          parent_layout_id: string | null
+          path_tokens: string[] | null
+          template: Json | null
+          updated_at: string
+          version: string | null
+          www_id: string
+        }
+        Insert: {
+          base_path?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          metadata?: Json | null
+          name: string
+          parent_layout_id?: string | null
+          path_tokens?: string[] | null
+          template?: Json | null
+          updated_at?: string
+          version?: string | null
+          www_id: string
+        }
+        Update: {
+          base_path?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          metadata?: Json | null
+          name?: string
+          parent_layout_id?: string | null
+          path_tokens?: string[] | null
+          template?: Json | null
+          updated_at?: string
+          version?: string | null
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page: {
+        Row: {
+          body: Json
+          created_at: string
+          id: string
+          label: string
+          layout_id: string | null
+          metadata: Json | null
+          name: string
+          path_tokens: string[] | null
+          updated_at: string
+          version: string | null
+          www_id: string
+        }
+        Insert: {
+          body: Json
+          created_at?: string
+          id?: string
+          label: string
+          layout_id?: string | null
+          metadata?: Json | null
+          name: string
+          path_tokens?: string[] | null
+          updated_at?: string
+          version?: string | null
+          www_id: string
+        }
+        Update: {
+          body?: Json
+          created_at?: string
+          id?: string
+          label?: string
+          layout_id?: string | null
+          metadata?: Json | null
+          name?: string
+          path_tokens?: string[] | null
+          updated_at?: string
+          version?: string | null
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "page_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "page_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      www: {
         Row: {
           description: string | null
           favicon: Json | null
@@ -2956,7 +3087,7 @@ export type Database = {
           lang: string
           name: string | null
           og_image: string | null
-          project_id: number | null
+          project_id: number
           theme: Json | null
           title: string | null
         }
@@ -2968,7 +3099,7 @@ export type Database = {
           lang?: string
           name?: string | null
           og_image?: string | null
-          project_id?: number | null
+          project_id: number
           theme?: Json | null
           title?: string | null
         }
@@ -2980,7 +3111,7 @@ export type Database = {
           lang?: string
           name?: string | null
           og_image?: string | null
-          project_id?: number | null
+          project_id?: number
           theme?: Json | null
           title?: string | null
         }
@@ -2988,7 +3119,19 @@ export type Database = {
       }
     }
     Views: {
-      project_www_public: {
+      routing_table_public: {
+        Row: {
+          id: string | null
+          layout_id: string | null
+          metadata: Json | null
+          route_path: string | null
+          type: string | null
+          version: string | null
+          www_id: string | null
+        }
+        Relationships: []
+      }
+      www_public: {
         Row: {
           description: string | null
           favicon: Json | null
@@ -3023,8 +3166,8 @@ export type Database = {
       }
     }
     Functions: {
-      rls_project_www: {
-        Args: { p_project_www: string }
+      rls_www: {
+        Args: { p_www_id: string }
         Returns: boolean
       }
     }

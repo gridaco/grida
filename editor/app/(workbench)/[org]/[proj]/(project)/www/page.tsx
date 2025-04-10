@@ -41,19 +41,19 @@ function useSiteSettings() {
 
   const { data, isLoading, error } = useSWR<ProjectWWW>(__key, async () => {
     const { data } = await client
-      .from("project_www")
+      .from("www")
       .select()
       .eq("project_id", project.id)
       .single()
       .throwOnError();
 
-    return data;
+    return data satisfies ProjectWWW;
   });
 
   const update = useCallback(
     async (payload: Partial<ProjectWWW>) => {
       const task = await client
-        .from("project_www")
+        .from("www")
         .update(payload)
         .eq("project_id", project.id);
 
