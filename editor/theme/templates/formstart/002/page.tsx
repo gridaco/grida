@@ -20,7 +20,7 @@ import {
 import data from "./messages.json";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { KakaoTalkLogo, PolestarTypeLogo } from "@/components/logos";
+import { KakaoTalkLogo } from "@/components/logos";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { ArrowRightIcon, GlobeIcon } from "@radix-ui/react-icons";
 import {

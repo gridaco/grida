@@ -188,6 +188,20 @@ export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
     }
   );
 
+export const createRouteHandlerWWWClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createRouteHandlerClient<Database, "grida_www">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_www" },
+      },
+    }
+  );
+
 export const createRouteHandlerXSBClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>

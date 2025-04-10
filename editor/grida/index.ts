@@ -62,6 +62,7 @@ export namespace grida {
 
       interface TypeScalarPropertyDefinition {
         type: "string" | "number" | "boolean";
+        title?: string;
         default?:
           | tokens.StringValueExpression
           | tokens.NumericValueExpression
@@ -72,6 +73,7 @@ export namespace grida {
 
       interface TypeArrayPropertyDefinition<T extends Array<Value>> {
         type: "array";
+        title?: string;
         items: PropertyDefinition;
         default?: T;
         required?: boolean;
@@ -80,6 +82,7 @@ export namespace grida {
 
       interface TypeObjectPropertyDefinition<T extends Record<string, Value>> {
         type: "object";
+        title?: string;
         properties: Record<string, PropertyDefinition>;
         default?: T;
         required?: boolean;
@@ -88,6 +91,7 @@ export namespace grida {
 
       interface TypeWellKnownObjectPropertyDefinition {
         type: objects.ObjectType;
+        title?: string;
         default?: objects.Object;
         required?: boolean;
         //

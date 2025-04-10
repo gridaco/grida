@@ -3,6 +3,11 @@ import { MergeDeep } from "type-fest";
 import { Database as DatabaseGenerated } from "./database-generated.types";
 export { type Json } from "./database-generated.types";
 
+type SystemSchema_Favicon = {
+  src: string;
+  srcDark?: string | undefined;
+};
+
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
   DatabaseGenerated,
@@ -12,6 +17,21 @@ export type Database = MergeDeep<
         customer_with_tags: {
           Row: DatabaseGenerated["public"]["Tables"]["customer"]["Row"] & {
             tags: string[];
+          };
+        };
+      };
+    };
+    grida_www: {
+      Tables: {
+        www: {
+          Row: DatabaseGenerated["grida_www"]["Tables"]["www"]["Row"] & {
+            favicon: SystemSchema_Favicon | null;
+          };
+          Insert: DatabaseGenerated["grida_www"]["Tables"]["www"]["Insert"] & {
+            favicon?: SystemSchema_Favicon | null;
+          };
+          Update: DatabaseGenerated["grida_www"]["Tables"]["www"]["Update"] & {
+            favicon?: SystemSchema_Favicon | null;
           };
         };
       };

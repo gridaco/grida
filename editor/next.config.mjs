@@ -12,6 +12,10 @@ const nextConfig = withMDX()({
   images: {
     remotePatterns: [
       {
+        protocol: "http",
+        hostname: "127.0.0.1",
+      },
+      {
         protocol: "https",
         hostname: "mozagqllybnbytfcmvdh.supabase.co",
       },

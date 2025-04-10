@@ -3,6 +3,7 @@ import { PropertyLine, PropertyLineLabel } from "../ui";
 import { StringValueControl } from "./string-value";
 import type { tokens } from "@grida/tokens";
 import { SrcControl } from "./src";
+import { RichTextControl } from "./richtext";
 import {
   Tooltip,
   TooltipContent,
@@ -67,6 +68,14 @@ export function PropControl({
       return (
         <SrcControl value={value as string} onValueChange={onValueChange} />
       );
+    case "richtext": {
+      return (
+        <RichTextControl
+          value={value as { html: string }}
+          onValueChange={onValueChange}
+        />
+      );
+    }
     default:
       return (
         <Tooltip>

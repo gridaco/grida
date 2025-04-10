@@ -105,7 +105,7 @@ export namespace prototypes {
 
   export const image = {
     type: "image",
-    src: "/assets/image.png",
+    src: "/dummy/image/png/png-square-transparent-1k.png",
     width: 100,
     height: 100,
     position: "relative",
@@ -119,7 +119,7 @@ export namespace prototypes {
 
   export const video = {
     type: "video",
-    src: "/assets/video.mp4",
+    src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
     width: 320,
     height: 240,
     position: "relative",
@@ -214,7 +214,7 @@ export namespace prototypes {
       {
         type: "image",
         name: "image",
-        src: "/assets/image.png",
+        src: "/dummy/image/png/png-square-transparent-1k.png",
         width: 48,
         height: 48,
         position: "relative",

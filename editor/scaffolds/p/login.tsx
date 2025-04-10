@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/input-otp";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
+import { template } from "@/utils/template";
 import toast from "react-hot-toast";
 
 type Step = "email" | "otp";
@@ -51,20 +52,16 @@ const dictionary = {
   },
 };
 
-function template(str: string, vars: Record<string, string>) {
-  return str.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
-}
-
 interface CustomerPropsMinimalCustomizationProps {
   locale?: string;
 }
 
 export default function PortalLogin({
-  policy,
+  www,
   locale = "en",
   onSession,
 }: CustomerPropsMinimalCustomizationProps & {
-  policy: string;
+  www: string;
   onSession?: () => void;
 }) {
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
@@ -83,7 +80,7 @@ export default function PortalLogin({
     }
 
     setIsLoading(true);
-    fetch(`/p/access/${policy}/with-email`, {
+    fetch(`www/${www}/p/access/with-email`, {
       method: "POST",
       body: JSON.stringify({
         email: email,
