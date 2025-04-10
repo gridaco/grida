@@ -49,6 +49,9 @@ enabled = true
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
 
+[db.migrations]
+schema_paths = ["./schemas/*.sql",]
+
 [realtime]
 enabled = true
 # Bind realtime via either IPv4 or IPv6. (default: IPv4)
