@@ -4,7 +4,6 @@ import type React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { SupabaseClient } from "@supabase/supabase-js";
 
 interface FaviconSectionProps {
   favicon: { src: string; srcDark?: string | undefined } | null;

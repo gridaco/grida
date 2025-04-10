@@ -13,7 +13,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createClientWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
@@ -22,6 +22,8 @@ import { useForm } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type ProjectWWW = {
+  id: string;
+  project_id: number;
   title: string | null;
   description: string | null;
   og_image: string | null;
@@ -33,7 +35,7 @@ type ProjectWWW = {
 
 function useSiteSettings() {
   const project = useProject();
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createClientWWWClient(), []);
 
   const { data, isLoading, error } = useSWR<ProjectWWW>("site", async () => {
     const { data } = await client
@@ -67,8 +69,8 @@ function useSiteSettings() {
       const t = Date.now();
       const isdark = name === "srcDark";
       const path = isdark
-        ? `${project.id}/icons/favicon-dark-${t}.ico`
-        : `${project.id}/icons/favicon-${t}.ico`;
+        ? `${data.id}/icons/favicon-dark-${t}.ico`
+        : `${data.id}/icons/favicon-${t}.ico`;
 
       const { data: uploaded, error: upload_err } = await client.storage
         .from("www")
@@ -94,8 +96,9 @@ function useSiteSettings() {
 
   const updateOgImage = useCallback(
     async (file: File) => {
+      if (!data) return false;
       const t = Date.now();
-      const path = `${project.id}/images/og-image-${t}`;
+      const path = `${data.id}/images/og-image-${t}`;
 
       const { data: uploaded, error: upload_err } = await client.storage
         .from("www")
@@ -109,7 +112,7 @@ function useSiteSettings() {
       if (error) return false;
       return true;
     },
-    [update, client, project.id]
+    [update, data, client, project.id]
   );
 
   const getPublicUrl = useCallback(
