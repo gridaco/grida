@@ -20,7 +20,7 @@ import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 import toast from "react-hot-toast";
 
 function ActionsCell({

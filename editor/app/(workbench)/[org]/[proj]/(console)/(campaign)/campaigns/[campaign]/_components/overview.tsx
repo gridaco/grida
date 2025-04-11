@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Analytics } from "@/lib/analytics";
 import useSWR from "swr";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 
 interface DateRange {
   from: Date;

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 import { Button } from "@/components/ui/button";
 import {
   Card,

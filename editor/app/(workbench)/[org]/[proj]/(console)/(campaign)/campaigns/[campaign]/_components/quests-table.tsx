@@ -40,7 +40,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 
 const QUESTNAME = "refer-a-friend"; // TODO:
 

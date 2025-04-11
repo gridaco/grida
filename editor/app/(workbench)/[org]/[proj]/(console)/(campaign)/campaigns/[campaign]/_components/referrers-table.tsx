@@ -21,7 +21,7 @@ import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { MoreHorizontal } from "lucide-react";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 import Link from "next/link";
 import toast from "react-hot-toast";
 

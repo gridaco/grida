@@ -1,4 +1,3 @@
-import { ToasterWithMax } from "@/components/toaster";
 import {
   Sidebar,
   SidebarContent,
@@ -9,13 +8,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarFooter,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { AboutGridaWestCard } from "./about-west-card";
 import Link from "next/link";
 
 type Params = { org: string; proj: string };
@@ -74,24 +70,6 @@ export default async function Layout({
                 </SidebarGroupContent>
               </SidebarGroup>
               <SidebarGroup>
-                <SidebarGroupLabel>Marketing</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <Link href={`/${org}/${proj}/campaigns`}>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton size="sm">
-                          <ResourceTypeIcon
-                            type="campaign"
-                            className="size-4"
-                          />
-                          Campaigns
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    </Link>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-              <SidebarGroup>
                 <SidebarGroupLabel>Site</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -115,6 +93,24 @@ export default async function Layout({
                 </SidebarGroupContent>
               </SidebarGroup>
               <SidebarGroup>
+                <SidebarGroupLabel>Events</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <Link href={`/${org}/${proj}/campaigns`}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton size="sm">
+                          <ResourceTypeIcon
+                            type="campaign"
+                            className="size-4"
+                          />
+                          Campaigns
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </Link>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+              <SidebarGroup>
                 <SidebarGroupLabel>Advanced</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -130,9 +126,6 @@ export default async function Layout({
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter>
-              <AboutGridaWestCard />
-            </SidebarFooter>
           </Sidebar>
           <div className="flex flex-col overflow-hidden w-full h-full">
             <div className="w-full h-full overflow-x-hidden overflow-y-auto">
@@ -141,8 +134,6 @@ export default async function Layout({
           </div>
         </div>
       </div>
-      <EditorHelpFab />
-      <ToasterWithMax position="bottom-center" max={5} />
     </SidebarProvider>
   );
 }

@@ -183,17 +183,22 @@ const document: IDocumentEditorInit = {
 
 export default function CampaignDesignerPage() {
   return (
-    <main className="fixed z-10 inset-0 w-screen h-screen overflow-hidden">
-      <Editor
-        document={document}
-        templates={{
-          "tmp-2503-invite": CustomComponent__Referrer,
-          "tmp-2503-join-main": CustomComponent__Join_Main,
-          "tmp-2503-join-hello": CustomComponent__Join_Hello,
-        }}
-      />
-    </main>
+    <div className="w-full h-full bg-green-200">
+      <header></header>
+      {/*  */}
+      {/*  */}
+    </div>
   );
+  // <main className="fixed z-10 inset-0 w-screen h-screen overflow-hidden">
+  //   <Editor
+  //     document={document}
+  //     templates={{
+  //       "tmp-2503-invite": CustomComponent__Referrer,
+  //       "tmp-2503-join-main": CustomComponent__Join_Main,
+  //       "tmp-2503-join-hello": CustomComponent__Join_Hello,
+  //     }}
+  //   />
+  // </main>
 }
 
 function CustomComponent__Referrer(componentprops: any) {

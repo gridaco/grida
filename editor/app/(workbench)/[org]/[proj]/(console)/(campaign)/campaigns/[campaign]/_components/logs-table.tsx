@@ -12,7 +12,7 @@ import {
 import useSWR from "swr";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
-import { useCampaign } from "./store";
+import { useCampaign } from "../store";
 
 export default function LogsTable() {
   const campaign = useCampaign();
