@@ -28,7 +28,7 @@ export default function NewCampaignPage() {
       const { data: new_campaign } = await res.json();
       if (res.ok) {
         router.replace(
-          `/${project.organization_name}/${project.name}/campaigns/${(new_campaign as Platform.WEST.Referral.Campaign).slug}`
+          `/${project.organization_name}/${project.name}/campaigns/${(new_campaign as Platform.WEST.Referral.Campaign).id}`
         );
       }
     });

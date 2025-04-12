@@ -4,10 +4,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Shield, User, Users, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Platform } from "@/lib/platform";
 
 interface SecurityStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 export function SecurityStep({ data, updateData }: SecurityStepProps) {
@@ -109,10 +112,10 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
               </div>
               <Switch
                 id="expose-referrer"
-                checked={data.is_referrer_name_exposed_to_public_dangerously}
+                checked={data.is_referrer_profile_exposed_to_public_dangerously}
                 onCheckedChange={(checked) =>
                   updateData({
-                    is_referrer_name_exposed_to_public_dangerously: checked,
+                    is_referrer_profile_exposed_to_public_dangerously: checked,
                   })
                 }
               />
@@ -130,10 +133,10 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
               </div>
               <Switch
                 id="expose-invitee"
-                checked={data.is_invitee_name_exposed_to_public_dangerously}
+                checked={data.is_invitee_profile_exposed_to_public_dangerously}
                 onCheckedChange={(checked) =>
                   updateData({
-                    is_invitee_name_exposed_to_public_dangerously: checked,
+                    is_invitee_profile_exposed_to_public_dangerously: checked,
                   })
                 }
               />
@@ -157,7 +160,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
               <div className="p-3 bg-muted/10 rounded-md">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
-                    {data.is_referrer_name_exposed_to_public_dangerously && (
+                    {data.is_referrer_profile_exposed_to_public_dangerously && (
                       <AvatarImage
                         src={referrers[0].image}
                         alt={referrers[0].name}
@@ -166,7 +169,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                     <AvatarFallback>{referrers[0].avatar}</AvatarFallback>
                   </Avatar>
                   <div>
-                    {data.is_referrer_name_exposed_to_public_dangerously ? (
+                    {data.is_referrer_profile_exposed_to_public_dangerously ? (
                       <p className="text-sm font-medium">{referrers[0].name}</p>
                     ) : (
                       <p className="text-sm font-medium text-muted-foreground">
@@ -216,7 +219,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                         >
                           <ChevronRight className="h-3 w-3 text-muted-foreground absolute -ml-5" />
                           <Avatar className="h-6 w-6">
-                            {data.is_invitee_name_exposed_to_public_dangerously && (
+                            {data.is_invitee_profile_exposed_to_public_dangerously && (
                               <AvatarImage
                                 src={invitee.image}
                                 alt={invitee.name}
@@ -227,7 +230,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            {data.is_invitee_name_exposed_to_public_dangerously ? (
+                            {data.is_invitee_profile_exposed_to_public_dangerously ? (
                               <p className="text-sm">{invitee.name}</p>
                             ) : (
                               <p className="text-sm text-muted-foreground">
@@ -252,13 +255,13 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
           <div>
             <p className="text-sm font-medium">Referrer Profile Exposure:</p>
             <p className="text-sm text-muted-foreground">
-              {data.is_referrer_name_exposed_to_public_dangerously
+              {data.is_referrer_profile_exposed_to_public_dangerously
                 ? "Invitees will see who invited them with name and avatar."
                 : "Invitees will not see who invited them by name or avatar."}
             </p>
             <div className="mt-2 p-3 bg-muted/20 rounded-md">
               <p className="text-xs">
-                {data.is_referrer_name_exposed_to_public_dangerously
+                {data.is_referrer_profile_exposed_to_public_dangerously
                   ? '"Join Alex\'s team and get rewards!"'
                   : '"Someone invited you to join and get rewards!"'}
               </p>
@@ -268,13 +271,13 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
           <div>
             <p className="text-sm font-medium">Invitee Profile Exposure:</p>
             <p className="text-sm text-muted-foreground">
-              {data.is_invitee_name_exposed_to_public_dangerously
+              {data.is_invitee_profile_exposed_to_public_dangerously
                 ? "Referrers will see the names and avatars of people who accepted their invitations."
                 : "Referrers will not see the names or avatars of people who accepted their invitations."}
             </p>
             <div className="mt-2 p-3 bg-muted/20 rounded-md">
               <p className="text-xs">
-                {data.is_invitee_name_exposed_to_public_dangerously
+                {data.is_invitee_profile_exposed_to_public_dangerously
                   ? '"Taylor, Jordan, and 1 other joined through your link!"'
                   : '"3 people joined through your link!"'}
               </p>

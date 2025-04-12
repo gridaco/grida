@@ -5,10 +5,7 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-// import Portal from "@/app/(demo)/r/[slug]/p/_flows/page";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
-// import Main from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/main";
-// import Hello from "@/app/(demo)/r/[slug]/t/[code]/_join/_flows/hello";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -283,11 +280,11 @@ function CustomComponent__Referrer(componentprops: any) {
           },
         }}
         locale="en"
+        slug="dummy"
         data={{
           campaign: {
             id: "dummy",
-            name: "DUMMY",
-            slug: "dummy",
+            title: "DUMMY",
             enabled: true,
             conversion_currency: "USD",
             conversion_value: 0,

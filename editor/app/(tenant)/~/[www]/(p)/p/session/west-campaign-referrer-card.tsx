@@ -80,7 +80,7 @@ export default function CampaignReferrerCard({
           <div>
             <Badge variant="outline">{t.status[status]}</Badge>
             <h3 className="mt-2 text-xl font-bold tracking-tight">
-              {campaign.name}
+              {campaign.title}
             </h3>
           </div>
           <Image

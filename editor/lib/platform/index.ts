@@ -555,15 +555,14 @@ export namespace Platform.WEST.Referral {
 
   export type Campaign = {
     id: string;
-    slug: string;
+    title: string;
     public: Record<string, string> | unknown;
     created_at: string;
     description: string | null;
     enabled: boolean;
-    is_invitee_name_exposed_to_public_dangerously: boolean;
-    is_referrer_name_exposed_to_public_dangerously: boolean;
+    is_invitee_profile_exposed_to_public_dangerously: boolean;
+    is_referrer_profile_exposed_to_public_dangerously: boolean;
     max_invitations_per_referrer: number | null;
-    name: string;
     project_id: number;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
@@ -572,12 +571,11 @@ export namespace Platform.WEST.Referral {
 
   export type CampaignPublic = {
     id: string;
-    slug: string;
+    title: string;
     conversion_currency: string | null;
     conversion_value: number | null;
     enabled: boolean | null;
     max_invitations_per_referrer: number | null;
-    name: string | null;
     public: Record<string, string> | unknown;
     reward_currency: string;
     scheduling_close_at: string | null;
@@ -650,23 +648,20 @@ export namespace Platform.WEST.Referral {
     created_at: string;
   };
 
-  const _x_grida_west_campaign_slug = "x-grida-west-campaign-slug";
+  const _x_grida_west_campaign_id = "x-grida-west-campaign-id";
   const _x_grida_west_token_code = "x-grida-west-token-code";
 
   export class WestReferralClient {
-    constructor(readonly slug: string) {}
+    constructor(readonly campaign_id: string) {}
 
-    read(
-      code: string,
-      type: TokenRole = "referrer"
-    ): Promise<{
+    read(code: string): Promise<{
       data: ReferrerPublicRead | InvitationPublicRead;
     }> {
       return fetch(`/west/t`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
@@ -677,7 +672,7 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
@@ -691,7 +686,7 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
           "x-grida-west-invitation-id": invitation_id,
         },
@@ -703,7 +698,7 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           "x-grida-customer-id": owner_id,
           [_x_grida_west_token_code]: code,
         },
@@ -721,7 +716,7 @@ export namespace Platform.WEST.Referral {
         }),
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       });
@@ -739,7 +734,7 @@ export namespace Platform.WEST.Referral.Wizard {
     | "custom";
 
   export type CampaignData = {
-    name: string;
+    title: string;
     description: string;
     reward_strategy_type: RewardType;
     reward_currency_type: RewardCurrencyType;
@@ -768,8 +763,8 @@ export namespace Platform.WEST.Referral.Wizard {
     }>;
     conversion_currency: string;
     conversion_value: number | null;
-    is_referrer_name_exposed_to_public_dangerously: boolean;
-    is_invitee_name_exposed_to_public_dangerously: boolean;
+    is_referrer_profile_exposed_to_public_dangerously: boolean;
+    is_invitee_profile_exposed_to_public_dangerously: boolean;
     enabled: boolean;
     scheduling: {
       __prefers_start_now: boolean;

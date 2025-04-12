@@ -67,12 +67,12 @@ const timezones = [
 
 // Form schema based on the database structure
 const formSchema = z.object({
-  name: z.string().min(1).max(256, {
-    message: "Campaign name must be between 1 and 256 characters",
+  title: z.string().min(1).max(256, {
+    message: "Campaign title must be between 1 and 256 characters",
   }),
   description: z.string().optional(),
-  is_invitee_name_exposed_to_public_dangerously: z.boolean().default(false),
-  is_referrer_name_exposed_to_public_dangerously: z.boolean().default(false),
+  is_invitee_profile_exposed_to_public_dangerously: z.boolean().default(false),
+  is_referrer_profile_exposed_to_public_dangerously: z.boolean().default(false),
   max_invitations_per_referrer: z.number().int().nullable(),
   enabled: z.boolean().default(true),
   scheduling_open_at: z.date().nullable(),
@@ -99,22 +99,21 @@ function useCampaignData(id: string) {
         if (data) setCampaign(data as Platform.WEST.Referral.Campaign);
       });
   }, [client, id]);
-
   const update = useCallback(
     async (data: CampaignFormValues) => {
       const { data: updated, error } = await client
         .from("campaign")
         .update({
-          name: data.name,
+          name: data.title,
           description: data.description,
           enabled: data.enabled,
           scheduling_tz: data.scheduling_tz,
           scheduling_open_at: data.scheduling_open_at?.toISOString(),
           scheduling_close_at: data.scheduling_close_at?.toISOString(),
-          is_invitee_name_exposed_to_public_dangerously:
-            data.is_invitee_name_exposed_to_public_dangerously,
-          is_referrer_name_exposed_to_public_dangerously:
-            data.is_referrer_name_exposed_to_public_dangerously,
+          is_invitee_profile_exposed_to_public_dangerously:
+            data.is_invitee_profile_exposed_to_public_dangerously,
+          is_referrer_profile_exposed_to_public_dangerously:
+            data.is_referrer_profile_exposed_to_public_dangerously,
           max_invitations_per_referrer: data.max_invitations_per_referrer,
           public: data.public,
         })
@@ -232,7 +231,7 @@ function Body({
 
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Campaign Name</FormLabel>
@@ -451,13 +450,13 @@ function Body({
 
                 <FormField
                   control={form.control}
-                  name="is_invitee_name_exposed_to_public_dangerously"
+                  name="is_invitee_profile_exposed_to_public_dangerously"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
                       <div className="space-y-0.5">
                         <div className="flex items-center">
                           <FormLabel className="text-base mr-2">
-                            Expose Invitee Names Publicly
+                            Expose Invitee Profiles Publicly
                           </FormLabel>
                           <TooltipProvider>
                             <Tooltip>
@@ -490,13 +489,13 @@ function Body({
 
                 <FormField
                   control={form.control}
-                  name="is_referrer_name_exposed_to_public_dangerously"
+                  name="is_referrer_profile_exposed_to_public_dangerously"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
                       <div className="space-y-0.5">
                         <div className="flex items-center">
                           <FormLabel className="text-base mr-2">
-                            Expose Referrer Names Publicly
+                            Expose Referrer Profiles Publicly
                           </FormLabel>
                           <TooltipProvider>
                             <Tooltip>

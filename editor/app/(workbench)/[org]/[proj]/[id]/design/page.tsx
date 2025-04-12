@@ -25,10 +25,7 @@ import Toolbar, {
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-// import Portal from "@/app/(public)/www/[www]/r/[slug]/p/_flows/page";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
-// import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
-// import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
 
 export default function SiteDeisngPage() {
   return (
@@ -131,11 +128,11 @@ function CustomComponent__Referrer(props: any) {
           },
         }}
         locale="en"
+        slug="dummy"
         data={{
           campaign: {
             id: "dummy",
-            name: "DUMMY",
-            slug: "dummy",
+            title: "DUMMY",
             enabled: true,
             conversion_currency: "USD",
             conversion_value: 0,

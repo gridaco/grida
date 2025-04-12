@@ -9,17 +9,17 @@ import assert from "assert";
 export async function POST(req: NextRequest) {
   //
   const headersList = await headers();
-  const campaign_slug = headersList.get("x-grida-west-campaign-slug");
+  const campaign_id = headersList.get("x-grida-west-campaign-id");
   const code = headersList.get("x-grida-west-token-code");
 
-  console.log("invite", campaign_slug, code);
-  assert(campaign_slug, "x-grida-west-campaign-slug is required");
+  console.log("invite", campaign_id, code);
+  assert(campaign_id, "x-grida-west-campaign-id is required");
   assert(code, "x-grida-west-token-code is required");
 
   const { data: next, error: mint_err } = await grida_west_referral_client.rpc(
     "invite",
     {
-      p_campaign_ref: campaign_slug,
+      p_campaign_id: campaign_id,
       p_code: code,
     }
   );

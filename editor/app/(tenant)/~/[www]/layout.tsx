@@ -24,12 +24,15 @@ export async function generateMetadata({
   const client = createRouteHandlerWWWClient(cookieStore);
 
   const { data, error } = await client
-    .from("www")
+    .from("www_public")
     .select()
     .eq("name", www)
     .single();
 
-  if (error) return notFound();
+  if (error) {
+    console.error("www not found", www, error);
+    return notFound();
+  }
 
   const og_image = data?.og_image
     ? client.storage.from("www").getPublicUrl(data.og_image).data.publicUrl

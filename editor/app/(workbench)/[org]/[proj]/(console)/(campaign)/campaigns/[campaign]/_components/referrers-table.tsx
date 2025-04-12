@@ -32,7 +32,7 @@ type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
 function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
   const referrer = row.original;
 
-  const { slug: ref } = useCampaign();
+  const { id } = useCampaign();
 
   return (
     <DropdownMenu>
@@ -46,7 +46,8 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => {
-            open(`/r/${ref}/t/${referrer.code}`, "_blank");
+            // FIXME: tenant url
+            open(`/r/${id}/t/${referrer.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

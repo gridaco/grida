@@ -96,7 +96,8 @@ export default async function CustomerPortalSession({
           </header>
           {iam_referrers?.length === 0 && <Empty />}
           {iam_referrers?.map((r) => {
-            const link = `/r/${r.campaign.slug}/t/${r.code}`;
+            // FIXME: tenant url
+            const link = `/r/${r.campaign.id}/t/${r.code}`;
             return (
               <Link key={link} href={link}>
                 <CampaignReferrerCard

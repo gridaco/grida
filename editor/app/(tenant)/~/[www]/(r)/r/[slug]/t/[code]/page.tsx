@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import ReferrerPage from "./_invite";
 import InvitationPage from "./_join";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCampaignAgent } from "../../store";
 
 type Params = {
   code: string;
@@ -14,12 +15,12 @@ type Params = {
 };
 
 export default function RoutingPage({ params }: { params: Params }) {
-  const client = useMemo(
-    () => new Platform.WEST.Referral.WestReferralClient(params.slug),
-    [params.slug]
-  );
-
   const { code, slug } = params;
+  const campaign = useCampaignAgent();
+  const client = useMemo(
+    () => new Platform.WEST.Referral.WestReferralClient(campaign.id),
+    [campaign.id]
+  );
 
   const { data, isLoading, error } = useSWR<{
     data:
@@ -37,12 +38,14 @@ export default function RoutingPage({ params }: { params: Params }) {
   );
 
   useEffect(() => {
-    //
-    const client = new Platform.WEST.Referral.WestReferralClient(slug);
+    const client = new Platform.WEST.Referral.WestReferralClient(campaign.id);
     client.track(code, "page_view");
-  }, [code, slug]);
+  }, [code, campaign.id]);
+
+  console.log("campaign.id", campaign.id);
 
   if (error) {
+    console.error("error", error);
     return notFound();
   }
 
@@ -62,7 +65,7 @@ export default function RoutingPage({ params }: { params: Params }) {
     case "referrer":
       return (
         <ScreenWindowRoot>
-          <ReferrerPage data={data.data} />
+          <ReferrerPage slug={slug} data={data.data} />
         </ScreenWindowRoot>
       );
     case "invitation":

@@ -1,5 +1,8 @@
 import { Database } from "@/database.types";
-import { createRouteHandlerWestReferralClient } from "@/lib/supabase/server";
+import {
+  createRouteHandlerWestReferralClient,
+  createRouteHandlerWorkspaceClient,
+} from "@/lib/supabase/server";
 import assert from "assert";
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -9,6 +12,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const cookieStore = await cookies();
   const headerList = await headers();
+  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
   const client = createRouteHandlerWestReferralClient(cookieStore);
 
   const project_id = Number(
@@ -19,14 +23,14 @@ export async function POST(req: Request) {
 
   const {
     //
-    name,
+    title,
     description,
     conversion_currency,
     conversion_value,
     reward_currency,
     max_invitations_per_referrer,
-    is_referrer_name_exposed_to_public_dangerously,
-    is_invitee_name_exposed_to_public_dangerously,
+    is_referrer_profile_exposed_to_public_dangerously,
+    is_invitee_profile_exposed_to_public_dangerously,
     enabled,
     scheduling,
     //
@@ -36,21 +40,36 @@ export async function POST(req: Request) {
     challenges,
   } = body as Platform.WEST.Referral.Wizard.CampaignData;
 
+  // step 0. create document
+  const { data: base_doc, error: base_doc_err } = await wsclient
+    .from("document")
+    .insert({
+      doctype: "v0_campaign_referral",
+      project_id: project_id,
+    })
+    .select("id")
+    .single();
+
+  if (base_doc_err) console.error("err@0", base_doc_err);
+  if (!base_doc)
+    return new NextResponse("failed to create campaign doc", { status: 500 });
+
   // step 1. create campaign
-  const { data: new_campaign, error } = await client
+  const { data: new_campaign, error: new_campaign_err } = await client
     .from("campaign")
     .insert({
+      id: base_doc.id,
       project_id: project_id,
-      name: name,
+      title: title,
       description: description,
       conversion_currency: conversion_currency,
       conversion_value: conversion_value,
       reward_currency: reward_currency,
       enabled: enabled,
-      is_invitee_name_exposed_to_public_dangerously:
-        is_invitee_name_exposed_to_public_dangerously,
-      is_referrer_name_exposed_to_public_dangerously:
-        is_referrer_name_exposed_to_public_dangerously,
+      is_invitee_profile_exposed_to_public_dangerously:
+        is_invitee_profile_exposed_to_public_dangerously,
+      is_referrer_profile_exposed_to_public_dangerously:
+        is_referrer_profile_exposed_to_public_dangerously,
       max_invitations_per_referrer: max_invitations_per_referrer,
       metadata: null,
       public: null,
@@ -61,7 +80,7 @@ export async function POST(req: Request) {
     .select()
     .single();
 
-  if (error) console.error("err@1", error);
+  if (new_campaign_err) console.error("err@1", new_campaign_err);
   if (!new_campaign)
     return new NextResponse("failed to create campaign", { status: 500 });
 

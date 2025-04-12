@@ -8,11 +8,11 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export async function POST(req: NextRequest) {
   const headersList = await headers();
-  const campaign_slug = headersList.get("x-grida-west-campaign-slug");
+  const campaign_id = headersList.get("x-grida-west-campaign-id");
   const customer_id = headersList.get("x-grida-customer-id");
   const code = headersList.get("x-grida-west-token-code");
 
-  assert(campaign_slug, "x-grida-west-campaign-slug is required");
+  assert(campaign_id, "x-grida-west-campaign-id is required");
   assert(code, "x-grida-west-token-code is required");
 
   if (!customer_id) {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { data: next, error: claim_err } = await grida_west_referral_client.rpc(
     "claim",
     {
-      p_campaign_ref: campaign_slug,
+      p_campaign_id: campaign_id,
       p_code: code,
       p_customer_id: customer_id,
     }

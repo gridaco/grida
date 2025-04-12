@@ -23,7 +23,7 @@ const seedTriggers = [
 ];
 
 const initialData: Platform.WEST.Referral.Wizard.CampaignData = {
-  name: "",
+  title: "",
   description: "",
   reward_strategy_type: "double-sided",
   reward_currency_type: "virtual-currency",
@@ -37,8 +37,8 @@ const initialData: Platform.WEST.Referral.Wizard.CampaignData = {
   __prefers_offline_manual: false,
   challenges: [],
   triggers: seedTriggers,
-  is_referrer_name_exposed_to_public_dangerously: false,
-  is_invitee_name_exposed_to_public_dangerously: false,
+  is_referrer_profile_exposed_to_public_dangerously: false,
+  is_invitee_profile_exposed_to_public_dangerously: false,
   enabled: true,
   scheduling: {
     __prefers_start_now: true,

@@ -346,11 +346,11 @@ function CustomComponent__Referrer(componentprops: any) {
           },
         }}
         locale="en"
+        slug="dummy"
         data={{
           campaign: {
             id: "dummy",
-            name: "DUMMY",
-            slug: "dummy",
+            title: "DUMMY",
             enabled: true,
             conversion_currency: "USD",
             conversion_value: 0,
@@ -424,8 +424,7 @@ function CustomComponent__Join_Main(componentprops: any) {
           id: "123",
           campaign: {
             id: "dummy",
-            name: "DUMMY",
-            slug: "dummy",
+            title: "DUMMY",
             enabled: true,
             conversion_currency: "USD",
             conversion_value: 0,

@@ -22,7 +22,7 @@ export function CampaignCard({
   // This would normally be passed as props
   const campaign = {
     id: data.id,
-    name: data.name,
+    title: data.title,
     description: data.description ?? "(No description)",
     status: data.enabled ? "active" : "paused",
     open_at: data.scheduling_open_at,
@@ -36,7 +36,7 @@ export function CampaignCard({
           <Badge variant={"outline"}>
             {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
           </Badge>
-          <CardTitle className="text-lg mt-2">{campaign.name}</CardTitle>
+          <CardTitle className="text-lg mt-2">{campaign.title}</CardTitle>
           <CardDescription className="line-clamp-1 mt-1">
             {campaign.description}
           </CardDescription>

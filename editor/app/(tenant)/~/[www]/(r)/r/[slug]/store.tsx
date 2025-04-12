@@ -2,12 +2,12 @@
 
 import React, { createContext, useContext } from "react";
 
-const CampaignContext = createContext<{
+const CampaignAgentContext = createContext<{
   id: string;
   title: string;
 } | null>(null);
 
-export function CampaignProvider({
+export function CampaignAgentProvider({
   children,
   campaign,
 }: {
@@ -18,14 +18,14 @@ export function CampaignProvider({
   };
 }) {
   return (
-    <CampaignContext.Provider value={campaign}>
+    <CampaignAgentContext.Provider value={campaign}>
       {children}
-    </CampaignContext.Provider>
+    </CampaignAgentContext.Provider>
   );
 }
 
-export function useCampaign() {
-  const context = useContext(CampaignContext);
+export function useCampaignAgent() {
+  const context = useContext(CampaignAgentContext);
   if (!context) {
     throw new Error("useCampaign must be used within a CampaignProvider");
   }

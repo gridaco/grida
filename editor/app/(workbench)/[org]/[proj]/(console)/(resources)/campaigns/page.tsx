@@ -65,7 +65,7 @@ export default function CampaignsPage({ params }: { params: Params }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {campaigns.map((c) => {
           return (
-            <Link key={c.id} href={`./campaigns/${c.slug}`}>
+            <Link key={c.id} href={`./campaigns/${c.id}`}>
               <CampaignCard data={c} />
             </Link>
           );

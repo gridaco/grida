@@ -48,22 +48,26 @@ function __share_obj({
   invitation_code: string;
 }) {
   return {
+    // FIXME: content
     title: "Polestar 시승하고 경품 받아가세요 🎁",
     text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
+    // FIXME: tenant url
     url: `${window.location.origin}/r/${campaign_slug}/t/${invitation_code}`,
   };
 }
 
 async function mkshare({
+  campaign_id,
   campaign_slug,
   referrer_code,
   referrer_name,
 }: {
+  campaign_id: string;
   campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
   const { data: invitation } = await client.invite(referrer_code);
 
   return __share_obj({
@@ -74,17 +78,19 @@ async function mkshare({
 }
 
 async function reshare({
+  campaign_id,
   campaign_slug,
   referrer_code,
   referrer_name,
   invitation_id,
 }: {
+  campaign_id: string;
   campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
   invitation_id: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_slug);
+  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
 
   const { data: invitation } = await client.refresh(
     referrer_code,
@@ -195,9 +201,11 @@ export interface Props {
 export default function ReferrerPageTemplate({
   data,
   design,
+  slug,
   locale,
 }: {
   data: Platform.WEST.Referral.ReferrerPublicRead;
+  slug: string;
   design: Props;
   locale: keyof typeof dictionary;
 }) {
@@ -219,7 +227,8 @@ export default function ReferrerPageTemplate({
 
   const triggerShare = async () => {
     return mkshare({
-      campaign_slug: campaign.slug,
+      campaign_id: campaign.id,
+      campaign_slug: slug,
       referrer_code: code!,
       referrer_name,
     }).then((sharable) => {
@@ -380,7 +389,8 @@ export default function ReferrerPageTemplate({
                                     size="sm"
                                     onClick={() => {
                                       reshare({
-                                        campaign_slug: campaign.slug,
+                                        campaign_id: campaign.id,
+                                        campaign_slug: slug,
                                         referrer_code: code!,
                                         referrer_name,
                                         invitation_id: inv.id,

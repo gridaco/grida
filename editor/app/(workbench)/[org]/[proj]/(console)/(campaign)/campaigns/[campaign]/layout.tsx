@@ -26,7 +26,6 @@ import {
   TrophyIcon,
   UsersIcon,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { AboutGridaWestCard } from "./about-west-card";
 type Params = { org: string; proj: string; campaign: string };
 
@@ -37,14 +36,14 @@ export default async function CampaignLayout({
   children: React.ReactNode;
   params: Promise<Params>;
 }>) {
-  const { org, proj, campaign: campaign_slug } = await params;
+  const { org, proj, campaign: campaign_id } = await params;
   const cookieStore = await cookies();
   const client = createRouteHandlerWestReferralClient(cookieStore);
 
   const { data, error } = await client
     .from("campaign")
     .select()
-    .eq("slug", campaign_slug)
+    .eq("id", campaign_id)
     .single();
 
   if (error) {
@@ -52,7 +51,7 @@ export default async function CampaignLayout({
     return <>something went wrong</>;
   }
 
-  const base_url = `/${org}/${proj}/campaigns/${campaign_slug}`;
+  const base_url = `/${org}/${proj}/campaigns/${campaign_id}`;
 
   return (
     <CampaignProvider campaign={data}>
@@ -66,7 +65,7 @@ export default async function CampaignLayout({
                     <SidebarMenuItem>
                       <SidebarMenuButton>
                         <ArrowLeftIcon />
-                        <span className="truncate">{data.name}</span>
+                        <span className="truncate">{data.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   </Link>

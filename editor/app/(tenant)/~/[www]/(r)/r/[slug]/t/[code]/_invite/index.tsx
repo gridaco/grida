@@ -6,8 +6,10 @@ import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page"
 import t from "./data-01.json";
 
 export default function ReferrerPage({
+  slug,
   data,
 }: {
+  slug: string;
   data: Platform.WEST.Referral.ReferrerPublicRead;
 }) {
   const { referrer_name: _referrer_name } = data;
@@ -15,6 +17,7 @@ export default function ReferrerPage({
 
   return (
     <ReferrerPageTemplate
+      slug={slug}
       design={{
         logo: {
           src: "/logos/polestar.png",

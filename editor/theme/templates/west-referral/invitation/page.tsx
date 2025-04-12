@@ -138,7 +138,7 @@ export default function InvitationPageTemplate({
 
     const customer_id = submission.data.customer_id;
 
-    const client = new Platform.WEST.Referral.WestReferralClient(campaign.slug);
+    const client = new Platform.WEST.Referral.WestReferralClient(campaign.id);
     const ok = await client.claim(code, customer_id);
     if (ok) {
       toast.success(t.event_signup_success);

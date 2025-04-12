@@ -51,7 +51,8 @@ function ActionsCell({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            open(`/r/${campaign.slug}/t/${token.code}`, "_blank");
+            // FIXME: tenant url
+            open(`/r/${campaign.id}/t/${token.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

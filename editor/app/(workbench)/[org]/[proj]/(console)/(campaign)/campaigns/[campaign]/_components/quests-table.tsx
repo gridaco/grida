@@ -261,7 +261,8 @@ export function QuestsTable() {
                         <DropdownMenuItem
                           onClick={() => {
                             open(
-                              `/r/${campaign.slug}/t/${quest.code}`,
+                              // FIXME: tenant url
+                              `/r/${campaign.id}/t/${quest.code}`,
                               "_blank"
                             );
                           }}
