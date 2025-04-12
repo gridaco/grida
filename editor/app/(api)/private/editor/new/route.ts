@@ -10,7 +10,6 @@ import {
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import type { GDocumentType } from "@/types";
 import assert from "assert";
 import { EditorApiResponse } from "@/types/private/api";
 import {
