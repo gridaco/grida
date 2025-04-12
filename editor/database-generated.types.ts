@@ -1966,6 +1966,8 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
+          invitation_email_template: Json | null
+          invitation_share_template: Json | null
           is_invitee_profile_exposed_to_public_dangerously: boolean
           is_referrer_profile_exposed_to_public_dangerously: boolean
           layout_id: string | null
@@ -1987,6 +1989,8 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id: string
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
           is_invitee_profile_exposed_to_public_dangerously?: boolean
           is_referrer_profile_exposed_to_public_dangerously?: boolean
           layout_id?: string | null
@@ -2008,6 +2012,8 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
           is_invitee_profile_exposed_to_public_dangerously?: boolean
           is_referrer_profile_exposed_to_public_dangerously?: boolean
           layout_id?: string | null
@@ -2699,12 +2705,13 @@ export type Database = {
     Views: {
       campaign_public: {
         Row: {
-          conversion_currency: string | null
-          conversion_value: number | null
           description: string | null
           enabled: boolean | null
           id: string | null
+          invitation_email_template: Json | null
+          invitation_share_template: Json | null
           layout_id: string | null
+          main_image_path: string | null
           max_invitations_per_referrer: number | null
           public: Json | null
           reward_currency: string | null
@@ -2714,12 +2721,13 @@ export type Database = {
           title: string | null
         }
         Insert: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
           description?: string | null
           enabled?: boolean | null
           id?: string | null
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
           layout_id?: string | null
+          main_image_path?: string | null
           max_invitations_per_referrer?: number | null
           public?: Json | null
           reward_currency?: string | null
@@ -2729,12 +2737,13 @@ export type Database = {
           title?: string | null
         }
         Update: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
           description?: string | null
           enabled?: boolean | null
           id?: string | null
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
           layout_id?: string | null
+          main_image_path?: string | null
           max_invitations_per_referrer?: number | null
           public?: Json | null
           reward_currency?: string | null
@@ -4411,14 +4420,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4438,6 +4447,24 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4448,24 +4475,6 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4480,7 +4489,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: string
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

@@ -33,5 +33,21 @@ CREATE TABLE public.document (
   constraint document_id_doctype_key UNIQUE (id, doctype)
 ) TABLESPACE pg_default;
 
+---------------------------------------------------------------------
+-- [RLS Document] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.rls_document(p_document_id uuid) RETURNS boolean
+LANGUAGE "plpgsql" SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.document d
+        WHERE d.id = p_document_id
+          AND public.rls_project(d.project_id)
+    );
+END;
+$$;
+
 ALTER TABLE public.document ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "access_based_on_project_membership" ON public.document USING (public.rls_document(id));
+CREATE POLICY "access_based_on_project_membership" ON public.document USING (public.rls_document(id)) WITH CHECK(public.rls_project(project_id));

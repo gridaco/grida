@@ -128,13 +128,17 @@ CREATE TYPE grida_west_referral.token_role AS ENUM ('referrer', 'invitation');
 -- [Campaign] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_west_referral.campaign (
-  id UUID PRIMARY KEY REFERENCES public.document(id) ON DELETE CASCADE,                  -- Unique identifier
-  slug public.slug NOT NULL UNIQUE DEFAULT public.gen_random_slug(),                   -- Unique slug for the campaign
+  id UUID PRIMARY KEY REFERENCES public.document(id) ON DELETE CASCADE,               -- Unique identifier
   project_id BIGINT NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,         -- Project namespace identifier
   
-  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 256),                          -- Campaign name (e.g., "Spring 2025 Campaign") / will be public
-  description TEXT,                                                                   -- Campaign description / will NOT be public
-  image_path TEXT,                                                                    -- Campaign image path / will be public
+  title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 256),                        -- Campaign title (e.g., "Spring 2025 Campaign") / will be public
+  description TEXT,                                                                   -- Campaign description / will be public
+  main_image_path TEXT,                                                               -- Campaign image path / will be public
+
+  invitation_email_template JSONB,                                                    -- Invitation email template / will be public
+  invitation_share_template JSONB,                                                    -- Invitation web share template (web share, sms, copy) / will be public
+
+  layout_id UUID REFERENCES grida_www.layout(id) ON DELETE SET NULL,                  -- Layout id for the campaign / will be public
 
   enabled BOOLEAN NOT NULL DEFAULT true,                                              -- Enable/disable the campaign
   max_invitations_per_referrer INTEGER DEFAULT NULL,                                  -- Maximum number of tokens per host
@@ -146,13 +150,14 @@ CREATE TABLE grida_west_referral.campaign (
   conversion_currency grida_west_referral.virtual_currency NOT NULL DEFAULT 'XTS',
   conversion_value NUMERIC(12, 2),
 
-  is_referrer_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,      -- Expose referrer name to public
-  is_invitee_name_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,       -- Expose invitee name to public
+  is_referrer_profile_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,   -- Expose referrer name to public
+  is_invitee_profile_exposed_to_public_dangerously BOOLEAN NOT NULL DEFAULT FALSE,    -- Expose invitee name to public
 
   public JSONB DEFAULT '{}'::jsonb,                                                   -- custom additional public data for the campaign / will be public
   metadata JSONB DEFAULT NULL,                                                        -- Flexible additional private data for the campaign / will NOT be public
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),                                      -- timestamp
 
+  CONSTRAINT fk_campaign_layout_document_id FOREIGN KEY (layout_id, id) REFERENCES grida_www.layout(id, document_id) ON DELETE SET NULL,
   CONSTRAINT unique_campaign_id_project_id UNIQUE (id, project_id)
 );
 
@@ -174,6 +179,30 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+
+---------------------------------------------------------------------
+-- [Campaign (Public)] --
+---------------------------------------------------------------------
+CREATE OR REPLACE VIEW grida_west_referral.campaign_public AS
+SELECT
+  id,
+  title,
+  description,
+  main_image_path,
+  invitation_email_template,
+  invitation_share_template,
+  layout_id,
+  enabled,
+  max_invitations_per_referrer,
+  reward_currency,
+  scheduling_open_at,
+  scheduling_close_at,
+  scheduling_tz,
+  public
+FROM grida_west_referral.campaign;
+
+GRANT SELECT ON grida_west_referral.campaign_public TO anon, authenticated, service_role;
 
 
 
@@ -246,28 +275,6 @@ ALTER TABLE grida_west_referral.campaign_invitee_onboarding_reward ENABLE ROW LE
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_invitee_onboarding_reward USING (grida_west_referral.rls_campaign(campaign_id));
 
 ---------------------------------------------------------------------
--- [Campaign (Public)] --
----------------------------------------------------------------------
-CREATE OR REPLACE VIEW grida_west_referral.campaign_public AS
-SELECT
-  id,
-  slug,
-  name,
-  enabled,
-  max_invitations_per_referrer,
-  reward_currency,
-  conversion_currency,
-  conversion_value,
-  scheduling_open_at,
-  scheduling_close_at,
-  scheduling_tz,
-  public
-FROM grida_west_referral.campaign;
-
-GRANT SELECT ON grida_west_referral.campaign_public TO anon, authenticated, service_role;
-
-
----------------------------------------------------------------------
 -- [Code] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_west_referral.code (
@@ -323,7 +330,7 @@ SELECT
   r.created_at,
   r.invitation_count,
   CASE
-    WHEN c.is_referrer_name_exposed_to_public_dangerously THEN cust.name
+    WHEN c.is_referrer_profile_exposed_to_public_dangerously THEN cust.name
     ELSE NULL
   END AS referrer_name
 FROM grida_west_referral.referrer r
@@ -392,7 +399,7 @@ SELECT
   i.is_claimed,
   i.created_at,
   CASE
-    WHEN c.is_invitee_name_exposed_to_public_dangerously THEN cust.name
+    WHEN c.is_invitee_profile_exposed_to_public_dangerously THEN cust.name
     ELSE NULL
   END AS invitee_name
 FROM grida_west_referral.invitation i
@@ -509,33 +516,10 @@ GRANT SELECT ON grida_west_referral.customer TO anon, authenticated;
 
 
 ---------------------------------------------------------------------
--- [find campaign_id by slug (Utility)] --
----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION grida_west_referral.find_campaign_id_by_slug(
-  p_slug public.slug
-)
-RETURNS UUID AS $$
-DECLARE
-  result UUID;
-BEGIN
-  SELECT id INTO result
-  FROM grida_west_referral.campaign
-  WHERE slug = p_slug;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Campaign with slug "%" not found', p_slug;
-  END IF;
-
-  RETURN result;
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
-
-
----------------------------------------------------------------------
 -- [Function: Lookup] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.lookup(
-    p_campaign_ref TEXT,
+    p_campaign_id UUID,
     p_code TEXT
 )
 RETURNS TABLE (
@@ -543,11 +527,7 @@ RETURNS TABLE (
     code VARCHAR(256),
     type grida_west_referral.token_role
 ) AS $$
-DECLARE
-    v_campaign_id UUID;
 BEGIN
-    v_campaign_id := grida_west_referral.find_campaign_id_by_slug(p_campaign_ref);
-
     -- Try invitation first
     RETURN QUERY
     SELECT
@@ -555,7 +535,7 @@ BEGIN
         i.code,
         'invitation'::grida_west_referral.token_role
     FROM grida_west_referral.invitation i
-    WHERE i.campaign_id = v_campaign_id AND i.code = p_code;
+    WHERE i.campaign_id = p_campaign_id AND i.code = p_code;
 
     -- Then try referrer
     RETURN QUERY
@@ -564,7 +544,7 @@ BEGIN
         r.code,
         'referrer'::grida_west_referral.token_role
     FROM grida_west_referral.referrer r
-    WHERE r.campaign_id = v_campaign_id AND r.code = p_code;
+    WHERE r.campaign_id = p_campaign_id AND r.code = p_code;
 
     RETURN;
 END;
@@ -576,22 +556,20 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 -- Function: track  --
 -----------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.track(
-    p_campaign_ref TEXT,
+    p_campaign_id UUID,
     p_code TEXT,
     p_name TEXT,
     p_data JSONB DEFAULT NULL
 )
 RETURNS VOID AS $$
 DECLARE
-    v_campaign_id UUID;
     ref_id UUID;
     inv_id UUID;
 BEGIN
-    v_campaign_id := grida_west_referral.find_campaign_id_by_slug(p_campaign_ref);
     -- Try to find in invitation
     SELECT id INTO inv_id
     FROM grida_west_referral.invitation
-    WHERE campaign_id = v_campaign_id AND code = p_code;
+    WHERE campaign_id = p_campaign_id AND code = p_code;
 
     IF FOUND THEN
         INSERT INTO grida_west_referral.event_log (
@@ -603,7 +581,7 @@ BEGIN
             data
         )
         SELECT
-            v_campaign_id,
+            p_campaign_id,
             i.referrer_id,
             o.id,
             i.customer_id,
@@ -618,7 +596,7 @@ BEGIN
     -- Try to find in referrer
     SELECT id INTO ref_id
     FROM grida_west_referral.referrer
-    WHERE campaign_id = v_campaign_id AND code = p_code;
+    WHERE campaign_id = p_campaign_id AND code = p_code;
 
     IF FOUND THEN
         INSERT INTO grida_west_referral.event_log (
@@ -628,7 +606,7 @@ BEGIN
             data
         )
         VALUES (
-            v_campaign_id,
+            p_campaign_id,
             ref_id,
             p_name,
             p_data
@@ -645,20 +623,18 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- [Function: Invite] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.invite(
-    p_campaign_ref TEXT,
+    p_campaign_id UUID,
     p_code VARCHAR(256),
     p_new_invitation_code VARCHAR(256) DEFAULT NULL
 )
 RETURNS grida_west_referral.invitation AS $$
 DECLARE
-    v_campaign_id UUID;
     origin_referrer grida_west_referral.referrer%ROWTYPE;
     new_invitation grida_west_referral.invitation%ROWTYPE;
     max_allowed INTEGER;
     current_count INTEGER;
 BEGIN
-    v_campaign_id := grida_west_referral.find_campaign_id_by_slug(p_campaign_ref);
-    SELECT * INTO origin_referrer FROM grida_west_referral.referrer WHERE campaign_id = v_campaign_id AND code = p_code;
+    SELECT * INTO origin_referrer FROM grida_west_referral.referrer WHERE campaign_id = p_campaign_id AND code = p_code;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'origin referrer not found';
     END IF;
@@ -685,7 +661,7 @@ BEGIN
     )
     RETURNING * INTO new_invitation;
 
-    PERFORM grida_west_referral.track(p_campaign_ref, origin_referrer.code, 'invite');
+    PERFORM grida_west_referral.track(p_campaign_id, origin_referrer.code, 'invite');
 
     RETURN new_invitation;
 END;
@@ -696,21 +672,19 @@ $$ LANGUAGE plpgsql;
 -- [Function: Refresh (Invitation)] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.refresh(
-    p_campaign_ref TEXT,
+    p_campaign_id UUID,
     p_invitation_id UUID,
     p_new_invitation_code VARCHAR(256) DEFAULT NULL
 )
 RETURNS grida_west_referral.invitation AS $$
 DECLARE
-    v_campaign_id UUID;
     invitation_record grida_west_referral.invitation%ROWTYPE;
     new_code TEXT;
 BEGIN
-    v_campaign_id := grida_west_referral.find_campaign_id_by_slug(p_campaign_ref);
     -- Lock the invitation if unclaimed
     SELECT * INTO invitation_record
     FROM grida_west_referral.invitation
-    WHERE id = p_invitation_id AND campaign_id = v_campaign_id AND is_claimed = false
+    WHERE id = p_invitation_id AND campaign_id = p_campaign_id AND is_claimed = false
     FOR UPDATE;
 
     IF NOT FOUND THEN
@@ -739,18 +713,16 @@ $$ LANGUAGE plpgsql;
 -- [Function: Claim Invitation] --
 ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION grida_west_referral.claim(
-    p_campaign_ref TEXT,
+    p_campaign_id UUID,
     p_code TEXT,
     p_customer_id UUID
 )
 RETURNS grida_west_referral.invitation AS $$
 DECLARE
-    v_campaign_id UUID;
     invitation_record grida_west_referral.invitation%ROWTYPE;
 BEGIN
-    v_campaign_id := grida_west_referral.find_campaign_id_by_slug(p_campaign_ref);
     SELECT * INTO invitation_record FROM grida_west_referral.invitation 
-    WHERE campaign_id = v_campaign_id AND code = p_code FOR UPDATE;
+    WHERE campaign_id = p_campaign_id AND code = p_code FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Invitation not found';
@@ -768,7 +740,7 @@ BEGIN
     RETURNING * INTO invitation_record;
 
     -- Track the claim event
-    PERFORM grida_west_referral.track(p_campaign_ref, invitation_record.code, 'claim', jsonb_build_object('customer_id', p_customer_id));
+    PERFORM grida_west_referral.track(p_campaign_id, invitation_record.code, 'claim', jsonb_build_object('customer_id', p_customer_id));
 
     RETURN invitation_record;
 END;
@@ -788,7 +760,6 @@ RETURNS VOID AS $$
 DECLARE
   challenge grida_west_referral.campaign_challenge%ROWTYPE;
   dep_met BOOLEAN;
-  v_campaign_slug TEXT;
   v_code TEXT;
 BEGIN
   -- Step 1–2: check challenge is defined for campaign
@@ -820,18 +791,13 @@ BEGIN
   END IF;
 
   -- Step 5: insert event and challenge log
-  -- get the campaign.ref (slug)
-  SELECT slug INTO v_campaign_slug
-  FROM grida_west_referral.campaign
-  WHERE id = p_campaign_id;
-
   -- get the invitation code
   SELECT code INTO v_code
   FROM grida_west_referral.invitation
   WHERE id = p_invitation_id AND campaign_id = p_campaign_id;
 
   PERFORM grida_west_referral.track(
-    v_campaign_slug,
+    p_campaign_id,
     v_code,
     p_event_name,
     p_event_data

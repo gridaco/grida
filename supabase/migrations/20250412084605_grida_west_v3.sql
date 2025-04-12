@@ -135,6 +135,9 @@ CREATE TABLE grida_west_referral.campaign (
   description TEXT,                                                                   -- Campaign description / will be public
   main_image_path TEXT,                                                               -- Campaign image path / will be public
 
+  invitation_email_template JSONB,                                                    -- Invitation email template / will be public
+  invitation_share_template JSONB,                                                    -- Invitation web share template (web share, sms, copy) / will be public
+
   layout_id UUID REFERENCES grida_www.layout(id) ON DELETE SET NULL,                  -- Layout id for the campaign / will be public
 
   enabled BOOLEAN NOT NULL DEFAULT true,                                              -- Enable/disable the campaign
@@ -176,6 +179,30 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+
+---------------------------------------------------------------------
+-- [Campaign (Public)] --
+---------------------------------------------------------------------
+CREATE OR REPLACE VIEW grida_west_referral.campaign_public AS
+SELECT
+  id,
+  title,
+  description,
+  main_image_path,
+  invitation_email_template,
+  invitation_share_template,
+  layout_id,
+  enabled,
+  max_invitations_per_referrer,
+  reward_currency,
+  scheduling_open_at,
+  scheduling_close_at,
+  scheduling_tz,
+  public
+FROM grida_west_referral.campaign;
+
+GRANT SELECT ON grida_west_referral.campaign_public TO anon, authenticated, service_role;
 
 
 
@@ -246,29 +273,6 @@ CREATE TABLE grida_west_referral.campaign_invitee_onboarding_reward (
 
 ALTER TABLE grida_west_referral.campaign_invitee_onboarding_reward ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_campaign_project_membership" ON grida_west_referral.campaign_invitee_onboarding_reward USING (grida_west_referral.rls_campaign(campaign_id));
-
----------------------------------------------------------------------
--- [Campaign (Public)] --
----------------------------------------------------------------------
-CREATE OR REPLACE VIEW grida_west_referral.campaign_public AS
-SELECT
-  id,
-  title,
-  description,
-  layout_id,
-  enabled,
-  max_invitations_per_referrer,
-  reward_currency,
-  conversion_currency,
-  conversion_value,
-  scheduling_open_at,
-  scheduling_close_at,
-  scheduling_tz,
-  public
-FROM grida_west_referral.campaign;
-
-GRANT SELECT ON grida_west_referral.campaign_public TO anon, authenticated, service_role;
-
 
 ---------------------------------------------------------------------
 -- [Code] --
