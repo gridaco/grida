@@ -69,7 +69,6 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
-
 ---------------------------------------------------------------------
 -- [Project WWW (Public)] --
 ---------------------------------------------------------------------
@@ -124,14 +123,18 @@ CREATE TABLE grida_www.layout (
     www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
     base_path grida_www.base_path NULL, -- e.g. '/docs'
     name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
-    module VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    document_id UUID NOT NULL,
+    document_type public.doctype NOT NULL,
     path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
     template JSONB,
     metadata JSONB,
     version TEXT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(www_id, base_path, name)
+    UNIQUE(www_id, base_path, name),
+
+    CONSTRAINT layout_id_document_id_key UNIQUE (id, document_id),
+    CONSTRAINT fk_layout_document FOREIGN KEY (document_id, document_type) REFERENCES public.document(id, doctype) ON DELETE CASCADE
 );
 ALTER TABLE grida_www.layout ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_www_editor" ON grida_www.layout USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
@@ -144,14 +147,18 @@ CREATE TABLE grida_www.page (
     www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
     layout_id UUID NULL REFERENCES grida_www.layout(id) ON DELETE CASCADE,
     name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
-    module VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    document_id UUID NOT NULL,
+    document_type public.doctype NOT NULL,
     path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
     body JSONB NOT NULL,
     metadata JSONB,
     version TEXT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(www_id, layout_id, name)
+    UNIQUE(www_id, layout_id, name),
+
+    CONSTRAINT page_id_document_id_key UNIQUE (id, document_id),
+    CONSTRAINT fk_page_document FOREIGN KEY (document_id, document_type) REFERENCES public.document(id, doctype) ON DELETE CASCADE
 );
 ALTER TABLE grida_www.page ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_www_editor" ON grida_www.page USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
@@ -164,7 +171,8 @@ SELECT
   id,
   www_id,
   'layout' AS type,
-  module,
+  document_id,
+  document_type,
   parent_layout_id AS layout_id,
   (COALESCE(base_path, '') || '/' || name)::TEXT AS route_path,
   version,
@@ -175,7 +183,8 @@ SELECT
   id,
   www_id,
   'page' AS type,
-  module,
+  document_id,
+  document_type,
   layout_id,
   ( -- compute full path
     COALESCE(
@@ -203,4 +212,3 @@ with check (
   bucket_id = 'www' and
   grida_www.rls_www((storage.foldername(name))[1]::uuid)
 );
-

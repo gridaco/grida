@@ -1966,19 +1966,19 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
-          image_path: string | null
-          is_invitee_name_exposed_to_public_dangerously: boolean
-          is_referrer_name_exposed_to_public_dangerously: boolean
+          is_invitee_profile_exposed_to_public_dangerously: boolean
+          is_referrer_profile_exposed_to_public_dangerously: boolean
+          layout_id: string | null
+          main_image_path: string | null
           max_invitations_per_referrer: number | null
           metadata: Json | null
-          name: string
           project_id: number
           public: Json | null
           reward_currency: string
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          slug: string
+          title: string
         }
         Insert: {
           conversion_currency?: string
@@ -1986,20 +1986,20 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
-          id?: string
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean
-          is_referrer_name_exposed_to_public_dangerously?: boolean
+          id: string
+          is_invitee_profile_exposed_to_public_dangerously?: boolean
+          is_referrer_profile_exposed_to_public_dangerously?: boolean
+          layout_id?: string | null
+          main_image_path?: string | null
           max_invitations_per_referrer?: number | null
           metadata?: Json | null
-          name: string
           project_id: number
           public?: Json | null
           reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string
+          title: string
         }
         Update: {
           conversion_currency?: string
@@ -2008,19 +2008,19 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean
-          is_referrer_name_exposed_to_public_dangerously?: boolean
+          is_invitee_profile_exposed_to_public_dangerously?: boolean
+          is_referrer_profile_exposed_to_public_dangerously?: boolean
+          layout_id?: string | null
+          main_image_path?: string | null
           max_invitations_per_referrer?: number | null
           metadata?: Json | null
-          name?: string
           project_id?: number
           public?: Json | null
           reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string
+          title?: string
         }
         Relationships: []
       }
@@ -2701,44 +2701,47 @@ export type Database = {
         Row: {
           conversion_currency: string | null
           conversion_value: number | null
+          description: string | null
           enabled: boolean | null
           id: string | null
+          layout_id: string | null
           max_invitations_per_referrer: number | null
-          name: string | null
           public: Json | null
           reward_currency: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          slug: string | null
+          title: string | null
         }
         Insert: {
           conversion_currency?: string | null
           conversion_value?: number | null
+          description?: string | null
           enabled?: boolean | null
           id?: string | null
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
-          name?: string | null
           public?: Json | null
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string | null
+          title?: string | null
         }
         Update: {
           conversion_currency?: string | null
           conversion_value?: number | null
+          description?: string | null
           enabled?: boolean | null
           id?: string | null
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
-          name?: string | null
           public?: Json | null
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string | null
+          title?: string | null
         }
         Relationships: []
       }
@@ -2853,7 +2856,7 @@ export type Database = {
         }[]
       }
       claim: {
-        Args: { p_campaign_ref: string; p_code: string; p_customer_id: string }
+        Args: { p_campaign_id: string; p_code: string; p_customer_id: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2864,10 +2867,6 @@ export type Database = {
           metadata: Json | null
           referrer_id: string
         }
-      }
-      find_campaign_id_by_slug: {
-        Args: { p_slug: unknown }
-        Returns: string
       }
       flag: {
         Args: {
@@ -2884,7 +2883,7 @@ export type Database = {
       }
       invite: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_code: string
           p_new_invitation_code?: string
         }
@@ -2900,7 +2899,7 @@ export type Database = {
         }
       }
       lookup: {
-        Args: { p_campaign_ref: string; p_code: string }
+        Args: { p_campaign_id: string; p_code: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2909,7 +2908,7 @@ export type Database = {
       }
       refresh: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_invitation_id: string
           p_new_invitation_code?: string
         }
@@ -2930,7 +2929,7 @@ export type Database = {
       }
       track: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_code: string
           p_name: string
           p_data?: Json
@@ -2951,8 +2950,9 @@ export type Database = {
         Row: {
           base_path: string | null
           created_at: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
           id: string
-          label: string
           metadata: Json | null
           name: string
           parent_layout_id: string | null
@@ -2965,8 +2965,9 @@ export type Database = {
         Insert: {
           base_path?: string | null
           created_at?: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
           id?: string
-          label: string
           metadata?: Json | null
           name: string
           parent_layout_id?: string | null
@@ -2979,8 +2980,9 @@ export type Database = {
         Update: {
           base_path?: string | null
           created_at?: string
+          document_id?: string
+          document_type?: Database["public"]["Enums"]["doctype"]
           id?: string
-          label?: string
           metadata?: Json | null
           name?: string
           parent_layout_id?: string | null
@@ -3018,8 +3020,9 @@ export type Database = {
         Row: {
           body: Json
           created_at: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
           id: string
-          label: string
           layout_id: string | null
           metadata: Json | null
           name: string
@@ -3031,8 +3034,9 @@ export type Database = {
         Insert: {
           body: Json
           created_at?: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
           id?: string
-          label: string
           layout_id?: string | null
           metadata?: Json | null
           name: string
@@ -3044,8 +3048,9 @@ export type Database = {
         Update: {
           body?: Json
           created_at?: string
+          document_id?: string
+          document_type?: Database["public"]["Enums"]["doctype"]
           id?: string
-          label?: string
           layout_id?: string | null
           metadata?: Json | null
           name?: string
@@ -3121,6 +3126,8 @@ export type Database = {
     Views: {
       routing_table_public: {
         Row: {
+          document_id: string | null
+          document_type: Database["public"]["Enums"]["doctype"] | null
           id: string | null
           layout_id: string | null
           metadata: Json | null
@@ -4404,14 +4411,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4431,24 +4438,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4459,6 +4448,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4473,7 +4480,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
@@ -4506,7 +4513,13 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site" | "v0_schema" | "v0_canvas" | "v0_bucket"
+      doctype:
+        | "v0_form"
+        | "v0_site"
+        | "v0_schema"
+        | "v0_canvas"
+        | "v0_bucket"
+        | "v0_campaign_referral"
       language_code:
         | "en"
         | "ko"
@@ -4966,7 +4979,14 @@ export const Constants = {
   },
   public: {
     Enums: {
-      doctype: ["v0_form", "v0_site", "v0_schema", "v0_canvas", "v0_bucket"],
+      doctype: [
+        "v0_form",
+        "v0_site",
+        "v0_schema",
+        "v0_canvas",
+        "v0_bucket",
+        "v0_campaign_referral",
+      ],
       language_code: [
         "en",
         "ko",

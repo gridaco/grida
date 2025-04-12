@@ -8,6 +8,8 @@ type SystemSchema_Favicon = {
   srcDark?: string | undefined;
 };
 
+type DBDocType = DatabaseGenerated["public"]["Enums"]["doctype"];
+
 // Override the type for a specific column in a view:
 export type Database = MergeDeep<
   DatabaseGenerated,
@@ -35,13 +37,32 @@ export type Database = MergeDeep<
           };
         };
       };
+      Views: {
+        www_public: DatabaseGenerated["grida_www"]["Views"]["www_public"]["Row"] & {
+          Row: {
+            id: string;
+            name: string;
+            favicon: SystemSchema_Favicon | null;
+          };
+        };
+        routing_table_public: {
+          Row: DatabaseGenerated["grida_www"]["Views"]["routing_table_public"]["Row"] & {
+            id: string;
+            type: string;
+            route_path: string;
+            document_id: string;
+            document_type: DBDocType;
+          };
+        };
+      };
     };
     grida_west_referral: {
       Views: {
         campaign_public: {
           Row: DatabaseGenerated["grida_west_referral"]["Views"]["campaign_public"]["Row"] & {
-            id: number;
-            slug: string;
+            id: string;
+            title: string;
+            description: string | null;
             reward_currency: string;
           };
         };
