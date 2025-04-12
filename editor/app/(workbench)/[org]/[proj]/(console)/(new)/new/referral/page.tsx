@@ -22,16 +22,22 @@ export default function NewCampaignPage() {
         "Content-Type": "application/json",
         "x-grida-editor-user-current-project-id": project.id.toString(),
       },
-    });
-
-    task.then(async (res) => {
-      const { data: new_campaign } = await res.json();
-      if (res.ok) {
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          return res.json();
+        } else {
+          throw new Error(res.statusText);
+        }
+      })
+      .then((new_campaign: Platform.WEST.Referral.Campaign) => {
         router.replace(
-          `/${project.organization_name}/${project.name}/campaigns/${(new_campaign as Platform.WEST.Referral.Campaign).id}`
+          `/${project.organization_name}/${project.name}/campaigns/${new_campaign.id}`
         );
-      }
-    });
+      })
+      .catch((err) => {
+        throw err;
+      });
 
     toast.promise(task, {
       loading: "Creating campaign...",

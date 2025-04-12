@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { createRouteHandlerWWWClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { Tenant } from "@/lib/tenant";
 import "../../../editor.css";
 
 type Params = {
@@ -38,7 +39,7 @@ export async function generateMetadata({
     ? client.storage.from("www").getPublicUrl(data.og_image).data.publicUrl
     : null;
 
-  const og_images = getOpenGraphImages(og_image);
+  const og_images = Tenant.www.metadata.getOpenGraphImages(og_image);
 
   const favicon = data.favicon?.src
     ? client.storage.from("www").getPublicUrl(data.favicon.src).data.publicUrl
@@ -48,7 +49,7 @@ export async function generateMetadata({
         .publicUrl
     : null;
 
-  const icons = getFavicons(favicon, faviconDark);
+  const icons = Tenant.www.metadata.getFavicons(favicon, faviconDark);
 
   return {
     generator: "Grida",
@@ -59,49 +60,6 @@ export async function generateMetadata({
       images: og_images,
     },
   };
-}
-
-function getOpenGraphImages(src: string | null) {
-  const images = [];
-
-  if (src) {
-    images.push({
-      url: src,
-      width: 1200,
-      height: 630,
-    });
-  }
-
-  return images;
-}
-
-function getFavicons(src: string | null, srcDark?: string | null) {
-  const icons = [];
-
-  if (src) {
-    icons.push({
-      rel: "icon",
-      url: src,
-      media: "(prefers-color-scheme: light)",
-    });
-  }
-
-  if (srcDark) {
-    icons.push({
-      rel: "icon",
-      url: srcDark,
-      media: "(prefers-color-scheme: dark)",
-    });
-  }
-
-  if (!src && !srcDark) {
-    icons.push({
-      rel: "icon",
-      url: "/favicon.ico",
-    });
-  }
-
-  return icons;
 }
 
 export const viewport: Viewport = {

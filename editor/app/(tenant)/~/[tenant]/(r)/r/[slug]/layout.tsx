@@ -1,34 +1,21 @@
 import {
   createRouteHandlerWestReferralClient,
   createRouteHandlerWWWClient,
+  workspaceclient,
 } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampaignAgentProvider } from "./store";
+import { Tenant } from "@/lib/tenant";
 
 type Params = {
+  tenant: string;
   slug: string;
 };
 
-// FIXME: REPLACE_STATIC
-export const metadata: Metadata = {
-  title: "Polestar 친구 초대 시승 이벤트",
-  description: "Polestar 시승 하고 10만원 상당의 상품권을 받아보세요.",
-  openGraph: {
-    images:
-      "https://www.polestar.com/dato-assets/11286/1644586145-home.jpg?auto=format&w=1200&h=630&fit=crop&q=35",
-  },
-};
-
-export default async function Layout({
-  params,
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-  params: Promise<Params>;
-}>) {
-  const { slug } = await params;
+async function fetchCampaign({ params }: { params: Params }) {
+  const { slug } = params;
   const route_path = "/r/" + slug;
   const cookieStore = cookies();
   const routing_client = createRouteHandlerWWWClient(cookieStore);
@@ -61,7 +48,43 @@ export default async function Layout({
     return notFound();
   }
 
-  console.log("campaign found", campaign);
+  return {
+    routing,
+    campaign,
+  };
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<Params>;
+}): Promise<Metadata> {
+  const { campaign } = await fetchCampaign({ params: await params });
+
+  // const og_image = data?.og_image
+  //   ? workspaceclient.storage.from("www").getPublicUrl(data.og_image).data.publicUrl
+  //   : null;
+
+  // const og_images = Tenant.www.metadata.getOpenGraphImages(og_image);
+
+  return {
+    title: campaign.title || undefined,
+    description: campaign.description || undefined,
+    // TODO: og image from campaign
+    // openGraph: {
+    //   images: og_images,
+    // },
+  };
+}
+
+export default async function Layout({
+  params,
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+  params: Promise<Params>;
+}>) {
+  const { campaign } = await fetchCampaign({ params: await params });
 
   return (
     <CampaignAgentProvider campaign={campaign}>

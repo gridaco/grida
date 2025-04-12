@@ -50,9 +50,10 @@ export async function POST(req: Request) {
     .select("id")
     .single();
 
-  if (base_doc_err) console.error("err@0", base_doc_err);
-  if (!base_doc)
+  if (base_doc_err) {
+    console.error("err@0", base_doc_err, "for project", project_id);
     return new NextResponse("failed to create campaign doc", { status: 500 });
+  }
 
   // step 1. create campaign
   const { data: new_campaign, error: new_campaign_err } = await client

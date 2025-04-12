@@ -555,32 +555,37 @@ export namespace Platform.WEST.Referral {
 
   export type Campaign = {
     id: string;
+    project_id: number;
     title: string;
-    public: Record<string, string> | unknown;
-    created_at: string;
     description: string | null;
     enabled: boolean;
+    created_at: string;
+    invitation_email_template: unknown | null;
+    invitation_share_template: unknown | null;
+    layout_id: string | null;
     is_invitee_profile_exposed_to_public_dangerously: boolean;
     is_referrer_profile_exposed_to_public_dangerously: boolean;
     max_invitations_per_referrer: number | null;
-    project_id: number;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
+    public: Record<string, string> | unknown;
   };
 
   export type CampaignPublic = {
     id: string;
-    title: string;
-    conversion_currency: string | null;
-    conversion_value: number | null;
     enabled: boolean | null;
-    max_invitations_per_referrer: number | null;
-    public: Record<string, string> | unknown;
+    title: string;
+    description: string | null;
     reward_currency: string;
+    max_invitations_per_referrer: number | null;
+    invitation_email_template: unknown | null;
+    invitation_share_template: unknown | null;
+    layout_id: string | null;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
+    public: Record<string, string> | unknown;
   };
 
   export type TokenEvent = {
