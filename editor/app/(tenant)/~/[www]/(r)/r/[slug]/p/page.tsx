@@ -12,7 +12,7 @@ import Link from "next/link";
 import * as Standard from "@/theme/templates/west-referral/standard";
 
 type Params = {
-  www: string;
+  tenant: string;
   slug: string;
 };
 

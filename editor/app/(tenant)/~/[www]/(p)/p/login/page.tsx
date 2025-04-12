@@ -5,7 +5,7 @@ import PortalLogin from "@/scaffolds/p/login";
 import { useRouter } from "next/navigation";
 
 type Params = {
-  www: string;
+  tenant: string;
 };
 
 export default function CustomerPortalLoginPage({
@@ -13,7 +13,7 @@ export default function CustomerPortalLoginPage({
 }: {
   params: Params;
 }) {
-  const { www } = params;
+  const { tenant } = params;
   const router = useRouter();
 
   const onSession = () => {
@@ -25,7 +25,7 @@ export default function CustomerPortalLoginPage({
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <PortalLogin locale={locale} www={www} onSession={onSession} />
+        <PortalLogin locale={locale} tenant={tenant} onSession={onSession} />
       </div>
     </div>
   );

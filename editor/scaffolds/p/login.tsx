@@ -57,11 +57,11 @@ interface CustomerPropsMinimalCustomizationProps {
 }
 
 export default function PortalLogin({
-  www,
+  tenant,
   locale = "en",
   onSession,
 }: CustomerPropsMinimalCustomizationProps & {
-  www: string;
+  tenant: string;
   onSession?: () => void;
 }) {
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
@@ -80,7 +80,8 @@ export default function PortalLogin({
     }
 
     setIsLoading(true);
-    fetch(`www/${www}/p/access/with-email`, {
+    // FIXME: tenant url
+    fetch(`~/${tenant}/p/access/with-email`, {
       method: "POST",
       body: JSON.stringify({
         email: email,

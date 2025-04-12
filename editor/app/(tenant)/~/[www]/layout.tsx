@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import "../../../editor.css";
 
 type Params = {
-  www: string;
+  tenant: string;
 };
 
 const inter = Inter({ subsets: ["latin"] });
@@ -18,7 +18,7 @@ export async function generateMetadata({
 }: {
   params: Promise<Params>;
 }): Promise<Metadata> {
-  const { www } = await params;
+  const { tenant } = await params;
 
   const cookieStore = cookies();
   const client = createRouteHandlerWWWClient(cookieStore);
@@ -26,11 +26,11 @@ export async function generateMetadata({
   const { data, error } = await client
     .from("www_public")
     .select()
-    .eq("name", www)
+    .eq("name", tenant)
     .single();
 
   if (error) {
-    console.error("www not found", www, error);
+    console.error("www not found", tenant, error);
     return notFound();
   }
 

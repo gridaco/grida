@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
 
 type Params = {
-  www: string;
+  tenant: string;
 };
 
 const dictionary = {
