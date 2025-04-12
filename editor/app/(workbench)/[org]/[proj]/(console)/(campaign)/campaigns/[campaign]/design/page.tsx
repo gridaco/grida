@@ -243,7 +243,7 @@ function PageEditor() {
               <Tabs value={state.scene_id} onValueChange={switchPage}>
                 <TabsList>
                   <TabsTrigger value="general">General</TabsTrigger>
-                  <TabsTrigger value="invite">Referrer's Page</TabsTrigger>
+                  <TabsTrigger value="invite">{"Referrer's Page"}</TabsTrigger>
                   <TabsTrigger value="join">Invitation Page</TabsTrigger>
                 </TabsList>
               </Tabs>
