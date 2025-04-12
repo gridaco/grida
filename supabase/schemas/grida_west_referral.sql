@@ -1,7 +1,3 @@
--- V2 - complete rework of the grida_west schema / this is not yet used. safe to drop and recreate.
-DROP SCHEMA IF EXISTS grida_west CASCADE;
-
-
 --                                                                                                               --
 --                                                                                                               --
 --                        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░░▒▓███████▓▒░▒▓████████▓▒░                           --
@@ -132,7 +128,7 @@ CREATE TYPE grida_west_referral.token_role AS ENUM ('referrer', 'invitation');
 -- [Campaign] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_west_referral.campaign (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                                      -- Unique identifier
+  id UUID PRIMARY KEY REFERENCES public.document(id) ON DELETE CASCADE,                  -- Unique identifier
   slug public.slug NOT NULL UNIQUE DEFAULT public.gen_random_slug(),                   -- Unique slug for the campaign
   project_id BIGINT NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,         -- Project namespace identifier
   
