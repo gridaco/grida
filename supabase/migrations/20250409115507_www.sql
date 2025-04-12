@@ -124,7 +124,7 @@ CREATE TABLE grida_www.layout (
     www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
     base_path grida_www.base_path NULL, -- e.g. '/docs'
     name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
-    label VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    module VARCHAR(256) NOT NULL, -- e.g. v0_forms
     path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
     template JSONB,
     metadata JSONB,
@@ -144,7 +144,7 @@ CREATE TABLE grida_www.page (
     www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
     layout_id UUID NULL REFERENCES grida_www.layout(id) ON DELETE CASCADE,
     name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
-    label VARCHAR(256) NOT NULL, -- e.g. v0_forms
+    module VARCHAR(256) NOT NULL, -- e.g. v0_forms
     path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
     body JSONB NOT NULL,
     metadata JSONB,
@@ -164,6 +164,7 @@ SELECT
   id,
   www_id,
   'layout' AS type,
+  module,
   parent_layout_id AS layout_id,
   (COALESCE(base_path, '') || '/' || name)::TEXT AS route_path,
   version,
@@ -174,6 +175,7 @@ SELECT
   id,
   www_id,
   'page' AS type,
+  module,
   layout_id,
   ( -- compute full path
     COALESCE(
