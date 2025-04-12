@@ -1,12 +1,39 @@
 "use client";
 
-import React from "react";
+import React, { useReducer } from "react";
 import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-import Editor from "@/app/(dev)/canvas/editor";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
+import {
+  useDocument,
+  useRootTemplateInstanceNode,
+  initDocumentEditorState,
+  StandaloneDocumentEditor,
+  ViewportRoot,
+  EditorSurface,
+  StandaloneSceneContent,
+  standaloneDocumentReducer,
+} from "@/grida-react-canvas";
+import {
+  AutoInitialFitTransformer,
+  StandaloneSceneBackground,
+  UserCustomTemplatesProvider,
+} from "@/grida-react-canvas/renderer";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Selection,
+  Zoom,
+} from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
+import { SidebarRoot } from "@/components/sidebar";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/utils";
+import {
+  PreviewButton,
+  PreviewProvider,
+} from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -182,23 +209,102 @@ const document: IDocumentEditorInit = {
 };
 
 export default function CampaignDesignerPage() {
+  useDisableSwipeBack();
   return (
-    <div className="w-full h-full bg-green-200">
-      <header></header>
-      {/*  */}
-      {/*  */}
-    </div>
+    <main className="w-full h-full flex relative bg-background">
+      <PageEditor />
+    </main>
   );
-  // <main className="fixed z-10 inset-0 w-screen h-screen overflow-hidden">
-  //   <Editor
-  //     document={document}
-  //     templates={{
-  //       "tmp-2503-invite": CustomComponent__Referrer,
-  //       "tmp-2503-join-main": CustomComponent__Join_Main,
-  //       "tmp-2503-join-hello": CustomComponent__Join_Hello,
-  //     }}
-  //   />
-  // </main>
+}
+
+function PageEditor() {
+  const [state, dispatch] = useReducer(
+    standaloneDocumentReducer,
+    initDocumentEditorState(document)
+  );
+
+  const switchPage = (scene: string) => {
+    dispatch({ type: "load", scene: scene });
+  };
+
+  return (
+    <>
+      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <UserCustomTemplatesProvider
+          templates={{
+            "tmp-2503-invite": CustomComponent__Referrer,
+            "tmp-2503-join-main": CustomComponent__Join_Main,
+            "tmp-2503-join-hello": CustomComponent__Join_Hello,
+          }}
+        >
+          <PreviewProvider>
+            <header className="absolute top-6 left-6 z-50 flex flex-col gap-2 px-4 py-2">
+              {/* <Navigation /> */}
+              <Tabs value={state.scene_id} onValueChange={switchPage}>
+                <TabsList>
+                  <TabsTrigger value="general">General</TabsTrigger>
+                  <TabsTrigger value="invite">Referrer's Page</TabsTrigger>
+                  <TabsTrigger value="join">Invitation Page</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </header>
+            <div className="px-10 pt-20 flex-1">
+              <div className="w-full h-full border rounded-t-xl shadow-xl overflow-hidden">
+                <div className="w-full h-full flex">
+                  <StandaloneSceneBackground className="w-full h-full flex flex-col relative bg-muted">
+                    <div className="absolute top-4 right-4 z-50 pointer-events-auto">
+                      <Zoom
+                        className={cn(
+                          WorkbenchUI.inputVariants({
+                            variant: "input",
+                            size: "xs",
+                          }),
+                          "w-auto"
+                        )}
+                      />
+                    </div>
+                    <ViewportRoot
+                      onDoubleClick={() => {
+                        // console.log("dblclick");
+                        // setEdit(true);
+                      }}
+                      className="relative w-full h-full overflow-hidden"
+                    >
+                      <EditorSurface />
+                      <AutoInitialFitTransformer>
+                        <StandaloneSceneContent />
+                      </AutoInitialFitTransformer>
+                    </ViewportRoot>
+                  </StandaloneSceneBackground>
+                </div>
+              </div>
+            </div>
+            <SidebarRoot side="right" className="hidden sm:block">
+              <header className="h-11 flex items-center px-2 justify-end gap-2">
+                <PreviewButton />
+              </header>
+              <Selection
+                config={{
+                  base: "off",
+                  developer: "off",
+                  export: "off",
+                  image: "off",
+                  layout: "off",
+                  link: "off",
+                  position: "off",
+                  props: "on", // ON
+                  size: "off",
+                  template: "off",
+                  text: "off",
+                }}
+              />
+            </SidebarRoot>
+          </PreviewProvider>
+        </UserCustomTemplatesProvider>
+        {/* <aside className="min-w-60 w-60 h-full border-l"></aside> */}
+      </StandaloneDocumentEditor>
+    </>
+  );
 }
 
 function CustomComponent__Referrer(componentprops: any) {
