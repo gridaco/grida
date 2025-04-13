@@ -57,12 +57,12 @@ interface CustomerPropsMinimalCustomizationProps {
 }
 
 export default function PortalLogin({
-  tenant,
   locale = "en",
   onSession,
+  sendEmail,
 }: CustomerPropsMinimalCustomizationProps & {
-  tenant: string;
   onSession?: () => void;
+  sendEmail?: (email: string) => Promise<boolean>;
 }) {
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
   const [step, setStep] = useState<Step>("email");
@@ -80,15 +80,9 @@ export default function PortalLogin({
     }
 
     setIsLoading(true);
-    // FIXME: tenant url
-    fetch(`~/${tenant}/p/access/with-email`, {
-      method: "POST",
-      body: JSON.stringify({
-        email: email,
-      }),
-    })
-      .then((res) => {
-        if (res.ok) {
+    sendEmail?.(email)
+      .then((ok) => {
+        if (ok) {
           setStep("otp");
         } else {
           toast.error("Something went wrong");
