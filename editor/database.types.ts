@@ -48,7 +48,7 @@ export type Database = MergeDeep<
         routing_table_public: {
           Row: DatabaseGenerated["grida_www"]["Views"]["routing_table_public"]["Row"] & {
             id: string;
-            type: string;
+            type: "page" | "layout";
             route_path: string;
             document_id: string;
             document_type: DBDocType;

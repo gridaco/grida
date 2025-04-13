@@ -1,6 +1,5 @@
 "use client";
-import Link from "next/link";
-import { Users, ArrowUpRight, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Platform } from "@/lib/platform";
 
 export function CampaignCard({
@@ -38,7 +36,7 @@ export function CampaignCard({
           </Badge>
           <CardTitle className="text-lg mt-2">{campaign.title}</CardTitle>
           <CardDescription className="line-clamp-1 mt-1">
-            {campaign.description}
+            {campaign.description?.substring(0, 100) ?? "(No description)"}
           </CardDescription>
         </div>
       </CardHeader>

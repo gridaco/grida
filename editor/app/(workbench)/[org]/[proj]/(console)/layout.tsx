@@ -3,10 +3,15 @@ import { ToasterWithMax } from "@/components/toaster";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
+import { Metadata } from "next";
 
 const inter = Inter({ subsets: ["latin"] });
 
 type Params = { org: string; proj: string };
+
+export const metadata: Metadata = {
+  title: "Project Console",
+};
 
 export default async function Layout({
   params,

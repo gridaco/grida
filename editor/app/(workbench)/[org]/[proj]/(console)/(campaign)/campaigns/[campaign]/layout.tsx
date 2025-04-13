@@ -28,7 +28,12 @@ import {
 } from "lucide-react";
 import { AboutGridaWestCard } from "./about-west-card";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
 type Params = { org: string; proj: string; campaign: string };
+
+export const metadata: Metadata = {
+  title: "Campaign | Grida WEST",
+};
 
 export default async function CampaignLayout({
   params,

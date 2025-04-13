@@ -24,6 +24,7 @@ import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { useProject } from "@/scaffolds/workspace";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -32,6 +33,7 @@ type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
 function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
   const referrer = row.original;
 
+  const project = useProject();
   const { id } = useCampaign();
 
   return (
@@ -47,7 +49,8 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuItem
           onClick={() => {
             // FIXME: tenant url
-            open(`/r/${id}/t/${referrer.code}`, "_blank");
+            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${id}/default`;
+            open(baseurl + `/t/${referrer.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />
