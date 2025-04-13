@@ -57,17 +57,17 @@ function __share_obj({
 }
 
 async function mkshare({
-  campaign_id,
+  client,
   campaign_slug,
   referrer_code,
   referrer_name,
 }: {
-  campaign_id: string;
+  client?: Platform.WEST.Referral.WestReferralClient;
   campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
+  if (!client) throw new Error("client is not defined");
   const { data: invitation } = await client.invite(referrer_code);
 
   return __share_obj({
@@ -78,20 +78,19 @@ async function mkshare({
 }
 
 async function reshare({
-  campaign_id,
+  client,
   campaign_slug,
   referrer_code,
   referrer_name,
   invitation_id,
 }: {
-  campaign_id: string;
+  client?: Platform.WEST.Referral.WestReferralClient;
   campaign_slug: string;
   referrer_code: string;
   referrer_name: string;
   invitation_id: string;
 }) {
-  const client = new Platform.WEST.Referral.WestReferralClient(campaign_id);
-
+  if (!client) throw new Error("client is not defined");
   const { data: invitation } = await client.refresh(
     referrer_code,
     invitation_id
@@ -203,11 +202,13 @@ export default function ReferrerPageTemplate({
   design,
   slug,
   locale,
+  client,
 }: {
   data: Platform.WEST.Referral.ReferrerPublicRead;
   slug: string;
   design: Props;
   locale: keyof typeof dictionary;
+  client?: Platform.WEST.Referral.WestReferralClient;
 }) {
   const t = dictionary[locale];
   const beforeShareDialog = useDialogState("before-share");
@@ -227,7 +228,7 @@ export default function ReferrerPageTemplate({
 
   const triggerShare = async () => {
     return mkshare({
-      campaign_id: campaign.id,
+      client: client,
       campaign_slug: slug,
       referrer_code: code!,
       referrer_name,
@@ -389,7 +390,7 @@ export default function ReferrerPageTemplate({
                                     size="sm"
                                     onClick={() => {
                                       reshare({
-                                        campaign_id: campaign.id,
+                                        client: client,
                                         campaign_slug: slug,
                                         referrer_code: code!,
                                         referrer_name,

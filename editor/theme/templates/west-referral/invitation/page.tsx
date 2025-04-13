@@ -109,6 +109,7 @@ export default function InvitationPageTemplate({
   visible = true,
   design,
   locale,
+  client,
 }: {
   visible?: boolean;
   design: Props;
@@ -116,6 +117,7 @@ export default function InvitationPageTemplate({
   data: Platform.WEST.Referral.InvitationPublicRead & {
     signup_form_id: string;
   };
+  client?: Platform.WEST.Referral.WestReferralClient;
 }) {
   const t = dictionary[locale];
   const { code, campaign, referrer_name: _referrer_name, is_claimed } = data;
@@ -138,8 +140,7 @@ export default function InvitationPageTemplate({
 
     const customer_id = submission.data.customer_id;
 
-    const client = new Platform.WEST.Referral.WestReferralClient(campaign.id);
-    const ok = await client.claim(code, customer_id);
+    const ok = await client?.claim?.(code, customer_id);
     if (ok) {
       toast.success(t.event_signup_success);
       router.replace(fixme_external_link);

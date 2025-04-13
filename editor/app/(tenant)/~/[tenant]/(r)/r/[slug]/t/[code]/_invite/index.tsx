@@ -8,9 +8,11 @@ import t from "./data-01.json";
 export default function ReferrerPage({
   slug,
   data,
+  client,
 }: {
   slug: string;
   data: Platform.WEST.Referral.ReferrerPublicRead;
+  client: Platform.WEST.Referral.WestReferralClient;
 }) {
   const { referrer_name: _referrer_name } = data;
   const referrer_name = _referrer_name || "?";
@@ -18,6 +20,7 @@ export default function ReferrerPage({
   return (
     <ReferrerPageTemplate
       slug={slug}
+      client={client}
       design={{
         logo: {
           src: "/logos/polestar.png",

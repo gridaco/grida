@@ -657,12 +657,15 @@ export namespace Platform.WEST.Referral {
   const _x_grida_west_token_code = "x-grida-west-token-code";
 
   export class WestReferralClient {
-    constructor(readonly campaign_id: string) {}
+    constructor(
+      readonly campaign_id: string,
+      readonly base_url: string = "/west"
+    ) {}
 
     read(code: string): Promise<{
       data: ReferrerPublicRead | InvitationPublicRead;
     }> {
-      return fetch(`/west/t`, {
+      return fetch(`${this.base_url}/t`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -673,7 +676,7 @@ export namespace Platform.WEST.Referral {
     }
 
     invite(code: string): Promise<{ data: Invitation }> {
-      return fetch(`/west/t/invite`, {
+      return fetch(`${this.base_url}/t/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -687,7 +690,7 @@ export namespace Platform.WEST.Referral {
       code: string,
       invitation_id: string
     ): Promise<{ data: Invitation }> {
-      return fetch(`/west/t/refresh`, {
+      return fetch(`${this.base_url}/t/refresh`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -699,7 +702,7 @@ export namespace Platform.WEST.Referral {
     }
 
     claim(code: string, owner_id: string) {
-      return fetch(`/west/t/claim`, {
+      return fetch(`${this.base_url}/t/claim`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -713,7 +716,7 @@ export namespace Platform.WEST.Referral {
     }
 
     track(code: string, name: string, data?: Record<string, string>) {
-      fetch(`/west/t/track`, {
+      fetch(`${this.base_url}/t/track`, {
         method: "POST",
         body: JSON.stringify({
           name: name,

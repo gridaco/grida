@@ -16,8 +16,10 @@ interface CampaignPublicData {
 
 export default function InvitationPage({
   data,
+  client,
 }: {
   data: Platform.WEST.Referral.InvitationPublicRead;
+  client: Platform.WEST.Referral.WestReferralClient;
 }) {
   const locale = "ko"; // FIXME:
   const { is_claimed, referrer_name: _referrer_name } = data;
@@ -91,6 +93,7 @@ export default function InvitationPage({
           ],
         }}
         visible={!open}
+        client={client}
       />
     </ScreenRoot>
   );

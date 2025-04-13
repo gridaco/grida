@@ -18,6 +18,7 @@ export default function RoutingPage({ params }: { params: Params }) {
   const { code, slug } = params;
   const campaign = useCampaignAgent();
   const client = useMemo(
+    // TODO: BASE_URL
     () => new Platform.WEST.Referral.WestReferralClient(campaign.id),
     [campaign.id]
   );
@@ -38,9 +39,8 @@ export default function RoutingPage({ params }: { params: Params }) {
   );
 
   useEffect(() => {
-    const client = new Platform.WEST.Referral.WestReferralClient(campaign.id);
     client.track(code, "page_view");
-  }, [code, campaign.id]);
+  }, [code, client]);
 
   console.log("campaign.id", campaign.id);
 
@@ -65,13 +65,13 @@ export default function RoutingPage({ params }: { params: Params }) {
     case "referrer":
       return (
         <ScreenWindowRoot>
-          <ReferrerPage slug={slug} data={data.data} />
+          <ReferrerPage slug={slug} data={data.data} client={client} />
         </ScreenWindowRoot>
       );
     case "invitation":
       return (
         <ScreenWindowRoot>
-          <InvitationPage data={data.data} />
+          <InvitationPage data={data.data} client={client} />
         </ScreenWindowRoot>
       );
 
