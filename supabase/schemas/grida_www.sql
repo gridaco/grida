@@ -168,33 +168,39 @@ CREATE POLICY "access_based_on_www_editor" ON grida_www.page USING (grida_www.rl
 ---------------------------------------------------------------------
 CREATE VIEW grida_www.routing_table_public AS
 SELECT
-  id,
-  www_id,
+  l.id,
+  l.www_id,
+  w.name AS www_name,
   'layout' AS type,
-  document_id,
-  document_type,
-  parent_layout_id AS layout_id,
-  (COALESCE(base_path, '') || '/' || name)::TEXT AS route_path,
-  version,
-  metadata
-FROM grida_www.layout
+  l.document_id,
+  l.document_type,
+  l.parent_layout_id AS layout_id,
+  (COALESCE(l.base_path, '') || '/' || l.name)::TEXT AS route_path,
+  l.version,
+  l.metadata
+FROM grida_www.layout l
+JOIN grida_www.www w ON w.id = l.www_id
+
   UNION ALL
+
 SELECT
-  id,
-  www_id,
+  p.id,
+  p.www_id,
+  w.name AS www_name,
   'page' AS type,
-  document_id,
-  document_type,
-  layout_id,
-  ( -- compute full path
+  p.document_id,
+  p.document_type,
+  p.layout_id,
+  (
     COALESCE(
-      (SELECT base_path FROM grida_www.layout l WHERE l.id = p.layout_id),
+      (SELECT base_path FROM grida_www.layout l2 WHERE l2.id = p.layout_id),
       ''
     ) || '/' || p.name
   )::TEXT AS route_path,
-  version,
-  metadata
-FROM grida_www.page p;
+  p.version,
+  p.metadata
+FROM grida_www.page p
+JOIN grida_www.www w ON w.id = p.www_id;
 
 
 ---------------------------------------------------------------------
