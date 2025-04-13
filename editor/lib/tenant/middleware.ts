@@ -7,19 +7,18 @@ export namespace TanantMiddleware {
   const EDITOR_DOMAIN = process.env.NEXT_PUBLIC_URL;
 
   export const analyze = function (
-    host: string,
+    url: URL,
     LOCALHOST = false
   ): {
     name: string | null;
     apex: string;
     domain: string;
   } {
-    const url = new URL(`http://${host}`);
-    const domain = url.hostname; // strips port if any
-    const parts = domain.split(".");
+    const hostname = url.hostname; // strips port if any
+    const parts = hostname.split(".");
 
     if (LOCALHOST) {
-      if (domain === "localhost") {
+      if (hostname === "localhost") {
         return {
           name: null,
           apex: "localhost",
@@ -29,12 +28,12 @@ export namespace TanantMiddleware {
         return {
           name: parts[0],
           apex: "localhost",
-          domain: domain,
+          domain: hostname,
         };
       }
     }
 
-    if (domain === EDITOR_DOMAIN) {
+    if (hostname === EDITOR_DOMAIN) {
       return {
         name: null,
         apex: EDITOR_DOMAIN,
@@ -48,7 +47,7 @@ export namespace TanantMiddleware {
     return {
       name: subdomain,
       apex: apex,
-      domain: domain,
+      domain: hostname,
     };
   };
 }

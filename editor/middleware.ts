@@ -51,10 +51,12 @@ export async function middleware(req: NextRequest) {
   // #endregion supabase
 
   // #region tanent
-  const tanentwww = TanantMiddleware.analyze(
-    req.headers.get("host") || "",
-    IS_DEV
-  );
+
+  const host = req.headers.get("host") || "";
+  const url = new URL(`https://${host}`);
+  const hostname = url.hostname;
+
+  const tanentwww = TanantMiddleware.analyze(url, IS_DEV);
 
   if (tanentwww.name) {
     const url = req.nextUrl.clone();
@@ -64,6 +66,14 @@ export async function middleware(req: NextRequest) {
       request: { headers: req.headers },
       status: res.status,
     });
+  }
+
+  // block direct access to the tanent layout
+  if (
+    hostname === (IS_DEV ? "localhost" : process.env.NEXT_PUBLIC_URL) &&
+    req.nextUrl.pathname.startsWith("/~/")
+  ) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
   // #endregion tanent
 
