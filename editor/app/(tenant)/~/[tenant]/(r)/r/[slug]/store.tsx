@@ -5,6 +5,7 @@ import React, { createContext, useContext } from "react";
 const CampaignAgentContext = createContext<{
   id: string;
   title: string;
+  description?: string | null;
 } | null>(null);
 
 export function CampaignAgentProvider({
@@ -15,6 +16,7 @@ export function CampaignAgentProvider({
   campaign: {
     id: string;
     title: string;
+    description?: string | null;
   };
 }) {
   return (

@@ -3,11 +3,14 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Platform } from "@/lib/platform";
 import { Smile } from "lucide-react";
 
 interface GeneralStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 export function GeneralStep({ data, updateData }: GeneralStepProps) {
@@ -33,18 +36,18 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
 
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="name">Campaign Name</Label>
+          <Label htmlFor="title">Campaign Title</Label>
           <Input
-            id="name"
+            id="title"
             placeholder="Spring 2025 Referral Program"
-            value={data.name}
+            value={data.title}
             autoComplete="off"
-            onChange={(e) => updateData({ name: e.target.value })}
+            onChange={(e) => updateData({ title: e.target.value })}
             maxLength={40}
             required
           />
           <p className="text-xs text-muted-foreground">
-            This name will be visible to your users.
+            This title will be visible to your users.
           </p>
         </div>
 
@@ -58,7 +61,7 @@ export function GeneralStep({ data, updateData }: GeneralStepProps) {
             rows={4}
           />
           <p className="text-xs text-muted-foreground">
-            This description is for internal use only.
+            This description is visible to your users.
           </p>
         </div>
       </div>

@@ -25,14 +25,17 @@ export default function NewCampaignPage() {
     })
       .then(async (res) => {
         if (res.ok) {
-          return res.json();
+          return res.json() as Promise<{
+            data: Platform.WEST.Referral.Campaign;
+            error: null;
+          }>;
         } else {
           throw new Error(res.statusText);
         }
       })
-      .then((new_campaign: Platform.WEST.Referral.Campaign) => {
+      .then(({ data }) => {
         router.replace(
-          `/${project.organization_name}/${project.name}/campaigns/${new_campaign.id}`
+          `/${project.organization_name}/${project.name}/campaigns/${data.id}`
         );
       })
       .catch((err) => {

@@ -51,9 +51,11 @@ export async function generateMetadata({
 
   const icons = Tenant.www.metadata.getFavicons(favicon, faviconDark);
 
+  const title = data.title || "Made with Grida";
+
   return {
     generator: "Grida",
-    title: data.title ?? "Made with Grida",
+    title: { default: title, template: `%s | ${title}` },
     description: data.description,
     icons: icons,
     openGraph: {

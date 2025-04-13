@@ -265,7 +265,3 @@ function MainChart({ data }: { data: AnalyzedData }) {
     </div>
   );
 }
-
-function TopParticipants() {
-  //
-}

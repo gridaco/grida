@@ -27,6 +27,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { AboutGridaWestCard } from "./about-west-card";
+import { notFound } from "next/navigation";
 type Params = { org: string; proj: string; campaign: string };
 
 export default async function CampaignLayout({
@@ -47,8 +48,7 @@ export default async function CampaignLayout({
     .single();
 
   if (error) {
-    console.error("error", error);
-    return <>something went wrong</>;
+    return notFound();
   }
 
   const base_url = `/${org}/${proj}/campaigns/${campaign_id}`;
