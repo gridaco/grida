@@ -42,8 +42,6 @@ export default function RoutingPage({ params }: { params: Params }) {
     client.track(code, "page_view");
   }, [code, client]);
 
-  console.log("campaign.id", campaign.id);
-
   if (error) {
     console.error("error", error);
     return notFound();

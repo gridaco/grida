@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextResponse, type NextRequest } from "next/server";
 
-const IS_DEV = process.env.NODE_ENV === "development";
+const IS_HOSTED = process.env.VERCEL === "1";
 
 type Params = {
   organization_id: number;
@@ -39,14 +39,14 @@ export async function GET(
 
   const request_path = path_tokens.join("/");
 
-  if (IS_DEV) {
+  if (IS_HOSTED) {
     return NextResponse.redirect(
-      `http://${www.name}.localhost:3000/${routing.route_path}/${request_path}`,
+      `https://${www.name}.grida.site/${routing.route_path}/${request_path}`,
       { status: 302 }
     );
   } else {
     return NextResponse.redirect(
-      `https://${www.name}.grida.site/${routing.route_path}/${request_path}`,
+      `http://${www.name}.localhost:3000/${routing.route_path}/${request_path}`,
       { status: 302 }
     );
   }

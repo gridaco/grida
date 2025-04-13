@@ -6,6 +6,7 @@ import { TanantMiddleware } from "./lib/tenant/middleware";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";
+const IS_HOSTED = process.env.VERCEL === "1";
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   console.warn(
@@ -56,7 +57,7 @@ export async function middleware(req: NextRequest) {
   const url = new URL(`https://${host}`);
   const hostname = url.hostname;
 
-  const tanentwww = TanantMiddleware.analyze(url, IS_DEV);
+  const tanentwww = TanantMiddleware.analyze(url, !IS_HOSTED);
 
   if (tanentwww.name) {
     const url = req.nextUrl.clone();
