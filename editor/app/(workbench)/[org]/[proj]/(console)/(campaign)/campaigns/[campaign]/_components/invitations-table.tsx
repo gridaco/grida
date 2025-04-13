@@ -21,14 +21,16 @@ import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
+import { useProject } from "@/scaffolds/workspace";
 import toast from "react-hot-toast";
 
 function ActionsCell({
   row,
 }: CellContext<Platform.WEST.Referral.Invitation, unknown>) {
-  const token = row.original;
+  const invitation = row.original;
 
   const campaign = useCampaign();
+  const project = useProject();
 
   return (
     <DropdownMenu>
@@ -43,7 +45,7 @@ function ActionsCell({
         <DropdownMenuItem
           onClick={() => {
             toast.success("Copied token ID to clipboard");
-            navigator.clipboard.writeText(token.id);
+            navigator.clipboard.writeText(invitation.id);
           }}
         >
           Copy ID
@@ -51,8 +53,8 @@ function ActionsCell({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            // FIXME: tenant url
-            open(`/r/${campaign.id}/t/${token.code}`, "_blank");
+            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${campaign.id}/default`;
+            open(baseurl + `/t/${invitation.code}`, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

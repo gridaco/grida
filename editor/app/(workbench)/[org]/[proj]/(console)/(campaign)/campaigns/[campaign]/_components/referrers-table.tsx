@@ -48,7 +48,6 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => {
-            // FIXME: tenant url
             const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${id}/default`;
             open(baseurl + `/t/${referrer.code}`, "_blank");
           }}

@@ -41,6 +41,7 @@ import { Platform } from "@/lib/platform";
 import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
+import { useProject } from "@/scaffolds/workspace";
 
 const QUESTNAME = "refer-a-friend"; // TODO:
 
@@ -83,6 +84,7 @@ export function QuestsTable() {
   const [expandedQuests, setExpandedQuests] = useState<string[]>([]);
 
   const { tokens } = useReferrerQuests(campaign.id);
+  const project = useProject();
 
   // FIXME:
   const max_invitations_per_referrer = 10;
@@ -260,11 +262,8 @@ export function QuestsTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => {
-                            open(
-                              // FIXME: tenant url
-                              `/r/${campaign.id}/t/${quest.code}`,
-                              "_blank"
-                            );
+                            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${campaign.id}/default`;
+                            open(baseurl + `/t/${quest.code}`, "_blank");
                           }}
                         >
                           <OpenInNewWindowIcon className="size-4 me-2" />
