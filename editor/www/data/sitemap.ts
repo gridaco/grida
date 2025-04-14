@@ -14,6 +14,7 @@ export namespace sitemap {
     toc: "/terms",
     forms: "/forms",
     canvas: "/canvas",
+    west: "/west",
     cookies: "/cookies-policy",
     signin: "/sign-in",
     cta: "/dashboard/new?plan=free",
@@ -52,6 +53,11 @@ export namespace sitemap {
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
+    } satisfies Item,
+    west: {
+      title: "West",
+      href: links.west,
+      description: "Welcome to West of referral marketing",
     } satisfies Item,
     figma_ci: {
       title: "Figma CI",

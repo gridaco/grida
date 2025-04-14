@@ -25,6 +25,7 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
+  sitemap.items.west,
   sitemap.items.forms,
   sitemap.items.database,
 ];
