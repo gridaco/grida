@@ -76,6 +76,7 @@ export async function POST(req: Request) {
       www_id: www.id,
       data: {},
       version: "1",
+      is_public: true,
     })
     .select()
     .single();

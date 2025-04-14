@@ -1,12 +1,12 @@
 import {
   createRouteHandlerWestReferralClient,
   createRouteHandlerWWWClient,
-  workspaceclient,
 } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampaignAgentProvider } from "./store";
+import { TenantLayoutProvider } from "@/scaffolds/tenant";
 
 type Params = {
   tenant: string;
@@ -89,11 +89,17 @@ export default async function Layout({
   children: React.ReactNode;
   params: Promise<Params>;
 }>) {
-  const { campaign } = await fetchCampaign({ params: await params });
+  const { route, campaign, template } = await fetchCampaign({
+    params: await params,
+  });
 
   return (
-    <CampaignAgentProvider campaign={campaign}>
-      {children}
-    </CampaignAgentProvider>
+    <TenantLayoutProvider
+      layout={{ id: route.id, template: template!, metadata: route.metadata }}
+    >
+      <CampaignAgentProvider campaign={campaign}>
+        {children}
+      </CampaignAgentProvider>
+    </TenantLayoutProvider>
   );
 }

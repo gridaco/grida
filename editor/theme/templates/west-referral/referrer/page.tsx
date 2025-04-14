@@ -168,7 +168,7 @@ const dictionary = {
 
 export interface Props {
   title: string;
-  description: string;
+  description?: string | null;
   brand_name: string;
   logo: {
     src: string;
@@ -184,8 +184,8 @@ export interface Props {
     src: string;
     alt?: string;
   };
-  cta: { text: string };
-  article: {
+  cta: string;
+  article?: {
     html: string;
   };
   footer: {
@@ -223,7 +223,8 @@ export default function ReferrerPageTemplate({
 
   const { max_invitations_per_referrer: max_supply } = campaign;
 
-  const available_count = (max_supply ?? 0) - (invitation_count ?? 0);
+  const is_unlimited = max_supply === null;
+  const available_count = (max_supply ?? Infinity) - (invitation_count ?? 0);
   const is_available = available_count > 0;
 
   const triggerShare = async () => {
@@ -299,37 +300,38 @@ export default function ReferrerPageTemplate({
                     </span>
                   </div>
                 </div>
-                <CardHeader className="px-4 py-4">
-                  <span className="text-xl font-bold">
-                    {available_count > 0 ? (
-                      <span>
-                        <NumberFlow
-                          value={available_count}
-                          suffix={t.tickets_remaining_suffix}
-                        />
-                        <span className="ms-1 text-xs text-muted-foreground font-normal">
-                          {template(t.tickets_remaining_description, {
-                            max_supply: max_supply?.toString() ?? "",
-                            invitation_count:
-                              invitation_count?.toString() ?? "",
-                          })}
+                {!is_unlimited && (
+                  <CardHeader className="px-4 py-4 border-b">
+                    <span className="text-xl font-bold">
+                      {available_count > 0 ? (
+                        <span>
+                          <NumberFlow
+                            value={available_count}
+                            suffix={t.tickets_remaining_suffix}
+                          />
+                          <span className="ms-1 text-xs text-muted-foreground font-normal">
+                            {template(t.tickets_remaining_description, {
+                              max_supply: max_supply?.toString() ?? "",
+                              invitation_count:
+                                invitation_count?.toString() ?? "",
+                            })}
+                          </span>
                         </span>
-                      </span>
-                    ) : (
-                      <span>
-                        {t.tickets_remaining_all_used}
-                        <span className="ms-1 text-xs text-muted-foreground font-normal">
-                          {template(t.tickets_remaining_description, {
-                            max_supply: max_supply?.toString() ?? "",
-                            invitation_count:
-                              invitation_count?.toString() ?? "",
-                          })}
+                      ) : (
+                        <span>
+                          {t.tickets_remaining_all_used}
+                          <span className="ms-1 text-xs text-muted-foreground font-normal">
+                            {template(t.tickets_remaining_description, {
+                              max_supply: max_supply?.toString() ?? "",
+                              invitation_count:
+                                invitation_count?.toString() ?? "",
+                            })}
+                          </span>
                         </span>
-                      </span>
-                    )}
-                  </span>
-                </CardHeader>
-                <hr />
+                      )}
+                    </span>
+                  </CardHeader>
+                )}
                 <CardContent className="px-4 py-4">
                   <p className="text-sm text-muted-foreground">
                     {template(t.invite_description, {
@@ -345,7 +347,7 @@ export default function ReferrerPageTemplate({
                       className="w-full"
                       size="lg"
                     >
-                      {design.cta.text}
+                      {design.cta}
                     </Button>
                   </CardFooter>
                 )}
@@ -436,11 +438,13 @@ export default function ReferrerPageTemplate({
                 {t.about_event}
               </header>
 
-              <article className="prose prose-sm dark:prose-invert">
-                <span
-                  dangerouslySetInnerHTML={{ __html: design.article?.html }}
-                />
-              </article>
+              {design.article && (
+                <article className="prose prose-sm dark:prose-invert">
+                  <span
+                    dangerouslySetInnerHTML={{ __html: design.article.html }}
+                  />
+                </article>
+              )}
             </Standard.Section>
             <Standard.FooterTemplate
               logo={design.favicon}

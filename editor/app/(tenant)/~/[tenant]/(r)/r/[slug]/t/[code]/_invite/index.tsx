@@ -4,13 +4,16 @@ import React from "react";
 import { Platform } from "@/lib/platform";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 import t from "./data-01.json";
+import { TemplateData__West_Referrral__Duo_001 } from "@/theme/templates/west-referral/templates";
 
 export default function ReferrerPage({
   slug,
   data,
   client,
+  template,
 }: {
   slug: string;
+  template: TemplateData__West_Referrral__Duo_001["components"]["referrer"];
   data: Platform.WEST.Referral.ReferrerPublicRead;
   client: Platform.WEST.Referral.WestReferralClient;
 }) {
@@ -27,16 +30,14 @@ export default function ReferrerPage({
           srcDark: "/logos/polestar-dark.png",
         },
         brand_name: "Polestar",
-        title: "시승 초대 하고 경품 받기",
-        description: `${referrer_name} 고객님의 Polestar 4 시승 추천 페이지입니다.`,
+        title: template?.title ?? data.campaign.title,
+        description: template?.description ?? data.campaign.description,
         favicon: {
           src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
           srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
         },
-        article: { html: t.info },
-        cta: {
-          text: t.cta.label,
-        },
+        article: template?.article,
+        cta: template?.cta ?? "Invite",
         image: t.hero.media,
         footer: {
           link_privacy: "/privacy",

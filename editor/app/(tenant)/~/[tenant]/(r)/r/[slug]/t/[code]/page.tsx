@@ -8,6 +8,8 @@ import ReferrerPage from "./_invite";
 import InvitationPage from "./_join";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCampaignAgent } from "../../store";
+import { useLayout } from "@/scaffolds/tenant";
+import { TemplateData__West_Referrral__Duo_001 } from "@/theme/templates/west-referral/templates";
 
 type Params = {
   code: string;
@@ -16,6 +18,7 @@ type Params = {
 
 export default function RoutingPage({ params }: { params: Params }) {
   const { code, slug } = params;
+  const { template } = useLayout();
   const campaign = useCampaignAgent();
   const client = useMemo(
     // TODO: BASE_URL
@@ -63,13 +66,28 @@ export default function RoutingPage({ params }: { params: Params }) {
     case "referrer":
       return (
         <ScreenWindowRoot>
-          <ReferrerPage slug={slug} data={data.data} client={client} />
+          <ReferrerPage
+            slug={slug}
+            data={data.data}
+            client={client}
+            template={
+              (template.data as TemplateData__West_Referrral__Duo_001)
+                .components.referrer
+            }
+          />
         </ScreenWindowRoot>
       );
     case "invitation":
       return (
         <ScreenWindowRoot>
-          <InvitationPage data={data.data} client={client} />
+          <InvitationPage
+            data={data.data}
+            client={client}
+            templates={
+              (template.data as TemplateData__West_Referrral__Duo_001)
+                .components
+            }
+          />
         </ScreenWindowRoot>
       );
 

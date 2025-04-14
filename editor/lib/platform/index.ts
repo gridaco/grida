@@ -546,7 +546,6 @@ export namespace Platform.CustomerAuthPolicy {
 }
 
 export namespace Platform.WEST.Referral {
-  export const TEST_CODE = "test_00000000";
   export const TEST_CODE_REFERRER = "test_referrer";
   export const TEST_CODE_INVITATION = "test_invitation";
 
@@ -634,7 +633,6 @@ export namespace Platform.WEST.Referral {
     code: string | null;
     referrer_name: string | null;
     campaign: CampaignPublic;
-    created_at: string;
     invitation_count: number;
     invitations: {
       id: string;

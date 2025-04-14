@@ -6,9 +6,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Platform } from "@/lib/platform";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-
-const article =
-  "<h2>🏆 Polestar 4 시승 추천 하고 경품 받아게세요</h2><ul><li>1인 당 중복 신청은 불가합니다.</li><li>시승 초대를 한 고객과, 초대 링크를 통해 시승 신청을 한 고객 모두에게 경품을 드립니다.</li><li>무료 시승입니다.</li><li>시승 전 약 15분의 차량 설명 시간이 있습니다.</li></ul><h6>이벤트 FAQ</h6><ul><li>시승이 완료된 후 경품이 지급됩니다.</li><li>시승 신청자 본인에 한하여 시승 가능하며, 타인에게 양도할 수 없습니다.</li><li>운전면허 소지자 중 만 21세 이상 및 실제 도로 주행 경력 2년 이상의 분들만 참여 가능합니다.</li><li>차량 시승 기간 중 총 주행 가능 거리는 300Km로 제한됩니다.</li><li>시승 기간 중 발생한 통행료, 과태료, 범칙금은 시승 고객 본인 부담입니다.</li><li>시승 신청자에게 휴대폰 문자로 상세 안내 예정입니다.</li></ul>";
+import { TemplateData__West_Referrral__Duo_001 } from "@/theme/templates/west-referral/templates";
 
 interface CampaignPublicData {
   "signup-form-id": string;
@@ -17,9 +15,14 @@ interface CampaignPublicData {
 export default function InvitationPage({
   data,
   client,
+  templates,
 }: {
   data: Platform.WEST.Referral.InvitationPublicRead;
   client: Platform.WEST.Referral.WestReferralClient;
+  templates: {
+    invitation?: TemplateData__West_Referrral__Duo_001["components"]["invitation"];
+    ["invitation-ux-overlay"]?: TemplateData__West_Referrral__Duo_001["components"]["invitation-ux-overlay"];
+  };
 }) {
   const locale = "ko"; // FIXME:
   const { is_claimed, referrer_name: _referrer_name } = data;
@@ -69,7 +72,7 @@ export default function InvitationPage({
             src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
             srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
           },
-          article: { html: article },
+          article: templates.invitation?.article,
           cta: {
             text: "시승 신청하기",
           },

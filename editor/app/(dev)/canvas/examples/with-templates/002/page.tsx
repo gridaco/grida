@@ -264,9 +264,7 @@ function CustomComponent__Referrer(componentprops: any) {
             srcDark: "https://www.apple.com/favicon.ico",
           },
           article: componentprops.props.article,
-          cta: {
-            text: "Join Now",
-          },
+          cta: "Join Now",
           image: {
             src: componentprops.props.image,
             alt: "Example Image",
@@ -298,7 +296,6 @@ function CustomComponent__Referrer(componentprops: any) {
             scheduling_tz: null,
           },
           code: "dummy",
-          created_at: "2025-10-01T00:00:00Z",
           invitation_count: 0,
           invitations: [],
           type: "referrer",

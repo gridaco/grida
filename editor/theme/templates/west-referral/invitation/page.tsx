@@ -89,7 +89,7 @@ type Props = {
     src: string;
     srcDark?: string;
   };
-  article: {
+  article?: {
     html: string;
   };
   cta: {
@@ -287,11 +287,13 @@ export default function InvitationPageTemplate({
             <header className="border-b py-2 my-4 text-sm text-muted-foreground">
               {t.about_event}
             </header>
-            <article className="prose prose-sm dark:prose-invert">
-              <span
-                dangerouslySetInnerHTML={{ __html: design.article?.html }}
-              />
-            </article>
+            {design.article && (
+              <article className="prose prose-sm dark:prose-invert">
+                <span
+                  dangerouslySetInnerHTML={{ __html: design.article.html }}
+                />
+              </article>
+            )}
           </Standard.Section>
           <Standard.FooterTemplate
             logo={{
