@@ -29,7 +29,7 @@ export async function GET(
   if (www_err) return notFound();
 
   const { data: routing, error: routing_err } = await client
-    .from("routing_table_public")
+    .from("public_route")
     .select()
     .eq("www_id", www.id)
     .eq("document_id", docid)

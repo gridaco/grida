@@ -86,6 +86,24 @@ FROM grida_www.www;
 
 
 ---------------------------------------------------------------------
+-- [Template] -- “template” = A renderable, versionable structure of layout + content.
+---------------------------------------------------------------------
+CREATE TABLE grida_www.template (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
+  version TEXT NOT NULL,
+  data JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  is_public BOOLEAN DEFAULT false,
+  is_draft BOOLEAN DEFAULT true
+);
+
+ALTER TABLE grida_www.template ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "access_based_on_www_editor" ON grida_www.template USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
+CREATE POLICY "public_read_if_public" ON grida_www.template FOR SELECT TO public USING (is_public = true);
+
+
+---------------------------------------------------------------------
 -- [www layout] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_www.layout (
@@ -97,9 +115,8 @@ CREATE TABLE grida_www.layout (
     document_id UUID NOT NULL,
     document_type public.doctype NOT NULL,
     path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
-    template JSONB,
     metadata JSONB,
-    version TEXT NULL,
+    template_id UUID NOT NULL REFERENCES grida_www.template(id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(www_id, base_path, name),
@@ -110,34 +127,11 @@ CREATE TABLE grida_www.layout (
 ALTER TABLE grida_www.layout ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_www_editor" ON grida_www.layout USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
 
----------------------------------------------------------------------
--- [www page] --
----------------------------------------------------------------------
-CREATE TABLE grida_www.page (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    www_id UUID NOT NULL REFERENCES grida_www.www(id) ON DELETE CASCADE,
-    layout_id UUID NULL REFERENCES grida_www.layout(id) ON DELETE CASCADE,
-    name grida_www.sub_path NOT NULL, -- e.g. '[slug]', 'guides', etc
-    document_id UUID NOT NULL,
-    document_type public.doctype NOT NULL,
-    path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/'::text)) STORED,
-    body JSONB NOT NULL,
-    metadata JSONB,
-    version TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(www_id, layout_id, name),
-
-    CONSTRAINT page_id_document_id_key UNIQUE (id, document_id),
-    CONSTRAINT fk_page_document FOREIGN KEY (document_id, document_type) REFERENCES public.document(id, doctype) ON DELETE CASCADE
-);
-ALTER TABLE grida_www.page ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "access_based_on_www_editor" ON grida_www.page USING (grida_www.rls_www(www_id)) WITH CHECK (grida_www.rls_www(www_id));
 
 ---------------------------------------------------------------------
--- [Routing Table] --
+-- [Public Routing Table] --
 ---------------------------------------------------------------------
-CREATE VIEW grida_www.routing_table_public AS
+CREATE VIEW grida_www.public_route AS
 SELECT
   l.id,
   l.www_id,
@@ -145,33 +139,12 @@ SELECT
   'layout' AS type,
   l.document_id,
   l.document_type,
-  l.parent_layout_id AS layout_id,
+  l.parent_layout_id,
   (COALESCE(l.base_path, '') || '/' || l.name)::TEXT AS route_path,
-  l.version,
+  l.template_id,
   l.metadata
 FROM grida_www.layout l
-JOIN grida_www.www w ON w.id = l.www_id
-
-  UNION ALL
-
-SELECT
-  p.id,
-  p.www_id,
-  w.name AS www_name,
-  'page' AS type,
-  p.document_id,
-  p.document_type,
-  p.layout_id,
-  (
-    COALESCE(
-      (SELECT base_path FROM grida_www.layout l2 WHERE l2.id = p.layout_id),
-      ''
-    ) || '/' || p.name
-  )::TEXT AS route_path,
-  p.version,
-  p.metadata
-FROM grida_www.page p
-JOIN grida_www.www w ON w.id = p.www_id;
+JOIN grida_www.www w ON w.id = l.www_id;
 
 
 ---------------------------------------------------------------------

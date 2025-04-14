@@ -2966,9 +2966,8 @@ export type Database = {
           name: string
           parent_layout_id: string | null
           path_tokens: string[] | null
-          template: Json | null
+          template_id: string
           updated_at: string
-          version: string | null
           www_id: string
         }
         Insert: {
@@ -2981,9 +2980,8 @@ export type Database = {
           name: string
           parent_layout_id?: string | null
           path_tokens?: string[] | null
-          template?: Json | null
+          template_id: string
           updated_at?: string
-          version?: string | null
           www_id: string
         }
         Update: {
@@ -2996,9 +2994,8 @@ export type Database = {
           name?: string
           parent_layout_id?: string | null
           path_tokens?: string[] | null
-          template?: Json | null
+          template_id?: string
           updated_at?: string
-          version?: string | null
           www_id?: string
         }
         Relationships: [
@@ -3007,6 +3004,20 @@ export type Database = {
             columns: ["parent_layout_id"]
             isOneToOne: false
             referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "public_route"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "template"
             referencedColumns: ["id"]
           },
           {
@@ -3025,66 +3036,44 @@ export type Database = {
           },
         ]
       }
-      page: {
+      template: {
         Row: {
-          body: Json
-          created_at: string
-          document_id: string
-          document_type: Database["public"]["Enums"]["doctype"]
+          created_at: string | null
+          data: Json
           id: string
-          layout_id: string | null
-          metadata: Json | null
-          name: string
-          path_tokens: string[] | null
-          updated_at: string
-          version: string | null
+          is_draft: boolean | null
+          is_public: boolean | null
+          version: string
           www_id: string
         }
         Insert: {
-          body: Json
-          created_at?: string
-          document_id: string
-          document_type: Database["public"]["Enums"]["doctype"]
+          created_at?: string | null
+          data: Json
           id?: string
-          layout_id?: string | null
-          metadata?: Json | null
-          name: string
-          path_tokens?: string[] | null
-          updated_at?: string
-          version?: string | null
+          is_draft?: boolean | null
+          is_public?: boolean | null
+          version: string
           www_id: string
         }
         Update: {
-          body?: Json
-          created_at?: string
-          document_id?: string
-          document_type?: Database["public"]["Enums"]["doctype"]
+          created_at?: string | null
+          data?: Json
           id?: string
-          layout_id?: string | null
-          metadata?: Json | null
-          name?: string
-          path_tokens?: string[] | null
-          updated_at?: string
-          version?: string | null
+          is_draft?: boolean | null
+          is_public?: boolean | null
+          version?: string
           www_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "page_layout_id_fkey"
-            columns: ["layout_id"]
-            isOneToOne: false
-            referencedRelation: "layout"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "page_www_id_fkey"
+            foreignKeyName: "template_www_id_fkey"
             columns: ["www_id"]
             isOneToOne: false
             referencedRelation: "www"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "page_www_id_fkey"
+            foreignKeyName: "template_www_id_fkey"
             columns: ["www_id"]
             isOneToOne: false
             referencedRelation: "www_public"
@@ -3133,19 +3122,56 @@ export type Database = {
       }
     }
     Views: {
-      routing_table_public: {
+      public_route: {
         Row: {
           document_id: string | null
           document_type: Database["public"]["Enums"]["doctype"] | null
           id: string | null
-          layout_id: string | null
           metadata: Json | null
+          parent_layout_id: string | null
           route_path: string | null
+          template_id: string | null
           type: string | null
-          version: string | null
           www_id: string | null
+          www_name: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "public_route"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "template"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       www_public: {
         Row: {
@@ -4420,14 +4446,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4447,24 +4473,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4475,6 +4483,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4489,7 +4515,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

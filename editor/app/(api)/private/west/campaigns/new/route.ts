@@ -69,10 +69,27 @@ export async function POST(req: Request) {
     return new NextResponse("failed to create campaign doc", { status: 500 });
   }
 
-  // step www-1. create default www layout for the campaign
+  // step www-1. create default template for the campaign
+  const { data: template, error: template_err } = await wwwclient
+    .from("template")
+    .insert({
+      www_id: www.id,
+      data: {},
+      version: "1",
+    })
+    .select()
+    .single();
+
+  if (template_err) {
+    console.error("err@template", template_err, "for www", www.id);
+    return new NextResponse("failed to create campaign doc", { status: 500 });
+  }
+
+  // step www-2. create default www layout for the campaign
   const { data: layout, error: layout_err } = await wwwclient
     .from("layout")
     .insert({
+      template_id: template.id,
       name: nanoid(8), // slug
       base_path: "/r",
       document_id: base_doc.id,

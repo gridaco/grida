@@ -45,8 +45,8 @@ export type Database = MergeDeep<
             favicon: SystemSchema_Favicon | null;
           };
         };
-        routing_table_public: {
-          Row: DatabaseGenerated["grida_www"]["Views"]["routing_table_public"]["Row"] & {
+        public_route: {
+          Row: DatabaseGenerated["grida_www"]["Views"]["public_route"]["Row"] & {
             id: string;
             type: "page" | "layout";
             route_path: string;

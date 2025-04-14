@@ -7,7 +7,6 @@ import { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampaignAgentProvider } from "./store";
-import { Tenant } from "@/lib/tenant";
 
 type Params = {
   tenant: string;
@@ -24,8 +23,13 @@ async function fetchCampaign({ params }: { params: Params }) {
   // TODO: optimize query
 
   const { data: routing, error: routing_err } = await routing_client
-    .from("routing_table_public")
-    .select()
+    .from("public_route")
+    .select(
+      `
+        *,
+        template(*)
+      `
+    )
     .eq("route_path", route_path)
     .eq("document_type", "v0_campaign_referral")
     .single();
@@ -35,7 +39,7 @@ async function fetchCampaign({ params }: { params: Params }) {
     return notFound();
   }
 
-  const { document_id, document_type } = routing;
+  const { document_id, template, ...route } = routing;
 
   const { data: campaign, error: campaign_err } = await west_client
     .from("campaign_public")
@@ -49,7 +53,8 @@ async function fetchCampaign({ params }: { params: Params }) {
   }
 
   return {
-    routing,
+    route,
+    template,
     campaign,
   };
 }

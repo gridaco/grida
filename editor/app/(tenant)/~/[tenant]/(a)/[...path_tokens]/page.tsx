@@ -13,7 +13,7 @@ export default async function APage({ params }: { params: Promise<Params> }) {
   const client = createRouteHandlerWWWClient(cookieStore);
 
   const { data, error } = await client
-    .from("routing_table_public")
+    .from("public_route")
     .select()
     .eq("route_path", name)
     .single();
