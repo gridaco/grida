@@ -21,7 +21,7 @@ import {
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
 } from "@/grida-react-canvas/renderer";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Selection,
   Zoom,
@@ -33,7 +33,70 @@ import {
   PreviewButton,
   PreviewProvider,
 } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import { useCampaign } from "../store";
+import { Platform } from "@/lib/platform";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import Image from "next/image";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDownIcon, Share2Icon } from "@radix-ui/react-icons";
+
+export default function CampaignDesignerPage() {
+  useDisableSwipeBack();
+  return (
+    <main className="w-full h-full flex relative bg-background">
+      {/* <PlainEditor /> */}
+      <_Canvas_PageEditor />
+    </main>
+  );
+}
+
+function Preview() {
+  return (
+    <div role="group" className="inline-flex rounded-md shadow-sm">
+      <Link href={""} target="_blank">
+        <button
+          type="button"
+          className={cn(
+            "h-7 inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
+            "gap-2"
+          )}
+          title="Preview"
+        >
+          Preview
+        </button>
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="h-7 inline-flex items-center px-2 py-2 text-sm font-medium border-t border-b border-r rounded-e-lg focus:z-10 focus:ring-2"
+          >
+            <ChevronDownIcon />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <Link href={""}>
+            <DropdownMenuItem>
+              <Share2Icon className="me-2 align-middle" />
+              Share
+            </DropdownMenuItem>
+          </Link>
+          <Link href={""}>Configure Agent</Link>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -208,16 +271,7 @@ const document: IDocumentEditorInit = {
   },
 };
 
-export default function CampaignDesignerPage() {
-  useDisableSwipeBack();
-  return (
-    <main className="w-full h-full flex relative bg-background">
-      <PageEditor />
-    </main>
-  );
-}
-
-function PageEditor() {
+function _Canvas_PageEditor() {
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
     initDocumentEditorState(document)
@@ -242,9 +296,10 @@ function PageEditor() {
               {/* <Navigation /> */}
               <Tabs value={state.scene_id} onValueChange={switchPage}>
                 <TabsList>
-                  <TabsTrigger value="general">General</TabsTrigger>
                   <TabsTrigger value="invite">{"Referrer's Page"}</TabsTrigger>
                   <TabsTrigger value="join">Invitation Page</TabsTrigger>
+                  {/* <TabsTrigger value="general">General</TabsTrigger> */}
+                  {/* <TabsTrigger value="message">Messages</TabsTrigger> */}
                 </TabsList>
               </Tabs>
             </header>
@@ -308,6 +363,8 @@ function PageEditor() {
 }
 
 function CustomComponent__Referrer(componentprops: any) {
+  const campaign = useCampaign();
+
   return (
     <div
       className="rounded shadow border"
@@ -349,8 +406,8 @@ function CustomComponent__Referrer(componentprops: any) {
         slug="dummy"
         data={{
           campaign: {
-            id: "dummy",
-            title: "DUMMY",
+            id: campaign.id,
+            title: campaign.title,
             description: null,
             enabled: true,
             max_invitations_per_referrer: 10,
@@ -363,7 +420,7 @@ function CustomComponent__Referrer(componentprops: any) {
             scheduling_open_at: null,
             scheduling_tz: null,
           },
-          code: "dummy",
+          code: Platform.WEST.Referral.TEST_CODE_REFERRER,
           created_at: "2025-10-01T00:00:00Z",
           invitation_count: 0,
           invitations: [],
@@ -377,6 +434,8 @@ function CustomComponent__Referrer(componentprops: any) {
 }
 
 function CustomComponent__Join_Main(componentprops: any) {
+  const campaign = useCampaign();
+
   return (
     <div
       className="rounded shadow border"
@@ -420,13 +479,13 @@ function CustomComponent__Join_Main(componentprops: any) {
           referrer_id: "dummy",
           referrer_name: "DUMMY",
           is_claimed: false,
-          code: "dummy",
+          code: Platform.WEST.Referral.TEST_CODE_INVITATION,
           created_at: "2025-10-01T00:00:00Z",
           type: "invitation",
           id: "123",
           campaign: {
-            id: "dummy",
-            title: "DUMMY",
+            id: campaign.id,
+            title: campaign.title,
             description: null,
             enabled: true,
             max_invitations_per_referrer: 10,

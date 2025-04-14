@@ -13,9 +13,15 @@ import { SheetContent } from "@/components/ui/sheet-without-overlay";
 import { Pencil2Icon } from "@radix-ui/react-icons";
 
 export function RichTextControl({
+  title,
+  description,
+  placeholder,
   value = { html: "" },
   onValueChange,
 }: {
+  title?: string;
+  description?: string;
+  placeholder?: string;
   value?: { html: string };
   onValueChange?: (value: { html: string }) => void;
 }) {
@@ -27,14 +33,16 @@ export function RichTextControl({
           Edit
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Rich Text</SheetTitle>
-          <SheetDescription>Edit the rich text content.</SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <div className="h-full">
           <CMSRichText
             value={value.html}
+            placeholder={placeholder}
+            // uploader={() => {}} // TODO:
             onValueChange={(html) => {
               onValueChange?.({ html });
             }}

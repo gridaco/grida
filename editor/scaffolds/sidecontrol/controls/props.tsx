@@ -27,9 +27,9 @@ export function PropsControl({
 
         return (
           <PropertyLine key={key}>
-            <PropertyLineLabel>{key}</PropertyLineLabel>
+            <PropertyLineLabel>{def.title ?? key}</PropertyLineLabel>
             <PropControl
-              placeholder={key}
+              placeholder={def.description ?? def.title ?? key}
               property={def}
               value={value}
               onValueChange={(value) => {
@@ -71,6 +71,8 @@ export function PropControl({
     case "richtext": {
       return (
         <RichTextControl
+          title={property.title}
+          description={property.description}
           value={value as { html: string }}
           onValueChange={onValueChange}
         />

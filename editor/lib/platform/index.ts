@@ -546,6 +546,10 @@ export namespace Platform.CustomerAuthPolicy {
 }
 
 export namespace Platform.WEST.Referral {
+  export const TEST_CODE = "test_00000000";
+  export const TEST_CODE_REFERRER = "test_referrer";
+  export const TEST_CODE_INVITATION = "test_invitation";
+
   export type TokenRole = "referrer" | "invitation";
 
   export interface ImportParticipantsRequestBody {
