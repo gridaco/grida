@@ -21,13 +21,10 @@ export async function GET(request: NextRequest) {
   }
 
   // return
-
-  if (redirect_uri) {
-    return NextResponse.redirect(redirect_uri);
-  }
-
-  if (next) {
-    return NextResponse.redirect(resolve_next(requestUrl.origin, next));
+  if (redirect_uri || next) {
+    return NextResponse.redirect(
+      resolve_next(requestUrl.origin, redirect_uri || next)
+    );
   }
 
   // URL to redirect to after sign in process completes
