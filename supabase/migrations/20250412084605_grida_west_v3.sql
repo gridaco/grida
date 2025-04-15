@@ -188,8 +188,6 @@ SELECT
   id,
   title,
   description,
-  invitation_email_template,
-  invitation_share_template,
   layout_id,
   enabled,
   max_invitations_per_referrer,

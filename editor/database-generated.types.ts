@@ -2705,8 +2705,6 @@ export type Database = {
           description: string | null
           enabled: boolean | null
           id: string | null
-          invitation_email_template: Json | null
-          invitation_share_template: Json | null
           layout_id: string | null
           max_invitations_per_referrer: number | null
           public: Json | null
@@ -2720,8 +2718,6 @@ export type Database = {
           description?: string | null
           enabled?: boolean | null
           id?: string | null
-          invitation_email_template?: Json | null
-          invitation_share_template?: Json | null
           layout_id?: string | null
           max_invitations_per_referrer?: number | null
           public?: Json | null
@@ -2735,8 +2731,6 @@ export type Database = {
           description?: string | null
           enabled?: boolean | null
           id?: string | null
-          invitation_email_template?: Json | null
-          invitation_share_template?: Json | null
           layout_id?: string | null
           max_invitations_per_referrer?: number | null
           public?: Json | null
