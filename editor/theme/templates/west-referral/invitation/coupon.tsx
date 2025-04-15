@@ -18,7 +18,7 @@ const dictionary = {
 };
 
 export interface Props {
-  logo: {
+  logo?: {
     src: string;
     srcDark?: string;
     width?: number;
@@ -48,14 +48,16 @@ export default function InvitationCouponTemplate({
   return (
     <main className="w-full h-full flex flex-col items-center justify-center">
       <Standard.Header className="absolute top-0 z-10">
-        <Standard.Logo
-          src={design.logo.src}
-          srcDark={design.logo.srcDark}
-          alt="logo"
-          width={320}
-          height={64}
-          className="max-h-8 w-auto object-contain"
-        />
+        {design.logo && (
+          <Standard.Logo
+            src={design.logo.src}
+            srcDark={design.logo.srcDark}
+            alt="logo"
+            width={320}
+            height={64}
+            className="max-h-8 w-auto object-contain"
+          />
+        )}
       </Standard.Header>
 
       <section className="flex flex-col gap-4 items-center justify-center px-4 mt-10">

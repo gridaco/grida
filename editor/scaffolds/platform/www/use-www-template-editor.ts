@@ -15,16 +15,20 @@ export interface WWWTemplateEditorInstance<T extends Record<string, any>> {
   error: Error | null;
 }
 
+type WWWTemplate<T = any> = {
+  id: string;
+  data: T;
+  is_public: boolean;
+  is_draft: boolean;
+  www_id: string;
+};
+
 export function useWWWTemplate<T extends Record<string, any>>(
   id: string
 ): WWWTemplateEditorInstance<T> {
   const client = useMemo(() => createClientWWWClient(), []);
 
-  const [__template, setTemplate] = useState<{
-    www_id: string;
-    is_public: boolean;
-    is_draft: boolean;
-  } | null>(null);
+  const [__template, setTemplate] = useState<WWWTemplate<T> | null>(null);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,7 +46,7 @@ export function useWWWTemplate<T extends Record<string, any>>(
     if (error) {
       setError(error);
     } else {
-      setTemplate(result);
+      setTemplate(result satisfies WWWTemplate<any> as WWWTemplate<T>);
       setData(result.data as T);
     }
 

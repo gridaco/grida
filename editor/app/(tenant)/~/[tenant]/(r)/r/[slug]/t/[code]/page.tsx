@@ -4,12 +4,12 @@ import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 import useSWR from "swr";
 import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
-import ReferrerPage from "./_invite";
-import InvitationPage from "./_join";
+import ReferrerPage from "./_components/referrer";
+import InvitationPage from "./_components/invitation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCampaignAgent } from "../../store";
 import { useLayout } from "@/scaffolds/tenant";
-import { TemplateData__West_Referrral__Duo_001 } from "@/theme/templates/west-referral/templates";
+import { TemplateData } from "@/theme/templates/west-referral/templates";
 
 type Params = {
   code: string;
@@ -68,11 +68,11 @@ export default function RoutingPage({ params }: { params: Params }) {
         <ScreenWindowRoot>
           <ReferrerPage
             slug={slug}
-            data={data.data}
+            context={data.data}
             client={client}
             template={
-              (template.data as TemplateData__West_Referrral__Duo_001)
-                .components.referrer
+              (template.data as TemplateData.West_Referrral__Duo_001).components
+                .referrer
             }
           />
         </ScreenWindowRoot>
@@ -81,11 +81,10 @@ export default function RoutingPage({ params }: { params: Params }) {
       return (
         <ScreenWindowRoot>
           <InvitationPage
-            data={data.data}
+            context={data.data}
             client={client}
             templates={
-              (template.data as TemplateData__West_Referrral__Duo_001)
-                .components
+              (template.data as TemplateData.West_Referrral__Duo_001).components
             }
           />
         </ScreenWindowRoot>

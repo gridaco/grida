@@ -6,26 +6,26 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Platform } from "@/lib/platform";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-import { TemplateData__West_Referrral__Duo_001 } from "@/theme/templates/west-referral/templates";
+import { TemplateData } from "@/theme/templates/west-referral/templates";
 
 interface CampaignPublicData {
   "signup-form-id": string;
 }
 
 export default function InvitationPage({
-  data,
+  context,
   client,
   templates,
 }: {
-  data: Platform.WEST.Referral.InvitationPublicRead;
+  context: Platform.WEST.Referral.InvitationPublicRead;
   client: Platform.WEST.Referral.WestReferralClient;
   templates: {
-    invitation?: TemplateData__West_Referrral__Duo_001["components"]["invitation"];
-    ["invitation-ux-overlay"]?: TemplateData__West_Referrral__Duo_001["components"]["invitation-ux-overlay"];
+    invitation?: TemplateData.West_Referrral__Duo_001["components"]["invitation"];
+    ["invitation-ux-overlay"]?: TemplateData.West_Referrral__Duo_001["components"]["invitation-ux-overlay"];
   };
 }) {
   const locale = "ko"; // FIXME:
-  const { is_claimed, referrer_name: _referrer_name } = data;
+  const { is_claimed, referrer_name: _referrer_name } = context;
   const referrer_name = _referrer_name || "?";
   const is_first_time = !is_claimed;
   const [open, setOpen] = React.useState(is_first_time);
@@ -43,15 +43,14 @@ export default function InvitationPage({
             </DialogPrimitive.Description>
             <InvitationCouponTemplate
               locale={locale}
-              data={{ referrer_name: data.referrer_name }}
+              data={{ referrer_name: context.referrer_name }}
               design={{
-                logo: {
-                  src: "/logos/polestar.png",
-                  srcDark: "/logos/polestar-dark.png",
-                },
-                coupon: {
-                  src: "/mock/coupons/coupon-05.png",
-                  alt: "invitation",
+                // logo: {
+                //   src: "/logos/polestar.png",
+                //   srcDark: "/logos/polestar-dark.png",
+                // },
+                coupon: templates["invitation-ux-overlay"]?.image ?? {
+                  src: "",
                 },
               }}
               onComplete={() => setOpen?.(false)}
@@ -61,24 +60,20 @@ export default function InvitationPage({
       </DialogPrimitive.Root>
       <InvitationPageTemplate
         design={{
-          logo: {
-            src: "/logos/polestar.png",
-            srcDark: "/logos/polestar-dark.png",
-          },
-          brand_name: "Polestar",
-          title: "Polestar 4 시승 하고 경품을 받아보세요",
-          description: `${referrer_name} 님 께서 Polestar 4 를 추천 했습니다.`,
+          // logo: {
+          //   src: "/logos/polestar.png",
+          //   srcDark: "/logos/polestar-dark.png",
+          // },
           favicon: {
             src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
             srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
           },
+          brand_name: "Polestar",
+          title: templates.invitation?.title ?? context.campaign.title,
+          description: templates.invitation?.description,
           article: templates.invitation?.article,
-          cta: {
-            text: "시승 신청하기",
-          },
-          image: {
-            src: "https://www.polestar.com/dato-assets/11286/1725964311-pak_home_image-card_pc.jpeg?q=35&dpr=2&w=542",
-          },
+          cta: templates.invitation?.cta ?? "Join Now",
+          image: templates.invitation?.image ?? { src: "" },
           footer: {
             link_privacy: "/privacy",
             link_instagram: "https://www.instagram.com/polestarcars/",
@@ -89,11 +84,12 @@ export default function InvitationPage({
         }}
         locale="ko"
         data={{
-          ...data,
+          ...context,
           // FIXME:
-          signup_form_id: (data.campaign.public as CampaignPublicData)[
-            "signup-form-id"
-          ],
+          signup_form_id:
+            (context.campaign.public as CampaignPublicData | null)?.[
+              "signup-form-id"
+            ] ?? "",
         }}
         visible={!open}
         client={client}

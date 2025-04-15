@@ -170,7 +170,7 @@ export interface Props {
   title: string;
   description?: string | null;
   brand_name: string;
-  logo: {
+  logo?: {
     src: string;
     srcDark?: string;
     width?: number;
@@ -188,7 +188,7 @@ export interface Props {
   article?: {
     html: string;
   };
-  footer: {
+  footer?: {
     link_instagram?: string;
     link_privacy?: string;
     link_support?: string;
@@ -259,14 +259,16 @@ export default function ReferrerPageTemplate({
           <main className="bg-background h-full flex flex-col">
             {/* Header */}
             <Standard.Header>
-              <Standard.Logo
-                src={design.logo.src}
-                srcDark={design.logo.srcDark}
-                alt="logo"
-                width={design.logo.width ?? 320}
-                height={design.logo.height ?? 64}
-                className="max-h-8 w-auto object-contain"
-              />
+              {design.logo && (
+                <Standard.Logo
+                  src={design.logo.src}
+                  srcDark={design.logo.srcDark}
+                  alt="logo"
+                  width={design.logo.width ?? 320}
+                  height={design.logo.height ?? 64}
+                  className="max-h-8 w-auto object-contain"
+                />
+              )}
             </Standard.Header>
             {/* Main Image */}
             <Standard.Section className="pb-4">
@@ -446,25 +448,27 @@ export default function ReferrerPageTemplate({
                 </article>
               )}
             </Standard.Section>
-            <Standard.FooterTemplate
-              logo={design.favicon}
-              links={[
-                {
-                  href: design.footer.link_privacy ?? "/privacy",
-                  text: t.privacy,
-                },
-                {
-                  href: design.footer.link_terms ?? "/terms",
-                  text: t.terms,
-                },
-                {
-                  href: design.footer.link_support ?? "/support",
-                  text: t.support,
-                },
-              ]}
-              instagram={design.footer.link_instagram}
-              paragraph={design.footer.paragraph?.html}
-            />
+            {design.footer && (
+              <Standard.FooterTemplate
+                logo={design.favicon}
+                links={[
+                  {
+                    href: design.footer.link_privacy ?? "/privacy",
+                    text: t.privacy,
+                  },
+                  {
+                    href: design.footer.link_terms ?? "/terms",
+                    text: t.terms,
+                  },
+                  {
+                    href: design.footer.link_support ?? "/support",
+                    text: t.support,
+                  },
+                ]}
+                instagram={design.footer.link_instagram}
+                paragraph={design.footer.paragraph?.html}
+              />
+            )}
           </main>
           <ConfirmDrawer
             {...beforeShareDialog.props}

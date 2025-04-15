@@ -72,7 +72,7 @@ const dictionary = {
 };
 
 type Props = {
-  logo: {
+  logo?: {
     src: string;
     srcDark?: string;
     width?: number;
@@ -84,7 +84,7 @@ type Props = {
   };
   brand_name: string;
   title: string;
-  description: string;
+  description?: string;
   favicon: {
     src: string;
     srcDark?: string;
@@ -92,9 +92,7 @@ type Props = {
   article?: {
     html: string;
   };
-  cta: {
-    text: string;
-  };
+  cta: string;
   footer: {
     link_privacy: string;
     link_instagram: string;
@@ -165,14 +163,16 @@ export default function InvitationPageTemplate({
         <div>
           {/* Header */}
           <Standard.Header>
-            <Standard.Logo
-              src={design.logo.src}
-              srcDark={design.logo.srcDark}
-              alt="logo"
-              width={320}
-              height={64}
-              className="max-h-8 w-auto object-contain"
-            />
+            {design.logo && (
+              <Standard.Logo
+                src={design.logo.src}
+                srcDark={design.logo.srcDark}
+                alt="logo"
+                width={320}
+                height={64}
+                className="max-h-8 w-auto object-contain"
+              />
+            )}
           </Standard.Header>
 
           {/* Main Image */}
@@ -247,7 +247,7 @@ export default function InvitationPageTemplate({
                     className="w-full"
                     size="lg"
                   >
-                    {design.cta.text}
+                    {design.cta}
                   </Button>
                 </CardFooter>
               )}

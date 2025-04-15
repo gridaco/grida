@@ -4,8 +4,6 @@ import { ScratchToReveal } from "@/www/ui/scratch-to-reveal";
 import { Badge } from "@/components/ui/badge";
 import { GridaLogo } from "@/components/grida-logo";
 import ScratchAnimation from "@/www/ui/scratch-animation";
-import { PolestarTypeLogo } from "@/components/logos";
-import Image from "next/image";
 
 export default function HelloDemo() {
   const [scratchComplete, setScratchComplete] = React.useState(false);

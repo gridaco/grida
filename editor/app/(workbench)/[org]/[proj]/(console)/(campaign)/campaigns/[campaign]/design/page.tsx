@@ -1,534 +1,295 @@
 "use client";
 
-import React, { useReducer } from "react";
-import type { IDocumentEditorInit } from "@/grida-react-canvas";
-import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
-import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
-import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
-import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
-import {
-  useDocument,
-  useRootTemplateInstanceNode,
-  initDocumentEditorState,
-  StandaloneDocumentEditor,
-  ViewportRoot,
-  EditorSurface,
-  StandaloneSceneContent,
-  standaloneDocumentReducer,
-} from "@/grida-react-canvas";
-import {
-  AutoInitialFitTransformer,
-  StandaloneSceneBackground,
-  UserCustomTemplatesProvider,
-} from "@/grida-react-canvas/renderer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Selection,
-  Zoom,
-} from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { SidebarRoot } from "@/components/sidebar";
-import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
-import {
-  PreviewButton,
-  PreviewProvider,
-} from "@/grida-react-canvas-starter-kit/starterkit-preview";
-import { useCampaign } from "../store";
-import { Platform } from "@/lib/platform";
+import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { usePropsEditor } from "@/scaffolds/props-editor";
+import { CMSImageField, CMSRichText } from "@/components/formfield-cms";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/spinner";
+import { useProject } from "@/scaffolds/workspace";
+import { useCampaign } from "../store";
+import { Platform } from "@/lib/platform";
+import { documentpreviewlink } from "@/lib/internal/url";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { TemplateData } from "@/theme/templates/west-referral/templates";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { Label } from "@/components/ui/label";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDownIcon, Share2Icon } from "@radix-ui/react-icons";
+  useWWWLayout,
+  useWWWTemplate,
+  WWWLayoutProvider,
+  type WWWTemplateEditorInstance,
+} from "@/scaffolds/platform/www";
+import assert from "assert";
 
-export default function CampaignDesignerPage() {
-  useDisableSwipeBack();
+export default function CampaignLayoutDesignerPage() {
+  const { layout_id } = useCampaign();
+
+  if (!layout_id) {
+    return <div>This campaign does not have a layout.</div>;
+  }
+
   return (
     <main className="w-full h-full flex relative bg-background">
-      {/* <PlainEditor /> */}
-      <_Canvas_PageEditor />
+      <div className="w-full my-10 container max-w-4xl mx-auto">
+        <WWWLayoutProvider id={layout_id}>
+          <TemplateEditorRoot />
+        </WWWLayoutProvider>
+      </div>
     </main>
   );
 }
 
-function Preview() {
-  return (
-    <div role="group" className="inline-flex rounded-md shadow-sm">
-      <Link href={""} target="_blank">
-        <button
-          type="button"
-          className={cn(
-            "h-7 inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
-            "gap-2"
-          )}
-          title="Preview"
-        >
-          Preview
-        </button>
-      </Link>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="h-7 inline-flex items-center px-2 py-2 text-sm font-medium border-t border-b border-r rounded-e-lg focus:z-10 focus:ring-2"
-          >
-            <ChevronDownIcon />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <Link href={""}>
-            <DropdownMenuItem>
-              <Share2Icon className="me-2 align-middle" />
-              Share
-            </DropdownMenuItem>
-          </Link>
-          <Link href={""}>Configure Agent</Link>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
+function TemplateEditorRoot() {
+  const { template_id } = useWWWLayout();
+  const template =
+    useWWWTemplate<TemplateData.West_Referrral__Duo_001>(template_id);
+
+  if (template.loading || !template.data) {
+    return <Spinner />;
+  }
+
+  return <TemplateEditor template={template} />;
 }
 
-const document: IDocumentEditorInit = {
-  editable: true,
-  debug: false,
-  document: {
-    nodes: {
-      invite: {
-        id: "invite",
-        name: "Referrer Page",
-        type: "template_instance",
-        template_id: "tmp-2503-invite",
-        position: "absolute",
-        removable: false,
-        active: true,
-        locked: false,
-        width: 375,
-        height: "auto",
-        properties: {
-          image: {
-            type: "image",
-            title: "Main Image",
-            required: true,
-          },
-          title: {
-            type: "string",
-            title: "Title",
-            required: true,
-          },
-          description: {
-            title: "Page Description",
-            type: "string",
-            required: true,
-          },
-          article: {
-            type: "richtext",
-            title: "Article",
-            required: true,
-          },
-        },
-        props: {},
-        overrides: {},
-      },
-      join_main: {
-        id: "join_main",
-        name: "Invitation Page",
-        type: "template_instance",
-        template_id: "tmp-2503-join-main",
-        position: "absolute",
-        removable: false,
-        active: true,
-        locked: false,
-        width: 375,
-        height: "auto",
-        properties: {
-          image: {
-            type: "image",
-            title: "Main Image",
-            required: true,
-          },
-          title: {
-            type: "string",
-            title: "Title",
-            required: true,
-          },
-          description: {
-            title: "Page Description",
-            type: "string",
-            required: true,
-          },
-          article: {
-            type: "richtext",
-            title: "Article",
-            required: true,
-          },
-        },
-        props: {},
-        overrides: {},
-        top: 0,
-        left: 0,
-      },
-      join_hello: {
-        id: "join_hello",
-        name: "Invitation Coupon (Dialog)",
-        type: "template_instance",
-        template_id: "tmp-2503-join-hello",
-        position: "absolute",
-        removable: false,
-        active: true,
-        locked: false,
-        width: 375,
-        height: 812,
-        top: 0,
-        left: -500,
-        properties: {
-          coupon: {
-            type: "image",
-            title: "Coupon Image",
-            required: true,
-          },
-        },
-        props: {},
-        overrides: {},
-      },
-    },
-    entry_scene_id: "invite",
-    scenes: {
-      invite: {
-        type: "scene",
-        id: "invite",
-        name: "Referrer's Page",
-        children: ["invite"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 1,
-      },
-      join: {
-        type: "scene",
-        id: "join",
-        name: "Invitee's Page",
-        children: ["join_main", "join_hello"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 2,
-      },
-    },
-  },
-  templates: {
-    ["tmp-2503-invite"]: {
-      name: "Invite",
-      type: "template",
-      properties: {
-        title: {
-          title: "Page Title",
-          type: "string",
-          required: true,
-        },
-        description: {
-          title: "Page Description",
-          type: "string",
-          required: true,
-        },
-        article: {
-          type: "richtext",
-          title: "Article",
-          required: true,
-        },
-      },
-      default: {},
-      version: "0.0.0",
-      nodes: {},
-    },
-    ["tmp-2503-join"]: {
-      name: "Join",
-      type: "template",
-      properties: {},
-      default: {},
-      version: "0.0.0",
-      nodes: {},
-    },
-    ["tmp-2503-join-main"]: {
-      name: "Join",
-      type: "template",
-      properties: {},
-      default: {},
-      version: "0.0.0",
-      nodes: {},
-    },
-  },
-};
+function TemplateEditor({
+  template,
+}: {
+  template: WWWTemplateEditorInstance<any>;
+}) {
+  assert(template.data, "data should be warmed");
 
-function _Canvas_PageEditor() {
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState(document)
-  );
+  const project = useProject();
+  const campaign = useCampaign();
 
-  const switchPage = (scene: string) => {
-    dispatch({ type: "load", scene: scene });
-  };
+  const previewbaseurl = documentpreviewlink({
+    docid: campaign.id,
+    orgid: project.organization_id,
+    projid: project.id,
+  });
+
+  const editor = usePropsEditor<TemplateData.West_Referrral__Duo_001>({
+    initialProps: template.data,
+    onChange: template.set,
+  });
+
+  const values =
+    editor.mergedDefaultProps as unknown as TemplateData.West_Referrral__Duo_001;
 
   return (
-    <>
-      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
-        <UserCustomTemplatesProvider
-          templates={{
-            "tmp-2503-invite": CustomComponent__Referrer,
-            "tmp-2503-join-main": CustomComponent__Join_Main,
-            "tmp-2503-join-hello": CustomComponent__Join_Hello,
-          }}
-        >
-          <PreviewProvider>
-            <header className="absolute top-6 left-6 z-50 flex flex-col gap-2 px-4 py-2">
-              {/* <Navigation /> */}
-              <Tabs value={state.scene_id} onValueChange={switchPage}>
-                <TabsList>
-                  <TabsTrigger value="invite">{"Referrer's Page"}</TabsTrigger>
-                  <TabsTrigger value="join">Invitation Page</TabsTrigger>
-                  {/* <TabsTrigger value="general">General</TabsTrigger> */}
-                  {/* <TabsTrigger value="message">Messages</TabsTrigger> */}
-                </TabsList>
-              </Tabs>
-            </header>
-            <div className="px-10 pt-20 flex-1">
-              <div className="w-full h-full border rounded-t-xl shadow-xl overflow-hidden">
-                <div className="w-full h-full flex">
-                  <StandaloneSceneBackground className="w-full h-full flex flex-col relative bg-muted">
-                    <div className="absolute top-4 right-4 z-50 pointer-events-auto">
-                      <Zoom
-                        className={cn(
-                          WorkbenchUI.inputVariants({
-                            variant: "input",
-                            size: "xs",
-                          }),
-                          "w-auto"
-                        )}
-                      />
-                    </div>
-                    <ViewportRoot
-                      onDoubleClick={() => {
-                        // console.log("dblclick");
-                        // setEdit(true);
-                      }}
-                      className="relative w-full h-full overflow-hidden"
-                    >
-                      <EditorSurface />
-                      <AutoInitialFitTransformer>
-                        <StandaloneSceneContent />
-                      </AutoInitialFitTransformer>
-                    </ViewportRoot>
-                  </StandaloneSceneBackground>
+    <div className="w-full">
+      <Tabs defaultValue="referrer">
+        <header className="w-full flex justify-between items-center">
+          <TabsList>
+            <TabsTrigger value="referrer">Referrer</TabsTrigger>
+            <TabsTrigger value="invitation">Invitation</TabsTrigger>
+            <TabsTrigger value="theme">Theme</TabsTrigger>
+          </TabsList>
+          <Button
+            variant="default"
+            onClick={template.save}
+            disabled={!template.dirty || template.saving}
+          >
+            {template.saving ? "Saving..." : "Save & Publish Changes"}
+          </Button>
+        </header>
+        <TabsContent value="theme">
+          <Card>
+            <CardHeader>
+              <CardTitle>Theme</CardTitle>
+            </CardHeader>
+            <CardContent>
+              You can manage Site theme{" "}
+              <Link
+                href={`/${project.organization_name}/${project.name}/www`}
+                className="underline"
+              >
+                here
+              </Link>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="referrer">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Referrer</span>
+                <span>
+                  <Link
+                    href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_REFERRER}`}
+                    target="_blank"
+                  >
+                    <Button size="xs" variant="outline">
+                      <OpenInNewWindowIcon className="me-2" />
+                      Preview Referrer
+                    </Button>
+                  </Link>
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-8">
+                <div className="grid gap-2">
+                  <Label>Image</Label>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values.components.referrer?.image?.src
+                        ? { publicUrl: values.components.referrer?.image?.src }
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      editor.set("components.referrer.image", {
+                        type: "image",
+                        src: r?.publicUrl,
+                      });
+                    }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Title</Label>
+                  <Input
+                    value={values.components.referrer?.title}
+                    onChange={(e) => {
+                      editor.set("components.referrer.title", e.target.value);
+                    }}
+                    placeholder="Enter your title"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={values.components.referrer?.description}
+                    onChange={(e) => {
+                      editor.set(
+                        "components.referrer.description",
+                        e.target.value
+                      );
+                    }}
+                    placeholder="Enter your description"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Button Text</Label>
+                  <Input
+                    value={values.components.referrer?.cta}
+                    onChange={(e) => {
+                      editor.set("components.referrer.cta", e.target.value);
+                    }}
+                    placeholder="Button Text"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Article</Label>
+                  <CMSRichText
+                    value={values.components.referrer?.article?.html ?? ""}
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      editor.set("components.referrer.article", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
                 </div>
               </div>
-            </div>
-            <SidebarRoot side="right" className="hidden sm:block">
-              <header className="h-11 flex items-center px-2 justify-end gap-2">
-                <PreviewButton />
-              </header>
-              <Selection
-                config={{
-                  base: "off",
-                  developer: "off",
-                  export: "off",
-                  image: "off",
-                  layout: "off",
-                  link: "off",
-                  position: "off",
-                  props: "on", // ON
-                  size: "off",
-                  template: "off",
-                  text: "off",
-                }}
-              />
-            </SidebarRoot>
-          </PreviewProvider>
-        </UserCustomTemplatesProvider>
-        {/* <aside className="min-w-60 w-60 h-full border-l"></aside> */}
-      </StandaloneDocumentEditor>
-    </>
-  );
-}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="invitation">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Invitation</span>
+                <span>
+                  <Link
+                    href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
+                    target="_blank"
+                  >
+                    <Button size="xs" variant="outline">
+                      <OpenInNewWindowIcon className="me-2" />
+                      Preview Invitation
+                    </Button>
+                  </Link>
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-8">
+                <div className="grid gap-2">
+                  <Label>Image</Label>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values.components.invitation?.image?.src
+                        ? {
+                            publicUrl: values.components.invitation?.image?.src,
+                          }
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      editor.set("components.invitation.image", {
+                        type: "image",
+                        src: r?.publicUrl,
+                      });
+                    }}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Title</Label>
 
-function CustomComponent__Referrer(componentprops: any) {
-  const campaign = useCampaign();
-
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...componentprops.style,
-      }}
-      {...queryattributes(componentprops)}
-    >
-      <ReferrerPageTemplate
-        design={{
-          brand_name: "Apple",
-          title: componentprops.props.title as string,
-          description: componentprops.props.description as string,
-          logo: {
-            src: "/logos/thebundle.png",
-            srcDark: "/logos/thebundle-dark.png",
-          },
-          favicon: {
-            src: "https://www.apple.com/favicon.ico",
-            srcDark: "https://www.apple.com/favicon.ico",
-          },
-          article: componentprops.props.article,
-          cta: {
-            text: "Join Now",
-          },
-          image: {
-            src: componentprops.props.image,
-            alt: "Main Image",
-          },
-          footer: {
-            link_privacy: "/privacy",
-            link_instagram: "https://www.instagram.com/polestarcars/",
-            paragraph: {
-              html: "1. Hearing Aid and Hearing Test: The Hearing Aid feature has received FDA authorization. The Hearing Test and Hearing Aid features are supported on AirPods Pro 2 with the latest firmware paired with a compatible iPhone or iPad with iOS 18 or iPadOS 18 and later and are intended for people 18 years old or older. The Hearing Aid feature is also supported on a compatible Mac with macOS Sequoia and later. It is intended for people with perceived mild to moderate hearing loss.",
-            },
-          },
-        }}
-        locale="en"
-        slug="dummy"
-        data={{
-          campaign: {
-            id: campaign.id,
-            title: campaign.title,
-            description: null,
-            enabled: true,
-            max_invitations_per_referrer: 10,
-            layout_id: null,
-            reward_currency: "USD",
-            invitation_email_template: null,
-            invitation_share_template: null,
-            public: null,
-            scheduling_close_at: null,
-            scheduling_open_at: null,
-            scheduling_tz: null,
-          },
-          code: Platform.WEST.Referral.TEST_CODE_REFERRER,
-          created_at: "2025-10-01T00:00:00Z",
-          invitation_count: 0,
-          invitations: [],
-          type: "referrer",
-          id: "123",
-          referrer_name: "DUMMY",
-        }}
-      />
-    </div>
-  );
-}
-
-function CustomComponent__Join_Main(componentprops: any) {
-  const campaign = useCampaign();
-
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...componentprops.style,
-      }}
-      {...queryattributes(componentprops)}
-    >
-      <InvitationPageTemplate
-        design={{
-          brand_name: "Apple",
-          title: componentprops.props.title as string,
-          description: componentprops.props.description as string,
-          logo: {
-            src: "/logos/thebundle.png",
-            srcDark: "/logos/thebundle-dark.png",
-          },
-          favicon: {
-            src: "https://www.apple.com/favicon.ico",
-            srcDark: "https://www.apple.com/favicon.ico",
-          },
-          article: componentprops.props.article,
-          cta: {
-            text: "Join Now",
-          },
-          image: {
-            src: componentprops.props.image,
-            alt: "Main Image",
-          },
-          footer: {
-            link_privacy: "/privacy",
-            link_instagram: "https://www.instagram.com/polestarcars/",
-            paragraph: {
-              html: "1. Hearing Aid and Hearing Test: The Hearing Aid feature has received FDA authorization. The Hearing Test and Hearing Aid features are supported on AirPods Pro 2 with the latest firmware paired with a compatible iPhone or iPad with iOS 18 or iPadOS 18 and later and are intended for people 18 years old or older. The Hearing Aid feature is also supported on a compatible Mac with macOS Sequoia and later. It is intended for people with perceived mild to moderate hearing loss.",
-            },
-          },
-        }}
-        locale="en"
-        data={{
-          signup_form_id: "",
-          referrer_id: "dummy",
-          referrer_name: "DUMMY",
-          is_claimed: false,
-          code: Platform.WEST.Referral.TEST_CODE_INVITATION,
-          created_at: "2025-10-01T00:00:00Z",
-          type: "invitation",
-          id: "123",
-          campaign: {
-            id: campaign.id,
-            title: campaign.title,
-            description: null,
-            enabled: true,
-            max_invitations_per_referrer: 10,
-            layout_id: null,
-            reward_currency: "USD",
-            invitation_email_template: null,
-            invitation_share_template: null,
-            public: null,
-            scheduling_close_at: null,
-            scheduling_open_at: null,
-            scheduling_tz: null,
-          },
-        }}
-      />
-    </div>
-  );
-}
-
-function CustomComponent__Join_Hello(componentprops: any) {
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...componentprops.style,
-      }}
-      {...queryattributes(componentprops)}
-    >
-      <InvitationCouponTemplate
-        locale={"en"}
-        data={{
-          referrer_name: "DUMMY",
-        }}
-        design={{
-          logo: {
-            src: "/logos/thebundle.png",
-            srcDark: "/logos/thebundle-dark.png",
-          },
-          coupon: {
-            src: componentprops.props.coupon,
-            alt: "Main Image",
-          },
-        }}
-      />
+                  <Input
+                    value={values.components.invitation?.title}
+                    onChange={(e) => {
+                      editor.set("components.invitation.title", e.target.value);
+                    }}
+                    placeholder="Enter your title"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={values.components.invitation?.description as string}
+                    onChange={(e) => {
+                      editor.set(
+                        "components.invitation.description",
+                        e.target.value
+                      );
+                    }}
+                    placeholder="Enter your description"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Button Text</Label>
+                  <Input
+                    value={values.components.invitation?.cta as string}
+                    onChange={(e) => {
+                      editor.set("components.invitation.cta", e.target.value);
+                    }}
+                    placeholder="Button Text"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Article</Label>
+                  <CMSRichText
+                    value={values.components.invitation?.article?.html ?? ""}
+                    uploader={template.upload}
+                    onValueChange={(value) => {
+                      editor.set("components.invitation.article", {
+                        type: "richtext",
+                        html: value,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
