@@ -180,7 +180,7 @@ export interface Props {
     src: string;
     srcDark?: string;
   };
-  image: {
+  image?: {
     src: string;
     alt?: string;
   };
@@ -205,6 +205,9 @@ export default function ReferrerPageTemplate({
   client,
 }: {
   data: Platform.WEST.Referral.ReferrerPublicRead;
+  /**
+   * @deprecated
+   */
   slug: string;
   design: Props;
   locale: keyof typeof dictionary;
@@ -273,8 +276,8 @@ export default function ReferrerPageTemplate({
             {/* Main Image */}
             <Standard.Section className="pb-4">
               <Standard.MainImage
-                src={design.image.src}
-                alt={design.image.alt}
+                src={design.image?.src}
+                alt={design.image?.alt}
               />
             </Standard.Section>
             <Standard.Section className="py-4">

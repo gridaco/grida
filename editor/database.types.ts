@@ -62,6 +62,7 @@ export type Database = MergeDeep<
           Row: DatabaseGenerated["grida_west_referral"]["Views"]["campaign_public"]["Row"] & {
             id: string;
             title: string;
+            enabled: boolean;
             description: string | null;
             reward_currency: string;
           };

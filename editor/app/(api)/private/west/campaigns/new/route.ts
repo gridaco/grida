@@ -76,6 +76,7 @@ export async function POST(req: Request) {
     .insert({
       www_id: www.id,
       data: {
+        locale: "en",
         template_id: "grida_west_referral.duo-000",
         components: {
           referrer: {

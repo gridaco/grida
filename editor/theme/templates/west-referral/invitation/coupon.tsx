@@ -24,7 +24,7 @@ export interface Props {
     width?: number;
     height?: number;
   };
-  coupon: {
+  coupon?: {
     src: string;
     alt?: string;
   };
@@ -76,13 +76,15 @@ export default function InvitationCouponTemplate({
           className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-background border shadow-lg"
           gradientColors={["#000", "#333", "#666"]}
         >
-          <img
-            src={design.coupon.src}
-            alt={design.coupon.alt}
-            width={640}
-            height={640}
-            className="w-full h-full object-cover"
-          />
+          {design.coupon && (
+            <img
+              src={design.coupon.src}
+              alt={design.coupon.alt}
+              width={640}
+              height={640}
+              className="w-full h-full object-cover"
+            />
+          )}
           <div className="absolute inset-0 pointer-events-none">
             <ScratchAnimation width={350} height={350} enabled={!started} />
           </div>

@@ -43,7 +43,7 @@ export default function ReferrerPage({
         //   },
         // },
       }}
-      locale="ko"
+      locale={template.locale}
       data={context}
     />
   );

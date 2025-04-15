@@ -4,6 +4,7 @@ import { cn } from "@/utils";
 import { InstagramIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Section({
   className,
@@ -107,7 +108,7 @@ export function MainImage({
   alt,
   className,
 }: {
-  src: string;
+  src?: string;
   alt?: string;
   className?: string;
 }) {
@@ -118,26 +119,38 @@ export function MainImage({
         className
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src || "/images/abstract-placeholder.jpg"}
-        alt={alt}
-        width={800}
-        height={800}
-        className="max-w-[400px] max-h-[400px] aspect-square rounded-xl object-cover shadow-xl overflow-hidden z-10"
-      />
+      <figure className="w-full max-w-[400px] max-h-[400px] shadow-xl overflow-hidden z-10 rounded-xl aspect-square ">
+        {src ? (
+          <Image
+            src={src}
+            alt={alt ?? "main image"}
+            width={800}
+            height={800}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full relative flex items-center justify-center">
+            <Skeleton className="absolute inset-0" />
+            <span className="text-muted-foreground text-xs">
+              Place your image here
+            </span>
+          </div>
+        )}
+      </figure>
       {/* Shadow container with blur effect */}
-      <div
-        className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-full h-full
+      {src && (
+        <div
+          className={`absolute -bottom-4 left-1/2 -translate-x-1/2 w-full h-full
                      blur-xl opacity-25 scale-100 transition-opacity duration-700 -z-10
                      `}
-        style={{
-          backgroundImage: `url(${src})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center bottom",
-          filter: "blur(24px) brightness(0.8)",
-        }}
-      />
+          style={{
+            backgroundImage: `url(${src})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center bottom",
+            filter: "blur(24px) brightness(0.8)",
+          }}
+        />
+      )}
     </div>
   );
 }

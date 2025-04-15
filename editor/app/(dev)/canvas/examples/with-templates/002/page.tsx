@@ -288,8 +288,6 @@ function CustomComponent__Referrer(componentprops: any) {
             max_invitations_per_referrer: 10,
             layout_id: null,
             reward_currency: "USD",
-            invitation_email_template: null,
-            invitation_share_template: null,
             public: null,
             scheduling_close_at: null,
             scheduling_open_at: null,

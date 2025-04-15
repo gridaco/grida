@@ -577,13 +577,11 @@ export namespace Platform.WEST.Referral {
 
   export type CampaignPublic = {
     id: string;
-    enabled: boolean | null;
+    enabled: boolean;
     title: string;
     description: string | null;
     reward_currency: string;
     max_invitations_per_referrer: number | null;
-    invitation_email_template: unknown | null;
-    invitation_share_template: unknown | null;
     layout_id: string | null;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;

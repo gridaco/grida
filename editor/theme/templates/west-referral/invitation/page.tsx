@@ -78,14 +78,14 @@ type Props = {
     width?: number;
     height?: number;
   };
-  image: {
+  image?: {
     src: string;
     alt?: string;
   };
-  brand_name: string;
+  brand_name?: string;
   title: string;
   description?: string;
-  favicon: {
+  favicon?: {
     src: string;
     srcDark?: string;
   };
@@ -177,7 +177,10 @@ export default function InvitationPageTemplate({
 
           {/* Main Image */}
           <Standard.Section className="pb-4">
-            <Standard.MainImage src={design.image.src} alt={design.image.alt} />
+            <Standard.MainImage
+              src={design?.image?.src}
+              alt={design?.image?.alt}
+            />
           </Standard.Section>
 
           <Standard.Section className="py-4">
@@ -185,10 +188,12 @@ export default function InvitationPageTemplate({
             <span className="text-sm text-muted-foreground">
               {design.description}
             </span>
-            <Standard.BrandHostChip
-              logo={design.favicon}
-              name={design.brand_name}
-            />
+            {design.brand_name && design.favicon && (
+              <Standard.BrandHostChip
+                logo={design.favicon}
+                name={design.brand_name}
+              />
+            )}
           </Standard.Section>
 
           {/* Countdown Timer */}

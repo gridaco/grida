@@ -69,11 +69,11 @@ function mergeDefaultProps(
   return merged;
 }
 
-export interface TemplateEditorInstance {
+export interface PropsEditorInstance<T extends Record<string, any> = any> {
   /**
    * the current props of the template
    */
-  props: Record<string, unknown>;
+  props: T;
 
   /**
    * set the props of the template
@@ -85,6 +85,9 @@ export interface TemplateEditorInstance {
    */
   mergedDefaultProps: Record<string, unknown>;
 }
+
+export type ReadonlyPropsEditorInstance<T extends Record<string, any> = any> =
+  Pick<PropsEditorInstance<T>, "props" | "mergedDefaultProps">;
 
 export interface UseTemplateEditorArgs<
   T extends Record<string, grida.program.schema.PropertyDefinition>,
@@ -132,7 +135,7 @@ function reducer(state: State, action: Action): State {
 export function usePropsEditor<T extends Record<string, any>>(
   { schema, initialProps, onChange }: UseTemplateEditorArgs<T>,
   deps: DependencyList = []
-): TemplateEditorInstance {
+): PropsEditorInstance {
   const [state, dispatch] = useReducer(reducer, {
     schema,
     props: initialProps,

@@ -21,7 +21,6 @@ export default function InvitationPage({
   client: Platform.WEST.Referral.WestReferralClient;
   template: TemplateData.West_Referrral__Duo_001;
 }) {
-  const locale = "ko"; // FIXME:
   const { is_claimed, referrer_name: _referrer_name } = context;
   const referrer_name = _referrer_name || "?";
   const is_first_time = !is_claimed;
@@ -43,7 +42,7 @@ export default function InvitationPage({
               UX Overlay
             </DialogPrimitive.Description>
             <InvitationCouponTemplate
-              locale={locale}
+              locale={template.locale}
               data={{ referrer_name: context.referrer_name }}
               design={{
                 logo: _t?.navbar?.logo,
@@ -59,16 +58,16 @@ export default function InvitationPage({
       <InvitationPageTemplate
         design={{
           logo: _t?.navbar?.logo,
-          favicon: {
-            src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-            srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-          },
-          brand_name: "Polestar",
+          // favicon: {
+          //   src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+          //   srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+          // },
+          // brand_name: "Polestar",
           title: _i?.title ?? context.campaign.title,
           description: _i?.description,
           article: _i?.article,
           cta: _i?.cta ?? "Join Now",
-          image: _i?.image ?? { src: "" },
+          image: _i?.image,
           // footer: {
           //   link_privacy: "/privacy",
           //   link_instagram: "https://www.instagram.com/polestarcars/",

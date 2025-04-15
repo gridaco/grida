@@ -1,6 +1,7 @@
 export namespace TemplateData {
   export interface West_Referrral__Duo_001 {
     template_id: "grida_west_referral.duo-000";
+    locale: "en" | "ko";
     theme?: {
       navbar?: {
         logo?: {
