@@ -420,19 +420,12 @@ function PropertyField({
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
 
-  const uploadFile = useCallback(
-    (file: File) => {
-      return uploadPublic(file).then((r) => r.publicUrl);
-    },
-    [uploadPublic]
-  );
-
   switch (definition.type) {
     case "richtext": {
       return (
         <CMSRichText
           value={value}
-          uploader={uploadFile}
+          uploader={uploadPublic}
           onValueChange={onValueChange}
           placeholder={"Enter text here"}
           autofocus={true}

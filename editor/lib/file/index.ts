@@ -32,9 +32,11 @@ export namespace FileIO {
     document_id: string | null;
   };
 
+  export type BucketFileUploaderFn = (file: File) => Promise<BucketFile>;
+
   export type GridaAssetUploaderFn = (file: File) => Promise<GridaAsset>;
 
-  export type UploadResult = {
+  export type BucketFile = {
     /**
      * storage.objects.id
      */
@@ -44,6 +46,8 @@ export namespace FileIO {
     fullPath: string;
     publicUrl: string;
   };
+
+  export type UploadResult = BucketFile;
 
   /**
    * direct uploader - uploads directly to resolved path

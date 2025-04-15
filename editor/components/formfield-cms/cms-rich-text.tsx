@@ -1,24 +1,33 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import type { Content } from "@tiptap/react";
+import { FileIO } from "@/lib/file";
 
 export function CMSRichText({
   value,
   uploader,
   onValueChange,
   placeholder,
-  autofocus,
-  disabled,
+  autofocus = false,
+  disabled = false,
 }: {
-  uploader?: (file: File) => Promise<string>;
+  uploader?: FileIO.BucketFileUploaderFn;
   value: Content;
   onValueChange?: (value: string) => void;
   placeholder?: string;
   autofocus?: boolean;
   disabled?: boolean;
 }) {
+  const _uploader = useCallback(
+    async (file: File) => {
+      const o = await uploader!(file);
+      return o.publicUrl;
+    },
+    [uploader]
+  );
+
   return (
     <div className="w-full max-w-full">
       <MinimalTiptapEditor
@@ -32,7 +41,7 @@ export function CMSRichText({
         immediatelyRender={false}
         autofocus={autofocus}
         editable={!disabled}
-        uploader={uploader}
+        uploader={uploader ? _uploader : undefined}
         editorClassName="focus:outline-none prose"
       />
     </div>

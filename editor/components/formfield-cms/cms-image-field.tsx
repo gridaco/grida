@@ -10,6 +10,12 @@ interface ImageAssetFieldProps {
   onValueChange?: (value?: FileIO.GridaAsset[]) => void;
 }
 
+interface BucketFileFieldProps {
+  uploader: FileIO.BucketFileUploaderFn;
+  value?: { publicUrl: string };
+  onValueChange?: (value: FileIO.BucketFile | null) => void;
+}
+
 export function CMSVideoAssetField({
   value,
   uploader,
@@ -102,6 +108,45 @@ export function CMSImageAssetField({
   );
 }
 
+export function CMSImageField({
+  value,
+  uploader,
+  onValueChange,
+}: BucketFileFieldProps) {
+  const { openFilePicker, plainFiles, loading } = useFilePicker({
+    readAs: "ArrayBuffer",
+    accept: "image/*",
+    multiple: false,
+  });
+
+  useEffect(
+    () => {
+      if (plainFiles.length > 0) {
+        uploader(plainFiles[0]).then((r) => onValueChange?.(r));
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plainFiles]
+  );
+
+  return (
+    <div
+      onClick={openFilePicker}
+      className="flex gap-2 w-full h-20 bg-card rounded-md border shadow-card p-2 overflow-x-scroll"
+    >
+      {value ? (
+        <AssetItem
+          type="image"
+          asset={value}
+          onRemoveClick={() => onValueChange?.(null)}
+        />
+      ) : (
+        <Placeholder />
+      )}
+    </div>
+  );
+}
+
 function Placeholder() {
   return (
     <div className="relative aspect-[4/3] h-full">
@@ -117,7 +162,7 @@ function AssetItem({
   onRemoveClick,
 }: {
   type: "video" | "image";
-  asset: FileIO.GridaAsset;
+  asset: { publicUrl: string };
   onRemoveClick?: () => void;
   onClick?: () => void;
 }) {
