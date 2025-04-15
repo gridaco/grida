@@ -1,9 +1,9 @@
 export namespace TemplateData {
   export interface West_Referrral__Duo_001 {
     template_id: "grida_west_referral.duo-000";
-    theme: {
-      navbar: {
-        logo: {
+    theme?: {
+      navbar?: {
+        logo?: {
           src: string;
           srcDark?: string;
         };

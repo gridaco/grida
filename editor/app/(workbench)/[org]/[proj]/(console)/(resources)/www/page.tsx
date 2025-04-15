@@ -1,13 +1,10 @@
 "use client";
 
 import { SiteGeneralSection, type SiteGeneral } from "./section-general";
-import { FaviconSection } from "./section-favicon";
-import { ThemeLogoSection } from "./section-logo";
 import { SocialPreviewSection } from "./section-social-preview";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   CardFooter,
@@ -15,11 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { createClientWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
 import { Spinner } from "@/components/spinner";
 import { useForm } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
 
 type ProjectWWW = {
   id: string;
@@ -181,7 +179,7 @@ export default function ProjectWWWSettingsPage() {
           <CardTitle>Site Images</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <FaviconSection
+          <FaviconEditor
             favicon={data.favicon}
             onFileUpload={(file, variant) => {
               return updateFavicon(file, variant);

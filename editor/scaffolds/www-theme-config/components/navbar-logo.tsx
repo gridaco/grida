@@ -3,21 +3,26 @@
 import type React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { FileIO } from "@/lib/file";
 
-export function ThemeLogoSection({
+type Logo = {
+  src: string;
+  srcDark?: string | undefined;
+};
+
+export function NavbarLogoEditor({
   logo,
-  onFileUpload,
-  getPublicUrl,
+  uploader,
+  onLogoChange,
+  getPublicUrl = (path: string) => path,
 }: {
-  logo: {
-    src: string;
-    srcDark?: string | undefined;
-  } | null;
-  onFileUpload: (
-    e: React.ChangeEvent<HTMLInputElement>,
+  logo?: Logo | null;
+  uploader: (
+    file: File,
     type: "src" | "srcDark"
-  ) => Promise<boolean>;
-  getPublicUrl: (path: string) => string;
+  ) => Promise<FileIO.UploadResult>;
+  onLogoChange?: (file: FileIO.UploadResult, type: "src" | "srcDark") => void;
+  getPublicUrl?: (path: string) => string;
 }) {
   return (
     <div className="space-y-6">
@@ -45,14 +50,20 @@ export function ThemeLogoSection({
             </p>
             <div className="flex justify-center">
               <Button variant="outline" size="sm" className="w-24" asChild>
-                <label htmlFor="favicon-dark-upload">
+                <label htmlFor="logo-upload">
                   Upload
                   <input
-                    id="favicon-dark-upload"
+                    id="logo-upload"
                     type="file"
                     accept="image/*"
                     className="sr-only"
-                    onChange={(e) => onFileUpload(e, "src")}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        uploader(e.target.files[0], "src").then((r) => {
+                          onLogoChange?.(r, "src");
+                        });
+                      }
+                    }}
                   />
                 </label>
               </Button>
@@ -75,14 +86,20 @@ export function ThemeLogoSection({
             </p>
             <div className="flex justify-center">
               <Button variant="outline" size="sm" className="w-24" asChild>
-                <label htmlFor="favicon-dark-upload">
+                <label htmlFor="logo-dark-upload">
                   Upload
                   <input
-                    id="favicon-dark-upload"
+                    id="logo-dark-upload"
                     type="file"
                     accept="image/*"
                     className="sr-only"
-                    onChange={(e) => onFileUpload(e, "srcDark")}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        uploader(e.target.files[0], "srcDark").then((r) => {
+                          onLogoChange?.(r, "srcDark");
+                        });
+                      }
+                    }}
                   />
                 </label>
               </Button>

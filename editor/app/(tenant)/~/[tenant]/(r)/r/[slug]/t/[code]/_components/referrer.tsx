@@ -12,29 +12,29 @@ export default function ReferrerPage({
   template,
 }: {
   slug: string;
-  template: TemplateData.West_Referrral__Duo_001["components"]["referrer"];
+  template: TemplateData.West_Referrral__Duo_001;
   context: Platform.WEST.Referral.ReferrerPublicRead;
   client: Platform.WEST.Referral.WestReferralClient;
 }) {
+  const _t = template.theme;
+  const _r = template.components.referrer;
+
   return (
     <ReferrerPageTemplate
       slug={slug}
       client={client}
       design={{
-        // logo: {
-        //   src: "/logos/polestar.png",
-        //   srcDark: "/logos/polestar-dark.png",
+        logo: _t?.navbar?.logo,
+        // favicon: {
+        //   src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
+        //   srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
         // },
-        favicon: {
-          src: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-          srcDark: "https://www.polestar.com/w3-assets/favicon-32x32.png",
-        },
-        brand_name: "Polestar",
-        title: template?.title ?? context.campaign.title,
-        description: template?.description ?? context.campaign.description,
-        article: template?.article,
-        cta: template?.cta ?? "Invite",
-        image: template?.image ?? { src: "" },
+        // brand_name: "Polestar",
+        title: _r?.title ?? context.campaign.title,
+        description: _r?.description ?? context.campaign.description,
+        article: _r?.article,
+        cta: _r?.cta ?? "Invite",
+        image: _r?.image ?? { src: "" },
         // footer: {
         //   link_privacy: "/privacy",
         //   link_instagram: "https://www.instagram.com/polestarcars/",

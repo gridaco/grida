@@ -168,7 +168,7 @@ export function FooterTemplate({
   paragraph,
   instagram,
 }: {
-  logo: LogoData;
+  logo?: LogoData;
   links?: Links;
   paragraph?: string;
   instagram?: string;
@@ -177,14 +177,16 @@ export function FooterTemplate({
   return (
     <footer className="grid gap-2 px-4 py-10 border-t mt-10">
       <div className="flex items-center justify-between">
-        <div>
-          <Logo
-            {...logo}
-            width={400}
-            height={200}
-            className="h-4 w-auto object-contain"
-          />
-        </div>
+        {logo && (
+          <div>
+            <Logo
+              {...logo}
+              width={400}
+              height={200}
+              className="h-4 w-auto object-contain"
+            />
+          </div>
+        )}
         <div className="text-muted-foreground">
           {instagram && <InstagramIcon className="size-4" />}
         </div>

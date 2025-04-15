@@ -169,14 +169,14 @@ const dictionary = {
 export interface Props {
   title: string;
   description?: string | null;
-  brand_name: string;
+  brand_name?: string;
   logo?: {
     src: string;
     srcDark?: string;
     width?: number;
     height?: number;
   };
-  favicon: {
+  favicon?: {
     src: string;
     srcDark?: string;
   };
@@ -282,10 +282,12 @@ export default function ReferrerPageTemplate({
               <span className="text-sm text-muted-foreground">
                 {design.description}
               </span>
-              <Standard.BrandHostChip
-                logo={design.favicon}
-                name={design.brand_name}
-              />
+              {design.favicon && design.brand_name && (
+                <Standard.BrandHostChip
+                  logo={design.favicon}
+                  name={design.brand_name}
+                />
+              )}
             </Standard.Section>
             <Standard.Section className="py-4">
               <Card className="relative overflow-hidden rounded-xl border-0">

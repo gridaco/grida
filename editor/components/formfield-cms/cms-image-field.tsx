@@ -13,7 +13,7 @@ interface ImageAssetFieldProps {
 interface BucketFileFieldProps {
   uploader: FileIO.BucketFileUploaderFn;
   value?: { publicUrl: string };
-  onValueChange?: (value: FileIO.BucketFile | null) => void;
+  onValueChange?: (value: FileIO.UploadResult | null) => void;
 }
 
 export function CMSVideoAssetField({

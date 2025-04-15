@@ -16,12 +16,11 @@ type Params = {
   slug: string;
 };
 
-export default function RoutingPage({ params }: { params: Params }) {
+export default function LayoutPage({ params }: { params: Params }) {
   const { code, slug } = params;
   const { template } = useLayout();
   const campaign = useCampaignAgent();
   const client = useMemo(
-    // TODO: BASE_URL
     () => new Platform.WEST.Referral.WestReferralClient(campaign.id),
     [campaign.id]
   );
@@ -70,10 +69,7 @@ export default function RoutingPage({ params }: { params: Params }) {
             slug={slug}
             context={data.data}
             client={client}
-            template={
-              (template.data as TemplateData.West_Referrral__Duo_001).components
-                .referrer
-            }
+            template={template.data as TemplateData.West_Referrral__Duo_001}
           />
         </ScreenWindowRoot>
       );
@@ -83,9 +79,7 @@ export default function RoutingPage({ params }: { params: Params }) {
           <InvitationPage
             context={data.data}
             client={client}
-            templates={
-              (template.data as TemplateData.West_Referrral__Duo_001).components
-            }
+            template={template.data as TemplateData.West_Referrral__Duo_001}
           />
         </ScreenWindowRoot>
       );

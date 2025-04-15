@@ -7,10 +7,12 @@ import {
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
 import { useCampaignAgent } from "./store";
+import { useLayout } from "@/scaffolds/tenant";
+import * as Standard from "@/theme/templates/west-referral/standard";
 
 export default function Home() {
   const campaign = useCampaignAgent();
-
+  const { template } = useLayout();
   return (
     <ScreenWindowRoot>
       <ScreenRoot>
@@ -25,7 +27,7 @@ export default function Home() {
                     alt={data.media.alt}
                     className="object-cover aspect-square select-none pointer-events-none rounded-t-lg"
                   /> */}
-                  {/* <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-center">
+                  <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-center">
                     <Standard.Logo
                       src={"/logos/polestar.png"}
                       srcDark={"/logos/polestar-dark.png"}
@@ -34,7 +36,7 @@ export default function Home() {
                       height={64}
                       className="max-h-8 w-auto object-contain"
                     />
-                  </div> */}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3 px-4">
                   <h1 className="text-xl font-semibold text-center">

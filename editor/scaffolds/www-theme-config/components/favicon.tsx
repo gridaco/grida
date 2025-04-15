@@ -11,7 +11,7 @@ interface FaviconSectionProps {
   getPublicUrl: (path: string) => string;
 }
 
-export function FaviconSection({
+export function FaviconEditor({
   getPublicUrl,
   favicon,
   onFileUpload,

@@ -24,6 +24,7 @@ import {
   type WWWTemplateEditorInstance,
 } from "@/scaffolds/platform/www";
 import assert from "assert";
+import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
 
 export default function CampaignLayoutDesignerPage() {
   const { layout_id } = useCampaign();
@@ -71,13 +72,14 @@ function TemplateEditor({
     projid: project.id,
   });
 
-  const editor = usePropsEditor<TemplateData.West_Referrral__Duo_001>({
+  const props = usePropsEditor<TemplateData.West_Referrral__Duo_001>({
     initialProps: template.data,
     onChange: template.set,
   });
 
-  const values =
-    editor.mergedDefaultProps as unknown as TemplateData.West_Referrral__Duo_001;
+  const values = props.mergedDefaultProps as unknown as
+    | TemplateData.West_Referrral__Duo_001
+    | undefined;
 
   return (
     <div className="w-full">
@@ -96,22 +98,6 @@ function TemplateEditor({
             {template.saving ? "Saving..." : "Save & Publish Changes"}
           </Button>
         </header>
-        <TabsContent value="theme">
-          <Card>
-            <CardHeader>
-              <CardTitle>Theme</CardTitle>
-            </CardHeader>
-            <CardContent>
-              You can manage Site theme{" "}
-              <Link
-                href={`/${project.organization_name}/${project.name}/www`}
-                className="underline"
-              >
-                here
-              </Link>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="referrer">
           <Card>
             <CardHeader>
@@ -137,12 +123,12 @@ function TemplateEditor({
                   <CMSImageField
                     uploader={template.upload}
                     value={
-                      values.components.referrer?.image?.src
+                      values?.components?.referrer?.image?.src
                         ? { publicUrl: values.components.referrer?.image?.src }
                         : undefined
                     }
                     onValueChange={(r) => {
-                      editor.set("components.referrer.image", {
+                      props.set("components.referrer.image", {
                         type: "image",
                         src: r?.publicUrl,
                       });
@@ -152,9 +138,9 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Title</Label>
                   <Input
-                    value={values.components.referrer?.title}
+                    value={values?.components?.referrer?.title}
                     onChange={(e) => {
-                      editor.set("components.referrer.title", e.target.value);
+                      props.set("components.referrer.title", e.target.value);
                     }}
                     placeholder="Enter your title"
                   />
@@ -162,9 +148,9 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Description</Label>
                   <Textarea
-                    value={values.components.referrer?.description}
+                    value={values?.components?.referrer?.description}
                     onChange={(e) => {
-                      editor.set(
+                      props.set(
                         "components.referrer.description",
                         e.target.value
                       );
@@ -175,9 +161,9 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Button Text</Label>
                   <Input
-                    value={values.components.referrer?.cta}
+                    value={values?.components?.referrer?.cta}
                     onChange={(e) => {
-                      editor.set("components.referrer.cta", e.target.value);
+                      props.set("components.referrer.cta", e.target.value);
                     }}
                     placeholder="Button Text"
                   />
@@ -185,10 +171,10 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Article</Label>
                   <CMSRichText
-                    value={values.components.referrer?.article?.html ?? ""}
+                    value={values?.components?.referrer?.article?.html ?? ""}
                     uploader={template.upload}
                     onValueChange={(value) => {
-                      editor.set("components.referrer.article", {
+                      props.set("components.referrer.article", {
                         type: "richtext",
                         html: value,
                       });
@@ -224,14 +210,14 @@ function TemplateEditor({
                   <CMSImageField
                     uploader={template.upload}
                     value={
-                      values.components.invitation?.image?.src
+                      values?.components?.invitation?.image?.src
                         ? {
                             publicUrl: values.components.invitation?.image?.src,
                           }
                         : undefined
                     }
                     onValueChange={(r) => {
-                      editor.set("components.invitation.image", {
+                      props.set("components.invitation.image", {
                         type: "image",
                         src: r?.publicUrl,
                       });
@@ -242,9 +228,9 @@ function TemplateEditor({
                   <Label>Title</Label>
 
                   <Input
-                    value={values.components.invitation?.title}
+                    value={values?.components?.invitation?.title}
                     onChange={(e) => {
-                      editor.set("components.invitation.title", e.target.value);
+                      props.set("components.invitation.title", e.target.value);
                     }}
                     placeholder="Enter your title"
                   />
@@ -252,9 +238,11 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Description</Label>
                   <Textarea
-                    value={values.components.invitation?.description as string}
+                    value={
+                      values?.components?.invitation?.description as string
+                    }
                     onChange={(e) => {
-                      editor.set(
+                      props.set(
                         "components.invitation.description",
                         e.target.value
                       );
@@ -265,9 +253,9 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Button Text</Label>
                   <Input
-                    value={values.components.invitation?.cta as string}
+                    value={values?.components?.invitation?.cta as string}
                     onChange={(e) => {
-                      editor.set("components.invitation.cta", e.target.value);
+                      props.set("components.invitation.cta", e.target.value);
                     }}
                     placeholder="Button Text"
                   />
@@ -275,10 +263,10 @@ function TemplateEditor({
                 <div className="grid gap-2">
                   <Label>Article</Label>
                   <CMSRichText
-                    value={values.components.invitation?.article?.html ?? ""}
+                    value={values?.components?.invitation?.article?.html ?? ""}
                     uploader={template.upload}
                     onValueChange={(value) => {
-                      editor.set("components.invitation.article", {
+                      props.set("components.invitation.article", {
                         type: "richtext",
                         html: value,
                       });
@@ -286,6 +274,34 @@ function TemplateEditor({
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="theme">
+          <Card>
+            <CardHeader>
+              <CardTitle>Theme</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2">
+                <NavbarLogoEditor
+                  logo={values?.theme?.navbar?.logo}
+                  uploader={template.upload}
+                  onLogoChange={(file, type) => {
+                    if (type === "src")
+                      props.set("theme.navbar.logo.src", file.publicUrl);
+                    if (type === "srcDark")
+                      props.set("theme.navbar.logo.srcDark", file.publicUrl);
+                  }}
+                />
+              </div>
+              You can{" "}
+              <Link
+                href={`/${project.organization_name}/${project.name}/www`}
+                className="underline"
+              >
+                manage site settings here
+              </Link>
             </CardContent>
           </Card>
         </TabsContent>

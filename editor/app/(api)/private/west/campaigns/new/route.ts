@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
 import { nanoid } from "nanoid";
+import { TemplateData } from "@/theme/templates/west-referral/templates";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -74,7 +75,29 @@ export async function POST(req: Request) {
     .from("template")
     .insert({
       www_id: www.id,
-      data: {},
+      data: {
+        template_id: "grida_west_referral.duo-000",
+        components: {
+          referrer: {
+            title: title,
+            description: description,
+            article: {
+              type: "richtext",
+              html: description,
+            },
+            cta: "Next",
+          },
+          invitation: {
+            title: title,
+            description: description,
+            article: {
+              type: "richtext",
+              html: description,
+            },
+            cta: "Next",
+          },
+        },
+      } satisfies TemplateData.West_Referrral__Duo_001 as any,
       version: "1",
       is_public: true,
     })
