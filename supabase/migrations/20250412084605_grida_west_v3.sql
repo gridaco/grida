@@ -133,7 +133,6 @@ CREATE TABLE grida_west_referral.campaign (
   
   title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 256),                        -- Campaign title (e.g., "Spring 2025 Campaign") / will be public
   description TEXT,                                                                   -- Campaign description / will be public
-  main_image_path TEXT,                                                               -- Campaign image path / will be public
 
   invitation_email_template JSONB,                                                    -- Invitation email template / will be public
   invitation_share_template JSONB,                                                    -- Invitation web share template (web share, sms, copy) / will be public
@@ -189,7 +188,6 @@ SELECT
   id,
   title,
   description,
-  main_image_path,
   invitation_email_template,
   invitation_share_template,
   layout_id,
