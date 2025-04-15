@@ -25,6 +25,7 @@ import { useCampaign } from "../store";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useProject } from "@/scaffolds/workspace";
+import { documentpreviewlink } from "@/lib/internal/url";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -48,8 +49,13 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => {
-            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${id}/default`;
-            open(baseurl + `/t/${referrer.code}`, "_blank");
+            const link = documentpreviewlink({
+              orgid: project.organization_id,
+              projid: project.id,
+              docid: id,
+              path: `/t/${referrer.code}`,
+            });
+            open(link, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />

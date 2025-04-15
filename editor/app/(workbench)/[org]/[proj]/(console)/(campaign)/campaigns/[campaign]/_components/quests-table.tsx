@@ -42,6 +42,7 @@ import { createClientWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import { useProject } from "@/scaffolds/workspace";
+import { documentpreviewlink } from "@/lib/internal/url";
 
 const QUESTNAME = "refer-a-friend"; // TODO:
 
@@ -262,8 +263,13 @@ export function QuestsTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={() => {
-                            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${campaign.id}/default`;
-                            open(baseurl + `/t/${quest.code}`, "_blank");
+                            const link = documentpreviewlink({
+                              orgid: project.organization_id,
+                              projid: project.id,
+                              docid: campaign.id,
+                              path: `/t/${quest.code}`,
+                            });
+                            open(link, "_blank");
                           }}
                         >
                           <OpenInNewWindowIcon className="size-4 me-2" />

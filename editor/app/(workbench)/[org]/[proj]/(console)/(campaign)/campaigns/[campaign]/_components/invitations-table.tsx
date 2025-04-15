@@ -3,7 +3,6 @@
 import React from "react";
 import { ColumnDef, CellContext } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -22,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import { useProject } from "@/scaffolds/workspace";
+import { documentpreviewlink } from "@/lib/internal/url";
 import toast from "react-hot-toast";
 
 function ActionsCell({
@@ -53,8 +53,13 @@ function ActionsCell({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
-            const baseurl = `/private/~/${project.organization_id}/${project.id}/preview/documents/${campaign.id}/default`;
-            open(baseurl + `/t/${invitation.code}`, "_blank");
+            const link = documentpreviewlink({
+              orgid: project.organization_id,
+              projid: project.id,
+              docid: campaign.id,
+              path: `/t/${invitation.code}`,
+            });
+            open(link, "_blank");
           }}
         >
           <OpenInNewWindowIcon className="size-4 me-2" />
