@@ -195,15 +195,27 @@ function Body({
         <CardDescription>
           Configure the settings for your campaign.
         </CardDescription>
-        <Tabs>
+        <Tabs defaultValue="general">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="milestone">Quest Milestone</TabsTrigger>
-            <TabsTrigger value="rewards">Rewards</TabsTrigger>
-            <TabsTrigger value="challenges">Challenges</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger disabled value="milestone">
+              Quest Milestone
+            </TabsTrigger>
+            <TabsTrigger disabled value="rewards">
+              Rewards
+            </TabsTrigger>
+            <TabsTrigger disabled value="challenges">
+              Challenges
+            </TabsTrigger>
+            <TabsTrigger disabled value="events">
+              Events
+            </TabsTrigger>
+            <TabsTrigger disabled value="security">
+              Security
+            </TabsTrigger>
+            <TabsTrigger disabled value="advanced">
+              Advanced
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>

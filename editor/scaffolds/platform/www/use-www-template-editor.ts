@@ -7,7 +7,7 @@ import { FileIO } from "@/lib/file";
 export interface WWWTemplateEditorInstance<T extends Record<string, any>> {
   data: T | null;
   set: (data: T | null) => void;
-  save: () => Promise<void>;
+  save: () => Promise<boolean>;
   upload: FileIO.BucketFileUploaderFn;
   dirty: boolean;
   loading: boolean;
@@ -56,25 +56,31 @@ export function useWWWTemplate<T extends Record<string, any>>(
   const set = useCallback(
     (newdata: T | null) => {
       setData(newdata);
-      // deep compare
-      if (!dirty) {
-        setDirty(JSON.stringify(newdata) !== JSON.stringify(data));
-      }
+      setDirty(
+        JSON.stringify(newdata) !== JSON.stringify(__template?.data ?? null)
+      );
     },
-    [setData]
+    [__template]
   );
 
   const save = useCallback(async () => {
-    if (!data) return;
+    if (!data) return false;
     setSaving(true);
     const { error } = await client
       .from("template")
       .update({ data: data as any })
       .eq("id", id);
+
+    setSaving(false);
+
     if (error) {
       setError(error);
+      return false;
+    } else {
+      setDirty(false);
+      setTemplate((prev) => (prev ? { ...prev, data: data as T } : null));
+      return true;
     }
-    setSaving(false);
   }, [client, id, data]);
 
   const upload: FileIO.BucketFileUploaderFn = useCallback(

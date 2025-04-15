@@ -25,6 +25,7 @@ import {
 } from "@/scaffolds/platform/www";
 import assert from "assert";
 import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
+import toast from "react-hot-toast";
 
 export default function CampaignLayoutDesignerPage() {
   const { layout_id } = useCampaign();
@@ -87,12 +88,21 @@ function TemplateEditor({
         <header className="w-full flex justify-between items-center">
           <TabsList>
             <TabsTrigger value="referrer">Referrer</TabsTrigger>
+            <TabsTrigger value="invitation-ux-overlay">
+              Invitation Ticket
+            </TabsTrigger>
             <TabsTrigger value="invitation">Invitation</TabsTrigger>
             <TabsTrigger value="theme">Theme</TabsTrigger>
           </TabsList>
           <Button
             variant="default"
-            onClick={template.save}
+            onClick={() => {
+              toast.promise(template.save(), {
+                loading: "Saving...",
+                success: "Saved",
+                error: "Error saving",
+              });
+            }}
             disabled={!template.dirty || template.saving}
           >
             {template.saving ? "Saving..." : "Save & Publish Changes"}
@@ -177,6 +187,51 @@ function TemplateEditor({
                       props.set("components.referrer.article", {
                         type: "richtext",
                         html: value,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="invitation-ux-overlay">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Invitation Ticket</span>
+                <span>
+                  <Link
+                    href={`${previewbaseurl}/t/${Platform.WEST.Referral.TEST_CODE_INVITATION}`}
+                    target="_blank"
+                  >
+                    <Button size="xs" variant="outline">
+                      <OpenInNewWindowIcon className="me-2" />
+                      Preview Invitation
+                    </Button>
+                  </Link>
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-8">
+                <div className="grid gap-2">
+                  <Label>Ticket Image</Label>
+                  <CMSImageField
+                    uploader={template.upload}
+                    value={
+                      values?.components?.["invitation-ux-overlay"]?.image?.src
+                        ? {
+                            publicUrl:
+                              values.components["invitation-ux-overlay"]?.image
+                                ?.src,
+                          }
+                        : undefined
+                    }
+                    onValueChange={(r) => {
+                      props.set("components.invitation-ux-overlay.image", {
+                        type: "image",
+                        src: r?.publicUrl,
                       });
                     }}
                   />
