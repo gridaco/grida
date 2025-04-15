@@ -3,11 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import {
-  AvatarIcon,
   ChevronDownIcon,
   DotsHorizontalIcon,
-  FileIcon,
-  ImageIcon,
   PlusIcon,
   ViewGridIcon,
   ViewHorizontalIcon,
@@ -23,8 +20,6 @@ import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,

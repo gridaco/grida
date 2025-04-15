@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     .from("document")
     .insert({
       doctype: "v0_campaign_referral",
+      title: title,
       project_id: project_id,
     })
     .select("id")
