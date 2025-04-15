@@ -39,6 +39,7 @@ CREATE TABLE grida_www.www (
     description TEXT,
     keywords TEXT[],
     lang TEXT DEFAULT 'en' NOT NULL,
+    publisher TEXT,
     favicon JSONB,
     CHECK (
         jsonb_matches_schema(
@@ -94,8 +95,8 @@ CREATE TABLE grida_www.template (
   version TEXT NOT NULL,
   data JSONB NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
-  is_public BOOLEAN DEFAULT false,
-  is_draft BOOLEAN DEFAULT true
+  is_public BOOLEAN NOT NULL DEFAULT false,
+  is_draft BOOLEAN NOT NULL DEFAULT true
 );
 
 ALTER TABLE grida_www.template ENABLE ROW LEVEL SECURITY;

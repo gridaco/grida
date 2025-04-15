@@ -3041,8 +3041,8 @@ export type Database = {
           created_at: string | null
           data: Json
           id: string
-          is_draft: boolean | null
-          is_public: boolean | null
+          is_draft: boolean
+          is_public: boolean
           version: string
           www_id: string
         }
@@ -3050,8 +3050,8 @@ export type Database = {
           created_at?: string | null
           data: Json
           id?: string
-          is_draft?: boolean | null
-          is_public?: boolean | null
+          is_draft?: boolean
+          is_public?: boolean
           version: string
           www_id: string
         }
@@ -3059,8 +3059,8 @@ export type Database = {
           created_at?: string | null
           data?: Json
           id?: string
-          is_draft?: boolean | null
-          is_public?: boolean | null
+          is_draft?: boolean
+          is_public?: boolean
           version?: string
           www_id?: string
         }
@@ -3091,6 +3091,7 @@ export type Database = {
           name: string
           og_image: string | null
           project_id: number
+          publisher: string | null
           theme: Json | null
           title: string | null
         }
@@ -3103,6 +3104,7 @@ export type Database = {
           name?: string
           og_image?: string | null
           project_id: number
+          publisher?: string | null
           theme?: Json | null
           title?: string | null
         }
@@ -3115,6 +3117,7 @@ export type Database = {
           name?: string
           og_image?: string | null
           project_id?: number
+          publisher?: string | null
           theme?: Json | null
           title?: string | null
         }
@@ -4069,7 +4072,7 @@ export type Database = {
         }[]
       }
       citext: {
-        Args: { "": string } | { "": boolean } | { "": unknown }
+        Args: { "": unknown } | { "": string } | { "": boolean }
         Returns: string
       }
       citext_hash: {
