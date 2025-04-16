@@ -76,7 +76,7 @@ export default function InvitationPage({
           //   },
           // },
         }}
-        locale="ko"
+        locale={template.locale}
         data={{
           ...context,
           // FIXME:
