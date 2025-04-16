@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ToasterWithMax } from "@/components/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
-import { createRouteHandlerWWWClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { sb } from "@/lib/supabase/server";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Tenant } from "@/lib/tenant";
 import "../../../editor.css";
@@ -22,7 +22,12 @@ export async function generateMetadata({
   const { tenant } = await params;
 
   const cookieStore = cookies();
-  const client = createRouteHandlerWWWClient(cookieStore);
+  const headersList = headers();
+
+  const client = sb.rr.www.createRouteHandlerClient({
+    headers: headersList,
+    cookies: cookieStore,
+  });
 
   const { data, error } = await client
     .from("www_public")

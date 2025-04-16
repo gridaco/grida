@@ -1,6 +1,6 @@
 import { Platform } from "@/lib/platform";
-import { grida_west_referral_client } from "@/lib/supabase/server";
-import { headers } from "next/headers";
+import { sb } from "@/lib/supabase/server";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
@@ -9,10 +9,16 @@ export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const headersList = await headers();
+  const cookieStore = await cookies();
   const campaign_id = headersList.get("x-grida-west-campaign-id");
   const code = headersList.get("x-grida-west-token-code");
   assert(code, "x-grida-west-token-code is required");
   assert(campaign_id, "x-grida-west-campaign-id is required");
+
+  const rrwest = sb.rr.west_referral.createClient({
+    headers: headersList,
+    cookies: cookieStore,
+  });
 
   // #region test codes
   if (
@@ -20,12 +26,11 @@ export async function GET(req: NextRequest) {
     code === Platform.WEST.Referral.TEST_CODE_INVITATION
   ) {
     const now = new Date().toISOString();
-    const { data: campaign, error: campaing_err } =
-      await grida_west_referral_client
-        .from("campaign_public")
-        .select()
-        .eq("id", campaign_id)
-        .single();
+    const { data: campaign, error: campaing_err } = await rrwest
+      .from("campaign_public")
+      .select()
+      .eq("id", campaign_id)
+      .single();
 
     if (campaing_err) {
       console.error(
@@ -68,11 +73,15 @@ export async function GET(req: NextRequest) {
   }
   // #endregion
 
-  const { data: ref, error: ref_err } = await grida_west_referral_client
-    .rpc("lookup", {
-      p_campaign_id: campaign_id,
-      p_code: code,
-    })
+  const { data: ref, error: ref_err } = await rrwest
+    .rpc(
+      "lookup",
+      {
+        p_campaign_id: campaign_id,
+        p_code: code,
+      },
+      { get: true }
+    )
     .single();
 
   if (ref_err) console.error("lookup failed", ref_err);
@@ -89,7 +98,7 @@ export async function GET(req: NextRequest) {
   > | null = null;
   switch (ref.type) {
     case "referrer": {
-      const { data, error } = await grida_west_referral_client
+      const { data, error } = await rrwest
         .from("referrer_public_secure")
         .select(
           `
@@ -118,7 +127,7 @@ export async function GET(req: NextRequest) {
       break;
     }
     case "invitation": {
-      const { data, error } = await grida_west_referral_client
+      const { data, error } = await rrwest
         .from("invitation")
         .select(
           `
