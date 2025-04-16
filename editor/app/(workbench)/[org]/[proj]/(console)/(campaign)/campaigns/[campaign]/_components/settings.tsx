@@ -104,7 +104,7 @@ function useCampaignData(id: string) {
       const { data: updated, error } = await client
         .from("campaign")
         .update({
-          name: data.title,
+          title: data.title,
           description: data.description,
           enabled: data.enabled,
           scheduling_tz: data.scheduling_tz,
@@ -246,12 +246,12 @@ function Body({
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Campaign Name</FormLabel>
+                      <FormLabel>Campaign Title</FormLabel>
                       <FormControl>
                         <Input placeholder="Spring 2025 Campaign" {...field} />
                       </FormControl>
                       <FormDescription>
-                        Enter a name for your campaign (1-40 characters).
+                        Enter a title for your campaign (1-40 characters).
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
