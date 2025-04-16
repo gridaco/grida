@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { TanantMiddleware } from "./lib/tenant/middleware";
+import { Env } from "./env";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -58,6 +59,14 @@ export async function middleware(req: NextRequest) {
   const hostname = url.hostname;
 
   const tanentwww = TanantMiddleware.analyze(url, !IS_HOSTED);
+
+  // www.grida.site => grida.co
+  if (tanentwww.name === "www") {
+    const website = new URL("/", Env.web.HOST);
+    return NextResponse.redirect(website, {
+      status: 301,
+    });
+  }
 
   if (tanentwww.name) {
     const url = req.nextUrl.clone();
