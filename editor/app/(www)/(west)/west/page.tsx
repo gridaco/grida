@@ -25,6 +25,7 @@ import { cn } from "@/utils";
 import CustomDomainDemo from "./custom-domain-demo";
 import { AnalysisIcon } from "@/www/icons";
 import Hello from "./hello";
+import Footer from "@/www/footer";
 
 export default function WestPage() {
   return (
@@ -38,7 +39,7 @@ export default function WestPage() {
       <HowItWorksSection />
       <HorizontalScrollDemo />
       <WestCTA />
-      <FooterWithCTA />
+      <Footer />
     </main>
   );
 }
@@ -74,17 +75,21 @@ function HeroSection() {
               <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-800">
                 Saddle up for success
               </div>
-              <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl flex flex-wrap items-center gap-2">
-                Welcome to
-                <span className="relative md:w-[190px] md:h-[70px] w-[160px] h-[40px]">
-                  <Image
-                    src="/west/logo-with-type.png"
-                    alt="Wild West Logo"
-                    fill
-                    className="object-contain dark:invert"
-                  />
-                </span>
-                of referral marketing
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl max-w-xl">
+                <>
+                  <span>Welcome to</span>
+                  <span className="block mt-2">
+                    <span className="inline-block align-middle relative w-40 sm:w-48 md:w-56 h-auto aspect-[190/70]">
+                      <Image
+                        src="/west/logo-with-type.png"
+                        alt="Wild West Logo"
+                        fill
+                        className="object-contain dark:invert"
+                      />
+                    </span>
+                  </span>
+                  <span className="block mt-2">of referral marketing</span>
+                </>
               </h1>
               <p className="text-lg text-muted-foreground">
                 Create engaging referral campaigns, design interactive quests,
@@ -169,7 +174,7 @@ function FeaturesSection() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.0, ease: "easeOut" }}
         >
-          <div className="grid gap-8 md:grid-cols-2">
+          <div className="grid gap-8  md:grid-cols-2">
             <FeatureCard
               icon={<Link2 />}
               title="Generate Referral Code & Invite"
@@ -322,8 +327,8 @@ function FeatureCard({
   imageSrc?: string;
 }) {
   return (
-    <div className="rounded-lg border bg-card dark:bg-muted px-6 py-3 shadow-sm transition-all hover:bg-neutral-50 dark:hover:bg-white/10 group">
-      <div className="flex flex-row items-end h-full gap-6">
+    <div className="rounded-lg border bg-card dark:bg-muted px-6 py-6 md:py-3 shadow-sm transition-all hover:bg-neutral-50 dark:hover:bg-white/10 group">
+      <div className="flex flex-col items-center sm:flex-row sm:items-end h-full gap-6">
         <div className="flex-1 self-end">
           <div className="mb-4 text-3xl opacity-50">{icon}</div>
           <h3 className="mb-2 text-xl font-bold">{title}</h3>
@@ -471,14 +476,14 @@ function InteractiveCardDemo() {
           </p>
         </div>
 
-        <div className="max-w-lg lg:max-w-6xl relative h-[500px] py-20 px-40 overflow-hidden flex items-end justify-center bg-muted/50 border border-muted rounded-lg transition-all">
+        <div className="max-w-sm md:max-w-lg lg:max-w-6xl relative h-[500px] py-20 px-40 overflow-hidden flex items-end justify-center bg-muted/50 border border-muted rounded-lg transition-all">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             viewport={{ once: true }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.0, ease: "easeOut" }}
           >
-            <div className="relative w-[450px] h-[500px] rounded-3xl shadow-lg bg-white border border-mute overflow-hidden">
+            <div className="relative w-[350px] md:w-[450px] h-[500px] rounded-3xl shadow-lg bg-white border border-mute overflow-hidden">
               <div className="absolute inset-0 -translate-y-1">
                 {/* 기존 카드 슬라이더 컴포넌트 */}
                 <div className="relative h-full w-full flex items-center justify-center perspective">
@@ -728,8 +733,8 @@ function WestCTA() {
       transition={{ duration: 1.0, ease: "easeOut" }}
     >
       <section className="flex justify-center py-12 mb-60 ">
-        <div className="max-w-md md:max-w-2xl lg:max-w-4xl w-full bg-muted/50 rounded-xl border flex flex-col items-center text-center space-y-6 px-6 py-12 transition-all">
-          <h2 className="text-2xl md:text-3xl font-bold">
+        <div className="max-w-sm md:max-w-2xl lg:max-w-4xl w-full bg-muted/50 rounded-xl border flex flex-col items-center text-center space-y-6 px-6 py-12 transition-all">
+          <h2 className="text-xl md:text-3xl font-bold">
             Elevate Your Referral Marketing
             <br /> with Grida West Enterprise
           </h2>

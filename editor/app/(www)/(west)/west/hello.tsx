@@ -9,7 +9,7 @@ export default function HelloDemo() {
   const [scratchComplete, setScratchComplete] = React.useState(false);
 
   return (
-    <div className="w-[400px] h-[600px] dark:bg-white/10 bg-white/40 overflow-hidden rounded-3xl border shadow-md p-4 flex flex-col items-center justify-center">
+    <div className="w-[350px] h-[550px] md:w-[400px] md:h-[600px] dark:bg-white/10 bg-white/40 overflow-hidden rounded-3xl border shadow-md p-4 flex flex-col items-center justify-center">
       <div className="w-[40px] h-[40px] items-center justify-center">
         <GridaLogo />
       </div>
