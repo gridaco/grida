@@ -32,9 +32,11 @@ export namespace FileIO {
     document_id: string | null;
   };
 
-  export type GridaAssetUploaderFn = (file: File) => Promise<GridaAsset>;
+  export interface IPublicUrl {
+    publicUrl: string;
+  }
 
-  export type UploadResult = {
+  export type BucketObject = {
     /**
      * storage.objects.id
      */
@@ -42,8 +44,13 @@ export namespace FileIO {
     bucket: string;
     path: string;
     fullPath: string;
-    publicUrl: string;
   };
+
+  export type UploadResult = BucketObject & IPublicUrl;
+
+  export type BucketFileUploaderFn = (file: File) => Promise<UploadResult>;
+
+  export type GridaAssetUploaderFn = (file: File) => Promise<GridaAsset>;
 
   /**
    * direct uploader - uploads directly to resolved path
@@ -53,16 +60,14 @@ export namespace FileIO {
   /**
    * staged uploader - uploads to tmp staged
    */
-  export type StagedFileUploaderFn = (
-    file: File
-  ) => Promise<{ path: string; fullPath: string }>;
+  export type StagedFileUploaderFn = (file: File) => Promise<BucketObject>;
 
   /**
    * previewer for staged uploader
    */
   export type StagedFileResolverFn = (file: {
     path: string;
-  }) => Promise<{ publicUrl: string } | null> | { publicUrl: string };
+  }) => Promise<BucketObject | null> | BucketObject;
 
   /**
    * When the uploaded file is not a final file, but a temporary staged file which backend handler will move to the final path

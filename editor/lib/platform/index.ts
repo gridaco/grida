@@ -546,6 +546,9 @@ export namespace Platform.CustomerAuthPolicy {
 }
 
 export namespace Platform.WEST.Referral {
+  export const TEST_CODE_REFERRER = "test_referrer";
+  export const TEST_CODE_INVITATION = "test_invitation";
+
   export type TokenRole = "referrer" | "invitation";
 
   export interface ImportParticipantsRequestBody {
@@ -555,34 +558,35 @@ export namespace Platform.WEST.Referral {
 
   export type Campaign = {
     id: string;
-    slug: string;
-    public: Record<string, string> | unknown;
-    created_at: string;
+    project_id: number;
+    title: string;
     description: string | null;
     enabled: boolean;
-    is_invitee_name_exposed_to_public_dangerously: boolean;
-    is_referrer_name_exposed_to_public_dangerously: boolean;
+    created_at: string;
+    invitation_email_template: unknown | null;
+    invitation_share_template: unknown | null;
+    layout_id: string | null;
+    is_invitee_profile_exposed_to_public_dangerously: boolean;
+    is_referrer_profile_exposed_to_public_dangerously: boolean;
     max_invitations_per_referrer: number | null;
-    name: string;
-    project_id: number;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
+    public: Record<string, string> | unknown;
   };
 
   export type CampaignPublic = {
     id: string;
-    slug: string;
-    conversion_currency: string | null;
-    conversion_value: number | null;
-    enabled: boolean | null;
-    max_invitations_per_referrer: number | null;
-    name: string | null;
-    public: Record<string, string> | unknown;
+    enabled: boolean;
+    title: string;
+    description: string | null;
     reward_currency: string;
+    max_invitations_per_referrer: number | null;
+    layout_id: string | null;
     scheduling_close_at: string | null;
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
+    public: Record<string, string> | unknown;
   };
 
   export type TokenEvent = {
@@ -627,7 +631,6 @@ export namespace Platform.WEST.Referral {
     code: string | null;
     referrer_name: string | null;
     campaign: CampaignPublic;
-    created_at: string;
     invitation_count: number;
     invitations: {
       id: string;
@@ -650,34 +653,39 @@ export namespace Platform.WEST.Referral {
     created_at: string;
   };
 
-  const _x_grida_west_campaign_slug = "x-grida-west-campaign-slug";
+  const _x_grida_west_campaign_id = "x-grida-west-campaign-id";
   const _x_grida_west_token_code = "x-grida-west-token-code";
 
   export class WestReferralClient {
-    constructor(readonly slug: string) {}
+    readonly BASE_URL: string;
+    constructor(
+      readonly campaign_id: string,
+      config?: {
+        base_url: string;
+      }
+    ) {
+      this.BASE_URL = config?.base_url ?? "/api/west";
+    }
 
-    read(
-      code: string,
-      type: TokenRole = "referrer"
-    ): Promise<{
+    read(code: string): Promise<{
       data: ReferrerPublicRead | InvitationPublicRead;
     }> {
-      return fetch(`/west/t`, {
+      return fetch(`${this.BASE_URL}/t`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
     }
 
     invite(code: string): Promise<{ data: Invitation }> {
-      return fetch(`/west/t/invite`, {
+      return fetch(`${this.BASE_URL}/t/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       }).then((res) => res.json());
@@ -687,11 +695,11 @@ export namespace Platform.WEST.Referral {
       code: string,
       invitation_id: string
     ): Promise<{ data: Invitation }> {
-      return fetch(`/west/t/refresh`, {
+      return fetch(`${this.BASE_URL}/t/refresh`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
           "x-grida-west-invitation-id": invitation_id,
         },
@@ -699,11 +707,11 @@ export namespace Platform.WEST.Referral {
     }
 
     claim(code: string, owner_id: string) {
-      return fetch(`/west/t/claim`, {
+      return fetch(`${this.BASE_URL}/t/claim`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           "x-grida-customer-id": owner_id,
           [_x_grida_west_token_code]: code,
         },
@@ -713,7 +721,7 @@ export namespace Platform.WEST.Referral {
     }
 
     track(code: string, name: string, data?: Record<string, string>) {
-      fetch(`/west/t/track`, {
+      fetch(`${this.BASE_URL}/t/track`, {
         method: "POST",
         body: JSON.stringify({
           name: name,
@@ -721,7 +729,7 @@ export namespace Platform.WEST.Referral {
         }),
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_slug]: this.slug,
+          [_x_grida_west_campaign_id]: this.campaign_id,
           [_x_grida_west_token_code]: code,
         },
       });
@@ -739,7 +747,7 @@ export namespace Platform.WEST.Referral.Wizard {
     | "custom";
 
   export type CampaignData = {
-    name: string;
+    title: string;
     description: string;
     reward_strategy_type: RewardType;
     reward_currency_type: RewardCurrencyType;
@@ -768,8 +776,8 @@ export namespace Platform.WEST.Referral.Wizard {
     }>;
     conversion_currency: string;
     conversion_value: number | null;
-    is_referrer_name_exposed_to_public_dangerously: boolean;
-    is_invitee_name_exposed_to_public_dangerously: boolean;
+    is_referrer_profile_exposed_to_public_dangerously: boolean;
+    is_invitee_profile_exposed_to_public_dangerously: boolean;
     enabled: boolean;
     scheduling: {
       __prefers_start_now: boolean;

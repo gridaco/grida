@@ -64,7 +64,8 @@ export type ResourceTypeIconName =
   | "v0_form"
   | "v0_site"
   | "v0_canvas"
-  | "v0_schema";
+  | "v0_schema"
+  | "v0_campaign_referral";
 
 export function ResourceTypeIcon({
   type,
@@ -115,6 +116,7 @@ export function ResourceTypeIcon({
     case "chart-pie":
       return <PieChartIcon {...props} />;
     case "campaign":
+    case "v0_campaign_referral":
       return <MegaphoneIcon {...props} />;
     case "connect":
       return <PlugIcon {...props} />;

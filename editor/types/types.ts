@@ -500,10 +500,14 @@ export interface Project {
 
 export type GDocumentType =
   | "v0_form"
+  /**
+   * @deprecated
+   */
   | "v0_site"
   | "v0_schema"
   | "v0_bucket"
-  | "v0_canvas";
+  | "v0_canvas"
+  | "v0_campaign_referral";
 
 export interface GDocument {
   id: string;

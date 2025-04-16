@@ -502,17 +502,11 @@ export type Database = {
     }
     Functions: {
       generate_combinations: {
-        Args: {
-          options: Json
-          index: number
-          current: Json
-        }
+        Args: { options: Json; index: number; current: Json }
         Returns: Json
       }
       get_inventory_items_with_committed: {
-        Args: {
-          p_store_id: number
-        }
+        Args: { p_store_id: number }
         Returns: {
           id: number
           created_at: string
@@ -526,10 +520,7 @@ export type Database = {
         }[]
       }
       get_inventory_with_committed: {
-        Args: {
-          p_store_id: number
-          p_sku: string
-        }
+        Args: { p_store_id: number; p_sku: string }
         Returns: {
           id: number
           created_at: string
@@ -1565,29 +1556,19 @@ export type Database = {
     }
     Functions: {
       core_check_max_responses: {
-        Args: {
-          p_form_id: string
-        }
+        Args: { p_form_id: string }
         Returns: undefined
       }
       rls_form: {
-        Args: {
-          p_form_id: string
-        }
+        Args: { p_form_id: string }
         Returns: boolean
       }
       rpc_check_max_responses: {
-        Args: {
-          form_id: string
-        }
+        Args: { form_id: string }
         Returns: undefined
       }
       set_response_session_field_value: {
-        Args: {
-          session_id: string
-          key: string
-          value: Json
-        }
+        Args: { session_id: string; key: string; value: Json }
         Returns: undefined
       }
     }
@@ -1719,16 +1700,11 @@ export type Database = {
     }
     Functions: {
       create_secret_connection_supabase_service_key: {
-        Args: {
-          p_supabase_project_id: number
-          p_secret: string
-        }
+        Args: { p_supabase_project_id: number; p_secret: string }
         Returns: string
       }
       reveal_secret_connection_supabase_service_key: {
-        Args: {
-          p_supabase_project_id: number
-        }
+        Args: { p_supabase_project_id: number }
         Returns: string
       }
     }
@@ -1990,19 +1966,20 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
-          image_path: string | null
-          is_invitee_name_exposed_to_public_dangerously: boolean
-          is_referrer_name_exposed_to_public_dangerously: boolean
+          invitation_email_template: Json | null
+          invitation_share_template: Json | null
+          is_invitee_profile_exposed_to_public_dangerously: boolean
+          is_referrer_profile_exposed_to_public_dangerously: boolean
+          layout_id: string | null
           max_invitations_per_referrer: number | null
           metadata: Json | null
-          name: string
           project_id: number
           public: Json | null
           reward_currency: string
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          slug: string
+          title: string
         }
         Insert: {
           conversion_currency?: string
@@ -2010,20 +1987,21 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
-          id?: string
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean
-          is_referrer_name_exposed_to_public_dangerously?: boolean
+          id: string
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
+          is_invitee_profile_exposed_to_public_dangerously?: boolean
+          is_referrer_profile_exposed_to_public_dangerously?: boolean
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
           metadata?: Json | null
-          name: string
           project_id: number
           public?: Json | null
           reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string
+          title: string
         }
         Update: {
           conversion_currency?: string
@@ -2032,19 +2010,20 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
-          image_path?: string | null
-          is_invitee_name_exposed_to_public_dangerously?: boolean
-          is_referrer_name_exposed_to_public_dangerously?: boolean
+          invitation_email_template?: Json | null
+          invitation_share_template?: Json | null
+          is_invitee_profile_exposed_to_public_dangerously?: boolean
+          is_referrer_profile_exposed_to_public_dangerously?: boolean
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
           metadata?: Json | null
-          name?: string
           project_id?: number
           public?: Json | null
           reward_currency?: string
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string
+          title?: string
         }
         Relationships: []
       }
@@ -2723,46 +2702,43 @@ export type Database = {
     Views: {
       campaign_public: {
         Row: {
-          conversion_currency: string | null
-          conversion_value: number | null
+          description: string | null
           enabled: boolean | null
           id: string | null
+          layout_id: string | null
           max_invitations_per_referrer: number | null
-          name: string | null
           public: Json | null
           reward_currency: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
-          slug: string | null
+          title: string | null
         }
         Insert: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
+          description?: string | null
           enabled?: boolean | null
           id?: string | null
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
-          name?: string | null
           public?: Json | null
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string | null
+          title?: string | null
         }
         Update: {
-          conversion_currency?: string | null
-          conversion_value?: number | null
+          description?: string | null
           enabled?: boolean | null
           id?: string | null
+          layout_id?: string | null
           max_invitations_per_referrer?: number | null
-          name?: string | null
           public?: Json | null
           reward_currency?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
-          slug?: string | null
+          title?: string | null
         }
         Relationships: []
       }
@@ -2877,11 +2853,7 @@ export type Database = {
         }[]
       }
       claim: {
-        Args: {
-          p_campaign_ref: string
-          p_code: string
-          p_customer_id: string
-        }
+        Args: { p_campaign_id: string; p_code: string; p_customer_id: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2892,12 +2864,6 @@ export type Database = {
           metadata: Json | null
           referrer_id: string
         }
-      }
-      find_campaign_id_by_slug: {
-        Args: {
-          p_slug: unknown
-        }
-        Returns: string
       }
       flag: {
         Args: {
@@ -2914,7 +2880,7 @@ export type Database = {
       }
       invite: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_code: string
           p_new_invitation_code?: string
         }
@@ -2930,10 +2896,7 @@ export type Database = {
         }
       }
       lookup: {
-        Args: {
-          p_campaign_ref: string
-          p_code: string
-        }
+        Args: { p_campaign_id: string; p_code: string }
         Returns: {
           campaign_id: string
           code: string
@@ -2942,7 +2905,7 @@ export type Database = {
       }
       refresh: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_invitation_id: string
           p_new_invitation_code?: string
         }
@@ -2958,14 +2921,12 @@ export type Database = {
         }
       }
       rls_campaign: {
-        Args: {
-          p_campaign_id: string
-        }
+        Args: { p_campaign_id: string }
         Returns: boolean
       }
       track: {
         Args: {
-          p_campaign_ref: string
+          p_campaign_id: string
           p_code: string
           p_name: string
           p_data?: Json
@@ -2975,6 +2936,276 @@ export type Database = {
     }
     Enums: {
       token_role: "referrer" | "invitation"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_www: {
+    Tables: {
+      layout: {
+        Row: {
+          base_path: string | null
+          created_at: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
+          id: string
+          metadata: Json | null
+          name: string
+          parent_layout_id: string | null
+          path_tokens: string[] | null
+          template_id: string
+          updated_at: string
+          www_id: string
+        }
+        Insert: {
+          base_path?: string | null
+          created_at?: string
+          document_id: string
+          document_type: Database["public"]["Enums"]["doctype"]
+          id?: string
+          metadata?: Json | null
+          name: string
+          parent_layout_id?: string | null
+          path_tokens?: string[] | null
+          template_id: string
+          updated_at?: string
+          www_id: string
+        }
+        Update: {
+          base_path?: string | null
+          created_at?: string
+          document_id?: string
+          document_type?: Database["public"]["Enums"]["doctype"]
+          id?: string
+          metadata?: Json | null
+          name?: string
+          parent_layout_id?: string | null
+          path_tokens?: string[] | null
+          template_id?: string
+          updated_at?: string
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "public_route"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "template"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template: {
+        Row: {
+          created_at: string | null
+          data: Json
+          id: string
+          is_draft: boolean
+          is_public: boolean
+          version: string
+          www_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          id?: string
+          is_draft?: boolean
+          is_public?: boolean
+          version: string
+          www_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          id?: string
+          is_draft?: boolean
+          is_public?: boolean
+          version?: string
+          www_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      www: {
+        Row: {
+          description: string | null
+          favicon: Json | null
+          id: string
+          keywords: string[] | null
+          lang: string
+          name: string
+          og_image: string | null
+          project_id: number
+          publisher: string | null
+          theme: Json | null
+          title: string | null
+        }
+        Insert: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string
+          keywords?: string[] | null
+          lang?: string
+          name?: string
+          og_image?: string | null
+          project_id: number
+          publisher?: string | null
+          theme?: Json | null
+          title?: string | null
+        }
+        Update: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string
+          keywords?: string[] | null
+          lang?: string
+          name?: string
+          og_image?: string | null
+          project_id?: number
+          publisher?: string | null
+          theme?: Json | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      public_route: {
+        Row: {
+          document_id: string | null
+          document_type: Database["public"]["Enums"]["doctype"] | null
+          id: string | null
+          metadata: Json | null
+          parent_layout_id: string | null
+          route_path: string | null
+          template_id: string | null
+          type: string | null
+          www_id: string | null
+          www_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "layout"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_parent_layout_id_fkey"
+            columns: ["parent_layout_id"]
+            isOneToOne: false
+            referencedRelation: "public_route"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "template"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layout_www_id_fkey"
+            columns: ["www_id"]
+            isOneToOne: false
+            referencedRelation: "www_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      www_public: {
+        Row: {
+          description: string | null
+          favicon: Json | null
+          id: string | null
+          keywords: string[] | null
+          lang: string | null
+          name: string | null
+          og_image: string | null
+          title: string | null
+        }
+        Insert: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string | null
+          keywords?: string[] | null
+          lang?: string | null
+          name?: string | null
+          og_image?: string | null
+          title?: string | null
+        }
+        Update: {
+          description?: string | null
+          favicon?: Json | null
+          id?: string | null
+          keywords?: string[] | null
+          lang?: string | null
+          name?: string | null
+          og_image?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      rls_www: {
+        Args: { p_www_id: string }
+        Returns: boolean
+      }
+    }
+    Enums: {
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3665,11 +3896,12 @@ export type Database = {
       add_compression_policy: {
         Args: {
           hypertable: unknown
-          compress_after: unknown
+          compress_after?: unknown
           if_not_exists?: boolean
           schedule_interval?: unknown
           initial_start?: string
           timezone?: string
+          compress_created_before?: unknown
         }
         Returns: number
       }
@@ -3685,35 +3917,17 @@ export type Database = {
         }
         Returns: number
       }
-      add_data_node: {
-        Args: {
-          node_name: unknown
-          host: string
-          database?: unknown
-          port?: number
-          if_not_exists?: boolean
-          bootstrap?: boolean
-          password?: string
-        }
-        Returns: {
-          node_name: unknown
-          host: string
-          port: number
-          database: unknown
-          node_created: boolean
-          database_created: boolean
-          extension_created: boolean
-        }[]
-      }
       add_dimension: {
-        Args: {
-          hypertable: unknown
-          column_name: unknown
-          number_partitions?: number
-          chunk_time_interval?: unknown
-          partitioning_func?: unknown
-          if_not_exists?: boolean
-        }
+        Args:
+          | {
+              hypertable: unknown
+              column_name: unknown
+              number_partitions?: number
+              chunk_time_interval?: unknown
+              partitioning_func?: unknown
+              if_not_exists?: boolean
+            }
+          | { hypertable: unknown; dimension: unknown; if_not_exists?: boolean }
         Returns: {
           dimension_id: number
           schema_name: unknown
@@ -3748,29 +3962,14 @@ export type Database = {
       add_retention_policy: {
         Args: {
           relation: unknown
-          drop_after: unknown
+          drop_after?: unknown
           if_not_exists?: boolean
           schedule_interval?: unknown
           initial_start?: string
           timezone?: string
+          drop_created_before?: unknown
         }
         Returns: number
-      }
-      alter_data_node: {
-        Args: {
-          node_name: unknown
-          host?: string
-          database?: unknown
-          port?: number
-          available?: boolean
-        }
-        Returns: {
-          node_name: unknown
-          host: string
-          port: number
-          database: unknown
-          available: boolean
-        }[]
       }
       alter_job: {
         Args: {
@@ -3784,6 +3983,9 @@ export type Database = {
           next_start?: string
           if_exists?: boolean
           check_config?: unknown
+          fixed_schedule?: boolean
+          initial_start?: string
+          timezone?: string
         }
         Returns: {
           job_id: number
@@ -3795,26 +3997,14 @@ export type Database = {
           config: Json
           next_start: string
           check_config: string
+          fixed_schedule: boolean
+          initial_start: string
+          timezone: string
         }[]
       }
       approximate_row_count: {
-        Args: {
-          relation: unknown
-        }
+        Args: { relation: unknown }
         Returns: number
-      }
-      attach_data_node: {
-        Args: {
-          node_name: unknown
-          hypertable: unknown
-          if_not_attached?: boolean
-          repartition?: boolean
-        }
-        Returns: {
-          hypertable_id: number
-          node_hypertable_id: number
-          node_name: unknown
-        }[]
       }
       attach_tablespace: {
         Args: {
@@ -3824,10 +4014,24 @@ export type Database = {
         }
         Returns: undefined
       }
-      chunk_compression_stats: {
+      by_hash: {
         Args: {
-          hypertable: unknown
+          column_name: unknown
+          number_partitions: number
+          partition_func?: unknown
         }
+        Returns: unknown
+      }
+      by_range: {
+        Args: {
+          column_name: unknown
+          partition_interval?: unknown
+          partition_func?: unknown
+        }
+        Returns: unknown
+      }
+      chunk_compression_stats: {
+        Args: { hypertable: unknown }
         Returns: {
           chunk_schema: unknown
           chunk_name: unknown
@@ -3844,9 +4048,7 @@ export type Database = {
         }[]
       }
       chunks_detailed_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           chunk_schema: unknown
           chunk_name: unknown
@@ -3857,118 +4059,63 @@ export type Database = {
           node_name: unknown
         }[]
       }
-      citext:
-        | {
-            Args: {
-              "": boolean
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: string
-          }
+      citext: {
+        Args: { "": string } | { "": boolean } | { "": unknown }
+        Returns: string
+      }
       citext_hash: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: number
       }
       citextin: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       citextout: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: unknown
       }
       citextrecv: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       citextsend: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string
       }
       compress_chunk: {
         Args: {
           uncompressed_chunk: unknown
           if_not_compressed?: boolean
+          recompress?: boolean
         }
         Returns: unknown
       }
-      create_distributed_hypertable: {
-        Args: {
-          relation: unknown
-          time_column_name: unknown
-          partitioning_column?: unknown
-          number_partitions?: number
-          associated_schema_name?: unknown
-          associated_table_prefix?: unknown
-          chunk_time_interval?: unknown
-          create_default_indexes?: boolean
-          if_not_exists?: boolean
-          partitioning_func?: unknown
-          migrate_data?: boolean
-          chunk_target_size?: string
-          chunk_sizing_func?: unknown
-          time_partitioning_func?: unknown
-          replication_factor?: number
-          data_nodes?: unknown[]
-        }
-        Returns: {
-          hypertable_id: number
-          schema_name: unknown
-          table_name: unknown
-          created: boolean
-        }[]
-      }
-      create_distributed_restore_point: {
-        Args: {
-          name: string
-        }
-        Returns: {
-          node_name: unknown
-          node_type: string
-          restore_point: unknown
-        }[]
-      }
       create_hypertable: {
-        Args: {
-          relation: unknown
-          time_column_name: unknown
-          partitioning_column?: unknown
-          number_partitions?: number
-          associated_schema_name?: unknown
-          associated_table_prefix?: unknown
-          chunk_time_interval?: unknown
-          create_default_indexes?: boolean
-          if_not_exists?: boolean
-          partitioning_func?: unknown
-          migrate_data?: boolean
-          chunk_target_size?: string
-          chunk_sizing_func?: unknown
-          time_partitioning_func?: unknown
-          replication_factor?: number
-          data_nodes?: unknown[]
-          distributed?: boolean
-        }
+        Args:
+          | {
+              relation: unknown
+              time_column_name: unknown
+              partitioning_column?: unknown
+              number_partitions?: number
+              associated_schema_name?: unknown
+              associated_table_prefix?: unknown
+              chunk_time_interval?: unknown
+              create_default_indexes?: boolean
+              if_not_exists?: boolean
+              partitioning_func?: unknown
+              migrate_data?: boolean
+              chunk_target_size?: string
+              chunk_sizing_func?: unknown
+              time_partitioning_func?: unknown
+            }
+          | {
+              relation: unknown
+              dimension: unknown
+              create_default_indexes?: boolean
+              if_not_exists?: boolean
+              migrate_data?: boolean
+            }
         Returns: {
           hypertable_id: number
           schema_name: unknown
@@ -3977,38 +4124,12 @@ export type Database = {
         }[]
       }
       decompress_chunk: {
-        Args: {
-          uncompressed_chunk: unknown
-          if_compressed?: boolean
-        }
+        Args: { uncompressed_chunk: unknown; if_compressed?: boolean }
         Returns: unknown
       }
-      delete_data_node: {
-        Args: {
-          node_name: unknown
-          if_exists?: boolean
-          force?: boolean
-          repartition?: boolean
-          drop_database?: boolean
-        }
-        Returns: boolean
-      }
       delete_job: {
-        Args: {
-          job_id: number
-        }
+        Args: { job_id: number }
         Returns: undefined
-      }
-      detach_data_node: {
-        Args: {
-          node_name: unknown
-          hypertable?: unknown
-          if_attached?: boolean
-          force?: boolean
-          repartition?: boolean
-          drop_remote_data?: boolean
-        }
-        Returns: number
       }
       detach_tablespace: {
         Args: {
@@ -4019,10 +4140,20 @@ export type Database = {
         Returns: number
       }
       detach_tablespaces: {
+        Args: { hypertable: unknown }
+        Returns: number
+      }
+      disable_chunk_skipping: {
         Args: {
           hypertable: unknown
+          column_name: unknown
+          if_not_exists?: boolean
         }
-        Returns: number
+        Returns: {
+          hypertable_id: number
+          column_name: unknown
+          disabled: boolean
+        }[]
       }
       drop_chunks: {
         Args: {
@@ -4030,45 +4161,42 @@ export type Database = {
           older_than?: unknown
           newer_than?: unknown
           verbose?: boolean
+          created_before?: unknown
+          created_after?: unknown
         }
         Returns: string[]
       }
-      flatten_jsonb_object_values: {
+      enable_chunk_skipping: {
         Args: {
-          obj: Json
+          hypertable: unknown
+          column_name: unknown
+          if_not_exists?: boolean
         }
+        Returns: {
+          column_stats_id: number
+          enabled: boolean
+        }[]
+      }
+      flatten_jsonb_object_values: {
+        Args: { obj: Json }
         Returns: string
       }
       gen_random_slug: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      generate_combinations:
-        | {
-            Args: {
-              option_ids: number[]
-              product_id: number
-              store_id: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              product_id: number
-              option_value_combinations: number[]
-            }
-            Returns: undefined
-          }
+      generate_combinations: {
+        Args:
+          | { product_id: number; option_value_combinations: number[] }
+          | { option_ids: number[]; product_id: number; store_id: number }
+        Returns: undefined
+      }
       get_organizations_for_user: {
-        Args: {
-          user_id: string
-        }
+        Args: { user_id: string }
         Returns: number[]
       }
       get_projects_for_user: {
-        Args: {
-          user_id: string
-        }
+        Args: { user_id: string }
         Returns: number[]
       }
       get_telemetry_report: {
@@ -4076,39 +4204,40 @@ export type Database = {
         Returns: Json
       }
       gtrgm_compress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_decompress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_in: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_options: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: undefined
       }
       gtrgm_out: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
+      hypertable_approximate_detailed_size: {
+        Args: { relation: unknown }
+        Returns: {
+          table_bytes: number
+          index_bytes: number
+          toast_bytes: number
+          total_bytes: number
+        }[]
+      }
+      hypertable_approximate_size: {
+        Args: { hypertable: unknown }
+        Returns: number
+      }
       hypertable_compression_stats: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           total_chunks: number
           number_compressed_chunks: number
@@ -4124,9 +4253,7 @@ export type Database = {
         }[]
       }
       hypertable_detailed_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: {
           table_bytes: number
           index_bytes: number
@@ -4136,62 +4263,44 @@ export type Database = {
         }[]
       }
       hypertable_index_size: {
-        Args: {
-          index_name: unknown
-        }
+        Args: { index_name: unknown }
         Returns: number
       }
       hypertable_size: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: number
       }
-      interpolate:
-        | {
-            Args: {
+      interpolate: {
+        Args:
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               value: number
               prev?: Record<string, unknown>
               next?: Record<string, unknown>
             }
-            Returns: number
-          }
+        Returns: number
+      }
       jsonb_array_objects_only: {
-        Args: {
-          arr: Json[]
-        }
+        Args: { arr: Json[] }
         Returns: boolean
       }
       locf: {
@@ -4213,10 +4322,7 @@ export type Database = {
         Returns: undefined
       }
       remove_compression_policy: {
-        Args: {
-          hypertable: unknown
-          if_exists?: boolean
-        }
+        Args: { hypertable: unknown; if_exists?: boolean }
         Returns: boolean
       }
       remove_continuous_aggregate_policy: {
@@ -4228,74 +4334,47 @@ export type Database = {
         Returns: undefined
       }
       remove_reorder_policy: {
-        Args: {
-          hypertable: unknown
-          if_exists?: boolean
-        }
+        Args: { hypertable: unknown; if_exists?: boolean }
         Returns: undefined
       }
       remove_retention_policy: {
-        Args: {
-          relation: unknown
-          if_exists?: boolean
-        }
+        Args: { relation: unknown; if_exists?: boolean }
         Returns: undefined
       }
       reorder_chunk: {
-        Args: {
-          chunk: unknown
-          index?: unknown
-          verbose?: boolean
-        }
+        Args: { chunk: unknown; index?: unknown; verbose?: boolean }
         Returns: undefined
       }
       rls_asset: {
-        Args: {
-          p_asset_id: string
-        }
+        Args: { p_asset_id: string }
         Returns: boolean
       }
       rls_document: {
-        Args: {
-          p_document_id: string
-        }
+        Args: { p_document_id: string }
         Returns: boolean
       }
       rls_manifest: {
-        Args: {
-          p_manifest_id: number
-        }
+        Args: { p_manifest_id: number }
         Returns: boolean
       }
       rls_organization: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: boolean
       }
       rls_organization_owner: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: boolean
       }
       rls_project: {
-        Args: {
-          project_id: number
-        }
+        Args: { project_id: number }
         Returns: boolean
       }
       rls_via_customer: {
-        Args: {
-          p_customer_id: string
-        }
+        Args: { p_customer_id: string }
         Returns: boolean
       }
       set_adaptive_chunking: {
-        Args: {
-          hypertable: unknown
-          chunk_target_size: string
-        }
+        Args: { hypertable: unknown; chunk_target_size: string }
         Returns: Record<string, unknown>
       }
       set_chunk_time_interval: {
@@ -4315,9 +4394,7 @@ export type Database = {
         Returns: undefined
       }
       set_limit: {
-        Args: {
-          "": number
-        }
+        Args: { "": number }
         Returns: number
       }
       set_number_partitions: {
@@ -4328,10 +4405,11 @@ export type Database = {
         }
         Returns: undefined
       }
-      set_replication_factor: {
+      set_partitioning_interval: {
         Args: {
           hypertable: unknown
-          replication_factor: number
+          partition_interval: unknown
+          dimension_name?: unknown
         }
         Returns: undefined
       }
@@ -4340,6 +4418,8 @@ export type Database = {
           relation: unknown
           older_than?: unknown
           newer_than?: unknown
+          created_before?: unknown
+          created_after?: unknown
         }
         Returns: unknown[]
       }
@@ -4348,210 +4428,85 @@ export type Database = {
         Returns: number
       }
       show_tablespaces: {
-        Args: {
-          hypertable: unknown
-        }
+        Args: { hypertable: unknown }
         Returns: unknown[]
       }
       show_trgm: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string[]
       }
-      time_bucket:
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: number
-              ts: number
-              offset: number
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              offset: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              bucket_width: unknown
-              ts: string
-              origin: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
+      time_bucket: {
+        Args:
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string; offset: unknown }
+          | {
               bucket_width: unknown
               ts: string
               timezone: string
               origin?: string
               offset?: unknown
             }
-            Returns: string
-          }
-      time_bucket_gapfill:
-        | {
-            Args: {
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number }
+          | { bucket_width: number; ts: number; offset: number }
+          | { bucket_width: number; ts: number; offset: number }
+          | { bucket_width: number; ts: number; offset: number }
+        Returns: string
+      }
+      time_bucket_gapfill: {
+        Args:
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: number
               ts: number
               start?: number
               finish?: number
             }
-            Returns: number
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-        | {
-            Args: {
+          | {
               bucket_width: unknown
               ts: string
               timezone: string
               start?: string
               finish?: string
             }
-            Returns: string
-          }
-      timescaledb_fdw_handler: {
-        Args: Record<PropertyKey, never>
-        Returns: unknown
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
@@ -4562,17 +4517,11 @@ export type Database = {
         Returns: boolean
       }
       update_customer_tags: {
-        Args: {
-          p_customer_uid: string
-          p_project_id: number
-          p_tags: string[]
-        }
+        Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
         Returns: undefined
       }
       workspace_documents: {
-        Args: {
-          p_organization_id: number
-        }
+        Args: { p_organization_id: number }
         Returns: {
           id: string
           created_at: string
@@ -4590,7 +4539,13 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site" | "v0_schema" | "v0_canvas" | "v0_bucket"
+      doctype:
+        | "v0_form"
+        | "v0_site"
+        | "v0_schema"
+        | "v0_canvas"
+        | "v0_bucket"
+        | "v0_campaign_referral"
       language_code:
         | "en"
         | "ko"
@@ -5040,6 +4995,9 @@ export const Constants = {
       token_role: ["referrer", "invitation"],
     },
   },
+  grida_www: {
+    Enums: {},
+  },
   grida_x_supabase: {
     Enums: {
       sb_postgrest_method: ["get", "post", "delete", "patch"],
@@ -5047,7 +5005,14 @@ export const Constants = {
   },
   public: {
     Enums: {
-      doctype: ["v0_form", "v0_site", "v0_schema", "v0_canvas", "v0_bucket"],
+      doctype: [
+        "v0_form",
+        "v0_site",
+        "v0_schema",
+        "v0_canvas",
+        "v0_bucket",
+        "v0_campaign_referral",
+      ],
       language_code: [
         "en",
         "ko",

@@ -943,7 +943,7 @@ export function initDocumentEditorState({
       past: [],
     },
     gesture_modifiers: DEFAULT_GESTURE_MODIFIERS,
-    ruler: "on",
+    ruler: "off",
     pixelgrid: "on",
     when_not_removable: "ignore",
     document_ctx: document.Context.from(doc).snapshot(),

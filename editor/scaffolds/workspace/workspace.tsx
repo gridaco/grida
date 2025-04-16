@@ -27,7 +27,11 @@ export interface WorkspaceState {
   loading: boolean;
   organization: OrganizationWithAvatar & OrganizationWithMembers;
   organizations: OrganizationWithAvatar[];
-  project: Project | null;
+  project:
+    | (Project & {
+        organization_name: string;
+      })
+    | null;
   projects: Project[];
   documents: GDocument[];
 }
@@ -89,7 +93,12 @@ export const useWorkspace = (): WorkspaceState => {
     organizations: state.organizations,
     projects: state.projects,
     documents: state.documents,
-    project: project,
+    project: project
+      ? {
+          ...project,
+          organization_name: state.organization.name,
+        }
+      : null,
   };
 };
 

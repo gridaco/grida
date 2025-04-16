@@ -3,6 +3,7 @@
 import React from "react";
 import { domapi } from "../domapi";
 import { ViewportSurfaceContext } from "./context";
+import { cn } from "@/utils";
 
 export function ViewportRoot({
   className,
@@ -18,7 +19,7 @@ export function ViewportRoot({
       <div
         {...props}
         id={domapi.k.VIEWPORT_ELEMENT_ID}
-        className={className}
+        className={cn("z-0", className)}
         style={{ pointerEvents: "auto", overflow: "hidden" }}
       >
         {children}
