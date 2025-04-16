@@ -221,6 +221,21 @@ export namespace sb.rr {
   }
 
   export namespace www {
+    /**
+     * @deprecated - deprecation warning for extra security (not actually deprecated)
+     */
+    export function createClient(request: Request) {
+      return _createClient<Database, "grida_www">(
+        supabaseUrl(request),
+        process.env.SUPABASE_SERVICE_KEY!,
+        {
+          db: {
+            schema: "grida_www",
+          },
+        }
+      );
+    }
+
     export function createRouteHandlerClient(request: Request) {
       return _createRouteHandlerClient<Database, "grida_www">(
         {

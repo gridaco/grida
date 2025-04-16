@@ -3,10 +3,11 @@ import {
   createServerComponentWorkspaceClient,
   createServerComponentWestReferralClient,
 } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { sb } from "@/lib/supabase/server";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
+import Link from "next/link";
 
 type Params = {
   tenant: string;
@@ -34,9 +35,9 @@ export default async function CustomerPortalSession({
 }: {
   params: Promise<Params>;
 }) {
-  // TODO: bound by project
-
+  const { tenant } = await params;
   const cookieStore = cookies();
+  const headersList = headers();
   const authclient = createServerComponentWorkspaceClient(cookieStore);
   const westclient = createServerComponentWestReferralClient(cookieStore);
 
@@ -48,9 +49,23 @@ export default async function CustomerPortalSession({
     return redirect(`./login/`);
   }
 
+  const rrwww = sb.rr.www.createClient({
+    cookies: cookieStore,
+    headers: headersList,
+  });
+
+  const { data: wwwref, error: wwwreferr } = await rrwww
+    .from("www")
+    .select("project_id")
+    .eq("name", tenant)
+    .single();
+
+  if (wwwreferr) return notFound();
+
   const { data: cus, error: cus_err } = await authclient
     .from("customer")
     .select()
+    .eq("project_id", wwwref.project_id)
     .eq("user_id", data.session.user.id)
     .single();
 
