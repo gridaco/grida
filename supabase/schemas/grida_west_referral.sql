@@ -163,7 +163,10 @@ CREATE TABLE grida_west_referral.campaign (
 ALTER TABLE grida_west_referral.campaign enable row level security;
 CREATE POLICY "access_based_on_project_membership" ON grida_west_referral.campaign USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));
 
-
+---------------------------------------------------------------------
+-- [prevent orphan : grida_west_referral.campaign] --
+---------------------------------------------------------------------
+CREATE TRIGGER trg_prevent_orphan_document_subtype BEFORE DELETE ON grida_west_referral.campaign FOR EACH ROW EXECUTE FUNCTION public.prevent_orphan_document_subtype();
 
 ---------------------------------------------------------------------
 -- [rls_campaign] --

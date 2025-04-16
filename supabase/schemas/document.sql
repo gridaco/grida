@@ -51,3 +51,19 @@ $$;
 
 ALTER TABLE public.document ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_project_membership" ON public.document USING (public.rls_document(id)) WITH CHECK(public.rls_project(project_id));
+
+
+---------------------------------------------------------------------
+-- [Prevents direct delete of the subdocument (add this as trigger)] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.prevent_orphan_document_subtype()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.document WHERE id = OLD.id
+  ) THEN
+    RAISE EXCEPTION 'Cannot delete document subtype directly. Delete the associated document instead.';
+  END IF;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
