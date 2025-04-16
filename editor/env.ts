@@ -20,56 +20,32 @@ export namespace Env {
   }
 
   export namespace vercel {
-    export type VercelRegion =
-      | "eu-north-1"
-      | "ap-south-1"
-      | "eu-west-3"
-      | "us-east-2"
-      | "eu-west-3"
-      | "eu-west-1"
-      | "eu-central-1"
-      | "sa-east-1"
-      | "ap-northeast-1"
-      | "ap-northeast-1"
-      | "us-east-1"
-      | "ap-northeast-2"
-      | "ap-northeast-1"
-      | "eu-west-2"
-      | "us-west-1"
-      | "us-west-1"
-      | "ap-southeast-1"
-      | "ap-southeast-2";
-
-    /*
-     * Maps Vercel edge region codes to AWS region names used by Supabase.
-     * This allows region-based routing when using Vercel's `req.geo.region` field (e.g., "icn1").
-     *
+    /**
      * @see https://vercel.com/docs/edge-network/regions
      */
-    export const region_code_to_name: Record<
-      string,
-      VercelRegion | "localhost"
-    > = {
-      dev1: "localhost",
-      arn1: "eu-north-1",
-      bom1: "ap-south-1",
-      cdg1: "eu-west-3",
-      cle1: "us-east-2",
-      cpt1: "eu-west-3",
-      dub1: "eu-west-1",
-      fra1: "eu-central-1",
-      gru1: "sa-east-1",
-      hkg1: "ap-northeast-1",
-      hnd1: "ap-northeast-1",
-      iad1: "us-east-1",
-      icn1: "ap-northeast-2",
-      kix1: "ap-northeast-1",
-      lhr1: "eu-west-2",
-      pdx1: "us-west-1",
-      sfo1: "us-west-1",
-      sin1: "ap-southeast-1",
-      syd1: "ap-southeast-2",
-    } as const;
+    export const regions = [
+      ["arn1", "eu-north-1", "Stockholm, Sweden"],
+      ["bom1", "ap-south-1", "Mumbai, India"],
+      ["cdg1", "eu-west-3", "Paris, France"],
+      ["cle1", "us-east-2", "Cleveland, USA"],
+      ["cpt1", "af-south-1", "Cape Town, South Africa"],
+      ["dub1", "eu-west-1", "Dublin, Ireland"],
+      ["fra1", "eu-central-1", "Frankfurt, Germany"],
+      ["gru1", "sa-east-1", "São Paulo, Brazil"],
+      ["hkg1", "ap-east-1", "Hong Kong"],
+      ["hnd1", "ap-northeast-1", "Tokyo, Japan"],
+      ["iad1", "us-east-1", "Washington, D.C., USA"],
+      ["icn1", "ap-northeast-2", "Seoul, South Korea"],
+      ["kix1", "ap-northeast-3", "Osaka, Japan"],
+      ["lhr1", "eu-west-2", "London, United Kingdom"],
+      ["pdx1", "us-west-2", "Portland, USA"],
+      ["sfo1", "us-west-1", "San Francisco, USA"],
+      ["sin1", "ap-southeast-1", "Singapore"],
+      ["syd1", "ap-southeast-2", "Sydney, Australia"],
+    ] as const;
+
+    export type VercelRegionCode = (typeof regions)[number][0];
+    export type VercelRegionName = (typeof regions)[number][1];
 
     /**
      * Resolves a Vercel region code (e.g., "sfo1", "icn1") to a known AWS-style region name
@@ -83,12 +59,12 @@ export namespace Env {
      * @see https://vercel.com/docs/edge-network/regions
      */
     export function region(
-      region: string | undefined
-    ): VercelRegion | "localhost" {
-      return (
-        region_code_to_name[region as keyof typeof region_code_to_name] ||
-        "localhost"
-      );
+      region: VercelRegionCode | "dev1" | undefined | (string & {})
+    ): VercelRegionName | "localhost" | undefined {
+      if (!region) return undefined;
+      if (region === "dev1") return "localhost";
+      const match = regions.find(([code]) => code === region);
+      return match?.[1] ?? undefined;
     }
   }
 
