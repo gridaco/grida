@@ -27,13 +27,57 @@ CHECK (
   VALUE ~ '^([a-zA-Z0-9\-_]+)(/[a-zA-Z0-9\-_]+)*$'
 );
 
+---------------------------------------------------------------------
+-- [www name type] --
+---------------------------------------------------------------------
+CREATE DOMAIN grida_www.www_name AS TEXT
+CHECK (
+  length(VALUE) <= 32 AND
+  VALUE ~ '^[a-zA-Z0-9][a-zA-Z0-9\-]*$'
+);
+
+
+---------------------------------------------------------------------
+-- [gen_random_www_name] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_www.gen_random_www_name(p_project_id INTEGER)
+RETURNS TEXT AS $$
+DECLARE
+    org_name TEXT;
+    project_name TEXT;
+    suffix TEXT := encode(gen_random_bytes(2), 'hex');
+BEGIN
+    SELECT o.name, p.name INTO org_name, project_name
+    FROM public.project p
+    JOIN public.organization o ON o.id = p.organization_id
+    WHERE p.id = p_project_id;
+
+    RETURN lower(regexp_replace(org_name, '[^a-zA-Z0-9]+', '', 'g')) || '-' ||
+           lower(regexp_replace(project_name, '[^a-zA-Z0-9]+', '', 'g')) || '-' || suffix;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+
+---------------------------------------------------------------------
+-- [Assign random www name trigger] --
+---------------------------------------------------------------------
+CREATE FUNCTION grida_www.assign_random_www_name()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.name := grida_www.gen_random_www_name(NEW.project_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
 
 ---------------------------------------------------------------------
 -- [Project WWW] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_www.www (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name public.slug UNIQUE NOT NULL DEFAULT public.gen_random_slug(),
+    name grida_www.www_name UNIQUE NOT NULL,
     project_id INTEGER UNIQUE NOT NULL REFERENCES public.project(id) ON DELETE CASCADE,
     title TEXT,
     description TEXT,
@@ -50,6 +94,8 @@ CREATE TABLE grida_www.www (
     og_image TEXT,
     theme JSONB
 );
+
+CREATE TRIGGER set_www_name BEFORE INSERT ON grida_www.www FOR EACH ROW WHEN (NEW.name IS NULL) EXECUTE FUNCTION grida_www.assign_random_www_name();
 
 ALTER TABLE grida_www.www ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "access_based_on_project_membership" ON grida_www.www USING (public.rls_project(project_id)) WITH CHECK (public.rls_project(project_id));

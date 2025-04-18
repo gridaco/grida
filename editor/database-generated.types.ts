@@ -3207,6 +3207,10 @@ export type Database = {
         Args: { p_name: string }
         Returns: boolean
       }
+      gen_random_www_name: {
+        Args: { p_project_id: number }
+        Returns: string
+      }
       rls_www: {
         Args: { p_www_id: string }
         Returns: boolean
@@ -4445,14 +4449,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4472,6 +4476,24 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4482,24 +4504,6 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4514,7 +4518,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: string
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
