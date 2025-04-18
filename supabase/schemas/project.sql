@@ -124,7 +124,7 @@ BEGIN
       document_id = EXCLUDED.document_id,
       updated_at = now();
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql VOLATILE;
 
 
 
