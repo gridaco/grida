@@ -5,11 +5,7 @@ import Editor from "../../../editor";
 import React from "react";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 
-import Invite from "@/app/(demo)/r/[slug]/[code]/_invite";
-import Portal from "@/app/(demo)/r/[slug]/(portal)/_flows/page";
-import Verify from "@/app/(demo)/r/[slug]/(portal)/_flows/step-verify";
-import Main from "@/app/(demo)/r/[slug]/[code]/_join/_flows/main";
-import Hello from "@/app/(demo)/r/[slug]/[code]/_join/_flows/hello";
+import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -27,7 +23,28 @@ const document: IDocumentEditorInit = {
         locked: false,
         width: 375,
         height: "auto",
-        properties: {},
+        properties: {
+          image: {
+            type: "image",
+            title: "Main Image",
+            required: true,
+          },
+          title: {
+            type: "string",
+            title: "Title",
+            required: true,
+          },
+          description: {
+            title: "Page Description",
+            type: "string",
+            required: true,
+          },
+          article: {
+            type: "richtext",
+            title: "Article",
+            required: true,
+          },
+        },
         props: {},
         overrides: {},
       },
@@ -158,7 +175,23 @@ const document: IDocumentEditorInit = {
     ["tmp-2503-invite"]: {
       name: "Invite",
       type: "template",
-      properties: {},
+      properties: {
+        title: {
+          title: "Page Title",
+          type: "string",
+          required: true,
+        },
+        description: {
+          title: "Page Description",
+          type: "string",
+          required: true,
+        },
+        article: {
+          type: "richtext",
+          title: "Article",
+          required: true,
+        },
+      },
       default: {},
       version: "0.0.0",
       nodes: {},
@@ -197,27 +230,77 @@ export default function FileExamplePage() {
         document={document}
         templates={{
           tabs: CustomComponent__Tabs,
-          "tmp-2503-invite": CustomComponent__Invite,
+          "tmp-2503-invite": CustomComponent__Referrer,
           "tmp-2503-join-main": CustomComponent__Join_Main,
           "tmp-2503-join-hello": CustomComponent__Join_Hello,
           "tmp-2503-portal": CustomComponent__Portal,
-          "tmp-2503-portal-verify": CustomComponent__Portal_Verify,
         }}
       />
     </main>
   );
 }
 
-function CustomComponent__Invite(props: any) {
+function CustomComponent__Referrer(componentprops: any) {
+  console.log("props", componentprops);
   return (
     <div
       className="rounded shadow border"
       style={{
-        ...props.style,
+        ...componentprops.style,
       }}
-      {...queryattributes(props)}
+      {...queryattributes(componentprops)}
     >
-      {/* <Invite params={{ code: "00000000" }} /> */}
+      <ReferrerPageTemplate
+        design={{
+          brand_name: "Apple",
+          title: componentprops.props.title as string,
+          description: componentprops.props.description as string,
+          logo: {
+            src: "/logos/thebundle.png",
+            srcDark: "/logos/thebundle-dark.png",
+          },
+          favicon: {
+            src: "https://www.apple.com/favicon.ico",
+            srcDark: "https://www.apple.com/favicon.ico",
+          },
+          article: componentprops.props.article,
+          cta: "Join Now",
+          image: {
+            src: componentprops.props.image,
+            alt: "Example Image",
+          },
+          footer: {
+            link_privacy: "/privacy",
+            link_instagram: "https://www.instagram.com/polestarcars/",
+            paragraph: {
+              html: "1. Hearing Aid and Hearing Test: The Hearing Aid feature has received FDA authorization. The Hearing Test and Hearing Aid features are supported on AirPods Pro 2 with the latest firmware paired with a compatible iPhone or iPad with iOS 18 or iPadOS 18 and later and are intended for people 18 years old or older. The Hearing Aid feature is also supported on a compatible Mac with macOS Sequoia and later. It is intended for people with perceived mild to moderate hearing loss.",
+            },
+          },
+        }}
+        locale="en"
+        slug="dummy"
+        data={{
+          campaign: {
+            id: "dummy",
+            title: "DUMMY",
+            description: null,
+            enabled: true,
+            max_invitations_per_referrer: 10,
+            layout_id: null,
+            reward_currency: "USD",
+            public: null,
+            scheduling_close_at: null,
+            scheduling_open_at: null,
+            scheduling_tz: null,
+          },
+          code: "dummy",
+          invitation_count: 0,
+          invitations: [],
+          type: "referrer",
+          id: "123",
+          referrer_name: "DUMMY",
+        }}
+      />
     </div>
   );
 }
@@ -288,21 +371,7 @@ function CustomComponent__Portal(props: any) {
       }}
       {...queryattributes(props)}
     >
-      <Portal />
-    </div>
-  );
-}
-
-function CustomComponent__Portal_Verify(props: any) {
-  return (
-    <div
-      className="rounded shadow border"
-      style={{
-        ...props.style,
-      }}
-      {...queryattributes(props)}
-    >
-      <Verify />
+      {/* <Portal /> */}
     </div>
   );
 }

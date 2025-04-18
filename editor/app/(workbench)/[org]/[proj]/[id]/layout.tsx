@@ -476,6 +476,9 @@ export default async function Layout({
         </Html>
       );
     }
+    case "v0_campaign_referral": {
+      redirect(`/${org}/${proj}/campaigns/${id}`);
+    }
     default: {
       console.error("unsupported doctype", masterdoc_ref.doctype);
       redirect("/");

@@ -364,10 +364,11 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 };
 
                 const value = rootProps[key];
+                const label = def.title || key;
 
                 return (
                   <div key={key} className="grid gap-2">
-                    <Label>{key}</Label>
+                    <Label>{label}</Label>
                     <PropertyField
                       name={key}
                       definition={def}
@@ -424,6 +425,7 @@ function PropertyField({
       return (
         <CMSRichText
           value={value}
+          uploader={uploadPublic}
           onValueChange={onValueChange}
           placeholder={"Enter text here"}
           autofocus={true}

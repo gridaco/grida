@@ -12,6 +12,8 @@ export async function GET(
     params: Promise<Params>;
   }
 ) {
+  // TODO: optimize query
+
   const { organization_id } = await context.params;
   const cookieStore = await cookies();
   const client = createRouteHandlerWorkspaceClient(cookieStore);

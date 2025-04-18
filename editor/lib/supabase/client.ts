@@ -40,11 +40,21 @@ export const createClientWorkspaceClient = () =>
     isSingleton: false,
   });
 
-export const createClientWestClient = () =>
-  createClientComponentClient<Database, "grida_west">({
+export const createClientWWWClient = () =>
+  createClientComponentClient<Database, "grida_www">({
     options: {
       db: {
-        schema: "grida_west",
+        schema: "grida_www",
+      },
+    },
+    isSingleton: false,
+  });
+
+export const createClientWestReferralClient = () =>
+  createClientComponentClient<Database, "grida_west_referral">({
+    options: {
+      db: {
+        schema: "grida_west_referral",
       },
     },
     isSingleton: false,

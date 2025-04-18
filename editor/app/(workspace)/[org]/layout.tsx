@@ -41,7 +41,7 @@ export default async function Layout({
     .eq("name", org)
     .single();
 
-  if (err) console.error(err);
+  if (err) console.error("[org] - possibly not found", err, "while", org);
   if (!organization) {
     return notFound();
   }
