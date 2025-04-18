@@ -3199,6 +3199,18 @@ export type Database = {
       }
     }
     Functions: {
+      change_www_name: {
+        Args: { p_www_id: string; p_name: string }
+        Returns: undefined
+      }
+      check_www_name_available: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      gen_random_www_name: {
+        Args: { p_project_id: number }
+        Returns: string
+      }
       rls_www: {
         Args: { p_www_id: string }
         Returns: boolean

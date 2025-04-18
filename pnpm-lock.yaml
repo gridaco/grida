@@ -649,6 +649,9 @@ importers:
       '@vercel/functions':
         specifier: ^1.4.1
         version: 1.6.0
+      '@vercel/sdk':
+        specifier: ^1.5.0
+        version: 1.5.0(zod@3.24.2)
       '@vercel/speed-insights':
         specifier: ^1.0.12
         version: 1.2.0(next@14.2.5(@babel/core@7.26.9)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(svelte@4.2.19)(vue@3.5.13(typescript@5.7.3))
@@ -8454,6 +8457,16 @@ packages:
       '@aws-sdk/credential-provider-web-identity': '*'
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-web-identity':
+        optional: true
+
+  '@vercel/sdk@1.5.0':
+    resolution: {integrity: sha512-B7yoBAfejiv0rdUzGmvPZSmiF+9hxyUqsU6NkHyg5nM/666DGemIFkDnykr9ZqY9IZAUKy0EcKhuKS6Jw7k01g==}
+    hasBin: true
+    peerDependencies:
+      '@modelcontextprotocol/sdk': ^1.5.0
+      zod: '>= 3'
+    peerDependenciesMeta:
+      '@modelcontextprotocol/sdk':
         optional: true
 
   '@vercel/speed-insights@1.2.0':
@@ -30629,6 +30642,10 @@ snapshots:
       '@vercel/edge-config-fs': 0.1.0
 
   '@vercel/functions@1.6.0': {}
+
+  '@vercel/sdk@1.5.0(zod@3.24.2)':
+    dependencies:
+      zod: 3.24.2
 
   '@vercel/speed-insights@1.2.0(next@14.2.5(@babel/core@7.26.9)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(svelte@4.2.19)(vue@3.5.13(typescript@5.7.3))':
     optionalDependencies:
