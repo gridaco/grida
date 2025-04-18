@@ -382,9 +382,11 @@ export function NavProjects({
                     </SidebarMenuAction>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="right" align="start">
-                    {/* <DropdownMenuItem>
-                      <span>Rename Project</span>
-                    </DropdownMenuItem> */}
+                    <Link href={`/${orgname}/${project.name}/dash`}>
+                      <DropdownMenuItem>
+                        <span>Console</span>
+                      </DropdownMenuItem>
+                    </Link>
                     <CreateNewDocumentButton
                       project_name={project.name}
                       project_id={project.id}
