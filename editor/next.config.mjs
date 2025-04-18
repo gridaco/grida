@@ -21,6 +21,10 @@ const nextConfig = withMDX()({
       },
       {
         protocol: "https",
+        hostname: "mozagqllybnbytfcmvdh-all.supabase.co",
+      },
+      {
+        protocol: "https",
         hostname: "base.grida.co",
       },
       {
