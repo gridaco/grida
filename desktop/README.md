@@ -1,6 +1,6 @@
 # Grida Desktop App
 
-[👉 Download](https://app.grida.co/downloads)
+[👉 Download](https://grida.co/downloads)
 
 ## Distributions
 
