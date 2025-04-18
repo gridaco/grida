@@ -65,7 +65,7 @@ import "core-js/features/object/group-by";
 import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
-} from "@/components/delete-confirmation-dialog";
+} from "@/components/dialogs/delete-confirmation-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 function SidebarMenuLinkButton({
@@ -331,10 +331,8 @@ export function NavProjects({
             .eq("id", id);
           if (error) return false;
           if (count === 1) {
-            // TODO: need to revalidate as well. (we're using swr for the projects - needs to be mutated manually after delete)
-            alert(
-              "Project deleted successfully. Please refresh the page to see the changes."
-            );
+            // TODO: needs to revalidate
+            router.replace(`/${orgname}`);
             return true;
           }
           return false;

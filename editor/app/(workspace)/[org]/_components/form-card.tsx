@@ -1,10 +1,10 @@
 import React from "react";
 import Image from "next/image";
-import { ResourceTypeIcon } from "../resource-type-icon";
-import type { GDocument, GDocumentType } from "@/types";
-import { Badge } from "../ui/badge";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
-import { LockOpen1Icon, LockOpen2Icon } from "@radix-ui/react-icons";
+import { LockOpen1Icon } from "@radix-ui/react-icons";
+import type { GDocument, GDocumentType } from "@/types";
 
 export function GridCard({
   title,

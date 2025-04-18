@@ -235,7 +235,7 @@ export function Sessions({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (
@@ -307,7 +307,7 @@ export function Customers({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (
@@ -379,7 +379,7 @@ export function Responses({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (
