@@ -76,7 +76,7 @@ export namespace Env {
    *
    * @example if your main region is us-west-1, have it also set as rr.
    * ```txt
-   * NEXT_PUBLIC_SUPABASE_URL="https://primary.supabase.co"
+   * NEXT_PUBLIC_SUPABASE_URL="https://primary-all.supabase.co"
    * NEXT_PUBLIC_SUPABASE_URL_RR_US_WEST_1="https://primary.supabase.co" # set as rr, even if it is primary
    * NEXT_PUBLIC_SUPABASE_URL_RR_AP_NORTHEAST_2="https://primary-rr-ap-northeast-2-xyz.supabase.co"
    * NEXT_PUBLIC_SUPABASE_URL_RR_...

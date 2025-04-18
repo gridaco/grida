@@ -154,9 +154,13 @@ export class GridaCommerceClient {
    */
   async fetchInventoryItemsRPC() {
     assert(this.store_id, "store_id is required");
-    return await this.client.rpc("get_inventory_items_with_committed", {
-      p_store_id: this.store_id,
-    });
+    return await this.client.rpc(
+      "get_inventory_items_with_committed",
+      {
+        p_store_id: this.store_id,
+      },
+      { get: true }
+    );
   }
 
   async fetchInventoryItem({ sku }: { sku: string }) {
