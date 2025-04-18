@@ -9,6 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Grida",
   description: "Grida is a Free & Open Canvas",
+  keywords: ["visual website builder", "canvas editor", "no-code design tool"],
 };
 
 export default function RootLayout({

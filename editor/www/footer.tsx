@@ -19,7 +19,7 @@ export default function Footer() {
           <_Footer className="border-t pt-8 bg-transparent">
             <FooterContent className="sm:grid-cols-2 md:grid-cols-3">
               <FooterColumn className="col-span-2 flex-row items-center justify-between gap-8 pb-8 md:col-span-1 md:flex-col md:items-start md:justify-start">
-                <Link href="/">
+                <Link href="/home">
                   <div className="flex items-center gap-2">
                     <GridaLogo />
                     <h3 className="text-xl font-bold">Grida</h3>
