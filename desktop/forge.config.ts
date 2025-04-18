@@ -66,7 +66,7 @@ const config: ForgeConfig = {
         setupExe: `${productName} Setup ${version} ${arch}.exe`,
         name: appBundleId + `.${arch}`,
         title: productName,
-        iconUrl: "https://app.grida.co/favicon.ico",
+        iconUrl: "https://grida.co/favicon.ico",
         loadingGif: "./images/loadingGif.gif",
         setupIcon: "./images/icon.ico",
       } satisfies MakerSquirrelConfig;
