@@ -246,4 +246,4 @@ BEGIN
   SET name = p_name
   WHERE id = p_www_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql VOLATILE;
