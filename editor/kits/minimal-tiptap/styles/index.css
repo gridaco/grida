@@ -1,8 +1,8 @@
-@import './partials/code.css';
-@import './partials/placeholder.css';
-@import './partials/lists.css';
-@import './partials/typography.css';
-@import './partials/zoom.css';
+@import "./partials/code.css";
+@import "./partials/placeholder.css";
+@import "./partials/lists.css";
+@import "./partials/typography.css";
+@import "./partials/zoom.css";
 
 :root {
   --mt-overlay: rgba(251, 251, 251, 0.75);
@@ -171,6 +171,10 @@
 
 .minimal-tiptap-editor .ProseMirror .selection {
   @apply inline-block;
+}
+
+.minimal-tiptap-editor .ProseMirror s span {
+  @apply line-through;
 }
 
 .minimal-tiptap-editor .ProseMirror .selection,

@@ -1,4 +1,4 @@
-import { cn } from "@/utils";
+import { cn } from "@/utils/cn";
 import * as React from "react";
 
 interface SpinnerProps extends React.SVGProps<SVGSVGElement> {}
