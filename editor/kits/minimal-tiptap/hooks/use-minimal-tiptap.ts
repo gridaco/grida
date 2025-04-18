@@ -11,18 +11,17 @@ import {
   Link,
   Image,
   HorizontalRule,
-  // CodeBlockLowlight,
+  CodeBlockLowlight,
   Selection,
   // Color,
   UnsetAllMarks,
   ResetMarksOnEnter,
   FileHandler,
 } from "../extensions";
+import { cn } from "@/utils";
 import { fileToBase64, getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
-// import { toast } from "sonner";
 import { toast } from "react-hot-toast";
-import { cn } from "@/utils";
 
 export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   value?: Content;
@@ -150,7 +149,7 @@ const createExtensions = ({
   UnsetAllMarks,
   HorizontalRule,
   ResetMarksOnEnter,
-  // CodeBlockLowlight,
+  CodeBlockLowlight,
   Placeholder.configure({ placeholder: () => placeholder }),
 ];
 

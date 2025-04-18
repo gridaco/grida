@@ -73,20 +73,21 @@
     "@supabase/supabase-js": "^2.43.5",
     "@tanstack/react-table": "^8.21.2",
     "@tanstack/react-virtual": "^3.10.9",
-    "@tiptap/core": "^2.9.1",
-    "@tiptap/extension-color": "^2.9.1",
-    "@tiptap/extension-heading": "^2.9.1",
-    "@tiptap/extension-horizontal-rule": "^2.9.1",
-    "@tiptap/extension-image": "^2.9.1",
-    "@tiptap/extension-link": "^2.9.1",
-    "@tiptap/extension-mention": "^2.9.1",
-    "@tiptap/extension-placeholder": "^2.9.1",
-    "@tiptap/extension-text-style": "^2.9.1",
-    "@tiptap/extension-typography": "^2.9.1",
-    "@tiptap/extension-underline": "^2.9.1",
-    "@tiptap/pm": "^2.9.1",
-    "@tiptap/react": "^2.9.1",
-    "@tiptap/starter-kit": "^2.9.1",
+    "@tiptap/core": "^2.11.7",
+    "@tiptap/extension-code-block-lowlight": "^2.11.7",
+    "@tiptap/extension-color": "^2.11.7",
+    "@tiptap/extension-heading": "^2.11.7",
+    "@tiptap/extension-horizontal-rule": "^2.11.7",
+    "@tiptap/extension-image": "^2.11.7",
+    "@tiptap/extension-link": "^2.11.7",
+    "@tiptap/extension-mention": "^2.11.7",
+    "@tiptap/extension-placeholder": "^2.11.7",
+    "@tiptap/extension-text-style": "^2.11.7",
+    "@tiptap/extension-typography": "^2.11.7",
+    "@tiptap/extension-underline": "^2.11.7",
+    "@tiptap/pm": "^2.11.7",
+    "@tiptap/react": "^2.11.7",
+    "@tiptap/starter-kit": "^2.11.7",
     "@tosspayments/payment-widget-sdk": "^0.10.2",
     "@types/mdx": "^2.0.11",
     "@uidotdev/usehooks": "^2.4.1",
@@ -139,6 +140,7 @@
     "inline-style-parser": "^0.2.4",
     "input-otp": "^1.4.2",
     "libphonenumber-js": "^1.12.6",
+    "lowlight": "^3.3.0",
     "lucide-react": "^0.367.0",
     "mapbox-gl": "^3.4.0",
     "mdn-data": "^2.8.0",
@@ -238,11 +240,6 @@
     "typescript": "^5"
   },
   "pnpm": {
-    "overrides": {
-      "@blocknote/core>prosemirror-model": "1.23.0",
-      "@blocknote/core>prosemirror-view": "1.36.0",
-      "@tiptap/pm>prosemirror-model": "1.23.0",
-      "@tiptap/pm>prosemirror-view": "1.36.0"
-    }
+    "overrides": {}
   }
 }
