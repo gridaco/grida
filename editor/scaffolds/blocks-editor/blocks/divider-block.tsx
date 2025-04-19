@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
@@ -30,12 +31,12 @@ export function DividerBlock({ id }: EditorFlatFormBlock) {
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
             <span className="flex flex-row gap-2 items-center">
-              <DividerHorizontalIcon />
-              Divider
+              <DividerHorizontalIcon className="size-3" />
+              <span className="text-xs">Divider</span>
             </span>
           </div>
         </div>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -49,7 +50,7 @@ export function DividerBlock({ id }: EditorFlatFormBlock) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
       <div>
         <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">

@@ -13,7 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, useBlockFocus, useDeleteBlock } from "./base-block";
+import {
+  BlockAction,
+  BlockHeader,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import clsx from "clsx";
 
@@ -48,7 +53,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
             {")"}
           </span>
         </span>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -62,7 +67,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
     </div>
   );
