@@ -34,6 +34,7 @@ export interface WorkspaceState {
     | null;
   projects: Project[];
   documents: GDocument[];
+  refresh: () => void;
 }
 
 interface __WorkspaceState {
@@ -43,6 +44,7 @@ interface __WorkspaceState {
   project: string | null;
   projects: Project[];
   documents: GDocument[];
+  refresh: () => void;
 }
 
 type WorkspaceAction =
@@ -88,6 +90,7 @@ export const useWorkspace = (): WorkspaceState => {
   }, [state.projects, projectname]);
 
   return {
+    refresh: state.refresh,
     loading: state.loading,
     organization: state.organization,
     organizations: state.organizations,
@@ -112,6 +115,22 @@ export function Workspace({
 }>) {
   const supabase = createClientWorkspaceClient();
 
+  const key = `/private/workspace/${organization.id}`;
+  const { data } = useSWR<
+    EditorApiResponse<{
+      organizations: OrganizationWithAvatar[];
+      projects: Project[];
+      documents: GDocument[];
+    }>
+  >(
+    key,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {}
+  );
+
   const initial = {
     loading: true,
     organization: {
@@ -124,24 +143,12 @@ export function Workspace({
     projects: [],
     project: project || null,
     documents: [],
+    refresh: () => {
+      mutate(key);
+    },
   } satisfies __WorkspaceState;
 
   const [state, dispatch] = useReducer(workspaceReducer, initial);
-
-  const { data } = useSWR<
-    EditorApiResponse<{
-      organizations: OrganizationWithAvatar[];
-      projects: Project[];
-      documents: GDocument[];
-    }>
-  >(
-    `/private/workspace/${organization.id}`,
-    async (url: string) => {
-      const res = await fetch(url);
-      return res.json();
-    },
-    {}
-  );
 
   useEffect(() => {
     if (!data?.data) return;

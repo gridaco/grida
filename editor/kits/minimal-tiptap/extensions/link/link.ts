@@ -1,8 +1,8 @@
-import { mergeAttributes } from '@tiptap/react'
-import TiptapLink from '@tiptap/extension-link'
-import type { EditorView } from '@tiptap/pm/view'
-import { getMarkRange } from '@tiptap/react'
-import { Plugin, TextSelection } from '@tiptap/pm/state'
+import { mergeAttributes } from "@tiptap/react";
+import TiptapLink from "@tiptap/extension-link";
+import type { EditorView } from "@tiptap/pm/view";
+import { getMarkRange } from "@tiptap/react";
+import { Plugin, TextSelection } from "@tiptap/pm/state";
 
 export const Link = TiptapLink.extend({
   /*
@@ -17,11 +17,19 @@ export const Link = TiptapLink.extend({
    * - <a> elements with an href attribute that contains 'javascript:'
    */
   parseHTML() {
-    return [{ tag: 'a[href]:not([data-type="button"]):not([href *= "javascript:" i])' }]
+    return [
+      {
+        tag: 'a[href]:not([data-type="button"]):not([href *= "javascript:" i])',
+      },
+    ];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['a', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0]
+    return [
+      "a",
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+      0,
+    ];
   },
 
   addOptions() {
@@ -29,61 +37,63 @@ export const Link = TiptapLink.extend({
       ...this.parent?.(),
       openOnClick: false,
       HTMLAttributes: {
-        class: 'link'
-      }
-    }
+        class: "link",
+      },
+    };
   },
 
   addProseMirrorPlugins() {
-    const { editor } = this
+    const { editor } = this;
 
     return [
       ...(this.parent?.() || []),
       new Plugin({
         props: {
           handleKeyDown: (_: EditorView, event: KeyboardEvent) => {
-            const { selection } = editor.state
+            const { selection } = editor.state;
 
             /*
              * Handles the 'Escape' key press when there's a selection within the link.
              * This will move the cursor to the end of the link.
              */
-            if (event.key === 'Escape' && selection.empty !== true) {
-              editor.commands.focus(selection.to, { scrollIntoView: false })
+            if (event.key === "Escape" && selection.empty !== true) {
+              editor.commands.focus(selection.to, { scrollIntoView: false });
             }
 
-            return false
+            return false;
           },
           handleClick(view, pos) {
             /*
              * Marks the entire link when the user clicks on it.
              */
 
-            const { schema, doc, tr } = view.state
-            const range = getMarkRange(doc.resolve(pos), schema.marks.link)
+            const { schema, doc, tr } = view.state;
+            const range = getMarkRange(doc.resolve(pos), schema.marks.link);
 
             if (!range) {
-              return
+              return;
             }
 
-            const { from, to } = range
-            const start = Math.min(from, to)
-            const end = Math.max(from, to)
+            const { from, to } = range;
+            const start = Math.min(from, to);
+            const end = Math.max(from, to);
 
             if (pos < start || pos > end) {
-              return
+              return;
             }
 
-            const $start = doc.resolve(start)
-            const $end = doc.resolve(end)
-            const transaction = tr.setSelection(new TextSelection($start, $end))
+            const $start = doc.resolve(start);
+            const $end = doc.resolve(end);
+            const transaction = tr.setSelection(
+              new TextSelection($start, $end)
+            );
 
-            view.dispatch(transaction)
-          }
-        }
-      })
-    ]
-  }
-})
+            view.dispatch(transaction);
+          },
+        },
+      }),
+    ];
+  },
+});
 
-export default Link
+export default Link;

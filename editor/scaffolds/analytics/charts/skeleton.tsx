@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/utils";
 
 export function NumberSkeleton() {
   return (
@@ -8,9 +9,9 @@ export function NumberSkeleton() {
   );
 }
 
-export function GraphSkeleton() {
+export function GraphSkeleton({ className }: { className?: string }) {
   return (
-    <div className="w-full h-full">
+    <div className={cn("w-full h-full", className)}>
       <Skeleton className="h-full w-full rounded-xl" />
     </div>
   );

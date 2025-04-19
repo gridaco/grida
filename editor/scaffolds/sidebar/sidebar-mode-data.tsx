@@ -61,7 +61,7 @@ import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
-} from "@/components/delete-confirmation-dialog";
+} from "@/components/dialogs/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FormInputType } from "@/types";
 import { Badge } from "@/components/ui/badge";

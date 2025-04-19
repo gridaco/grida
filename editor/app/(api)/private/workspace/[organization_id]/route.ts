@@ -38,9 +38,13 @@ export async function GET(
   }
 
   const { data: documents, error: documents_err } = await client
-    .rpc("workspace_documents", {
-      p_organization_id: Number(organization_id),
-    })
+    .rpc(
+      "workspace_documents",
+      {
+        p_organization_id: Number(organization_id),
+      },
+      { get: true }
+    )
     .order("updated_at", { ascending: false });
 
   if (documents_err) {

@@ -43,6 +43,9 @@ export async function GET(req: NextRequest, context: Context) {
       p_time_from: from,
       p_time_to: to,
       p_interval: interval,
+    },
+    {
+      get: true,
     }
   );
 

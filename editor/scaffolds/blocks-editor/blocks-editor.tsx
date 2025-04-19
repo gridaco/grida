@@ -252,6 +252,9 @@ function BlocksEditor() {
               })}
             </SectionStyle>
           </SortableContext>
+          <div className="mt-10 w-full flex items-center justify-center">
+            <InsertMenuTrigger />
+          </div>
         </BlocksCanvas>
       </div>
     </div>

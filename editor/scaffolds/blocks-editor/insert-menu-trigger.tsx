@@ -5,8 +5,9 @@ import { useEditorState } from "../editor";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { CommandItem } from "@/components/ui/command";
+import { cn } from "@/utils";
 
-export function InsertMenuTrigger() {
+export function InsertMenuTrigger({ className }: { className?: string }) {
   const [state, dispatch] = useEditorState();
   const { insertmenu } = state;
 
@@ -22,7 +23,7 @@ export function InsertMenuTrigger() {
       role="combobox"
       variant={insertmenu.open ? "default" : "outline"}
       size="icon"
-      className="rounded-full"
+      className={cn("rounded-full", className)}
       onPointerDown={(e) => {
         // this shall not trigger focused block to lose focus
         e.preventDefault();

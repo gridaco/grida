@@ -10,10 +10,8 @@ import {
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
-import { GDocument } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
-import { GridCard, RowCard } from "@/components/site/form-card";
 import { BoxSelectIcon } from "lucide-react";
 import { CreateNewProjectDialog } from "@/scaffolds/workspace/new-project-dialog";
 import {
@@ -25,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
-import { editorlink } from "@/lib/forms/url";
+import { DocumentsGrid } from "./_components/documents-grid";
 
 export default function OrganizationDashboardPage({
   params,
@@ -42,7 +40,8 @@ export default function OrganizationDashboardPage({
 }) {
   const layout = searchParams.layout ?? "list";
 
-  const { loading, organization, projects, documents } = useWorkspace();
+  const { loading, organization, projects, documents, refresh } =
+    useWorkspace();
 
   return (
     <main className="w-full h-full overflow-y-scroll">
@@ -126,6 +125,7 @@ export default function OrganizationDashboardPage({
                     project_name={p.name}
                     documents={projectdocuments}
                     layout={layout}
+                    onChange={refresh}
                   />
                 </div>
               );
@@ -140,64 +140,6 @@ export default function OrganizationDashboardPage({
   );
 }
 
-function DocumentsGrid({
-  documents,
-  layout,
-  organization_name,
-  project_name,
-}: {
-  organization_name: string;
-  project_name: string;
-  documents: GDocument[];
-  layout: "grid" | "list";
-}) {
-  if (layout === "grid") {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {documents?.map((doc, i) => (
-          <Link
-            key={i}
-            href={editorlink(".", {
-              org: organization_name,
-              proj: project_name,
-              document_id: doc.id,
-            })}
-            prefetch={false}
-          >
-            <GridCard {...doc} />
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
-      <header className="flex text-sm opacity-80">
-        <span className="flex-1">
-          Documents
-          <span className="ml-2 text-xs opacity-50">{documents.length}</span>
-        </span>
-        <span className="w-32">Entries</span>
-        <span className="w-44">Updated At</span>
-      </header>
-      {documents?.map((doc, i) => (
-        <Link
-          key={i}
-          href={editorlink(".", {
-            org: organization_name,
-            proj: project_name,
-            document_id: doc.id,
-          })}
-          prefetch={false}
-        >
-          <RowCard {...doc} />
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 function ProjectsLoading() {
   return (
     <div className="w-full grid gap-2">
@@ -207,4 +149,8 @@ function ProjectsLoading() {
       <Skeleton className="w-full h-10" />
     </div>
   );
+}
+
+function RenameDialog() {
+  //
 }

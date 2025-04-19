@@ -44,7 +44,7 @@ export default function Header() {
       <header className="py-4 px-4 lg:py-8 lg:px-24">
         {/* desktop */}
         <div className="hidden md:flex container mx-auto justify-between items-center">
-          <Link href="/" className="flex items-center justify-center gap-2">
+          <Link href="/home" className="flex items-center justify-center gap-2">
             <GridaLogo className="w-5 h-5" />
             <span className="text-lg font-bold">Grida</span>
           </Link>
@@ -115,7 +115,7 @@ export default function Header() {
         </div>
         {/* mobile */}
         <div className="md:hidden flex justify-between items-center">
-          <Link href="/" className="flex items-center justify-center gap-2">
+          <Link href="/home" className="flex items-center justify-center gap-2">
             <GridaLogo className="w-5 h-5" />
             <span className="text-lg font-bold">Grida</span>
           </Link>
@@ -128,7 +128,7 @@ export default function Header() {
             <DrawerContent className="min-h-96 flex flex-col justify-between">
               <div className="w-full px-4 space-y-8 mb-10">
                 <section className="grid gap-2">
-                  <Link href="/">Home</Link>
+                  <Link href="/home">Home</Link>
                   <Link href={sitemap.links.pricing}>Pricing</Link>
                   <Link href={sitemap.links.github} target="_blank">
                     GitHub

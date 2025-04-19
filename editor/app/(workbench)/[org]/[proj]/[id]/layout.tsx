@@ -93,6 +93,15 @@ export default async function Layout({
     return redirect("/sign-in");
   }
 
+  // mark only. no need to await
+  wsclient
+    .rpc("workspace_mark_access", {
+      p_organization_name: org,
+      p_project_name: proj,
+      p_document_id: id,
+    })
+    .then();
+
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
     .select("id, name, organization!inner(id, name)")
