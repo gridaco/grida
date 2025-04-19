@@ -32,6 +32,7 @@ export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   onUpdate?: (content: Content) => void;
   onBlur?: (content: Content) => void;
   uploader?: (file: File) => Promise<string>;
+  extensions?: any[];
 }
 
 async function fakeuploader(file: File): Promise<string> {
@@ -159,6 +160,7 @@ export const useMinimalTiptapEditor = ({
   placeholder = "",
   editorClassName,
   throttleDelay = 0,
+  extensions,
   onUpdate,
   onBlur,
   uploader,
@@ -189,7 +191,7 @@ export const useMinimalTiptapEditor = ({
   );
 
   const editor = useEditor({
-    extensions: createExtensions({ placeholder }),
+    extensions: extensions ? extensions : createExtensions({ placeholder }),
     editorProps: {
       attributes: {
         autocomplete: "off",

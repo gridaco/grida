@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
@@ -52,8 +53,8 @@ export function ImageBlock({
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
-            <ImageIcon />
-            Image
+            <ImageIcon className="size-3" />
+            <span className="text-xs">Image</span>
           </span>
         </div>
         <div className="flex gap-2">
@@ -73,19 +74,21 @@ export function ImageBlock({
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <DotsHorizontalIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon className="me-2 align-middle" />
-                Delete Block
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <BlockAction>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <DotsHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => deleteBlock(id)}>
+                  <TrashIcon className="me-2 align-middle" />
+                  Delete Block
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </BlockAction>
         </div>
       </BlockHeader>
       <div>
