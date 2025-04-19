@@ -20,7 +20,7 @@ export default async function Layout({
   const { org, proj } = await params;
 
   // in local dev, the vercel insights script is not loaded, will hit this route
-  if (org === "_vercel") return notFound();
+  if (org.startsWith("_")) return notFound();
 
   const cookieStore = await cookies();
   const platform = await getPlatform(cookieStore);
