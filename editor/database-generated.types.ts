@@ -4486,28 +4486,28 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
               bucket_width: unknown
               ts: string
               start?: string
               finish?: string
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4528,7 +4528,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: string
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
@@ -4557,14 +4557,6 @@ export type Database = {
           responses: number
           max_responses: number
           is_public: boolean
-        }[]
-      }
-      workspace_entry: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          organization_id: number
-          project_id: number
-          document_id: string
         }[]
       }
       workspace_mark_access: {

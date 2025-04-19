@@ -125,29 +125,3 @@ BEGIN
       updated_at = now();
 END;
 $$ LANGUAGE plpgsql VOLATILE;
-
-
-
----------------------------------------------------------------------
--- [RPC] workspace_entry --
----------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.workspace_entry()
-RETURNS TABLE (
-  organization_id bigint,
-  project_id bigint,
-  document_id uuid
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    o.id AS organization_id,
-    p.id AS project_id,
-    upas.document_id
-  FROM public.user_project_access_state upas
-  JOIN public.project p ON p.id = upas.project_id
-  JOIN public.organization o ON o.id = p.organization_id
-  WHERE upas.user_id = auth.uid()
-    AND public.rls_project(p.id)
-  LIMIT 1;
-END;
-$$ LANGUAGE plpgsql STABLE;
