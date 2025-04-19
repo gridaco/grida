@@ -104,7 +104,7 @@ export function BlockAction({
   children,
   className,
   ...props
-}: React.HtmlHTMLAttributes<HTMLDivElement>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
