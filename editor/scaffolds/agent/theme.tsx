@@ -1,48 +1,55 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { FormPageBackground } from "../e/form/background";
-import { useEditorState } from "../editor";
-import { fonts } from "@/theme/font-family";
-import type { NextFont } from "@next/font/dist/types";
-import type { FormPageBackgroundSchema } from "@/types";
 import { cn } from "@/utils";
 import { useTheme } from "next-themes";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
+import type { NextFont } from "@next/font/dist/types";
+import type {
+  Appearance,
+  FontFamily,
+  TemplatePageBackgroundSchema,
+} from "@/types";
+import { fonts } from "@/theme/font-family";
 
-export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
-
-  const font = state.theme.fontFamily
-    ? fonts[state.theme.fontFamily]
-    : fonts.inter;
-
-  const customcss = state.theme.customCSS;
-
+export function AgentThemeProvider({
+  appearance,
+  palette,
+  font,
+  customcss,
+  children,
+  background,
+}: React.PropsWithChildren<{
+  palette?: keyof typeof palettes;
+  customcss?: string;
+  font?: NextFont | FontFamily;
+  appearance?: Appearance;
+  background?: TemplatePageBackgroundSchema;
+}>) {
   return (
     <div id="agent-theme-provider" className="relative w-full h-full">
-      <PaletteProvider />
+      <PaletteProvider appearance={appearance} palette={palette} />
       <CustomCSSProvider css={customcss}>
         <FontFamilyProvider font={font}>{children}</FontFamilyProvider>
       </CustomCSSProvider>
-      <BackgroundProvider background={state.theme.background} />
+      <BackgroundProvider background={background} />
     </div>
   );
-  //
 }
 
 function BackgroundProvider({
   background,
 }: {
-  background?: FormPageBackgroundSchema;
+  background?: TemplatePageBackgroundSchema;
 }) {
   return (
     <>
       {background && (
-        <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+        <FormPageBackground {...(background as TemplatePageBackgroundSchema)} />
       )}
     </>
   );
@@ -51,14 +58,25 @@ function BackgroundProvider({
 function FontFamilyProvider({
   font,
   children,
-}: React.PropsWithChildren<{ font: NextFont }>) {
-  return <div className={cn("w-full h-full", font.className)}>{children}</div>;
+}: React.PropsWithChildren<{ font?: NextFont | FontFamily }>) {
+  const _font: NextFont | undefined =
+    typeof font === "string" ? fonts[font] : font;
+
+  return (
+    <div className={cn("w-full h-full", _font?.className ?? "")}>
+      {children}
+    </div>
+  );
 }
 
-function PaletteProvider({ children }: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
-
-  const { appearance, palette } = state.theme;
+function PaletteProvider({
+  appearance = "system",
+  palette,
+  children,
+}: React.PropsWithChildren<{
+  appearance?: Appearance;
+  palette?: keyof typeof palettes;
+}>) {
   const { setTheme: setAppearance } = useTheme();
 
   useEffect(() => {
@@ -72,16 +90,4 @@ function PaletteProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   return <>{children}</>;
-}
-
-export function SectionStyle({
-  className,
-  children,
-}: React.PropsWithChildren<{
-  className?: string;
-}>) {
-  const [state] = useEditorState();
-  const sectioncss = state.theme.section;
-
-  return <section className={cn(sectioncss, className)}>{children}</section>;
 }

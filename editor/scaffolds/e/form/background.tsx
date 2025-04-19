@@ -1,11 +1,14 @@
 "use client";
 
-import { motion } from "framer-motion";
-import type { FormPageBackgroundSchema } from "@/types";
-import { useMemo, useState } from "react";
+import { motion } from "motion/react";
+import { useMemo } from "react";
 import { useTheme } from "next-themes";
+import type { TemplatePageBackgroundSchema } from "@/types";
 
-export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
+export function FormPageBackground({
+  element,
+  src,
+}: TemplatePageBackgroundSchema) {
   const renderBackground = () => {
     switch (element) {
       case "iframe":

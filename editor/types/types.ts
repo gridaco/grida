@@ -386,7 +386,9 @@ export interface PaymentFieldData {
   service_provider: PaymentsServiceProviders;
 }
 
-export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
+export type TemplatePageBackgroundSchema = PageThemeEmbeddedBackgroundData;
+
+export type FormPageBackgroundSchema = PageThemeEmbeddedBackgroundData;
 
 export type FormStyleSheetV1Schema = {
   section?: string;
@@ -400,7 +402,7 @@ export type FontFamily = "inter" | "lora" | "inconsolata";
 
 export type Appearance = "light" | "dark" | "system";
 
-interface FormPageThemeEmbeddedBackgroundData {
+interface PageThemeEmbeddedBackgroundData {
   type: "background";
   element: "iframe" | "img" | "div";
   /**
