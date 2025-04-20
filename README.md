@@ -36,7 +36,7 @@
 
 <br/>
 
-- [x] Connecy your Supabase Project (Talbe, Views, Storage, Auth)
+- [x] Connecy your Supabase Project (Table, Views, Storage, Auth)
 - [x] Readonly Views
 - [x] Storage Connected Rich Text Editor
 - [x] CMS Ready
