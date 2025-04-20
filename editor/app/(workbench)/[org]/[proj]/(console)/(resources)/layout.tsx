@@ -10,10 +10,10 @@ import {
   SidebarProvider,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import { ArrowLeftIcon, OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import Link from "next/link";
 import { previewlink } from "@/lib/internal/url";
+import Link from "next/link";
 
 type Params = { org: string; proj: string };
 
@@ -125,13 +125,13 @@ export default async function Layout({
                     </Link>
                   </SidebarMenu>
                   <SidebarMenu>
-                    <Link href={previewlink({ org, proj, path: "/p/login" })}>
+                    <Link
+                      href={previewlink({ org, proj, path: "/p/login" })}
+                      target="_blank"
+                    >
                       <SidebarMenuItem>
                         <SidebarMenuButton size="sm">
-                          <ResourceTypeIcon
-                            type="customer-portal"
-                            className="size-4"
-                          />
+                          <OpenInNewWindowIcon className="size-4" />
                           Customer Portal
                         </SidebarMenuButton>
                       </SidebarMenuItem>
