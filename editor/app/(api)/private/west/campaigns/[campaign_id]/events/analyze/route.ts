@@ -1,7 +1,4 @@
-import {
-  createWestReferralClient,
-  _sr_grida_west_referral_client,
-} from "@/lib/supabase/server";
+import { createWestReferralClient, service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -34,7 +31,7 @@ export async function GET(req: NextRequest, context: Context) {
     return notFound();
   }
 
-  const { data, error: analyze_err } = await _sr_grida_west_referral_client.rpc(
+  const { data, error: analyze_err } = await service_role.west_referral.rpc(
     "analyze",
     {
       p_campaign_id: campaign_id,

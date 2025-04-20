@@ -1,4 +1,4 @@
-import { _sr_grida_forms_client as _sr_grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import assert from "assert";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
@@ -161,7 +161,7 @@ export async function prepare_response_file_upload_storage_presigned_url(
   );
 
   const storage = new SessionStagedFileStorage(
-    _sr_grida_forms_client,
+    service_role.forms,
     GRIDA_FORMS_RESPONSE_BUCKET
   );
 

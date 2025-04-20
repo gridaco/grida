@@ -1,7 +1,4 @@
-import {
-  _sr_grida_forms_client,
-  _sr_workspaceclient,
-} from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { unique } from "@/utils/unique";
 import assert from "assert";
@@ -22,7 +19,7 @@ export async function POST(
 
   assert(response_id, "response_id is required");
 
-  const { data: response, error: response_err } = await _sr_grida_forms_client
+  const { data: response, error: response_err } = await service_role.forms
     .from("response")
     .select(
       `*, response_fields:response_field(*, form_field:attribute(type, name))`
@@ -77,7 +74,7 @@ export async function POST(
   // update customer
 
   const { data: customer_prev, error: customer_prev_err } =
-    await _sr_workspaceclient
+    await service_role.workspace
       .from("customer")
       .select("email_provisional, phone_provisional")
       .eq("uid", response.customer_id)
@@ -91,7 +88,7 @@ export async function POST(
   const { email_provisional, phone_provisional } =
     process_response_provisional_info([response as any]);
 
-  const { error } = await _sr_workspaceclient
+  const { error } = await service_role.workspace
     .from("customer")
     .update({
       email_provisional: unique(

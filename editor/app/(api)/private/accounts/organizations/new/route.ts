@@ -1,4 +1,4 @@
-import { createClient, _sr_workspaceclient } from "@/lib/supabase/server";
+import { createClient, service_role } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data, error } = await _sr_workspaceclient
+  const { data, error } = await service_role.workspace
     .from("organization")
     .insert({
       name: String(name),

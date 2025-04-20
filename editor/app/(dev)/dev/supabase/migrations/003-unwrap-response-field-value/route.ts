@@ -1,17 +1,15 @@
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
-import { _sr_grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const { data: forms } = await _sr_grida_forms_client
-    .from("form")
-    .select("id");
+  const { data: forms } = await service_role.forms.from("form").select("id");
 
   let i = 1;
   for (const form of forms!) {
     console.log(`===== ${i} / ${forms?.length} =====`);
 
-    const { data } = await _sr_grida_forms_client
+    const { data } = await service_role.forms
       .from("response_field")
       .select("id, type, value")
       .eq("form_id", form.id);
@@ -21,7 +19,7 @@ export async function POST() {
       const { type, value } = rf;
       const unwrapped = unwrapFeildValue(value, type);
 
-      await _sr_grida_forms_client
+      await service_role.forms
         .from("response_field")
         .update({ value: unwrapped as any })
         .eq("id", rf.id);

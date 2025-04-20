@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
-  _sr_grida_xsupabase_client,
+  service_role,
   createClient,
   createFormsClient,
   createStorageClient,
@@ -315,7 +315,7 @@ export default async function Layout({
         .single();
 
       // get project supabase project
-      const { data: supabase_project } = await _sr_grida_xsupabase_client
+      const { data: supabase_project } = await service_role.xsb
         .from("supabase_project")
         .select("*")
         .eq("project_id", project_ref.id)

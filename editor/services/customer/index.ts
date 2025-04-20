@@ -1,4 +1,4 @@
-import { _sr_workspaceclient } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { is_uuid_v4 } from "@/utils/is";
 
 export async function upsert_customer_with({
@@ -38,7 +38,7 @@ export async function upsert_customer_with({
       // if uuid is provided, we don't need to store fingerprint (vulnerable)
       delete pl._fp_fingerprintjs_visitorid;
 
-      const { data: customer, error } = await _sr_workspaceclient
+      const { data: customer, error } = await service_role.workspace
         .from("customer")
         .upsert(pl, {
           onConflict: "project_id, uuid",
@@ -55,7 +55,7 @@ export async function upsert_customer_with({
       // FIXME: we should not be relying on fingerprint for customer identification
       // this should be replaced with 100% user-configured policy
       // there is no universal way to idintify a customer (without explicit uuid)
-      const { data: customer, error } = await _sr_workspaceclient
+      const { data: customer, error } = await service_role.workspace
         .from("customer")
         .upsert(pl, {
           onConflict: "project_id, _fp_fingerprintjs_visitorid",

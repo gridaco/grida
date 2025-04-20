@@ -1,4 +1,4 @@
-import { _sr_grida_west_referral_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
@@ -16,11 +16,13 @@ export async function POST(req: NextRequest) {
   assert(campaign_id, "x-grida-west-campaign-id is required");
   assert(code, "x-grida-west-token-code is required");
 
-  const { data: next, error: mint_err } =
-    await _sr_grida_west_referral_client.rpc("invite", {
+  const { data: next, error: mint_err } = await service_role.west_referral.rpc(
+    "invite",
+    {
       p_campaign_id: campaign_id,
       p_code: code,
-    });
+    }
+  );
 
   if (mint_err) {
     console.error("error while minting", mint_err);

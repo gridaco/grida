@@ -1,6 +1,6 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
-import { _sr_grida_xsupabase_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,
@@ -18,7 +18,7 @@ export async function sbconn_insert({
 }) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
-    await _sr_grida_xsupabase_client
+    await service_role.xsb
       .from("supabase_project")
       .select("*, tables:supabase_table(*)")
       .eq("id", connection.supabase_project_id)
@@ -74,7 +74,7 @@ export async function sbconn_update(
 ) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
-    await _sr_grida_xsupabase_client
+    await service_role.xsb
       .from("supabase_project")
       .select("*, tables:supabase_table(*)")
       .eq("id", connection.supabase_project_id)

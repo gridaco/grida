@@ -1,8 +1,5 @@
 import { FieldSupports } from "@/k/supported_field_types";
-import {
-  _sr_grida_commerce_client,
-  createFormsClient,
-} from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import assert from "assert";
 import { notFound } from "next/navigation";
@@ -241,7 +238,7 @@ export async function POST(
     assert(form_reference.store_connection, "store_connection is required");
 
     const commerce = new GridaCommerceClient(
-      _sr_grida_commerce_client,
+      service_role.commerce,
       form_reference.project_id,
       form_reference.store_connection.store_id
     );

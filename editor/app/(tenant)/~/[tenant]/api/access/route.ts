@@ -2,7 +2,7 @@ import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { Authentication } from "@/lib/auth";
-import { _sr_workspaceclient } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import parsePhoneNumber from "libphonenumber-js";
 import { resolve_next } from "@/lib/forms/url";
 import { headers } from "next/headers";
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, context: Context) {
   const formdata = await reqformdata(req, contenttype);
   const { policy: policyid } = await context.params;
 
-  const { data: policy, error: policy_fetch_err } = await _sr_workspaceclient
+  const { data: policy, error: policy_fetch_err } = await service_role.workspace
     .from("customer_auth_policy")
     .select("*")
     .eq("id", policyid)
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest, context: Context) {
     assert(challenge.type === submission.type);
 
     // dynamically query customer with the data
-    const query = _sr_workspaceclient
+    const query = service_role.workspace
       .from("customer")
       .select("*")
       .eq("project_id", project_id);

@@ -2,7 +2,7 @@ import { Database } from "@/database.types";
 import {
   createWestReferralClient,
   createWWWClient,
-  _sr_workspaceclient,
+  service_role,
 } from "@/lib/supabase/server";
 import assert from "assert";
 import { headers } from "next/headers";
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   } = body as Platform.WEST.Referral.Wizard.CampaignData;
 
   // step document-1. create document
-  const { data: base_doc, error: base_doc_err } = await _sr_workspaceclient
+  const { data: base_doc, error: base_doc_err } = await service_role.workspace
     .from("document")
     .insert({
       doctype: "v0_campaign_referral",

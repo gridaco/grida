@@ -1,8 +1,8 @@
 import { resolve_next } from "@/lib/forms/url";
 import {
-  _sr_grida_commerce_client,
   createClient,
   createFormsClient,
+  service_role,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import { GridaFormsClient } from "@/services/form";
@@ -65,7 +65,7 @@ export async function POST(
   }
 
   const commerce = new GridaCommerceClient(
-    _sr_grida_commerce_client, // TODO: use non admin client
+    service_role.commerce, // TODO: use non admin client
     form_reference.project_id
   );
 

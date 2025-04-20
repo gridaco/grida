@@ -1,4 +1,4 @@
-import { _sr_grida_west_referral_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   assert(invitation_id, "x-grida-west-invitation-id is required");
 
   const { data: next, error: refresh_err } =
-    await _sr_grida_west_referral_client.rpc("refresh", {
+    await service_role.west_referral.rpc("refresh", {
       p_campaign_id: campaign_id,
       p_invitation_id: invitation_id,
     });

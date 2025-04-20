@@ -87,47 +87,21 @@ const __create_service_role_client = <
 /**
  * @deprecated - deprecation warning for extra security (not actually deprecated)
  */
-export const _sr_workspaceclient =
-  __create_service_role_client<"public">("public");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_forms_client =
-  __create_service_role_client<"grida_forms">("grida_forms");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_storage_client =
-  __create_service_role_client<"grida_storage">("grida_storage");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_canvas_client =
-  __create_service_role_client<"grida_canvas">("grida_canvas");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_sites_client =
-  __create_service_role_client<"grida_sites">("grida_sites");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_commerce_client =
-  __create_service_role_client<"grida_commerce">("grida_commerce");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_west_referral_client =
-  __create_service_role_client<"grida_west_referral">("grida_west_referral");
-
-/**
- * @deprecated - deprecation warning for extra security (not actually deprecated)
- */
-export const _sr_grida_xsupabase_client =
-  __create_service_role_client<"grida_x_supabase">("grida_x_supabase");
+export namespace service_role {
+  export const workspace = __create_service_role_client<"public">("public");
+  export const forms =
+    __create_service_role_client<"grida_forms">("grida_forms");
+  export const storage =
+    __create_service_role_client<"grida_storage">("grida_storage");
+  export const canvas =
+    __create_service_role_client<"grida_canvas">("grida_canvas");
+  export const sites =
+    __create_service_role_client<"grida_sites">("grida_sites");
+  export const commerce =
+    __create_service_role_client<"grida_commerce">("grida_commerce");
+  export const west_referral =
+    __create_service_role_client<"grida_west_referral">("grida_west_referral");
+  export const xsb =
+    __create_service_role_client<"grida_x_supabase">("grida_x_supabase");
+  export const www = __create_service_role_client<"grida_www">("grida_www");
+}

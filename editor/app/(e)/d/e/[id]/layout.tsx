@@ -1,8 +1,5 @@
 import { notFound } from "next/navigation";
-import {
-  _sr_grida_forms_client,
-  _sr_workspaceclient,
-} from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
@@ -34,7 +31,7 @@ export async function generateMetadata({
   // room for improvement - query optimization via rpc or meta from client side
   const { id } = await params;
 
-  const { data: formdoc, error: formdoc_err } = await _sr_grida_forms_client
+  const { data: formdoc, error: formdoc_err } = await service_role.forms
     .from("form_document")
     .select(
       `
@@ -51,7 +48,7 @@ export async function generateMetadata({
     return notFound();
   }
 
-  const { data: doc } = await _sr_workspaceclient
+  const { data: doc } = await service_role.workspace
     .from("document")
     .select("*")
     .eq("id", formdoc.id)
@@ -78,7 +75,7 @@ export default async function Layout({
 }>) {
   const { id } = await params;
 
-  const { data, error } = await _sr_grida_forms_client
+  const { data, error } = await service_role.forms
     .from("form_document")
     .select(
       `

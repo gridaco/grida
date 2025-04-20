@@ -1,4 +1,4 @@
-import { _sr_grida_west_referral_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
@@ -19,12 +19,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 400 });
   }
 
-  const { data: next, error: claim_err } =
-    await _sr_grida_west_referral_client.rpc("claim", {
+  const { data: next, error: claim_err } = await service_role.west_referral.rpc(
+    "claim",
+    {
       p_campaign_id: campaign_id,
       p_code: code,
       p_customer_id: customer_id,
-    });
+    }
+  );
 
   if (claim_err) {
     console.error("claim", claim_err);

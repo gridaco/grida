@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { _sr_grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { parseStorageUrlOptions } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormFieldStorageSchema } from "@/types";
@@ -27,7 +27,7 @@ export async function GET(
   assert(qpath);
 
   // TODO: support RLS
-  const { data } = await _sr_grida_forms_client
+  const { data } = await service_role.forms
     .from("form")
     .select(
       `
@@ -98,7 +98,7 @@ export async function GET(
     }
   }
 
-  const { data: singed } = await _sr_grida_forms_client.storage
+  const { data: singed } = await service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .createSignedUrl(qpath, expiresIn, options);
   const src = singed?.signedUrl;

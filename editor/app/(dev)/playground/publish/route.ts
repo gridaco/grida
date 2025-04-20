@@ -1,6 +1,6 @@
 import { Env } from "@/env";
 import { editorlink } from "@/lib/forms/url";
-import { createFormsClient, _sr_workspaceclient } from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   // check if user has a project as a owner
   // get the user owned organization
   // TODO: WROKSPACE MANAGEMENT
-  const { data: org, error } = await _sr_workspaceclient
+  const { data: org, error } = await service_role.workspace
     .from("organization")
     .select(`*, projects:project(*)`)
     .eq("owner_id", auth.user.id)
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   if (!org) {
     // 1. create org if not exists
-    const { data: neworg, error } = await _sr_workspaceclient
+    const { data: neworg, error } = await service_role.workspace
       .from("organization")
       .insert({
         owner_id: auth.user.id,
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   if (!PROJECT) {
     // 2. create project if not exists  - TODO: also bad
-    const { data: project, error } = await _sr_workspaceclient
+    const { data: project, error } = await service_role.workspace
       .from("project")
       .insert({
         organization_id: ORG.id,
