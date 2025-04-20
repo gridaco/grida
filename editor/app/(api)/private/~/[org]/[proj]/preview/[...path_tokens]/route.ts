@@ -8,17 +8,12 @@ type Params = {
   /**
    * organization.id or organization.name
    */
-  organization_id: string;
+  org: string;
 
   /**
    * project.id or project.name
    */
-  project_id: string;
-
-  /**
-   * document.id
-   */
-  docid: string;
+  proj: string;
 
   /**
    * tenant site path
@@ -30,7 +25,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
-  const { organization_id, project_id, docid, path_tokens } = await params;
+  const { org, proj, path_tokens } = await params;
 
   const client = await createClient();
   const wwwClient = await createWWWClient();
@@ -39,8 +34,8 @@ export async function GET(
     .rpc(
       "find_project",
       {
-        p_org_ref: organization_id,
-        p_proj_ref: project_id,
+        p_org_ref: org,
+        p_proj_ref: proj,
       },
       { get: true }
     )
@@ -48,8 +43,8 @@ export async function GET(
 
   if (project_err) {
     console.error("project not found", project_err, "with", {
-      project_id,
-      organization_id,
+      project_id: proj,
+      organization_id: org,
     });
     return notFound();
   }
@@ -61,25 +56,16 @@ export async function GET(
     .single();
   if (www_err) return notFound();
 
-  const { data: routing, error: routing_err } = await wwwClient
-    .from("public_route")
-    .select()
-    .eq("www_id", www.id)
-    .eq("document_id", docid)
-    .single();
-
-  if (routing_err) return notFound();
-
   const request_path = path_tokens.join("/");
 
   if (IS_HOSTED) {
     return NextResponse.redirect(
-      `https://${www.name}.grida.site/${routing.route_path}/${request_path}`,
+      `https://${www.name}.grida.site/${request_path}`,
       { status: 302 }
     );
   } else {
     return NextResponse.redirect(
-      `http://${www.name}.localhost:3000/${routing.route_path}/${request_path}`,
+      `http://${www.name}.localhost:3000/${request_path}`,
       { status: 302 }
     );
   }

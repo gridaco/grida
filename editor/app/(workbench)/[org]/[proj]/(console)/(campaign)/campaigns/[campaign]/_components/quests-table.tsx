@@ -264,8 +264,8 @@ export function QuestsTable() {
                         <DropdownMenuItem
                           onClick={() => {
                             const link = documentpreviewlink({
-                              orgid: project.organization_id,
-                              projid: project.id,
+                              org: project.organization_id,
+                              proj: project.id,
                               docid: campaign.id,
                               path: `/t/${quest.code}`,
                             });

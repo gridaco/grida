@@ -50,8 +50,8 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
         <DropdownMenuItem
           onClick={() => {
             const link = documentpreviewlink({
-              orgid: project.organization_id,
-              projid: project.id,
+              org: project.organization_id,
+              proj: project.id,
               docid: id,
               path: `/t/${referrer.code}`,
             });
