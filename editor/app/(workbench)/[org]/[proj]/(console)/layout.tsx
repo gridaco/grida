@@ -4,6 +4,7 @@ import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
 import { Metadata } from "next";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,19 +31,21 @@ export default async function Layout({
             enableSystem
             disableTransitionOnChange
           >
-            <div className="flex flex-1 overflow-y-auto">
-              <div className="h-full flex flex-1 w-full">
-                <div className="flex flex-col overflow-hidden w-full h-full">
-                  <div className="w-full h-full overflow-x-hidden overflow-y-auto">
-                    <ProjectLoaded>
-                      <ProjectTagsProvider>{children}</ProjectTagsProvider>
-                    </ProjectLoaded>
+            <TooltipProvider>
+              <div className="flex flex-1 overflow-y-auto">
+                <div className="h-full flex flex-1 w-full">
+                  <div className="flex flex-col overflow-hidden w-full h-full">
+                    <div className="w-full h-full overflow-x-hidden overflow-y-auto">
+                      <ProjectLoaded>
+                        <ProjectTagsProvider>{children}</ProjectTagsProvider>
+                      </ProjectLoaded>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <EditorHelpFab />
-            <ToasterWithMax position="bottom-center" max={5} />
+              <EditorHelpFab />
+              <ToasterWithMax position="bottom-center" max={5} />
+            </TooltipProvider>
           </ThemeProvider>
         </div>
       </body>
