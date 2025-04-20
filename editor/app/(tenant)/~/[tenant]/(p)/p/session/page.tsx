@@ -1,6 +1,10 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createClient, createWestReferralClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import {
+  createClient,
+  createWWWClient,
+  createWestReferralClient,
+} from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
 import Link from "next/link";
 
@@ -30,22 +34,31 @@ export default async function CustomerPortalSession({
 }: {
   params: Promise<Params>;
 }) {
-  // TODO: bound by project
-
+  const { tenant } = await params;
   const client = await createClient();
-  const westclient = await createWestReferralClient();
+  const westClient = await createWestReferralClient();
+  const wwwClient = await createWWWClient();
 
   const t = dictionary[locale];
 
   const { data } = await client.auth.getSession();
-  // authclient.auth.getUserIdentities
+
   if (!data.session) {
     return redirect(`./login/`);
   }
 
+  const { data: wwwref, error: wwwreferr } = await wwwClient
+    .from("www")
+    .select("project_id")
+    .eq("name", tenant)
+    .single();
+
+  if (wwwreferr) return notFound();
+
   const { data: cus, error: cus_err } = await client
     .from("customer")
     .select()
+    .eq("project_id", wwwref.project_id)
     .eq("user_id", data.session.user.id)
     .single();
 
@@ -54,7 +67,7 @@ export default async function CustomerPortalSession({
   //   return redirect(`./login/`);
   // }
 
-  const { data: iam_referrers, error: referrer_err } = await westclient
+  const { data: iam_referrers, error: referrer_err } = await westClient
     .from("referrer")
     .select(
       `
