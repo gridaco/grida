@@ -68,6 +68,7 @@ export async function middleware(req: NextRequest) {
     });
   }
 
+  // tenant.grida.site => "/~/[tenant]/**"
   if (tanentwww.name) {
     const url = req.nextUrl.clone();
     url.pathname = `/~/${tanentwww.name}${req.nextUrl.pathname}`;
