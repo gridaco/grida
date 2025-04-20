@@ -100,8 +100,8 @@ function TemplateEditor({
 
   const previewbaseurl = documentpreviewlink({
     docid: campaign.id,
-    orgid: project.organization_id,
-    projid: project.id,
+    org: project.organization_id,
+    proj: project.id,
   });
 
   const props = usePropsEditor<TemplateData.West_Referrral__Duo_001>({
