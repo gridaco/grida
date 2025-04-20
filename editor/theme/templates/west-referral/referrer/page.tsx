@@ -38,56 +38,26 @@ import { template } from "@/utils/template";
 import * as Standard from "../standard";
 import toast from "react-hot-toast";
 
-function __share_obj({
-  campaign_slug,
-  referrer_name,
-  invitation_code,
-}: {
-  campaign_slug: string;
-  referrer_name: string;
-  invitation_code: string;
-}) {
-  return {
-    // FIXME: content
-    title: "Polestar 시승하고 경품 받아가세요 🎁",
-    text: `${referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
-    // FIXME: tenant url
-    url: `${window.location.origin}/r/${campaign_slug}/t/${invitation_code}`,
-  };
-}
-
 async function mkshare({
   client,
-  campaign_slug,
   referrer_code,
-  referrer_name,
 }: {
   client?: Platform.WEST.Referral.WestReferralClient;
-  campaign_slug: string;
   referrer_code: string;
-  referrer_name: string;
 }) {
   if (!client) throw new Error("client is not defined");
   const { data: invitation } = await client.invite(referrer_code);
 
-  return __share_obj({
-    campaign_slug: campaign_slug,
-    referrer_name,
-    invitation_code: invitation.code,
-  });
+  return invitation.sharable;
 }
 
 async function reshare({
   client,
-  campaign_slug,
   referrer_code,
-  referrer_name,
   invitation_id,
 }: {
   client?: Platform.WEST.Referral.WestReferralClient;
-  campaign_slug: string;
   referrer_code: string;
-  referrer_name: string;
   invitation_id: string;
 }) {
   if (!client) throw new Error("client is not defined");
@@ -96,11 +66,7 @@ async function reshare({
     invitation_id
   );
 
-  return __share_obj({
-    campaign_slug: campaign_slug,
-    referrer_name,
-    invitation_code: invitation.code,
-  });
+  return invitation.sharable;
 }
 
 async function share_or_copy(sharable: {
@@ -233,9 +199,7 @@ export default function ReferrerPageTemplate({
   const triggerShare = async () => {
     return mkshare({
       client: client,
-      campaign_slug: slug,
       referrer_code: code!,
-      referrer_name,
     }).then((sharable) => {
       share_or_copy(sharable)
         .then(({ type }) => {
@@ -400,9 +364,7 @@ export default function ReferrerPageTemplate({
                                     onClick={() => {
                                       reshare({
                                         client: client,
-                                        campaign_slug: slug,
                                         referrer_code: code!,
-                                        referrer_name,
                                         invitation_id: inv.id,
                                       }).then((sharable) => {
                                         share_or_copy(sharable).then(

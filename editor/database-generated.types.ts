@@ -3917,6 +3917,7 @@ export type Database = {
       }
       add_dimension: {
         Args:
+          | { hypertable: unknown; dimension: unknown; if_not_exists?: boolean }
           | {
               hypertable: unknown
               column_name: unknown
@@ -3925,12 +3926,8 @@ export type Database = {
               partitioning_func?: unknown
               if_not_exists?: boolean
             }
-          | { hypertable: unknown; dimension: unknown; if_not_exists?: boolean }
         Returns: {
           dimension_id: number
-          schema_name: unknown
-          table_name: unknown
-          column_name: unknown
           created: boolean
         }[]
       }
