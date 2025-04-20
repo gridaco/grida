@@ -1,9 +1,8 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import { EditorApiResponseOk } from "@/types/private/api";
-import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import assert from "assert";
 
 type Params = { schema_id: string; table_id: string };
 
@@ -14,13 +13,12 @@ type Context = {
 export async function DELETE(req: NextRequest, context: Context) {
   const { schema_id, table_id } = await context.params;
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const { user_confirmation_txt } = await req.json();
 
   // validate user confirmation text
-  const { data: ref, error: ref_err } = await supabase
+  const { data: ref, error: ref_err } = await formsClient
     .from("form")
     .select("id, schema_id, name:title")
     .eq("id", table_id)
@@ -40,7 +38,7 @@ export async function DELETE(req: NextRequest, context: Context) {
     "Invalid confirmation text"
   );
 
-  const { count, error } = await supabase
+  const { count, error } = await formsClient
     .from("form")
     .delete({ count: "exact" })
     .eq("id", table_id)

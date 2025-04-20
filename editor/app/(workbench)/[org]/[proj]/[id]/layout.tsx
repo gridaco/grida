@@ -1,12 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
-  createRouteHandlerXSBClient,
-  createServerComponentClient,
-  createServerComponentWorkspaceClient,
-  createServerComponentCanvasClient,
-  grida_xsupabase_client,
-  createServerComponentStorageClient,
+  service_role,
+  createClient,
+  createFormsClient,
+  createStorageClient,
+  createCanvasClient,
+  createXSBClient,
 } from "@/lib/supabase/server";
 import { EditorSidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
@@ -52,9 +52,9 @@ export async function generateMetadata({
   params: Promise<GDocEditorRouteParams>;
 }): Promise<Metadata> {
   const { id, proj } = await params;
-  const cookieStore = await cookies();
-  const supabase = createServerComponentWorkspaceClient(cookieStore);
-  const { data, error } = await supabase
+  const client = await createClient();
+
+  const { data, error } = await client
     .from("document")
     .select(`title`)
     .eq("id", id)
@@ -79,22 +79,22 @@ export default async function Layout({
   const { id, org, proj } = await params;
 
   // in local dev, the vercel insights script is not loaded, will hit this route
-  if (org === "_vercel") return notFound();
+  if (org.startsWith("_")) return notFound();
 
   const cookieStore = await cookies();
-  const supabase = createServerComponentClient(cookieStore);
-  const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const client = await createClient();
+  const formsClient = await createFormsClient();
 
   const {
     data: { user },
-  } = await wsclient.auth.getUser();
+  } = await client.auth.getUser();
 
   if (!user) {
     return redirect("/sign-in");
   }
 
   // mark only. no need to await
-  wsclient
+  client
     .rpc("workspace_mark_access", {
       p_organization_name: org,
       p_project_name: proj,
@@ -102,7 +102,7 @@ export default async function Layout({
     })
     .then();
 
-  const { data: project_ref, error: project_ref_err } = await wsclient
+  const { data: project_ref, error: project_ref_err } = await client
     .from("project")
     .select("id, name, organization!inner(id, name)")
     .eq("name", proj)
@@ -119,7 +119,7 @@ export default async function Layout({
     return notFound();
   }
 
-  const { data: masterdoc_ref, error: masterdoc_ref_err } = await wsclient
+  const { data: masterdoc_ref, error: masterdoc_ref_err } = await client
     .from("document")
     .select("*")
     .eq("id", id)
@@ -137,7 +137,7 @@ export default async function Layout({
 
   switch (masterdoc_ref.doctype) {
     case "v0_form": {
-      const { data, error } = await supabase
+      const { data, error } = await formsClient
         .from("form_document")
         .select(
           `
@@ -293,7 +293,7 @@ export default async function Layout({
       );
     }
     case "v0_schema": {
-      const { data, error } = await supabase
+      const { data, error } = await formsClient
         .from("schema_document")
         .select(
           `
@@ -315,7 +315,7 @@ export default async function Layout({
         .single();
 
       // get project supabase project
-      const { data: supabase_project } = await grida_xsupabase_client
+      const { data: supabase_project } = await service_role.xsb
         .from("supabase_project")
         .select("*")
         .eq("project_id", project_ref.id)
@@ -327,8 +327,8 @@ export default async function Layout({
       }
 
       // get x-supabase coonnected tables
-      const xsb_client = createRouteHandlerXSBClient(cookieStore);
-      const { data: xsb_tables, error: xsb_tables_err } = await xsb_client
+      const xsbClient = await createXSBClient();
+      const { data: xsb_tables, error: xsb_tables_err } = await xsbClient
         .from("supabase_table")
         .select("*")
         .in(
@@ -404,7 +404,7 @@ export default async function Layout({
       );
     }
     case "v0_bucket": {
-      const storageclient = createServerComponentStorageClient(cookieStore);
+      const storageclient = await createStorageClient();
       const { data, error } = await storageclient
         .from("bucket_document")
         .select("*")
@@ -445,7 +445,7 @@ export default async function Layout({
       break;
     }
     case "v0_canvas": {
-      const canvasclient = createServerComponentCanvasClient(cookieStore);
+      const canvasclient = await createCanvasClient();
 
       const { data, error } = await canvasclient
         .from("canvas_document")

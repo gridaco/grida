@@ -1,4 +1,4 @@
-import { grida_commerce_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "../commerce";
 import assert from "assert";
 import { Option } from "@/types";
@@ -14,7 +14,7 @@ export async function form_field_options_inventory({
   store_id: number;
 }): Promise<FormFieldOptionsInventoryMap> {
   const commerce = new GridaCommerceClient(
-    grida_commerce_client,
+    service_role.commerce,
     project_id,
     store_id
   );

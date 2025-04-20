@@ -15,13 +15,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import { GridaLogo } from "@/components/grida-logo";
 import { DeleteOrganizationConfirm } from "./delete";
 import { Badge } from "@/components/ui/badge";
+import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 
 type Params = { organization_name: string };
 
@@ -31,17 +30,16 @@ export default async function OrganizationsSettingsProfilePage({
   params: Promise<Params>;
 }) {
   const { organization_name } = await params;
-  const cookieStore = await cookies();
 
-  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await client.auth.getUser();
 
   if (!auth.user) {
     return redirect("/sign-in");
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("organization")
     .select()
     .eq("name", organization_name)

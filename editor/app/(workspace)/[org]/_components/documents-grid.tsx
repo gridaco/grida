@@ -23,7 +23,7 @@ import {
   DeleteConfirmationSnippet,
 } from "@/components/dialogs/delete-confirmation-dialog";
 import { TrashIcon } from "@radix-ui/react-icons";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 const variants = {
   list: RowCard,
@@ -56,7 +56,7 @@ export function DocumentsGrid({
 
   const Item = variants[layout];
 
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
 
   const renameDocument = async (docid: string, newname: string) => {
     const { error } = await client

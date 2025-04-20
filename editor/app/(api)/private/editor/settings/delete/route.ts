@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createFormsClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,17 +6,16 @@ export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
-  const cookieStore = await cookies();
 
   const formdata = await req.formData();
 
   const form_id = String(formdata.get("form_id"));
   const comfirmation_text = String(formdata.get("comfirmation_text"));
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   // load the form
-  const { data: form } = await supabase
+  const { data: form } = await formsClient
     .from("form")
     .select("*")
     .eq("id", form_id)
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   // delete
-  await supabase.from("form").delete().eq("id", form_id).single();
+  await formsClient.from("form").delete().eq("id", form_id).single();
 
   // once deleted, redirect to dashboard
   return NextResponse.redirect(origin + "?redirect_reason=deleted", {

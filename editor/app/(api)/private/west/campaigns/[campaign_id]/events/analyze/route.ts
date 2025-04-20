@@ -1,8 +1,4 @@
-import {
-  createRouteHandlerWestReferralClient,
-  grida_west_referral_client,
-} from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createWestReferralClient, service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -20,8 +16,7 @@ export async function GET(req: NextRequest, context: Context) {
   const to = req.nextUrl.searchParams.get("to") || undefined;
   const interval = req.nextUrl.searchParams.get("interval") || undefined;
 
-  const cookieStore = cookies();
-  const rlsclient = createRouteHandlerWestReferralClient(cookieStore);
+  const rlsclient = await createWestReferralClient();
 
   // !!!
   // [analyze] bypasses rls for query efficiency. we need to explicitly check the ownership.
@@ -36,7 +31,7 @@ export async function GET(req: NextRequest, context: Context) {
     return notFound();
   }
 
-  const { data, error: analyze_err } = await grida_west_referral_client.rpc(
+  const { data, error: analyze_err } = await service_role.west_referral.rpc(
     "analyze",
     {
       p_campaign_id: campaign_id,

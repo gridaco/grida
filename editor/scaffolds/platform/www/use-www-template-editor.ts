@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClientWWWClient } from "@/lib/supabase/client";
+import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { nanoid } from "nanoid";
 import { FileIO } from "@/lib/file";
 
@@ -26,7 +26,7 @@ type WWWTemplate<T = any> = {
 export function useWWWTemplate<T extends Record<string, any>>(
   id: string
 ): WWWTemplateEditorInstance<T> {
-  const client = useMemo(() => createClientWWWClient(), []);
+  const client = useMemo(() => createBrowserWWWClient(), []);
 
   const [__template, setTemplate] = useState<WWWTemplate<T> | null>(null);
   const [data, setData] = useState<T | null>(null);

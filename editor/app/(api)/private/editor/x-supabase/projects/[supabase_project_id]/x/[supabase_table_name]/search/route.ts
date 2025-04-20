@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { XSupabaseClientQueryBuilder } from "@/lib/supabase-postgrest/builder";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createXSBClient } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { omit } from "@/utils/qs";
 import type { GridaXSupabase } from "@/types";
@@ -22,11 +21,10 @@ export async function GET(req: NextRequest, context: Context) {
   const supabase_schema_name = req.headers.get("Accept-Profile") || "public";
   const { supabase_project_id, supabase_table_name } = await context.params;
 
-  const cookieStore = await cookies();
-  const client = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
 
   // fetch connection
-  const { data: connection_ref, error: connection_ref_err } = await client
+  const { data: connection_ref, error: connection_ref_err } = await xsbClient
     .from("supabase_project")
     .select("id, sb_schema_definitions")
     .eq("id", supabase_project_id)

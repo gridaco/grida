@@ -1,19 +1,17 @@
 "use server";
 
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createFormsClient } from "@/lib/supabase/server";
 
 export async function fetchTemplates() {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data } = await supabase.from("form_template").select();
+  const { data } = await formsClient.from("form_template").select();
 
   if (data) {
     return data.map((template) => {
       return {
         ...template,
-        preview_url: supabase.storage
+        preview_url: formsClient.storage
           .from("grida-forms-template")
           .getPublicUrl(template.preview_path).data.publicUrl,
       };

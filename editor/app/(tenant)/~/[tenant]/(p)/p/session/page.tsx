@@ -1,12 +1,8 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  createServerComponentWorkspaceClient,
-  createServerComponentWestReferralClient,
-} from "@/lib/supabase/server";
-import { cookies } from "next/headers";
-import Link from "next/link";
+import { createClient, createWestReferralClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
+import Link from "next/link";
 
 type Params = {
   tenant: string;
@@ -36,19 +32,18 @@ export default async function CustomerPortalSession({
 }) {
   // TODO: bound by project
 
-  const cookieStore = cookies();
-  const authclient = createServerComponentWorkspaceClient(cookieStore);
-  const westclient = createServerComponentWestReferralClient(cookieStore);
+  const client = await createClient();
+  const westclient = await createWestReferralClient();
 
   const t = dictionary[locale];
 
-  const { data } = await authclient.auth.getSession();
+  const { data } = await client.auth.getSession();
   // authclient.auth.getUserIdentities
   if (!data.session) {
     return redirect(`./login/`);
   }
 
-  const { data: cus, error: cus_err } = await authclient
+  const { data: cus, error: cus_err } = await client
     .from("customer")
     .select()
     .eq("user_id", data.session.user.id)

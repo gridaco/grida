@@ -20,7 +20,7 @@ import {
 
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/spinner";
 
@@ -31,7 +31,7 @@ export default function _Page() {
   const next = searchParams.get("next");
   const redirect_uri = searchParams.get("redirect_uri");
 
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");

@@ -69,7 +69,10 @@ export class GridaCommerceClient {
           { onConflict: "store_id, sku" }
         );
 
-      assert(!upsertion_error, "failed to upsert inventory item");
+      if (upsertion_error) {
+        console.error("upsertion error", upsertion_error);
+        throw upsertion_error;
+      }
       is_upserted = true;
     };
 

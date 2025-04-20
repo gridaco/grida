@@ -1,10 +1,9 @@
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_local_index } from "@/utils/fmt";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 
 type Params = { id: string };
 
@@ -17,10 +16,9 @@ export async function GET(
   }
 ) {
   const { id } = await context.params;
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
   //
-  const { data } = await supabase
+  const { data } = await formsClient
     .from("form")
     .select(
       `

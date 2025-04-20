@@ -1,6 +1,6 @@
 import { Platform } from "@/lib/platform";
-import { sb } from "@/lib/supabase/server";
-import { cookies, headers } from "next/headers";
+import { createWestReferralClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
@@ -9,16 +9,12 @@ export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const headersList = await headers();
-  const cookieStore = await cookies();
   const campaign_id = headersList.get("x-grida-west-campaign-id");
   const code = headersList.get("x-grida-west-token-code");
   assert(code, "x-grida-west-token-code is required");
   assert(campaign_id, "x-grida-west-campaign-id is required");
 
-  const rrwest = sb.rr.west_referral.createClient({
-    headers: headersList,
-    cookies: cookieStore,
-  });
+  const westClient = await createWestReferralClient();
 
   // #region test codes
   if (
@@ -26,7 +22,7 @@ export async function GET(req: NextRequest) {
     code === Platform.WEST.Referral.TEST_CODE_INVITATION
   ) {
     const now = new Date().toISOString();
-    const { data: campaign, error: campaing_err } = await rrwest
+    const { data: campaign, error: campaing_err } = await westClient
       .from("campaign_public")
       .select()
       .eq("id", campaign_id)
@@ -73,7 +69,7 @@ export async function GET(req: NextRequest) {
   }
   // #endregion
 
-  const { data: ref, error: ref_err } = await rrwest
+  const { data: ref, error: ref_err } = await westClient
     .rpc(
       "lookup",
       {
@@ -98,7 +94,7 @@ export async function GET(req: NextRequest) {
   > | null = null;
   switch (ref.type) {
     case "referrer": {
-      const { data, error } = await rrwest
+      const { data, error } = await westClient
         .from("referrer_public_secure")
         .select(
           `
@@ -127,7 +123,7 @@ export async function GET(req: NextRequest) {
       break;
     }
     case "invitation": {
-      const { data, error } = await rrwest
+      const { data, error } = await westClient
         .from("invitation")
         .select(
           `

@@ -1,5 +1,4 @@
-import { createRouteHandlerWWWClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
 type Params = {
@@ -9,8 +8,7 @@ export default async function APage({ params }: { params: Promise<Params> }) {
   const { path_tokens } = await params;
   const name = "/" + path_tokens.join("/");
 
-  const cookieStore = cookies();
-  const client = createRouteHandlerWWWClient(cookieStore);
+  const client = await createWWWClient();
 
   const { data, error } = await client
     .from("public_route")

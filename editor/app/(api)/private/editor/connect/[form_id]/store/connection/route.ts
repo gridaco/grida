@@ -1,13 +1,12 @@
 import { resolve_next } from "@/lib/forms/url";
 import {
-  grida_commerce_client,
-  createRouteHandlerClient,
-  createRouteHandlerWorkspaceClient,
+  createClient,
+  createFormsClient,
+  service_role,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import { GridaFormsClient } from "@/services/form";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -24,13 +23,12 @@ export async function POST(
   const formdata = await req.formData();
 
   const origin = req.nextUrl.origin;
-  const cookieStore = await cookies();
   const { form_id } = await context.params;
   const next = req.nextUrl.searchParams.get("next");
-  const supabase = createRouteHandlerClient(cookieStore);
-  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
+  const formsClient = await createFormsClient();
 
-  const { data: form_reference, error: form_ref_err } = await supabase
+  const { data: form_reference, error: form_ref_err } = await formsClient
     .from("form")
     .select(
       `
@@ -51,7 +49,7 @@ export async function POST(
     return notFound();
   }
 
-  const { data: project_ref, error: project_ref_err } = await wsclient
+  const { data: project_ref, error: project_ref_err } = await client
     .from("project")
     .select(`id, name, organization(name)`)
     .eq("id", form_reference.project_id)
@@ -67,12 +65,12 @@ export async function POST(
   }
 
   const commerce = new GridaCommerceClient(
-    grida_commerce_client, // TODO: use non admin client
+    service_role.commerce, // TODO: use non admin client
     form_reference.project_id
   );
 
   const forms = new GridaFormsClient(
-    supabase,
+    formsClient,
     form_reference.project_id,
     form_id
   );

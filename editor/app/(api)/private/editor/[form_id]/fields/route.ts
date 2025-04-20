@@ -1,11 +1,7 @@
 import { FieldSupports } from "@/k/supported_field_types";
-import {
-  grida_commerce_client,
-  createRouteHandlerClient,
-} from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import type { FormFieldUpsert } from "@/types/private/api";
@@ -27,8 +23,7 @@ export async function POST(
   }
 ) {
   const { form_id } = await context.params;
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
@@ -43,7 +38,7 @@ export async function POST(
     delete init.options;
   }
 
-  const { data: form_reference } = await supabase
+  const { data: form_reference } = await formsClient
     .from("form")
     .select(`project_id, store_connection:connection_commerce_store(*)`)
     .eq("id", form_id)
@@ -53,7 +48,7 @@ export async function POST(
     return notFound();
   }
 
-  const { data: upserted, error } = await supabase
+  const { data: upserted, error } = await formsClient
     .from("attribute")
     .upsert({
       id: init.id,
@@ -135,7 +130,7 @@ export async function POST(
   const upserted_optgroups_id_map = new Map<string, string>();
   if (optgroups) {
     // keeping optgroups
-    const { data: upserted, error: upsertion_err } = await supabase
+    const { data: upserted, error: upsertion_err } = await formsClient
       .from("optgroup")
       .upsert(
         optgroups.map((optgroup) => ({
@@ -178,7 +173,7 @@ export async function POST(
   let upserted_options: any[] | undefined = undefined;
 
   if (options) {
-    const { data: options_upsert, error } = await supabase
+    const { data: options_upsert, error } = await formsClient
       .from("option")
       .upsert(
         options.map((option) => ({
@@ -208,7 +203,7 @@ export async function POST(
       console.info("failed options payload", init.options);
       if (operation === "create") {
         // revert field if options failed
-        await supabase.from("attribute").delete().eq("id", upserted.id);
+        await formsClient.from("attribute").delete().eq("id", upserted.id);
       } else {
         // just let only the options fail, keep the updated field
       }
@@ -223,13 +218,13 @@ export async function POST(
   // delete removed optgroups
   if (deleting_optgroup_ids?.length) {
     console.log("removing_option_ids", deleting_optgroup_ids);
-    await supabase.from("optgroup").delete().in("id", deleting_optgroup_ids);
+    await formsClient.from("optgroup").delete().in("id", deleting_optgroup_ids);
   }
 
   // delete removed options
   if (deleting_option_ids?.length) {
     console.log("removing_option_ids", deleting_option_ids);
-    await supabase.from("option").delete().in("id", deleting_option_ids);
+    await formsClient.from("option").delete().in("id", deleting_option_ids);
   }
 
   // #endregion
@@ -243,7 +238,7 @@ export async function POST(
     assert(form_reference.store_connection, "store_connection is required");
 
     const commerce = new GridaCommerceClient(
-      grida_commerce_client,
+      service_role.commerce,
       form_reference.project_id,
       form_reference.store_connection.store_id
     );

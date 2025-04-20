@@ -51,7 +51,7 @@ import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
@@ -302,7 +302,7 @@ export function NavProjects({
   allowNew?: boolean;
 }) {
   const router = useRouter();
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
 
   const deleteProjectDialog = useDialogState<{
     id: number;
@@ -493,7 +493,7 @@ function OrganizationSwitcher({
   organization: OrganizationWithAvatar;
   organizations: OrganizationWithAvatar[];
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {
       window.location.href = "/";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { workspaceclient } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { resend } from "@/clients/resend";
 import EmailTemplateCustomerPortalVerification from "@/theme/templates-email/customer-portal-verification/default";
 import assert from "assert";
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   // TODO: scope by policy / project
   const { data: customer_list, error: customer_list_err } =
-    await workspaceclient
+    await service_role.workspace
       .from("customer")
       .select()
       .eq("email", email)
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   assert(customer);
 
   const { data: linkdata, error: linkerror } =
-    await workspaceclient.auth.admin.generateLink({
+    await service_role.workspace.auth.admin.generateLink({
       type: "magiclink",
       email: email,
       options: {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   } = linkdata;
 
   // link the user to the customer
-  const { error: customer_user_link_err } = await workspaceclient
+  const { error: customer_user_link_err } = await service_role.workspace
     .from("customer")
     .update({
       user_id: user.id,

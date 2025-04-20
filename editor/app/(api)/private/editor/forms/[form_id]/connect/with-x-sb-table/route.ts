@@ -1,12 +1,8 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import {
-  createRouteHandlerClient,
-  grida_xsupabase_client,
-} from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -61,8 +57,7 @@ export async function GET(req: NextRequest, context: Context) {
 // @see https://github.com/gridaco/grida/pull/179
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id } = await context.params;
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const {
     schema_name,
@@ -70,7 +65,7 @@ export async function PUT(req: NextRequest, context: Context) {
   }: XSupabasePrivateApiTypes.CreateConnectionTableRequestData =
     await req.json();
 
-  const { data: conn_ref, error: conn_ref_error } = await supabase
+  const { data: conn_ref, error: conn_ref_error } = await formsClient
     .from("connection_supabase")
     .select()
     .eq("form_id", form_id)
@@ -83,7 +78,7 @@ export async function PUT(req: NextRequest, context: Context) {
 
   if (!conn_ref) return notFound();
 
-  const { data: supabase_project } = await grida_xsupabase_client
+  const { data: supabase_project } = await service_role.xsb
     .from("supabase_project")
     .select(
       "sb_schema_definitions, sb_schema_openapi_docs, tables:supabase_table(*)"
@@ -109,7 +104,7 @@ export async function PUT(req: NextRequest, context: Context) {
       table_name
     );
 
-  const { data: upserted_supabase_table, error } = await grida_xsupabase_client
+  const { data: upserted_supabase_table, error } = await service_role.xsb
     .from("supabase_table")
     .upsert(
       {
@@ -132,7 +127,7 @@ export async function PUT(req: NextRequest, context: Context) {
   }
 
   // update connection_supabase
-  await supabase
+  await formsClient
     .from("connection_supabase")
     .update({
       main_supabase_table_id: upserted_supabase_table.id,

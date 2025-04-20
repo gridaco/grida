@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from "react";
 import { DataGrid, type DataGridCellSelectionCursor } from "../grid";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -136,7 +136,7 @@ export function GridEditor({
   selection: "on" | "off";
   deletion: "on" | "off";
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
   const [state, dispatch] = useEditorState();
 
   const query = useDataGridQuery();
@@ -681,7 +681,7 @@ function TableMod() {
 
 function useDeleteSelectedSchemaTableRows() {
   const [state, dispatch] = useEditorState();
-  const supabase = createClientFormsClient();
+  const supabase = createBrowserFormsClient();
   const { datagrid_selected_rows } = state;
   return useCallback(() => {
     const deleting = supabase
