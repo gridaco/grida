@@ -13,6 +13,7 @@ import {
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import Link from "next/link";
+import { previewlink } from "@/lib/internal/url";
 
 type Params = { org: string; proj: string };
 
@@ -119,6 +120,19 @@ export default async function Layout({
                         <SidebarMenuButton size="sm">
                           <ResourceTypeIcon type="connect" className="size-4" />
                           Connections
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </Link>
+                  </SidebarMenu>
+                  <SidebarMenu>
+                    <Link href={previewlink({ org, proj, path: "/p/login" })}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton size="sm">
+                          <ResourceTypeIcon
+                            type="customer-portal"
+                            className="size-4"
+                          />
+                          Customer Portal
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     </Link>

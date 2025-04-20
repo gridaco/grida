@@ -27,6 +27,7 @@ import {
   PlugIcon,
   TagIcon,
   LockKeyholeIcon,
+  BookUserIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -56,6 +57,7 @@ export type ResourceTypeIconName =
   | "connect"
   | "campaign"
   | "customer"
+  | "customer-portal"
   | "user"
   | "i18n"
   | "supabase"
@@ -134,6 +136,8 @@ export function ResourceTypeIcon({
     case "user":
     case "customer":
       return <AvatarIcon {...props} />;
+    case "customer-portal":
+      return <BookUserIcon {...props} />;
     case "i18n":
       return <LanguagesIcon {...props} />;
     case "view-gallery":
