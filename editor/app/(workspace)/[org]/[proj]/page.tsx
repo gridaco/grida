@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DocumentsGrid } from "@/app/(workspace)/[org]/_components/documents-grid";
+import { SettingsIcon } from "lucide-react";
 import Head from "next/head";
 
 export default function ProjectDashboardPage({
@@ -55,46 +56,11 @@ export default function ProjectDashboardPage({
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               {project_name}
-              {/* <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="ghost">
-                    <DotsHorizontalIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="bottom">
-                  <Link
-                    href={`/${organization_name}/${project_name}/customers`}
-                  >
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="customer"
-                        className="size-4 me-2"
-                      />
-                      Customers
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link
-                    href={`/${organization_name}/${project_name}/campaigns`}
-                  >
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="campaign"
-                        className="size-4 me-2"
-                      />
-                      Campaigns
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href={`/${organization_name}/${project_name}/www`}>
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="v0_site"
-                        className="size-4 me-2"
-                      />
-                      Site
-                    </DropdownMenuItem>
-                  </Link>
-                </DropdownMenuContent>
-              </DropdownMenu> */}
+              <Link href={`/${organization_name}/${project_name}/dash`}>
+                <Button size="icon" variant="ghost">
+                  <SettingsIcon className="size-4" />
+                </Button>
+              </Link>
             </span>
           </div>
           {project && (

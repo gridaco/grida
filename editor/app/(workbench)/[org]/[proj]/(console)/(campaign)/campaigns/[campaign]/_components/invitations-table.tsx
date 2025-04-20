@@ -54,8 +54,8 @@ function ActionsCell({
         <DropdownMenuItem
           onClick={() => {
             const link = documentpreviewlink({
-              orgid: project.organization_id,
-              projid: project.id,
+              org: project.organization_id,
+              proj: project.id,
               docid: campaign.id,
               path: `/t/${invitation.code}`,
             });

@@ -4175,6 +4175,16 @@ export type Database = {
           enabled: boolean
         }[]
       }
+      find_project: {
+        Args: { p_org_ref: string; p_proj_ref: string }
+        Returns: {
+          created_at: string
+          id: number
+          name: string
+          organization_id: number
+          ref_id: string | null
+        }[]
+      }
       flatten_jsonb_object_values: {
         Args: { obj: Json }
         Returns: string

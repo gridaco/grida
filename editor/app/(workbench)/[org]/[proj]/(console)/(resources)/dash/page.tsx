@@ -1,152 +1,89 @@
 "use client";
 
 import React from "react";
+import { useProject } from "@/scaffolds/workspace";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import Head from "next/head";
 import Link from "next/link";
 import {
-  ChevronDownIcon,
-  PlusIcon,
-  ViewGridIcon,
-  ViewHorizontalIcon,
-} from "@radix-ui/react-icons";
-import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
-import { ProjectStats } from "@/scaffolds/analytics/stats";
-import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
-import { useWorkspace } from "@/scaffolds/workspace";
-import { Skeleton } from "@/components/ui/skeleton";
-import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { DocumentsGrid } from "@/app/(workspace)/[org]/_components/documents-grid";
-import Head from "next/head";
+  AppWindowMacIcon,
+  BarChart2Icon,
+  MegaphoneIcon,
+  TagsIcon,
+  User2Icon,
+} from "lucide-react";
 
-export default function ProjectDashboardPage({
-  params,
-  searchParams,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
-    org: string;
-    proj: string;
-  };
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  searchParams: {
-    layout?: "grid" | "list";
-  };
-}) {
-  const { loading, projects, documents, refresh } = useWorkspace();
-  const { org: organization_name, proj: project_name } = params;
+const menus = [
+  {
+    title: "Customers",
+    description: "View and manage your customer list and profiles.",
+    link: "./customers",
+    icon: User2Icon,
+  },
+  {
+    title: "Tags",
+    description: "Create and organize tags for better content classification.",
+    link: "./tags",
+    icon: TagsIcon,
+  },
+  {
+    title: "Site",
+    description: "Customize your site layout and domain settings.",
+    link: "./www",
+    icon: AppWindowMacIcon,
+  },
+  {
+    title: "Analytics",
+    description: "Track page views, traffic sources, and user behavior.",
+    link: "./analytics",
+    icon: BarChart2Icon,
+  },
+  {
+    title: "Campaigns",
+    description: "Launch and manage marketing or referral campaigns.",
+    link: "./campaigns",
+    icon: MegaphoneIcon,
+  },
+];
 
-  const layout = searchParams.layout ?? "list";
-
-  const project = projects.find((p) => p.name === project_name);
-
-  if (!project && !loading) {
-    return notFound();
-  }
+export default function ProjectDashboardPage() {
+  const project = useProject();
 
   return (
     <main className="w-full h-full overflow-y-scroll">
       <Head>
         <title>
-          {organization_name}/{project_name} | Grida
+          {project.organization_name}/{project.name} | Grida
         </title>
       </Head>
       <div className="container mx-auto">
         <header className="py-10 flex justify-between">
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
-              {project_name}
-              {/* <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="ghost">
-                    <DotsHorizontalIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="bottom">
-                  <Link
-                    href={`/${organization_name}/${project_name}/customers`}
-                  >
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="customer"
-                        className="size-4 me-2"
-                      />
-                      Customers
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link
-                    href={`/${organization_name}/${project_name}/campaigns`}
-                  >
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="campaign"
-                        className="size-4 me-2"
-                      />
-                      Campaigns
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href={`/${organization_name}/${project_name}/www`}>
-                    <DropdownMenuItem>
-                      <ResourceTypeIcon
-                        type="v0_site"
-                        className="size-4 me-2"
-                      />
-                      Site
-                    </DropdownMenuItem>
-                  </Link>
-                </DropdownMenuContent>
-              </DropdownMenu> */}
+              {project.name}
             </span>
           </div>
-          {project && (
-            <div>
-              <CreateNewDocumentButton
-                project_name={project_name}
-                project_id={project.id}
-              >
-                <Button className="gap-1">
-                  <PlusIcon />
-                  Create New
-                  <ChevronDownIcon />
-                </Button>
-              </CreateNewDocumentButton>
-            </div>
-          )}
         </header>
-
-        {loading ? (
-          <>
-            <div>
-              <Skeleton className="w-full h-32 rounded" />
-            </div>
-          </>
-        ) : (
-          <div>
-            <section>
-              <ProjectStats project_ids={[project!.id]} />
-            </section>
-            <section className="w-full flex justify-end gap-2 mt-10">
-              <Link href="?layout=grid" replace>
-                <ViewGridIcon />
-              </Link>
-              <Link href="?layout=list" replace>
-                <ViewHorizontalIcon />
-              </Link>
-            </section>
-            <hr className="mb-10 mt-5 dark:border-neutral-700" />
-            <DocumentsGrid
-              organization_name={organization_name}
-              project_name={project_name}
-              documents={documents.filter(
-                (doc) => doc.project_id === project!.id
-              )}
-              layout={layout}
-              onChange={refresh}
-            />
-            <footer className="mt-10 mb-5">
-              <PoweredByGridaFooter />
-            </footer>
-          </div>
-        )}
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {menus.map((menu, i) => (
+            <Link href={menu.link} key={i}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <menu.icon className="size-5" />
+                    {menu.title}
+                  </CardTitle>
+                  <CardDescription>{menu.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
     </main>
   );
