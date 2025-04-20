@@ -57,9 +57,7 @@ export function StandaloneSceneContent({
       id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
       {...props}
     >
-      {children.map((id) => (
-        <NodeElement key={id} node_id={id} />
-      ))}
+      {children?.map((id) => <NodeElement key={id} node_id={id} />)}
     </div>
   );
 }
