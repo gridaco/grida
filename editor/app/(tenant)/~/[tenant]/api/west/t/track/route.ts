@@ -1,7 +1,7 @@
-import { grida_west_referral_client } from "@/lib/supabase/server";
-import assert from "assert";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import assert from "assert";
 
 /**
  * [track]
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   assert(code, "x-grida-west-token-code is required");
   assert(campaign_id, "x-grida-west-campaign-id is required");
 
-  const { error: track_err } = await grida_west_referral_client.rpc("track", {
+  const { error: track_err } = await service_role.west_referral.rpc("track", {
     p_campaign_id: campaign_id,
     p_code: code,
     p_name: name,

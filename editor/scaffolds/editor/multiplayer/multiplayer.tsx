@@ -15,7 +15,7 @@ import {
 } from "./provider";
 import { useMultiplayerRoom } from "./room";
 import { ICursorPos, ICursorNode } from "./types";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 const RT_THROTTLE_MS = 50;
 
@@ -36,7 +36,7 @@ export default function Multiplayer({ children }: React.PropsWithChildren<{}>) {
 }
 
 function useFetchUserProfile() {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   return useCallback(
     async (uid: string) => {

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
@@ -8,7 +8,7 @@ import { FileIO } from "@/lib/file";
 import { StorageClient } from "@supabase/storage-js";
 
 function useStorageClient() {
-  return useMemo(() => createClientWorkspaceClient().storage, []);
+  return useMemo(() => createBrowserClient().storage, []);
 }
 
 function useUpload(
@@ -57,7 +57,7 @@ function useCreateAsset() {
   const [state] = useEditorState();
   const { document_id } = state;
 
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   return useCallback(
     async ({ file, is_public }: { file: File; is_public: boolean }) => {

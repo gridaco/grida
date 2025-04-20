@@ -1,9 +1,6 @@
 import { getPlatform } from "@/host/platform";
 import PlatformProvider from "@/host/platform-provider";
-import {
-  createServerComponentClient,
-  createServerComponentWorkspaceClient,
-} from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -25,16 +22,15 @@ export default async function Layout({
   const cookieStore = await cookies();
   const platform = await getPlatform(cookieStore);
 
-  const supabase = createServerComponentClient(cookieStore);
-  const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const client = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await client.auth.getUser();
 
   if (!auth.user) {
     return redirect("/sign-in");
   }
 
-  const { data: organization, error: err } = await wsclient
+  const { data: organization, error: err } = await client
     .from("organization")
     .select(
       `

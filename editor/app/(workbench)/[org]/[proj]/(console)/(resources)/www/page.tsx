@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createClientWWWClient } from "@/lib/supabase/client";
+import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
@@ -35,7 +35,7 @@ type ProjectWWW = {
 
 function useSiteSettings() {
   const project = useProject();
-  const client = useMemo(() => createClientWWWClient(), []);
+  const client = useMemo(() => createBrowserWWWClient(), []);
 
   const __key = "site";
 

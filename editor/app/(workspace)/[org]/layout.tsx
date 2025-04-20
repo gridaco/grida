@@ -1,9 +1,5 @@
-import {
-  createServerComponentClient,
-  createServerComponentWorkspaceClient,
-} from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
@@ -20,17 +16,15 @@ export default async function Layout({
   params: Promise<Params>;
 }>) {
   const { org } = await params;
-  const cookieStore = await cookies();
-  const supabase = createServerComponentClient(cookieStore);
-  const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const client = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await client.auth.getUser();
 
   if (!auth.user) {
     return redirect("/sign-in?next=/" + encodeURIComponent(org));
   }
 
-  const { data: organization, error: err } = await wsclient
+  const { data: organization, error: err } = await client
     .from("organization")
     .select(
       `

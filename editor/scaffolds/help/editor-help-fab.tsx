@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,26 +17,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SlackIcon } from "lucide-react";
 import { sendGAEvent } from "@next/third-parties/google";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useWorkspace } from "../workspace";
 import { sitemap } from "@/www/data/sitemap";
 import Link from "next/link";
 import Head from "next/head";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 function useGAAuthenticatedUserIDTelemetry() {
   const { organization } = useWorkspace();
   const [uid, setUid] = useState<string>();
 
-  const supabase = useMemo(
-    () => createClientComponentClient({ isSingleton: false }),
-    []
-  );
-
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    const clinet = createBrowserClient();
+    clinet.auth.getUser().then(({ data }) => {
       setUid(data.user?.id);
     });
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (!uid) return;

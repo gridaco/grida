@@ -1,7 +1,7 @@
-import { grida_west_referral_client } from "@/lib/supabase/server";
-import assert from "assert";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import assert from "assert";
 
 /**
  * [claim]
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 400 });
   }
 
-  const { data: next, error: claim_err } = await grida_west_referral_client.rpc(
+  const { data: next, error: claim_err } = await service_role.west_referral.rpc(
     "claim",
     {
       p_campaign_id: campaign_id,

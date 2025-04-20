@@ -1,4 +1,4 @@
-import { grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { SessionStorageServices } from "@/services/form/storage";
 import type {
   CreateSessionSignedUploadUrlRequest,
@@ -25,7 +25,7 @@ export async function POST(
   // TODO: validate if anonymous user is owner of this session
   // TODO: validate if session is open
 
-  const { data, error } = await grida_forms_client
+  const { data, error } = await service_role.forms
     .from("response_session")
     .select(
       `id, form:form( fields:attribute( id, storage ), supabase_connection:connection_supabase(*) )`
@@ -73,7 +73,7 @@ export async function PUT(
   // TODO: validate if anonymous user is owner of this session
   // TODO: validate if session is open
 
-  const { data, error } = await grida_forms_client
+  const { data, error } = await service_role.forms
     .from("response_session")
     .select(
       `id, form:form( fields:attribute( id, storage ), supabase_connection:connection_supabase(*) )`

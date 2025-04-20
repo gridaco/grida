@@ -17,7 +17,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
 import { template } from "@/utils/template";
 import toast from "react-hot-toast";
@@ -64,7 +64,7 @@ export default function PortalLogin({
   onSession?: () => void;
   sendEmail?: (email: string) => Promise<boolean>;
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");

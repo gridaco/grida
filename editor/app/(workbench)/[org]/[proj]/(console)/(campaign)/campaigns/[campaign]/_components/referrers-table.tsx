@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState } from "react";
-import { createClientWestReferralClient } from "@/lib/supabase/client";
+import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
 import { ImportFromCustomersDialog } from "@/scaffolds/platform/customer/import-from-customers-dialog";
@@ -143,7 +143,7 @@ function useReferrers(campaign_id: string) {
   const [participants, setParticipants] = useState<
     ReferrerWithCustomer[] | null
   >(null);
-  const client = useMemo(() => createClientWestReferralClient(), []);
+  const client = useMemo(() => createBrowserWestReferralClient(), []);
 
   useEffect(() => {
     client

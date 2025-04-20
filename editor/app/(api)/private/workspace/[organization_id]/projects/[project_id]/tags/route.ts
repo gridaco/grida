@@ -1,5 +1,4 @@
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Platform } from "@/lib/platform";
@@ -11,9 +10,8 @@ export async function GET(
   context: { params: Promise<Params> }
 ) {
   const { project_id } = await context.params;
-  const cookieStore = await cookies();
-  const client = createRouteHandlerWorkspaceClient(cookieStore);
-  //
+
+  const client = await createClient();
 
   const { data: tags, error: projects_err } = await client
     .from("tag")

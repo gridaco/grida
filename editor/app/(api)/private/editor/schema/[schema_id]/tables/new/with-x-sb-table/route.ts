@@ -1,17 +1,13 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import {
-  createRouteHandlerClient,
-  createRouteHandlerXSBClient,
-} from "@/lib/supabase/server";
+import { createFormsClient, createXSBClient } from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import {
   CreateNewSchemaTableWithXSBTableConnectionRequest,
   CreateNewSchemaTableWithXSBTableConnectionResponse,
 } from "@/types/private/api";
-import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import assert from "assert";
 
 type Params = {
   schema_id: string;
@@ -22,10 +18,9 @@ type Context = {
 };
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
   const { schema_id } = await context.params;
-  const supabase = createRouteHandlerClient(cookieStore);
-  const grida_x_sb_client = createRouteHandlerXSBClient(cookieStore);
+  const formsClient = await createFormsClient();
+  const xsbClient = await createXSBClient();
 
   const data: CreateNewSchemaTableWithXSBTableConnectionRequest =
     await req.json();
@@ -35,7 +30,7 @@ export async function POST(req: NextRequest, context: Context) {
     data: data,
   });
 
-  const { data: schema_ref, error: schema_ref_err } = await supabase
+  const { data: schema_ref, error: schema_ref_err } = await formsClient
     .from("schema_document")
     .select()
     .eq("id", schema_id)
@@ -51,7 +46,7 @@ export async function POST(req: NextRequest, context: Context) {
 
   // #region validations
   // check if supabase connection is established
-  const { data: xsb_project_ref } = await grida_x_sb_client
+  const { data: xsb_project_ref } = await xsbClient
     .from("supabase_project")
     .select()
     .eq("project_id", schema_ref.project_id)
@@ -115,7 +110,7 @@ export async function POST(req: NextRequest, context: Context) {
     );
 
   const { data: upserted_supabase_table, error: x_sb_table_err } =
-    await grida_x_sb_client
+    await xsbClient
       .from("supabase_table")
       .upsert(
         {
@@ -138,7 +133,7 @@ export async function POST(req: NextRequest, context: Context) {
   }
 
   // check if connection already exists for other table within the same schema_document
-  const { count: conn_ref_count, error: conn_ref_error } = await supabase
+  const { count: conn_ref_count, error: conn_ref_error } = await formsClient
     .from("connection_supabase")
     .select("id, schema:form!inner(schema_id)", { count: "exact" })
     .eq("main_supabase_table_id", upserted_supabase_table.id)
@@ -155,7 +150,7 @@ export async function POST(req: NextRequest, context: Context) {
   // #endregion prep x-sb main table
 
   // TODO: shall be renamed to "table"
-  const { data: new_table_ref, error: new_table_ref_err } = await supabase
+  const { data: new_table_ref, error: new_table_ref_err } = await formsClient
     .from("form")
     .insert({
       project_id: schema_ref.project_id,
@@ -180,7 +175,7 @@ export async function POST(req: NextRequest, context: Context) {
     })
   );
 
-  const { error: fields_init_err } = await supabase.from("attribute").insert(
+  const { error: fields_init_err } = await formsClient.from("attribute").insert(
     fields_init.map((field) => ({
       form_id: new_table_ref.id,
       type: field.type ?? "text",
@@ -196,7 +191,7 @@ export async function POST(req: NextRequest, context: Context) {
 
   // create connection
 
-  const { data: conn, error: conn_err } = await supabase
+  const { data: conn, error: conn_err } = await formsClient
     .from("connection_supabase")
     .upsert(
       {
@@ -218,11 +213,12 @@ export async function POST(req: NextRequest, context: Context) {
   }
 
   // get final
-  const { data: new_table_detail, error: new_table_detail_err } = await supabase
-    .from("form")
-    .select(`*, attributes:attribute(*)`)
-    .eq("id", new_table_ref.id)
-    .single();
+  const { data: new_table_detail, error: new_table_detail_err } =
+    await formsClient
+      .from("form")
+      .select(`*, attributes:attribute(*)`)
+      .eq("id", new_table_ref.id)
+      .single();
 
   if (new_table_detail_err) {
     console.error("ERR: while fetching new table detail", new_table_detail_err);

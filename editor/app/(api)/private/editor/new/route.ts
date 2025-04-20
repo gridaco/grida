@@ -1,5 +1,5 @@
 import { editorlink } from "@/lib/forms/url";
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import {
   SchemaDocumentSetupAssistantService,
   FormDocumentSetupAssistantService,
@@ -7,7 +7,6 @@ import {
   CanvasDocumentSetupAssistantService,
   BucketDocumentSetupAssistantService,
 } from "@/services/new";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
@@ -60,8 +59,7 @@ export type NewDocumentResponse = EditorApiResponse<
 >;
 
 export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
+  const wsclient = await createClient();
   const origin = request.nextUrl.origin;
   const data = (await request.json()) as NewDocumentRequest;
   const { project_id } = data;

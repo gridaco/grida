@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createXSBClient } from "@/lib/supabase/server";
 import {
   secureCreateServiceKey,
   __dangerously_fetch_secure_service_role_key,
@@ -13,13 +12,12 @@ interface Context {
 }
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).
-  const { error: rls_err } = await supabase
+  const { error: rls_err } = await xsbClient
     .from("supabase_project")
     .select("id")
     .eq("id", supabase_project_id)
@@ -41,13 +39,12 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
   // [REQUIRED SECURITY LAYER]
   // Security layer - this is secure (protected by RLS).
-  const { error: rls_err } = await supabase
+  const { error: rls_err } = await xsbClient
     .from("supabase_project")
     .select("id")
     .eq("id", supabase_project_id)

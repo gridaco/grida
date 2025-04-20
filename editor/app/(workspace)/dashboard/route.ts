@@ -1,5 +1,4 @@
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
@@ -7,10 +6,9 @@ export const revalidate = 0;
 export async function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await client.auth.getUser();
   if (!auth.user) {
     return NextResponse.redirect(origin + "/sign-in", {
       status: 302,
@@ -22,7 +20,7 @@ export async function GET(req: NextRequest) {
   // 3. go to last organization
   // 4. go to first organization
 
-  const { data: state } = await supabase
+  const { data: state } = await client
     .from("user_project_access_state")
     .select(
       `
@@ -46,7 +44,7 @@ export async function GET(req: NextRequest) {
   }
 
   // get the user organization
-  const { data: memberships, error } = await supabase
+  const { data: memberships, error } = await client
     .from("organization_member")
     .select(
       `

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { createClientWWWClient } from "@/lib/supabase/client";
+import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
 import { GDocumentType } from "@/types";
 
@@ -21,7 +21,7 @@ type WWWLayout = {
 };
 
 function __useWWWLayoutData(id: string) {
-  const client = createClientWWWClient();
+  const client = createBrowserWWWClient();
   const [data, setData] = React.useState<WWWLayout | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);

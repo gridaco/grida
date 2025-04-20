@@ -1,5 +1,4 @@
-import { createRouteHandlerWWWClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -18,8 +17,7 @@ export async function GET(
 ) {
   const { organization_id, project_id, docid, path_tokens } = await params;
 
-  const cookieStore = await cookies();
-  const client = createRouteHandlerWWWClient(cookieStore);
+  const client = await createWWWClient();
 
   const { data: www, error: www_err } = await client
     .from("www")

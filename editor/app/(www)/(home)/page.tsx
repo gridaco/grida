@@ -1,7 +1,6 @@
 import React from "react";
 import HomePage from "./_home";
-import { createServerComponentClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -12,10 +11,9 @@ export const metadata: Metadata = {
 };
 
 export default async function WWWIndex() {
-  const cookieStore = await cookies();
-  const supabase = createServerComponentClient(cookieStore);
+  const client = await createClient();
 
-  const { data } = await supabase.auth.getUser();
+  const { data } = await client.auth.getUser();
 
   const isLoggedIn = !!data?.user;
 

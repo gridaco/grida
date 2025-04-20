@@ -1,14 +1,10 @@
 import { Env } from "@/env";
-import { editorlink, formlink } from "@/lib/forms/url";
-import {
-  createRouteHandlerClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+import { editorlink } from "@/lib/forms/url";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";
 import { customAlphabet } from "nanoid";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -20,8 +16,7 @@ const nanoid = customAlphabet(alphabet, 39);
  */
 export async function POST(req: NextRequest) {
   const form = await req.formData();
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const gist = form.get("gist");
   const src = form.get("src");
@@ -29,7 +24,7 @@ export async function POST(req: NextRequest) {
   assert(src, "src is required");
 
   // upsert the gist - this is used for temporal storage on this flow.
-  const { data, error: _gist_upsertion_error } = await supabase
+  const { data, error: _gist_upsertion_error } = await formsClient
     .from("gist")
     .upsert(
       {
@@ -53,7 +48,7 @@ export async function POST(req: NextRequest) {
   }
 
   // check if user is logged in
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await formsClient.auth.getUser();
   if (!auth?.user) {
     // redirect back to playground, atm, user need to click the publish button again.
     return NextResponse.redirect(
@@ -70,7 +65,7 @@ export async function POST(req: NextRequest) {
   // check if user has a project as a owner
   // get the user owned organization
   // TODO: WROKSPACE MANAGEMENT
-  const { data: org, error } = await workspaceclient
+  const { data: org, error } = await service_role.workspace
     .from("organization")
     .select(`*, projects:project(*)`)
     .eq("owner_id", auth.user.id)
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   if (!org) {
     // 1. create org if not exists
-    const { data: neworg, error } = await workspaceclient
+    const { data: neworg, error } = await service_role.workspace
       .from("organization")
       .insert({
         owner_id: auth.user.id,
@@ -104,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   if (!PROJECT) {
     // 2. create project if not exists  - TODO: also bad
-    const { data: project, error } = await workspaceclient
+    const { data: project, error } = await service_role.workspace
       .from("project")
       .insert({
         organization_id: ORG.id,
@@ -126,7 +121,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.error();
   }
 
-  const service = new JSONFrom2DB(supabase, PROJECT.id, jsonform);
+  const service = new JSONFrom2DB(formsClient, PROJECT.id, jsonform);
 
   const { form_document_id } = await service.insert();
 

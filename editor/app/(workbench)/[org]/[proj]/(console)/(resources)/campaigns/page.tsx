@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { CampaignCard } from "./campaign-card";
-import { createClientWestReferralClient } from "@/lib/supabase/client";
+import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { Spinner } from "@/components/spinner";
 import { Platform } from "@/lib/platform";
@@ -15,7 +15,7 @@ type Params = {
 };
 
 export default function CampaignsPage({ params }: { params: Params }) {
-  const client = createClientWestReferralClient();
+  const client = createBrowserWestReferralClient();
   const { id: project_id } = useProject();
 
   const { data: campaigns, isLoading } = useSWR<

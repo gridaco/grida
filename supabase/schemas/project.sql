@@ -24,9 +24,10 @@ create index IF not exists project_organization_id_idx on public.project using b
 
 
 ALTER TABLE public.project ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow insert based on membership" ON "public"."project" FOR INSERT WITH CHECK ("public"."rls_organization"("organization_id"));
-CREATE POLICY "select_project" ON "public"."project" FOR SELECT USING ("public"."rls_project"("id"));
-
+CREATE POLICY "Allow insert based on organization membership" ON public.project FOR INSERT WITH CHECK (public.rls_organization(organization_id));
+CREATE POLICY "Allow select based on project access" ON public.project FOR SELECT USING (public.rls_project(id));
+CREATE POLICY "Allow delete based on project access" ON public.project FOR DELETE USING (rls_project(id));
+CREATE POLICY "Allow update based on project access" ON public.project FOR UPDATE USING (rls_project(id)) WITH CHECK (rls_project(id));
 
 ---------------------------------------------------------------------
 -- [trigger set_project_ref_id] --

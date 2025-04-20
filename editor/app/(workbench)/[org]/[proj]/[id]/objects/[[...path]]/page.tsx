@@ -67,7 +67,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { fmt_bytes } from "@/utils/fmt";
 import StorageEditorProvider, {
   reducer,
@@ -82,6 +81,7 @@ import toast from "react-hot-toast";
 import { useQueryState } from "@/utils/use-query-state";
 import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
 import { vfs } from "@/lib/vfs";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 /**
  * function to return a value from a list of options or a fallback value
@@ -148,8 +148,8 @@ export default function FileExplorer({
   const [{ document_id }] = useEditorState();
 
   const api: StorageApi = useMemo(() => {
-    const sb = createClientComponentClient();
-    const __api = sb.storage.from(BUCLET.public);
+    const client = createBrowserClient();
+    const __api = client.storage.from(BUCLET.public);
     // const rmrf = async (path: string) => {
     //   alert("not ready");
     // };

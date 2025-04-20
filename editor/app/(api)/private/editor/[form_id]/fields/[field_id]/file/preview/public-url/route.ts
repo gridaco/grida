@@ -1,11 +1,10 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { grida_forms_client } from "@/lib/supabase/server";
-import { parseStorageUrlOptions } from "@/services/form/storage";
+import { service_role } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormFieldStorageSchema } from "@/types";
-import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import assert from "assert";
 
 type Params = { form_id: string; field_id: string };
 
@@ -22,14 +21,10 @@ export async function GET(
   // @see https://sweetcoding.tistory.com/257
   // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
 
-  // TODO: support RLS
-  // const cookieStore = await cookies();
-  // const supabase = createRouteHandlerClient(cookieStore);
-  const supabase = grida_forms_client;
-
   assert(qpath);
 
-  const { data } = await supabase
+  // TODO: support RLS
+  const { data } = await service_role.forms
     .from("form")
     .select(
       `
@@ -84,7 +79,7 @@ export async function GET(
     }
   }
 
-  const { data: singed } = await supabase.storage
+  const { data: singed } = await service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .getPublicUrl(qpath);
 

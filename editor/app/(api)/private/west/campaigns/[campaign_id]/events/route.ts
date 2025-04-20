@@ -1,8 +1,4 @@
-import {
-  createRouteHandlerWestReferralClient,
-  grida_west_referral_client,
-} from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createWestReferralClient, service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,11 +13,10 @@ type Context = {
 export async function GET(req: NextRequest, context: Context) {
   const { campaign_id: campaign_id } = await context.params;
 
-  const cookieStore = cookies();
-  const client = createRouteHandlerWestReferralClient(cookieStore);
+  const rlsclient = await createWestReferralClient();
 
   // check access
-  const { error } = await client
+  const { error } = await rlsclient
     .from("campaign")
     .select("id")
     .eq("id", campaign_id);
@@ -31,7 +26,7 @@ export async function GET(req: NextRequest, context: Context) {
   }
 
   // SERVICE ROLE ACCESS
-  const { data, error: fetch_err } = await grida_west_referral_client
+  const { data, error: fetch_err } = await service_role.west_referral
     .from("event_log")
     .select("*")
     .eq("campaign_id", campaign_id)

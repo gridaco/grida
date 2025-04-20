@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
 
@@ -18,7 +18,7 @@ export async function POST(
   assert(response_id, "response_id is required");
   assert(session_id, "session_id is required");
 
-  const { data: form_ref, error: form_ref_err } = await grida_forms_client
+  const { data: form_ref, error: form_ref_err } = await service_role.forms
     .from("form")
     .select("id, fields:attribute(*)")
     .eq("id", form_id)
@@ -31,7 +31,7 @@ export async function POST(
 
   // sync sessions'raw data from response's final raw data
   const { data: response_ref, error: response_ref_err } =
-    await grida_forms_client
+    await service_role.forms
       .from("response")
       .select("raw, session_id")
       .eq("id", response_id)
@@ -46,7 +46,7 @@ export async function POST(
   // convert response raw data to session raw data
   // name:value -> id:value
 
-  await grida_forms_client
+  await service_role.forms
     .from("response_session")
     .update({
       raw: response_ref.raw

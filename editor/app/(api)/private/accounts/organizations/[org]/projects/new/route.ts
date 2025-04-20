@@ -1,5 +1,4 @@
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -13,10 +12,9 @@ export async function POST(
 ) {
   const origin = req.nextUrl.origin;
   const { org } = await context.params;
-  const cookieStore = await cookies();
-  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
 
-  const { data: orgref, error: orgerr } = await wsclient
+  const { data: orgref, error: orgerr } = await client
     .from("organization")
     .select("id")
     .eq("name", org)
@@ -35,7 +33,7 @@ export async function POST(
 
   const name = body.get("name");
 
-  const { error } = await wsclient.from("project").insert({
+  const { error } = await client.from("project").insert({
     organization_id: orgref.id,
     name: String(name),
   });
