@@ -188,18 +188,21 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 ---------------------------------------------------------------------
 CREATE OR REPLACE VIEW grida_west_referral.campaign_public AS
 SELECT
-  id,
-  title,
-  description,
-  layout_id,
-  enabled,
-  max_invitations_per_referrer,
-  reward_currency,
-  scheduling_open_at,
-  scheduling_close_at,
-  scheduling_tz,
-  public
-FROM grida_west_referral.campaign;
+  c.id,
+  c.title,
+  c.description,
+  c.layout_id,
+  c.enabled,
+  c.max_invitations_per_referrer,
+  c.reward_currency,
+  c.scheduling_open_at,
+  c.scheduling_close_at,
+  c.scheduling_tz,
+  c.public,
+  r.www_name,
+  r.route_path AS www_route_path
+FROM grida_west_referral.campaign c
+LEFT JOIN grida_www.public_route r ON r.id = c.layout_id;
 
 GRANT SELECT ON grida_west_referral.campaign_public TO anon, authenticated, service_role;
 

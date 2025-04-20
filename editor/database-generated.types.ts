@@ -2713,32 +2713,8 @@ export type Database = {
           scheduling_open_at: string | null
           scheduling_tz: string | null
           title: string | null
-        }
-        Insert: {
-          description?: string | null
-          enabled?: boolean | null
-          id?: string | null
-          layout_id?: string | null
-          max_invitations_per_referrer?: number | null
-          public?: Json | null
-          reward_currency?: string | null
-          scheduling_close_at?: string | null
-          scheduling_open_at?: string | null
-          scheduling_tz?: string | null
-          title?: string | null
-        }
-        Update: {
-          description?: string | null
-          enabled?: boolean | null
-          id?: string | null
-          layout_id?: string | null
-          max_invitations_per_referrer?: number | null
-          public?: Json | null
-          reward_currency?: string | null
-          scheduling_close_at?: string | null
-          scheduling_open_at?: string | null
-          scheduling_tz?: string | null
-          title?: string | null
+          www_name: string | null
+          www_route_path: string | null
         }
         Relationships: []
       }
