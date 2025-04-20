@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import useSWR from "swr";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -72,7 +72,7 @@ const useSubscription = ({
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
   enabled: boolean;
 }) => {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   useTableSubscription<Database, "grida_forms">({
     client: supabase,
@@ -91,7 +91,7 @@ const useSubscription = ({
 };
 
 function useFetchSchemaTableRows(table_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async ({ range }: { range: { from: number; to: number } }) => {
@@ -122,7 +122,7 @@ function useFetchSchemaTableRows(table_id: string) {
 }
 
 function useFetchSchemaTableRow() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async (id: string) => {
@@ -148,7 +148,7 @@ function useFetchSchemaTableRow() {
 }
 
 function useFetchResponseSessions(form_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async ({ range }: { range: { from: number; to: number } }) => {
@@ -185,7 +185,7 @@ function useChangeDatagridLoading() {
 }
 
 function useUpdateCell() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {

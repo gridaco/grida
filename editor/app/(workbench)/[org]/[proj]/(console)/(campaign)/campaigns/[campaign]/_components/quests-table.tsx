@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Platform } from "@/lib/platform";
-import { createClientWestReferralClient } from "@/lib/supabase/client";
+import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import { useProject } from "@/scaffolds/workspace";
@@ -55,7 +55,7 @@ type ReferrerQuest = Platform.WEST.Referral.Referrer & {
 
 function useReferrerQuests(campaign_id: string) {
   const [tokens, setTokens] = useState<ReferrerQuest[] | null>(null);
-  const client = useMemo(() => createClientWestReferralClient(), []);
+  const client = useMemo(() => createBrowserWestReferralClient(), []);
 
   useEffect(() => {
     client

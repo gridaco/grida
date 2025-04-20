@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ToasterWithMax } from "@/components/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
-import { sb } from "@/lib/supabase/server";
-import { cookies, headers } from "next/headers";
+import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Tenant } from "@/lib/tenant";
 import "../../../editor.css";
@@ -21,15 +20,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { tenant } = await params;
 
-  const cookieStore = cookies();
-  const headersList = headers();
+  const wwwClient = await createWWWClient();
 
-  const client = sb.rr.www.createRouteHandlerClient({
-    headers: headersList,
-    cookies: cookieStore,
-  });
-
-  const { data, error } = await client
+  const { data, error } = await wwwClient
     .from("www_public")
     .select()
     .eq("name", tenant)
@@ -41,16 +34,17 @@ export async function generateMetadata({
   }
 
   const og_image = data?.og_image
-    ? client.storage.from("www").getPublicUrl(data.og_image).data.publicUrl
+    ? wwwClient.storage.from("www").getPublicUrl(data.og_image).data.publicUrl
     : null;
 
   const og_images = Tenant.www.metadata.getOpenGraphImages(og_image);
 
   const favicon = data.favicon?.src
-    ? client.storage.from("www").getPublicUrl(data.favicon.src).data.publicUrl
+    ? wwwClient.storage.from("www").getPublicUrl(data.favicon.src).data
+        .publicUrl
     : null;
   const faviconDark = data.favicon?.srcDark
-    ? client.storage.from("www").getPublicUrl(data.favicon.srcDark).data
+    ? wwwClient.storage.from("www").getPublicUrl(data.favicon.srcDark).data
         .publicUrl
     : null;
 

@@ -1,11 +1,10 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import { get_grida_table_x_supabase_table_connector } from "@/services/x-supabase";
 import {
   XSupabaseStorageCrossBucketTaskPooler,
   XSupabaseStorageTaskPoolerResult,
 } from "@/services/x-supabase/xsb-storage-pooler";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
@@ -22,8 +21,7 @@ interface XSBStorageBulkResolverRequest {
 }
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
   const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
@@ -34,7 +32,7 @@ export async function POST(req: NextRequest, context: Context) {
       await get_grida_table_x_supabase_table_connector({
         form_id,
         sb_table_id: sb_table_id,
-        client: grida_forms_client,
+        client: formsClient,
       });
 
     const { fields } = grida_table;

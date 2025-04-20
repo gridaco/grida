@@ -4,7 +4,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils";
+import { cn } from "@/utils/cn";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

@@ -40,13 +40,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { useWorkspace, WorkspaceState } from "@/scaffolds/workspace";
-import { DotsHorizontalIcon, PlusIcon } from "@radix-ui/react-icons";
+import {
+  DotsHorizontalIcon,
+  GearIcon,
+  Pencil2Icon,
+  PlusIcon,
+} from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
@@ -65,8 +70,9 @@ import "core-js/features/object/group-by";
 import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
-} from "@/components/delete-confirmation-dialog";
+} from "@/components/dialogs/delete-confirmation-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { RenameDialog } from "@/components/dialogs/rename-dialog";
 
 function SidebarMenuLinkButton({
   href,
@@ -296,7 +302,7 @@ export function NavProjects({
   allowNew?: boolean;
 }) {
   const router = useRouter();
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
 
   const deleteProjectDialog = useDialogState<{
     id: number;
@@ -304,9 +310,32 @@ export function NavProjects({
   }>("delete-project", {
     refreshkey: true,
   });
+  const renameProjectDialog = useDialogState<{
+    id: number;
+    name: string;
+  }>("rename-project", {
+    refreshkey: true,
+  });
 
   return (
     <SidebarGroup>
+      <RenameDialog
+        key={renameProjectDialog.refreshkey}
+        open={renameProjectDialog.open}
+        onOpenChange={renameProjectDialog.setOpen}
+        id={renameProjectDialog.data?.id?.toString() ?? ""}
+        title="Rename Project"
+        description="Enter a new name for this project."
+        currentName={renameProjectDialog.data?.name}
+        onRename={async (id: string, newName: string): Promise<boolean> => {
+          const { count } = await client
+            .from("project")
+            .update({ name: newName }, { count: "exact" })
+            .eq("id", parseInt(id));
+          return count === 1;
+          // TODO: needs to revalidate
+        }}
+      />
       <DeleteConfirmationAlertDialog
         key={deleteProjectDialog.refreshkey}
         {...deleteProjectDialog.props}
@@ -331,10 +360,8 @@ export function NavProjects({
             .eq("id", id);
           if (error) return false;
           if (count === 1) {
-            // TODO: need to revalidate as well. (we're using swr for the projects - needs to be mutated manually after delete)
-            alert(
-              "Project deleted successfully. Please refresh the page to see the changes."
-            );
+            // TODO: needs to revalidate
+            router.replace(`/${orgname}`);
             return true;
           }
           return false;
@@ -384,17 +411,32 @@ export function NavProjects({
                     </SidebarMenuAction>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="right" align="start">
-                    {/* <DropdownMenuItem>
-                      <span>Rename Project</span>
-                    </DropdownMenuItem> */}
                     <CreateNewDocumentButton
                       project_name={project.name}
                       project_id={project.id}
                     >
                       <DropdownMenuItem>
+                        <PlusIcon className="mr-2" />
                         <span>New Document</span>
                       </DropdownMenuItem>
                     </CreateNewDocumentButton>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        renameProjectDialog.openDialog({
+                          id: project.id,
+                          name: project.name,
+                        });
+                      }}
+                    >
+                      <Pencil2Icon className="mr-2" />
+                      <span>Rename</span>
+                    </DropdownMenuItem>
+                    <Link href={`/${orgname}/${project.name}/dash`}>
+                      <DropdownMenuItem>
+                        <GearIcon className="mr-2" />
+                        <span>Console</span>
+                      </DropdownMenuItem>
+                    </Link>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={() => {
@@ -451,7 +493,7 @@ function OrganizationSwitcher({
   organization: OrganizationWithAvatar;
   organizations: OrganizationWithAvatar[];
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {
       window.location.href = "/";

@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createClientWWWClient } from "@/lib/supabase/client";
+import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
@@ -18,6 +18,7 @@ import { Spinner } from "@/components/spinner";
 import { useForm } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
+import { SiteDomainsSection } from "./section-domain";
 
 type ProjectWWW = {
   id: string;
@@ -34,7 +35,7 @@ type ProjectWWW = {
 
 function useSiteSettings() {
   const project = useProject();
-  const client = useMemo(() => createClientWWWClient(), []);
+  const client = useMemo(() => createBrowserWWWClient(), []);
 
   const __key = "site";
 
@@ -61,6 +62,37 @@ function useSiteSettings() {
       return task;
     },
     [project.id, client]
+  );
+
+  const checkDomainName = useCallback(
+    async (name: string) => {
+      const { data: available, error } = await client.rpc(
+        "check_www_name_available",
+        {
+          p_name: name,
+        }
+      );
+
+      if (error) return false;
+      return available;
+    },
+    [client]
+  );
+
+  const changeDomainName = useCallback(
+    async (name: string) => {
+      if (!data) return false;
+      const { error } = await client.rpc("change_www_name", {
+        p_www_id: data.id,
+        p_name: name,
+      });
+
+      if (error) return false;
+
+      mutate(__key);
+      return true;
+    },
+    [client, data]
   );
 
   const updateFavicon = useCallback(
@@ -130,6 +162,8 @@ function useSiteSettings() {
     update,
     updateFavicon,
     updateOgImage,
+    checkDomainName,
+    changeDomainName,
     getPublicUrl,
   };
 }
@@ -141,6 +175,8 @@ export default function ProjectWWWSettingsPage() {
     update,
     updateFavicon,
     updateOgImage,
+    checkDomainName,
+    changeDomainName,
     getPublicUrl,
   } = useSiteSettings();
 
@@ -172,6 +208,14 @@ export default function ProjectWWWSettingsPage() {
           description: data.description,
         }}
         update={update}
+      />
+
+      <FormSiteDomain
+        defaultValues={{
+          name: data.name,
+        }}
+        changeDomainName={changeDomainName}
+        checkDomainName={checkDomainName}
       />
 
       <Card>
@@ -252,6 +296,36 @@ function FormSiteGeneral({
           )}
         </Button>
       </CardFooter>
+    </Card>
+  );
+}
+
+function FormSiteDomain({
+  defaultValues,
+  changeDomainName,
+  checkDomainName,
+}: {
+  checkDomainName: (name: string) => Promise<boolean>;
+  changeDomainName: (name: string) => Promise<boolean>;
+  defaultValues: {
+    name: string;
+  };
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Domains</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <SiteDomainsSection
+          onDomainNameChange={async (name) => {
+            const available = await checkDomainName(name);
+            if (!available) return false;
+            return await changeDomainName(name);
+          }}
+          name={defaultValues.name}
+        />
+      </CardContent>
     </Card>
   );
 }

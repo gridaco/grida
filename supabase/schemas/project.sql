@@ -24,9 +24,10 @@ create index IF not exists project_organization_id_idx on public.project using b
 
 
 ALTER TABLE public.project ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow insert based on membership" ON "public"."project" FOR INSERT WITH CHECK ("public"."rls_organization"("organization_id"));
-CREATE POLICY "select_project" ON "public"."project" FOR SELECT USING ("public"."rls_project"("id"));
-
+CREATE POLICY "Allow insert based on organization membership" ON public.project FOR INSERT WITH CHECK (public.rls_organization(organization_id));
+CREATE POLICY "Allow select based on project access" ON public.project FOR SELECT USING (public.rls_project(id));
+CREATE POLICY "Allow delete based on project access" ON public.project FOR DELETE USING (rls_project(id));
+CREATE POLICY "Allow update based on project access" ON public.project FOR UPDATE USING (rls_project(id)) WITH CHECK (rls_project(id));
 
 ---------------------------------------------------------------------
 -- [trigger set_project_ref_id] --
@@ -77,3 +78,51 @@ CREATE OR REPLACE FUNCTION public.rls_project(project_id bigint) RETURNS boolean
     );
 END;$$;
 
+
+---------------------------------------------------------------------
+-- [project access state] --
+---------------------------------------------------------------------
+create table public.user_project_access_state (
+    user_id uuid primary key references auth.users(id) on delete cascade default auth.uid(),
+    project_id bigint null references project(id) on delete set null,
+    document_id uuid null references document(id) on delete set null,
+    updated_at timestamp with time zone not null default now()
+) TABLESPACE pg_default;
+
+ALTER TABLE public.user_project_access_state ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all based on user_id" ON public.user_project_access_state USING ((user_id = auth.uid())) WITH CHECK (user_id = auth.uid());
+
+
+
+---------------------------------------------------------------------
+-- [RPC] mark_access --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.workspace_mark_access(
+  p_organization_name text,
+  p_project_name text,
+  p_document_id uuid DEFAULT NULL
+)
+RETURNS void AS $$
+DECLARE
+  resolved_project_id bigint;
+BEGIN
+  SELECT p.id INTO resolved_project_id
+  FROM public.project p
+  JOIN public.organization o ON o.id = p.organization_id
+  WHERE o.name = p_organization_name
+    AND p.name = p_project_name
+    AND public.rls_project(p.id)
+  LIMIT 1;
+
+  IF resolved_project_id IS NULL THEN
+    RAISE EXCEPTION 'Project not found or access denied for %/%', p_organization_name, p_project_name;
+  END IF;
+
+  INSERT INTO public.user_project_access_state (user_id, project_id, document_id, updated_at)
+  VALUES (auth.uid(), resolved_project_id, p_document_id, now())
+  ON CONFLICT (user_id) DO UPDATE
+  SET project_id = EXCLUDED.project_id,
+      document_id = EXCLUDED.document_id,
+      updated_at = now();
+END;
+$$ LANGUAGE plpgsql VOLATILE;

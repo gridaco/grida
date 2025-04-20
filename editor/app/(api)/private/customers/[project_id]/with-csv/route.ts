@@ -1,10 +1,7 @@
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { Platform } from "@/lib/platform";
-import Papa from "papaparse";
 import assert from "assert";
-import { unflatten } from "flat";
 import { qboolean } from "@/utils/qs";
 import type { Database } from "@/database.types";
 
@@ -93,11 +90,10 @@ export async function POST(
   { params }: { params: Promise<Params> }
 ) {
   const { project_id } = await params;
-  const cookieStore = await cookies();
   const formdata = await request.formData();
   const searchParams = request.nextUrl.searchParams;
   const dryrun = qboolean(searchParams.get("dryrun"));
-  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
   const csvf = formdata.get("csv") as File;
   assert(csvf, "CSV file is required");
 
@@ -119,7 +115,7 @@ export async function POST(
       length: data?.length,
       summary: data?.slice(0, 5),
     });
-    const { count, error } = await supabase
+    const { count, error } = await client
       .from("customer_with_tags")
       .insert(
         data! satisfies Platform.Customer.CustomerInsertionWithTags[] as any,
@@ -154,11 +150,10 @@ export async function PATCH(
   { params }: { params: Promise<Params> }
 ) {
   const { project_id } = await params;
-  const cookieStore = await cookies();
   const formdata = await request.formData();
   const searchParams = request.nextUrl.searchParams;
   const dryrun = qboolean(searchParams.get("dryrun"));
-  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
   const csvf = formdata.get("csv") as File;
   assert(csvf, "CSV file is required");
 
@@ -188,7 +183,7 @@ export async function PATCH(
     return NextResponse.json({ message: "CSV is valid" });
   } else {
     console.log("with-csv::upserting", data);
-    const { count, error } = await supabase
+    const { count, error } = await client
       .from("customer")
       .upsert(data!, {
         onConflict: "project_id, uuid",

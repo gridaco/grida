@@ -69,7 +69,10 @@ export class GridaCommerceClient {
           { onConflict: "store_id, sku" }
         );
 
-      assert(!upsertion_error, "failed to upsert inventory item");
+      if (upsertion_error) {
+        console.error("upsertion error", upsertion_error);
+        throw upsertion_error;
+      }
       is_upserted = true;
     };
 
@@ -154,9 +157,13 @@ export class GridaCommerceClient {
    */
   async fetchInventoryItemsRPC() {
     assert(this.store_id, "store_id is required");
-    return await this.client.rpc("get_inventory_items_with_committed", {
-      p_store_id: this.store_id,
-    });
+    return await this.client.rpc(
+      "get_inventory_items_with_committed",
+      {
+        p_store_id: this.store_id,
+      },
+      { get: true }
+    );
   }
 
   async fetchInventoryItem({ sku }: { sku: string }) {

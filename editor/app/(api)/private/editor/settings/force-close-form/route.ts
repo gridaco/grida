@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createFormsClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import type {
@@ -11,15 +10,13 @@ import assert from "assert";
 export async function POST(req: NextRequest) {
   const data: UpdateFormAccessForceClosedRequest = await req.json();
 
-  const cookieStore = await cookies();
-
   const { form_id, closed } = data;
 
   assert(form_id, "form_id is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { error } = await supabase
+  const { error } = await formsClient
     .from("form")
     .update({
       is_force_closed: closed,

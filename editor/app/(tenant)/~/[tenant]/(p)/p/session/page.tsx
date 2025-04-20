@@ -1,11 +1,10 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  createServerComponentWorkspaceClient,
-  createServerComponentWestReferralClient,
+  createClient,
+  createWWWClient,
+  createWestReferralClient,
 } from "@/lib/supabase/server";
-import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { sb } from "@/lib/supabase/server";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
 import Link from "next/link";
 
@@ -36,25 +35,19 @@ export default async function CustomerPortalSession({
   params: Promise<Params>;
 }) {
   const { tenant } = await params;
-  const cookieStore = cookies();
-  const headersList = headers();
-  const authclient = createServerComponentWorkspaceClient(cookieStore);
-  const westclient = createServerComponentWestReferralClient(cookieStore);
+  const client = await createClient();
+  const westClient = await createWestReferralClient();
+  const wwwClient = await createWWWClient();
 
   const t = dictionary[locale];
 
-  const { data } = await authclient.auth.getSession();
-  // authclient.auth.getUserIdentities
+  const { data } = await client.auth.getSession();
+
   if (!data.session) {
     return redirect(`./login/`);
   }
 
-  const rrwww = sb.rr.www.createClient({
-    cookies: cookieStore,
-    headers: headersList,
-  });
-
-  const { data: wwwref, error: wwwreferr } = await rrwww
+  const { data: wwwref, error: wwwreferr } = await wwwClient
     .from("www")
     .select("project_id")
     .eq("name", tenant)
@@ -62,7 +55,7 @@ export default async function CustomerPortalSession({
 
   if (wwwreferr) return notFound();
 
-  const { data: cus, error: cus_err } = await authclient
+  const { data: cus, error: cus_err } = await client
     .from("customer")
     .select()
     .eq("project_id", wwwref.project_id)
@@ -74,7 +67,7 @@ export default async function CustomerPortalSession({
   //   return redirect(`./login/`);
   // }
 
-  const { data: iam_referrers, error: referrer_err } = await westclient
+  const { data: iam_referrers, error: referrer_err } = await westClient
     .from("referrer")
     .select(
       `

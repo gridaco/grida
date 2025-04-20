@@ -9,7 +9,7 @@ import React, {
   useMemo,
 } from "react";
 import useSWR, { mutate } from "swr";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import { EditorApiResponse } from "@/types/private/api";
 import { Spinner } from "@/components/spinner";
@@ -34,6 +34,7 @@ export interface WorkspaceState {
     | null;
   projects: Project[];
   documents: GDocument[];
+  refresh: () => void;
 }
 
 interface __WorkspaceState {
@@ -43,6 +44,7 @@ interface __WorkspaceState {
   project: string | null;
   projects: Project[];
   documents: GDocument[];
+  refresh: () => void;
 }
 
 type WorkspaceAction =
@@ -88,6 +90,7 @@ export const useWorkspace = (): WorkspaceState => {
   }, [state.projects, projectname]);
 
   return {
+    refresh: state.refresh,
     loading: state.loading,
     organization: state.organization,
     organizations: state.organizations,
@@ -110,7 +113,23 @@ export function Workspace({
   organization: OrganizationWithMembers;
   project?: string;
 }>) {
-  const supabase = createClientWorkspaceClient();
+  const supabase = createBrowserClient();
+
+  const key = `/private/workspace/${organization.id}`;
+  const { data } = useSWR<
+    EditorApiResponse<{
+      organizations: OrganizationWithAvatar[];
+      projects: Project[];
+      documents: GDocument[];
+    }>
+  >(
+    key,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {}
+  );
 
   const initial = {
     loading: true,
@@ -124,24 +143,12 @@ export function Workspace({
     projects: [],
     project: project || null,
     documents: [],
+    refresh: () => {
+      mutate(key);
+    },
   } satisfies __WorkspaceState;
 
   const [state, dispatch] = useReducer(workspaceReducer, initial);
-
-  const { data } = useSWR<
-    EditorApiResponse<{
-      organizations: OrganizationWithAvatar[];
-      projects: Project[];
-      documents: GDocument[];
-    }>
-  >(
-    `/private/workspace/${organization.id}`,
-    async (url: string) => {
-      const res = await fetch(url);
-      return res.json();
-    },
-    {}
-  );
 
   useEffect(() => {
     if (!data?.data) return;
@@ -205,7 +212,7 @@ export function ProjectTagsProvider({
 }) {
   const { id: project_id, organization_id } = useProject();
 
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   const key = `/private/workspace/${organization_id}/projects/${project_id}/tags`;
 

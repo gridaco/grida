@@ -3,8 +3,8 @@
 import type { Database } from "@/database.types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
+  createBrowserFormsClient,
+  createBrowserClient,
 } from "@/lib/supabase/client";
 import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
@@ -183,7 +183,7 @@ export function Sessions({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,7 +235,7 @@ export function Sessions({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (
@@ -255,7 +255,7 @@ export function Customers({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,7 +307,7 @@ export function Customers({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (
@@ -327,7 +327,7 @@ export function Responses({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -379,7 +379,7 @@ export function Responses({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-20">
+          <div className="h-36">
             <GraphSkeleton />
           </div>
         ) : (

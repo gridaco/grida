@@ -161,3 +161,12 @@ pnpm make --platform=linux --arch="x64,arm64"
 # or (for publishing)
 pnpm forge:publish --platform=linux --arch="x64,arm64"
 ```
+
+## Releasing
+
+We use Githib Actions for windows and linux releases. for macOS, we are locally building and uploading the release.
+
+```sh
+pnpm publish:prerelease --arch="universal,arm64,x64"
+pnpm publish:prerelease --arch="universal,arm64,x64" --insiders
+```

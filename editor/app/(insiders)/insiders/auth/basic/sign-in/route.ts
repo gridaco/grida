@@ -1,17 +1,13 @@
-import type { Database } from "@/database.types";
 import { resolve_next } from "@/lib/forms/url";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 import type { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest, res: NextResponse) {
   const requestUrl = new URL(req.url);
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient<Database>({
-    cookies: () => cookieStore,
-  });
+
+  const client = await createClient();
 
   const data = await req.formData();
   const email = data.get("email") as string;
@@ -19,7 +15,7 @@ export async function POST(req: NextRequest, res: NextResponse) {
   const redirect_uri = data.get("redirect_uri") as string | null;
   const next = data.get("next") as string | null;
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error } = await client.auth.signInWithPassword({
     email: email,
     password: password,
   });

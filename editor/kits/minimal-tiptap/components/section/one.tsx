@@ -5,6 +5,7 @@ import type { FormatAction } from "../../types";
 import type { VariantProps } from "class-variance-authority";
 import type { toggleVariants } from "@/components/ui/toggle";
 import { CaretDownIcon, LetterCaseCapitalizeIcon } from "@radix-ui/react-icons";
+import { cn } from "@/utils/cn";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,14 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToolbarButton } from "../toolbar-button";
 import { ShortcutKey } from "../shortcut-key";
-import { cn } from "@/utils";
 
 interface TextStyle
   extends Omit<
     FormatAction,
     "value" | "icon" | "action" | "isActive" | "canExecute"
   > {
-  element: keyof JSX.IntrinsicElements;
+  element: keyof React.JSX.IntrinsicElements;
   level?: Level;
   className: string;
 }

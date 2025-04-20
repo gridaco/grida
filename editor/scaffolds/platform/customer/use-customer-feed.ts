@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { Data } from "@/lib/data";
 import { Platform } from "@/lib/platform";
 import type { PostgrestError } from "@supabase/postgrest-js";
@@ -86,7 +86,7 @@ export function useCustomers(
   project_id: number,
   query: Data.Relation.QueryState
 ) {
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
   const [customers, setCustomers] = useState<
     Platform.Customer.CustomerWithTags[]
   >([]);
@@ -121,7 +121,7 @@ export function useCustomerFeed(
     onError?: (error: PostgrestError) => void;
   }
 ) {
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
 
   useEffect(() => {
     if (!enabled) return;

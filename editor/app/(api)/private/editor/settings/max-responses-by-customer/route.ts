@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import {
   EditorApiResponseOk,
   UpdateFormAccessMaxResponseByCustomerRequest,
@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
 
   assert(form_id, "form_id is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { error } = await supabase
+  const { error } = await formsClient
     .from("form")
     .update({
       max_form_responses_by_customer: max ?? null,

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
@@ -46,8 +47,8 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
             <span className="flex flex-row gap-2 items-center">
-              <CodeIcon />
-              HTML Block
+              <CodeIcon className="size-3" />
+              <span className="text-xs">HTML Block</span>
             </span>
             <p className="text-xs opacity-50">
               By default, the content will be styled with{" "}
@@ -64,7 +65,7 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
             </p>
           </div>
         </div>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -78,7 +79,7 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
       <div>
         <div className="rounded overflow-hidden border aspect-auto">

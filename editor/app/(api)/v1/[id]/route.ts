@@ -19,7 +19,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
 import { FormBlockTree } from "@/lib/forms/types";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   FormFieldOptionsInventoryMap,
@@ -31,7 +31,6 @@ import {
   validate_max_access_by_form,
 } from "@/services/form/validate-max-access";
 import i18next from "i18next";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type {
@@ -158,12 +157,8 @@ export async function GET(
     response.error = e;
   }
 
-  const cookieStore = await cookies();
   // TODO: strict with permissions
-  const supabase = grida_forms_client;
-  // const supabase = createRouteHandlerClient(cookieStore);
-
-  const { data, error } = await supabase
+  const { data, error } = await service_role.forms
     .from("form")
     .select(
       `
@@ -269,7 +264,7 @@ export async function GET(
   // ==================================================
   // session
   // ==================================================
-  const { data: session, error: session_error } = await supabase
+  const { data: session, error: session_error } = await service_role.forms
     .from("response_session")
     .upsert(
       {

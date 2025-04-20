@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useEditorState } from "./editor";
@@ -17,7 +17,7 @@ export function EditableDocumentTitle({
 
   const [value, setValue] = useState<string>(defaultValue || "");
 
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(

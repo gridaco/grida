@@ -1,14 +1,15 @@
 "use client";
 
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
+import { cn } from "@/utils";
 
 export function useDeleteBlock() {
   const [state, dispatch] = useEditorState();
-  const supabase = createClientFormsClient();
+  const supabase = createBrowserFormsClient();
 
   const deleteBlock = useCallback(
     async (id: string) => {
@@ -84,14 +85,33 @@ export function FlatBlockBase({
       data-invalid={invalid}
       data-focused={focused}
       className={clsx(
-        "rounded-md flex flex-col gap-4 border w-full p-4 bg-background shadow-md",
-        'data-[invalid="true"]:border-destructive data-[invalid="true"]:border-1 data-[invalid="true"]:border-dashed',
-        'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
+        "group/block rounded-md flex flex-col gap-4 w-full p-4 bg-background transition-all",
+        "shadow-[0_0_0_1px_theme('colors.border')]",
+        "hover:shadow-[0_0_0_2px_theme('colors.border')]",
+        'data-[focused="true"]:shadow-[0_0_0_2px_theme("colors.ring")]'
       )}
       onPointerDown={(e) => {
         e.stopPropagation();
         onPointerDown?.(e);
       }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function BlockAction({
+  children,
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn(
+        "opacity-0 group-hover/block:opacity-100 group-data-[focused='true']/block:opacity-100",
+        className
+      )}
+      {...props}
     >
       {children}
     </div>

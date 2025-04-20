@@ -21,7 +21,7 @@ import {
   insertCustomer,
 } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSpaceInstance } from "@/scaffolds/data-table";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import {
   DataPlatformProvider,
   SchemaNameProvider,
@@ -78,7 +78,7 @@ function Body() {
   const project_id = project.id;
   const router = useRouter();
   const pathname = usePathname();
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
   const [selection, setSelection] = useState<Set<string>>(new Set());
 
   const has_selected_rows = selection.size > 0;
@@ -293,7 +293,7 @@ function Body() {
 function NewButton({ onNewData }: { onNewData?: () => void }) {
   const project = useProject();
   const project_id = project.id;
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
   const createCustomerDialog = useDialogState("create-customer", {
     refreshkey: true,
   });

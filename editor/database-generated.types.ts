@@ -3089,7 +3089,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           lang?: string
-          name?: string
+          name: string
           og_image?: string | null
           project_id: number
           publisher?: string | null
@@ -3199,6 +3199,18 @@ export type Database = {
       }
     }
     Functions: {
+      change_www_name: {
+        Args: { p_www_id: string; p_name: string }
+        Returns: undefined
+      }
+      check_www_name_available: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      gen_random_www_name: {
+        Args: { p_project_id: number }
+        Returns: string
+      }
       rls_www: {
         Args: { p_www_id: string }
         Returns: boolean
@@ -3787,21 +3799,31 @@ export type Database = {
       }
       user_project_access_state: {
         Row: {
-          project_id: number
+          document_id: string | null
+          project_id: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          project_id: number
+          document_id?: string | null
+          project_id?: number | null
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
-          project_id?: number
+          document_id?: string | null
+          project_id?: number | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_project_access_state_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_project_access_state_project_id_fkey"
             columns: ["project_id"]
@@ -4536,6 +4558,14 @@ export type Database = {
           max_responses: number
           is_public: boolean
         }[]
+      }
+      workspace_mark_access: {
+        Args: {
+          p_organization_name: string
+          p_project_name: string
+          p_document_id?: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

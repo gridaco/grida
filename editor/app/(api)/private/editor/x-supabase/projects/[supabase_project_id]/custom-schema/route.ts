@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { XSupabasePrivateApiTypes } from "@/types/private/api";
-import { cookies } from "next/headers";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
-import assert from "assert";
+import { createXSBClient } from "@/lib/supabase/server";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import assert from "assert";
 
 type Params = { supabase_project_id: number };
 
@@ -12,15 +11,13 @@ interface Context {
 }
 
 export async function POST(req: NextRequest, context: Context) {
-  //
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
   const body: XSupabasePrivateApiTypes.AddSchemaNameRequestData =
     await req.json();
 
-  const { data: prev } = await supabase
+  const { data: prev } = await xsbClient
     .from("supabase_project")
     .select(`id, sb_project_url, sb_anon_key, sb_schema_names`)
     .eq("id", supabase_project_id)
@@ -39,7 +36,7 @@ export async function POST(req: NextRequest, context: Context) {
       schemas: schema_names,
     });
 
-  const { data: patch, error: patch_error } = await supabase
+  const { data: patch, error: patch_error } = await xsbClient
     .from("supabase_project")
     .update({
       sb_schema_names: Array.from(schema_names),

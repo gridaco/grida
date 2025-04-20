@@ -1,18 +1,14 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import type {
   EditorApiResponseOk,
   UpdateFormRedirectAfterSubmissionRequest,
 } from "@/types/private/api";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const origin = req.nextUrl.origin;
   const data: UpdateFormRedirectAfterSubmissionRequest = await req.json();
-
-  const cookieStore = await cookies();
 
   const {
     form_id,
@@ -22,9 +18,9 @@ export async function POST(req: NextRequest) {
 
   assert(form_id, "form_id is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { error } = await supabase
+  const { error } = await formsClient
     .from("form_document")
     .update({
       redirect_after_response_uri: redirect_after_response_uri,

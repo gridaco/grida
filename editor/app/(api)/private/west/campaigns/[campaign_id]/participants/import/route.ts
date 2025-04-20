@@ -1,6 +1,5 @@
-import { Platform } from "@/lib/platform";
-import { createRouteHandlerWestReferralClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { type Platform } from "@/lib/platform";
+import { createWestReferralClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
@@ -13,8 +12,7 @@ export async function POST(
     params: Promise<Params>;
   }
 ) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerWestReferralClient(cookieStore);
+  const supabase = await createWestReferralClient();
   const { campaign_id: campaign_id } = await context.params;
   const body =
     (await req.json()) as Platform.WEST.Referral.ImportParticipantsRequestBody;

@@ -16,11 +16,11 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
-import { SectionStyle } from "../agent/theme";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import { cn } from "@/utils";
 
 export default function BlocksEditorRoot() {
   return (
@@ -83,7 +83,7 @@ function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
 function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
-  const supabase = createClientFormsClient();
+  const supabase = createBrowserFormsClient();
 
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
@@ -147,7 +147,7 @@ function PendingBlocksResolver() {
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   // TODO: add debounce
 
-  const supabase = createClientFormsClient();
+  const supabase = createBrowserFormsClient();
   const prevBlocksRef = useRef(blocks);
 
   useEffect(() => {
@@ -242,7 +242,7 @@ function BlocksEditor() {
             items={state.blocks.map((b) => b.id)}
             strategy={verticalListSortingStrategy}
           >
-            <SectionStyle className="flex flex-col gap-4 ">
+            <FormSectionStyle className="flex flex-col gap-4 ">
               {state.blocks.map((block) => {
                 return (
                   <div key={block.id}>
@@ -250,12 +250,27 @@ function BlocksEditor() {
                   </div>
                 );
               })}
-            </SectionStyle>
+            </FormSectionStyle>
           </SortableContext>
+          <div className="mt-10 w-full flex items-center justify-center">
+            <InsertMenuTrigger />
+          </div>
         </BlocksCanvas>
       </div>
     </div>
   );
+}
+
+function FormSectionStyle({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const [state] = useEditorState();
+  const sectioncss = state.theme.section;
+
+  return <section className={cn(sectioncss, className)}>{children}</section>;
 }
 
 function shallowEqual(obj1: any, obj2: any) {

@@ -1,6 +1,8 @@
-import { sb } from "@/lib/supabase/server";
+import {
+  createWestReferralClient,
+  createWWWClient,
+} from "@/lib/supabase/server";
 import { Metadata } from "next";
-import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampaignAgentProvider } from "./store";
 import { TenantLayoutProvider } from "@/scaffolds/tenant";
@@ -13,22 +15,14 @@ type Params = {
 async function fetchCampaign({ params }: { params: Params }) {
   const { slug } = params;
   const route_path = "/r/" + slug;
-  const cookieStore = cookies();
-  const headersList = headers();
 
-  const rrwww = sb.rr.www.createRouteHandlerClient({
-    headers: headersList,
-    cookies: cookieStore,
-  });
+  const wwwClient = await createWWWClient();
 
-  const rrwest = sb.rr.west_referral.createRouteHandlerClient({
-    headers: headersList,
-    cookies: cookieStore,
-  });
+  const westClient = await createWestReferralClient();
 
   // TODO: optimize query
 
-  const { data: routing, error: routing_err } = await rrwww
+  const { data: routing, error: routing_err } = await wwwClient
     .from("public_route")
     .select(
       `
@@ -47,7 +41,7 @@ async function fetchCampaign({ params }: { params: Params }) {
 
   const { document_id, template, ...route } = routing;
 
-  const { data: campaign, error: campaign_err } = await rrwest
+  const { data: campaign, error: campaign_err } = await westClient
     .from("campaign_public")
     .select()
     .eq("id", document_id)

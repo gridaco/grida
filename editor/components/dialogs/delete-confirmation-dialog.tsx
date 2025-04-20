@@ -16,14 +16,14 @@ import { Spinner } from "../spinner";
 export function DeleteConfirmationAlertDialog<ID = string>({
   title,
   description,
-  placeholder,
-  data,
   match,
+  placeholder = match,
+  data,
   onDelete,
   ...props
 }: React.ComponentProps<typeof AlertDialog> & {
   title: React.ReactNode;
-  description?: React.ReactNode;
+  description?: React.ReactNode | ((match?: string) => React.ReactNode);
   placeholder?: string;
   match?: string;
   data?: {
@@ -53,7 +53,9 @@ export function DeleteConfirmationAlertDialog<ID = string>({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description && (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {renderDescription(description, match)}
+            </AlertDialogDescription>
           )}
         </AlertDialogHeader>
         <form
@@ -105,6 +107,16 @@ export function DeleteConfirmationAlertDialog<ID = string>({
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function renderDescription(
+  description: React.ReactNode | ((match?: string) => React.ReactNode),
+  match?: string
+) {
+  if (typeof description === "function") {
+    return description(match);
+  }
+  return description;
 }
 
 export function DeleteConfirmationSnippet({
