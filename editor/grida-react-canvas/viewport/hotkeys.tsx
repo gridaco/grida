@@ -851,12 +851,12 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    fit("*", 64);
+    fit("*", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 
   useHotkeys("shift+2", (e) => {
-    fit("selection", 64);
+    fit("selection", { margin: 64, animate: true });
     toast.success(`Zoom to selection`);
   });
 

@@ -193,7 +193,7 @@ function NodeHierarchyItemContextMenuWrapper({
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
-            fit([node_id]);
+            fit([node_id], { margin: 64, animate: true });
           }}
           className="text-xs"
         >
