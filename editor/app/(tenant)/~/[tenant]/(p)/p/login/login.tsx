@@ -21,6 +21,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
 import { template } from "@/utils/template";
 import toast from "react-hot-toast";
+import { useRouter } from "next/router";
 
 type Step = "email" | "otp";
 
@@ -58,17 +59,23 @@ interface CustomerPropsMinimalCustomizationProps {
 
 export default function PortalLogin({
   locale = "en",
-  onSession,
-  sendEmail,
-}: CustomerPropsMinimalCustomizationProps & {
-  onSession?: () => void;
-  sendEmail?: (email: string) => Promise<boolean>;
-}) {
+}: CustomerPropsMinimalCustomizationProps) {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserClient(), []);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const sendEmail = async (email: string) => {
+    const res = await fetch(`/api/p/access/with-email`, {
+      method: "POST",
+      body: JSON.stringify({
+        email: email,
+      }),
+    });
+    return res.ok;
+  };
 
   const handleEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +118,7 @@ export default function PortalLogin({
       return;
     }
 
-    onSession?.();
+    router.replace(`./session`);
   };
 
   const t = dictionary[locale as keyof typeof dictionary];
