@@ -1,6 +1,6 @@
 import { createClient, createWWWClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
 import { NextResponse, type NextRequest } from "next/server";
+import { notFound } from "next/navigation";
 
 const IS_HOSTED = process.env.VERCEL === "1";
 
@@ -72,15 +72,11 @@ export async function GET(
 
   const request_path = path_tokens.join("/");
 
-  if (IS_HOSTED) {
-    return NextResponse.redirect(
-      `https://${www.name}.grida.site/${routing.route_path}/${request_path}`,
-      { status: 302 }
-    );
-  } else {
-    return NextResponse.redirect(
-      `http://${www.name}.localhost:3000/${routing.route_path}/${request_path}`,
-      { status: 302 }
-    );
-  }
+  const url = new URL(
+    `${routing.route_path}/${request_path}`,
+    IS_HOSTED
+      ? `https://${www.name}.grida.site/`
+      : `http://${www.name}.localhost:3000/`
+  );
+  return NextResponse.redirect(url, { status: 302 });
 }
