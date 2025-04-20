@@ -8,7 +8,7 @@ export default function CustomerPortalLoginPage() {
   const router = useRouter();
 
   const onSession = () => {
-    router.replace(`../session`);
+    router.replace(`./session`);
   };
 
   const sendEmail = async (email: string) => {
