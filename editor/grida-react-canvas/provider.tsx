@@ -2233,17 +2233,17 @@ export function useTransform() {
         selector
       );
 
-      if (ids.length === 0) {
+      const cdom = new domapi.CanvasDOM(scene.transform);
+
+      const rects = ids
+        .map((id) => cdom.getNodeBoundingRect(id))
+        .filter((r) => r) as cmath.Rectangle[];
+
+      if (rects.length === 0) {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(scene.transform);
-
-      const area = cmath.rect.union(
-        ids
-          .map((id) => cdom.getNodeBoundingRect(id))
-          .filter((r) => r) as cmath.Rectangle[]
-      );
+      const area = cmath.rect.union(rects);
 
       const _view = domapi.get_viewport_rect();
       const view = { x: 0, y: 0, width: _view.width, height: _view.height };

@@ -11,31 +11,21 @@ import {
   EditorSurface,
   StandaloneSceneContent,
   standaloneDocumentReducer,
+  useDocument,
 } from "@/grida-react-canvas";
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
 } from "@/grida-react-canvas/renderer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Selection,
-  Zoom,
-} from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { SidebarRoot } from "@/components/sidebar";
+import { Zoom } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
-import {
-  PreviewButton,
-  PreviewProvider,
-} from "@/grida-react-canvas-starter-kit/starterkit-preview";
-import { useCampaign } from "../store";
+import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
-import {
-  PropsEditorInstance,
-  ReadonlyPropsEditorInstance,
-} from "@/scaffolds/props-editor";
+import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
+import { useTransform } from "@/grida-react-canvas/provider";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -56,6 +46,8 @@ const document: IDocumentEditorInit = {
         properties: {},
         props: {},
         overrides: {},
+        top: -1000,
+        left: 0,
       },
       invitation: {
         id: "invitation",
@@ -92,29 +84,18 @@ const document: IDocumentEditorInit = {
         overrides: {},
       },
     },
-    entry_scene_id: "referrer",
+    entry_scene_id: "main",
     scenes: {
-      referrer: {
+      main: {
         type: "scene",
-        id: "referrer",
+        id: "main",
         name: "Referrer's Page",
-        children: ["referrer"],
+        children: ["referrer", "invitation", "invitation-ux-overlay"],
         guides: [],
         constraints: {
           children: "multiple",
         },
-        order: 1,
-      },
-      invitation: {
-        type: "scene",
-        id: "invitation",
-        name: "Invitee's Page",
-        children: ["invitation", "invitation-ux-overlay"],
-        guides: [],
-        constraints: {
-          children: "multiple",
-        },
-        order: 2,
+        order: 0,
       },
     },
   },
@@ -171,7 +152,7 @@ export function CampaignTemplateDuo001Viewer({
   locale,
   onDoubleClick,
 }: {
-  focus: { scene: string; node?: string };
+  focus: { node?: string };
   props: ReadonlyPropsEditorInstance<TemplateData.West_Referrral__Duo_001>;
   campaign: Platform.WEST.Referral.CampaignPublic;
   locale: "en" | "ko";
@@ -182,18 +163,12 @@ export function CampaignTemplateDuo001Viewer({
     initDocumentEditorState(document)
   );
 
-  useEffect(() => {
-    dispatch({ type: "load", scene: focus.scene });
-    if (focus.node) {
-      dispatch({ type: "select", selectors: [[focus.node]] });
-    }
-  }, [focus.scene, focus.node]);
-
   return (
     <CampaignViewerContextAndPropsContext.Provider
       value={{ ...props, campaign: campaign, locale }}
     >
       <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <EditorUXServer focus={focus} />
         <UserCustomTemplatesProvider
           templates={{
             "grida_west_referral.duo-000.referrer":
@@ -241,6 +216,21 @@ export function CampaignTemplateDuo001Viewer({
       </StandaloneDocumentEditor>
     </CampaignViewerContextAndPropsContext.Provider>
   );
+}
+
+// will be removed after useEditor is ready
+function EditorUXServer({ focus }: { focus: { node?: string } }) {
+  const { select } = useDocument();
+  const { fit } = useTransform();
+
+  useEffect(() => {
+    if (focus.node) {
+      select([focus.node]);
+      fit([focus.node], { margin: 64, animate: true });
+    }
+  }, [focus.node]);
+  //
+  return <></>;
 }
 
 function CustomComponent_Viewer__Referrer(componentprops: any) {
