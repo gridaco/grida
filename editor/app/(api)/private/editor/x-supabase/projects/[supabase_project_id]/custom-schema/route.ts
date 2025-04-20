@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { createXSBClient } from "@/lib/supabase/server";
-import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import assert from "assert";
 
 type Params = { supabase_project_id: number };
 

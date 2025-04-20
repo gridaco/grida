@@ -31,7 +31,6 @@ import {
   validate_max_access_by_form,
 } from "@/services/form/validate-max-access";
 import i18next from "i18next";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type {

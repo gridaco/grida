@@ -6,7 +6,6 @@ import {
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -61,7 +60,6 @@ export async function GET(req: NextRequest, context: Context) {
 // @see https://github.com/gridaco/grida/pull/179
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id } = await context.params;
-  const cookieStore = await cookies();
   const formsClient = await createFormsClient();
 
   const {

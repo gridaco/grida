@@ -2,7 +2,6 @@ import { _sr_grida_west_referral_client } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
-import { notFound } from "next/navigation";
 
 /**
  * [refresh invitation]

@@ -5,7 +5,7 @@ import {
   _sr_workspaceclient,
 } from "@/lib/supabase/server";
 import assert from "assert";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
@@ -14,7 +14,6 @@ import { TemplateData } from "@/theme/templates/west-referral/templates";
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const cookieStore = await cookies();
   const headerList = await headers();
   const wwwclient = await createWWWClient();
   const client = await createWestReferralClient();

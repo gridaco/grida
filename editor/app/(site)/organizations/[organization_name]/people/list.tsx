@@ -17,10 +17,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { Database } from "@/database.types";
 import type { Organization } from "@/types";
 import toast from "react-hot-toast";
-import { createBrowserClient } from "@/lib/supabase/client";
 
 export interface MemberItem {
   id: number;

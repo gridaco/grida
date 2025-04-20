@@ -23,12 +23,11 @@ export async function GET(
 
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
-  // TODO: support RLS
-  const supabase = _sr_grida_forms_client;
 
   assert(qpath);
 
-  const { data } = await supabase
+  // TODO: support RLS
+  const { data } = await _sr_grida_forms_client
     .from("form")
     .select(
       `
@@ -99,7 +98,7 @@ export async function GET(
     }
   }
 
-  const { data: singed } = await supabase.storage
+  const { data: singed } = await _sr_grida_forms_client.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .createSignedUrl(qpath, expiresIn, options);
   const src = singed?.signedUrl;

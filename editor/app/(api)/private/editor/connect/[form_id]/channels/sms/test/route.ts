@@ -1,6 +1,5 @@
 import { OnSubmitProcessors } from "@/app/(api)/submit/[id]/hooks";
 import { createFormsClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {

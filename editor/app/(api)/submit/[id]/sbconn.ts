@@ -6,7 +6,6 @@ import type {
   SchemaTableConnectionXSupabaseMainTableJoint,
   GridaXSupabase,
 } from "@/types";
-import type { JSONSchemaType } from "ajv";
 
 // TODO: make it as a class to optimize performance (duplicated network requests)
 
