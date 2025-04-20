@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import type {
   ICursorId,
   ICursorPos,
@@ -48,7 +48,7 @@ export function useMultiplayerRoom({
     payload: Omit<IMultiplayerCursorNotify, "cursor_id">
   ) => void;
 }) {
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createBrowserClient(), []);
 
   const [broadcast, setBroadcast] = useState<
     | ((

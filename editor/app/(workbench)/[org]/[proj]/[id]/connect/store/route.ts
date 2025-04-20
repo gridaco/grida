@@ -1,9 +1,8 @@
 import { editorlink } from "@/lib/forms/url";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 import { notFound } from "next/navigation";
+import { createFormsClient } from "@/lib/supabase/server";
 
 export const revalidate = 0;
 
@@ -15,11 +14,10 @@ export async function GET(
 ) {
   const { id, org, proj } = await context.params;
   const origin = request.nextUrl.origin;
-  const cookieStore = await cookies();
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data: formdoc } = await supabase
+  const { data: formdoc } = await formsClient
     .from("form_document")
     .select("form_id")
     .eq("id", id)
@@ -29,7 +27,7 @@ export async function GET(
     return notFound();
   }
 
-  const { data: connection } = await supabase
+  const { data: connection } = await formsClient
     .from("connection_commerce_store")
     .select()
     .eq("form_id", formdoc.form_id)

@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { _sr_grida_forms_client } from "@/lib/supabase/server";
 import { parseStorageUrlOptions } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormFieldStorageSchema } from "@/types";
@@ -23,9 +23,7 @@ export async function GET(
   // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
 
   // TODO: support RLS
-  // const cookieStore = await cookies();
-  // const supabase = createRouteHandlerClient(cookieStore);
-  const supabase = grida_forms_client;
+  const supabase = _sr_grida_forms_client;
 
   assert(qpath);
 

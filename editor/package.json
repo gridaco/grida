@@ -67,7 +67,6 @@
     "@radix-ui/react-tooltip": "^1.0.7",
     "@react-email/components": "^0.0.34",
     "@stepperize/react": "^3.1.1",
-    "@supabase/auth-helpers-nextjs": "^0.9.0",
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.43.5",

@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import { FormInputType } from "@/types";
 import {
   CreateNewSchemaTableRequest,
@@ -6,7 +6,6 @@ import {
   EditorApiResponse,
 } from "@/types/private/api";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -21,7 +20,6 @@ type Context = {
 };
 
 export async function POST(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
   const data = (await req.json()) as Omit<
     CreateNewSchemaTableRequest,
     "schema_id"
@@ -29,9 +27,9 @@ export async function POST(req: NextRequest, context: Context) {
   const { schema_id } = await context.params;
   assert(data.table_name, "table_name is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data: schema_ref, error: schema_ref_err } = await supabase
+  const { data: schema_ref, error: schema_ref_err } = await formsClient
     .from("schema_document")
     .select()
     .eq("id", schema_id)
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest, context: Context) {
   }
 
   // TODO: shall be renamed to "table"
-  const { data: new_table_ref, error: new_table_ref_err } = await supabase
+  const { data: new_table_ref, error: new_table_ref_err } = await formsClient
     .from("form")
     .insert({
       project_id: schema_ref.project_id,
@@ -128,7 +126,7 @@ export async function POST(req: NextRequest, context: Context) {
         ];
         break;
     }
-    await supabase.from("attribute").insert(
+    await formsClient.from("attribute").insert(
       fields.map((field) => ({
         form_id: new_table_ref.id,
         type: field.type,
@@ -138,11 +136,12 @@ export async function POST(req: NextRequest, context: Context) {
     );
   }
 
-  const { data: new_table_detail, error: new_table_detail_err } = await supabase
-    .from("form")
-    .select(`*, attributes:attribute(*)`)
-    .eq("id", new_table_ref.id)
-    .single();
+  const { data: new_table_detail, error: new_table_detail_err } =
+    await formsClient
+      .from("form")
+      .select(`*, attributes:attribute(*)`)
+      .eq("id", new_table_ref.id)
+      .single();
 
   if (new_table_detail_err) {
     console.error("ERR: while fetching new table detail", new_table_detail_err);

@@ -1,6 +1,5 @@
 import React from "react";
-import { cookies } from "next/headers";
-import { createRouteHandlerWestReferralClient } from "@/lib/supabase/server";
+import { createWestReferralClient } from "@/lib/supabase/server";
 import { CampaignProvider } from "./store";
 import {
   Sidebar,
@@ -43,8 +42,7 @@ export default async function CampaignLayout({
   params: Promise<Params>;
 }>) {
   const { org, proj, campaign: campaign_id } = await params;
-  const cookieStore = await cookies();
-  const client = createRouteHandlerWestReferralClient(cookieStore);
+  const client = await createWestReferralClient();
 
   const { data, error } = await client
     .from("campaign")

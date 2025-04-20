@@ -1,8 +1,8 @@
 import {
-  grida_forms_client,
-  grida_canvas_client,
-  workspaceclient,
-  grida_storage_client,
+  _sr_grida_forms_client,
+  _sr_grida_canvas_client,
+  _sr_workspaceclient,
+  _sr_grida_storage_client,
 } from "@/lib/supabase/server";
 import type {
   CanvasDocumentSnapshotSchema,
@@ -30,7 +30,7 @@ class DocumentSetupAssistantService {
   document_id: string | null = null;
   protected async createMasterDocument({ title }: { title?: string }) {
     if (this.document_id) throw new Error("document already created");
-    const { data: document_ref, error: doc_ref_err } = await workspaceclient
+    const { data: document_ref, error: doc_ref_err } = await _sr_workspaceclient
       .from("document")
       .insert({
         title: title,
@@ -55,7 +55,7 @@ class DocumentSetupAssistantService {
     try {
       if (!this.document_id) return;
 
-      await workspaceclient
+      await _sr_workspaceclient
         .from("document")
         .delete()
         .eq("id", this.document_id);
@@ -79,7 +79,7 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
     }
 
     // check for duplicate
-    const { error, count } = await grida_forms_client
+    const { error, count } = await _sr_grida_forms_client
       .from("schema_document")
       .select("id", { count: "exact" })
       .eq("name", this.seed.name)
@@ -118,7 +118,7 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
       title: name,
     });
 
-    const { data, error } = await grida_forms_client
+    const { data, error } = await _sr_grida_forms_client
       .from("schema_document")
       .insert({
         id: masterdoc_ref.id,
@@ -155,7 +155,7 @@ export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantS
     }
 
     // check for duplicate
-    const { error, count } = await grida_storage_client
+    const { error, count } = await _sr_grida_storage_client
       .from("bucket_document")
       .select("id", { count: "exact" })
       .eq("name", this.seed.name)
@@ -194,7 +194,7 @@ export class BucketDocumentSetupAssistantService extends DocumentSetupAssistantS
       title: name,
     });
 
-    const { data, error } = await grida_storage_client
+    const { data, error } = await _sr_grida_storage_client
       .from("bucket_document")
       .insert({
         id: masterdoc_ref.id,
@@ -246,7 +246,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
       title: this.seed.title ?? "Untitled Canvas",
     });
 
-    const { data, error } = await grida_canvas_client
+    const { data, error } = await _sr_grida_canvas_client
       .from("canvas_document")
       .insert({
         id: masterdoc_ref.id,
@@ -305,7 +305,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
   private async createFormDatabase() {
     if (this.form_id) return this.form_id;
 
-    const { data: form, error } = await grida_forms_client
+    const { data: form, error } = await _sr_grida_forms_client
       .from("form")
       .insert({
         project_id: this.project_id,
@@ -345,7 +345,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
 
     // create a form document
     const { data: form_document, error: form_doc_err } =
-      await grida_forms_client
+      await _sr_grida_forms_client
         .from("form_document")
         .insert({
           id: document_ref.id,
@@ -361,7 +361,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
     }
 
     // link the page to the form
-    await grida_forms_client
+    await _sr_grida_forms_client
       .from("form")
       .update({
         default_form_page_id: form_document!.id,
@@ -394,7 +394,7 @@ async function seed_form_document_blocks({
   // - header block
   // - field block
 
-  const { data: section_block, error } = await grida_forms_client
+  const { data: section_block, error } = await _sr_grida_forms_client
     .from("form_block")
     .insert({
       type: "section",
@@ -409,7 +409,7 @@ async function seed_form_document_blocks({
 
   const section_1_id = section_block!.id;
 
-  await grida_forms_client.from("form_block").insert([
+  await _sr_grida_forms_client.from("form_block").insert([
     {
       type: "header",
       form_id,

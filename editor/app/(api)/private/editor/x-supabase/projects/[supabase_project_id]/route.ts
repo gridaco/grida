@@ -1,8 +1,7 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createXSBClient } from "@/lib/supabase/server";
 import type { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -13,11 +12,10 @@ interface Context {
 }
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
-  const { data: supabase_project, error: rls_err } = await supabase
+  const { data: supabase_project, error: rls_err } = await xsbClient
     .from("supabase_project")
     .select(
       `
@@ -42,11 +40,10 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
-  const { data: supabase_project, error: rls_err } = await supabase
+  const { data: supabase_project, error: rls_err } = await xsbClient
     .from("supabase_project")
     .select(
       `
@@ -82,7 +79,7 @@ export async function PATCH(req: NextRequest, context: Context) {
       );
 
     const might_be_deleted = !new_schema;
-    const { error } = await supabase
+    const { error } = await xsbClient
       .from("supabase_table")
       .update({
         sb_table_schema: might_be_deleted ? undefined : new_schema,
@@ -99,7 +96,7 @@ export async function PATCH(req: NextRequest, context: Context) {
     }
   }
 
-  const { data: patch, error: patch_error } = await supabase
+  const { data: patch, error: patch_error } = await xsbClient
     // TODO:
     .from("supabase_project")
     .update({
@@ -120,11 +117,10 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
-  const { count, error } = await supabase
+  const { count, error } = await xsbClient
     .from("supabase_project")
     .delete({ count: "exact" })
     .eq("id", supabase_project_id);

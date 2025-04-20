@@ -9,7 +9,7 @@ import React, {
   useMemo,
 } from "react";
 import useSWR, { mutate } from "swr";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import { EditorApiResponse } from "@/types/private/api";
 import { Spinner } from "@/components/spinner";
@@ -113,7 +113,7 @@ export function Workspace({
   organization: OrganizationWithMembers;
   project?: string;
 }>) {
-  const supabase = createClientWorkspaceClient();
+  const supabase = createBrowserClient();
 
   const key = `/private/workspace/${organization.id}`;
   const { data } = useSWR<
@@ -212,7 +212,7 @@ export function ProjectTagsProvider({
 }) {
   const { id: project_id, organization_id } = useProject();
 
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   const key = `/private/workspace/${organization_id}/projects/${project_id}/tags`;
 

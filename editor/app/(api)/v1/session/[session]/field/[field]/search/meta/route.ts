@@ -1,4 +1,4 @@
-import { grida_forms_client } from "@/lib/supabase/server";
+import { _sr_grida_forms_client } from "@/lib/supabase/server";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import { type FormFieldReferenceSchema, GridaXSupabase } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
@@ -21,7 +21,7 @@ export async function GET(
 ) {
   const { session: session_id, field: field_id } = await context.params;
 
-  const { data, error } = await grida_forms_client
+  const { data, error } = await _sr_grida_forms_client
     .from("response_session")
     .select(
       `id, form:form( fields:attribute( id, name, reference ), supabase_connection:connection_supabase(*) )`

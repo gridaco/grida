@@ -1,8 +1,8 @@
 import { Database } from "@/database.types";
 import {
-  createRouteHandlerWestReferralClient,
-  createRouteHandlerWWWClient,
-  workspaceclient,
+  createWestReferralClient,
+  createWWWClient,
+  _sr_workspaceclient,
 } from "@/lib/supabase/server";
 import assert from "assert";
 import { cookies, headers } from "next/headers";
@@ -16,8 +16,8 @@ export async function POST(req: Request) {
   const body = await req.json();
   const cookieStore = await cookies();
   const headerList = await headers();
-  const client = createRouteHandlerWestReferralClient(cookieStore);
-  const wwwclient = createRouteHandlerWWWClient(cookieStore);
+  const wwwclient = await createWWWClient();
+  const client = await createWestReferralClient();
 
   const project_id = Number(
     headerList.get("x-grida-editor-user-current-project-id")
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   } = body as Platform.WEST.Referral.Wizard.CampaignData;
 
   // step document-1. create document
-  const { data: base_doc, error: base_doc_err } = await workspaceclient
+  const { data: base_doc, error: base_doc_err } = await _sr_workspaceclient
     .from("document")
     .insert({
       doctype: "v0_campaign_referral",

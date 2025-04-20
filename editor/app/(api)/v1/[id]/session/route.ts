@@ -1,5 +1,5 @@
 import { parseGFKeys } from "@/lib/forms/gfkeys";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { _sr_grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { id: string };
@@ -19,7 +19,7 @@ export async function GET(
     req.nextUrl.searchParams
   );
 
-  const { data: session, error: session_error } = await grida_forms_client
+  const { data: session, error: session_error } = await _sr_grida_forms_client
     .from("response_session")
     .insert({
       form_id: form_id,

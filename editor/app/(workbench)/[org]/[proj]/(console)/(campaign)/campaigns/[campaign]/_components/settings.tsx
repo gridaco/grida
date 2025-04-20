@@ -49,7 +49,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import toast from "react-hot-toast";
-import { createClientWestReferralClient } from "@/lib/supabase/client";
+import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -86,7 +86,7 @@ type CampaignFormValues = z.infer<typeof formSchema>;
 function useCampaignData(id: string) {
   const [campaign, setCampaign] =
     useState<Platform.WEST.Referral.Campaign | null>(null);
-  const client = useMemo(() => createClientWestReferralClient(), []);
+  const client = useMemo(() => createBrowserWestReferralClient(), []);
 
   useEffect(() => {
     client

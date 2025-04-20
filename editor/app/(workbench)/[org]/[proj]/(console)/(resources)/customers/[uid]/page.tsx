@@ -44,7 +44,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import React, { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -85,7 +85,7 @@ type Params = {
 };
 
 function useCustomer(project_id: number, uid: string) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const _delete = useCallback(async () => {
     const { count } = await supabase
       .from("customer")

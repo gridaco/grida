@@ -4,7 +4,7 @@ import type { Database } from "@/database.types";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
-import { workspaceclient } from "@/lib/supabase/server";
+import { _sr_workspaceclient } from "@/lib/supabase/server";
 
 type ID = string;
 type FormFieldInsertion =
@@ -88,7 +88,7 @@ export class JSONFrom2DB {
 
     // insert document
     // this is bad, but since form is created, its safe to use without rls.
-    const { data: docref } = await workspaceclient
+    const { data: docref } = await _sr_workspaceclient
       .from("document")
       .insert({
         project_id: this.project_id,

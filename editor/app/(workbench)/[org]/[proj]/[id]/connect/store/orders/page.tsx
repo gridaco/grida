@@ -66,14 +66,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cookies } from "next/headers";
-import { createServerComponentClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 
 export default function Dashboard() {
   // const form_id = params.id;

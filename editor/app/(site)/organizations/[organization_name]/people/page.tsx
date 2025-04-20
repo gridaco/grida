@@ -1,6 +1,5 @@
 import React from "react";
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { PublicUrls } from "@/services/public-urls";
 import MemberList, { MemberItem } from "./list";
@@ -13,16 +12,15 @@ export default async function PoeplesPage({
   params: Promise<Params>;
 }) {
   const { organization_name } = await params;
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
-  const avatar_url = PublicUrls.organization_avatar_url(supabase);
-  const { data: auth } = await supabase.auth.getUser();
+  const client = await createClient();
+  const avatar_url = PublicUrls.organization_avatar_url(client);
+  const { data: auth } = await client.auth.getUser();
 
   if (!auth.user) {
     return redirect("/sign-in");
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("organization")
     .select(
       `

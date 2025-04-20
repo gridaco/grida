@@ -9,7 +9,7 @@ import {
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
-import { createClientCanvasClient } from "@/lib/supabase/client";
+import { createBrowserCanvasClient } from "@/lib/supabase/client";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { CanvasDocumentSnapshotSchema } from "@/types";
 import equal from "deep-equal";
@@ -31,7 +31,7 @@ function useSync(document: grida.program.document.Document | undefined) {
   const [{ document_id }, dispatch] = useEditorState();
   const debounced = useDebounce(document, 1000);
   const prev = usePrevious(debounced);
-  const supabase = useMemo(() => createClientCanvasClient(), []);
+  const supabase = useMemo(() => createBrowserCanvasClient(), []);
 
   const setSaving = useCallback(
     (saving: boolean) => dispatch({ type: "saving", saving: saving }),

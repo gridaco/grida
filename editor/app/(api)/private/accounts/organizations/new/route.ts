@@ -1,12 +1,7 @@
-import {
-  createRouteHandlerWorkspaceClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createClient, _sr_workspaceclient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const cookieStore = await cookies();
   const origin = req.nextUrl.origin;
 
   const body = await req.formData();
@@ -14,7 +9,7 @@ export async function POST(req: NextRequest) {
   const name = body.get("name");
   const email = body.get("email");
 
-  const client = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
   const { data: userdata } = await client.auth.getUser();
   if (!userdata.user) {
     return NextResponse.redirect(origin + "/sign-in", {
@@ -22,7 +17,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data, error } = await workspaceclient
+  const { data, error } = await _sr_workspaceclient
     .from("organization")
     .insert({
       name: String(name),

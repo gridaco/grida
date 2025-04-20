@@ -8,8 +8,8 @@ import {
 } from "@/k/system";
 // TODO: need RLS?
 import {
-  grida_forms_client,
-  grida_commerce_client,
+  _sr_grida_forms_client,
+  _sr_grida_commerce_client,
 } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
@@ -138,7 +138,7 @@ async function submit({
 
   // check if form exists
   const { data: form_reference, error: form_reference_err } =
-    await grida_forms_client
+    await _sr_grida_forms_client
       .from("form")
       .select(
         `
@@ -333,7 +333,7 @@ async function submit({
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
     const commerce = new GridaCommerceClient(
-      grida_commerce_client,
+      _sr_grida_commerce_client,
       project_id,
       store_connection.store_id
     );
@@ -430,7 +430,7 @@ async function submit({
 
   // create new form response
   const { data: response_reference_obj, error: response_insertion_error } =
-    await grida_forms_client
+    await _sr_grida_forms_client
       .from("response")
       .insert({
         raw: FormValue.safejson(Object.fromEntries(entries)),
@@ -545,7 +545,7 @@ async function submit({
 
   if (needs_to_be_created) {
     // create new fields
-    const { data: new_fields } = await grida_forms_client
+    const { data: new_fields } = await _sr_grida_forms_client
       .from("attribute")
       .insert(
         needs_to_be_created.map((key) => ({
@@ -641,7 +641,7 @@ async function submit({
   );
 
   // save each field value
-  const { error: v_fields_error } = await grida_forms_client
+  const { error: v_fields_error } = await _sr_grida_forms_client
     .from("response_field")
     .insert(
       v_form_fields!.map((field) => {
@@ -914,7 +914,7 @@ async function submit({
   });
 
   if (response_field_with_resolved_file_upserts.length > 0) {
-    const { error: file_upload_upsertion_error } = await grida_forms_client
+    const { error: file_upload_upsertion_error } = await _sr_grida_forms_client
       .from("response_field")
       .upsert(response_field_with_resolved_file_upserts, {
         onConflict: "response_id, form_field_id",
@@ -927,7 +927,7 @@ async function submit({
     }
 
     // notify response change with updating updated_at
-    await grida_forms_client
+    await _sr_grida_forms_client
       .from("response")
       .update({ updated_at: new Date().toISOString() })
       .eq("id", response_reference_obj!.id);
@@ -1013,7 +1013,7 @@ async function submit({
 
       // finally fetch the response for pingback
       const { data: response, error: select_response_error } =
-        await grida_forms_client
+        await _sr_grida_forms_client
           .from("response")
           .select(
             `
@@ -1203,7 +1203,7 @@ class ResponseFieldFilesProcessor {
           const uniqueFileName = uniqueFileNameGenerator.name(file.name);
           const path = basepath + uniqueFileName;
 
-          const upload = grida_forms_client.storage
+          const upload = _sr_grida_forms_client.storage
             .from(GRIDA_FORMS_RESPONSE_BUCKET)
             .upload(path, file);
           uploads.push(upload);
@@ -1283,7 +1283,7 @@ class ResponseFieldFilesProcessor {
               // refer: *(1) (see comment above)
               const targetpath = basepath + _p.name;
               const storage = new SessionStagedFileStorage(
-                grida_forms_client,
+                _sr_grida_forms_client,
                 GRIDA_FORMS_RESPONSE_BUCKET
               );
 

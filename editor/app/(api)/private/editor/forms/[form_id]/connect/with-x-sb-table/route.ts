@@ -1,7 +1,7 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
-  createRouteHandlerClient,
-  grida_xsupabase_client,
+  createFormsClient,
+  _sr_grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest, context: Context) {
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id } = await context.params;
   const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const {
     schema_name,
@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest, context: Context) {
   }: XSupabasePrivateApiTypes.CreateConnectionTableRequestData =
     await req.json();
 
-  const { data: conn_ref, error: conn_ref_error } = await supabase
+  const { data: conn_ref, error: conn_ref_error } = await formsClient
     .from("connection_supabase")
     .select()
     .eq("form_id", form_id)
@@ -83,7 +83,7 @@ export async function PUT(req: NextRequest, context: Context) {
 
   if (!conn_ref) return notFound();
 
-  const { data: supabase_project } = await grida_xsupabase_client
+  const { data: supabase_project } = await _sr_grida_xsupabase_client
     .from("supabase_project")
     .select(
       "sb_schema_definitions, sb_schema_openapi_docs, tables:supabase_table(*)"
@@ -109,22 +109,23 @@ export async function PUT(req: NextRequest, context: Context) {
       table_name
     );
 
-  const { data: upserted_supabase_table, error } = await grida_xsupabase_client
-    .from("supabase_table")
-    .upsert(
-      {
-        supabase_project_id: conn_ref!.supabase_project_id,
-        sb_table_name: table_name,
-        sb_schema_name: schema_name,
-        sb_table_schema: table_schema,
-        sb_postgrest_methods,
-      },
-      {
-        onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
-      }
-    )
-    .select()
-    .single();
+  const { data: upserted_supabase_table, error } =
+    await _sr_grida_xsupabase_client
+      .from("supabase_table")
+      .upsert(
+        {
+          supabase_project_id: conn_ref!.supabase_project_id,
+          sb_table_name: table_name,
+          sb_schema_name: schema_name,
+          sb_table_schema: table_schema,
+          sb_postgrest_methods,
+        },
+        {
+          onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
+        }
+      )
+      .select()
+      .single();
 
   if (error) {
     console.error(error);
@@ -132,7 +133,7 @@ export async function PUT(req: NextRequest, context: Context) {
   }
 
   // update connection_supabase
-  await supabase
+  await formsClient
     .from("connection_supabase")
     .update({
       main_supabase_table_id: upserted_supabase_table.id,

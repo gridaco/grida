@@ -4,7 +4,7 @@ import {
   XPostgrestQuery,
   XSupabaseClientQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import { get_grida_table_x_supabase_table_connector } from "@/services/x-supabase";
 import { omit } from "@/utils/qs";
 
@@ -18,8 +18,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
@@ -34,7 +33,7 @@ export async function GET(req: NextRequest, context: Context) {
     await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
-      client: grida_forms_client,
+      client: formsClient,
     });
 
   const query = new XSupabaseClientQueryBuilder(x_client);
@@ -63,8 +62,7 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
@@ -73,7 +71,7 @@ export async function PATCH(req: NextRequest, context: Context) {
     await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
-      client: grida_forms_client,
+      client: formsClient,
     });
 
   const body: XPostgrestQuery.Body = await req.json();
@@ -93,8 +91,7 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
   const { form_id, sb_table_id: _sb_table_id } = await context.params;
   const sb_table_id = parseInt(_sb_table_id);
@@ -103,7 +100,7 @@ export async function DELETE(req: NextRequest, context: Context) {
     await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
-      client: grida_forms_client,
+      client: formsClient,
     });
 
   const body: XPostgrestQuery.Body = await req.json();
