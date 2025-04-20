@@ -1,5 +1,5 @@
 import { Platform } from "@/lib/platform";
-import { createWestReferralClient } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,19 +14,18 @@ export async function GET(req: NextRequest) {
   assert(code, "x-grida-west-token-code is required");
   assert(campaign_id, "x-grida-west-campaign-id is required");
 
-  const westClient = await createWestReferralClient();
-
   // #region test codes
   if (
     code === Platform.WEST.Referral.TEST_CODE_REFERRER ||
     code === Platform.WEST.Referral.TEST_CODE_INVITATION
   ) {
     const now = new Date().toISOString();
-    const { data: campaign, error: campaing_err } = await westClient
-      .from("campaign_public")
-      .select()
-      .eq("id", campaign_id)
-      .single();
+    const { data: campaign, error: campaing_err } =
+      await service_role.west_referral
+        .from("campaign_public")
+        .select()
+        .eq("id", campaign_id)
+        .single();
 
     if (campaing_err) {
       console.error(
@@ -69,7 +68,7 @@ export async function GET(req: NextRequest) {
   }
   // #endregion
 
-  const { data: ref, error: ref_err } = await westClient
+  const { data: ref, error: ref_err } = await service_role.west_referral
     .rpc(
       "lookup",
       {
@@ -81,7 +80,10 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (ref_err) console.error("lookup failed", ref_err);
-  if (!ref) return notFound();
+  if (!ref) {
+    console.error("lookup failed", ref_err, ref, "with", code);
+    return notFound();
+  }
 
   let campaign_public: Platform.WEST.Referral.CampaignPublic;
   let referrer: Omit<
@@ -94,7 +96,7 @@ export async function GET(req: NextRequest) {
   > | null = null;
   switch (ref.type) {
     case "referrer": {
-      const { data, error } = await westClient
+      const { data, error } = await service_role.west_referral
         .from("referrer_public_secure")
         .select(
           `
@@ -108,7 +110,10 @@ export async function GET(req: NextRequest) {
         .order("created_at", { referencedTable: "invitations" })
         .single();
 
-      if (error) console.error(error);
+      if (error) {
+        console.error("fetching referrer failed", error);
+        return notFound();
+      }
       if (!data) return notFound();
       const { campaign, ...__private } = data;
       campaign_public = campaign;
@@ -123,7 +128,7 @@ export async function GET(req: NextRequest) {
       break;
     }
     case "invitation": {
-      const { data, error } = await westClient
+      const { data, error } = await service_role.west_referral
         .from("invitation")
         .select(
           `

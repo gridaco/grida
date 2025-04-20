@@ -3,10 +3,12 @@ import {
   createClient,
   createWWWClient,
   createWestReferralClient,
+  service_role,
 } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import CampaignReferrerCard from "./west-campaign-referrer-card";
 import Link from "next/link";
+import { getLocale } from "@/i18n/server";
 
 type Params = {
   tenant: string;
@@ -27,14 +29,15 @@ const dictionary = {
   },
 };
 
-type RangeQuery = "now" | "upcoming" | "past";
-const locale = "ko"; // FIXME:
 export default async function CustomerPortalSession({
   params,
 }: {
   params: Promise<Params>;
 }) {
   const { tenant } = await params;
+
+  const locale = await getLocale(["en", "ko"]);
+
   const client = await createClient();
   const westClient = await createWestReferralClient();
   const wwwClient = await createWWWClient();
@@ -47,7 +50,7 @@ export default async function CustomerPortalSession({
     return redirect(`./login/`);
   }
 
-  const { data: wwwref, error: wwwreferr } = await wwwClient
+  const { data: wwwref, error: wwwreferr } = await service_role.www
     .from("www")
     .select("project_id")
     .eq("name", tenant)
@@ -72,9 +75,15 @@ export default async function CustomerPortalSession({
     .select(
       `
         *,
-        campaign:campaign_public(*)
+        campaign:campaign_public(
+          *
+        )
       `
     );
+
+  if (referrer_err) {
+    console.error("referrer error", referrer_err);
+  }
 
   return (
     <main className="flex min-h-screen">
@@ -104,8 +113,9 @@ export default async function CustomerPortalSession({
           </header>
           {iam_referrers?.length === 0 && <Empty />}
           {iam_referrers?.map((r) => {
+            r.campaign.www_route_path;
             // FIXME: tenant url
-            const link = `/r/${r.campaign.id}/t/${r.code}`;
+            const link = `${r.campaign.www_route_path}/t/${r.code}`;
             return (
               <Link key={link} href={link}>
                 <CampaignReferrerCard
