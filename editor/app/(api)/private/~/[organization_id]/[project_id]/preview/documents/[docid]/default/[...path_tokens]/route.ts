@@ -1,13 +1,28 @@
-import { createWWWClient } from "@/lib/supabase/server";
+import { createClient, createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextResponse, type NextRequest } from "next/server";
 
 const IS_HOSTED = process.env.VERCEL === "1";
 
 type Params = {
-  organization_id: number;
-  project_id: number;
+  /**
+   * organization.id or organization.name
+   */
+  organization_id: string;
+
+  /**
+   * project.id or project.name
+   */
+  project_id: string;
+
+  /**
+   * document.id
+   */
   docid: string;
+
+  /**
+   * tenant site path
+   */
   path_tokens: string[];
 };
 
@@ -17,16 +32,36 @@ export async function GET(
 ) {
   const { organization_id, project_id, docid, path_tokens } = await params;
 
-  const client = await createWWWClient();
+  const client = await createClient();
+  const wwwClient = await createWWWClient();
 
-  const { data: www, error: www_err } = await client
+  const { data: project, error: project_err } = await client
+    .rpc(
+      "find_project",
+      {
+        p_org_ref: organization_id,
+        p_proj_ref: project_id,
+      },
+      { get: true }
+    )
+    .single();
+
+  if (project_err) {
+    console.error("project not found", project_err, "with", {
+      project_id,
+      organization_id,
+    });
+    return notFound();
+  }
+
+  const { data: www, error: www_err } = await wwwClient
     .from("www")
     .select("id, name")
-    .eq("project_id", project_id)
+    .eq("project_id", project.id)
     .single();
   if (www_err) return notFound();
 
-  const { data: routing, error: routing_err } = await client
+  const { data: routing, error: routing_err } = await wwwClient
     .from("public_route")
     .select()
     .eq("www_id", www.id)
