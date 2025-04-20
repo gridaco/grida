@@ -66,23 +66,18 @@ function TemplateEditorRoot() {
 }
 
 type EditorTab = "referrer" | "invitation-ux-overlay" | "invitation" | "theme";
-type CanvasScene = "referrer" | "invitation";
 type CanvasComponent = "referrer" | "invitation-ux-overlay" | "invitation";
 
-function getCanvasFocus(
-  tab: EditorTab
-): { scene: CanvasScene; node: CanvasComponent } | null {
+function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
   switch (tab) {
     case "referrer":
-      return { scene: "referrer", node: "referrer" };
+      return { node: "referrer" };
     case "invitation-ux-overlay":
       return {
-        scene: "invitation",
         node: "invitation-ux-overlay",
       };
     case "invitation":
       return {
-        scene: "invitation",
         node: "invitation",
       };
     default:
