@@ -11,11 +11,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function PresetSave() {
+export function PresetSave({ disabled }: { disabled?: boolean }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="secondary">Save</Button>
+        <Button disabled={disabled} variant="secondary">
+          Save
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[475px]">
         <DialogHeader>

@@ -1,15 +1,53 @@
+const DEFAULT_IFRAME_HTML = `
+  <html>
+    <head>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <script>
+        window.addEventListener("message", (event) => {
+          if (event.data?.type === "render") {
+            document.body.innerHTML = event.data.html;
+          }
+        });
+      </script>
+    </head>
+    <body></body>
+  </html>
+`;
 import { cn } from "@/utils";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 
 export function Canvas({
   node,
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { node: any }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleLoad = () => {
+      const html = renderJSONToHTML(node || "");
+      iframe.contentWindow?.postMessage({ type: "render", html }, "*");
+    };
+
+    iframe.addEventListener("load", handleLoad);
+
+    // Already loaded, just send the new content
+    const html = renderJSONToHTML(node || "");
+    iframe.contentWindow?.postMessage({ type: "render", html }, "*");
+
+    return () => {
+      iframe.removeEventListener("load", handleLoad);
+    };
+  }, [node]);
+
   return (
     <div className={cn("w-full h-full", className)} {...props}>
       <iframe
-        srcDoc={renderHTMLWithTailwind(renderJSONToHTML(node || ""))}
+        ref={iframeRef}
+        srcDoc={DEFAULT_IFRAME_HTML}
         style={{
           width: "100%",
           height: "100%",
@@ -18,17 +56,6 @@ export function Canvas({
       />
     </div>
   );
-}
-
-function renderHTMLWithTailwind(bodyHTML: string): string {
-  return `
-    <html>
-      <head>
-        <script src="https://cdn.tailwindcss.com"></script>
-      </head>
-      <body class="p-4">${bodyHTML}</body>
-    </html>
-  `;
 }
 
 function renderJSONToHTML(node: any): string {

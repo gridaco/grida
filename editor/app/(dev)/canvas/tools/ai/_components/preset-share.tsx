@@ -9,11 +9,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export function PresetShare() {
+export function PresetShare({ disabled }: { disabled?: boolean }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="secondary">Share</Button>
+        <Button disabled={disabled} variant="secondary">
+          Share
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[520px]">
         <div className="flex flex-col space-y-2 text-center sm:text-left">

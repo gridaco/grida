@@ -27,20 +27,29 @@ const schema = z.object({
 export async function generate({
   system,
   prompt,
+  modelId,
+  maxTokens = undefined,
+  temperature = undefined,
+  topP = undefined,
 }: {
   system?: string;
   prompt: string;
+  modelId?: string;
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
 }) {
   const stream = createStreamableValue({});
 
   (async () => {
     const { partialObjectStream } = await streamObject({
-      model: openai(MODEL),
+      model: openai(modelId ?? MODEL),
       system: system,
       prompt: prompt,
       schema: schema,
-      maxTokens: 16384,
-      temperature: 1,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      topP: topP,
     });
 
     for await (const partialObject of partialObjectStream) {
