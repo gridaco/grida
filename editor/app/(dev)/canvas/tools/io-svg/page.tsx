@@ -2,9 +2,7 @@
 
 import { useEffect, useReducer, useState } from "react";
 import { GridaLogo } from "@/components/grida-logo";
-import Link from "next/link";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { iosvg } from "@/grida-io-svg";
 import {
   EditorSurface,
   initDocumentEditorState,
@@ -19,6 +17,8 @@ import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
 import { Button } from "@/components/ui/button";
 import { useHotkeys } from "react-hotkeys-hook";
+import Link from "next/link";
+import iosvg from "@grida/io-svg";
 
 export default function IOSVGPage() {
   const [raw, setRaw] = useState<string>();

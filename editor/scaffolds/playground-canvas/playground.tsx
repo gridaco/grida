@@ -68,7 +68,6 @@ import {
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportFromFigmaDialog } from "@/scaffolds/playground-canvas/modals/import-from-figma";
-import { iofigma } from "@/grida-io-figma";
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "@/scaffolds/playground-canvas/modals/import-from-grida-file";
 import { v4 } from "uuid";
@@ -95,7 +94,6 @@ import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
-import { iosvg } from "@/grida-io-svg";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
@@ -104,7 +102,6 @@ import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
-  StandaloneDocumentContentProps,
   UserCustomTemplatesProvider,
   UserCustomTemplatesProps,
 } from "@/grida-react-canvas/renderer";
@@ -122,6 +119,8 @@ import {
   PreviewProvider,
 } from "@/grida-react-canvas-starter-kit/starterkit-preview";
 import { sitemap } from "@/www/data/sitemap";
+import iosvg from "@grida/io-svg";
+import iofigma from "@grida/io-figma";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
