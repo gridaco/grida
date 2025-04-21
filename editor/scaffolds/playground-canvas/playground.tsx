@@ -345,6 +345,15 @@ export default function CanvasPlayground({
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent>
                                           <Link
+                                            href="/canvas/tools/ai"
+                                            target="_blank"
+                                          >
+                                            <DropdownMenuItem className="text-xs">
+                                              <OpenInNewWindowIcon className="me-2" />
+                                              AI
+                                            </DropdownMenuItem>
+                                          </Link>
+                                          <Link
                                             href="/canvas/tools/io-figma"
                                             target="_blank"
                                           >
