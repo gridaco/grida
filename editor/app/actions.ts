@@ -6,12 +6,14 @@ import { createStreamableValue } from "ai/rsc";
 import { GENzJSONForm } from "@/types/zod";
 import { service_role } from "@/lib/supabase/server";
 
+const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
+
 export async function generate(input: string, gist?: string) {
   const stream = createStreamableValue({});
 
   (async () => {
     const { partialObjectStream } = await streamObject({
-      model: openai("gpt-4o-mini"),
+      model: openai(MODEL),
       prompt: input,
       schema: GENzJSONForm,
     });
