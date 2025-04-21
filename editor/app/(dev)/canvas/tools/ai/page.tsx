@@ -18,22 +18,29 @@ import { generate } from "./generate";
 export default function PlaygroundPage() {
   // const [modelId, setModelId] = useState<string | undefined>(undefined);
   // const [modelConfig, setModelConfig] = useState<any>(undefined);
-  const [system, setSystem] = useState<string>("");
+  const [system1, setSystem1] = useState<string>("");
+  const [system2, setSystem2] = useState<string>("");
+
+  const system = `${system1}\n${system2}`;
+
   const [response, setResponse] = useState<{ html: string } | null | undefined>(
     null
   );
-  const [busy, setBusy] = useState(false);
+  const [streamBusy, setStreamBusy] = useState(false);
   const generating = useRef(false);
 
   const onPrompt = (system: string, prompt: string) => {
-    generate({ system, prompt }).then(async ({ output }) => {
-      for await (const delta of readStreamableValue(output)) {
-        // setData(delta as JSONForm);
-        setResponse(delta as any);
+    setStreamBusy(true);
+    generate({ system, prompt, maxTokens: 16384, temperature: 1 }).then(
+      async ({ output }) => {
+        for await (const delta of readStreamableValue(output)) {
+          // setData(delta as JSONForm);
+          setResponse(delta as any);
+        }
+        generating.current = false;
+        setStreamBusy(false);
       }
-      generating.current = false;
-      setBusy(false);
-    });
+    );
   };
 
   return (
@@ -45,7 +52,7 @@ export default function PlaygroundPage() {
             <PresetSelector
               presets={presets}
               onValueChange={(preset) => {
-                setSystem(preset.system);
+                setSystem1(preset.system);
               }}
             />
             <PresetSave disabled />
@@ -70,21 +77,32 @@ export default function PlaygroundPage() {
                   <Textarea
                     placeholder="Describe desired model behaviour"
                     className="flex-1 p-4 h-full"
-                    value={system}
-                    onChange={(e) => setSystem(e.target.value)}
+                    value={system1}
+                    onChange={(e) => setSystem1(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <Label className="text-sm text-muted-foreground">
+                    System Message (2)
+                  </Label>
+                  <Textarea
+                    placeholder="Describe desired model behaviour"
+                    className="flex-1 p-4 h-full"
+                    value={system2}
+                    onChange={(e) => setSystem2(e.target.value)}
                   />
                 </div>
               </div>
             </aside>
             <aside className="flex-1 flex flex-col gap-4">
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col gap-2">
                 <Canvas
                   node={response?.html}
-                  className="rounded-xl overflow-hidden border"
+                  className="flex-1 rounded-xl overflow-hidden border"
                 />
               </div>
               <ChatBox
-                disabled={busy}
+                disabled={streamBusy}
                 onValueCommit={(value) => onPrompt(system, value)}
               />
             </aside>

@@ -1,6 +1,6 @@
 "use server";
 
-import { streamObject } from "ai";
+import { streamObject, experimental_generateImage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
 import { z } from "zod";
@@ -62,4 +62,17 @@ export async function generate({
   })();
 
   return { output: stream.value };
+}
+
+export async function generateImage(prompt: string) {
+  const gen = await experimental_generateImage({
+    model: openai.image("dall-e-3"),
+    prompt: prompt,
+    n: 1,
+  });
+
+  return {
+    mimeType: gen.image.mimeType,
+    base64: gen.image.base64,
+  };
 }
