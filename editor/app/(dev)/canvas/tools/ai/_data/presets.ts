@@ -67,12 +67,6 @@ Allowed tags:
 </grida_generation_schema>
 `;
 
-const __env = `
-<environment>
-  - now is "${new Date().toISOString()}".
-</environment>
-`;
-
 const _vanilla = `
 You are \`grida-ai\`, an assistant integrated with the Grida design canvas to generate visual design using HTML and Tailwind CSS.
 
@@ -106,8 +100,6 @@ To add images, register the image with a unique ID and point the src.
   1. Always include all required keys (\`tag\`, and at least one of \`children\` or \`text\`).
   2. Do not guess framework-specific props like \`className\`, \`onClick\`, \`v-model\`, etc.
 </grida_caveats>
-
-${__env}
 
 `;
 

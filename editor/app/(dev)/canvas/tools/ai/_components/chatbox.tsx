@@ -36,27 +36,31 @@ export function ChatBox({
     multiple: false,
   });
 
-  useEffect(() => {
-    if (plainFiles.length === 1) {
-      const file = plainFiles[0];
-      const task = uploader?.(file).then((result) => {
-        setAttachment({
-          type: "image",
-          filename: file.name,
-          mimeType: file.type,
-          url: result.publicUrl,
+  useEffect(
+    () => {
+      if (plainFiles.length === 1) {
+        const file = plainFiles[0];
+        const task = uploader?.(file).then((result) => {
+          setAttachment({
+            type: "image",
+            filename: file.name,
+            mimeType: file.type,
+            url: result.publicUrl,
+          });
         });
-      });
 
-      if (task) {
-        toast.promise(task, {
-          loading: "Uploading...",
-          success: "Uploaded",
-          error: "Failed to upload",
-        });
+        if (task) {
+          toast.promise(task, {
+            loading: "Uploading...",
+            success: "Uploaded",
+            error: "Failed to upload",
+          });
+        }
       }
-    }
-  }, [plainFiles]);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plainFiles]
+  );
 
   const [txt, setTxt] = React.useState<string>("");
 
