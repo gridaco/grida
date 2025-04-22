@@ -20,6 +20,7 @@ import { CodeIcon } from "@radix-ui/react-icons";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDummyPublicUpload } from "@/scaffolds/platform/storage";
 import { Spinner } from "@/components/spinner";
+import { GridaLogo } from "@/components/grida-logo";
 
 const systemmsg = (system: string, template?: string, context?: string) => {
   let txt = system;
@@ -73,8 +74,11 @@ export default function PlaygroundPage() {
   return (
     <>
       <div className="h-full min-h-screen flex flex-col">
-        <div className="container flex flex-col items-start justify-between space-y-2 py-4 sm:flex-row sm:items-center sm:space-y-0 md:h-16">
-          <h2 className="text-lg font-semibold w-full">Prompt Designer</h2>
+        <div className="container max-w-screen-2xl flex flex-col items-start justify-between space-y-2 py-4 sm:flex-row sm:items-center sm:space-y-0 md:h-16">
+          <h2 className="text-lg font-semibold w-full">
+            <GridaLogo className="inline mr-2" />
+            Prompt Designer
+          </h2>
           <div className="ml-auto flex w-full space-x-2 sm:justify-end">
             <PresetSelector
               presets={presets}
@@ -91,7 +95,7 @@ export default function PlaygroundPage() {
         </div>
         <Separator />
         <div className="flex-1 flex flex-col">
-          <div className="container flex-1 py-6 flex gap-4">
+          <div className="container max-w-screen-2xl flex-1 py-6 flex gap-4">
             <aside className="flex-1 flex flex-col">
               <div className="flex-1 flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-2">
