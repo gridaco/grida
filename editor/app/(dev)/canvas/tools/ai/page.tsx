@@ -14,18 +14,35 @@ import { ChatBox } from "./_components/chatbox";
 import { readStreamableValue } from "ai/rsc";
 import { Canvas } from "./_components/canvas";
 import { generate } from "./generate";
+import { type StreamingResponse } from "./schema";
+import { Toggle } from "@/components/ui/toggle";
+import { CodeIcon } from "@radix-ui/react-icons";
+import { ThemedMonacoEditor } from "@/components/monaco";
+
+const systemmsg = (system: string, template?: string, context?: string) => {
+  let txt = system;
+  if (template) {
+    txt += `<template>\n${template}\n</template>`;
+  }
+  if (context) {
+    txt += `<context>\n${context}\n</context>`;
+  }
+  return txt;
+};
 
 export default function PlaygroundPage() {
   // const [modelId, setModelId] = useState<string | undefined>(undefined);
   // const [modelConfig, setModelConfig] = useState<any>(undefined);
+  const [isRaw, setIsRaw] = useState(false);
   const [system1, setSystem1] = useState<string>("");
   const [system2, setSystem2] = useState<string>("");
+  const [system3, setSystem3] = useState<string>("");
 
-  const system = `${system1}\n${system2}`;
+  const systemall = systemmsg(system1, system2, system3);
 
-  const [response, setResponse] = useState<{ html: string } | null | undefined>(
-    null
-  );
+  const [response, setResponse] = useState<
+    StreamingResponse | null | undefined
+  >(null);
   const [streamBusy, setStreamBusy] = useState(false);
   const generating = useRef(false);
 
@@ -83,7 +100,7 @@ export default function PlaygroundPage() {
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
                   <Label className="text-sm text-muted-foreground">
-                    System Message (2)
+                    Template Message
                   </Label>
                   <Textarea
                     placeholder="Describe desired model behaviour"
@@ -92,18 +109,65 @@ export default function PlaygroundPage() {
                     onChange={(e) => setSystem2(e.target.value)}
                   />
                 </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <Label className="text-sm text-muted-foreground">
+                    Context Message
+                  </Label>
+                  <Textarea
+                    placeholder="Describe desired model behaviour"
+                    className="resize-none flex-1 p-4 h-full"
+                    value={system3}
+                    onChange={(e) => setSystem3(e.target.value)}
+                  />
+                </div>
               </div>
             </aside>
-            <aside className="flex-1 flex flex-col gap-4">
+            <aside className="flex-[2] flex flex-col gap-4">
               <div className="flex-1 flex flex-col gap-2">
-                <Canvas
-                  node={response?.html}
-                  className="flex-1 rounded-xl overflow-hidden border"
-                />
+                <div className="flex-1 flex flex-col rounded-xl overflow-hidden border">
+                  <header className="flex flex-col gap-1 py-2 px-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm">
+                        {response?.name}
+                        {response?.width && (
+                          <span className="text-muted-foreground text-xs ml-2">
+                            {response?.width} x {response?.height}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <Toggle
+                          size="sm"
+                          onPressedChange={setIsRaw}
+                          pressed={isRaw}
+                        >
+                          <CodeIcon />
+                        </Toggle>
+                      </div>
+                    </div>
+                    <div className="text-muted-foreground text-xs">
+                      {response?.description}
+                    </div>
+                  </header>
+                  {isRaw ? (
+                    <div className="flex-1 max-w-full">
+                      <ThemedMonacoEditor
+                        value={JSON.stringify(response, null, 2)}
+                        language="json"
+                        options={{
+                          readOnly: true,
+                          minimap: { enabled: false },
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <Canvas node={response?.html} className="flex-1" />
+                  )}
+                </div>
               </div>
               <ChatBox
                 disabled={streamBusy}
-                onValueCommit={(value) => onPrompt(system, value)}
+                onValueCommit={(value) => onPrompt(systemall, value)}
               />
             </aside>
           </div>

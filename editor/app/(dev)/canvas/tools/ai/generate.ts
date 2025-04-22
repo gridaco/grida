@@ -3,26 +3,9 @@
 import { streamObject, experimental_generateImage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
-import { z } from "zod";
+import { request_schema } from "./schema";
 
 const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
-
-const schema = z.object({
-  html: z.object({
-    tag: z.string(),
-    class: z.string().optional(),
-    src: z.string().optional(),
-    attributes: z.record(z.string()),
-    children: z.array(z.union([z.string(), z.any()])),
-  }),
-  images: z.array(
-    z.object({
-      id: z.string(),
-      src: z.string(),
-      alt: z.string(),
-    })
-  ),
-});
 
 export async function generate({
   system,
@@ -46,7 +29,7 @@ export async function generate({
       model: openai(modelId ?? MODEL),
       system: system,
       prompt: prompt,
-      schema: schema,
+      schema: request_schema,
       maxTokens: maxTokens,
       temperature: temperature,
       topP: topP,

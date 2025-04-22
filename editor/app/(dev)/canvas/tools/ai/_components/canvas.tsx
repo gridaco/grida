@@ -1,3 +1,5 @@
+import { type PortableNode } from "../schema";
+
 const DEFAULT_IFRAME_HTML = `
   <html>
     <head>
@@ -58,19 +60,41 @@ export function Canvas({
   );
 }
 
-function renderJSONToHTML(node: any): string {
+function renderJSONToHTML(node: PortableNode | string): string {
   if (typeof node === "string") {
     return node;
   }
 
-  const { tag, class: className, attributes = {}, children = [] } = node;
+  const {
+    tag,
+    class: _class,
+    d,
+    src,
+    attributes = {},
+    children = [],
+    ...otherAttributes
+  } = node;
 
-  const classAttr = className ? `class="${className}"` : "";
-  const attrPairs = Object.entries(attributes).map(([k, v]) => `${k}="${v}"`);
-  if (classAttr) attrPairs.unshift(classAttr);
-  const attrString = attrPairs.join(" ");
+  const __attributes_map = {
+    src,
+    class: _class,
+    d,
+    ...(attributes ?? {}),
+    ...(otherAttributes ?? {}),
+  };
 
-  const childrenHTML = children.map(renderJSONToHTML).join("");
+  const attributes_str = Object.entries(__attributes_map)
+    .map(([key, value]) => {
+      if (value === undefined || value === null) return "";
+      return `${key}="${value}"`;
+    })
+    .filter(Boolean)
+    .join(" ");
 
-  return `<${tag}${attrString ? " " + attrString : ""}>${childrenHTML}</${tag}>`;
+  const childrenHTML =
+    typeof children === "string"
+      ? children
+      : children.map(renderJSONToHTML).join("");
+
+  return `<${tag} ${attributes_str}>${childrenHTML}</${tag}>`;
 }

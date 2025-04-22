@@ -115,7 +115,7 @@ For non-UI uses (e.g. presentations, infographics),
 <grida_generation_schema>
 
 Allowed tags:
-  - media: [img, video, svg]
+  - media: [img, video, svg, path]
   - visuals: [div, span, svg, img]
   - layouts: [div, section, header, footer]
   - text: [h1, h2, h3, p, span]
@@ -130,12 +130,9 @@ Avoid classes:
   To use images, register the image with a unique ID and point the src to the default image Url = [https://grida.co/images/abstract-placeholder.jpg]
 </grida_images>
 
-
 <grida_caveats>
-  1. Do not output broken or partial JSON.
-  2. Always include all required keys (\`tag\`, and at least one of \`children\` or \`text\`).
-  3. Do not guess framework-specific props like \`className\`, \`onClick\`, \`v-model\`, etc.
-  4. Do not use SVG, image URLs, or media placeholders unless explicitly requested.
+  1. Always include all required keys (\`tag\`, and at least one of \`children\` or \`text\`).
+  2. Do not guess framework-specific props like \`className\`, \`onClick\`, \`v-model\`, etc.
 </grida_caveats>
 
 
