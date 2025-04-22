@@ -1,3 +1,5 @@
+import React, { useEffect, useRef } from "react";
+import { cn } from "@/utils";
 import { type PortableNode } from "../schema";
 
 const DEFAULT_IFRAME_HTML = `
@@ -12,11 +14,9 @@ const DEFAULT_IFRAME_HTML = `
         });
       </script>
     </head>
-    <body></body>
+    <body class="w-screen h-screen"></body>
   </html>
 `;
-import { cn } from "@/utils";
-import React, { useEffect, useRef } from "react";
 
 export function Canvas({
   node,
@@ -68,7 +68,9 @@ function renderJSONToHTML(node: PortableNode | string): string {
   const {
     tag,
     class: _class,
+    style,
     d,
+    text,
     src,
     attributes = {},
     children = [],
@@ -78,6 +80,7 @@ function renderJSONToHTML(node: PortableNode | string): string {
   const __attributes_map = {
     src,
     class: _class,
+    style,
     d,
     ...(attributes ?? {}),
     ...(otherAttributes ?? {}),
@@ -91,8 +94,9 @@ function renderJSONToHTML(node: PortableNode | string): string {
     .filter(Boolean)
     .join(" ");
 
-  const childrenHTML =
-    typeof children === "string"
+  const childrenHTML = text
+    ? text
+    : typeof children === "string"
       ? children
       : children.map(renderJSONToHTML).join("");
 

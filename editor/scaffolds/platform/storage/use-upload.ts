@@ -26,6 +26,7 @@ export function useUpload(
         })
         .then(({ data, error }) => {
           if (error) {
+            console.error("upload error", error);
             throw new Error("Failed to upload file");
           }
           const publicUrl = storage.from(bucket).getPublicUrl(_path)

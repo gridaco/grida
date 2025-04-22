@@ -13,11 +13,13 @@ import { Label } from "@/components/ui/label";
 import { ChatBox } from "./_components/chatbox";
 import { readStreamableValue } from "ai/rsc";
 import { Canvas } from "./_components/canvas";
-import { generate } from "./generate";
+import { generate, type UserAttachment } from "./generate";
 import { type StreamingResponse } from "./schema";
 import { Toggle } from "@/components/ui/toggle";
 import { CodeIcon } from "@radix-ui/react-icons";
 import { ThemedMonacoEditor } from "@/components/monaco";
+import { useDummyPublicUpload } from "@/scaffolds/platform/storage";
+import { Spinner } from "@/components/spinner";
 
 const systemmsg = (system: string, template?: string, context?: string) => {
   let txt = system;
@@ -31,7 +33,7 @@ const systemmsg = (system: string, template?: string, context?: string) => {
 };
 
 export default function PlaygroundPage() {
-  // const [modelId, setModelId] = useState<string | undefined>(undefined);
+  const [modelId, setModelId] = useState<string | undefined>(undefined);
   // const [modelConfig, setModelConfig] = useState<any>(undefined);
   const [isRaw, setIsRaw] = useState(false);
   const [system1, setSystem1] = useState<string>("");
@@ -40,15 +42,23 @@ export default function PlaygroundPage() {
 
   const systemall = systemmsg(system1, system2, system3);
 
+  const uploader = useDummyPublicUpload();
+
   const [response, setResponse] = useState<
     StreamingResponse | null | undefined
   >(null);
   const [streamBusy, setStreamBusy] = useState(false);
   const generating = useRef(false);
 
-  const onPrompt = (system: string, prompt: string) => {
+  const onPrompt = (
+    system: string,
+    user: {
+      text: string;
+      attachments: UserAttachment[];
+    }
+  ) => {
     setStreamBusy(true);
-    generate({ system, prompt, maxTokens: 16384, temperature: 1 }).then(
+    generate({ modelId, system, user, maxTokens: 16384, temperature: 1 }).then(
       async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
           // setData(delta as JSONForm);
@@ -70,6 +80,7 @@ export default function PlaygroundPage() {
               presets={presets}
               onValueChange={(preset) => {
                 setSystem1(preset.system);
+                setSystem2(preset.expert ?? "");
               }}
             />
             <PresetSave disabled />
@@ -84,7 +95,11 @@ export default function PlaygroundPage() {
             <aside className="flex-1 flex flex-col">
               <div className="flex-1 flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-2">
-                  <ModelSelector />
+                  <ModelSelector
+                    onValueChange={(model) => {
+                      setModelId(model.id);
+                    }}
+                  />
                   <ModelParams />
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
@@ -100,7 +115,7 @@ export default function PlaygroundPage() {
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
                   <Label className="text-sm text-muted-foreground">
-                    Template Message
+                    Expert Message
                   </Label>
                   <Textarea
                     placeholder="Describe desired model behaviour"
@@ -124,10 +139,11 @@ export default function PlaygroundPage() {
             </aside>
             <aside className="flex-[2] flex flex-col gap-4">
               <div className="flex-1 flex flex-col gap-2">
-                <div className="flex-1 flex flex-col rounded-xl overflow-hidden border">
+                <div className="flex-1 flex flex-col rounded-xl overflow-hidden border shadow-lg">
                   <header className="flex flex-col gap-1 py-2 px-4 border-b">
                     <div className="flex items-center justify-between">
                       <div className="text-sm">
+                        {streamBusy && <Spinner className="mr-2" />}
                         {response?.name}
                         {response?.width && (
                           <span className="text-muted-foreground text-xs ml-2">
@@ -167,6 +183,7 @@ export default function PlaygroundPage() {
               </div>
               <ChatBox
                 disabled={streamBusy}
+                uploader={uploader}
                 onValueCommit={(value) => onPrompt(systemall, value)}
               />
             </aside>
