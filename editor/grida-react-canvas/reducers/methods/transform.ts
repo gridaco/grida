@@ -18,7 +18,7 @@ import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import { grida } from "@/grida";
-import { vn } from "@/grida/vn";
+import vn from "@grida/vn";
 import nid from "../tools/id";
 
 /**

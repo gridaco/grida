@@ -1,4 +1,4 @@
-import { vn } from "./vn";
+import { vn } from "../vn";
 
 describe("vector network svg io", () => {
   it("from path data", () => {
