@@ -22,7 +22,9 @@ type Model = OpenAI.Models.Model;
 
 import { useModels } from "../_hooks/use-models";
 
-interface ModelSelectorProps extends PopoverProps {}
+interface ModelSelectorProps extends PopoverProps {
+  onValueChange?: (model: Model) => void;
+}
 
 export function ModelSelector({ ...props }: ModelSelectorProps) {
   const [open, setOpen] = React.useState(false);
@@ -56,6 +58,7 @@ export function ModelSelector({ ...props }: ModelSelectorProps) {
                 isSelected={selectedModel?.id === model.id}
                 onSelect={() => {
                   setSelectedModel(model);
+                  props.onValueChange?.(model);
                   setOpen(false);
                 }}
               />
