@@ -76,7 +76,7 @@ export default function PlaygroundPage() {
                   </Label>
                   <Textarea
                     placeholder="Describe desired model behaviour"
-                    className="flex-1 p-4 h-full"
+                    className="resize-none flex-1 p-4 h-full"
                     value={system1}
                     onChange={(e) => setSystem1(e.target.value)}
                   />
@@ -87,7 +87,7 @@ export default function PlaygroundPage() {
                   </Label>
                   <Textarea
                     placeholder="Describe desired model behaviour"
-                    className="flex-1 p-4 h-full"
+                    className="resize-none flex-1 p-4 h-full"
                     value={system2}
                     onChange={(e) => setSystem2(e.target.value)}
                   />
