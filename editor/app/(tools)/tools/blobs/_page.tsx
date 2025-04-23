@@ -54,7 +54,6 @@ export default function BlobGeneratorTool() {
     URL.revokeObjectURL(url);
   };
 
-  /* ─────── UI ─────────────────────────────────────────────────── */
   return (
     <main className="flex-1 w-full h-full flex py-4 container mx-auto gap-4">
       <aside className="flex-[2] flex flex-col items-center justify-center">
