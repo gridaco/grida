@@ -25,9 +25,10 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
-  sitemap.items.west,
   sitemap.items.forms,
   sitemap.items.database,
+  sitemap.items.tools,
+  sitemap.items.west,
 ];
 
 const resources: Item[] = [

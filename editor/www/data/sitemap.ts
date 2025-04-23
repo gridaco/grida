@@ -3,6 +3,7 @@ export namespace sitemap {
     x: "https://x.com/grida_co",
     github: "https://github.com/gridaco",
     downlaods: "/downloads",
+    tools: "/tools",
     releases_latest: "https://github.com/gridaco/grida/releases/latest",
     issues_new: "https://github.com/gridaco/grida/issues/new/choose",
     pricing: "/pricing",
@@ -54,8 +55,13 @@ export namespace sitemap {
       href: links.canvas,
       description: "Design Components and Websites",
     } satisfies Item,
+    tools: {
+      title: "Tools",
+      href: links.tools,
+      description: "Collection of Design Tools for your Daily work",
+    } satisfies Item,
     west: {
-      title: "West",
+      title: "WEST (beta)",
       href: links.west,
       description: "Welcome to West of referral marketing",
     } satisfies Item,
