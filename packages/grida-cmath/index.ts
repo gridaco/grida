@@ -3346,6 +3346,19 @@ export namespace cmath.color {
       a: color.a * alpha,
     };
   }
+
+  /**
+   *
+   * @param color
+   * @returns hex color string with the leading `#`
+   * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"#ffffff"`
+   *
+   */
+  export function rgba8888_to_hex(color: RGBA8888): string {
+    const a = Math.round(color.a * 255);
+
+    return `#${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
+  }
 }
 
 /**
