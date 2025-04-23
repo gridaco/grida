@@ -4,13 +4,13 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 
 export const metadata: Metadata = {
-  title: "E.164 Phone Number Tool",
-  description: "Format phone numbers to E.164 format",
+  title: "Blob Generator",
+  description: "Generate random blob designs",
   keywords:
-    "phone number, e.164, international, format, online phone number tool, online",
+    "blob, generator, random, design, design tools, online, batch, svg, blob path, metaball",
 };
 
-export default function PhoneNumberToolPage() {
+export default function BlobGeneratorToolPage() {
   return (
     <main>
       <Header />
