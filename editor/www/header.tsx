@@ -38,9 +38,9 @@ const resources: Item[] = [
   sitemap.items.contact,
 ];
 
-export default function Header() {
+export default function Header({ className }: { className?: string }) {
   return (
-    <div className="absolute top-0 left-0 right-0 z-50">
+    <div className={cn("absolute top-0 left-0 right-0 z-50", className)}>
       <header className="py-4 px-4 lg:py-8 lg:px-24">
         {/* desktop */}
         <div className="hidden md:flex container mx-auto justify-between items-center">

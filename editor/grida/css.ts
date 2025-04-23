@@ -15,19 +15,6 @@ export namespace css {
 
   /**
    *
-   * @param color
-   * @returns hex color string without the leading `#`
-   * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
-   *
-   */
-  export function rgbaToHex(color: grida.program.cg.RGBA8888): string {
-    const a = Math.round(color.a * 255);
-
-    return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
-  }
-
-  /**
-   *
    * {@link grida.program.cg.TextAlignVertical} to CSS `align-content` mapping
    *
    * - `top`:`start`

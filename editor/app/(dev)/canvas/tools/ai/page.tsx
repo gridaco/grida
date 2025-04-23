@@ -33,6 +33,11 @@ const systemmsg = (system: string, template?: string, context?: string) => {
   return txt;
 };
 
+type UserInput = {
+  text: string;
+  attachments: UserAttachment[];
+};
+
 export default function PlaygroundPage() {
   const [modelId, setModelId] = useState<string | undefined>(undefined);
   // const [modelConfig, setModelConfig] = useState<any>(undefined);
@@ -48,27 +53,24 @@ export default function PlaygroundPage() {
   const [response, setResponse] = useState<
     StreamingResponse | null | undefined
   >(null);
+
   const [streamBusy, setStreamBusy] = useState(false);
   const generating = useRef(false);
 
-  const onPrompt = (
-    system: string,
-    user: {
-      text: string;
-      attachments: UserAttachment[];
-    }
-  ) => {
+  const onPrompt = (system: string, user: UserInput) => {
     setStreamBusy(true);
-    generate({ modelId, system, user, maxTokens: 16384, temperature: 1 }).then(
-      async ({ output }) => {
+    generating.current = true;
+
+    generate({ modelId, system, user, maxTokens: 16384, temperature: 1 })
+      .then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
-          // setData(delta as JSONForm);
           setResponse(delta as any);
         }
+      })
+      .finally(() => {
         generating.current = false;
         setStreamBusy(false);
-      }
-    );
+      });
   };
 
   return (

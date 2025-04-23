@@ -5,7 +5,6 @@ import { useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
-import { css } from "@/grida/css";
 import { TransparencyGrid } from "@grida/transparency-grid";
 import { useMeasure } from "@uidotdev/usehooks";
 
@@ -102,7 +101,7 @@ export function StandaloneSceneBackground({
 
   const [cssBackgroundColor, opacity] = useMemo(() => {
     if (!backgroundColor) return [undefined, 1] as const;
-    const hex = "#" + css.rgbaToHex(backgroundColor);
+    const hex = cmath.color.rgba8888_to_hex(backgroundColor);
     const opacity = backgroundColor.a;
     return [hex, opacity] as const;
   }, [backgroundColor]);
