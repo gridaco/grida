@@ -19,13 +19,13 @@ const menus = [
   {
     title: "Halftone Generator",
     description: "Generate halftone patterns from images.",
-    link: "/tools//halftone",
+    link: "/tools/halftone",
     icon: FrameIcon,
   },
   {
     title: "E.164 Phone Number Tool",
     description: "Format phone numbers to E.164 format.",
-    link: "/tools//e164",
+    link: "/tools/e164",
     icon: CodeIcon,
   },
 ];
