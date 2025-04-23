@@ -8,11 +8,13 @@ import {
   type TextPart,
   type FilePart,
   type ImagePart,
+  type Tool,
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
 import { request_schema } from "./schema";
 import assert from "assert";
+import { z } from "zod";
 
 const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
 
@@ -43,7 +45,12 @@ export async function generate({
   temperature?: number;
   topP?: number;
 }) {
-  const stream = createStreamableValue({});
+  const model = openai(modelId ?? MODEL);
+  const model_config = {
+    maxTokens: maxTokens,
+    temperature: temperature,
+    topP: topP,
+  };
 
   assert(prompt || user, "Prompt or user is required");
 
@@ -85,16 +92,19 @@ export async function generate({
     };
   }
 
+  const messages = {
+    system: system,
+    messages: message ? [message] : undefined,
+    prompt: prompt,
+  };
+
+  const stream = createStreamableValue({});
   (async () => {
     const { partialObjectStream } = await streamObject({
-      model: openai(modelId ?? MODEL),
-      system: system,
-      messages: message ? [message] : undefined,
-      prompt: prompt,
+      model,
+      ...model_config,
+      ...messages,
       schema: request_schema,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      topP: topP,
     });
 
     for await (const partialObject of partialObjectStream) {

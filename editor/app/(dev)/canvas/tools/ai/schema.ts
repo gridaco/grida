@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const _$ = "grida-portable-html-tailwind-json";
+
 export type PortableNode = {
   tag: string;
   class?: string;
@@ -19,6 +21,7 @@ export type PortableFontReference = {
 };
 
 export type StreamingResponse = {
+  object: typeof _$ | string;
   name: string;
   description: string;
   width: number;
@@ -29,6 +32,7 @@ export type StreamingResponse = {
 };
 
 export const request_schema = z.object({
+  object: z.literal(_$),
   name: z.string().describe("name of the design"),
   description: z.string().describe("description of the design"),
   colors: z

@@ -54,3 +54,16 @@ Grida Standard Library is a 100% free & open-source handpicked collection of des
   "updated_at": 1677610602
 }
 ```
+
+## Metadata
+
+- generator - the generator used to create the asset
+
+  - grida-canvas
+  - the-bundle
+  - dall-e-3
+  - midjourney
+  - photoshop
+
+- entropy - the visual complexity of the design
+  - 0 ~ 1

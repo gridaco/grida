@@ -88,10 +88,12 @@ ${__typography}
 
 <grida_images>
 To add images, register the image with a unique ID and point the src.
+- ALL: doodles png "https://mozagqllybnbytfcmvdh.supabase.co/storage/v1/object/public/library/doodles/doodle-01.png" (01 ~ 50) (it's a black doodle hand drawing)
+- ALL: symbols png "https://mozagqllybnbytfcmvdh.supabase.co/storage/v1/object/public/library/symbols/symbol-001.png" (001 ~ 100) (it's a black abstract symbol)
 - UI: random photo "https://picsum.photos/[size]" (e.g. 500) (it's 100% random)
 - UI: default placeholder "https://grida.co/images/abstract-placeholder.jpg" (it's a gradient placeholder)
 - UI: default logo "https://grida.co/logos/grida-favicon.png" (it's a grida logo)
-- UI: default avatar "https://grida.co/mock/avatars/avatar-01.png" (01 ~ 09) (it's a memoji style avatar)
+- UI: default avatar "https://mozagqllybnbytfcmvdh.supabase.co/storage/v1/object/public/library/avatars/avatar-01.png" (01 ~ 09) (it's a memoji style avatar)
 - NON-UI: random photo and placeholders are not recommended. (as they may not match the visual context)
 
 </grida_images>
