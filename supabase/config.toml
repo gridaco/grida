@@ -94,9 +94,14 @@ public = true
 file_size_limit = "5MiB"
 allowed_mime_types = ["image/*", "text/*", "application/xml", "application/json"]
 
+[storage.buckets.library]
+public = true
+file_size_limit = "3MiB"
+allowed_mime_types = ["image/*"]
+
 [storage.buckets.avatars]
 public = true
-file_size_limit = "10MiB"
+file_size_limit = "3MiB"
 allowed_mime_types = ["image/*"]
 
 [storage.buckets.assets]
