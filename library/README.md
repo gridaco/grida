@@ -50,6 +50,8 @@ Grida Standard Library is a 100% free & open-source handpicked collection of des
   "colors": ["#000000"],
   "background": "#FFFFFF",
   "svg": "<svg>...</svg>",
+  "score": 0.5,
+  "year": 2025,
   "created_at": 1677610602,
   "updated_at": 1677610602
 }
