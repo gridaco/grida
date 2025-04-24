@@ -1882,6 +1882,234 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_library: {
+    Tables: {
+      author: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          id: string
+          name: string
+          provider: string | null
+          updated_at: string | null
+          url: string | null
+          user_id: string | null
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          provider?: string | null
+          updated_at?: string | null
+          url?: string | null
+          user_id?: string | null
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          provider?: string | null
+          updated_at?: string | null
+          url?: string | null
+          user_id?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
+      collection: {
+        Row: {
+          author_id: string | null
+          cover_object_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          cover_object_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          cover_object_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "author"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_cover_object_id_fkey"
+            columns: ["cover_object_id"]
+            isOneToOne: false
+            referencedRelation: "object"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collection_object: {
+        Row: {
+          collection_id: string
+          object_id: string
+        }
+        Insert: {
+          collection_id: string
+          object_id: string
+        }
+        Update: {
+          collection_id?: string
+          object_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_object_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_object_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: false
+            referencedRelation: "object"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      object: {
+        Row: {
+          author_id: string | null
+          background: string | null
+          bytes: number
+          categories: string[]
+          category: string | null
+          color: string
+          colors: unknown[]
+          created_at: string | null
+          description: string | null
+          entropy: number | null
+          generator: string | null
+          gravity_x: number | null
+          gravity_y: number | null
+          height: number
+          id: string
+          keywords: string[]
+          lang: string | null
+          license: string
+          mimetype: string
+          name: string
+          orientation: Database["grida_library"]["Enums"]["orientation"] | null
+          prompt: string | null
+          score: number | null
+          updated_at: string | null
+          version: number
+          width: number
+          year: number | null
+        }
+        Insert: {
+          author_id?: string | null
+          background?: string | null
+          bytes: number
+          categories?: string[]
+          category?: string | null
+          color: string
+          colors?: unknown[]
+          created_at?: string | null
+          description?: string | null
+          entropy?: number | null
+          generator?: string | null
+          gravity_x?: number | null
+          gravity_y?: number | null
+          height: number
+          id: string
+          keywords?: string[]
+          lang?: string | null
+          license?: string
+          mimetype: string
+          name: string
+          orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          prompt?: string | null
+          score?: number | null
+          updated_at?: string | null
+          version?: number
+          width: number
+          year?: number | null
+        }
+        Update: {
+          author_id?: string | null
+          background?: string | null
+          bytes?: number
+          categories?: string[]
+          category?: string | null
+          color?: string
+          colors?: unknown[]
+          created_at?: string | null
+          description?: string | null
+          entropy?: number | null
+          generator?: string | null
+          gravity_x?: number | null
+          gravity_y?: number | null
+          height?: number
+          id?: string
+          keywords?: string[]
+          lang?: string | null
+          license?: string
+          mimetype?: string
+          name?: string
+          orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          prompt?: string | null
+          score?: number | null
+          updated_at?: string | null
+          version?: number
+          width?: number
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "author"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      orientation: "portrait" | "landscape" | "square"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_sites: {
     Tables: {
       site_document: {
@@ -4999,6 +5227,11 @@ export const Constants = {
   },
   grida_g11n: {
     Enums: {},
+  },
+  grida_library: {
+    Enums: {
+      orientation: ["portrait", "landscape", "square"],
+    },
   },
   grida_sites: {
     Enums: {},

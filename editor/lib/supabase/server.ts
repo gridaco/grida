@@ -42,6 +42,10 @@ export async function createClient() {
   return __create_server_client<"public">("public");
 }
 
+export async function createLibraryClient() {
+  return __create_server_client<"grida_library">("grida_library");
+}
+
 export async function createFormsClient() {
   return __create_server_client<"grida_forms">("grida_forms");
 }
@@ -89,6 +93,8 @@ const __create_service_role_client = <
  */
 export namespace service_role {
   export const workspace = __create_service_role_client<"public">("public");
+  export const library =
+    __create_service_role_client<"grida_library">("grida_library");
   export const forms =
     __create_service_role_client<"grida_forms">("grida_forms");
   export const storage =

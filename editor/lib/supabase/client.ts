@@ -22,6 +22,9 @@ const __create_browser_client = <
 export const createBrowserClient = () =>
   __create_browser_client<"public">("public");
 
+export const createBrowserLibraryClient = () =>
+  __create_browser_client<"grida_library">("grida_library");
+
 export const createBrowserFormsClient = () =>
   __create_browser_client<"grida_forms">("grida_forms");
 
