@@ -14,14 +14,15 @@ BUCKET_NAME = "library"
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.argument('category')
 @click.option('--folder', show_default=True, help="custom folder in bucket (uses category by default)")
+@click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
 @click.option('--env-file', type=click.Path(exists=True, dir_okay=False), default=".env", show_default=True, help="Path to .env file")
-def cli(input_dir, category, folder, env_file):
+def cli(input_dir, category, folder, file_type, env_file):
     load_dotenv(env_file)
     url: str = os.environ.get("SUPABASE_URL")
     key: str = os.environ.get("SUPABASE_KEY")
     supabase: Client = create_client(url, key)
     input_path = Path(input_dir)
-    for file in tqdm(list(input_path.glob("*.[jJ][pP][gG]")), desc="Uploading images"):
+    for file in tqdm(list(input_path.glob(f"*.{file_type}")), desc="Uploading objects"):
         object_path = file.with_name(file.stem + ".object.json")
         if not object_path.exists():
             tqdm.write(f"[SKIP] {file.name}: missing object.json")
@@ -30,6 +31,7 @@ def cli(input_dir, category, folder, env_file):
         with open(object_path) as f:
             obj = json.load(f)
 
+        mimetype = obj.get("mimetype")
         content_type = mimetypes.guess_type(
             file)[0] or "application/octet-stream"
 
@@ -38,11 +40,11 @@ def cli(input_dir, category, folder, env_file):
 
         with open(file, "rb") as fdata:
             res = supabase.storage.from_(BUCKET_NAME).upload(
-                path, fdata, {"content-type": content_type, "x-upsert": "true"})
+                path, fdata, {"content-type": mimetype or content_type, "x-upsert": "true"})
 
             # https://github.com/supabase/supabase-py/issues/1111
             search = supabase.storage.from_(BUCKET_NAME).list(
-                category,
+                folder,
                 {
                     "limit": 1,
                     "offset": 0,

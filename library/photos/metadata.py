@@ -25,14 +25,12 @@ def analyze_image(file_path: Path):
         palette = extract_colors(image=file_path, palette_size=10)
         key_color = rgb_to_hex(palette[0].rgb)
         colors = [rgb_to_hex(c.rgb) for c in palette]
-        background = colors[0] if colors else key_color
         bytes = file_path.stat().st_size
 
     return {
         "mimetype": mimetype,
         "color": key_color,
         "colors": colors,
-        "background": background,
         "width": width,
         "height": height,
         "orientation": orientation,

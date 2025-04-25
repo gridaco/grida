@@ -12,12 +12,15 @@ from glom import glom, assign
 
 
 map_meta = {
+    "name": "name",
     "mimetype": "mimetype",
     "color": "color",
     "colors": "colors",
     "width": "width",
     "height": "height",
     "bytes": "bytes",
+    "centroid": "centroid",
+    "padding": "padding",
     "orientation": "orientation"
 }
 
@@ -108,6 +111,10 @@ def cli(input_dir, partial_ok, file_type):
             data.update(extract_from_unsplash(unsplash_path))
         if describe_path_ok:
             data.update(extract_from_describe(describe_path))
+
+        # fallbacks
+        if not data.get("description") and data.get("name"):
+            data["description"] = data.get("name")
 
         with open(object_path, "w") as f:
             json.dump(data, f, indent=2)
