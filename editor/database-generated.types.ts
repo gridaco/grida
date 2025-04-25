@@ -1887,34 +1887,34 @@ export type Database = {
       author: {
         Row: {
           avatar_url: string | null
+          blog: string | null
           created_at: string | null
           id: string
           name: string
           provider: string | null
           updated_at: string | null
-          url: string | null
           user_id: string | null
           username: string
         }
         Insert: {
           avatar_url?: string | null
+          blog?: string | null
           created_at?: string | null
           id?: string
           name: string
           provider?: string | null
           updated_at?: string | null
-          url?: string | null
           user_id?: string | null
           username: string
         }
         Update: {
           avatar_url?: string | null
+          blog?: string | null
           created_at?: string | null
           id?: string
           name?: string
           provider?: string | null
           updated_at?: string | null
-          url?: string | null
           user_id?: string | null
           username?: string
         }
@@ -4685,14 +4685,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4712,24 +4712,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4740,6 +4722,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4754,7 +4754,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

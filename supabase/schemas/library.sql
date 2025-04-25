@@ -39,7 +39,7 @@ CREATE TABLE grida_library.author (
   name TEXT NOT NULL,
   username TEXT NOT NULL,
   provider TEXT,
-  url TEXT,
+  blog TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
