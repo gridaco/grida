@@ -21,7 +21,9 @@ export default async function LibraryHomePage({
           category: q_category,
           text: q_search,
         })
-      : await list();
+      : await search({
+          category: "shapes",
+        });
 
   return (
     <main className="p-6 space-y-6">
@@ -55,7 +57,7 @@ export default async function LibraryHomePage({
       <section>
         <div className="flex flex-wrap gap-2">
           {/* Category cards placeholder */}
-          {["nature", "photos", "textures"].map((category) => (
+          {["shapes", "nature", "textures"].map((category) => (
             <Link key={category} href={`?category=${category}`}>
               <div className="bg-muted rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted-foreground/10">
                 {category}
