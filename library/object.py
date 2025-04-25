@@ -37,6 +37,7 @@ map_describe = {
 }
 
 map_unsplash = {
+    "alt_description": "description",  # for fallback only
     "description": "description",
     "user.name": "author.name",
     "user.username": "author.username",
@@ -47,7 +48,7 @@ map_unsplash = {
 
 @click.command()
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
-@click.option('--partial-ok', is_flag=True, default=False, help="Ignore missing metadata or describe files")
+@click.option('--partial-ok', is_flag=True, default=False, help="Ignore describe files")
 @click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
 @click.option('--license', show_default=True, help="Fallback License to apply")
 def cli(input_dir, partial_ok, file_type, license):
@@ -107,7 +108,7 @@ def cli(input_dir, partial_ok, file_type, license):
             continue
 
         if not partial_ok and (not describe_path_ok):
-            print(f"[SKIP] {base}: missing metadata or describe file")
+            print(f"[SKIP] {base}: missing describe file")
             continue
 
         data = {}

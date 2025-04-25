@@ -26,6 +26,7 @@ def analyze_image(file_path: Path):
         key_color = rgb_to_hex(palette[0].rgb)
         colors = [rgb_to_hex(c.rgb) for c in palette]
         bytes = file_path.stat().st_size
+        transparency = img.info.get("transparency") is not None
 
     return {
         "mimetype": mimetype,
@@ -35,6 +36,7 @@ def analyze_image(file_path: Path):
         "height": height,
         "orientation": orientation,
         "bytes": bytes,
+        "transparency": transparency,
     }
 
 
