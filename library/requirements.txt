@@ -1,4 +1,5 @@
 click
+ollama
 pillow
 pylette
 tqdm
