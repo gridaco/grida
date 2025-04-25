@@ -1882,6 +1882,255 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_library: {
+    Tables: {
+      author: {
+        Row: {
+          avatar_url: string | null
+          blog: string | null
+          created_at: string | null
+          id: string
+          name: string
+          provider: string | null
+          updated_at: string | null
+          user_id: string | null
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          blog?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          blog?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
+      collection: {
+        Row: {
+          author_id: string | null
+          cover_object_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          cover_object_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          cover_object_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "author"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_cover_object_id_fkey"
+            columns: ["cover_object_id"]
+            isOneToOne: false
+            referencedRelation: "object"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collection_object: {
+        Row: {
+          collection_id: string
+          object_id: string
+        }
+        Insert: {
+          collection_id: string
+          object_id: string
+        }
+        Update: {
+          collection_id?: string
+          object_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_object_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_object_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: false
+            referencedRelation: "object"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      object: {
+        Row: {
+          author_id: string | null
+          background: string | null
+          bytes: number
+          categories: unknown[]
+          category: string
+          color: string
+          colors: unknown[]
+          created_at: string | null
+          description: string
+          entropy: number | null
+          fill: string | null
+          generator: string | null
+          gravity_x: number | null
+          gravity_y: number | null
+          height: number
+          id: string
+          keywords: string[]
+          lang: string | null
+          license: string
+          mimetype: string
+          objects: string[]
+          orientation: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens: string[] | null
+          prompt: string | null
+          public_domain: boolean
+          score: number | null
+          search_tsv: unknown | null
+          title: string | null
+          transparency: boolean
+          updated_at: string | null
+          version: number
+          width: number
+          year: number | null
+        }
+        Insert: {
+          author_id?: string | null
+          background?: string | null
+          bytes: number
+          categories?: unknown[]
+          category: string
+          color: string
+          colors?: unknown[]
+          created_at?: string | null
+          description: string
+          entropy?: number | null
+          fill?: string | null
+          generator?: string | null
+          gravity_x?: number | null
+          gravity_y?: number | null
+          height: number
+          id: string
+          keywords?: string[]
+          lang?: string | null
+          license?: string
+          mimetype: string
+          objects?: string[]
+          orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens?: string[] | null
+          prompt?: string | null
+          public_domain?: boolean
+          score?: number | null
+          search_tsv?: unknown | null
+          title?: string | null
+          transparency: boolean
+          updated_at?: string | null
+          version?: number
+          width: number
+          year?: number | null
+        }
+        Update: {
+          author_id?: string | null
+          background?: string | null
+          bytes?: number
+          categories?: unknown[]
+          category?: string
+          color?: string
+          colors?: unknown[]
+          created_at?: string | null
+          description?: string
+          entropy?: number | null
+          fill?: string | null
+          generator?: string | null
+          gravity_x?: number | null
+          gravity_y?: number | null
+          height?: number
+          id?: string
+          keywords?: string[]
+          lang?: string | null
+          license?: string
+          mimetype?: string
+          objects?: string[]
+          orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          path?: string
+          path_tokens?: string[] | null
+          prompt?: string | null
+          public_domain?: boolean
+          score?: number | null
+          search_tsv?: unknown | null
+          title?: string | null
+          transparency?: boolean
+          updated_at?: string | null
+          version?: number
+          width?: number
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "author"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      orientation: "portrait" | "landscape" | "square"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_sites: {
     Tables: {
       site_document: {
@@ -4058,7 +4307,7 @@ export type Database = {
         }[]
       }
       citext: {
-        Args: { "": string } | { "": boolean } | { "": unknown }
+        Args: { "": unknown } | { "": string } | { "": boolean }
         Returns: string
       }
       citext_hash: {
@@ -4445,14 +4694,14 @@ export type Database = {
       }
       time_bucket: {
         Args:
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
-          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | { bucket_width: unknown; ts: string; offset: unknown }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
+          | { bucket_width: unknown; ts: string; origin: string }
           | { bucket_width: unknown; ts: string; offset: unknown }
           | {
               bucket_width: unknown
@@ -4472,24 +4721,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4500,6 +4731,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4514,7 +4763,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
@@ -4999,6 +5248,11 @@ export const Constants = {
   },
   grida_g11n: {
     Enums: {},
+  },
+  grida_library: {
+    Enums: {
+      orientation: ["portrait", "landscape", "square"],
+    },
   },
   grida_sites: {
     Enums: {},

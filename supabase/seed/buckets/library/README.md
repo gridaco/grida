@@ -44,6 +44,10 @@ This contains:
 
 - photos
 
+## Nature `/nature`
+
+> Nature photo, without any compositions, the nature as-is.
+
 ## Objects `/objects`
 
 > Objects are 3D rendered objects (or photo with transparency) that usually contains 1 object per image. It contains additional attributes like cropping, gravity center, color-scheme
