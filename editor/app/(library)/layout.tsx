@@ -9,8 +9,10 @@ import "../globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Grida | Tools",
-  description: "Free collection of tools",
+  title: "Library | Grida",
+  description: "Free collection of design resources",
+  category: "library",
+  keywords: ["free", "open-source", "design", "resources", "library"],
 };
 
 export default function RootLayout({
