@@ -25,8 +25,6 @@ class DescriptionResult(BaseModel):
     )
     description: str = Field(
         description="A short, human-readable and SEO-friendly description of the image.")
-    prompt: str = Field(
-        description="If this image were to be generated, A detailed prompt suitable for image generation (e.g. via AI diffusion).")
     category: str = Field(
         description="A single category that best represents the image.",
         examples=["nature", "people", "animals"]
@@ -80,7 +78,7 @@ def describe_image(filepath: Path, model: str) -> DescriptionResult:
 @click.command()
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--model', default="gemma3:27b", show_default=True, help="Ollama model to use")
-@click.option('--skip', is_flag=True, default=True, help="Skip files that already have .describe.json")
+@click.option('--skip', is_flag=True, default=False, help="Skip files that already have .describe.json")
 def cli(input_dir, model, skip):
 
     available_models = [m.model for m in client.list()['models']]
