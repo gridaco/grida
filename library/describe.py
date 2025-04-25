@@ -70,21 +70,32 @@ def resize_image_for_analysis(filepath: Path, max_width: int = 1024) -> Path:
         return Path(temp_file.name)
 
 
-def describe_image(filepath: Path, model: str, metadata: Any | None) -> DescriptionResult:
+import concurrent.futures
+
+def describe_image(filepath: Path, model: str, metadata: Any | None) -> DescriptionResult | None:
 
     prompt = "Visually Describe this image in detail."
     if metadata:
         prompt += f"\nimage metadata:\n```{json.dumps(metadata)}```"
 
     resized_path = resize_image_for_analysis(filepath)
+    def try_generate_with_timeout(**kwargs):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(lambda: client.generate(**kwargs))
+            return future.result(timeout=60)
     try:
-        response = client.generate(
-            model=model,
-            images=[resized_path],
-            prompt="Visually Describe this image in detail.",
-            format=DescriptionResult.model_json_schema()
-        )
-        return DescriptionResult.model_validate_json(response.response)
+        try:
+            response = try_generate_with_timeout(
+                model=model,
+                images=[resized_path],
+                prompt="Visually Describe this image in detail.",
+                format=DescriptionResult.model_json_schema(),
+                keep_alive=-1
+            )
+            return DescriptionResult.model_validate_json(response.response)
+        except Exception as e:
+            logging.warning(f"Timeout or error while generating description for {filepath.name}: {e}")
+            return None
     finally:
         if resized_path != filepath:
             resized_path.unlink(missing_ok=True)
@@ -115,6 +126,7 @@ def cli(input_dir, model, skip, file_type, use_metadata):
             tqdm.write(f"[SKIP] {file.name} (no metadata)")
             continue
         try:
+            tqdm.write(f"[...] describing {file.name}")
             metadata = json.loads(metadata_path.read_text()) if use_metadata else None
             result = describe_image(file, model, metadata)
             if result is None:
