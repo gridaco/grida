@@ -2,4 +2,6 @@ click
 ollama
 pillow
 pylette
+python-dotenv
+supabase
 tqdm

@@ -26,6 +26,7 @@ def analyze_image(file_path: Path):
         key_color = rgb_to_hex(palette[0].rgb)
         colors = [rgb_to_hex(c.rgb) for c in palette]
         background = colors[0] if colors else key_color
+        bytes = file_path.stat().st_size
 
     return {
         "mimetype": mimetype,
@@ -35,6 +36,7 @@ def analyze_image(file_path: Path):
         "width": width,
         "height": height,
         "orientation": orientation,
+        "bytes": bytes,
     }
 
 
