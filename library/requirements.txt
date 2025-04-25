@@ -1,4 +1,5 @@
 click
+cairosvg
 glom
 ollama
 pillow

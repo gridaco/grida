@@ -1,5 +1,5 @@
 # merges
-# - .jpg
+# - .(jpg|png|svg)
 # - .meta.json
 # - .describe.json
 # - .unsplash.json
@@ -41,7 +41,8 @@ map_unsplash = {
 @click.command()
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--partial-ok', is_flag=True, default=False, help="Ignore missing metadata or describe files")
-def cli(input_dir, partial_ok):
+@click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
+def cli(input_dir, partial_ok, file_type):
     input_path = Path(input_dir)
 
     def extract_from_metadata(path):
@@ -73,22 +74,25 @@ def cli(input_dir, partial_ok):
             return None
         with open(path) as f:
             raw = json.load(f)
-        result = {"author": {"provider": "unsplash"}}
+        result = {
+            "license": "Unsplash License",
+            "author": {"provider": "unsplash"}
+        }
         for src, dest in map_unsplash.items():
             value = glom(raw, src, default=None)
             if value is not None:
                 assign(result, dest, value, missing=dict)
         return result
 
-    for img_file in input_path.glob("*.[jJ][pP][gG]"):
-        base = img_file.stem
-        metadata_path = img_file.with_name(base + ".metadata.json")
+    for rawfile in input_path.glob(f"*.{file_type}"):
+        base = rawfile.stem
+        metadata_path = rawfile.with_name(base + ".metadata.json")
         metadata_path_ok = metadata_path.exists()
-        describe_path = img_file.with_name(base + ".describe.json")
+        describe_path = rawfile.with_name(base + ".describe.json")
         describe_path_ok = describe_path.exists()
-        unsplash_path = img_file.with_name(base + ".unsplash.json")
+        unsplash_path = rawfile.with_name(base + ".unsplash.json")
         unsplash_path_ok = unsplash_path.exists()
-        object_path = img_file.with_name(base + ".object.json")
+        object_path = rawfile.with_name(base + ".object.json")
 
         if not metadata_path_ok:
             print(f"[SKIP] {base}: missing metadata file")

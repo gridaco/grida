@@ -31,6 +31,7 @@ Grida Standard Library is a 100% free & open-source handpicked collection of des
   "description": "Grida logo svg with black path fill",
   "type": "application/svg+xml",
   "keywords": ["logo", "grida"],
+  "category": "logo",
   "categories": ["logos"],
   "author": {
     "name": "Grida",
@@ -69,3 +70,57 @@ Grida Standard Library is a 100% free & open-source handpicked collection of des
 
 - entropy - the visual complexity of the design
   - 0 ~ 1
+
+## Scripts
+
+**Setup**
+
+```sh
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
+**unsplash.py**: Download images from Unsplash.
+
+```sh
+python photos/unsplash.py xR4Yt3AEXLY --download --q=regular --access-key="..." --dir=/path/to/out
+```
+
+**optimize.py**: Optimize images.
+
+```sh
+python photos/optimize.py /path/to/process --output-dir=/path/to/output --max-size=3
+```
+
+**metadata.py**: Generate metadata for images.
+
+```sh
+python photos/metadata.py /path/to/process
+```
+
+outputs `.metadata.json` files.
+
+**describe.py**: Describe images using ollama.
+
+Needs ollama installed. Needs model with vision support.
+
+```sh
+python describe.py /path/to/process --model=gemma3:27b
+```
+
+outputs `.describe.json` files.
+
+**object.py**: Combines all metadata for library uploads.
+
+```sh
+python object.py /path/to/process
+```
+
+outputs `.object.json` files.
+
+**upload.py**: Upserts the object (file) and metadata (row) to the Grida Library.
+
+```sh
+python upload.py /path/to/process
+```

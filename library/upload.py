@@ -13,8 +13,9 @@ BUCKET_NAME = "library"
 @click.command()
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.argument('category')
+@click.option('--folder', show_default=True, help="custom folder in bucket (uses category by default)")
 @click.option('--env-file', type=click.Path(exists=True, dir_okay=False), default=".env", show_default=True, help="Path to .env file")
-def cli(input_dir, category, env_file):
+def cli(input_dir, category, folder, env_file):
     load_dotenv(env_file)
     url: str = os.environ.get("SUPABASE_URL")
     key: str = os.environ.get("SUPABASE_KEY")
@@ -32,7 +33,8 @@ def cli(input_dir, category, env_file):
         content_type = mimetypes.guess_type(
             file)[0] or "application/octet-stream"
 
-        path = f"{category}/{file.name}"
+        folder = folder or category
+        path = f"{folder}/{file.name}"
 
         with open(file, "rb") as fdata:
             res = supabase.storage.from_(BUCKET_NAME).upload(

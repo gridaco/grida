@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import logging
 from tqdm import tqdm
+import cairosvg
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +49,13 @@ class DescriptionResult(BaseModel):
 
 
 def resize_image_for_analysis(filepath: Path, max_width: int = 1024) -> Path:
+    if filepath.suffix.lower() == ".svg":
+        # render svg to png
+        rendered = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        cairosvg.svg2png(url=str(filepath),
+                         write_to=rendered.name, output_width=max_width)
+        return Path(rendered.name)
+
     with Image.open(filepath) as img:
         if img.width <= max_width:
             return filepath
@@ -55,8 +63,8 @@ def resize_image_for_analysis(filepath: Path, max_width: int = 1024) -> Path:
         new_size = (max_width, int(img.height * ratio))
         img = img.convert("RGB").resize(new_size, Image.LANCZOS)
 
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-        img.save(temp_file.name, format="JPEG", quality=85)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img.save(temp_file.name, format="PNG", quality=85)
         return Path(temp_file.name)
 
 
@@ -79,7 +87,8 @@ def describe_image(filepath: Path, model: str) -> DescriptionResult:
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--model', default="gemma3:27b", show_default=True, help="Ollama model to use")
 @click.option('--skip', is_flag=True, default=False, help="Skip files that already have .describe.json")
-def cli(input_dir, model, skip):
+@click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
+def cli(input_dir, model, skip, file_type):
 
     available_models = [m.model for m in client.list()['models']]
     if model not in available_models:
@@ -88,7 +97,7 @@ def cli(input_dir, model, skip):
 
     input_path = Path(input_dir)
 
-    for file in tqdm(list(input_path.glob("*.[jJ][pP][gG]")), desc="Describing images"):
+    for file in tqdm(list(input_path.glob(f"*.{file_type}")), desc="Describing images"):
         describe_path = file.with_name(file.stem + ".describe.json")
         if skip and describe_path.exists():
             tqdm.write(f"[SKIP] {file.name} (already described)")
