@@ -101,7 +101,7 @@ def cli(input_dir, model, skip):
                 tqdm.write(f"[WARN] failed to describe {file.name}")
                 continue
             with open(describe_path, "w") as f:
-                json.dump({**result.dict(), "model": model}, f, indent=2)
+                json.dump({**result.model_dump(), "model": model}, f, indent=2)
             tqdm.write(f"[OK] described {file.name}")
         except Exception as e:
             tqdm.write(f"[ERR] error processing {file.name}: {e}")
