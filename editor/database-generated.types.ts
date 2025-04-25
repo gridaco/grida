@@ -2010,6 +2010,7 @@ export type Database = {
           created_at: string | null
           description: string
           entropy: number | null
+          fill: string | null
           generator: string | null
           gravity_x: number | null
           gravity_y: number | null
@@ -2024,9 +2025,11 @@ export type Database = {
           path: string
           path_tokens: string[] | null
           prompt: string | null
+          public_domain: boolean
           score: number | null
           search_tsv: unknown | null
           title: string | null
+          transparency: boolean
           updated_at: string | null
           version: number
           width: number
@@ -2043,6 +2046,7 @@ export type Database = {
           created_at?: string | null
           description: string
           entropy?: number | null
+          fill?: string | null
           generator?: string | null
           gravity_x?: number | null
           gravity_y?: number | null
@@ -2057,9 +2061,11 @@ export type Database = {
           path: string
           path_tokens?: string[] | null
           prompt?: string | null
+          public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
           title?: string | null
+          transparency: boolean
           updated_at?: string | null
           version?: number
           width: number
@@ -2076,6 +2082,7 @@ export type Database = {
           created_at?: string | null
           description?: string
           entropy?: number | null
+          fill?: string | null
           generator?: string | null
           gravity_x?: number | null
           gravity_y?: number | null
@@ -2090,9 +2097,11 @@ export type Database = {
           path?: string
           path_tokens?: string[] | null
           prompt?: string | null
+          public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
           title?: string | null
+          transparency?: boolean
           updated_at?: string | null
           version?: number
           width?: number
@@ -4298,7 +4307,7 @@ export type Database = {
         }[]
       }
       citext: {
-        Args: { "": string } | { "": boolean } | { "": unknown }
+        Args: { "": unknown } | { "": string } | { "": boolean }
         Returns: string
       }
       citext_hash: {

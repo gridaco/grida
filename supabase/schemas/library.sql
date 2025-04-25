@@ -72,6 +72,7 @@ CREATE TABLE grida_library.object (
   bytes INT NOT NULL,
   license TEXT NOT NULL DEFAULT 'CC0-1.0',
   version INT NOT NULL DEFAULT 1 CHECK (version >= 1),
+  fill TEXT,
   color grida_library.color NOT NULL,
   colors grida_library.color[] NOT NULL DEFAULT '{}',
   background grida_library.color NULL,
@@ -84,6 +85,8 @@ CREATE TABLE grida_library.object (
   lang grida_library.lang,
   generator TEXT,
   prompt TEXT,
+  transparency BOOLEAN NOT NULL,
+  public_domain BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
