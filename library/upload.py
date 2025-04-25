@@ -27,7 +27,7 @@ def cli(input_dir, category, env_file):
             continue
 
         with open(object_path) as f:
-            meta = json.load(f)
+            obj = json.load(f)
 
         content_type = mimetypes.guess_type(
             file)[0] or "application/octet-stream"
@@ -54,34 +54,46 @@ def cli(input_dir, category, env_file):
         uploaded_obj_id = ref.get("id")
 
         tqdm.write(f"[OK] uploaded {file.name} to {uploaded_path}")
-        supabase.schema("grida_library").table("object").upsert({
-            "id": uploaded_obj_id,
-            "path": uploaded_path,
-            "title": meta.get("title"),
-            "description": meta["description"],
-            "author_id": meta.get("author_id"),
-            "category": category,
-            "objects": meta.get("objects", []),
-            "keywords": meta.get("keywords", []),
-            "mimetype": meta["mimetype"],
-            "width": meta["width"],
-            "height": meta["height"],
-            "bytes": meta["bytes"],
-            "license": meta.get("license", "CC0-1.0"),
-            "version": meta.get("version", 1),
-            "color": meta["color"],
-            "colors": meta.get("colors", []),
-            "background": meta.get("background"),
-            "score": meta.get("score"),
-            "year": meta.get("year"),
-            "entropy": meta.get("entropy"),
-            "orientation": meta["orientation"],
-            "gravity_x": meta.get("gravity_x"),
-            "gravity_y": meta.get("gravity_y"),
-            "lang": meta.get("lang"),
-            "generator": meta.get("generator"),
-            "prompt": meta.get("prompt"),
-        }).execute()
+
+        try:
+
+            obj_author = obj.get("author")
+            if obj_author:
+                author = supabase.schema("grida_library").table("author").upsert(
+                    obj_author, on_conflict="provider,username").execute()
+                author_id = author.data[0].get("id")
+
+            supabase.schema("grida_library").table("object").upsert({
+                "id": uploaded_obj_id,
+                "path": uploaded_path,
+                "title": obj.get("title"),
+                "description": obj["description"],
+                "author_id": author_id if obj_author else None,
+                "category": category,
+                "objects": obj.get("objects", []),
+                "keywords": obj.get("keywords", []),
+                "mimetype": obj["mimetype"],
+                "width": obj["width"],
+                "height": obj["height"],
+                "bytes": obj["bytes"],
+                "license": obj.get("license", "CC0-1.0"),
+                "version": obj.get("version", 1),
+                "color": obj["color"],
+                "colors": obj.get("colors", []),
+                "background": obj.get("background"),
+                "score": obj.get("score"),
+                "year": obj.get("year"),
+                "entropy": obj.get("entropy"),
+                "orientation": obj["orientation"],
+                "gravity_x": obj.get("gravity_x"),
+                "gravity_y": obj.get("gravity_y"),
+                "lang": obj.get("lang"),
+                "generator": obj.get("generator"),
+                "prompt": obj.get("prompt"),
+            }).execute()
+        except Exception as e:
+            tqdm.write(f"[ERROR] {file.name}: {e}")
+            continue
 
 
 if __name__ == "__main__":

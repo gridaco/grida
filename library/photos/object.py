@@ -1,35 +1,112 @@
-
+# merges
+# - .jpg
+# - .meta.json
+# - .describe.json
+# - .unsplash.json
+# into a single .object.json file for library upload.
 
 import json
 import click
 from pathlib import Path
+from glom import glom, assign
+
+
+map_meta = {
+    "mimetype": "mimetype",
+    "color": "color",
+    "colors": "colors",
+    "width": "width",
+    "height": "height",
+    "bytes": "bytes",
+    "orientation": "orientation"
+}
+
+map_describe = {
+    "objects": "objects",
+    "description": "description",
+    "category": "category",
+    "categories": "categories",
+    "keywords": "keywords",
+}
+
+map_unsplash = {
+    "description": "description",
+    "user.name": "author.name",
+    "user.username": "author.username",
+    "user.portfolio_url": "author.blog",
+    "user.profile_image.medium": "author.avatar_url",
+}
 
 
 @click.command()
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
-def cli(input_dir):
+@click.option('--partial-ok', is_flag=True, default=False, help="Ignore missing metadata or describe files")
+def cli(input_dir, partial_ok):
     input_path = Path(input_dir)
+
+    def extract_from_metadata(path):
+        if not path.exists():
+            return {}
+        with open(path) as f:
+            raw = json.load(f)
+        result = {}
+        for src, dest in map_meta.items():
+            value = glom(raw, src, default=None)
+            if value is not None:
+                assign(result, dest, value, missing=dict)
+        return result
+
+    def extract_from_describe(path):
+        if not path.exists():
+            return {}
+        with open(path) as f:
+            raw = json.load(f)
+        result = {}
+        for src, dest in map_describe.items():
+            value = glom(raw, src, default=None)
+            if value is not None:
+                assign(result, dest, value, missing=dict)
+        return result
+
+    def extract_from_unsplash(path):
+        if not path.exists():
+            return None
+        with open(path) as f:
+            raw = json.load(f)
+        result = {"author": {"provider": "unsplash"}}
+        for src, dest in map_unsplash.items():
+            value = glom(raw, src, default=None)
+            if value is not None:
+                assign(result, dest, value, missing=dict)
+        return result
 
     for img_file in input_path.glob("*.[jJ][pP][gG]"):
         base = img_file.stem
         metadata_path = img_file.with_name(base + ".metadata.json")
+        metadata_path_ok = metadata_path.exists()
         describe_path = img_file.with_name(base + ".describe.json")
+        describe_path_ok = describe_path.exists()
+        unsplash_path = img_file.with_name(base + ".unsplash.json")
+        unsplash_path_ok = unsplash_path.exists()
         object_path = img_file.with_name(base + ".object.json")
 
-        if not metadata_path.exists() or not describe_path.exists():
+        if not metadata_path_ok:
+            print(f"[SKIP] {base}: missing metadata file")
+            continue
+
+        if not partial_ok and (not describe_path_ok):
             print(f"[SKIP] {base}: missing metadata or describe file")
             continue
 
-        with open(metadata_path) as f:
-            metadata = json.load(f)
-
-        with open(describe_path) as f:
-            describe = json.load(f)
-
-        combined = {**describe, **metadata}
+        data = {}
+        data.update(extract_from_metadata(metadata_path))
+        if unsplash_path_ok:
+            data.update(extract_from_unsplash(unsplash_path))
+        if describe_path_ok:
+            data.update(extract_from_describe(describe_path))
 
         with open(object_path, "w") as f:
-            json.dump(combined, f, indent=2)
+            json.dump(data, f, indent=2)
 
         print(f"[OK] created {object_path.name}")
 
