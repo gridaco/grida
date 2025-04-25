@@ -5,7 +5,7 @@ import tempfile
 from ollama import Client
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any
 import logging
 from tqdm import tqdm
 import cairosvg
@@ -70,7 +70,12 @@ def resize_image_for_analysis(filepath: Path, max_width: int = 1024) -> Path:
         return Path(temp_file.name)
 
 
-def describe_image(filepath: Path, model: str) -> DescriptionResult:
+def describe_image(filepath: Path, model: str, metadata: Any | None) -> DescriptionResult:
+
+    prompt = "Visually Describe this image in detail."
+    if metadata:
+        prompt += f"\nimage metadata:\n```{json.dumps(metadata)}```"
+
     resized_path = resize_image_for_analysis(filepath)
     try:
         response = client.generate(
@@ -89,8 +94,9 @@ def describe_image(filepath: Path, model: str) -> DescriptionResult:
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--model', default="gemma3:27b", show_default=True, help="Ollama model to use")
 @click.option('--skip', is_flag=True, default=False, help="Skip files that already have .describe.json")
+@click.option('--use-metadata', 'use_metadata', is_flag=True, default=False, help="Includes the .metadata.json content to the Model")
 @click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
-def cli(input_dir, model, skip, file_type):
+def cli(input_dir, model, skip, file_type, use_metadata):
 
     available_models = [m.model for m in client.list()['models']]
     if model not in available_models:
@@ -101,11 +107,16 @@ def cli(input_dir, model, skip, file_type):
 
     for file in tqdm(list(input_path.glob(f"*.{file_type}")), desc="Describing images"):
         describe_path = file.with_name(file.stem + ".describe.json")
+        metadata_path = file.with_name(file.stem + ".metadata.json")
         if skip and describe_path.exists():
             tqdm.write(f"[SKIP] {file.name} (already described)")
             continue
+        if use_metadata and not metadata_path.exists():
+            tqdm.write(f"[SKIP] {file.name} (no metadata)")
+            continue
         try:
-            result = describe_image(file, model)
+            metadata = json.loads(metadata_path.read_text()) if use_metadata else None
+            result = describe_image(file, model, metadata)
             if result is None:
                 tqdm.write(f"[WARN] failed to describe {file.name}")
                 continue
