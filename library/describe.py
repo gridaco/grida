@@ -26,6 +26,8 @@ class DescriptionResult(BaseModel):
     )
     description: str = Field(
         description="A short, human-readable and SEO-friendly description of the image.")
+    alt: str = Field(
+        description="A short alt text for the image.")
     category: str = Field(
         description="A single category that best represents the image.",
         examples=["nature", "people", "animals"]
