@@ -13,7 +13,9 @@ from glom import glom, assign
 
 map_meta = {
     "name": "name",
+    "license": "license",
     "mimetype": "mimetype",
+    "fill": "fill",
     "color": "color",
     "colors": "colors",
     "width": "width",
@@ -21,7 +23,9 @@ map_meta = {
     "bytes": "bytes",
     "centroid": "centroid",
     "padding": "padding",
-    "orientation": "orientation"
+    "orientation": "orientation",
+    "transparency": "transparency",
+    "public_domain": "public_domain"
 }
 
 map_describe = {
@@ -45,7 +49,8 @@ map_unsplash = {
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--partial-ok', is_flag=True, default=False, help="Ignore missing metadata or describe files")
 @click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
-def cli(input_dir, partial_ok, file_type):
+@click.option('--license', show_default=True, help="Fallback License to apply")
+def cli(input_dir, partial_ok, file_type, license):
     input_path = Path(input_dir)
 
     def extract_from_metadata(path):
@@ -115,6 +120,9 @@ def cli(input_dir, partial_ok, file_type):
         # fallbacks
         if not data.get("description") and data.get("name"):
             data["description"] = data.get("name")
+
+        if not data.get("license"):
+            data["license"] = license
 
         with open(object_path, "w") as f:
             json.dump(data, f, indent=2)

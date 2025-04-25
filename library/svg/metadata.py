@@ -89,8 +89,13 @@ def get_svg_metadata(file_path: Path):
     key_color = rgb_to_hex(palette[0].rgb)
     colors = [rgb_to_hex(c.rgb) for c in palette]
 
+    fill = get_fill(file_path)
+    if fill is None:
+        fill = key_color
+
     centroid = get_visual_centroid(file_path)
     padding = get_visual_padding(file_path)
+    transparency = get_transparency(file_path)
 
     orientation = get_orientation(width, height)
 
@@ -104,8 +109,10 @@ def get_svg_metadata(file_path: Path):
         "mimetype": "image/svg+xml",
         "color": key_color,
         "colors": colors,
+        "fill": fill,
         "centroid": centroid,
-        "padding": padding
+        "padding": padding,
+        "transparency": transparency
     }
 
 
@@ -155,10 +162,55 @@ def get_visual_padding(svg_path: Path, raster_size: int = 512):
     ]
 
 
+def get_transparency(svg_path: Path, raster_size: int = 512, threshold: int = 250) -> bool:
+    """
+    Render the SVG and inspect the alpha channel.
+    Returns True if *any* pixel alpha < threshold (i.e. visible transparency).
+    """
+    buffer = BytesIO()
+    cairosvg.svg2png(url=str(svg_path), write_to=buffer,
+                     output_width=raster_size, output_height=raster_size)
+    buffer.seek(0)
+
+    img = Image.open(buffer).convert("LA")          # luminance + alpha
+    alpha = np.array(img)[:, :, 1]                  # alpha channel
+    return bool((alpha < threshold).any())
+
+
 def get_orientation(w, h):
     if abs(w - h) < min(w, h) * 0.05:
         return "square"
     return "landscape" if w > h else "portrait"
+
+
+def get_fill(svg_path: Path) -> str | None:
+    """
+    Inspect all elements in the SVG and categorise fill usage.
+
+    Returns
+    -------
+    "currentColor"   -> exactly one element and its fill == currentColor
+    "mixed"          -> more than one non‑uniform fill value detected
+    None             -> no element has an explicit fill, or single uniform non‑currentColor fill
+    """
+    tree = ET.parse(svg_path)
+    root = tree.getroot()
+
+    fills = []
+    for elem in root.iter():
+        fill = elem.attrib.get("fill")
+        if fill is None or fill.lower() == "none":
+            continue
+        fills.append(fill.strip())
+
+    if not fills:
+        return None
+
+    if len(fills) == 1:
+        return "currentColor" if fills[0].lower() == "currentcolor" else None
+
+    # multiple elements
+    return "mixed" if len(set(fills)) > 1 else ("currentColor" if list(set(fills))[0].lower() == "currentcolor" else None)
 
 
 @click.command()

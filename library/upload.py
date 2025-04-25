@@ -80,11 +80,13 @@ def cli(input_dir, category, folder, file_type, env_file):
                 "width": obj["width"],
                 "height": obj["height"],
                 "bytes": obj["bytes"],
-                "license": obj.get("license", "CC0-1.0"),
+                "license": obj.get("license"),
                 "version": obj.get("version", 1),
+                "fill": obj.get("fill"),
                 "color": obj["color"],
                 "colors": obj.get("colors", []),
                 "background": obj.get("background"),
+                "transparency": obj["transparency"],
                 "score": obj.get("score"),
                 "year": obj.get("year"),
                 "entropy": obj.get("entropy"),
@@ -94,6 +96,7 @@ def cli(input_dir, category, folder, file_type, env_file):
                 "lang": obj.get("lang"),
                 "generator": obj.get("generator"),
                 "prompt": obj.get("prompt"),
+                "public_domain": obj.get("public_domain", False),
             }).execute()
         except Exception as e:
             tqdm.write(f"[ERROR] {file.name}: {e}")
