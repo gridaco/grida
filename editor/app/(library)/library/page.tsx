@@ -1,47 +1,71 @@
 import React from "react";
 import Image from "next/image";
 import { list, search } from "../actions";
+import { Input } from "@/components/ui/input";
+import { GridaLogo } from "@/components/grida-logo";
+import Link from "next/link";
 
 export default async function LibraryHomePage({
   searchParams,
 }: {
-  searchParams: { search?: string };
+  searchParams: {
+    category?: string;
+    search?: string;
+  };
 }) {
   const q_search = searchParams?.search || "";
-  const objects = q_search ? await search(q_search) : await list();
+  const q_category = searchParams?.category || "";
+  const objects =
+    q_search || q_category
+      ? await search({
+          category: q_category,
+          text: q_search,
+        })
+      : await list();
 
   return (
     <main className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Library</h1>
-        <form method="get">
-          <input
-            type="search"
-            name="search"
-            placeholder="Search resources..."
-            defaultValue={q_search}
-            className="input input-sm w-64"
-          />
-        </form>
+        <Link
+          href="/library"
+          className="text-2xl font-semibold flex items-center gap-2"
+        >
+          <GridaLogo />
+          <span>Library</span>
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/library/license" className="hover:underline">
+            License
+          </Link>
+          <Link href="/tools" className="hover:underline">
+            Tools
+          </Link>
+          <form method="get">
+            <Input
+              type="search"
+              name="search"
+              placeholder="Search resources..."
+              defaultValue={q_search}
+              className=""
+            />
+          </form>
+        </div>
       </div>
 
       <section>
-        <h2 className="text-lg font-medium mb-2">Categories</h2>
         <div className="flex flex-wrap gap-2">
           {/* Category cards placeholder */}
           {["nature", "photos", "textures"].map((category) => (
-            <div
-              key={category}
-              className="bg-muted rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted-foreground/10"
-            >
-              {category}
-            </div>
+            <Link key={category} href={`?category=${category}`}>
+              <div className="bg-muted rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted-foreground/10">
+                {category}
+              </div>
+            </Link>
           ))}
         </div>
       </section>
 
       <section>
-        <h2 className="text-lg font-medium mb-2">Resources</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {/* Resource cards placeholder */}
           {objects.data?.map((object) => (
@@ -57,6 +81,18 @@ export default async function LibraryHomePage({
                 <div className="text-xs text-muted-foreground">
                   {object.description}
                 </div>
+                {object.author && (
+                  <div>
+                    <Link
+                      href={object.author.blog ?? "#"}
+                      className="text-xs underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      by {object.author.name}
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           ))}

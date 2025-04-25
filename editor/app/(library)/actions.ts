@@ -5,7 +5,7 @@ export async function list() {
   const client = await createLibraryClient();
   const { data, error, count } = await client
     .from("object")
-    .select("*", { count: "estimated" });
+    .select("*, author(*)", { count: "estimated" });
 
   if (error) {
     throw error;
@@ -23,15 +23,33 @@ export async function list() {
   };
 }
 
-export async function search(query: string) {
+export async function search({
+  text,
+  category,
+}: {
+  category?: string;
+  text?: string;
+}) {
+  if (!text && !category) {
+    return { data: [], count: 0 };
+  }
   const client = await createLibraryClient();
-  const { data, error, count } = await client
-    .from("object")
-    .select("*", { count: "exact" })
-    .textSearch("search_tsv", query, {
+
+  const q = client.from("object").select("*, author(*)", { count: "exact" });
+
+  if (category) {
+    q.eq("category", category);
+  }
+
+  if (text) {
+    q.textSearch("search_tsv", text, {
       config: "simple",
       type: "plain",
     });
+  }
+
+  const { data, error, count } = await q;
+
   if (error) {
     throw error;
   }
