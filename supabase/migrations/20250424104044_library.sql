@@ -16,6 +16,16 @@ CREATE DOMAIN grida_library.color AS TEXT
 CREATE DOMAIN grida_library.lang AS TEXT
   CHECK (VALUE ~ '^[a-z]{2}(-[A-Z]{2})?$');
 
+---------------------------------------------------------------------
+-- [label type (keyword)] --
+---------------------------------------------------------------------
+CREATE DOMAIN grida_library.label AS TEXT
+CHECK (
+  length(VALUE) >= 2 AND
+  length(VALUE) <= 32 AND
+  VALUE ~ '^[a-z0-9]+$'
+);
+
 CREATE TYPE grida_library.orientation AS ENUM ('portrait', 'landscape', 'square');
 
 
@@ -47,11 +57,14 @@ REVOKE SELECT (user_id) ON TABLE grida_library.author FROM authenticated;
 ---------------------------------------------------------------------
 CREATE TABLE grida_library.object (
   id UUID PRIMARY KEY REFERENCES storage.objects(id) ON DELETE CASCADE,
-  name TEXT UNIQUE NOT NULL,
-  description TEXT,
+  path TEXT NOT NULL UNIQUE,
+  path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(path, '/'::text)) STORED,
+  title TEXT,
+  description TEXT NOT NULL,
   author_id UUID REFERENCES grida_library.author(id) ON DELETE SET NULL,
-  category TEXT,
-  categories TEXT[] NOT NULL DEFAULT '{}',
+  category grida_library.label NOT NULL,
+  categories grida_library.label[] NOT NULL DEFAULT '{}',
+  objects TEXT[] NOT NULL DEFAULT '{}',
   keywords TEXT[] NOT NULL DEFAULT '{}',
   mimetype TEXT NOT NULL,
   width INT NOT NULL,
@@ -76,9 +89,24 @@ CREATE TABLE grida_library.object (
 );
 
 ALTER TABLE grida_library.object ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read" ON grida_library.object
-FOR SELECT TO public
-USING (true);
+CREATE POLICY "public_read" ON grida_library.object FOR SELECT TO public USING (true);
+
+
+---------------------------------------------------------------------
+-- [Search support] --
+---------------------------------------------------------------------
+ALTER TABLE grida_library.object
+ADD COLUMN search_tsv tsvector GENERATED ALWAYS AS (
+  setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
+  setweight(to_tsvector('simple', coalesce(description, '')), 'A') ||
+  setweight(to_tsvector('simple', coalesce(year::text, '')), 'B') ||
+  setweight(to_tsvector('simple', coalesce(category, '')), 'B') ||
+  setweight(array_to_tsvector(categories), 'C') ||
+  setweight(array_to_tsvector(keywords), 'C') ||
+  setweight(to_tsvector('simple', coalesce(prompt, '')), 'C')
+) STORED;
+
+CREATE INDEX object_search_idx ON grida_library.object USING GIN (search_tsv);
 
 
 ---------------------------------------------------------------------

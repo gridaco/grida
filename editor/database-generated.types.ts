@@ -2003,12 +2003,12 @@ export type Database = {
           author_id: string | null
           background: string | null
           bytes: number
-          categories: string[]
-          category: string | null
+          categories: unknown[]
+          category: string
           color: string
           colors: unknown[]
           created_at: string | null
-          description: string | null
+          description: string
           entropy: number | null
           generator: string | null
           gravity_x: number | null
@@ -2019,10 +2019,14 @@ export type Database = {
           lang: string | null
           license: string
           mimetype: string
-          name: string
+          objects: string[]
           orientation: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens: string[] | null
           prompt: string | null
           score: number | null
+          search_tsv: unknown | null
+          title: string | null
           updated_at: string | null
           version: number
           width: number
@@ -2032,12 +2036,12 @@ export type Database = {
           author_id?: string | null
           background?: string | null
           bytes: number
-          categories?: string[]
-          category?: string | null
+          categories?: unknown[]
+          category: string
           color: string
           colors?: unknown[]
           created_at?: string | null
-          description?: string | null
+          description: string
           entropy?: number | null
           generator?: string | null
           gravity_x?: number | null
@@ -2048,10 +2052,14 @@ export type Database = {
           lang?: string | null
           license?: string
           mimetype: string
-          name: string
+          objects?: string[]
           orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens?: string[] | null
           prompt?: string | null
           score?: number | null
+          search_tsv?: unknown | null
+          title?: string | null
           updated_at?: string | null
           version?: number
           width: number
@@ -2061,12 +2069,12 @@ export type Database = {
           author_id?: string | null
           background?: string | null
           bytes?: number
-          categories?: string[]
-          category?: string | null
+          categories?: unknown[]
+          category?: string
           color?: string
           colors?: unknown[]
           created_at?: string | null
-          description?: string | null
+          description?: string
           entropy?: number | null
           generator?: string | null
           gravity_x?: number | null
@@ -2077,10 +2085,14 @@ export type Database = {
           lang?: string | null
           license?: string
           mimetype?: string
-          name?: string
+          objects?: string[]
           orientation?: Database["grida_library"]["Enums"]["orientation"] | null
+          path?: string
+          path_tokens?: string[] | null
           prompt?: string | null
           score?: number | null
+          search_tsv?: unknown | null
+          title?: string | null
           updated_at?: string | null
           version?: number
           width?: number
