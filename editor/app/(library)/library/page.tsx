@@ -57,7 +57,7 @@ export default async function LibraryHomePage({
       <section>
         <div className="flex flex-wrap gap-2">
           {/* Category cards placeholder */}
-          {["shapes", "nature", "textures"].map((category) => (
+          {["shapes", "nature", "textures", "animals"].map((category) => (
             <Link key={category} href={`?category=${category}`}>
               <div className="bg-muted rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted-foreground/10">
                 {category}
