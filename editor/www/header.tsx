@@ -16,8 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
+import {
+  ResourceTypeIcon,
+  ResourceTypeIconName,
+} from "@/components/resource-type-icon";
 
 type Item = {
+  icon?: ResourceTypeIconName;
   title: string;
   href: string;
   description?: string;
@@ -27,15 +32,16 @@ const features: Item[] = [
   sitemap.items.canvas,
   sitemap.items.forms,
   sitemap.items.database,
-  sitemap.items.tools,
-  sitemap.items.west,
+  // sitemap.items.west,
 ];
 
 const resources: Item[] = [
-  sitemap.items.docs,
+  sitemap.items.library,
+  sitemap.items.tools,
   sitemap.items.downloads,
-  sitemap.items.joinslack,
+  sitemap.items.docs,
   sitemap.items.thebundle,
+  sitemap.items.joinslack,
   sitemap.items.contact,
 ];
 
@@ -57,10 +63,18 @@ export default function Header({ className }: { className?: string }) {
                     Features
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[300px] p-3">
+                    <ul className="flex flex-col w-[320px] p-3">
                       {features.map((component) => (
                         <ListItem
                           key={component.title}
+                          icon={
+                            component.icon ? (
+                              <ResourceTypeIcon
+                                type={component.icon}
+                                className="size-4"
+                              />
+                            ) : undefined
+                          }
                           title={component.title}
                           href={component.href}
                         >
@@ -75,13 +89,15 @@ export default function Header({ className }: { className?: string }) {
                     Resources
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[150px] p-3">
+                    <ul className="flex flex-col w-[320px] p-3">
                       {resources.map((component) => (
                         <ListItem
                           key={component.title}
                           title={component.title}
                           href={component.href}
-                        />
+                        >
+                          {component.description}
+                        </ListItem>
                       ))}
                     </ul>
                   </NavigationMenuContent>
@@ -184,8 +200,10 @@ export default function Header({ className }: { className?: string }) {
 
 const ListItem = React.forwardRef<
   React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a">
->(({ className, title, children, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<"a"> & {
+    icon?: React.ReactNode;
+  }
+>(({ className, icon, title, children, ...props }, ref) => {
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -197,7 +215,10 @@ const ListItem = React.forwardRef<
           )}
           {...props}
         >
-          <span className="text-sm font-medium leading-none">{title}</span>
+          <div className="flex items-center gap-2">
+            {icon && <div className="inline">{icon}</div>}
+            <span className="text-sm font-medium leading-none">{title}</span>
+          </div>
           <p className="line-clamp-2 leading-snug text-muted-foreground text-xs">
             {children}
           </p>

@@ -1,4 +1,6 @@
 export namespace Env {
+  export const gridaco = "https://grida.co";
+
   /**
    * for server requests
    */

@@ -23,6 +23,19 @@ export type Database = MergeDeep<
         };
       };
     };
+    grida_library: {
+      Tables: {
+        object: {
+          Row: Omit<
+            DatabaseGenerated["grida_library"]["Tables"]["object"]["Row"],
+            "colors"
+          > & {
+            color: string;
+            colors: string[];
+          };
+        };
+      };
+    };
     grida_www: {
       Tables: {
         www: {

@@ -41,8 +41,8 @@ CREATE TABLE grida_library.author (
   provider TEXT,
   blog TEXT,
   avatar_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   CONSTRAINT unique_provider_username UNIQUE (provider, username)
 );
@@ -87,8 +87,8 @@ CREATE TABLE grida_library.object (
   prompt TEXT,
   transparency BOOLEAN NOT NULL,
   public_domain BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE grida_library.object ENABLE ROW LEVEL SECURITY;
@@ -122,8 +122,8 @@ CREATE TABLE grida_library.collection (
   description TEXT,
   author_id UUID REFERENCES grida_library.author(id) ON DELETE SET NULL,
   cover_object_id UUID REFERENCES grida_library.object(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE grida_library.collection ENABLE ROW LEVEL SECURITY;
@@ -140,3 +140,22 @@ CREATE TABLE grida_library.collection_object (
 
 ALTER TABLE grida_library.collection_object ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read" ON grida_library.collection_object FOR SELECT TO public USING (true);
+
+
+---------------------------------------------------------------------
+-- [random rpc] --
+---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION grida_library.random(p_limit INT DEFAULT 1)
+RETURNS SETOF grida_library.object
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT *
+  FROM (
+    SELECT o.*
+    FROM grida_library.object o
+    ORDER BY random()
+    LIMIT p_limit
+  ) sub;
+END;
+$$ LANGUAGE plpgsql STABLE;

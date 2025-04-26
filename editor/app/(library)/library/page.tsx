@@ -4,6 +4,7 @@ import { list, search } from "../actions";
 import { Input } from "@/components/ui/input";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
+import { getBlurDataURLFromColor } from "@/utils/placeholder";
 
 export default async function LibraryHomePage({
   searchParams,
@@ -71,32 +72,39 @@ export default async function LibraryHomePage({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {/* Resource cards placeholder */}
           {objects.data?.map((object) => (
-            <div key={object.id} className="group transition-all">
-              <Image
-                src={object.url}
-                alt={object.description}
-                width={object.width}
-                height={object.height}
-                className="w-full object-cover rounded"
-              />
-              <div className="py-2">
-                <div className="text-xs text-muted-foreground">
-                  {object.description}
-                </div>
-                {object.author && (
-                  <div>
+            <Link
+              key={object.id}
+              href={`/library/o/${object.id}`}
+              className="group transition-all"
+            >
+              <div key={object.id}>
+                <Image
+                  src={object.url}
+                  alt={object.description}
+                  width={object.width}
+                  height={object.height}
+                  placeholder="blur"
+                  blurDataURL={getBlurDataURLFromColor(object.color)}
+                  className="w-full object-cover rounded"
+                />
+                <div className="py-2">
+                  <div className="text-xs text-muted-foreground">
+                    {object.description}
+                  </div>
+                  {object.author && (
                     <Link
                       href={object.author.blog ?? "#"}
-                      className="text-xs underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      by {object.author.name}
+                      <div className="text-xs underline">
+                        by {object.author.name}
+                      </div>
                     </Link>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
