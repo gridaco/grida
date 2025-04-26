@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next/types";
 import { list } from "../actions";
+import { Env } from "@/env";
 
 // Note: Google's limit is 50,000 URLs per sitemap
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -8,7 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return objects.data.map(
     (object) =>
       ({
-        url: `https://grida.co/library/o/${object.id}`,
+        url: `${Env.gridaco}/library/o/${object.id}`,
         changeFrequency: "yearly",
         lastModified: object.updated_at,
       }) satisfies MetadataRoute.Sitemap[number]

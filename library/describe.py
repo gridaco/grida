@@ -80,7 +80,7 @@ def describe_image(filepath: Path, model: str, metadata: Any | None) -> Descript
         response = client.generate(
             model=model,
             images=[resized_path],
-            prompt="Visually Describe this image in detail.",
+            prompt=prompt,
             format=DescriptionResult.model_json_schema(),
             keep_alive=-1
         )

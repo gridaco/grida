@@ -92,16 +92,15 @@ export default async function LibraryHomePage({
                     {object.description}
                   </div>
                   {object.author && (
-                    <div>
-                      <Link
-                        href={object.author.blog ?? "#"}
-                        className="text-xs underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                    <Link
+                      href={object.author.blog ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <div className="text-xs underline">
                         by {object.author.name}
-                      </Link>
-                    </div>
+                      </div>
+                    </Link>
                   )}
                 </div>
               </div>
