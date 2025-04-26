@@ -1,0 +1,114 @@
+import React from "react";
+import Image from "next/image";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { get } from "@/app/(library)/actions";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const object = await get(params.id);
+  if (!object) return notFound();
+
+  const { author } = object;
+
+  return {
+    title: object.title || object.description,
+    description: object.description,
+    openGraph: {
+      images: [{ url: object.url }],
+    },
+    authors: author
+      ? [
+          {
+            name: author.name,
+            url: author.blog ?? undefined,
+          },
+        ]
+      : undefined,
+  };
+}
+
+export default async function ObjectPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const object = await get(params.id);
+  if (!object) return notFound();
+
+  const { author } = object;
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-8">
+      <Image
+        src={object.url}
+        alt={object.description}
+        width={object.width}
+        height={object.height}
+        className="w-full object-cover rounded"
+      />
+      {/* colors */}
+      <div className="flex gap-2 mt-4">
+        <div
+          className="w-8 h-8 rounded-full"
+          style={{
+            backgroundColor: object.color,
+          }}
+        />{" "}
+        <Separator orientation="vertical" className="h-8" />
+        {object.colors.map((color, i) => (
+          <div
+            key={i}
+            className="w-8 h-8 rounded-full"
+            style={{ backgroundColor: color }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-4">
+        {object.objects.map((keyword, i) => (
+          <Badge variant="outline" key={i}>
+            {keyword}
+          </Badge>
+        ))}
+        {object.keywords.map((keyword, i) => (
+          <Badge variant="outline" key={i}>
+            {keyword}
+          </Badge>
+        ))}
+      </div>
+      <h1 className="text-2xl mt-4">{object.title}</h1>
+      <p className="text-xs text-muted-foreground">{object.description}</p>
+      {author && (
+        <div>
+          <Link
+            href={author.blog ?? "#"}
+            className="text-xs underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            by {author.name}
+          </Link>
+        </div>
+      )}
+      <hr />
+
+      {/* license */}
+      <div className="flex gap-2 mt-4">
+        <span className="text-xs">License: {object.license}</span>
+      </div>
+
+      <footer className="mt-10">
+        <Link href={object.url} download>
+          <Button>Download</Button>
+        </Link>
+      </footer>
+    </div>
+  );
+}

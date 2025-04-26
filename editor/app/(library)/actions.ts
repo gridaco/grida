@@ -1,6 +1,24 @@
 "use server";
 import { createLibraryClient } from "@/lib/supabase/server";
 
+export async function get(id: string) {
+  const client = await createLibraryClient();
+  const { data, error } = await client
+    .from("object")
+    .select("*, author(*)")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    ...data,
+    url: client.storage.from("library").getPublicUrl(data.path).data.publicUrl,
+  };
+}
+
 export async function list() {
   const client = await createLibraryClient();
   const { data, error, count } = await client

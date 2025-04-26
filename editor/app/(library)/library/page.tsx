@@ -71,32 +71,38 @@ export default async function LibraryHomePage({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {/* Resource cards placeholder */}
           {objects.data?.map((object) => (
-            <div key={object.id} className="group transition-all">
-              <Image
-                src={object.url}
-                alt={object.description}
-                width={object.width}
-                height={object.height}
-                className="w-full object-cover rounded"
-              />
-              <div className="py-2">
-                <div className="text-xs text-muted-foreground">
-                  {object.description}
-                </div>
-                {object.author && (
-                  <div>
-                    <Link
-                      href={object.author.blog ?? "#"}
-                      className="text-xs underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      by {object.author.name}
-                    </Link>
+            <Link
+              key={object.id}
+              href={`/library/o/${object.id}`}
+              className="group transition-all"
+            >
+              <div key={object.id}>
+                <Image
+                  src={object.url}
+                  alt={object.description}
+                  width={object.width}
+                  height={object.height}
+                  className="w-full object-cover rounded"
+                />
+                <div className="py-2">
+                  <div className="text-xs text-muted-foreground">
+                    {object.description}
                   </div>
-                )}
+                  {object.author && (
+                    <div>
+                      <Link
+                        href={object.author.blog ?? "#"}
+                        className="text-xs underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        by {object.author.name}
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
