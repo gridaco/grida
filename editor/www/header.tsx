@@ -27,15 +27,16 @@ const features: Item[] = [
   sitemap.items.canvas,
   sitemap.items.forms,
   sitemap.items.database,
-  sitemap.items.tools,
-  sitemap.items.west,
+  // sitemap.items.west,
 ];
 
 const resources: Item[] = [
-  sitemap.items.docs,
+  sitemap.items.library,
+  sitemap.items.tools,
   sitemap.items.downloads,
-  sitemap.items.joinslack,
+  sitemap.items.docs,
   sitemap.items.thebundle,
+  sitemap.items.joinslack,
   sitemap.items.contact,
 ];
 

@@ -4,13 +4,14 @@ export namespace sitemap {
     github: "https://github.com/gridaco",
     downlaods: "/downloads",
     tools: "/tools",
+    library: "/library",
     releases_latest: "https://github.com/gridaco/grida/releases/latest",
     issues_new: "https://github.com/gridaco/grida/issues/new/choose",
     pricing: "/pricing",
     slack: "/join-slack",
     docs: "/docs",
     contact: "/contact",
-    database: "/database", // FIXME: <DEADLINK> no link
+    database: "/database",
     privacy: "/privacy",
     toc: "/terms",
     forms: "/forms",
@@ -54,6 +55,11 @@ export namespace sitemap {
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
+    } satisfies Item,
+    library: {
+      title: "Library",
+      href: links.library,
+      description: "Free hand picked design resources",
     } satisfies Item,
     tools: {
       title: "Tools",
