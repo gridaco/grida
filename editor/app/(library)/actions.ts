@@ -1,12 +1,34 @@
 "use server";
 import { createLibraryClient } from "@/lib/supabase/server";
 
-export async function get(id: string) {
+export async function getObject(id: string) {
   const client = await createLibraryClient();
   const { data, error } = await client
     .from("object")
     .select("*, author(*)")
     .eq("id", id)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    ...data,
+    url: client.storage.from("library").getPublicUrl(data.path).data.publicUrl,
+  };
+}
+
+export async function random() {
+  const client = await createLibraryClient();
+  const { data, error } = await client
+    .rpc(
+      "random",
+      {
+        p_limit: 1,
+      },
+      { get: true }
+    )
     .single();
 
   if (error) {

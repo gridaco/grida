@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { get } from "@/app/(library)/actions";
+import { getObject } from "@/app/(library)/actions";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -13,7 +13,7 @@ export async function generateMetadata({
 }: {
   params: { id: string };
 }): Promise<Metadata> {
-  const object = await get(params.id);
+  const object = await getObject(params.id);
   if (!object) return notFound();
 
   const { author } = object;
@@ -40,7 +40,7 @@ export default async function ObjectPage({
 }: {
   params: { id: string };
 }) {
-  const object = await get(params.id);
+  const object = await getObject(params.id);
   if (!object) return notFound();
 
   const { author } = object;
