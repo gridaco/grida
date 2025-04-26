@@ -4,6 +4,7 @@ import { list, search } from "../actions";
 import { Input } from "@/components/ui/input";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
+import { getBlurDataURLFromColor } from "@/utils/placeholder";
 
 export default async function LibraryHomePage({
   searchParams,
@@ -82,6 +83,8 @@ export default async function LibraryHomePage({
                   alt={object.description}
                   width={object.width}
                   height={object.height}
+                  placeholder="blur"
+                  blurDataURL={getBlurDataURLFromColor(object.color)}
                   className="w-full object-cover rounded"
                 />
                 <div className="py-2">

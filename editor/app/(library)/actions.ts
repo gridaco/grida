@@ -19,8 +19,16 @@ export async function getObject(id: string) {
   };
 }
 
-export async function random() {
+export async function random({ text }: { text?: string }) {
   const client = await createLibraryClient();
+
+  if (text) {
+    const s = await search({ text, limit: 1 });
+    if (s.data.length) {
+      return s.data[0];
+    }
+  }
+
   const { data, error } = await client
     .rpc(
       "random",
@@ -64,9 +72,11 @@ export async function list() {
 }
 
 export async function search({
+  limit,
   text,
   category,
 }: {
+  limit?: number;
   category?: string;
   text?: string;
 }) {
@@ -79,6 +89,10 @@ export async function search({
 
   if (category) {
     q.eq("category", category);
+  }
+
+  if (limit) {
+    q.limit(limit);
   }
 
   if (text) {

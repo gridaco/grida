@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { getObject } from "@/app/(library)/actions";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getBlurDataURLFromColor } from "@/utils/placeholder";
 
 export async function generateMetadata({
   params,
@@ -53,6 +54,12 @@ export default async function ObjectPage({
         width={object.width}
         height={object.height}
         className="w-full object-cover rounded"
+        placeholder="blur"
+        blurDataURL={getBlurDataURLFromColor(object.color)}
+        style={{
+          maxWidth: object.width,
+          maxHeight: object.height,
+        }}
       />
       {/* colors */}
       <div className="flex gap-2 mt-4">

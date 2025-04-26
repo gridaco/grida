@@ -3,9 +3,12 @@ import { random } from "../../actions";
 import { headers } from "next/headers";
 import { Env } from "@/env";
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   const headersList = await headers();
-  const object = await random();
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get("query");
+  const object = await random({ text: query || undefined });
+
   const accept = headersList.get("accept") || "";
 
   // browser visit
