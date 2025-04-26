@@ -1,3 +1,5 @@
+import type { ResourceTypeIconName } from "@/components/resource-type-icon";
+
 export namespace sitemap {
   export const links = {
     x: "https://x.com/grida_co",
@@ -33,30 +35,59 @@ export namespace sitemap {
     changelog: "https://x.com/univ___erse",
   };
 
-  type Item = { title: string; href: string; description?: string };
+  type Item = {
+    icon?: ResourceTypeIconName;
+    title: string;
+    href: string;
+    description?: string;
+  };
 
   export const items = {
-    downloads: { title: "Downloads", href: links.downlaods } satisfies Item,
-    docs: { title: "Docs", href: links.docs } satisfies Item,
-    thebundle: { title: "The Bundle", href: links.thebundle } satisfies Item,
-    joinslack: { title: "Join Slack", href: links.slack } satisfies Item,
-    contact: { title: "Contact", href: links.contact } satisfies Item,
+    downloads: {
+      title: "Downloads",
+      href: links.downlaods,
+      description: "Get Grida Desktop App",
+    } satisfies Item,
+    docs: {
+      title: "Docs",
+      href: links.docs,
+      description: "Docs, Guides, Tutorials and API",
+    } satisfies Item,
+    thebundle: {
+      title: "The Bundle",
+      href: links.thebundle,
+      description: "Collection of 3D Illustrations",
+    } satisfies Item,
+    joinslack: {
+      title: "Join Slack",
+      href: links.slack,
+      description: "Join our Slack channel, chat with founders!",
+    } satisfies Item,
+    contact: {
+      title: "Contact",
+      href: links.contact,
+      description: "Have questions? Contact Us",
+    } satisfies Item,
     database: {
+      icon: "database",
       title: "Database",
       href: links.database,
       description: "Manage data, create pipelines & endpoints",
     } satisfies Item,
     forms: {
+      icon: "v0_form",
       title: "Forms",
       href: links.forms,
       description: "Get user responses, Launch MVP",
     } satisfies Item,
     canvas: {
+      icon: "v0_canvas",
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
     } satisfies Item,
     library: {
+      icon: "folder",
       title: "Library",
       href: links.library,
       description: "Free hand picked design resources",
