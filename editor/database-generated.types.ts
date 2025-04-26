@@ -1888,33 +1888,33 @@ export type Database = {
         Row: {
           avatar_url: string | null
           blog: string | null
-          created_at: string | null
+          created_at: string
           id: string
           name: string
           provider: string | null
-          updated_at: string | null
+          updated_at: string
           user_id: string | null
           username: string
         }
         Insert: {
           avatar_url?: string | null
           blog?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
           name: string
           provider?: string | null
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string | null
           username: string
         }
         Update: {
           avatar_url?: string | null
           blog?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
           name?: string
           provider?: string | null
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string | null
           username?: string
         }
@@ -1924,32 +1924,32 @@ export type Database = {
         Row: {
           author_id: string | null
           cover_object_id: string | null
-          created_at: string | null
+          created_at: string
           description: string | null
           id: string
           name: string
           slug: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           author_id?: string | null
           cover_object_id?: string | null
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           name: string
           slug: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           author_id?: string | null
           cover_object_id?: string | null
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           id?: string
           name?: string
           slug?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -2007,7 +2007,7 @@ export type Database = {
           category: string
           color: string
           colors: unknown[]
-          created_at: string | null
+          created_at: string
           description: string
           entropy: number | null
           fill: string | null
@@ -2030,7 +2030,7 @@ export type Database = {
           search_tsv: unknown | null
           title: string | null
           transparency: boolean
-          updated_at: string | null
+          updated_at: string
           version: number
           width: number
           year: number | null
@@ -2043,7 +2043,7 @@ export type Database = {
           category: string
           color: string
           colors?: unknown[]
-          created_at?: string | null
+          created_at?: string
           description: string
           entropy?: number | null
           fill?: string | null
@@ -2066,7 +2066,7 @@ export type Database = {
           search_tsv?: unknown | null
           title?: string | null
           transparency: boolean
-          updated_at?: string | null
+          updated_at?: string
           version?: number
           width: number
           year?: number | null
@@ -2079,7 +2079,7 @@ export type Database = {
           category?: string
           color?: string
           colors?: unknown[]
-          created_at?: string | null
+          created_at?: string
           description?: string
           entropy?: number | null
           fill?: string | null
@@ -2102,7 +2102,7 @@ export type Database = {
           search_tsv?: unknown | null
           title?: string | null
           transparency?: boolean
-          updated_at?: string | null
+          updated_at?: string
           version?: number
           width?: number
           year?: number | null
