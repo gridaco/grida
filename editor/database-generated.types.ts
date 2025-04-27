@@ -1920,6 +1920,27 @@ export type Database = {
         }
         Relationships: []
       }
+      category: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       collection: {
         Row: {
           author_id: string | null
@@ -2114,6 +2135,13 @@ export type Database = {
           year?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_object_category"
+            columns: ["category"]
+            isOneToOne: false
+            referencedRelation: "category"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "object_author_id_fkey"
             columns: ["author_id"]
@@ -4767,24 +4795,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4795,6 +4805,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4809,7 +4837,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

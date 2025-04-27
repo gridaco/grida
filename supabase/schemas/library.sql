@@ -53,6 +53,19 @@ REVOKE SELECT (user_id) ON TABLE grida_library.author FROM anon;
 REVOKE SELECT (user_id) ON TABLE grida_library.author FROM authenticated;
 
 ---------------------------------------------------------------------
+-- [Category] --
+---------------------------------------------------------------------
+CREATE TABLE grida_library.category (
+  id TEXT PRIMARY KEY,        -- e.g. 'wallpaper', 'illustration'
+  name TEXT NOT NULL,          -- human-readable name
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE grida_library.category ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_read" ON grida_library.category FOR SELECT TO public USING (true);
+
+---------------------------------------------------------------------
 -- [Object] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_library.object (
@@ -63,7 +76,7 @@ CREATE TABLE grida_library.object (
   alt TEXT,
   description TEXT,
   author_id UUID REFERENCES grida_library.author(id) ON DELETE SET NULL,
-  category grida_library.label NOT NULL,
+  category TEXT NOT NULL REFERENCES grida_library.category(id) ON DELETE RESTRICT,
   categories grida_library.label[] NOT NULL DEFAULT '{}',
   objects TEXT[] NOT NULL DEFAULT '{}',
   keywords TEXT[] NOT NULL DEFAULT '{}',
