@@ -60,7 +60,7 @@ export default async function ObjectPage({
         width={object.width}
         height={object.height}
         className="w-full object-cover rounded"
-        placeholder="blur"
+        placeholder={object.color ? "blur" : undefined}
         blurDataURL={
           object.color ? getBlurDataURLFromColor(object.color) : undefined
         }
