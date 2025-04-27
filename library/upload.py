@@ -67,11 +67,17 @@ def cli(input_dir, category, folder, file_type, env_file):
                     obj_author, on_conflict="provider,username").execute()
                 author_id = author.data[0].get("id")
 
+            annotated_fields = [
+                k for k, v in obj.items()
+                if v not in (None, [], "", {})
+            ]
+
             supabase.schema("grida_library").table("object").upsert({
                 "id": uploaded_obj_id,
                 "path": uploaded_path,
                 "title": obj.get("title"),
-                "description": obj["description"],
+                "alt": obj.get("alt"),
+                "description": obj.get("description"),
                 "author_id": author_id if obj_author else None,
                 "category": category,
                 "objects": obj.get("objects", []),
@@ -83,7 +89,7 @@ def cli(input_dir, category, folder, file_type, env_file):
                 "license": obj.get("license"),
                 "version": obj.get("version", 1),
                 "fill": obj.get("fill"),
-                "color": obj["color"],
+                "color": obj.get("color"),
                 "colors": obj.get("colors", []),
                 "background": obj.get("background"),
                 "transparency": obj["transparency"],
@@ -97,6 +103,7 @@ def cli(input_dir, category, folder, file_type, env_file):
                 "generator": obj.get("generator"),
                 "prompt": obj.get("prompt"),
                 "public_domain": obj.get("public_domain", False),
+                "sys_annotations": annotated_fields,
             }).execute()
         except Exception as e:
             tqdm.write(f"[ERROR] {file.name}: {e}")

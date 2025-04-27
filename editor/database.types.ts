@@ -30,7 +30,7 @@ export type Database = MergeDeep<
             DatabaseGenerated["grida_library"]["Tables"]["object"]["Row"],
             "colors"
           > & {
-            color: string;
+            color: string | null;
             colors: string[];
           };
         };

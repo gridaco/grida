@@ -49,6 +49,17 @@ export async function random({ text }: { text?: string }) {
   };
 }
 
+export async function listCategories() {
+  const client = await createLibraryClient();
+  const { data, error } = await client.from("category").select("*");
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export async function list() {
   const client = await createLibraryClient();
   const { data, error, count } = await client

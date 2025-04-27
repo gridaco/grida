@@ -1,6 +1,6 @@
 import React from "react";
 import Image from "next/image";
-import { list, search } from "../actions";
+import { list, listCategories, search } from "../actions";
 import { Input } from "@/components/ui/input";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
@@ -14,6 +14,7 @@ export default async function LibraryHomePage({
     search?: string;
   };
 }) {
+  const categories = await listCategories();
   const q_search = searchParams?.search || "";
   const q_category = searchParams?.category || "";
   const objects =
@@ -58,10 +59,10 @@ export default async function LibraryHomePage({
       <section>
         <div className="flex flex-wrap gap-2">
           {/* Category cards placeholder */}
-          {["shapes", "nature", "textures", "animals"].map((category) => (
-            <Link key={category} href={`?category=${category}`}>
+          {categories.map((category) => (
+            <Link key={category.id} href={`?category=${category.id}`}>
               <div className="bg-muted rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted-foreground/10">
-                {category}
+                {category.name}
               </div>
             </Link>
           ))}
@@ -80,16 +81,29 @@ export default async function LibraryHomePage({
               <div key={object.id}>
                 <Image
                   src={object.url}
-                  alt={object.description}
+                  alt={
+                    object.alt ||
+                    object.description ||
+                    object.title ||
+                    object.prompt ||
+                    object.category
+                  }
                   width={object.width}
                   height={object.height}
-                  placeholder="blur"
-                  blurDataURL={getBlurDataURLFromColor(object.color)}
+                  placeholder={object.color ? "blur" : undefined}
+                  blurDataURL={
+                    object.color
+                      ? getBlurDataURLFromColor(object.color)
+                      : undefined
+                  }
                   className="w-full object-cover rounded"
                 />
                 <div className="py-2">
                   <div className="text-xs text-muted-foreground">
-                    {object.description}
+                    {object.description ||
+                      object.alt ||
+                      object.title ||
+                      object.prompt}
                   </div>
                   {object.author && (
                     <Link

@@ -53,6 +53,19 @@ REVOKE SELECT (user_id) ON TABLE grida_library.author FROM anon;
 REVOKE SELECT (user_id) ON TABLE grida_library.author FROM authenticated;
 
 ---------------------------------------------------------------------
+-- [Category] --
+---------------------------------------------------------------------
+CREATE TABLE grida_library.category (
+  id TEXT PRIMARY KEY,        -- e.g. 'wallpaper', 'illustration'
+  name TEXT NOT NULL,          -- human-readable name
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE grida_library.category ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_read" ON grida_library.category FOR SELECT TO public USING (true);
+
+---------------------------------------------------------------------
 -- [Object] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_library.object (
@@ -60,9 +73,10 @@ CREATE TABLE grida_library.object (
   path TEXT NOT NULL UNIQUE,
   path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(path, '/'::text)) STORED,
   title TEXT,
-  description TEXT NOT NULL,
+  alt TEXT,
+  description TEXT,
   author_id UUID REFERENCES grida_library.author(id) ON DELETE SET NULL,
-  category grida_library.label NOT NULL,
+  category TEXT NOT NULL REFERENCES grida_library.category(id) ON DELETE RESTRICT,
   categories grida_library.label[] NOT NULL DEFAULT '{}',
   objects TEXT[] NOT NULL DEFAULT '{}',
   keywords TEXT[] NOT NULL DEFAULT '{}',
@@ -72,8 +86,8 @@ CREATE TABLE grida_library.object (
   bytes INT NOT NULL,
   license TEXT NOT NULL DEFAULT 'CC0-1.0',
   version INT NOT NULL DEFAULT 1 CHECK (version >= 1),
-  fill TEXT,
-  color grida_library.color NOT NULL,
+  fill TEXT, -- e.g. currentColor / mixed
+  color grida_library.color,
   colors grida_library.color[] NOT NULL DEFAULT '{}',
   background grida_library.color NULL,
   score NUMERIC CHECK (score >= 0 AND score <= 1),
@@ -87,6 +101,7 @@ CREATE TABLE grida_library.object (
   prompt TEXT,
   transparency BOOLEAN NOT NULL,
   public_domain BOOLEAN NOT NULL DEFAULT false,
+  sys_annotations TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

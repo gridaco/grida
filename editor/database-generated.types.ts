@@ -1920,6 +1920,27 @@ export type Database = {
         }
         Relationships: []
       }
+      category: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       collection: {
         Row: {
           author_id: string | null
@@ -2000,15 +2021,16 @@ export type Database = {
       }
       object: {
         Row: {
+          alt: string | null
           author_id: string | null
           background: string | null
           bytes: number
           categories: unknown[]
           category: string
-          color: string
+          color: string | null
           colors: unknown[]
           created_at: string
-          description: string
+          description: string | null
           entropy: number | null
           fill: string | null
           generator: string | null
@@ -2028,6 +2050,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown | null
+          sys_annotations: string[]
           title: string | null
           transparency: boolean
           updated_at: string
@@ -2036,15 +2059,16 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          alt?: string | null
           author_id?: string | null
           background?: string | null
           bytes: number
           categories?: unknown[]
           category: string
-          color: string
+          color?: string | null
           colors?: unknown[]
           created_at?: string
-          description: string
+          description?: string | null
           entropy?: number | null
           fill?: string | null
           generator?: string | null
@@ -2064,6 +2088,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
+          sys_annotations?: string[]
           title?: string | null
           transparency: boolean
           updated_at?: string
@@ -2072,15 +2097,16 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          alt?: string | null
           author_id?: string | null
           background?: string | null
           bytes?: number
           categories?: unknown[]
           category?: string
-          color?: string
+          color?: string | null
           colors?: unknown[]
           created_at?: string
-          description?: string
+          description?: string | null
           entropy?: number | null
           fill?: string | null
           generator?: string | null
@@ -2100,6 +2126,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
+          sys_annotations?: string[]
           title?: string | null
           transparency?: boolean
           updated_at?: string
@@ -2108,6 +2135,13 @@ export type Database = {
           year?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_object_category"
+            columns: ["category"]
+            isOneToOne: false
+            referencedRelation: "category"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "object_author_id_fkey"
             columns: ["author_id"]
@@ -2125,15 +2159,16 @@ export type Database = {
       random: {
         Args: { p_limit?: number }
         Returns: {
+          alt: string | null
           author_id: string | null
           background: string | null
           bytes: number
           categories: unknown[]
           category: string
-          color: string
+          color: string | null
           colors: unknown[]
           created_at: string
-          description: string
+          description: string | null
           entropy: number | null
           fill: string | null
           generator: string | null
@@ -2153,6 +2188,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown | null
+          sys_annotations: string[]
           title: string | null
           transparency: boolean
           updated_at: string
@@ -4759,24 +4795,6 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4787,6 +4805,24 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4801,7 +4837,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: number
+        Returns: string
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
