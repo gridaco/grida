@@ -80,11 +80,21 @@ export default async function LibraryHomePage({
               <div key={object.id}>
                 <Image
                   src={object.url}
-                  alt={object.description}
+                  alt={
+                    object.alt ||
+                    object.description ||
+                    object.title ||
+                    object.prompt ||
+                    object.category
+                  }
                   width={object.width}
                   height={object.height}
                   placeholder="blur"
-                  blurDataURL={getBlurDataURLFromColor(object.color)}
+                  blurDataURL={
+                    object.color
+                      ? getBlurDataURLFromColor(object.color)
+                      : undefined
+                  }
                   className="w-full object-cover rounded"
                 />
                 <div className="py-2">

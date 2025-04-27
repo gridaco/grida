@@ -30,6 +30,7 @@ map_meta = {
 
 map_describe = {
     "objects": "objects",
+    "alt": "alt",
     "description": "description",
     "category": "category",
     "categories": "categories",
@@ -37,7 +38,7 @@ map_describe = {
 }
 
 map_unsplash = {
-    "alt_description": "description",  # for fallback only
+    "alt_description": "alt",
     "description": "description",
     "user.name": "author.name",
     "user.username": "author.username",

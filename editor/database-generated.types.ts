@@ -2000,15 +2000,16 @@ export type Database = {
       }
       object: {
         Row: {
+          alt: string | null
           author_id: string | null
           background: string | null
           bytes: number
           categories: unknown[]
           category: string
-          color: string
+          color: string | null
           colors: unknown[]
           created_at: string
-          description: string
+          description: string | null
           entropy: number | null
           fill: string | null
           generator: string | null
@@ -2028,6 +2029,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown | null
+          sys_annotations: string[]
           title: string | null
           transparency: boolean
           updated_at: string
@@ -2036,15 +2038,16 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          alt?: string | null
           author_id?: string | null
           background?: string | null
           bytes: number
           categories?: unknown[]
           category: string
-          color: string
+          color?: string | null
           colors?: unknown[]
           created_at?: string
-          description: string
+          description?: string | null
           entropy?: number | null
           fill?: string | null
           generator?: string | null
@@ -2064,6 +2067,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
+          sys_annotations?: string[]
           title?: string | null
           transparency: boolean
           updated_at?: string
@@ -2072,15 +2076,16 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          alt?: string | null
           author_id?: string | null
           background?: string | null
           bytes?: number
           categories?: unknown[]
           category?: string
-          color?: string
+          color?: string | null
           colors?: unknown[]
           created_at?: string
-          description?: string
+          description?: string | null
           entropy?: number | null
           fill?: string | null
           generator?: string | null
@@ -2100,6 +2105,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown | null
+          sys_annotations?: string[]
           title?: string | null
           transparency?: boolean
           updated_at?: string
@@ -2125,15 +2131,16 @@ export type Database = {
       random: {
         Args: { p_limit?: number }
         Returns: {
+          alt: string | null
           author_id: string | null
           background: string | null
           bytes: number
           categories: unknown[]
           category: string
-          color: string
+          color: string | null
           colors: unknown[]
           created_at: string
-          description: string
+          description: string | null
           entropy: number | null
           fill: string | null
           generator: string | null
@@ -2153,6 +2160,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown | null
+          sys_annotations: string[]
           title: string | null
           transparency: boolean
           updated_at: string

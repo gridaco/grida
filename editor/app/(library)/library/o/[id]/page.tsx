@@ -50,12 +50,20 @@ export default async function ObjectPage({
     <div className="flex flex-col items-center justify-center min-h-screen p-8">
       <Image
         src={object.url}
-        alt={object.description}
+        alt={
+          object.alt ||
+          object.description ||
+          object.title ||
+          object.prompt ||
+          object.category
+        }
         width={object.width}
         height={object.height}
         className="w-full object-cover rounded"
         placeholder="blur"
-        blurDataURL={getBlurDataURLFromColor(object.color)}
+        blurDataURL={
+          object.color ? getBlurDataURLFromColor(object.color) : undefined
+        }
         style={{
           maxWidth: object.width,
           maxHeight: object.height,
@@ -63,12 +71,14 @@ export default async function ObjectPage({
       />
       {/* colors */}
       <div className="flex gap-2 mt-4">
-        <div
-          className="w-8 h-8 rounded-full"
-          style={{
-            backgroundColor: object.color,
-          }}
-        />{" "}
+        {object.color && (
+          <div
+            className="w-8 h-8 rounded-full"
+            style={{
+              backgroundColor: object.color,
+            }}
+          />
+        )}
         <Separator orientation="vertical" className="h-8" />
         {object.colors.map((color, i) => (
           <div
