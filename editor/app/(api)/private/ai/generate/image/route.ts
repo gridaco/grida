@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { experimental_generateImage, type GeneratedFile } from "ai";
+import {
+  experimental_generateImage,
+  type GeneratedFile,
+  type ImageModel,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
 import { replicate } from "@ai-sdk/replicate";
 import { createLibraryClient, service_role } from "@/lib/supabase/server";
 import { v4 } from "uuid";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { ai_credit_limit } from "../../ratelimit";
 import mime from "mime-types";
 import ai from "@/lib/ai";
 
-type GenerateImageApiRequestBody = {
+export type GenerateImageApiRequestBody = {
   prompt: string;
   width: number;
   height: number;
-  model: ai.image.ProviderModel;
+  model: ai.image.ProviderModel | ai.image.ImageModelId;
+};
+
+export type GenerateImageApiResponse = {
+  data: {
+    object: any;
+    publicUrl: string;
+    timestamp: string;
+    modelId: string;
+  };
 };
 
 export async function POST(req: NextRequest) {
@@ -27,50 +39,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "login required" }, { status: 401 });
   }
 
-  // rate limit
-  const ratelimit = new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(10, "1h"),
-  });
+  const rate = await ai_credit_limit();
+  if (!rate) {
+    return NextResponse.json(
+      { message: "something went wrong" },
+      { status: 500 }
+    );
+  }
 
-  const { success, limit, reset, remaining } = await ratelimit.limit(
-    `ratelimit_u_${userdata.user.id}`
-  );
-
-  const ratelimit_headers = {
-    "x-ratelimit-limit": limit.toString(),
-    "x-ratelimit-reset": reset.toString(),
-    "x-ratelimit-remaining": remaining.toString(),
-  };
-
-  if (!success) {
+  if (!rate.success) {
     return NextResponse.json(
       {
         message: "ratelimit exceeded",
-        limit,
-        reset,
-        remaining,
+        limit: rate.limit,
+        reset: rate.reset,
+        remaining: rate.remaining,
       },
       {
         status: 429,
-        headers: { ...ratelimit_headers },
+        headers: { ...rate.headers },
       }
     );
   }
+
+  const model = getImageModel(body.model);
+  if (!model) throw new Error("Model not found");
 
   // generate image
   const generation = await generateImage({
     prompt: body.prompt,
     width: body.width,
     height: body.height,
-    model: body.model,
+    model: model,
   });
+
+  const meta = generation.responses[0];
 
   // save to library
   const { object, publicUrl } = await upload_generated_to_library({
     client: service_role.library,
     request: {
-      model: body.model,
+      model: model.modelId,
       prompt: body.prompt,
       width: body.width,
       height: body.height,
@@ -83,18 +92,35 @@ export async function POST(req: NextRequest) {
     data: {
       object,
       publicUrl,
+      modelId: meta.modelId,
+      timestamp: meta.timestamp.toISOString(),
     },
-  });
+  } satisfies GenerateImageApiResponse);
 }
 
-function getImageModel(model: ai.image.ProviderModel) {
+function getImageModel(
+  model: ai.image.ProviderModel | ai.image.ImageModelId
+): ImageModel | null {
+  if (typeof model === "string") {
+    const card = ai.image.models[model];
+    if (!card) return null;
+    switch (card.provider) {
+      case "openai":
+        return openai.image(card.id);
+      case "replicate":
+        return replicate.image(card.id);
+      default:
+        return null;
+    }
+  }
+
   switch (model.provider) {
     case "openai":
       return openai.image(model.modelId);
     case "replicate":
       return replicate.image(model.modelId);
     default:
-      return undefined;
+      return null;
   }
 }
 
@@ -106,7 +132,7 @@ async function upload_generated_to_library({
   client: Awaited<ReturnType<typeof createLibraryClient>>;
   file: GeneratedFile;
   request: {
-    model: ai.image.ProviderModel;
+    model: ai.image.ImageModelId;
     prompt: string;
     width: number;
     height: number;
@@ -137,7 +163,7 @@ async function upload_generated_to_library({
       path: uploaded.path,
       mimetype: mimeType,
       //
-      generator: request.model.modelId,
+      generator: request.model,
       prompt: request.prompt,
       //
       width: request.width,
@@ -159,19 +185,16 @@ async function upload_generated_to_library({
 }
 
 async function generateImage({
-  model: _model,
+  model,
   prompt,
   width,
   height,
 }: {
-  model: ai.image.ProviderModel;
+  model: ImageModel;
   prompt: string;
   width: number;
   height: number;
 }) {
-  const model = getImageModel(_model);
-  if (!model) throw new Error("Model not found");
-
   return await experimental_generateImage({
     model: model,
     prompt: prompt,

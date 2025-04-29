@@ -183,7 +183,7 @@
     "react-player": "^2.14.1",
     "react-rnd": "^10.5.2",
     "react-textarea-autosize": "^8.5.9",
-    "react-timer-hook": "^3.0.7",
+    "react-timer-hook": "^4.0.5",
     "react-use": "^17.5.1",
     "react-window": "^1.8.6",
     "recharts": "^2.12.7",

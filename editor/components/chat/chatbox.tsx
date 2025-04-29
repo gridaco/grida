@@ -3,13 +3,13 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUpIcon, ImageUpIcon } from "lucide-react";
-import { FileIO } from "@/lib/file";
 import { useFilePicker } from "use-file-picker";
-import { cn } from "@/utils";
+import { Cross2Icon } from "@radix-ui/react-icons";
+import { cn } from "@/utils/cn";
+import type { FileIO } from "@/lib/file";
 import Image from "next/image";
 import TextareaAutoResize from "react-textarea-autosize";
 import toast from "react-hot-toast";
-import { Cross2Icon } from "@radix-ui/react-icons";
 
 type Attachment = {
   type: "file" | "image";
@@ -22,19 +22,25 @@ export function ChatBox({
   disabled,
   onValueCommit,
   uploader,
+  placeholder = "Chat with your prompt...",
   className,
+  accept,
 }: {
   disabled?: boolean;
   onValueCommit?: (value: { text: string; attachments: Attachment[] }) => void;
   uploader?: FileIO.BucketFileUploaderFn;
+  placeholder?: string;
   className?: string;
+  accept?: string;
 }) {
   const [attatchment, setAttachment] = React.useState<Attachment>();
 
   const { plainFiles, openFilePicker } = useFilePicker({
-    accept: "image/*",
+    accept: accept,
     multiple: false,
   });
+
+  const acceptsImage = accept?.includes("image/") ?? false;
 
   useEffect(
     () => {
@@ -63,6 +69,7 @@ export function ChatBox({
   );
 
   const [txt, setTxt] = React.useState<string>("");
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const clear = () => {
     setTxt("");
@@ -85,9 +92,10 @@ export function ChatBox({
   return (
     <div
       className={cn(
-        "w-full flex flex-col rounded-xl border border-input bg-muted p-4",
+        "w-full flex flex-col rounded-xl border border-input bg-muted cursor-text",
         className
       )}
+      onClick={() => textareaRef.current?.focus()}
     >
       {attatchment && (
         <div className="flex mb-2">
@@ -111,8 +119,10 @@ export function ChatBox({
         </div>
       )}
       <TextareaAutoResize
-        placeholder="Chat with your prompt..."
-        className="resize-none border-none outline-none bg-transparent"
+        ref={textareaRef}
+        placeholder={placeholder}
+        maxRows={10}
+        className="resize-none border-none outline-none bg-transparent text-sm p-4"
         value={txt}
         onChange={(e) => setTxt(e.target.value)}
         onKeyDown={(e) => {
@@ -122,16 +132,18 @@ export function ChatBox({
           }
         }}
       />
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-2 px-4 pb-4">
         <div className="flex-1 flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={openFilePicker}
-          >
-            <ImageUpIcon className="size-4" />
-          </Button>
+          {acceptsImage && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={openFilePicker}
+            >
+              <ImageUpIcon className="size-4" />
+            </Button>
+          )}
         </div>
         <Button
           disabled={disabled}

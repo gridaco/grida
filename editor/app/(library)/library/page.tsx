@@ -3,8 +3,9 @@ import Image from "next/image";
 import { list, listCategories, search } from "../actions";
 import { Input } from "@/components/ui/input";
 import { GridaLogo } from "@/components/grida-logo";
-import Link from "next/link";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
+import type { Library } from "@/lib/library";
+import Link from "next/link"; //
 
 export default async function LibraryHomePage({
   searchParams,
@@ -70,7 +71,7 @@ export default async function LibraryHomePage({
       </section>
 
       <section>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {/* Resource cards placeholder */}
           {objects.data?.map((object) => (
             <Link
@@ -78,50 +79,58 @@ export default async function LibraryHomePage({
               href={`/library/o/${object.id}`}
               className="group transition-all"
             >
-              <div key={object.id}>
-                <Image
-                  src={object.url}
-                  alt={
-                    object.alt ||
-                    object.description ||
-                    object.title ||
-                    object.prompt ||
-                    object.category
-                  }
-                  width={object.width}
-                  height={object.height}
-                  placeholder={object.color ? "blur" : undefined}
-                  blurDataURL={
-                    object.color
-                      ? getBlurDataURLFromColor(object.color)
-                      : undefined
-                  }
-                  className="w-full object-cover rounded"
-                />
-                <div className="py-2">
-                  <div className="text-xs text-muted-foreground">
-                    {object.description ||
-                      object.alt ||
-                      object.title ||
-                      object.prompt}
-                  </div>
-                  {object.author && (
-                    <Link
-                      href={object.author.blog ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <div className="text-xs underline">
-                        by {object.author.name}
-                      </div>
-                    </Link>
-                  )}
-                </div>
-              </div>
+              <ImageCard object={object} />
             </Link>
           ))}
         </div>
       </section>
     </main>
+  );
+}
+
+function ImageCard({
+  object,
+}: {
+  object: Library.Object & {
+    url: string;
+    author: Library.Author | null;
+  };
+}) {
+  const text =
+    object.description || object.alt || object.title || object.prompt;
+  return (
+    <div className="group relative">
+      <Image
+        src={object.url}
+        alt={
+          object.alt ||
+          object.description ||
+          object.title ||
+          object.prompt ||
+          object.category
+        }
+        width={object.width}
+        height={object.height}
+        placeholder={object.color ? "blur" : undefined}
+        blurDataURL={
+          object.color ? getBlurDataURLFromColor(object.color) : undefined
+        }
+        className="w-full object-cover rounded"
+      />
+      <div className="py-2 flex flex-col gap-1">
+        <div className="max-h-10">
+          <p className="text-xs text-muted-foreground line-clamp-2">{text}</p>
+        </div>
+        {object.author && (
+          <Link
+            href={object.author.blog ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div className="text-xs underline">@{object.author.name}</div>
+          </Link>
+        )}
+      </div>
+    </div>
   );
 }

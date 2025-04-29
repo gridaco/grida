@@ -917,8 +917,8 @@ importers:
         specifier: ^8.5.9
         version: 8.5.9(@types/react@18.2.58)(react@18.3.1)
       react-timer-hook:
-        specifier: ^3.0.7
-        version: 3.0.8(react@18.3.1)
+        specifier: ^4.0.5
+        version: 4.0.5(react@18.3.1)
       react-use:
         specifier: ^17.5.1
         version: 17.6.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -17464,8 +17464,8 @@ packages:
     peerDependencies:
       react: ^18.2.0
 
-  react-timer-hook@3.0.8:
-    resolution: {integrity: sha512-bi2e7DhPBU1MRPU4ZHaVqBmgM9e2HK0ae8O2AIqwqjcPo4/qR7lVGQonOQLAKOZPQCJSYfV8F5aBWzOLXElzqQ==}
+  react-timer-hook@4.0.5:
+    resolution: {integrity: sha512-elDxx4OIxBTbm4rXSK5cjBHkq06prO2qY9JzoYxOa11AkL3ij69jp0VuDUOqcehEK38CV0uu7FzUKtPVISRLKA==}
     peerDependencies:
       react: ^18.2.0
 
@@ -42485,7 +42485,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  react-timer-hook@3.0.8(react@18.3.1):
+  react-timer-hook@4.0.5(react@18.3.1):
     dependencies:
       react: 18.3.1
 
