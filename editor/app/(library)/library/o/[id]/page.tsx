@@ -46,8 +46,13 @@ export default async function ObjectPage({
 
   const { author } = object;
 
+  const text =
+    object.description || object.alt || object.title || object.prompt;
+
+  const has_colors = object.colors && object.colors.length > 0;
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8">
+    <div className="container max-w-4xl mx-auto flex flex-col items-center justify-center text-center min-h-screen p-8">
       <Image
         src={object.url}
         alt={
@@ -69,25 +74,26 @@ export default async function ObjectPage({
           maxHeight: object.height,
         }}
       />
-      {/* colors */}
-      <div className="flex gap-2 mt-4">
-        {object.color && (
-          <div
-            className="w-8 h-8 rounded-full"
-            style={{
-              backgroundColor: object.color,
-            }}
-          />
-        )}
-        <Separator orientation="vertical" className="h-8" />
-        {object.colors.map((color, i) => (
-          <div
-            key={i}
-            className="w-8 h-8 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-        ))}
-      </div>
+      {has_colors && (
+        <div className="flex gap-2 mt-4">
+          {object.color && (
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{
+                backgroundColor: object.color,
+              }}
+            />
+          )}
+          <Separator orientation="vertical" className="h-8" />
+          {object.colors.map((color, i) => (
+            <div
+              key={i}
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 mt-4">
         {object.objects.map((keyword, i) => (
           <Badge variant="outline" key={i}>
@@ -101,7 +107,7 @@ export default async function ObjectPage({
         ))}
       </div>
       <h1 className="text-2xl mt-4">{object.title}</h1>
-      <p className="text-xs text-muted-foreground">{object.description}</p>
+      <p className="text-xs text-muted-foreground">{text}</p>
       {author && (
         <div>
           <Link
@@ -119,6 +125,9 @@ export default async function ObjectPage({
       {/* license */}
       <div className="flex gap-2 mt-4">
         <span className="text-xs">License: {object.license}</span>
+        {object.generator && (
+          <span className="text-xs">Generator: {object.generator}</span>
+        )}
       </div>
 
       <footer className="mt-10">
