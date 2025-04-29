@@ -57,6 +57,12 @@ export namespace ai {
 
     export type ImageModelId = OpenAIImageModelId | ReplicateImageModelId;
 
+    export type AspectRatioString = `${number}:${number}`;
+
+    export type SizeString = `${number}x${number}`;
+
+    export type SizeWithAspectRatio = [number, number, AspectRatioString];
+
     export type ImageModelCard = {
       id: ImageModelId;
       label: string;
@@ -70,7 +76,7 @@ export namespace ai {
       max_width: number;
       min_height: number;
       max_height: number;
-      sizes: [number, number][] | null;
+      sizes: SizeWithAspectRatio[] | null;
       avg_ppi: number;
       avg_credit: number;
     };
@@ -107,9 +113,9 @@ export namespace ai {
         speed_max: "1m",
         styles: null,
         sizes: [
-          [1024, 1024],
-          [1024, 1536],
-          [1536, 1024],
+          [1024, 1024, "1:1"],
+          [1024, 1536, "2:3"],
+          [1536, 1024, "3:2"],
         ],
         min_width: 1024,
         max_width: 1536,
@@ -149,21 +155,21 @@ export namespace ai {
           "realistic_image/motion_blur",
         ] as RecraftV3Style[],
         sizes: [
-          [1024, 1024],
-          [1365, 1024],
-          [1024, 1365],
-          [1536, 1024],
-          [1024, 1536],
-          [1820, 1024],
-          [1024, 1820],
-          [1024, 2048],
-          [2048, 1024],
-          [1434, 1024],
-          [1024, 1434],
-          [1024, 1280],
-          [1280, 1024],
-          [1024, 1707],
-          [1707, 1024],
+          [1024, 1024, "1:1"],
+          [1365, 1024, "4:3"],
+          [1024, 1365, "3:4"],
+          [1536, 1024, "3:2"],
+          [1024, 1536, "2:3"],
+          [1820, 1024, "16:9"],
+          [1024, 1820, "9:16"],
+          [1024, 2048, "1:2"],
+          [2048, 1024, "2:1"],
+          [1434, 1024, "7:5"],
+          [1024, 1434, "5:7"],
+          [1024, 1280, "4:5"],
+          [1280, 1024, "5:4"],
+          [1024, 1707, "3:5"],
+          [1707, 1024, "5:3"],
         ],
         min_width: 1024,
         max_width: 1820,
