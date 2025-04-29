@@ -22,14 +22,14 @@ export function ChatBox({
   disabled,
   onValueCommit,
   uploader,
-  placeeholder = "Chat with your prompt...",
+  placeholder = "Chat with your prompt...",
   className,
   accept,
 }: {
   disabled?: boolean;
   onValueCommit?: (value: { text: string; attachments: Attachment[] }) => void;
   uploader?: FileIO.BucketFileUploaderFn;
-  placeeholder?: string;
+  placeholder?: string;
   className?: string;
   accept?: string;
 }) {
@@ -120,7 +120,7 @@ export function ChatBox({
       )}
       <TextareaAutoResize
         ref={textareaRef}
-        placeholder={placeeholder}
+        placeholder={placeholder}
         maxRows={10}
         className="resize-none border-none outline-none bg-transparent text-sm p-4"
         value={txt}

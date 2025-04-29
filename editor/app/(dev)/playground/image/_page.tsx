@@ -281,7 +281,7 @@ export default function ImagePlayground() {
           <ChatBox
             disabled={loading}
             onValueCommit={onCommit}
-            placeeholder="Describe what you want to see..."
+            placeholder="Describe what you want to see..."
           />
         </div>
       </main>
