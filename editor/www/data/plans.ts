@@ -24,28 +24,34 @@ export const plans: PricingInformation[] = [
     nameBadge: "",
     href: "/dashboard/new?plan=free",
     priceLabel: "",
-    priceMonthly: 0,
+    priceMonthly: "$0",
     description: "Perfect for hobby projects.",
     features: [
       {
-        name: "Responses Included",
-        trail: "100 / month",
+        name: "1,000 monthly active users",
       },
       {
-        name: "Additional responses",
-        trail: "X",
+        name: "Projects & Sites",
+        trail: "3",
       },
       {
-        name: "Number of forms",
-        trail: "5",
+        name: "AI Credits",
+        trail: "500",
       },
       {
-        name: "Blocks per form",
+        name: "Designs",
+        trail: "♾️",
+      },
+      {
+        name: "Forms",
         trail: "♾️",
       },
       {
         name: "Seats",
         trail: "1",
+      },
+      {
+        name: "1GB Storage",
       },
     ],
     cta: "Start for free",
@@ -59,28 +65,36 @@ export const plans: PricingInformation[] = [
     href: "/dashboard/new?plan=pro",
     priceLabel: "From",
     warning: "$10 in compute credits included",
-    priceMonthly: 20,
-    description: "For teams with the option to scale.",
+    priceMonthly: `$20`,
+    description: "For teams with creative workflows.",
     features: [
       {
-        name: "Responses Included",
-        trail: "1,000 / month",
+        name: "10,000 monthly active users",
       },
       {
-        name: "Additional responses",
-        trail: "$5 per 1K",
+        name: "Unlimited Projects & Sites",
       },
       {
-        name: "Number of forms",
+        name: "AI Credits",
+        trail: "10,000",
+      },
+      {
+        name: "Designs",
         trail: "♾️",
       },
       {
-        name: "Blocks per form",
+        name: "Forms",
         trail: "♾️",
       },
       {
         name: "Seats",
         trail: "♾️",
+      },
+      {
+        name: "30GB Storage",
+      },
+      {
+        name: "Email support",
       },
     ],
     cta: "Get Started",
@@ -93,28 +107,36 @@ export const plans: PricingInformation[] = [
     href: "/dashboard/new?plan=team",
     priceLabel: "From",
     warning: "$10 in compute credits included",
-    priceMonthly: 60,
-    description: "Pro, plus commerce features and more responses.",
+    priceMonthly: `$60`,
+    description: "Pro, plus more automated process",
     features: [
       {
-        name: "Responses Included",
-        trail: "10,000 / month",
+        name: "50,000 monthly active users",
       },
       {
-        name: "Additional responses",
-        trail: "$1 per 1K",
+        name: "Unlimited Projects & Sites",
       },
       {
-        name: "Number of forms",
+        name: "AI Credits",
+        trail: "35,000",
+      },
+      {
+        name: "Designs",
         trail: "♾️",
       },
       {
-        name: "Blocks per form",
+        name: "Forms",
         trail: "♾️",
       },
       {
         name: "Seats",
         trail: "♾️",
+      },
+      {
+        name: "500GB Storage",
+      },
+      {
+        name: "Chat support",
       },
     ],
     cta: "Get Started",
@@ -122,29 +144,21 @@ export const plans: PricingInformation[] = [
   {
     id: "tier_enterprise",
     name: "Enterprise",
-    href: "https://forms.grida.co/d/e/c3cf8937-f4f3-4c69-81f3-8d3b9e109013",
+    href: "https://grida.co/d/e/c3cf8937-f4f3-4c69-81f3-8d3b9e109013",
     description:
-      "For large-scale and building custom solutions on top fo Grida Forms.",
+      "For large-scale and building custom solutions on top fo Grida",
     features: [
       {
-        name: "Responses Included",
-        trail: "♾️",
+        name: "Dedicated support",
       },
       {
-        name: "Additional responses",
-        trail: "$1 per 1K",
+        name: "Dedicated instance",
       },
       {
-        name: "Number of forms",
-        trail: "♾️",
+        name: "Bulk operations",
       },
       {
-        name: "Blocks per form",
-        trail: "♾️",
-      },
-      {
-        name: "Seats",
-        trail: "♾️",
+        name: "Any Custom feature you need",
       },
     ],
     priceLabel: "",
@@ -157,12 +171,12 @@ export const save_plans: PricingInformation[] = [
   plans[0],
   {
     ...plans[1],
-    priceMonthly: 10,
+    priceMonthly: `$16`,
     href: "/dashboard/new?plan=pro&period=yearly",
   },
   {
     ...plans[2],
-    priceMonthly: 48,
+    priceMonthly: `$48`,
     href: "/dashboard/new?plan=team&period=yearly",
   },
   plans[3],

@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { CheckIcon } from "@radix-ui/react-icons";
 import clsx from "clsx";
 import React from "react";
+import { ShineBorder } from "../ui/shine-border";
 
 interface PricingCardFeatureItem {
   name: string;
@@ -31,35 +32,39 @@ export function PricingCard({
     <div
       data-highlight={highlight}
       className="
+        relative
         bg-background
-        dark:bg-white/5
-        flex-1 flex flex-col p-8 border gap-4 rounded-lg
+        dark:bg-muted/50
+        flex-1 flex flex-col p-6 border gap-4 rounded-lg
         md:h-[570px]
-        data-[highlight='true']:border-2
-        data-[highlight='true']:border-foreground
         hover:scale-[1.02]
         duration-300
         transition-all
         shadow
-         justify-between
+        justify-between
         "
     >
-      <div className="flex flex-col gap-1">
-        <span className="text-2xl font-semibold">{plan}</span>
-        <span className=" text-sm font-normal text-muted-foreground">
-          {excerpt}
-        </span>
-      </div>
-      <div>
-        <span className="text-4xl font-bold">{price.primary}</span>
-        {price.secondary && (
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {price.secondary}
+      {highlight && (
+        <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+      )}
+      <div className="flex-[2] flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-2xl font-semibold">{plan}</span>
+          <span className=" text-sm font-normal text-muted-foreground">
+            {excerpt}
           </span>
-        )}
+        </div>
+        <div className="my-2">
+          <span className="text-4xl font-bold">{price.primary}</span>
+          {price.secondary && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {price.secondary}
+            </span>
+          )}
+        </div>
+        <hr />
       </div>
-      <hr />
-      <div className="flex flex-col gap-5">
+      <div className="flex-[3] flex flex-col gap-3">
         {features.map((feature, i) => (
           <PricingFeatureRow key={i} {...feature} />
         ))}
@@ -89,8 +94,8 @@ export function PricingFeatureRow({
   return (
     <div className="flex items-center w-full gap-2">
       <CheckIcon />
-      <span className="flex-1">{name}</span>
-      <span className=" opacity-50">{number}</span>
+      <span className="flex-1 text-sm">{name}</span>
+      <span className="opacity-50 text-sm">{number}</span>
     </div>
   );
 }

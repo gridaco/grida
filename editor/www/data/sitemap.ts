@@ -4,6 +4,8 @@ export namespace sitemap {
   export const links = {
     x: "https://x.com/grida_co",
     github: "https://github.com/gridaco",
+    github_grida: "https://github.com/gridaco/grida",
+    dashboard: "/dashboard",
     downlaods: "/downloads",
     tools: "/tools",
     library: "/library",

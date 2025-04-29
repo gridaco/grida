@@ -40,6 +40,9 @@ export default async function OnboardWithNewFormPage({
     redirect("/sign-in?redirect_uri=" + uri);
   }
 
+  // FIXME:
+  redirect("/dashboard");
+
   if (price) {
     // if has price, create checkout session
     //
