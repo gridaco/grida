@@ -92,7 +92,7 @@ export function ChatBox({
   return (
     <div
       className={cn(
-        "w-full flex flex-col rounded-xl border border-input bg-muted p-4 cursor-text",
+        "w-full flex flex-col rounded-xl border border-input bg-muted cursor-text",
         className
       )}
       onClick={() => textareaRef.current?.focus()}
@@ -121,7 +121,8 @@ export function ChatBox({
       <TextareaAutoResize
         ref={textareaRef}
         placeholder={placeeholder}
-        className="resize-none border-none outline-none bg-transparent text-sm"
+        maxRows={10}
+        className="resize-none border-none outline-none bg-transparent text-sm p-4"
         value={txt}
         onChange={(e) => setTxt(e.target.value)}
         onKeyDown={(e) => {
@@ -131,7 +132,7 @@ export function ChatBox({
           }
         }}
       />
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-2 px-4 pb-4">
         <div className="flex-1 flex items-center gap-2">
           {acceptsImage && (
             <Button
