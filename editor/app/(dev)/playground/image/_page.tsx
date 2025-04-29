@@ -22,9 +22,12 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import ai from "@/lib/ai";
 import Link from "next/link";
-import { SingleImageFrame } from "./_components/image-frame";
+import { GenerationImageFrame } from "./_components/image-frame";
 import { SlashIcon } from "@radix-ui/react-icons";
-import type { GenerateImageApiRequestBody } from "@/app/(api)/private/ai/generate/image/route";
+import type {
+  GenerateImageApiRequestBody,
+  GenerateImageApiResponse,
+} from "@/app/(api)/private/ai/generate/image/route";
 
 type GeneratedImage = {
   src: string;
@@ -34,6 +37,9 @@ type GeneratedImage = {
 };
 
 function useGenerateImage() {
+  const [key, setKey] = useState(0);
+  const [start, setStart] = useState<Date | null>(null);
+  const [end, setEnd] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<GeneratedImage | null>(null);
   const generate = useCallback(
@@ -48,20 +54,28 @@ function useGenerateImage() {
       width: number;
       height: number;
     }) => {
+      setImage(null);
+      setKey((k) => k + 1);
+      setStart(new Date());
+      setEnd(null);
       setLoading(true);
-      const r = await fetch(`/private/ai/generate/image`, {
-        body: JSON.stringify({
-          model: model,
-          width: width,
-          height: height,
-          prompt,
-        } satisfies GenerateImageApiRequestBody),
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }).then((res) => res.json());
+      const r: GenerateImageApiResponse = await fetch(
+        `/private/ai/generate/image`,
+        {
+          body: JSON.stringify({
+            model: model,
+            width: width,
+            height: height,
+            prompt,
+          } satisfies GenerateImageApiRequestBody),
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      ).then((res) => res.json());
       setLoading(false);
+      setEnd(new Date(r.data.timestamp));
       setImage({
         src: r.data.publicUrl,
         width: width,
@@ -73,8 +87,11 @@ function useGenerateImage() {
   );
 
   return {
+    key,
     loading,
     image,
+    start,
+    end,
     generate,
   };
 }
@@ -152,7 +169,7 @@ export default function ImagePlayground() {
   const credits = useCredits();
   const [prompt, setPrompt] = useState("");
   const model = useImageModelConfig("gpt-image-1");
-  const { generate, loading, image } = useGenerateImage();
+  const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const sizeGroups = useMemo(() => {
     const groups = {
@@ -190,13 +207,16 @@ export default function ImagePlayground() {
         <span className="text-sm font-bold">Image Playground</span>
       </header>
       <main className="w-full h-full flex flex-col container max-w-xl mx-auto p-4">
-        <div className="flex-1 w-full h-full">
+        <div className="flex-1 flex flex-col items-center justify-center">
           {(loading || image) && (
-            <SingleImageFrame
-              key={prompt}
+            <GenerationImageFrame
+              key={key}
+              start={start}
+              end={end}
               width={model.width}
               height={model.height}
               image={image}
+              className="w-full overflow-scroll shadow-lg"
             />
           )}
         </div>

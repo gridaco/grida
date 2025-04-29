@@ -1,12 +1,17 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/utils";
 import { ShineBorder } from "@/www/ui/shine-border";
+import { useStopwatch } from "react-timer-hook";
+import { cn } from "@/utils";
 import Image from "next/image";
 
-export function SingleImageFrame({
+export function GenerationImageFrame({
   image,
   className,
+  width,
+  height,
+  start,
+  end,
 }: {
   image: {
     src: string;
@@ -14,14 +19,28 @@ export function SingleImageFrame({
     width: number;
     height: number;
   } | null;
+  start?: Date | null;
+  end?: Date | null;
   width: number;
   height: number;
   className?: string;
 }) {
+  const { totalMilliseconds, pause } = useStopwatch({
+    autoStart: true,
+    offsetTimestamp: start ?? undefined,
+    interval: 100,
+  });
+
+  useEffect(() => {
+    if (image) {
+      pause();
+    }
+  }, [image]);
+
   return (
     <figure
       className={cn(
-        "relative w-full h-full overflow-hidden rounded",
+        "relative w-full h-auto min-h-64 aspect-square overflow-hidden rounded",
         className
       )}
     >
@@ -32,10 +51,17 @@ export function SingleImageFrame({
           width={image.width}
           height={image.height}
           alt={image.alt ?? "Generated"}
-          className="w-full h-full object-cover"
+          className="w-full h-auto"
         />
       ) : (
-        <Skeleton className="w-full h-full" />
+        <div className="relative w-full h-full">
+          <Skeleton className="w-full h-full" />
+          <div className="absolute right-2 bottom-2">
+            <span className="font-mono text-xs">
+              {(totalMilliseconds / 1000).toFixed(1)}s
+            </span>
+          </div>
+        </div>
       )}
     </figure>
   );
