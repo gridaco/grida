@@ -7,6 +7,5 @@ const openai = new OpenAI({
 
 export async function GET() {
   const result = await openai.models.list();
-
   return NextResponse.json({ data: result.data });
 }
