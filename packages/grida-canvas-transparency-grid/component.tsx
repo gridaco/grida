@@ -17,7 +17,10 @@ export const TransparencyGrid: React.FC<TransparencyProps> = (props) => {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    if (!gridRef.current || gridRef.current.backend !== props.backend) {
+    if (
+      !gridRef.current ||
+      (props.backend && gridRef.current.backend !== props.backend)
+    ) {
       // Create once (or re-create if backend changes)
       gridRef.current = new TransparencyGridCanvas(
         canvasRef.current,
