@@ -5,12 +5,14 @@ import { NetworkArrow } from "./network-arrow";
 import { cn } from "@/utils";
 
 export function BezierCurvedLine({
+  id,
   a,
   b,
   width = 2,
   className,
 }: {
-  width: number;
+  id?: string;
+  width?: number;
   className?: string;
   a: cmath.Vector2;
   b: cmath.Vector2;
@@ -19,6 +21,7 @@ export function BezierCurvedLine({
 
   return (
     <svg
+      id={id}
       fill="transparent"
       style={{
         overflow: "visible",
@@ -27,7 +30,7 @@ export function BezierCurvedLine({
         // transform: `translate(${a[0]}px, ${a[1]}px)`,
         zIndex: 10,
       }}
-      className={cn(className)}
+      className={cn("text-foreground", className)}
     >
       <path
         strokeWidth={width}
