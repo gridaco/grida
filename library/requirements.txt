@@ -7,3 +7,4 @@ pylette
 python-dotenv
 supabase
 tqdm
+textual
