@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "esModuleInterop": true,
+    "jsx": "react",
+    "types": ["@webgpu/types"]
+  }
+}
