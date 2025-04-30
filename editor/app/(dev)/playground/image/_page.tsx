@@ -1,15 +1,13 @@
 "use client";
 
+import React, { useState, useMemo } from "react";
 import { ChatBox } from "@/components/chat";
-
-import { useCallback, useEffect, useState, useMemo } from "react";
 import { CommandIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 import {
   Select,
   SelectContent,
@@ -20,150 +18,15 @@ import {
   SelectLabel,
 } from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
-import ai from "@/lib/ai";
-import Link from "next/link";
 import { GenerationImageFrame } from "./_components/image-frame";
 import { SlashIcon } from "@radix-ui/react-icons";
-import type {
-  GenerateImageApiRequestBody,
-  GenerateImageApiResponse,
-} from "@/app/(api)/private/ai/generate/image/route";
-
-type GeneratedImage = {
-  src: string;
-  width: number;
-  height: number;
-  alt: string | null;
-};
-
-function useGenerateImage() {
-  const [key, setKey] = useState(0);
-  const [start, setStart] = useState<Date | null>(null);
-  const [end, setEnd] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [image, setImage] = useState<GeneratedImage | null>(null);
-  const generate = useCallback(
-    async ({
-      model,
-      prompt,
-      width,
-      height,
-    }: {
-      model: ai.image.ProviderModel | ai.image.ImageModelId;
-      prompt: string;
-      width: number;
-      height: number;
-    }) => {
-      setImage(null);
-      setKey((k) => k + 1);
-      setStart(new Date());
-      setEnd(null);
-      setLoading(true);
-      const r: GenerateImageApiResponse = await fetch(
-        `/private/ai/generate/image`,
-        {
-          body: JSON.stringify({
-            model: model,
-            width: width,
-            height: height,
-            prompt,
-          } satisfies GenerateImageApiRequestBody),
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      ).then((res) => res.json());
-      setLoading(false);
-      setEnd(new Date(r.data.timestamp));
-      setImage({
-        src: r.data.publicUrl,
-        width: width,
-        height: height,
-        alt: prompt,
-      });
-    },
-    []
-  );
-
-  return {
-    key,
-    loading,
-    image,
-    start,
-    end,
-    generate,
-  };
-}
-
-function useCredits() {
-  const [remaining, setRemaining] = useState(0);
-  const [reset, setReset] = useState(0);
-
-  const refresh = useCallback(async () => {
-    const r = await fetch(`/private/ai/credits`, {
-      method: "GET",
-    }).then((res) => res.json());
-    setRemaining(r.data.remaining);
-    setReset(r.data.reset);
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return {
-    remaining,
-    reset,
-    refresh,
-  };
-}
-
-function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
-  const [modelId, setModelId] = useState<ai.image.ImageModelId>(defaultModel);
-  const [config, setConfig] = useState<{
-    width: number;
-    height: number;
-  }>({
-    width: 1024,
-    height: 1024,
-  });
-
-  const [card, setCard] = useState<ai.image.ImageModelCard | undefined>(
-    ai.image.models[defaultModel]
-  );
-
-  const select = useCallback((modelId: ai.image.ImageModelId) => {
-    setCard(ai.image.models[modelId]);
-    setModelId(modelId);
-    // setConfig();
-  }, []);
-
-  const setSize = ({ width, height }: { width: number; height: number }) => {
-    setConfig((c: any) => ({
-      ...(c || {}),
-      width: width,
-      height: height,
-    }));
-  };
-
-  const setSizeFromValue = (value: ai.image.SizeString) => {
-    const [widthStr, heightStr] = value.split("x");
-    const width = parseInt(widthStr);
-    const height = parseInt(heightStr);
-    setSize({ width, height });
-  };
-
-  return {
-    modelId,
-    card,
-    ...config,
-    models: Object.values(ai.image.models) as ai.image.ImageModelCard[],
-    select,
-    setSize,
-    setSizeFromValue,
-  };
-}
+import {
+  useImageModelConfig,
+  useGenerateImage,
+  useCredits,
+} from "@/lib/ai/hooks";
+import ai from "@/lib/ai";
+import Link from "next/link";
 
 export default function ImagePlayground() {
   const credits = useCredits();
