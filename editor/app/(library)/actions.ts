@@ -51,7 +51,11 @@ export async function random({ text }: { text?: string }) {
 
 export async function listCategories() {
   const client = await createLibraryClient();
-  const { data, error } = await client.from("category").select("*");
+  const { data, error } = await client
+    .from("category")
+    .select("*")
+    // exclude IDs starting with _
+    .not("id", "ilike", "\\_%");
 
   if (error) {
     throw error;
