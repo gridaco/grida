@@ -7,11 +7,11 @@ from tqdm import tqdm
 SRC_BASE_URL = "https://the-public-domain-review.imgix.net"
 
 
-
 @click.group()
 def cli():
     """PD Image Archive CLI"""
     pass
+
 
 @cli.command("archive")
 @click.argument('images', type=click.Path(exists=True))
@@ -25,7 +25,7 @@ def archive(images, download_dir, no_skip):
     # Archive images
     with open(images, 'r', encoding='utf-8') as f:
         images = json.load(f)
-        
+
         os.makedirs(download_dir, exist_ok=True)
         for img in tqdm(images, desc="Downloading images"):
             src = img.get("src")
@@ -33,9 +33,11 @@ def archive(images, download_dir, no_skip):
                 continue
             url = SRC_BASE_URL + src
             uuid = img.get("uuid")
-            ext = os.path.splitext(src)[1].lower()
-            if ext == '.jpeg': ext = '.jpg' # use .jpg extension for consistency (if .jpeg)
-            filename = f"{uuid}{ext}" if uuid and ext else os.path.basename(src)
+            ext = os.path.splitext(src.split("?")[0])[1].lower()
+            if ext == '.jpeg':
+                ext = '.jpg'  # use .jpg extension for consistency (if .jpeg)
+            filename = f"{uuid}{ext}" if uuid and ext else os.path.basename(
+                src)
             path = os.path.join(download_dir, filename)
 
             if not no_skip and os.path.exists(path):
@@ -50,7 +52,7 @@ def archive(images, download_dir, no_skip):
                     print(f"Failed to download {url}: {response.status_code}")
             except Exception as e:
                 print(f"Error downloading {url}: {e}")
-                
+
         print(f"Archived images to {download_dir}")
 
 
@@ -83,6 +85,7 @@ def dump(file_path, output_path):
         json.dump(all_images, out, ensure_ascii=False)
 
     print(f"Dumped {len(all_images)} unique images to {output_path}")
+
 
 if __name__ == "__main__":
     cli()
