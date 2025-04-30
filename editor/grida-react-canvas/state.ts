@@ -883,12 +883,14 @@ export interface IDocumentEditorInit
   extends Pick<IEditorConfig, "editable" | "debug">,
     Partial<Pick<IEditorConfig, "features">>,
     grida.program.document.IDocumentTemplatesRepository {
-  document: Pick<
-    grida.program.document.Document,
-    "nodes" | "scenes" | "entry_scene_id"
-  > &
-    Partial<grida.program.document.IBitmapsRepository>;
+  document: Pick<grida.program.document.Document, "nodes" | "entry_scene_id"> &
+    Partial<grida.program.document.IBitmapsRepository> & {
+      scenes: Record<string, IDocumentSceneInit>;
+    };
 }
+
+type IDocumentSceneInit = Partial<grida.program.document.Scene> &
+  Pick<grida.program.document.Scene, "id" | "name" | "constraints">;
 
 export interface IDocumentEditorState
   extends IEditorConfig,

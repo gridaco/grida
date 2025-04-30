@@ -12,6 +12,7 @@ import {
   schemaname_validation_messages,
 } from "../utils/regex";
 import { grida } from "@/grida";
+import { GridFileStorageQueueProvider } from "@/scaffolds/grid/providers";
 
 /**
  * NO RLS - use with caution
@@ -250,16 +251,13 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
           __schema_version: grida.program.document.SCHEMA_VERSION,
           nodes: {},
           scenes: {
-            "0": {
-              type: "scene",
+            "0": grida.program.document.init_scene({
               id: "0",
               name: "main",
-              children: [],
-              guides: [],
               constraints: {
                 children: "multiple",
               },
-            },
+            }),
           },
           bitmaps: {},
           properties: {},

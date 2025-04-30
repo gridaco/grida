@@ -449,6 +449,7 @@ export namespace grida.program.document {
       // default, fallback values
       type: "scene",
       guides: [],
+      edges: [],
       constraints: { children: "multiple" },
       children: [],
       ...init,

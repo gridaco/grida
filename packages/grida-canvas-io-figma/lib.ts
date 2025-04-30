@@ -232,6 +232,7 @@ export namespace iofigma {
             name: rootNode.name,
             children: [rootNode.id],
             guides: [],
+            edges: [],
             constraints: {
               children: "multiple",
             },
