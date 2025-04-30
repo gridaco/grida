@@ -329,6 +329,13 @@ export function EditorSurface() {
           touchAction: "none",
           outline: "none",
           cursor: cursor,
+          overflowX: "scroll",
+          overflowY: "hidden",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehaviorX: "contain",
+        }}
+        onScroll={(e) => {
+          (e.target as HTMLDivElement).scrollLeft = 0;
         }}
       >
         <NetworkOverlay edges={edges} transform={transform} />
@@ -1350,7 +1357,7 @@ function PixelGridOverlay() {
   const { transform, scaleX } = useTransform();
   const viewport = useViewport();
   return (
-    <div className="fixed inset-0">
+    <div role="pixel-grid" className="fixed inset-0 pointer-events-none">
       {scaleX > 4 && (
         <PixelGrid
           transform={transform}

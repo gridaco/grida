@@ -28,7 +28,6 @@ import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewpor
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
@@ -36,12 +35,10 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-  SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar";
 
-export default function CanvasPlayground() {
-  useDisableSwipeBack();
+export default function MinimalCanvasDemo() {
   const fonts = useGoogleFontsList();
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
@@ -75,56 +72,54 @@ export default function CanvasPlayground() {
             dispatch={dispatch}
           >
             <Hotkyes />
-            <div className="flex w-full h-full">
-              <Sidebar side="left" variant="floating">
-                <SidebarContent>
-                  <ScenesGroup />
-                  <hr />
-                  <NodeHierarchyGroup />
-                </SidebarContent>
-              </Sidebar>
-              <SidebarInset>
-                <EditorSurfaceClipboardSyncProvider>
-                  <EditorSurfaceDropzone>
-                    <EditorSurfaceContextMenu>
-                      <div className="w-full h-full flex flex-col relative bg-black/5">
-                        <ViewportRoot className="relative w-full h-full overflow-hidden">
-                          <EditorSurface />
-                          <AutoInitialFitTransformer>
-                            <StandaloneSceneContent />
-                          </AutoInitialFitTransformer>
-                          <ToolbarPosition>
-                            <Toolbar />
-                          </ToolbarPosition>
-                        </ViewportRoot>
-                      </div>
-                    </EditorSurfaceContextMenu>
-                  </EditorSurfaceDropzone>
-                </EditorSurfaceClipboardSyncProvider>
-              </SidebarInset>
-              <Sidebar side="right" variant="floating">
-                <SidebarHeader className="border-b">
-                  <div className="flex items-center justify-end gap-2">
-                    <Zoom
-                      className={cn(
-                        WorkbenchUI.inputVariants({
-                          variant: "input",
-                          size: "xs",
-                        }),
-                        "w-auto"
-                      )}
-                    />
-                  </div>
-                  <hr />
-                  <Align />
-                </SidebarHeader>
-                <SidebarContent>
-                  <FontFamilyListProvider fonts={fonts}>
-                    <Selection />
-                  </FontFamilyListProvider>
-                </SidebarContent>
-              </Sidebar>
+            <Sidebar side="left" variant="floating">
+              <SidebarContent>
+                <ScenesGroup />
+                <hr />
+                <NodeHierarchyGroup />
+              </SidebarContent>
+            </Sidebar>
+            <div className="fixed inset-0 flex w-full h-full">
+              <EditorSurfaceClipboardSyncProvider>
+                <EditorSurfaceDropzone>
+                  <EditorSurfaceContextMenu>
+                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                      <ViewportRoot className="relative w-full h-full overflow-hidden">
+                        <EditorSurface />
+                        <AutoInitialFitTransformer>
+                          <StandaloneSceneContent />
+                        </AutoInitialFitTransformer>
+                        <ToolbarPosition>
+                          <Toolbar />
+                        </ToolbarPosition>
+                      </ViewportRoot>
+                    </div>
+                  </EditorSurfaceContextMenu>
+                </EditorSurfaceDropzone>
+              </EditorSurfaceClipboardSyncProvider>
             </div>
+            <Sidebar side="right" variant="floating">
+              <SidebarHeader className="border-b">
+                <div className="flex items-center justify-end gap-2">
+                  <Zoom
+                    className={cn(
+                      WorkbenchUI.inputVariants({
+                        variant: "input",
+                        size: "xs",
+                      }),
+                      "w-auto"
+                    )}
+                  />
+                </div>
+                <hr />
+                <Align />
+              </SidebarHeader>
+              <SidebarContent>
+                <FontFamilyListProvider fonts={fonts}>
+                  <Selection />
+                </FontFamilyListProvider>
+              </SidebarContent>
+            </Sidebar>
           </StandaloneDocumentEditor>
         </main>
       </SidebarProvider>
