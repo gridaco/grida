@@ -2379,7 +2379,7 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
   const scene = useCurrentScene();
 
-  const { guides } = scene;
+  const { guides, edges } = scene;
 
   const {
     pointer,
@@ -2823,6 +2823,8 @@ export function useEventTarget() {
       startGuideGesture,
       deleteGuide,
       //
+      edges,
+      //
       pixelgrid,
       setPixelGridState,
       //
@@ -2883,6 +2885,8 @@ export function useEventTarget() {
     guides,
     startGuideGesture,
     deleteGuide,
+    //
+    edges,
     //
     pixelgrid,
     setPixelGridState,

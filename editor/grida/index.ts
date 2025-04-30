@@ -286,6 +286,25 @@ export namespace grida.program.document {
     guides: Array<Guide2D>;
   }
 
+  export type EdgePointPosition2D = {
+    type: "position";
+    x: number;
+    y: number;
+  };
+
+  export type EdgePoint = EdgePointPosition2D;
+
+  export interface Edge2D {
+    id: string;
+    readonly type: "edge";
+    a: EdgePoint;
+    b: EdgePoint;
+  }
+
+  export interface IEdges {
+    edges: Array<Edge2D>;
+  }
+
   /**
    * Represents a normalized document structure where all nodes are stored in a flat map
    * with a single `root_id` as the entry point for traversal.
@@ -382,7 +401,10 @@ export namespace grida.program.document {
   /**
    * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
    */
-  export interface Scene extends document.ISceneBackground, document.I2DGuides {
+  export interface Scene
+    extends document.ISceneBackground,
+      document.I2DGuides,
+      document.IEdges {
     type: "scene";
 
     /**
@@ -1941,6 +1963,7 @@ export namespace grida.program.nodes {
           name: "tmp",
           children: [],
           guides: [],
+          edges: [],
           constraints: {
             children: "multiple",
           },
@@ -2016,6 +2039,37 @@ export namespace grida.program.nodes {
       }
 
       return prototype as nodes.NodePrototype;
+    }
+
+    export function createContainerNode(
+      id: string,
+      partial: Partial<ContainerNode> = {}
+    ): ContainerNode {
+      return {
+        type: "container",
+        id: id,
+        name: "container",
+        active: true,
+        locked: false,
+        expanded: false,
+        rotation: 0,
+        zIndex: 0,
+        opacity: 1,
+        position: "absolute",
+        layout: "flow",
+        direction: "horizontal",
+        mainAxisAlignment: "start",
+        mainAxisGap: 0,
+        crossAxisAlignment: "start",
+        crossAxisGap: 0,
+        padding: 0,
+        width: 100,
+        height: 100,
+        cornerRadius: 0,
+        style: {},
+        children: [],
+        ...partial,
+      };
     }
   }
 }

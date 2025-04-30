@@ -56,6 +56,7 @@ import {
 } from "./ui/floating-bar";
 import { grida } from "@/grida";
 import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
+import { BezierCurvedLine } from "./ui/network-curve";
 
 const DRAG_THRESHOLD = 2;
 
@@ -143,6 +144,7 @@ export function EditorSurface() {
     pointer,
     ruler,
     pixelgrid,
+    edges,
     marquee,
     hovered_node_id,
     dropzone,
@@ -329,6 +331,7 @@ export function EditorSurface() {
           cursor: cursor,
         }}
       >
+        <NetworkOverlay edges={edges} transform={transform} />
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
@@ -1015,6 +1018,29 @@ function LayerOverlayResizeHandle({
   });
 
   return <Knob size={size} {...bind()} anchor={anchor} />;
+}
+
+function NetworkOverlay({
+  edges,
+  transform,
+}: {
+  edges: grida.program.document.Edge2D[];
+  transform: cmath.Transform;
+}) {
+  return (
+    <>
+      {edges?.map((edge) => {
+        return (
+          <BezierCurvedLine
+            key={edge.id}
+            id={edge.id}
+            a={vector2ToSurfaceSpace([edge.a.x, edge.a.y], transform)}
+            b={vector2ToSurfaceSpace([edge.b.x, edge.b.y], transform)}
+          />
+        );
+      })}
+    </>
+  );
 }
 
 function SortOverlay(props: SurfaceSelectionGroup) {
