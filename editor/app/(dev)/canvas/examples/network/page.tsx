@@ -15,27 +15,32 @@ const document: IDocumentEditorInit = {
         name: "Main",
         constraints: { children: "multiple" },
         guides: [],
-        // children: ["a", "b"],
-        children: [],
+        children: ["a", "b"],
         edges: [
           {
             id: "a-b",
             type: "edge",
-            a: { type: "position", x: 0, y: 0 },
-            b: { type: "position", x: 100, y: 100 },
+            a: { type: "anchor", target: "a" },
+            b: { type: "anchor", target: "b" },
+            // a: { type: "position", x: 50, y: 50 },
+            // b: { type: "position", x: 250, y: 150 },
           },
         ],
       },
     },
     nodes: {
-      // a: grida.program.nodes.factory.createContainerNode("a", {
-      //   name: "A",
-      //   fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#00f") },
-      // }),
-      // b: grida.program.nodes.factory.createContainerNode("b", {
-      //   name: "B",
-      //   fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#0f0") },
-      // }),
+      a: grida.program.nodes.factory.createContainerNode("a", {
+        name: "A",
+        fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#00f") },
+        left: 0,
+        top: 0,
+      }),
+      b: grida.program.nodes.factory.createContainerNode("b", {
+        name: "B",
+        fill: { type: "solid", color: cmath.color.hex_to_rgba8888("#0f0") },
+        left: 200,
+        top: 100,
+      }),
     },
   },
 };

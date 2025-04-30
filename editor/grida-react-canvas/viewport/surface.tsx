@@ -1024,23 +1024,48 @@ function NetworkOverlay({
   edges,
   transform,
 }: {
-  edges: grida.program.document.Edge2D[];
+  edges: grida.program.document.Edge2D[] | undefined | null;
   transform: cmath.Transform;
 }) {
   return (
     <>
       {edges?.map((edge) => {
-        return (
-          <BezierCurvedLine
-            key={edge.id}
-            id={edge.id}
-            a={vector2ToSurfaceSpace([edge.a.x, edge.a.y], transform)}
-            b={vector2ToSurfaceSpace([edge.b.x, edge.b.y], transform)}
-          />
-        );
+        return <Edge key={edge.id} transform={transform} {...edge} />;
       })}
     </>
   );
+}
+
+function Edge({
+  id,
+  a,
+  b,
+  transform,
+}: grida.program.document.Edge2D & {
+  transform: cmath.Transform;
+}) {
+  // normalize a/b to surface space position
+  const { getNodeById } = useDocument();
+
+  const get_pos = (p: grida.program.document.EdgePoint) => {
+    switch (p.type) {
+      case "position":
+        return vector2ToSurfaceSpace([p.x, p.y], transform);
+      case "anchor":
+        try {
+          const n = getNodeById(p.target);
+          const cx = (n as any).left + (n as any).width / 2;
+          const cy = (n as any).top + (n as any).height / 2;
+          return vector2ToSurfaceSpace([cx, cy], transform);
+        } catch (e) {}
+    }
+  };
+
+  const _a = get_pos(a);
+  const _b = get_pos(b);
+  if (!_a || !_b) return null;
+
+  return <BezierCurvedLine id={id} a={_a} b={_b} />;
 }
 
 function SortOverlay(props: SurfaceSelectionGroup) {

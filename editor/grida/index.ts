@@ -292,7 +292,12 @@ export namespace grida.program.document {
     y: number;
   };
 
-  export type EdgePoint = EdgePointPosition2D;
+  export type EdgePointNodeAnchor = {
+    type: "anchor";
+    target: nodes.NodeID;
+  };
+
+  export type EdgePoint = EdgePointPosition2D | EdgePointNodeAnchor;
 
   export interface Edge2D {
     id: string;

@@ -1997,6 +1997,7 @@ export function useDocument() {
       //
       setOpacity,
       //
+      getNodeById,
       getNodeDepth,
       getNodeAbsoluteRotation,
       insertNode,
@@ -2053,6 +2054,7 @@ export function useDocument() {
     //
     setOpacity,
     //
+    getNodeById,
     getNodeDepth,
     getNodeAbsoluteRotation,
     insertNode,
