@@ -32,9 +32,9 @@ export const TransparencyGrid: React.FC<TransparencyProps> = (props) => {
     gridRef.current.setSize(props.width, props.height);
     gridRef.current.updateTransform(props.transform);
     requestAnimationFrame(() => {
-      gridRef.current.draw();
+      gridRef.current!.draw();
     });
-  }, [props]);
+  }, [props.backend, props.width, props.height, props.transform]);
 
   return (
     <canvas

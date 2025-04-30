@@ -1,6 +1,10 @@
 import parse from "color-parse";
 
 export function quantize(value: number): number {
+  if (value <= 0 || !Number.isFinite(value)) {
+    // Fallback to a sane default of 1 px for pathological inputs
+    return 1;
+  }
   const exponent = Math.floor(Math.log10(value));
   const fraction = value / Math.pow(10, exponent);
   let niceFraction: number;
@@ -25,10 +29,12 @@ export function quantize(value: number): number {
 export function parseColor(
   color: string
 ): [number, number, number, number] | undefined {
-  const parsed = parse(color);
-  if (parsed.space === "rgb") {
-    const [r, g, b] = parsed.values;
-    const a = parsed.alpha ?? 1;
-    return [r / 255, g / 255, b / 255, a];
-  }
+  try {
+    const parsed = parse(color);
+    if (parsed.space === "rgb") {
+      const [r, g, b] = parsed.values;
+      const a = parsed.alpha ?? 1;
+      return [r / 255, g / 255, b / 255, a];
+    }
+  } catch (e) {}
 }

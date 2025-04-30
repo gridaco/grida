@@ -31,9 +31,8 @@ export class TransparencyGridCanvas {
         this.backend = "webgpu";
         break;
       default:
-        const supports_wgpu = !!(
-          typeof navigator !== "undefined" && (navigator as any).gpu
-        );
+        const supports_wgpu =
+          typeof navigator !== "undefined" && "gpu" in navigator;
         this.backend = supports_wgpu ? "webgpu" : "2d";
         this.impl = supports_wgpu
           ? new TransparencyGrid_WGPU(canvas, options)
