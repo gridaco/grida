@@ -1,6 +1,5 @@
 import { OnSubmitProcessors } from "@/app/(api)/submit/[id]/hooks";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { createFormsClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = {
@@ -13,10 +12,9 @@ export async function POST(
     params: Promise<Params>;
   }
 ) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data: getuser } = await supabase.auth.getUser();
+  const { data: getuser } = await formsClient.auth.getUser();
   if (!getuser.user) {
     return NextResponse.json(
       { error: "Unauthorized" },

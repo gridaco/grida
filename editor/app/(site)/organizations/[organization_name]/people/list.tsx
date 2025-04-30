@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { Database } from "@/database.types";
 import type { Organization } from "@/types";
 import toast from "react-hot-toast";
@@ -38,10 +38,10 @@ const MemberList = ({
   members: MemberItem[];
   canEdit: boolean;
 }) => {
-  const supabase = createClientComponentClient<Database>();
+  const client = createBrowserClient();
 
   const removeMember = async (memberId: number) => {
-    await supabase
+    await client
       .from("organization_member")
       .delete()
       .eq("id", memberId)

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AgentThemeProvider } from "@/scaffolds/agent/theme";
+import { FormEditorAgentThemeProvider } from "@/scaffolds/agent-form-builder/theme";
 import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
@@ -21,9 +21,9 @@ export default function EditFormPage() {
       <main className="h-full flex flex-1 w-full">
         <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
           <CanvasOverlay />
-          <AgentThemeProvider>
+          <FormEditorAgentThemeProvider>
             <CurrentPageCanvas />
-          </AgentThemeProvider>
+          </FormEditorAgentThemeProvider>
         </CanvasEventTarget>
         <aside className="hidden lg:flex h-full">
           <SideControl />

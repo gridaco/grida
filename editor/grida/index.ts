@@ -1,5 +1,5 @@
 import type { tokens } from "@grida/tokens";
-import type { vn } from "./vn";
+import type vn from "@grida/vn";
 
 // TODO: remove this dependency
 import type { DocumentDispatcher } from "@/grida-react-canvas";
@@ -62,6 +62,8 @@ export namespace grida {
 
       interface TypeScalarPropertyDefinition {
         type: "string" | "number" | "boolean";
+        title?: string;
+        description?: string;
         default?:
           | tokens.StringValueExpression
           | tokens.NumericValueExpression
@@ -72,6 +74,8 @@ export namespace grida {
 
       interface TypeArrayPropertyDefinition<T extends Array<Value>> {
         type: "array";
+        title?: string;
+        description?: string;
         items: PropertyDefinition;
         default?: T;
         required?: boolean;
@@ -80,6 +84,8 @@ export namespace grida {
 
       interface TypeObjectPropertyDefinition<T extends Record<string, Value>> {
         type: "object";
+        title?: string;
+        description?: string;
         properties: Record<string, PropertyDefinition>;
         default?: T;
         required?: boolean;
@@ -88,6 +94,8 @@ export namespace grida {
 
       interface TypeWellKnownObjectPropertyDefinition {
         type: objects.ObjectType;
+        title?: string;
+        description?: string;
         default?: objects.Object;
         required?: boolean;
         //
@@ -711,42 +719,44 @@ export namespace grida.program.css {
    * @deprecated Note: Do not modify this directly - it will progressively be replaced by a more robust and universal CSS property type system.
    * If you wish to add a complex styled node, try using {@link template.TemplateDocumentDefinition}
    */
-  export type ExplicitlySupportedCSSProperties = Pick<
-    // TODO: Drop the React dependency and use css-types instead
-    React.CSSProperties,
-    // explicitly prohibited
-    // - "opacity"
-    // - "zIndex"
-    // - "width"
-    // - "height"
-    // - "position"
-    // - "left"
-    // - "top"
-    // - "right"
-    // - "bottom"
-    // - "cursor"
-    // - "pointerEvents"
-    // - "borderRadius"
-    //
-    // position & dimension
-    // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
-    // | "position"
-    // | "width"
-    // | "height"
-    // | "top"
-    // | "left"
-    //
-    // | "textTransform"
-    //
-    // | "boxShadow"
-    //
-    | "aspectRatio"
-    //
-    | "overflow"
-    //
-    // | "margin"
-    | "flexWrap"
-    //
+  export type ExplicitlySupportedCSSProperties = Partial<
+    Pick<
+      // TODO: Drop the React dependency and use css-types instead
+      React.CSSProperties,
+      // explicitly prohibited
+      // - "opacity"
+      // - "zIndex"
+      // - "width"
+      // - "height"
+      // - "position"
+      // - "left"
+      // - "top"
+      // - "right"
+      // - "bottom"
+      // - "cursor"
+      // - "pointerEvents"
+      // - "borderRadius"
+      //
+      // position & dimension
+      // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
+      // | "position"
+      // | "width"
+      // | "height"
+      // | "top"
+      // | "left"
+      //
+      // | "textTransform"
+      //
+      // | "boxShadow"
+      //
+      | "aspectRatio"
+      //
+      | "overflow"
+      //
+      // | "margin"
+      | "flexWrap"
+      //
+    >
   >;
 }
 
@@ -2142,77 +2152,6 @@ export namespace grida.program.cg {
      */
     a: number;
   };
-
-  /**
-   * Converts a normalized RGBA color to an 8-bit integer RGBA color.
-   * @param rgba - The normalized RGBA color to convert.
-   * @returns The 8-bit integer RGBA color.
-   * @see {@link RGBAf}
-   * @see {@link RGBA8888}
-   * @example
-   * ```typescript
-   * const rgba: RGBAf = { r: 1, g: 0.5, b: 0, a: 0.75 };
-   * const rgba8888: RGBA8888 = rgbaf_to_rgba8888(rgba);
-   * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
-   * ```
-   */
-  export function rgbaf_to_rgba8888(rgba: RGBAf): RGBA8888 {
-    return {
-      r: Math.round(rgba.r * 255),
-      g: Math.round(rgba.g * 255),
-      b: Math.round(rgba.b * 255),
-      a: rgba.a,
-    };
-  }
-
-  export function rgbaf_multiply_alpha(color: TRGBA, alpha: number): TRGBA {
-    return {
-      r: color.r,
-      g: color.g,
-      b: color.b,
-      a: color.a * alpha,
-    };
-  }
-
-  export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
-    return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
-  }
-
-  /**
-   * Converts a HEX color string to an RGBA8888 object.
-   *
-   * Supports both short (`#RGB`) and long (`#RRGGBB`) HEX formats.
-   *
-   * @param hex - The HEX color string to convert. Must start with `#` and be 3 or 6 characters long after the `#`.
-   * @returns An object containing `r`, `g`, `b`, and `a` properties.
-   *
-   * @throws {Error} If the input HEX string is invalid.
-   *
-   * @example
-   * ```typescript
-   * hex_to_rgba8888("#F80"); // { r: 255, g: 136, b: 0, a: 1 }
-   * hex_to_rgba8888("#FF8800"); // { r: 255, g: 136, b: 0, a: 1 }
-   * ```
-   */
-  export function hex_to_rgba8888(hex: string): cg.RGBA8888 {
-    const normalizedHex = hex.replace("#", "");
-    let r, g, b;
-
-    if (normalizedHex.length === 3) {
-      // Expand short hex to long hex
-      r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
-      g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
-      b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
-    } else if (normalizedHex.length === 6) {
-      r = parseInt(normalizedHex.substring(0, 2), 16);
-      g = parseInt(normalizedHex.substring(2, 4), 16);
-      b = parseInt(normalizedHex.substring(4, 6), 16);
-    } else {
-      throw new Error("Invalid hex format. Expected #RGB or #RRGGBB.");
-    }
-
-    return { r, g, b, a: 1 };
-  }
 
   /**
    * Defines a single path

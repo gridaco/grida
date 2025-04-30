@@ -1,13 +1,12 @@
 import { PrivateEditorApi } from "@/lib/private";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createXSBClient } from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import type {
   EditorApiResponse,
   XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -16,10 +15,9 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("grida_project_id")
   );
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
 
-  const { data: supabase_project, error: rls_err } = await supabase
+  const { data: supabase_project, error: rls_err } = await xsbClient
     .from("supabase_project")
     .select(
       `
@@ -45,8 +43,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
 
   const data: PrivateEditorApi.XSupabase.CreateProjectConnectionRequest =
     await req.json();
@@ -63,20 +60,21 @@ export async function POST(req: NextRequest) {
   });
 
   // 1. create supabase project
-  const { data: supabase_project, error: supabase_project_err } = await supabase
-    .from("supabase_project")
-    .insert({
-      project_id: project_id,
-      sb_anon_key,
-      sb_project_reference_id,
-      sb_public_schema: sb_schema_definitions["public"],
-      sb_schema_definitions,
-      sb_schema_openapi_docs: sb_schema_openapi_docs as {},
-      sb_schema_names: ["public"],
-      sb_project_url,
-    })
-    .select()
-    .single();
+  const { data: supabase_project, error: supabase_project_err } =
+    await xsbClient
+      .from("supabase_project")
+      .insert({
+        project_id: project_id,
+        sb_anon_key,
+        sb_project_reference_id,
+        sb_public_schema: sb_schema_definitions["public"],
+        sb_schema_definitions,
+        sb_schema_openapi_docs: sb_schema_openapi_docs as {},
+        sb_schema_names: ["public"],
+        sb_project_url,
+      })
+      .select()
+      .single();
 
   if (supabase_project_err) {
     console.error(supabase_project_err);

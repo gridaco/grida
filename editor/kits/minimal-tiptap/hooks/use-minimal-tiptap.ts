@@ -11,18 +11,17 @@ import {
   Link,
   Image,
   HorizontalRule,
-  // CodeBlockLowlight,
+  CodeBlockLowlight,
   Selection,
   // Color,
   UnsetAllMarks,
   ResetMarksOnEnter,
   FileHandler,
 } from "../extensions";
+import { cn } from "@/utils";
 import { fileToBase64, getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
-// import { toast } from "sonner";
 import { toast } from "react-hot-toast";
-import { cn } from "@/utils";
 
 export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   value?: Content;
@@ -33,6 +32,7 @@ export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   onUpdate?: (content: Content) => void;
   onBlur?: (content: Content) => void;
   uploader?: (file: File) => Promise<string>;
+  extensions?: any[];
 }
 
 async function fakeuploader(file: File): Promise<string> {
@@ -150,7 +150,7 @@ const createExtensions = ({
   UnsetAllMarks,
   HorizontalRule,
   ResetMarksOnEnter,
-  // CodeBlockLowlight,
+  CodeBlockLowlight,
   Placeholder.configure({ placeholder: () => placeholder }),
 ];
 
@@ -160,6 +160,7 @@ export const useMinimalTiptapEditor = ({
   placeholder = "",
   editorClassName,
   throttleDelay = 0,
+  extensions,
   onUpdate,
   onBlur,
   uploader,
@@ -190,7 +191,7 @@ export const useMinimalTiptapEditor = ({
   );
 
   const editor = useEditor({
-    extensions: createExtensions({ placeholder }),
+    extensions: extensions ? extensions : createExtensions({ placeholder }),
     editorProps: {
       attributes: {
         autocomplete: "off",

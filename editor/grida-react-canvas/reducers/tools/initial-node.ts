@@ -128,7 +128,7 @@ export default function initialNode(
         fit: "cover",
         fill: undefined,
         // TODO: replace with static url
-        src: "/assets/image.png",
+        src: "/dummy/image/png/png-square-transparent-1k.png",
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
@@ -144,7 +144,7 @@ export default function initialNode(
         fill: undefined,
         fit: "cover",
         // TODO: replace with static url
-        src: "/assets/video.mp4",
+        src: "/dummy/video/mp4/mp4-30s-5mb.mp4",
         loop: true,
         muted: true,
         autoplay: true,

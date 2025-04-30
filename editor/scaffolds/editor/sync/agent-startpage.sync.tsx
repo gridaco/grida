@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { FormStartPageSchema } from "@/types";
 import { useEditorState } from "@/scaffolds/editor/use-editor";
@@ -14,7 +14,7 @@ export function useSyncFormAgentStartPage() {
   const document = startpagestate?.document;
   const debounced = useDebounce(document, 1000);
   const prev = usePrevious(debounced);
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   const setSaving = useCallback(
     (saving: boolean) => dispatch({ type: "saving", saving: saving }),

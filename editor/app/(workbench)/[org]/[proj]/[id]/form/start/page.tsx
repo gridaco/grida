@@ -1,5 +1,5 @@
 "use client";
-import { AgentThemeProvider } from "@/scaffolds/agent/theme";
+import { FormEditorAgentThemeProvider } from "@/scaffolds/agent-form-builder/theme";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import React, { useCallback, useState } from "react";
 import {
@@ -225,7 +225,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
         className="relative w-full no-scrollbar overflow-y-auto bg-transparent"
       >
         <EditorSurface />
-        <AgentThemeProvider>
+        <FormEditorAgentThemeProvider>
           <div className="w-full px-10 overflow-scroll">
             <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
               <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline hover:outline-2 hover:outline-workbench-accent-sky">
@@ -239,7 +239,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
               </SandboxWrapper>
             </div>
           </div>
-        </AgentThemeProvider>
+        </FormEditorAgentThemeProvider>
       </ViewportRoot>
     </>
   );
@@ -364,10 +364,11 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 };
 
                 const value = rootProps[key];
+                const label = def.title || key;
 
                 return (
                   <div key={key} className="grid gap-2">
-                    <Label>{key}</Label>
+                    <Label>{label}</Label>
                     <PropertyField
                       name={key}
                       definition={def}
@@ -424,6 +425,7 @@ function PropertyField({
       return (
         <CMSRichText
           value={value}
+          uploader={uploadPublic}
           onValueChange={onValueChange}
           placeholder={"Enter text here"}
           autofocus={true}

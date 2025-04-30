@@ -32,7 +32,7 @@ import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
-import { iosvg } from "@/grida-io-svg";
+import iosvg from "@grida/io-svg";
 import toast from "react-hot-toast";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida/utils/supports";
@@ -2118,6 +2118,43 @@ export function useCurrentScene(): UseScene {
   return useScene(state.scene_id!);
 }
 
+function animateTransformTo(
+  from: cmath.Transform,
+  to: cmath.Transform,
+  update: (t: cmath.Transform) => void
+) {
+  const duration = 200; // ms
+  const start = performance.now();
+
+  function lerp(a: number, b: number, t: number) {
+    return a + (b - a) * t;
+  }
+
+  function step(now: number) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+
+    const next: cmath.Transform = [
+      [0, 0, 0],
+      [0, 0, 0],
+    ] as cmath.Transform;
+
+    for (let i = 0; i < 2; i++) {
+      for (let j = 0; j < 3; j++) {
+        next[i][j] = lerp(from[i][j], to[i][j], progress);
+      }
+    }
+
+    update(next);
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
 export function useTransform() {
   const [_, dispatch] = __useInternal();
   const scene = useCurrentScene();
@@ -2182,7 +2219,13 @@ export function useTransform() {
   const fit = useCallback(
     (
       selector: grida.program.document.Selector,
-      margin: number | [number, number, number, number] = 64
+      options: {
+        margin?: number | [number, number, number, number];
+        animate?: boolean;
+      } = {
+        margin: 64,
+        animate: false,
+      }
     ) => {
       const ids = document.querySelector(
         scene.document_ctx,
@@ -2190,27 +2233,40 @@ export function useTransform() {
         selector
       );
 
-      if (ids.length === 0) {
+      const cdom = new domapi.CanvasDOM(scene.transform);
+
+      const rects = ids
+        .map((id) => cdom.getNodeBoundingRect(id))
+        .filter((r) => r) as cmath.Rectangle[];
+
+      if (rects.length === 0) {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(scene.transform);
-
-      const area = cmath.rect.union(
-        ids
-          .map((id) => cdom.getNodeBoundingRect(id))
-          .filter((r) => r) as cmath.Rectangle[]
-      );
+      const area = cmath.rect.union(rects);
 
       const _view = domapi.get_viewport_rect();
       const view = { x: 0, y: 0, width: _view.width, height: _view.height };
 
-      const transform = cmath.ext.viewport.transformToFit(view, area, margin);
+      const transform = cmath.ext.viewport.transformToFit(
+        view,
+        area,
+        options.margin
+      );
 
-      dispatch({
-        type: "transform",
-        transform: transform,
-      });
+      if (options.animate) {
+        animateTransformTo(scene.transform, transform, (t) => {
+          dispatch({
+            type: "transform",
+            transform: t,
+          });
+        });
+      } else {
+        dispatch({
+          type: "transform",
+          transform: transform,
+        });
+      }
     },
     [
       dispatch,

@@ -1,6 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
+import { DataFormat } from "@/scaffolds/data-format";
 import type { DataGridCellSelectionCursor } from "../types";
 import type { DataGridCellRootProps } from "../cells";
+import { MarkerConfig, mask } from "../grid-text-mask";
 import assert from "assert";
 
 type State = {
@@ -8,21 +10,27 @@ type State = {
   local_cursor_id?: string;
   selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
+  dateformat: DataFormat.DateFormat;
+  datetz: DataFormat.DateTZ;
 };
 
 const Context = React.createContext<State | null>(null);
 
-export function DataGridStateProvider({
+export function StandaloneDataGridStateProvider({
   masking_enabled,
   local_cursor_id,
   selections,
   highlightTokens,
   children,
+  dateformat = "datetime",
+  datetz = DataFormat.SYM_LOCALTZ,
 }: React.PropsWithChildren<{
   masking_enabled?: boolean;
   local_cursor_id?: string;
   selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
+  dateformat?: DataFormat.DateFormat;
+  datetz?: DataFormat.DateTZ;
 }>) {
   return (
     <Context.Provider
@@ -31,6 +39,8 @@ export function DataGridStateProvider({
         local_cursor_id,
         selections,
         highlightTokens: highlightTokens,
+        dateformat,
+        datetz,
       }}
     >
       {children}
@@ -42,11 +52,47 @@ export function useDataGridState() {
   const context = React.useContext(Context);
   if (!context) {
     throw new Error(
-      "useDataGridState must be used within a DataGridStateProvider"
+      "useDataGridState must be used within a StandaloneDataGridStateProvider"
     );
   }
 
   return context;
+}
+
+/**
+ * @example
+ * ```tsx
+ * const mask = useMasking();
+ * ```
+ */
+export function useMasking() {
+  const { masking_enabled } = useDataGridState();
+
+  return useCallback(
+    (txt: string | undefined, config?: MarkerConfig): string | undefined => {
+      return masking_enabled && typeof txt === "string"
+        ? mask(txt, config)
+        : txt?.toString();
+    },
+    [masking_enabled]
+  );
+}
+
+/**
+ * @example
+ * ```tsx
+ * const format = useDateFormatting();
+ * ```
+ */
+export function useDateFormatting() {
+  const { dateformat, datetz } = useDataGridState();
+
+  return useCallback(
+    (date: Date | string) => {
+      return DataFormat.fmtdate(date, dateformat, datetz);
+    },
+    [dateformat, datetz]
+  );
 }
 
 type CellSelection = {
@@ -89,19 +135,15 @@ function getCellSelection({
 export function useCellSelection(pk: string | -1, column: string) {
   const { selections, local_cursor_id } = useDataGridState();
 
-  assert(local_cursor_id, "local_cursor_id must be defined");
-  assert(selections, "selections must be defined");
-
-  return useMemo(
-    () =>
-      getCellSelection({
-        local_cursor_id,
-        selections,
-        pk,
-        column,
-      }),
-    [local_cursor_id, selections, pk, column]
-  );
+  return useMemo(() => {
+    if (!local_cursor_id || !selections) return undefined;
+    return getCellSelection({
+      local_cursor_id,
+      selections,
+      pk,
+      column,
+    });
+  }, [local_cursor_id, selections, pk, column]);
 }
 
 export function useCellRootProps(

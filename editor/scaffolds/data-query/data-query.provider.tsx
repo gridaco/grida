@@ -23,6 +23,7 @@ import type {
   DataQueryTextSearchClearDispatcher,
   DataQueryTextSearchColumnSetDispatcher,
   DataQueryTextSearchQueryDispatcher,
+  DataQueryTextSearchSetDispatcher,
   IDataQueryGlobalConsumer,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
@@ -53,12 +54,31 @@ const useDispatch = (): Dispatcher => {
 
 export function StandaloneDataQueryProvider({
   initial = Data.Relation.INITIAL_QUERY_STATE,
+  value,
+  onChange,
   children,
 }: React.PropsWithChildren<{
   initial?: DataQueryState;
+  value?: DataQueryState;
   onChange?: (query: DataQueryState) => void;
 }>) {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const isControlled = value !== undefined && onChange !== undefined;
+
+  const [internalState, dispatchInternal] = useReducer(reducer, initial);
+
+  const state = isControlled ? value : internalState;
+
+  const dispatch = useCallback(
+    (action: any) => {
+      const newState = reducer(state, action);
+      if (isControlled) {
+        onChange(newState);
+      } else {
+        dispatchInternal(action);
+      }
+    },
+    [isControlled, state, onChange]
+  );
 
   return (
     <StandaloneDataQueryContext.Provider value={state}>
@@ -86,6 +106,13 @@ export function useStandaloneDataQuery() {
 // #region with schema
 //
 
+export type SchemaDataQueryConsumerReturnType = DataQueryState &
+  IDataQueryGlobalConsumer &
+  IDataQueryOrderbyConsumer &
+  IDataQueryPredicatesConsumer &
+  IDataQueryPaginationConsumer &
+  IDataQueryTextSearchConsumer;
+
 export function useStandaloneSchemaDataQuery({
   estimated_count,
 }: {
@@ -96,13 +123,6 @@ export function useStandaloneSchemaDataQuery({
     estimated_count,
   });
 }
-
-type SchemaDataQueryConsumerReturnType = DataQueryState &
-  IDataQueryGlobalConsumer &
-  IDataQueryOrderbyConsumer &
-  IDataQueryPredicatesConsumer &
-  IDataQueryPaginationConsumer &
-  IDataQueryTextSearchConsumer;
 
 export function useStandaloneSchemaDataQueryConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
@@ -248,6 +268,22 @@ export function useStandaloneSchemaDataQueryConsumer(
   // #endregion
 
   // #region text search
+  const onTextSearch: DataQueryTextSearchSetDispatcher = useCallback(
+    (
+      column: string | null,
+      query: string,
+      config?: { type: Data.Query.Predicate.TextSearchQuery["type"] }
+    ) => {
+      dispatch({
+        type: "data/query/textsearch",
+        column,
+        query,
+        config,
+      });
+    },
+    [dispatch]
+  );
+
   const onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher =
     useCallback(
       (column: string | null) => {
@@ -313,6 +349,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       //
       isTextSearchSet,
       isTextSearchValid,
+      onTextSearch,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,
@@ -350,6 +387,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       //
       isTextSearchSet,
       isTextSearchValid,
+      onTextSearch,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,

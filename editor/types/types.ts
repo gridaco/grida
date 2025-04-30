@@ -47,17 +47,6 @@ export type UserProfile = {
   avatar_path: string | null;
 };
 
-export interface Customer {
-  uid: string;
-  created_at: string;
-  last_seen_at: string;
-  email: string | null;
-  email_provisional: string[];
-  phone: string | null;
-  phone_provisional: string[];
-  uuid: string | null;
-}
-
 /**
  * user facing page language
  */
@@ -397,7 +386,9 @@ export interface PaymentFieldData {
   service_provider: PaymentsServiceProviders;
 }
 
-export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
+export type TemplatePageBackgroundSchema = PageThemeEmbeddedBackgroundData;
+
+export type FormPageBackgroundSchema = PageThemeEmbeddedBackgroundData;
 
 export type FormStyleSheetV1Schema = {
   section?: string;
@@ -411,7 +402,7 @@ export type FontFamily = "inter" | "lora" | "inconsolata";
 
 export type Appearance = "light" | "dark" | "system";
 
-interface FormPageThemeEmbeddedBackgroundData {
+interface PageThemeEmbeddedBackgroundData {
   type: "background";
   element: "iframe" | "img" | "div";
   /**
@@ -487,6 +478,14 @@ export interface Organization {
   owner_id: string;
 }
 
+export type OrganizationWithMembers = Organization & {
+  members: OrganizationMember[];
+};
+
+export type OrganizationWithAvatar = Organization & {
+  avatar_url: string | null;
+};
+
 export interface OrganizationMember {
   id: number;
   user_id: string;
@@ -503,10 +502,14 @@ export interface Project {
 
 export type GDocumentType =
   | "v0_form"
+  /**
+   * @deprecated
+   */
   | "v0_site"
   | "v0_schema"
   | "v0_bucket"
-  | "v0_canvas";
+  | "v0_canvas"
+  | "v0_campaign_referral";
 
 export interface GDocument {
   id: string;

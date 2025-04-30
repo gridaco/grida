@@ -12,8 +12,16 @@ const nextConfig = withMDX()({
   images: {
     remotePatterns: [
       {
+        protocol: "http",
+        hostname: "127.0.0.1",
+      },
+      {
         protocol: "https",
         hostname: "mozagqllybnbytfcmvdh.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "mozagqllybnbytfcmvdh-all.supabase.co",
       },
       {
         protocol: "https",
@@ -103,7 +111,7 @@ const nextConfig = withMDX()({
       },
       {
         source: "/figma",
-        destination: "https://grida.co",
+        destination: "https://legacy.grida.co",
         permanent: false,
       },
       // Static redirects

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
@@ -40,13 +41,13 @@ export function PdfBlock({
         <div className="flex flex-col gap-2">
           <div className="flex flex-row items-center gap-8">
             <span className="flex flex-row gap-2 items-center">
-              <ReaderIcon />
-              PDF
+              <ReaderIcon className="size-3" />
+              <span className="text-xs">PDF</span>
             </span>
           </div>
           <p className="text-xs opacity-50">Embed pdf from URL.</p>
         </div>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -60,7 +61,7 @@ export function PdfBlock({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
       <div>
         <div className="py-4">

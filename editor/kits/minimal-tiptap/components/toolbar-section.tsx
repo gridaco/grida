@@ -3,6 +3,7 @@ import type { Editor } from "@tiptap/react";
 import type { FormatAction } from "../types";
 import type { VariantProps } from "class-variance-authority";
 import type { toggleVariants } from "@/components/ui/toggle";
+import { cn } from "@/utils/cn";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -13,7 +14,6 @@ import {
 import { ToolbarButton } from "./toolbar-button";
 import { ShortcutKey } from "./shortcut-key";
 import { getShortcutKey } from "../utils";
-import { cn } from "@/utils";
 
 interface ToolbarSectionProps extends VariantProps<typeof toggleVariants> {
   editor: Editor;

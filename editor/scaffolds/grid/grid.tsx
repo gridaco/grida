@@ -40,13 +40,12 @@ import type {
 import {
   SelectColumn,
   CreateNewAttributeColumn,
+  ExpandRowProvider,
   CreateNewAttributeProvider,
 } from "./columns";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
-import { toZonedTime } from "date-fns-tz";
-import { tztostr } from "../editor/symbols";
 import toast from "react-hot-toast";
 import { FormValue } from "@/services/form";
 import {
@@ -62,8 +61,9 @@ import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./grid-empty-state";
 import { cn } from "@/utils";
 import {
-  DataGridStateProvider,
+  StandaloneDataGridStateProvider,
   useCellRootProps,
+  useDateFormatting,
   useDataGridState,
   useFileRefs,
   useMasking,
@@ -122,6 +122,17 @@ export function DataGrid({
 }) {
   const [state, dispatch] = useEditorState();
   const { datagrid_selected_rows: selected_responses } = state;
+
+  const onExpandClick = useCallback(
+    (row: DGResponseRow) => {
+      dispatch({
+        type: "editor/panels/record-edit",
+        response_id: row.__gf_id,
+        refresh: true,
+      });
+    },
+    [dispatch]
+  );
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({
@@ -252,81 +263,85 @@ export function DataGrid({
   };
 
   return (
-    <DataGridStateProvider
+    <StandaloneDataGridStateProvider
       masking_enabled={state.datagrid_local_filter.masking_enabled}
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
       highlightTokens={highlightTokens}
+      dateformat={state.dateformat}
+      datetz={state.datetz}
     >
-      <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
-        <RDG
-          className={cn(
-            "flex-grow select-none text-xs text-foreground/80",
-            className
-          )}
-          rowKeyGetter={rowKeyGetter}
-          columns={allcolumns}
-          rows={rows}
-          rowHeight={32}
-          headerRowHeight={36}
-          onCellDoubleClick={({ column, row }) => {
-            if (readonly) {
-              //
-              toast("This table is readonly", { icon: "🔒" });
-              return;
-            }
+      <ExpandRowProvider onExpandClick={onExpandClick}>
+        <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
+          <RDG
+            className={cn(
+              "flex-grow select-none text-xs text-foreground/80",
+              className
+            )}
+            rowKeyGetter={rowKeyGetter}
+            columns={allcolumns}
+            rows={rows}
+            rowHeight={32}
+            headerRowHeight={36}
+            onCellDoubleClick={({ column, row }) => {
+              if (readonly) {
+                //
+                toast("This table is readonly", { icon: "🔒" });
+                return;
+              }
 
-            const coldata = columns.find((c) => c.key === column.key);
-            if (coldata?.readonly) {
-              toast(`'${coldata.name}' is readonly`, { icon: "🔒" });
-              return;
-            }
-          }}
-          onColumnsReorder={onColumnsReorder}
-          selectedRows={selectionDisabled ? undefined : selected_responses}
-          onCopy={onCopy}
-          onSelectedCellChange={(cell) => {
-            if (cell.rowIdx === -1) {
-              const column = cell.column.key;
-              onSelectedCellChange?.({
-                pk: -1,
-                column,
-              });
-            } else {
-              const pk = cell.row.__gf_id;
-              const column = cell.column.key;
-              onSelectedCellChange?.({
-                pk,
-                column,
-              });
-            }
-          }}
-          onRowsChange={(rows, data) => {
-            if (readonly) return;
-            const key = data.column.key;
-            const indexes = data.indexes;
+              const coldata = columns.find((c) => c.key === column.key);
+              if (coldata?.readonly) {
+                toast(`'${coldata.name}' is readonly`, { icon: "🔒" });
+                return;
+              }
+            }}
+            onColumnsReorder={onColumnsReorder}
+            selectedRows={selectionDisabled ? undefined : selected_responses}
+            onCopy={onCopy}
+            onSelectedCellChange={(cell) => {
+              if (cell.rowIdx === -1) {
+                const column = cell.column.key;
+                onSelectedCellChange?.({
+                  pk: -1,
+                  column,
+                });
+              } else {
+                const pk = cell.row.__gf_id;
+                const column = cell.column.key;
+                onSelectedCellChange?.({
+                  pk,
+                  column,
+                });
+              }
+            }}
+            onRowsChange={(rows, data) => {
+              if (readonly) return;
+              const key = data.column.key;
+              const indexes = data.indexes;
 
-            for (const i of indexes) {
-              const row = rows[i];
-              const field = row.fields[key];
+              for (const i of indexes) {
+                const row = rows[i];
+                const field = row.fields[key];
 
-              onCellChange?.(row, key, field);
+                onCellChange?.(row, key, field);
+              }
+            }}
+            onSelectedRowsChange={
+              selectionDisabled ? undefined : onSelectedRowsChange
             }
-          }}
-          onSelectedRowsChange={
-            selectionDisabled ? undefined : onSelectedRowsChange
-          }
-          renderers={{
-            noRowsFallback: (
-              <EmptyRowsRenderer
-                loading={loading}
-                hasPredicates={hasPredicates}
-              />
-            ),
-          }}
-        />
-      </CreateNewAttributeProvider>
-    </DataGridStateProvider>
+            renderers={{
+              noRowsFallback: (
+                <EmptyRowsRenderer
+                  loading={loading}
+                  hasPredicates={hasPredicates}
+                />
+              ),
+            }}
+          />
+        </CreateNewAttributeProvider>
+      </ExpandRowProvider>
+    </StandaloneDataGridStateProvider>
   );
 }
 
@@ -371,7 +386,7 @@ function DefaultPropertyDateCell({
 }: RenderCellProps<RenderingRow>) {
   const date = row.__gf_created_at;
 
-  const formatDate = useFormatDate();
+  const formatDate = useDateFormatting();
 
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 
@@ -382,43 +397,8 @@ function DefaultPropertyDateCell({
   return <CellRoot {...rootprops}>{formatDate(date)}</CellRoot>;
 }
 
-function useFormatDate() {
-  const [state] = useEditorState();
-  const { dateformat, datetz } = state;
-
-  return useCallback(
-    (date: Date | string) => {
-      return fmtdate(date, dateformat, tztostr(datetz));
-    },
-    [dateformat, datetz]
-  );
-}
-
 function fmtdatetimelocal(date: Date | string) {
   return format(date, "yyyy-MM-dd'T'HH:mm");
-}
-
-function fmtdate(
-  date: Date | string,
-  format: "date" | "time" | "datetime",
-  tz?: string
-) {
-  if (typeof date === "string") {
-    date = new Date(date);
-  }
-
-  if (tz) {
-    date = toZonedTime(date, tz);
-  }
-
-  switch (format) {
-    case "date":
-      return date.toLocaleDateString();
-    case "time":
-      return date.toLocaleTimeString();
-    case "datetime":
-      return date.toLocaleString();
-  }
 }
 
 function DefaultPropertyCustomerCell({
@@ -483,7 +463,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
 
   const { highlightTokens } = useDataGridState();
 
-  const formatDate = useFormatDate();
+  const formatDate = useDateFormatting();
 
   const def = useTableDefinition();
   const fk = def?.fks.find((fk) => fk.referencing_column === column.name);

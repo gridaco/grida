@@ -20,15 +20,16 @@ interface InsertElement extends FormatAction {
 }
 
 const formatActions: InsertElement[] = [
-  // {
-  //   value: 'codeBlock',
-  //   label: 'Code block',
-  //   icon: <CodeIcon className="size-5" />,
-  //   action: editor => editor.chain().focus().toggleCodeBlock().run(),
-  //   isActive: editor => editor.isActive('codeBlock'),
-  //   canExecute: editor => editor.can().chain().focus().toggleCodeBlock().run(),
-  //   shortcuts: ['mod', 'alt', 'C']
-  // },
+  {
+    value: "codeBlock",
+    label: "Code block",
+    icon: <CodeIcon className="size-5" />,
+    action: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+    isActive: (editor) => editor.isActive("codeBlock"),
+    canExecute: (editor) =>
+      editor.can().chain().focus().toggleCodeBlock().run(),
+    shortcuts: ["mod", "alt", "C"],
+  },
   {
     value: "blockquote",
     label: "Blockquote",
@@ -66,7 +67,7 @@ export const SectionFive: React.FC<SectionFiveProps> = ({
 }) => {
   return (
     <>
-      {/* <LinkEditPopover editor={editor} size={size} variant={variant} /> */}
+      <LinkEditPopover editor={editor} size={size} variant={variant} />
       <ImageEditDialog editor={editor} size={size} variant={variant} />
       <ToolbarSection
         editor={editor}

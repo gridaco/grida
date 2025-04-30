@@ -4,14 +4,16 @@ import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
 import { GENzJSONForm } from "@/types/zod";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
+
+const MODEL = process.env.NEXT_PUBLIC_OPENAI_BEST_MODEL_ID || "gpt-4o-mini";
 
 export async function generate(input: string, gist?: string) {
   const stream = createStreamableValue({});
 
   (async () => {
     const { partialObjectStream } = await streamObject({
-      model: openai("gpt-4o"),
+      model: openai(MODEL),
       prompt: input,
       schema: GENzJSONForm,
     });
@@ -25,7 +27,7 @@ export async function generate(input: string, gist?: string) {
     const final = (stream.value as any)["curr"];
 
     if (gist) {
-      const { error, data } = await grida_forms_client
+      const { error, data } = await service_role.forms
         .from("gist")
         .update({
           slug: gist,

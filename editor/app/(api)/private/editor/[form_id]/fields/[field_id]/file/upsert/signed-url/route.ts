@@ -1,10 +1,9 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createFormsClient } from "@/lib/supabase/server";
 import type { FormFieldStorageSchema } from "@/types";
 import type {
   FormsApiResponse,
   SignedUploadUrlData,
 } from "@/types/private/api";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { queryorbody } from "@/utils/qs";
@@ -35,10 +34,9 @@ export async function PUT(
 
   assert(path);
 
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data: form, error: formerr } = await supabase
+  const { data: form, error: formerr } = await formsClient
     .from("form")
     .select(
       `

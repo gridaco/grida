@@ -1,10 +1,5 @@
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
-import {
-  grida_forms_client,
-  createServerComponentClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+import { service_role } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
@@ -26,8 +21,6 @@ const fonts = {
   inconsolata,
 };
 
-const IS_PRODUTION = process.env.NODE_ENV === "production";
-
 type Params = { id: string };
 
 export async function generateMetadata({
@@ -38,7 +31,7 @@ export async function generateMetadata({
   // room for improvement - query optimization via rpc or meta from client side
   const { id } = await params;
 
-  const { data: formdoc, error: formdoc_err } = await grida_forms_client
+  const { data: formdoc, error: formdoc_err } = await service_role.forms
     .from("form_document")
     .select(
       `
@@ -55,7 +48,7 @@ export async function generateMetadata({
     return notFound();
   }
 
-  const { data: doc } = await workspaceclient
+  const { data: doc } = await service_role.workspace
     .from("document")
     .select("*")
     .eq("id", formdoc.id)
@@ -81,10 +74,8 @@ export default async function Layout({
   params: Promise<Params>;
 }>) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const supabase = createServerComponentClient(cookieStore);
 
-  const { data, error } = await grida_forms_client
+  const { data, error } = await service_role.forms
     .from("form_document")
     .select(
       `

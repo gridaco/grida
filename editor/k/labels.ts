@@ -7,6 +7,7 @@ export namespace Labels {
     v0_site: "Site",
     v0_canvas: "Canvas",
     v0_bucket: "Storage",
+    v0_campaign_referral: "Campaign",
   } as const;
 
   const price_tier_labels = {
@@ -23,4 +24,11 @@ export namespace Labels {
   export function priceTier(tier: PlatformPricingTier) {
     return price_tier_labels[tier];
   }
+
+  /**
+   * may the fourth be with you
+   *
+   * (used for example date)
+   */
+  export const starwarsday = new Date(new Date().getFullYear(), 4, 4);
 }

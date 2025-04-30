@@ -1,0 +1,1 @@
+see https://grida.co/docs/platform/customers#working-with-csv

@@ -1,8 +1,7 @@
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { PublicUrls } from "@/services/public-urls";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 type Params = { organization_id: number };
 
@@ -12,9 +11,10 @@ export async function GET(
     params: Promise<Params>;
   }
 ) {
+  // TODO: optimize query
+
   const { organization_id } = await context.params;
-  const cookieStore = await cookies();
-  const client = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
 
   const avatar_url = PublicUrls.organization_avatar_url(client);
 
@@ -36,9 +36,13 @@ export async function GET(
   }
 
   const { data: documents, error: documents_err } = await client
-    .rpc("workspace_documents", {
-      p_organization_id: Number(organization_id),
-    })
+    .rpc(
+      "workspace_documents",
+      {
+        p_organization_id: Number(organization_id),
+      },
+      { get: true }
+    )
     .order("updated_at", { ascending: false });
 
   if (documents_err) {

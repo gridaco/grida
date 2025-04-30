@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import React, { useMemo } from "react";
@@ -21,10 +21,8 @@ export function WorkspaceMenu({
 }: React.PropsWithChildren<{
   current?: number;
 }>) {
-  const { state } = useWorkspace();
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
-
-  const { organizations } = state;
+  const { organizations } = useWorkspace();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {

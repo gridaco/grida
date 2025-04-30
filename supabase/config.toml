@@ -10,7 +10,7 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public", "grida_g11n", "grida_x_supabase", "grida_sites", "grida_canvas", "grida_commerce", "grida_forms_secure", "grida_forms", "grida_storage"]
+schemas = ["public", "graphql_public", "grida_library", "grida_www", "grida_g11n", "grida_x_supabase", "grida_sites", "grida_canvas", "grida_commerce", "grida_forms_secure", "grida_forms", "grida_storage", "grida_west", "grida_west_referral"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
@@ -49,6 +49,9 @@ enabled = true
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
 
+[db.migrations]
+schema_paths = ["./schemas/*.sql",]
+
 [realtime]
 enabled = true
 # Bind realtime via either IPv4 or IPv6. (default: IPv4)
@@ -86,9 +89,19 @@ file_size_limit = "150MiB"
 [storage.image_transformation]
 enabled = true
 
+[storage.buckets.www]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/*", "text/*", "application/xml", "application/json"]
+
+[storage.buckets.library]
+public = true
+file_size_limit = "3MiB"
+allowed_mime_types = ["image/*"]
+
 [storage.buckets.avatars]
 public = true
-file_size_limit = "10MiB"
+file_size_limit = "3MiB"
 allowed_mime_types = ["image/*"]
 
 [storage.buckets.assets]

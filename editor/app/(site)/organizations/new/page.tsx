@@ -73,6 +73,7 @@ export default function NewOrganizationSetupPage({
   return (
     <main className="max-w-md mx-auto p-4 md:p-0">
       <Nav />
+      <div className="h-40" />
       <header className="text-center py-20">
         <span className="text-muted-foreground text-sm">
           Tell us about your organization

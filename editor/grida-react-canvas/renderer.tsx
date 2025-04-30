@@ -5,7 +5,6 @@ import { useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
-import { css } from "@/grida/css";
 import { TransparencyGrid } from "@grida/transparency-grid";
 import { useMeasure } from "@uidotdev/usehooks";
 
@@ -57,9 +56,7 @@ export function StandaloneSceneContent({
       id={primary ? domapi.k.EDITOR_CONTENT_ELEMENT_ID : undefined}
       {...props}
     >
-      {children.map((id) => (
-        <NodeElement key={id} node_id={id} />
-      ))}
+      {children?.map((id) => <NodeElement key={id} node_id={id} />)}
     </div>
   );
 }
@@ -104,7 +101,7 @@ export function StandaloneSceneBackground({
 
   const [cssBackgroundColor, opacity] = useMemo(() => {
     if (!backgroundColor) return [undefined, 1] as const;
-    const hex = "#" + css.rgbaToHex(backgroundColor);
+    const hex = cmath.color.rgba8888_to_hex(backgroundColor);
     const opacity = backgroundColor.a;
     return [hex, opacity] as const;
   }, [backgroundColor]);

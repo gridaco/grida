@@ -1,7 +1,6 @@
 import type { FormInputType } from "@/types";
 import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
-import type { XPostgrestQuery } from "../supabase-postgrest/builder";
 import type { Data } from "../data";
 
 export namespace PostgresTypeTools {
@@ -117,8 +116,16 @@ export namespace PostgresTypeTools {
   export type SQLLiteralInputType = SQLLiteralInputConfig["type"];
 
   export function getSQLLiteralInputConfig(
-    meta: SupabasePostgRESTOpenApi.PostgRESTColumnMeta
-  ): Exclude<SQLLiteralInputConfig, { type: "is" }> | undefined {
+    meta: SupabasePostgRESTOpenApi.PostgRESTColumnMeta,
+    op?: Data.Query.Predicate.PredicateOperatorKeyword | (string & {})
+  ): SQLLiteralInputConfig | undefined {
+    if (op === "is") {
+      return {
+        type: "is",
+        accepts_boolean: meta.format === "bool" || meta.format === "boolean",
+      };
+    }
+
     if (meta.format?.includes("[]")) {
       return { type: "text" };
     }

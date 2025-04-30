@@ -8,9 +8,19 @@ export const qval = (v?: string | null) => {
 
 /**
  * Convert string to boolean (formdata, searchparams)
+ *
+ * `true`:
+ * - `"1"`
+ * - `"true"`
+ * - `"on"`
+ * - `"yes"`
+ * - `"y"`
+ *
+ * `false`:
+ * - all other values
  */
 export const qboolean = (v: string | null): boolean => {
-  return v === "1" || v === "true" || v === "on";
+  return v === "1" || v === "true" || v === "on" || v === "yes" || v === "y";
 };
 
 export function queryorbody(

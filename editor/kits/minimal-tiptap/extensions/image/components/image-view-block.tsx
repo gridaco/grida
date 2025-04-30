@@ -3,7 +3,7 @@ import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import type { ElementDimensions } from "../hooks/use-drag-resize";
 import { useDragResize } from "../hooks/use-drag-resize";
 import { ResizeHandle } from "./resize-handle";
-import { cn } from "@/utils";
+import { cn } from "@/utils/cn";
 import { Controlled as ControlledZoom } from "react-medium-image-zoom";
 import { ActionButton, ActionWrapper, ImageActions } from "./image-actions";
 import { useImageActions } from "../hooks/use-image-actions";
@@ -205,7 +205,6 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
 
         updateAttributes(normalizedData);
       } catch (error) {
-        console.error("Image upload failed:", error);
         setImageState((prev) => ({
           ...prev,
           error: true,
@@ -243,7 +242,7 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
         >
           <div className="h-full contain-paint">
             <div className="relative h-full">
-              {!imageState.imageLoaded && !imageState.error && (
+              {imageState.isServerUploading && !imageState.error && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Spinner className="size-7" />
                 </div>
@@ -264,7 +263,6 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
                   setImageState((prev) => ({ ...prev, isZoomed: false }))
                 }
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   className={cn(
                     "h-auto rounded object-contain transition-shadow",
@@ -283,6 +281,8 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
                   onError={handleImageError}
                   onLoad={handleImageLoad}
                   alt={node.attrs.alt || ""}
+                  title={node.attrs.title || ""}
+                  id={node.attrs.id}
                 />
               </ControlledZoom>
             </div>

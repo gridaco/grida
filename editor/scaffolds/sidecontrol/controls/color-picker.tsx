@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React from "react";
 import HexValueInput from "./utils/hex";
 import { RgbaColorPicker } from "react-colorful";
 import { grida } from "@/grida";
@@ -7,12 +7,13 @@ import { cn } from "@/utils";
 import { PipetteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEyeDropper } from "./utils/eyedropper";
-import "./color-picker.css";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cmath } from "@grida/cmath";
+import "./color-picker.css";
 
 interface IDColor {
   id: string;
@@ -49,7 +50,7 @@ export function ColorPicker({
             className="text-muted-foreground"
             onClick={() => {
               open()?.then((result) => {
-                const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
+                const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
                 onColorChange?.(rgba);
               });
             }}

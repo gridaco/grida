@@ -1,170 +1,113 @@
 import type { Database } from "@/database.types";
-import { createServerComponentClient as _createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { createClient } from "@supabase/supabase-js";
-import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
+import { createClient as _createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-export const workspaceclient = createClient<Database, "public">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "public",
-    },
-  }
-);
-
-export const grida_forms_client = createClient<Database, "grida_forms">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_forms",
-    },
-  }
-);
-
-export const grida_storage_client = createClient<Database, "grida_storage">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_storage",
-    },
-  }
-);
-
-export const grida_canvas_client = createClient<Database, "grida_canvas">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_canvas",
-    },
-  }
-);
-
-export const grida_sites_client = createClient<Database, "grida_sites">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_sites",
-    },
-  }
-);
-
-export const grida_commerce_client = createClient<Database, "grida_commerce">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-  {
-    db: {
-      schema: "grida_commerce",
-    },
-  }
-);
-
-export const grida_xsupabase_client = createClient<
-  Database,
-  "grida_x_supabase"
->(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
-  db: {
-    schema: "grida_x_supabase",
-  },
-});
-
-export const createServerComponentClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createServerComponentClient<Database, "grida_forms">(
+const __create_server_client = async <
+  SchemaName extends string & keyof Database = "public" extends keyof Database
+    ? "public"
+    : string & keyof Database,
+>(
+  schema: SchemaName
+) => {
+  const cookieStore = await cookies();
+  return createServerClient<Database, SchemaName>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "grida_forms" },
+      db: {
+        schema: schema,
+      },
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
       },
     }
   );
+};
 
-export const createServerComponentWorkspaceClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createServerComponentClient<Database, "public">(
+export async function createClient() {
+  return __create_server_client<"public">("public");
+}
+
+export async function createLibraryClient() {
+  return __create_server_client<"grida_library">("grida_library");
+}
+
+export async function createFormsClient() {
+  return __create_server_client<"grida_forms">("grida_forms");
+}
+
+export async function createStorageClient() {
+  return __create_server_client<"grida_storage">("grida_storage");
+}
+
+export async function createCanvasClient() {
+  return __create_server_client<"grida_canvas">("grida_canvas");
+}
+
+export async function createWestReferralClient() {
+  return __create_server_client<"grida_west_referral">("grida_west_referral");
+}
+
+export async function createWWWClient() {
+  return __create_server_client<"grida_www">("grida_www");
+}
+
+export async function createXSBClient() {
+  return __create_server_client<"grida_x_supabase">("grida_x_supabase");
+}
+
+const __create_service_role_client = <
+  SchemaName extends string & keyof Database = "public" extends keyof Database
+    ? "public"
+    : string & keyof Database,
+>(
+  schema: SchemaName
+) => {
+  return _createClient<Database, SchemaName>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!,
     {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "public" },
+      db: {
+        schema: schema,
       },
     }
   );
+};
 
-export const createServerComponentStorageClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createServerComponentClient<Database, "grida_storage">(
-    {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "grida_storage" },
-      },
-    }
-  );
-
-export const createServerComponentCanvasClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createServerComponentClient<Database, "grida_canvas">(
-    {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "grida_canvas" },
-      },
-    }
-  );
-
-export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
-  _createRouteHandlerClient<Database, "grida_forms">(
-    {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "grida_forms" },
-      },
-    }
-  );
-
-export const createRouteHandlerXSBClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createRouteHandlerClient<Database, "grida_x_supabase">(
-    {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "grida_x_supabase" },
-      },
-    }
-  );
-
-export const createRouteHandlerWorkspaceClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
-  _createRouteHandlerClient<Database, "public">(
-    {
-      cookies: () => cookieStore,
-    },
-    {
-      options: {
-        db: { schema: "public" },
-      },
-    }
-  );
+/**
+ * @deprecated - deprecation warning for extra security (not actually deprecated)
+ */
+export namespace service_role {
+  export const workspace = __create_service_role_client<"public">("public");
+  export const library =
+    __create_service_role_client<"grida_library">("grida_library");
+  export const forms =
+    __create_service_role_client<"grida_forms">("grida_forms");
+  export const storage =
+    __create_service_role_client<"grida_storage">("grida_storage");
+  export const canvas =
+    __create_service_role_client<"grida_canvas">("grida_canvas");
+  export const sites =
+    __create_service_role_client<"grida_sites">("grida_sites");
+  export const commerce =
+    __create_service_role_client<"grida_commerce">("grida_commerce");
+  export const west_referral =
+    __create_service_role_client<"grida_west_referral">("grida_west_referral");
+  export const xsb =
+    __create_service_role_client<"grida_x_supabase">("grida_x_supabase");
+  export const www = __create_service_role_client<"grida_www">("grida_www");
+}

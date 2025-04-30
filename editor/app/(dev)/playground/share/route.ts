@@ -1,14 +1,11 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import assert from "assert";
-import { cookies } from "next/headers";
+import { createFormsClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const formsClient = await createFormsClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await formsClient
     .from("gist")
     .insert({
       data: {

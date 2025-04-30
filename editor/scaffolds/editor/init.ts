@@ -19,7 +19,7 @@ import type {
   SchemaMayVaryDocument,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
-import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
+import { EditorSymbols } from "./symbols";
 import {
   FormFieldDefinition,
   FormStartPageSchema,
@@ -37,20 +37,20 @@ import {
 } from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
 import { grida } from "@/grida";
+import { DataFormat } from "../data-format";
 // import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
     case "v0_form":
       return initialFormEditorState(init);
-    case "v0_site":
-      return initialSiteEditorState(init);
     case "v0_schema":
       return initialDatabaseEditorState(init);
     case "v0_bucket":
       return initialBucketEditorState(init);
     case "v0_canvas":
       return initialCanvasEditorState(init);
+    case "v0_site":
     default:
       throw new Error("unsupported doctype");
   }
@@ -97,7 +97,7 @@ function initialBaseDocumentEditorState(
       open: false,
     },
     dateformat: "datetime",
-    datetz: SYM_LOCALTZ,
+    datetz: DataFormat.SYM_LOCALTZ,
   };
 }
 
@@ -308,303 +308,6 @@ function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
       },
       mode_connect: {
         disabled: true,
-      },
-    },
-    tables: [],
-  };
-}
-/**
- * // FIXME: not ready
- * @deprecated @beta
- * @param init
- * @returns
- */
-function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
-  // documents: {
-  //   ["site"]: initDocumentEditorState({
-  //     editable: true,
-  //     debug: false,
-  //     document: {
-  //       nodes: {},
-  //       scene: {
-  //         type: "scene",
-  //         children: ["root"],
-  //         guides: [],
-  //         constraints: {
-  //           children: "single",
-  //         },
-  //       },
-  //     },
-  //     templates: {
-  //       ["formcollection_sample_001_the_bundle"]: {
-  //         name: "formcollection_sample_001_the_bundle",
-  //         type: "template",
-  //         properties: {},
-  //         default: {},
-  //         // props: samples["formcollection_sample_001_the_bundle"] as any,
-  //         // overrides: {},
-  //         version: "0.0.0",
-  //         nodes: {},
-  //       },
-  //     },
-  //   }),
-  // },
-
-  // {
-  //   type: "group",
-  //   label: "Pages",
-  //   children: [
-  //     {
-  //       type: "item",
-  //       id: "home",
-  //       label: "home",
-  //       link: {
-  //         href: `/${basepath}/${document_id}/design`,
-  //       },
-  //       icon: "home",
-  //     },
-  //     {
-  //       type: "folder",
-  //       id: "/invite",
-  //       label: "/invite",
-  //       icon: "folder",
-  //       children: [
-  //         {
-  //           type: "folder",
-  //           id: "/invite/<slug>",
-  //           label: "[slug]",
-  //           icon: "folder",
-  //           children: [
-  //             {
-  //               type: "item",
-  //               id: "/invite/<slug>/page",
-  //               label: "page",
-  //               link: {
-  //                 href: `?scene=/invite/<slug>/page`,
-  //               },
-  //               icon: "file",
-  //             },
-  //           ],
-  //         },
-  //       ],
-  //     },
-  //     {
-  //       type: "folder",
-  //       id: "/join",
-  //       label: "/join",
-  //       icon: "folder",
-  //       children: [
-  //         {
-  //           type: "folder",
-  //           id: "/join/<slug>",
-  //           label: "[slug]",
-  //           icon: "folder",
-  //           children: [
-  //             {
-  //               type: "item",
-  //               id: "/join/<slug>/page",
-  //               label: "page",
-  //               link: {
-  //                 href: `?scene=/join/<slug>/page`,
-  //               },
-  //               icon: "file",
-  //             },
-  //           ],
-  //         },
-  //       ],
-  //     },
-  //     {
-  //       type: "item",
-  //       id: "/portal",
-  //       label: "portal",
-  //       link: {
-  //         href: `?scene=/portal`,
-  //       },
-  //       icon: "file",
-  //     },
-  //   ],
-  // }
-
-  const base = initialBaseDocumentEditorState(init);
-  // @ts-ignore
-  return {
-    ...base,
-    pages: sitedocumentpagesinit({
-      basepath: base.basepath,
-      document_id: init.document_id,
-    }),
-    selected_page_id: "site",
-    documents: {
-      ["site"]: {
-        __schema_version: grida.program.document.SCHEMA_VERSION,
-        __schema_valid: true,
-        state: initDocumentEditorState({
-          editable: true,
-          debug: false,
-          document: {
-            nodes: {
-              invite: {
-                id: "invite",
-                name: "Invite Page",
-                type: "template_instance",
-                template_id: "tmp-2503-invite",
-                position: "absolute",
-                removable: false,
-                active: true,
-                locked: false,
-                width: 375,
-                height: "auto",
-                properties: {},
-                props: {},
-                overrides: {},
-              },
-              join: {
-                id: "join",
-                name: "Join Page",
-                type: "template_instance",
-                template_id: "tmp-2503-join",
-                position: "absolute",
-                removable: false,
-                active: true,
-                locked: false,
-                width: 375,
-                height: "auto",
-                properties: {},
-                props: {},
-                overrides: {},
-                top: 0,
-                left: 0,
-              },
-              join_hello: {
-                id: "join_hello",
-                name: "Join Hello (Overlay)",
-                type: "template_instance",
-                template_id: "tmp-2503-join-hello",
-                position: "absolute",
-                removable: false,
-                active: true,
-                locked: false,
-                width: 375,
-                height: 812,
-                top: 0,
-                left: -500,
-                properties: {},
-                props: {},
-                overrides: {},
-              },
-              portal: {
-                id: "portal",
-                name: "Portal Page",
-                type: "template_instance",
-                template_id: "tmp-2503-portal",
-                position: "absolute",
-                removable: false,
-                active: true,
-                locked: false,
-                width: 375,
-                height: "auto",
-                properties: {},
-                props: {},
-                overrides: {},
-                top: 0,
-                left: 0,
-              },
-              portal_verify: {
-                id: "portal_verify",
-                name: "Verify (Overlay)",
-                type: "template_instance",
-                template_id: "tmp-2503-portal-verify",
-                position: "absolute",
-                removable: false,
-                active: true,
-                locked: false,
-                width: 375,
-                height: "auto",
-                properties: {},
-                props: {},
-                overrides: {},
-                top: 0,
-                left: 500,
-              },
-            },
-            entry_scene_id: "invite",
-            scenes: {
-              invite: {
-                type: "scene",
-                id: "invite",
-                name: "Invite",
-                children: ["invite"],
-                guides: [],
-                constraints: {
-                  children: "multiple",
-                },
-                order: 1,
-              },
-              join: {
-                type: "scene",
-                id: "join",
-                name: "Join",
-                children: ["join", "join_hello"],
-                guides: [],
-                constraints: {
-                  children: "multiple",
-                },
-                order: 2,
-              },
-              portal: {
-                type: "scene",
-                id: "portal",
-                name: "Portal",
-                children: ["portal", "portal_verify"],
-                guides: [],
-                constraints: {
-                  children: "multiple",
-                },
-                order: 3,
-              },
-            },
-          },
-          templates: {
-            ["tmp-2503-invite"]: {
-              name: "Invite",
-              type: "template",
-              properties: {},
-              default: {},
-              version: "0.0.0",
-              nodes: {},
-            },
-            ["tmp-2503-join"]: {
-              name: "Join",
-              type: "template",
-              properties: {},
-              default: {},
-              version: "0.0.0",
-              nodes: {},
-            },
-            ["tmp-2503-portal"]: {
-              name: "Portal",
-              type: "template",
-              properties: {},
-              default: {},
-              version: "0.0.0",
-              nodes: {},
-            },
-          },
-        }),
-      },
-    },
-    sidebar: {
-      mode: initial_sidebar_mode[init.doctype],
-      mode_build: {
-        disabled: false,
-      },
-      mode_data: {
-        disabled: false,
-        tables: [],
-        menus: [],
-      },
-      mode_connect: {
-        disabled: false,
       },
     },
     tables: [],

@@ -1,41 +1,41 @@
 import type { Database } from "@/database.types";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient as _createBrowserClient } from "@supabase/ssr";
 
-export const createClientFormsClient = () =>
-  createClientComponentClient<Database, "grida_forms">({
-    options: {
+const __create_browser_client = <
+  SchemaName extends string & keyof Database = "public" extends keyof Database
+    ? "public"
+    : string & keyof Database,
+>(
+  schema: SchemaName
+) =>
+  _createBrowserClient<Database, SchemaName>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
       db: {
-        schema: "grida_forms",
+        schema: schema,
       },
-    },
-  });
+      isSingleton: false,
+    }
+  );
 
-export const createClientCommerceClient = () =>
-  createClientComponentClient<Database, "grida_commerce">({
-    options: {
-      db: {
-        schema: "grida_commerce",
-      },
-    },
-    isSingleton: false,
-  });
+export const createBrowserClient = () =>
+  __create_browser_client<"public">("public");
 
-export const createClientCanvasClient = () =>
-  createClientComponentClient<Database, "grida_canvas">({
-    options: {
-      db: {
-        schema: "grida_canvas",
-      },
-    },
-    isSingleton: false,
-  });
+export const createBrowserLibraryClient = () =>
+  __create_browser_client<"grida_library">("grida_library");
 
-export const createClientWorkspaceClient = () =>
-  createClientComponentClient<Database, "public">({
-    options: {
-      db: {
-        schema: "public",
-      },
-    },
-    isSingleton: false,
-  });
+export const createBrowserFormsClient = () =>
+  __create_browser_client<"grida_forms">("grida_forms");
+
+export const createBrowserCommerceClient = () =>
+  __create_browser_client<"grida_commerce">("grida_commerce");
+
+export const createBrowserCanvasClient = () =>
+  __create_browser_client<"grida_canvas">("grida_canvas");
+
+export const createBrowserWWWClient = () =>
+  __create_browser_client<"grida_www">("grida_www");
+
+export const createBrowserWestReferralClient = () =>
+  __create_browser_client<"grida_west_referral">("grida_west_referral");

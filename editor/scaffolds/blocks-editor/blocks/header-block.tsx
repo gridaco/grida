@@ -15,13 +15,14 @@ import {
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
 } from "./base-block";
-import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
+import { MinimalTiptapHeadlessEditor } from "@/kits/minimal-tiptap";
 
 export function HeaderBlock({
   id,
@@ -60,12 +61,12 @@ export function HeaderBlock({
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
             <span className="flex flex-row gap-2 items-center">
-              <HeadingIcon />
-              Header
+              <HeadingIcon className="size-3" />
+              <span className="text-xs">Header</span>
             </span>
           </div>
         </div>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -79,23 +80,23 @@ export function HeaderBlock({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
       <div>
-        <div className="bg-background rounded overflow-hidden border aspect-auto">
+        <div className="px-2 bg-background overflow-hidden aspect-auto">
           <input
             type="text"
-            className="bg-background w-full p-4 text-2xl font-bold outline-none"
+            className="bg-background w-full text-2xl font-bold outline-none"
             placeholder="Heading"
             value={title_html ?? ""}
             onChange={(e) => onEditTitle(e.target.value)}
           />
-          <TextareaAutosize
-            minRows={1}
-            className="bg-background w-full p-4 text-lg outline-none"
+          <MinimalTiptapHeadlessEditor
+            output="html"
+            className="bg-background w-full outline-none border-none mt-4"
             placeholder="Description"
             value={description_html ?? ""}
-            onChange={(e) => onEditDescription(e.target.value)}
+            onChange={(value) => onEditDescription((value as string) ?? "")}
           />
         </div>
       </div>

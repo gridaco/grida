@@ -8,6 +8,8 @@ export const SYSTEM_GF_FINGERPRINT_VISITORID_KEY =
 // customer
 export const SYSTEM_GF_CUSTOMER_UUID_KEY = "__gf_customer_uuid";
 export const SYSTEM_GF_CUSTOMER_EMAIL_KEY = "__gf_customer_email";
+export const SYSTEM_GF_CUSTOMER_PHONE_KEY = "__gf_customer_phone";
+export const SYSTEM_GF_CUSTOMER_NAME_KEY = "__gf_customer_name";
 
 // session
 export const SYSTEM_GF_SESSION_KEY = "__gf_session";

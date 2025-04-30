@@ -5,10 +5,10 @@ import { NavProjects, projectstree } from "../workspace/sidebar";
 import { usePathname } from "next/navigation";
 
 export function ModeProject() {
-  const { state } = useWorkspace();
-  const { organization } = state;
+  const workspace = useWorkspace();
+  const { organization } = workspace;
   const pathName = usePathname();
-  const tree = projectstree(state, { pathName, currentOnly: true });
+  const tree = projectstree(workspace, { pathName, currentOnly: true });
   return (
     <NavProjects
       label="Project"

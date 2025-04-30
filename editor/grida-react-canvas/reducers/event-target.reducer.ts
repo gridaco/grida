@@ -36,7 +36,7 @@ import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
-import { vn } from "@/grida/vn";
+import vn from "@grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
@@ -1271,7 +1271,7 @@ function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
 function get_next_brush_pain_color(
   state: IDocumentEditorClipboardState
 ): cmath.Vector4 {
-  return grida.program.cg.rgba_to_unit8_chunk(
+  return cmath.color.rgba_to_unit8_chunk(
     state.next_paint_color ?? state.user_clipboard_color ?? black
   );
 }

@@ -105,7 +105,13 @@ export function Align() {
 
 export const Zoom = ZoomControl;
 
-export function Selection({ empty }: { empty?: React.ReactNode }) {
+export function Selection({
+  empty,
+  config,
+}: {
+  empty?: React.ReactNode;
+  config?: ControlsConfig;
+}) {
   const { state: document } = useDocument();
 
   const selection_length = document.selection.length;
@@ -113,13 +119,44 @@ export function Selection({ empty }: { empty?: React.ReactNode }) {
   return (
     <div>
       {selection_length === 0 && empty && empty}
-      {selection_length === 1 && <SelectedNodeProperties />}
-      {selection_length > 1 && <SelectionMixedProperties />}
+      {selection_length === 1 && <SelectedNodeProperties config={config} />}
+      {selection_length > 1 && <SelectionMixedProperties config={config} />}
     </div>
   );
 }
 
-function SelectionMixedProperties() {
+export interface ControlsConfig {
+  base?: "on" | "off";
+  position?: "on" | "off";
+  size?: "on" | "off";
+  template?: "on" | "off";
+  link?: "on" | "off";
+  developer?: "on" | "off";
+  export?: "on" | "off";
+  props?: "on" | "off";
+  text?: "on" | "off";
+  image?: "on" | "off";
+  layout?: "on" | "off";
+}
+
+const __default_controls_config: ControlsConfig = {
+  base: "on",
+  position: "on",
+  size: "on",
+  template: "on",
+  link: "on",
+  developer: "on",
+  export: "on",
+  props: "on",
+  text: "on",
+  image: "on",
+};
+
+function SelectionMixedProperties({
+  config = __default_controls_config,
+}: {
+  config?: ControlsConfig;
+}) {
   const scene = useCurrentScene();
 
   const { selection: ids, nodes, properties, actions: change } = useSelection();
@@ -190,7 +227,10 @@ function SelectionMixedProperties() {
   return (
     <SchemaProvider schema={undefined}>
       <div key={sid} className="mt-4 mb-10">
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.base === "off"}
+          className="border-b pb-4"
+        >
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine className="items-center gap-1">
               <Checkbox
@@ -222,7 +262,10 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.position === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -256,7 +299,10 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.size === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -304,7 +350,10 @@ function SelectionMixedProperties() {
             </SidebarMenuSectionContent>
           )}
         </SidebarSection> */}
-        <SidebarSection hidden={!types.has("text")} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.text === "off" || !types.has("text")}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -368,7 +417,10 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={!types.has("image")} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.image === "off" || !types.has("image")}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -384,7 +436,10 @@ function SelectionMixedProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
         {types.has("container") && (
-          <SidebarSection className="border-b pb-4">
+          <SidebarSection
+            hidden={config.layout === "off"}
+            className="border-b pb-4"
+          >
             <SidebarSectionHeaderItem>
               <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
@@ -567,7 +622,10 @@ function SelectionMixedProperties() {
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.developer === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -577,7 +635,7 @@ function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="pb-4">
+        <SidebarSection hidden={config.export === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -592,7 +650,11 @@ function SelectionMixedProperties() {
   );
 }
 
-function SelectedNodeProperties() {
+function SelectedNodeProperties({
+  config = __default_controls_config,
+}: {
+  config?: ControlsConfig;
+}) {
   const { state } = useDocument();
   const scene = useCurrentScene();
 
@@ -684,7 +746,10 @@ function SelectedNodeProperties() {
       }}
     >
       <div key={node_id} className="mt-4 mb-10">
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.base === "off"}
+          className="border-b pb-4"
+        >
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine className="items-center gap-1">
               <ConfigurableProperty
@@ -722,7 +787,10 @@ function SelectedNodeProperties() {
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.position === "off" || is_single_mode_root}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -756,7 +824,10 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.size === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -777,7 +848,10 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.template === "off" || !is_templateinstance}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -787,8 +861,11 @@ function SelectedNodeProperties() {
               onValueChange={actions.component}
             />
           </SidebarMenuSectionContent>
-        </SidebarSection> */}
-        <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+        </SidebarSection>
+        <SidebarSection
+          hidden={config.props === "off" || !is_templateinstance}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -810,7 +887,10 @@ function SelectedNodeProperties() {
           )}
         </SidebarSection>
 
-        <SidebarSection hidden={!is_text} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.text === "off" || !is_text}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -884,7 +964,10 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={!is_image} className="border-b pb-4">
+        <SidebarSection
+          hidden={config.image === "off" || !is_image}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -900,7 +983,10 @@ function SelectedNodeProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
         {is_container && (
-          <SidebarSection className="border-b pb-4">
+          <SidebarSection
+            hidden={config.layout === "off"}
+            className="border-b pb-4"
+          >
             <SidebarSectionHeaderItem>
               <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
             </SidebarSectionHeaderItem>
@@ -1054,7 +1140,10 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.link === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -1077,7 +1166,10 @@ function SelectedNodeProperties() {
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection
+          hidden={config.developer === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -1091,7 +1183,7 @@ function SelectedNodeProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="pb-4">
+        <SidebarSection hidden={config.export === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>

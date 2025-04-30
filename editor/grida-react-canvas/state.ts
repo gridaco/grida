@@ -919,7 +919,7 @@ export function initDocumentEditorState({
     bitmaps: {},
     properties: {},
     ...init.document,
-    scenes: Object.entries(init.document.scenes).reduce(
+    scenes: Object.entries(init.document.scenes ?? {}).reduce(
       (acc, [key, scene]) => {
         acc[key] = grida.program.document.init_scene(scene);
         return acc;
@@ -943,7 +943,7 @@ export function initDocumentEditorState({
       past: [],
     },
     gesture_modifiers: DEFAULT_GESTURE_MODIFIERS,
-    ruler: "on",
+    ruler: "off",
     pixelgrid: "on",
     when_not_removable: "deactivate",
     document_ctx: document.Context.from(doc).snapshot(),

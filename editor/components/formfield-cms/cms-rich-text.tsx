@@ -1,37 +1,38 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { useDocumentAssetUpload } from "@/scaffolds/asset";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import type { Content } from "@tiptap/react";
+import { FileIO } from "@/lib/file";
 
 export function CMSRichText({
   value,
+  uploader,
   onValueChange,
   placeholder,
-  autofocus,
-  disabled,
+  autofocus = false,
+  disabled = false,
 }: {
+  uploader?: FileIO.BucketFileUploaderFn;
   value: Content;
-  onValueChange?: (value: Content) => void;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   autofocus?: boolean;
   disabled?: boolean;
 }) {
-  const { uploadPublic } = useDocumentAssetUpload();
-
-  const uploadFile = useCallback(
-    (file: File) => {
-      return uploadPublic(file).then((r) => r.publicUrl);
+  const _uploader = useCallback(
+    async (file: File) => {
+      const o = await uploader!(file);
+      return o.publicUrl;
     },
-    [uploadPublic]
+    [uploader]
   );
 
   return (
     <div className="w-full max-w-full">
       <MinimalTiptapEditor
         value={value}
-        onChange={onValueChange}
+        onChange={(content) => onValueChange?.(content as string)}
         className="w-full"
         editorContentClassName="p-5"
         output="html"
@@ -40,7 +41,7 @@ export function CMSRichText({
         immediatelyRender={false}
         autofocus={autofocus}
         editable={!disabled}
-        uploader={uploadFile}
+        uploader={uploader ? _uploader : undefined}
         editorClassName="focus:outline-none prose"
       />
     </div>

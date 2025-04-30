@@ -13,6 +13,7 @@ import assert from "assert";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import type { NextRequest } from "next/server";
 import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { haccept } from "@/utils/h";
 
 export interface SessionMeta {
   accept: "application/json" | "text/html";
@@ -102,17 +103,4 @@ export function meta(
   }
 
   return meta;
-}
-
-/**
- * parse accept header to determine to response with json or redirect
- *
- * default fallback is json
- */
-function haccept(accept?: string | null): "application/json" | "text/html" {
-  if (accept) {
-    if (accept.includes("application/json")) return "application/json";
-    if (accept.includes("text/html")) return "text/html";
-  }
-  return "application/json";
 }

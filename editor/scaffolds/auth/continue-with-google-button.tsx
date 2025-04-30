@@ -1,7 +1,7 @@
 "use client";
 
 import { Env } from "@/env";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 export function ContinueWithGoogleButton({
   next,
@@ -10,7 +10,7 @@ export function ContinueWithGoogleButton({
   next?: string;
   redirect_uri?: string;
 }) {
-  const supabase = createClientComponentClient();
+  const client = createBrowserClient();
 
   const url = new URL(`${Env.web.HOST}/auth/callback`);
 
@@ -26,7 +26,7 @@ export function ContinueWithGoogleButton({
     <button
       className="flex px-4 py-2 rounded items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow"
       onClick={() => {
-        supabase.auth.signInWithOAuth({
+        client.auth.signInWithOAuth({
           provider: "google",
           options: {
             redirectTo: url.toString(),

@@ -1,4 +1,3 @@
-import type { DataGridLocalFilter } from "@/scaffolds/editor/state";
 import Fuse from "fuse.js";
 
 type DataGetter<T> = ((row: T) => any) | keyof T;

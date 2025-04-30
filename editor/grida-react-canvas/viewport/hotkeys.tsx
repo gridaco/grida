@@ -8,6 +8,7 @@ import {
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
 import { useEffect, useRef } from "react";
+import { cmath } from "@grida/cmath";
 
 export const keybindings_sheet = [
   {
@@ -533,7 +534,7 @@ export function useEditorHotKeys() {
                */
               sRGBHex: string;
             }) => {
-              const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
+              const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
               // set fill if selection
               if (selection.length > 0) {
                 //
@@ -851,12 +852,12 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    fit("*", 64);
+    fit("*", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 
   useHotkeys("shift+2", (e) => {
-    fit("selection", 64);
+    fit("selection", { margin: 64, animate: true });
     toast.success(`Zoom to selection`);
   });
 

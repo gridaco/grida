@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { cookies } from "next/headers";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { getPlatform } from "@/host/platform";
 import PlatformProvider from "@/host/platform-provider";
 import "../editor.css";
@@ -32,7 +33,9 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <PlatformProvider {...platform}>{children}</PlatformProvider>
+          <PlatformProvider {...platform}>
+            <TooltipProvider>{children}</TooltipProvider>
+          </PlatformProvider>
         </ThemeProvider>
       </body>
     </html>

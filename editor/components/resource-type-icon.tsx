@@ -23,13 +23,20 @@ import {
   BarChartHorizontalIcon,
   PenToolIcon,
   FoldersIcon,
+  MegaphoneIcon,
+  PlugIcon,
+  TagIcon,
+  LockKeyholeIcon,
+  BookUserIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
 export type ResourceTypeIconName =
+  | "auth"
   | "folder"
   | "file"
   | "setting"
+  | "tag"
   | "home"
   | "ai"
   | "dev"
@@ -47,6 +54,10 @@ export type ResourceTypeIconName =
   | "chart-line"
   | "chart-pie"
   | "commerce"
+  | "connect"
+  | "campaign"
+  | "customer"
+  | "customer-portal"
   | "user"
   | "i18n"
   | "supabase"
@@ -55,7 +66,8 @@ export type ResourceTypeIconName =
   | "v0_form"
   | "v0_site"
   | "v0_canvas"
-  | "v0_schema";
+  | "v0_schema"
+  | "v0_campaign_referral";
 
 export function ResourceTypeIcon({
   type,
@@ -69,6 +81,10 @@ export function ResourceTypeIcon({
   };
 
   switch (type) {
+    case "auth":
+      return <LockKeyholeIcon {...props} />;
+    case "tag":
+      return <TagIcon {...props} />;
     case "ai":
       return <SparkleIcon {...props} />;
     case "dev":
@@ -101,6 +117,11 @@ export function ResourceTypeIcon({
       return <LineChartIcon {...props} />;
     case "chart-pie":
       return <PieChartIcon {...props} />;
+    case "campaign":
+    case "v0_campaign_referral":
+      return <MegaphoneIcon {...props} />;
+    case "connect":
+      return <PlugIcon {...props} />;
     case "v0_site":
       return <AppWindowIcon {...props} />;
     case "v0_canvas":
@@ -113,7 +134,10 @@ export function ResourceTypeIcon({
     case "commerce":
       return <ShoppingBagIcon {...props} />;
     case "user":
+    case "customer":
       return <AvatarIcon {...props} />;
+    case "customer-portal":
+      return <BookUserIcon {...props} />;
     case "i18n":
       return <LanguagesIcon {...props} />;
     case "view-gallery":

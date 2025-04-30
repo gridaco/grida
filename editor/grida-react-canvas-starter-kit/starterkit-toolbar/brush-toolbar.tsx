@@ -27,7 +27,6 @@ import { cmath } from "@grida/cmath";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
 import toast from "react-hot-toast";
-import { grida } from "@/grida";
 
 export function useSliderState() {
   const [active, setActive] = useState(false);
@@ -304,7 +303,7 @@ function EyedropButton() {
   const mod = () => {
     if (isSupported) {
       open()?.then((result) => {
-        const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
+        const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
         // editor clipboard
         setClipboardColor(rgba);
       });

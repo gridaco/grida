@@ -4,11 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import useSWR from "swr";
-import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
-} from "@/lib/supabase/client";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { createBrowserFormsClient } from "@/lib/supabase/client";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -23,13 +19,17 @@ import {
 } from "./state";
 import PQueue from "p-queue";
 import assert from "assert";
+import type { Data } from "@/lib/data";
+import { useCustomerFeed } from "@/scaffolds/platform/customer/use-customer-feed";
+import { useTableSubscription } from "@/lib/supabase/realtime";
+import type { Database } from "@/database.types";
 
 type RealtimeTableChangeData = {
   id: string;
   [key: string]: any;
 };
 
-const useDebouncedDatagridQuery = () => {
+const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
   const [state] = useEditorState();
   const [q, setQ] = useState(state.datagrid_query);
   const { datagrid_query } = state;
@@ -72,50 +72,26 @@ const useSubscription = ({
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
   enabled: boolean;
 }) => {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
-  useEffect(() => {
-    if (!form_id) return;
-    if (!enabled) return;
-
-    const channelname = `table-filter-changes-${table}-${form_id}`;
-
-    const changes = supabase
-      .channel(channelname)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "grida_forms",
-          table,
-          filter: `form_id=eq.${form_id}`,
-        },
-        async (
-          payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
-        ) => {
-          const { old, new: _new } = payload;
-          const old_id = (old as RealtimeTableChangeData).id;
-          const new_id = (_new as RealtimeTableChangeData).id;
-
-          if (new_id && old_id) {
-            onUpdate?.(_new as RealtimeTableChangeData);
-          } else if (new_id) {
-            onInsert?.(_new as RealtimeTableChangeData);
-          } else {
-            onDelete?.(old);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      changes.unsubscribe();
-    };
-  }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
+  useTableSubscription<Database, "grida_forms">({
+    client: supabase,
+    channel: `table-filter-changes-${table}-${form_id}`,
+    enabled,
+    filter: {
+      event: "*",
+      schema: "grida_forms",
+      table: table,
+      filter: `form_id=eq.${form_id}`,
+    },
+    onDelete,
+    onUpdate,
+    onInsert,
+  });
 };
 
 function useFetchSchemaTableRows(table_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async ({ range }: { range: { from: number; to: number } }) => {
@@ -146,7 +122,7 @@ function useFetchSchemaTableRows(table_id: string) {
 }
 
 function useFetchSchemaTableRow() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async (id: string) => {
@@ -172,7 +148,7 @@ function useFetchSchemaTableRow() {
 }
 
 function useFetchResponseSessions(form_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async ({ range }: { range: { from: number; to: number } }) => {
@@ -209,7 +185,7 @@ function useChangeDatagridLoading() {
 }
 
 function useUpdateCell() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
@@ -658,42 +634,26 @@ export function CustomerFeedProvider({
     datagrid_table_id,
   } = state;
 
-  const client = useMemo(() => createClientWorkspaceClient(), []);
-
   const datagrid_query = useDebouncedDatagridQuery();
-
   const setLoading = useChangeDatagridLoading();
 
-  useEffect(() => {
-    if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
-      return;
-
-    if (!datagrid_query) return;
-
-    setLoading(true);
-    client
-      .from("customer")
-      .select()
-      .order("last_seen_at", { ascending: false })
-      .limit(datagrid_query?.q_page_limit)
-      .eq("project_id", project_id)
-      .then(({ data, error }) => {
-        setLoading(false);
-        if (data) {
-          dispatch({
-            type: "editor/customers/feed",
-            data: data,
-          });
-        }
-      });
-  }, [
-    dispatch,
-    setLoading,
-    datagrid_table_id,
-    datagrid_query,
+  useCustomerFeed(
     project_id,
-    client,
-  ]);
+    {
+      enabled:
+        datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+      query: datagrid_query,
+    },
+    {
+      onLoadingChange: setLoading,
+      onFeed: (data) => {
+        dispatch({
+          type: "editor/customers/feed",
+          data: data,
+        });
+      },
+    }
+  );
 
   return <>{children}</>;
 }

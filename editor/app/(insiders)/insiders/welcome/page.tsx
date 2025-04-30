@@ -16,7 +16,7 @@ export default function WelcomeContent() {
     <div className="w-dvw h-dvh flex items-center justify-center">
       <Card>
         <CardHeader>
-          <CardTitle>Welcome Isiders.</CardTitle>
+          <CardTitle>Welcome Insiders.</CardTitle>
           <CardDescription>
             Ready to contribute? Here are some helpful links.
           </CardDescription>

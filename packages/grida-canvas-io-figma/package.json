@@ -1,0 +1,11 @@
+{
+  "name": "@grida/io-figma",
+  "description": "Figma I/O for Grida Canvas",
+  "dependencies": {
+    "@grida/cmath": "workspace:*"
+  },
+  "devDependencies": {
+    "@figma/rest-api-spec": "^0.21.0",
+    "editor": "workspace:*"
+  }
+}

@@ -1,6 +1,5 @@
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createXSBClient } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { GridaXSupabase } from "@/types";
@@ -15,8 +14,7 @@ interface Context {
 // Special route for fetching auth.users via proxy supabase client, for in-editor use.
 // this route is protected via supabase_project access RLS.
 export async function GET(req: NextRequest, context: Context) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const xsbClient = await createXSBClient();
   const { supabase_project_id } = await context.params;
 
   const _q_page = req.nextUrl.searchParams.get("page");
@@ -26,7 +24,7 @@ export async function GET(req: NextRequest, context: Context) {
   const perPage = _q_perPage ? parseInt(_q_perPage) : undefined;
 
   // [REQUIRED] RLS gate
-  const { data: supabase_project } = await supabase
+  const { data: supabase_project } = await xsbClient
     .from("supabase_project")
     .select(`*`)
     .eq("id", supabase_project_id)

@@ -1,9 +1,6 @@
-import {
-  createRouteHandlerClient,
-  createRouteHandlerWorkspaceClient,
-} from "@/lib/supabase/server";
-import { Customer, Form, FormResponse } from "@/types";
-import { cookies } from "next/headers";
+import type { Platform } from "@/lib/platform";
+import { createClient, createFormsClient } from "@/lib/supabase/server";
+import { Form, FormResponse } from "@/types";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,7 +8,7 @@ type Params = {
   uid: string;
 };
 
-export interface FormCustomerDetail extends Customer {
+export interface FormCustomerDetail extends Platform.Customer.CustomerWithTags {
   responses: (FormResponse & { form: Form })[];
 }
 
@@ -22,12 +19,11 @@ export async function GET(
   }
 ) {
   const { uid } = await context.params;
-  const cookieStore = await cookies();
-  const client = createRouteHandlerClient(cookieStore);
-  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
+  const client = await createClient();
+  const formsClient = await createFormsClient();
 
-  const { data: customer } = await wsclient
-    .from("customer")
+  const { data: customer } = await client
+    .from("customer_with_tags")
     .select("*")
     .eq("uid", uid)
     .single();
@@ -36,7 +32,7 @@ export async function GET(
     return notFound();
   }
 
-  const { data: responses } = await client
+  const { data: responses } = await formsClient
     .from("response")
     .select("*, form(*)")
     .eq("customer_id", customer.uid);

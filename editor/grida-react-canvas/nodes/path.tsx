@@ -1,8 +1,8 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
-import queryattributes from "./utils/attributes";
-import { vn } from "@/grida/vn";
 import { useMemo } from "react";
+import queryattributes from "./utils/attributes";
+import vn from "@grida/vn";
 
 /**
  * @deprecated - not ready - do not use in production

@@ -1,0 +1,16 @@
+{
+  "name": "@grida/io-svg",
+  "description": "SVG I/O for Grida Canvas",
+  "dependencies": {
+    "@grida/cmath": "workspace:*",
+    "@grida/vn": "workspace:*",
+    "color-name": "^2.0.0",
+    "inline-style-parser": "^0.2.4",
+    "svgo": "^3.3.2",
+    "svgson": "^5.3.1"
+  },
+  "devDependencies": {
+    "@types/color-name": "^2.0.0",
+    "editor": "workspace:*"
+  }
+}

@@ -22,7 +22,13 @@ import {
   SidebarMenuBadge,
   SidebarGroupAction,
 } from "@/components/ui/sidebar";
-import { Home, Settings2, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  Home,
+  Settings2,
+  ChevronRight,
+  ChevronDown,
+  Trash2Icon,
+} from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,29 +39,40 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { useWorkspace, WorkspaceState } from "@/scaffolds/workspace";
 import {
-  OrganizationWithAvatar,
-  OrganizationWithMembers,
-  useWorkspace,
-  WorkspaceState,
-} from "@/scaffolds/workspace";
-import { PlusIcon } from "@radix-ui/react-icons";
+  DotsHorizontalIcon,
+  GearIcon,
+  Pencil2Icon,
+  PlusIcon,
+} from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { usePathname } from "next/navigation";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui/button";
 import { ShineBorder } from "@/www/ui/shine-border";
-import type { GDocument, PlatformPricingTier } from "@/types";
+import type {
+  GDocument,
+  OrganizationWithAvatar,
+  OrganizationWithMembers,
+  PlatformPricingTier,
+} from "@/types";
 import Link from "next/link";
 import "core-js/features/object/group-by";
+import {
+  DeleteConfirmationAlertDialog,
+  DeleteConfirmationSnippet,
+} from "@/components/dialogs/delete-confirmation-dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { RenameDialog } from "@/components/dialogs/rename-dialog";
 
 function SidebarMenuLinkButton({
   href,
@@ -116,7 +133,7 @@ export function projectstree(
     return {
       ...project,
       url: path,
-      selected: pathName?.startsWith(path),
+      selected: pathName === path || pathName?.startsWith(path + "/"),
       children: (groups[project.id] || []).map((doc) => ({
         ...doc,
         url: editorlink(".", {
@@ -138,13 +155,14 @@ export function projectstree(
 export default function WorkspaceSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useWorkspace();
-  const { loading, organization, organizations, projects, documents } = state;
+  const workspace = useWorkspace();
+  const { loading, organization, organizations, projects, documents } =
+    workspace;
 
   const pathName = usePathname();
 
   const tree = useMemo(() => {
-    return projectstree(state, { pathName });
+    return projectstree(workspace, { pathName });
   }, [documents, projects, organization.name, pathName]);
 
   const settings = {
@@ -283,8 +301,72 @@ export function NavProjects({
   }[];
   allowNew?: boolean;
 }) {
+  const router = useRouter();
+  const client = useMemo(() => createBrowserClient(), []);
+
+  const deleteProjectDialog = useDialogState<{
+    id: number;
+    match: string;
+  }>("delete-project", {
+    refreshkey: true,
+  });
+  const renameProjectDialog = useDialogState<{
+    id: number;
+    name: string;
+  }>("rename-project", {
+    refreshkey: true,
+  });
+
   return (
     <SidebarGroup>
+      <RenameDialog
+        key={renameProjectDialog.refreshkey}
+        open={renameProjectDialog.open}
+        onOpenChange={renameProjectDialog.setOpen}
+        id={renameProjectDialog.data?.id?.toString() ?? ""}
+        title="Rename Project"
+        description="Enter a new name for this project."
+        currentName={renameProjectDialog.data?.name}
+        onRename={async (id: string, newName: string): Promise<boolean> => {
+          const { count } = await client
+            .from("project")
+            .update({ name: newName }, { count: "exact" })
+            .eq("id", parseInt(id));
+          return count === 1;
+          // TODO: needs to revalidate
+        }}
+      />
+      <DeleteConfirmationAlertDialog
+        key={deleteProjectDialog.refreshkey}
+        {...deleteProjectDialog.props}
+        title="Delete Project"
+        description={
+          <>
+            This action cannot be undone. All resources including files,
+            customers, and tables under this project will be permanently
+            deleted. Type{" "}
+            <DeleteConfirmationSnippet>
+              {deleteProjectDialog.data?.match}
+            </DeleteConfirmationSnippet>{" "}
+            to delete this project.
+          </>
+        }
+        placeholder={deleteProjectDialog.data?.match}
+        match={deleteProjectDialog.data?.match}
+        onDelete={async ({ id }) => {
+          const { count, error } = await client
+            .from("project")
+            .delete({ count: "exact" })
+            .eq("id", id);
+          if (error) return false;
+          if (count === 1) {
+            // TODO: needs to revalidate
+            router.replace(`/${orgname}`);
+            return true;
+          }
+          return false;
+        }}
+      />
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       {allowNew && (
         <CreateNewProjectDialog org={orgname}>
@@ -322,16 +404,64 @@ export function NavProjects({
                     <ChevronRight />
                   </SidebarMenuAction>
                 </CollapsibleTrigger>
-                <CreateNewDocumentButton
-                  project_name={project.name}
-                  project_id={project.id}
-                >
-                  <SidebarMenuAction showOnHover>
-                    <PlusIcon />
-                  </SidebarMenuAction>
-                </CreateNewDocumentButton>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuAction showOnHover>
+                      <DotsHorizontalIcon />
+                    </SidebarMenuAction>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start">
+                    <CreateNewDocumentButton
+                      project_name={project.name}
+                      project_id={project.id}
+                    >
+                      <DropdownMenuItem>
+                        <PlusIcon className="mr-2" />
+                        <span>New Document</span>
+                      </DropdownMenuItem>
+                    </CreateNewDocumentButton>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        renameProjectDialog.openDialog({
+                          id: project.id,
+                          name: project.name,
+                        });
+                      }}
+                    >
+                      <Pencil2Icon className="mr-2" />
+                      <span>Rename</span>
+                    </DropdownMenuItem>
+                    <Link href={`/${orgname}/${project.name}/dash`}>
+                      <DropdownMenuItem>
+                        <GearIcon className="mr-2" />
+                        <span>Console</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        deleteProjectDialog.openDialog({
+                          id: project.id,
+                          match: `DELETE ${project.name}`,
+                        });
+                      }}
+                      className="text-destructive"
+                    >
+                      <Trash2Icon className="size-3.5 me-2" />
+                      <span>Delete Project</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <CollapsibleContent>
                   <SidebarMenuSub>
+                    {project.children.length === 0 && (
+                      <SidebarMenuSubItem>
+                        <span className="text-xs text-muted-foreground">
+                          No documents inside
+                        </span>
+                      </SidebarMenuSubItem>
+                    )}
                     {project.children.map((page) => (
                       <SidebarMenuSubItem key={page.id}>
                         <SidebarMenuSubButton size="sm" asChild>
@@ -363,7 +493,7 @@ function OrganizationSwitcher({
   organization: OrganizationWithAvatar;
   organizations: OrganizationWithAvatar[];
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createBrowserClient(), []);
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {
       window.location.href = "/";

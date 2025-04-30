@@ -37,8 +37,10 @@ supabase seed buckets
 ### Supabase Types
 
 ```bash
-npx supabase gen types typescript --local \
+supabase gen types typescript --local \
   --schema public \
+  --schema grida_library \
+  --schema grida_www \
   --schema grida_g11n \
   --schema grida_x_supabase \
   --schema grida_sites \
@@ -47,15 +49,19 @@ npx supabase gen types typescript --local \
   --schema grida_forms_secure \
   --schema grida_forms \
   --schema grida_storage \
-  > database.types.ts
+  --schema grida_west \
+  --schema grida_west_referral \
+  > database-generated.types.ts
 ```
 
 or (if you are a tier 1 contributor)
 
 ```bash
-npx supabase gen types typescript \
-  --project-id "mozagqllybnbytfcmvdh" \
+supabase gen types typescript \
+  --project-id $PROJECT_REF \
   --schema public \
+  --schema grida_library \
+  --schema grida_www \
   --schema grida_g11n \
   --schema grida_x_supabase \
   --schema grida_sites \
@@ -64,7 +70,9 @@ npx supabase gen types typescript \
   --schema grida_forms_secure \
   --schema grida_forms \
   --schema grida_storage \
-  > database.types.ts
+  --schema grida_west \
+  --schema grida_west_referral \
+  > database-generated.types.ts
 ```
 
 ## Support

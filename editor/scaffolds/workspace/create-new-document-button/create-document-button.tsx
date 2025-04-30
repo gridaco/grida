@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  ChevronDownIcon,
-  InfoCircledIcon,
-  PlusIcon,
-} from "@radix-ui/react-icons";
+import React, { useState } from "react";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,12 +27,10 @@ import {
   DialogHeader,
   DialogDescription,
 } from "@/components/ui/dialog";
-import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
-import { EditorApiResponse } from "@/types/private/api";
 import { Spinner } from "@/components/spinner";
 import {
   NewDocumentRequest,
@@ -67,9 +62,7 @@ export function CreateNewDocumentButton({
   project_id: number;
 }>) {
   const {
-    state: {
-      organization: { name: organization_name },
-    },
+    organization: { name: organization_name },
   } = useWorkspace();
 
   const newDatabaseDialog = useDialogState();
@@ -87,31 +80,6 @@ export function CreateNewDocumentButton({
       loading: "Creating...",
       error: "Failed to create form",
       success: "Form created",
-    });
-
-    promise.then(({ data, error }) => {
-      if (error) {
-        console.error(error);
-        return;
-      }
-      if (data) {
-        // client side redirect
-        router.push(data.redirect);
-        toast.loading("Loading...");
-      }
-    });
-  };
-
-  const new_default_site = async () => {
-    const promise = create_new_document({
-      project_id: project_id,
-      doctype: "v0_site",
-    });
-
-    toast.promise(promise, {
-      loading: "Creating...",
-      error: "Failed to create site",
-      success: "Site created",
     });
 
     promise.then(({ data, error }) => {
@@ -179,7 +147,7 @@ export function CreateNewDocumentButton({
         <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={8}>
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Forms</DropdownMenuLabel>
+            <DropdownMenuLabel>Forms / Events</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_form}>
               <ResourceTypeIcon
                 type="v0_form"
@@ -208,7 +176,20 @@ export function CreateNewDocumentButton({
               </DropdownMenuItem>
             </Link>
             <DropdownMenuSeparator />
+            <Link href={`/${organization_name}/${project_name}/new/referral`}>
+              <DropdownMenuItem>
+                <ResourceTypeIcon
+                  type="campaign"
+                  className="w-4 h-4 me-2 align-middle"
+                />
+                Referral
+                <Badge variant="outline" className="ms-auto">
+                  beta
+                </Badge>
+              </DropdownMenuItem>
+            </Link>
           </DropdownMenuGroup>
+          <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuLabel>Database / Storage</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
@@ -247,39 +228,15 @@ export function CreateNewDocumentButton({
             <DropdownMenuSeparator />
           </DropdownMenuGroup>
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Sites / Design</DropdownMenuLabel>
+            <DropdownMenuLabel>Design</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_cavas}>
               <ResourceTypeIcon
                 type="v0_canvas"
                 className="w-4 h-4 me-2 align-middle"
               />
-              Design
+              Canvas
               <Badge variant="outline" className="ms-auto">
-                beta
-              </Badge>
-            </DropdownMenuItem>
-            {/* TODO: alpha feature */}
-            <DropdownMenuItem
-              disabled={IS_PRODUCTION}
-              onSelect={new_default_site}
-            >
-              <ResourceTypeIcon
-                type="v0_site"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Blank Site
-              <Badge variant="outline" className="ms-auto">
-                soon
-              </Badge>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <ResourceTypeIcon
-                type="commerce"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Store
-              <Badge variant="outline" className="ms-auto">
-                soon
+                canary
               </Badge>
             </DropdownMenuItem>
           </DropdownMenuGroup>
@@ -308,11 +265,6 @@ function CreateNewDatabaseDialog({
   project_name: string;
 }) {
   const router = useRouter();
-  const {
-    state: {
-      organization: { name: organization_name },
-    },
-  } = useWorkspace();
   const [resourceType, setResourceType] = useState<"database" | "table">(
     "database"
   );

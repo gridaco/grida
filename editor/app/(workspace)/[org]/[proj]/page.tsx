@@ -9,18 +9,17 @@ import {
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
-import { GDocument } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
-import { GridCard, RowCard } from "@/components/site/form-card";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
-import Head from "next/head";
-import { editorlink } from "@/lib/forms/url";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DocumentsGrid } from "@/app/(workspace)/[org]/_components/documents-grid";
+import { SettingsIcon } from "lucide-react";
+import Head from "next/head";
 
-export default function FormsDashboardPage({
+export default function ProjectDashboardPage({
   params,
   searchParams,
 }: {
@@ -34,9 +33,7 @@ export default function FormsDashboardPage({
     layout?: "grid" | "list";
   };
 }) {
-  const { state } = useWorkspace();
-
-  const { loading, organization, projects, documents } = state;
+  const { loading, projects, documents, refresh } = useWorkspace();
   const { org: organization_name, proj: project_name } = params;
 
   const layout = searchParams.layout ?? "list";
@@ -59,8 +56,12 @@ export default function FormsDashboardPage({
           <div>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               {project_name}
+              <Link href={`/${organization_name}/${project_name}/dash`}>
+                <Button size="icon" variant="ghost">
+                  <SettingsIcon className="size-4" />
+                </Button>
+              </Link>
             </span>
-            <span className="font-mono opacity-50">{organization_name}</span>
           </div>
           {project && (
             <div>
@@ -77,6 +78,7 @@ export default function FormsDashboardPage({
             </div>
           )}
         </header>
+
         {loading ? (
           <>
             <div>
@@ -104,6 +106,7 @@ export default function FormsDashboardPage({
                 (doc) => doc.project_id === project!.id
               )}
               layout={layout}
+              onChange={refresh}
             />
             <footer className="mt-10 mb-5">
               <PoweredByGridaFooter />
@@ -112,63 +115,5 @@ export default function FormsDashboardPage({
         )}
       </div>
     </main>
-  );
-}
-
-function DocumentsGrid({
-  organization_name,
-  project_name,
-  documents,
-  layout,
-}: {
-  organization_name: string;
-  project_name: string;
-  documents: GDocument[];
-  layout: "grid" | "list";
-}) {
-  if (layout === "grid") {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {documents?.map((doc, i) => (
-          <Link
-            key={i}
-            href={editorlink(".", {
-              org: organization_name,
-              proj: project_name,
-              document_id: doc.id,
-            })}
-            prefetch={false}
-          >
-            <GridCard {...doc} />
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
-      <header className="flex text-sm opacity-80">
-        <span className="flex-1">
-          Documents
-          <span className="ml-2 text-xs opacity-50">{documents.length}</span>
-        </span>
-        <span className="w-32">Entries</span>
-        <span className="w-44">Updated At</span>
-      </header>
-      {documents?.map((doc, i) => (
-        <Link
-          key={i}
-          href={editorlink(".", {
-            org: organization_name,
-            proj: project_name,
-            document_id: doc.id,
-          })}
-          prefetch={false}
-        >
-          <RowCard {...doc} />
-        </Link>
-      ))}
-    </div>
   );
 }

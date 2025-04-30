@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
+  BlockAction,
   BlockHeader,
   FlatBlockBase,
   useBlockFocus,
@@ -112,7 +113,7 @@ export function FieldBlock({
       <BlockHeader border>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
-            <InputIcon />
+            <InputIcon className="size-3" />
             <Dialog
               open={advanced}
               onOpenChange={(open) => {
@@ -226,7 +227,7 @@ export function FieldBlock({
             )}
           </span>
         </div>
-        <div>
+        <BlockAction>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button>
@@ -240,7 +241,7 @@ export function FieldBlock({
               />
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </BlockAction>
       </BlockHeader>
       <div className={clsx("w-full bg-background rounded px-4 py-10")}>
         {is_hidden_field ? (

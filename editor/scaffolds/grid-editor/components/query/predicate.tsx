@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,10 +29,7 @@ import { Data } from "@/lib/data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
-import {
-  SQLLiteralInputValue,
-  XSBSQLLiteralInput,
-} from "./xsb/xsb-sql-literal-input";
+import { XSBSQLLiteralInput } from "./xsb/xsb-sql-literal-input";
 import { KeyIcon } from "lucide-react";
 import {
   Link2Icon,
@@ -47,6 +46,8 @@ import {
   type IDataQueryPredicatesConsumer,
 } from "@/scaffolds/data-query";
 import { toShorter } from "@/lib/pg-meta/k/alias";
+import type { SQLLiteralInputValue } from "./types";
+import { SQLLiteralInput } from "./sql-literal-input";
 
 const {
   Query: { Predicate },
@@ -85,8 +86,6 @@ export function DataQueryPredicatesMenu({
           <section className="py-2" hidden={!isset}>
             <div className="flex flex-col space-y-2 w-full">
               {predicates.map((q, i) => {
-                const format = properties[q.column].format;
-
                 const onchange = (
                   predicate: Partial<Data.Query.Predicate.ExtendedPredicate>
                 ) => {
@@ -154,23 +153,24 @@ export function DataQueryPredicatesMenu({
                               supabase_project_id: platform.supabase_project_id,
                               supabase_schema_name: schema_name!,
                             }}
-                            config={
-                              q.op === "is"
-                                ? {
-                                    type: "is",
-                                    accepts_boolean:
-                                      format === "bool" || format === "boolean",
-                                  }
-                                : PostgresTypeTools.getSQLLiteralInputConfig(
-                                    properties[q.column]
-                                  )
-                            }
+                            config={PostgresTypeTools.getSQLLiteralInputConfig(
+                              properties[q.column],
+                              q.op
+                            )}
                             value={q.value as string}
                             // TODO: have a debounce here
                             onValueChange={(v) => onchange({ value: v })}
                           />
                         ) : (
-                          <>N/A</>
+                          <SQLLiteralInput
+                            config={PostgresTypeTools.getSQLLiteralInputConfig(
+                              properties[q.column],
+                              q.op
+                            )}
+                            value={q.value as string}
+                            // TODO: have a debounce here
+                            onValueChange={(v) => onchange({ value: v })}
+                          />
                         )}
                       </div>
                     </div>
@@ -238,6 +238,13 @@ export function DataQueryPrediateAddMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
+        {attributes.length === 0 && (
+          <div className="p-4 border border-dashed">
+            <span className="text-xs text-muted-foreground">
+              No attributes found
+            </span>
+          </div>
+        )}
         {attributes.map((key) => {
           const property = properties[key];
 
@@ -312,9 +319,13 @@ export function DataQueryPredicateChip({
     [onChange]
   );
 
-  useEffect(() => {
-    onChange({ value: debouncedSearch });
-  }, [onChange, debouncedSearch]);
+  useEffect(
+    () => {
+      onChange({ value: debouncedSearch });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [debouncedSearch]
+  );
 
   const allowed_ops = Predicate.K.get_operators_by_format(format);
 
@@ -416,22 +427,22 @@ export function DataQueryPredicateChip({
                   supabase_project_id: platform.supabase_project_id,
                   supabase_schema_name: schema_name!,
                 }}
-                config={
-                  predicate.op === "is"
-                    ? {
-                        type: "is",
-                        accepts_boolean:
-                          format === "bool" || format === "boolean",
-                      }
-                    : PostgresTypeTools.getSQLLiteralInputConfig(
-                        properties[predicate.column]
-                      )
-                }
+                config={PostgresTypeTools.getSQLLiteralInputConfig(
+                  properties[predicate.column],
+                  predicate.op
+                )}
                 value={search as string}
                 onValueChange={(v) => setSearch(v)}
               />
             ) : (
-              <>N/A</>
+              <SQLLiteralInput
+                config={PostgresTypeTools.getSQLLiteralInputConfig(
+                  properties[predicate.column],
+                  predicate.op
+                )}
+                value={search as string}
+                onValueChange={(v) => setSearch(v)}
+              />
             )}
           </>
         )}
