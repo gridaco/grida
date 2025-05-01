@@ -28,10 +28,7 @@ _pt_sdxl_base_1 = "stabilityai/stable-diffusion-xl-base-1.0"
 
 
 @click.command()
-@click.argument(
-    "prompt_or_file",
-    help="A prompt string, or a path to a file containing prompts (txt: one prompt per line, or jsonl: with 'prompt' field)."
-)
+@click.argument("prompt_or_file")
 @click.option("--steps", default=None, type=int, help="Number of inference steps (e.g. 50, 100)")
 @click.option("--model", required=True, type=click.Choice([_pt_flux_1_dev, _pt_sdxl_base_1]), help="Model to use")
 @click.option("--n", default=1, type=int, help="Number of images to generate per prompt")
