@@ -1,8 +1,9 @@
 import click
-from diffusers import StableDiffusionXLPipeline, FluxPipeline
 import torch
 import platform
 import hashlib
+from diffusers import StableDiffusionXLPipeline, FluxPipeline
+from pathlib import Path
 
 
 def safe_filename(prompt: str) -> str:
@@ -20,17 +21,18 @@ def get_device():
         return "cpu"
 
 
+# supported models
 _pt_flux_1_dev = "black-forest-labs/FLUX.1-dev"
 _pt_sdxl_base_1 = "stabilityai/stable-diffusion-xl-base-1.0"
 
 
 @click.command()
-@click.argument("prompt")
+@click.argument("prompt_or_file")
 @click.option("--steps", default=None, type=int, help="Number of inference steps (e.g. 50, 100)")
 @click.option("--model", required=True, type=click.Choice([_pt_flux_1_dev, _pt_sdxl_base_1]), help="Model to use")
 @click.option("--n", default=1, type=int, help="Number of images to generate per prompt")
-@click.option("--o", type=click.Path(), help="Output file")
-def generate(prompt, model, steps, n, o):
+@click.option("--o", type=click.Path(), help="Output path")
+def generate(prompt_or_file, model, steps, n, o):
     device = get_device()
     if model == _pt_sdxl_base_1:
         pipe = StableDiffusionXLPipeline.from_pretrained(
@@ -47,17 +49,39 @@ def generate(prompt, model, steps, n, o):
         )
         pipe.to(device)
 
-    pipe_args = {"prompt": prompt}
-    if steps is not None:
-        pipe_args["num_inference_steps"] = steps
-    if n := 1:
-        pipe_args["num_images_per_prompt"] = n
+    path = Path(prompt_or_file)
+    prompts = []
+    if path.is_file():
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    prompts.append(line)
+    else:
+        prompts = [prompt_or_file]
 
-    image = pipe(**pipe_args).images[0]
-    model_label = model.split("/")[-1]
-    filename = o if o else f"{model_label}-{safe_filename(prompt)}-{steps if steps else 'default'}.png"
-    image.save(filename)
-    print(f"Saved: {filename}")
+    for idx, prompt in enumerate(prompts):
+        pipe_args = {"prompt": prompt}
+        if steps is not None:
+            pipe_args["num_inference_steps"] = steps
+        if n:
+            pipe_args["num_images_per_prompt"] = n
+
+        images = pipe(**pipe_args).images
+        model_label = model.split("/")[-1]
+
+        for i, image in enumerate(images):
+            if o:
+                output_path = Path(o)
+                if output_path.is_dir():
+                    filename = output_path / \
+                        f"{model_label}-{steps if steps else 'default'}-{safe_filename(prompt)}-{i:03}.png"
+                else:
+                    filename = output_path
+            else:
+                filename = f"{model_label}-{steps if steps else 'default'}-{safe_filename(prompt)}-{i:03}.png"
+            image.save(filename)
+            print(f"Saved: {filename}")
 
 
 if __name__ == "__main__":
