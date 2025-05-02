@@ -124,7 +124,6 @@ export async function search({
   const client = await createLibraryClient();
 
   const q = client.from("object").select("*, author(*)", { count: "exact" });
-
   if (category) {
     q.eq("category", category);
   }
@@ -133,12 +132,14 @@ export async function search({
     q.limit(Math.min(limit, MAX_LIMIT));
   }
 
-  if (text) {
+  if (text?.trim()) {
     q.textSearch("search_tsv", text, {
       config: "simple",
       type: "plain",
     });
   }
+
+  q.order("score", { ascending: false });
 
   const { data, error, count } = await q;
 

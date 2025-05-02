@@ -69,13 +69,13 @@ function ImageCard({ object }: { object: ObjectDetail }) {
       />
       <div className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
         <div className="w-full h-full flex flex-col justify-end ">
-          <p className="text-sm line-clamp-2">{text}</p>
+          <p className="text-xs line-clamp-2 opacity-80">{text}</p>
           {object.author && (
             <Link
               href={object.author.blog ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs underline mt-1"
+              className="text-xs underline mt-2"
             >
               @{object.author.name}
             </Link>

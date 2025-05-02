@@ -1,11 +1,16 @@
+"use client";
+
 import React from "react";
-import Link from "next/link";
 import { GridaLogo } from "@/components/grida-logo";
 import { Input } from "@/components/ui/input";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
-export default function LibraryHeader({ search }: { search?: string }) {
+export default function LibraryHeader() {
+  const searchParams = useSearchParams();
+  const search = searchParams.get("search") || "";
   return (
-    <header className="flex items-center justify-between px-6 py-4 sticky top-0 bg-background z-10 border-b">
+    <header className="flex items-center justify-between px-6 py-2 sticky top-0 bg-background z-10 border-b">
       <div className="flex-1 flex justify-start">
         <Link
           href="/home"
@@ -15,7 +20,7 @@ export default function LibraryHeader({ search }: { search?: string }) {
         </Link>
       </div>
       <div className="flex-1 flex justify-center">
-        <form method="get" className="w-full max-w-xl">
+        <form method="get" action="/library" className="w-full max-w-xl">
           <Input
             type="search"
             name="search"

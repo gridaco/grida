@@ -1,6 +1,6 @@
 import React from "react";
-import LibraryHeader from "./header";
-import LibraryFooter from "./footer";
+import LibraryHeader from "./_components/header";
+import LibraryFooter from "./_components/footer";
 
 export default async function Layout({
   children,
