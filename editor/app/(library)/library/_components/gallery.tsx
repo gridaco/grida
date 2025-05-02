@@ -1,10 +1,25 @@
-import React from "react";
+"use client";
+
+import React, { ComponentType } from "react";
+import { type MasonryProps } from "masonic";
 import type { Library } from "@/lib/library";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import { Button } from "@/components/ui/button";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import Link from "next/link";
+import { SparklesIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import dynamic from "next/dynamic";
+
+const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
+  () => import("masonic").then((mod) => mod.Masonry),
+  { ssr: false }
+);
 
 type ObjectDetail = Library.Object & {
   url: string;
@@ -20,25 +35,21 @@ export default function Gallery({
     </div>
   ),
 }: {
-  objects: ObjectDetail[] | undefined;
+  objects?: ObjectDetail[] | null;
   empty?: React.ReactNode;
 }) {
   return (
     <div className="w-full min-h-96">
       {objects?.length === 0 && empty}
-      {(objects?.length ?? 0) > 0 && (
-        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4 space-y-4">
-          {objects?.map((object) => (
-            <div key={object.id} className="break-inside-avoid">
-              <Link
-                href={`/library/o/${object.id}`}
-                className="group transition-all"
-              >
-                <ImageCard object={object} />
-              </Link>
-            </div>
-          ))}
-        </div>
+      {objects && objects.length > 0 && (
+        <Masonry
+          columnGutter={16}
+          rowGutter={16}
+          maxColumnCount={6}
+          items={objects}
+          itemKey={(data) => data.id}
+          render={({ data }) => <ImageCard key={data.id} object={data} />}
+        />
       )}
     </div>
   );
@@ -49,47 +60,94 @@ function ImageCard({ object }: { object: ObjectDetail }) {
     object.description || object.alt || object.title || object.prompt;
 
   return (
-    <div className="group relative overflow-hidden rounded-lg">
-      <Image
-        src={object.url}
-        alt={
-          object.alt ||
-          object.description ||
-          object.title ||
-          object.prompt ||
-          object.category
-        }
-        width={object.width}
-        height={object.height}
-        placeholder={object.color ? "blur" : undefined}
-        blurDataURL={
-          object.color ? getBlurDataURLFromColor(object.color) : undefined
-        }
-        className="w-full object-cover"
-      />
-      <div className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
-        <div className="w-full h-full flex flex-col justify-end ">
-          <p className="text-xs line-clamp-2 opacity-80">{text}</p>
-          {object.author && (
-            <Link
-              href={object.author.blog ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs underline mt-2"
-            >
-              @{object.author.name}
-            </Link>
-          )}
-          <div className="mt-4 flex justify-end">
-            <Link href={object.download} download>
-              <Button variant="ghost">
-                <DownloadIcon className="size-4 mr-2" />
-                Download
-              </Button>
-            </Link>
+    <figure
+      className="group transition-all relative overflow-hidden rounded-lg"
+      itemScope
+      itemType="http://schema.org/ImageObject"
+    >
+      <Link href={`/library/o/${object.id}`}>
+        <Image
+          src={object.url}
+          alt={
+            object.alt ||
+            object.description ||
+            object.title ||
+            object.prompt ||
+            object.category ||
+            "Image"
+          }
+          width={object.width}
+          height={object.height}
+          loading="lazy"
+          decoding="async"
+          placeholder={object.color ? "blur" : undefined}
+          blurDataURL={
+            object.color ? getBlurDataURLFromColor(object.color) : undefined
+          }
+          className="w-full object-cover"
+        />
+        <meta itemProp="contentUrl" content={object.url} />
+        <meta itemProp="license" content={object.license} />
+      </Link>
+      <figcaption className="sr-only" itemProp="caption">
+        {text}
+      </figcaption>
+      <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+        <div className="w-full h-full flex flex-col justify-between">
+          <div className="pointer-events-auto">
+            {object.generator && (
+              <div>
+                <Tooltip delayDuration={10}>
+                  <TooltipTrigger>
+                    <SparklesIcon className="size-3" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    This image is generated by {object.generator}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+          </div>
+          <div className="pointer-events-auto">
+            <p className="text-xs line-clamp-2 opacity-80">{text}</p>
+            {object.author && (
+              <span
+                itemProp="author"
+                itemScope
+                itemType="http://schema.org/Person"
+              >
+                <Link
+                  href={object.author.blog ?? "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs underline mt-2"
+                  itemProp="url"
+                >
+                  <span itemProp="name">@{object.author.name}</span>
+                </Link>
+              </span>
+            )}
+            <div className="mt-4 flex justify-between items-center">
+              <Tooltip delayDuration={10}>
+                <TooltipTrigger>
+                  <span className="text-[8px] opacity-80">
+                    {object.license}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Free for commercial use, no attribution required.
+                </TooltipContent>
+              </Tooltip>
+              <Link href={object.download} download>
+                <Button variant="ghost">
+                  <DownloadIcon className="size-4 mr-2" />
+                  Download
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </figure>
   );
 }

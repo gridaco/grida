@@ -91,6 +91,7 @@ CREATE TABLE grida_library.object (
   colors grida_library.color[] NOT NULL DEFAULT '{}',
   background grida_library.color NULL,
   score NUMERIC CHECK (score >= 0 AND score <= 1),
+  priority INT,
   year INT CHECK (year >= 1000 AND year <= 3000),
   entropy NUMERIC CHECK (entropy >= 0 AND entropy <= 1),
   orientation grida_library.orientation,
@@ -111,7 +112,7 @@ CREATE POLICY "public_read" ON grida_library.object FOR SELECT TO public USING (
 
 
 ---------------------------------------------------------------------
--- [Search support] --
+-- [Text Search support] --
 ---------------------------------------------------------------------
 ALTER TABLE grida_library.object
 ADD COLUMN search_tsv tsvector GENERATED ALWAYS AS (
@@ -126,6 +127,18 @@ ADD COLUMN search_tsv tsvector GENERATED ALWAYS AS (
 
 CREATE INDEX object_search_idx ON grida_library.object USING GIN (search_tsv);
 
+
+---------------------------------------------------------------------
+-- [Embedding - Vision Support - clip-vit-large-patch14] --
+---------------------------------------------------------------------
+create table grida_library.object_embedding_clip_l14 (
+  object_id uuid primary key references grida_library.object(id) on delete cascade,
+  embedding vector(768),
+  created_at timestamptz default now()
+);
+
+ALTER TABLE grida_library.object_embedding_clip_l14 ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_read" ON grida_library.object_embedding_clip_l14 FOR SELECT TO public USING (true);
 
 ---------------------------------------------------------------------
 -- [Collection] --
@@ -143,6 +156,7 @@ CREATE TABLE grida_library.collection (
 
 ALTER TABLE grida_library.collection ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read" ON grida_library.collection FOR SELECT TO public USING (true);
+
 
 ---------------------------------------------------------------------
 -- [Collection Object] --
@@ -173,4 +187,26 @@ BEGIN
     LIMIT p_limit
   ) sub;
 END;
+$$ LANGUAGE plpgsql STABLE;
+
+
+---------------------------------------------------------------------
+-- [similar rpc] --
+---------------------------------------------------------------------
+create or replace function grida_library.similar(
+  ref_id uuid
+)
+returns setof grida_library.object
+as $$
+  with reference as (
+    select embedding
+    from grida_library.object_embedding_clip_l14
+    where object_id = ref_id
+  )
+  select o.*
+  from grida_library.object o
+  join grida_library.object_embedding_clip_l14 e on e.object_id = o.id,
+       reference r
+  where o.id <> ref_id and e.embedding is not null
+  order by e.embedding <#> r.embedding;
 $$ LANGUAGE plpgsql STABLE;

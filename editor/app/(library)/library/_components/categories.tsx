@@ -7,12 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Library } from "@/lib/library";
 import Link from "next/link";
 
-//
-
 function useCategories() {
   const [categories, setCategories] = useState<Library.Category[] | undefined>(
     undefined
   );
+
   useEffect(() => {
     listCategories().then((categories) => {
       setCategories(categories);

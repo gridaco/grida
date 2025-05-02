@@ -2,6 +2,16 @@
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
 
+type ObjectWithAuthor = Library.Object & {
+  author: Library.Author | null;
+};
+
+type ObjectDetail = Library.Object & {
+  author: Library.Author | null;
+  url: string;
+  download: string;
+};
+
 export async function getCategory(id: string) {
   const client = await createLibraryClient();
   const { data } = await client
@@ -64,6 +74,36 @@ export async function random({ text }: { text?: string }) {
     download: client.storage
       .from("library")
       .getPublicUrl(data.path, { download: true }).data.publicUrl,
+  };
+}
+
+export async function similar(
+  id: string,
+  options: { limit: number } = { limit: 100 }
+): Promise<{
+  data: ObjectDetail[] | null;
+  error: any | null;
+}> {
+  const client = await createLibraryClient();
+  const { data, error } = await client
+    // Note: for some reason get: true doesn't work with this function.
+    .rpc("similar", {
+      ref_id: id,
+    })
+    .select("*, author(*)")
+    .limit(options.limit);
+
+  return {
+    data:
+      (data as unknown as ObjectWithAuthor[])?.map((object) => ({
+        ...object,
+        url: client.storage.from("library").getPublicUrl(object.path).data
+          .publicUrl,
+        download: client.storage
+          .from("library")
+          .getPublicUrl(object.path, { download: true }).data.publicUrl,
+      })) || null,
+    error,
   };
 }
 
