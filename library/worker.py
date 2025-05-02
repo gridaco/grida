@@ -28,8 +28,9 @@ def cli(env_file):
     pbar = tqdm(desc="Embedding images", unit="image")
     while True:
         query = supabase.schema("grida_library").table("object") \
-            .select("id,path") \
-            .order("id", desc=False) \
+            .select("id,path,mimetype") \
+            .order("priority", desc=False) \
+            .like("mimetype", "image/%") \
             .limit(1)
         if last_id:
             query = query.gt("id", last_id)
@@ -52,27 +53,26 @@ def cli(env_file):
             pbar.update(1)
             continue
 
-        # Generate public URL for the image
-        path = obj.get("path")
-        public_url = f"{url}/storage/v1/object/public/{BUCKET_NAME}/{path}"
-
-        # Embed image and convert to list
-        vector = embed(public_url)
+        # Embed and insert embedding with error isolation
         try:
-            embedding = vector.squeeze().cpu().tolist()
-        except AttributeError:
-            embedding = vector.tolist()
-
-        # Insert embedding record
-        supabase.schema("grida_library") \
-            .table("object_embedding_clip_l14") \
-            .insert({
-                "object_id": object_id,
-                "embedding": embedding
-            }) \
-            .execute()
-
-        pbar.update(1)
+            path = obj.get("path")
+            public_url = f"{url}/storage/v1/object/public/{BUCKET_NAME}/{path}"
+            vector = embed(public_url, obj["mimetype"])
+            try:
+                embedding = vector.squeeze().cpu().tolist()
+            except AttributeError:
+                embedding = vector.tolist()
+            supabase.schema("grida_library") \
+                .table("object_embedding_clip_l14") \
+                .insert({
+                    "object_id": object_id,
+                    "embedding": embedding
+                }) \
+                .execute()
+        except Exception as e:
+            tqdm.write(f"[ERROR] {object_id}: {e}")
+        finally:
+            pbar.update(1)
     pbar.close()
 
     tqdm.write("All unfinished images have been embedded.")
