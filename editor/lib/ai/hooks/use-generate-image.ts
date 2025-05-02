@@ -25,11 +25,13 @@ export function useGenerateImage() {
       prompt,
       width,
       height,
+      aspect_ratio,
     }: {
       model: ai.image.ProviderModel | ai.image.ImageModelId;
       prompt: string;
-      width: number;
-      height: number;
+      width?: number;
+      height?: number;
+      aspect_ratio?: ai.image.AspectRatioString;
     }) => {
       setImage(null);
       setKey((k) => k + 1);
@@ -40,9 +42,10 @@ export function useGenerateImage() {
         `/private/ai/generate/image`,
         {
           body: JSON.stringify({
-            model: model,
-            width: width,
-            height: height,
+            model,
+            width,
+            height,
+            aspect_ratio,
             prompt,
           } satisfies GenerateImageApiRequestBody),
           method: "POST",
@@ -51,14 +54,18 @@ export function useGenerateImage() {
           },
         }
       ).then((res) => res.json());
+      const image = {
+        src: r.data.publicUrl,
+        width: r.data.width,
+        height: r.data.height,
+        alt: prompt,
+      };
+
       setLoading(false);
       setEnd(new Date(r.data.timestamp));
-      setImage({
-        src: r.data.publicUrl,
-        width: width,
-        height: height,
-        alt: prompt,
-      });
+      setImage(image);
+
+      return image;
     },
     []
   );

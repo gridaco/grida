@@ -4,7 +4,7 @@ import { Redis } from "@upstash/redis";
 
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(20, "30d"),
+  limiter: Ratelimit.slidingWindow(500, "30d"),
 });
 
 export async function ai_credit_remaining({ user_id }: { user_id: string }) {
@@ -18,7 +18,7 @@ export async function ai_credit_remaining({ user_id }: { user_id: string }) {
   };
 }
 
-export async function ai_credit_limit() {
+export async function ai_credit_limit(cost: number) {
   const client = await createClient();
 
   const { data: userdata, error: auth_err } = await client.auth.getUser();
@@ -27,7 +27,8 @@ export async function ai_credit_limit() {
 
   // limit
   const { success, limit, reset, remaining } = await ratelimit.limit(
-    `ratelimit_u_${user_id}`
+    `ratelimit_u_${user_id}`,
+    { rate: cost }
   );
 
   const ratelimit_headers = {

@@ -79,6 +79,11 @@ export namespace ai {
       sizes: SizeSpec[] | null;
       avg_ppi: number;
       avg_credit: number;
+      default: {
+        width: number;
+        height: number;
+        aspect_ratio: AspectRatioString;
+      };
     };
 
     type RecraftV3Style =
@@ -123,6 +128,11 @@ export namespace ai {
         max_height: 1536,
         avg_ppi: 0.0975,
         avg_credit: 62,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
       },
       "recraft-ai/recraft-v3": {
         id: "recraft-ai/recraft-v3",
@@ -177,6 +187,11 @@ export namespace ai {
         max_height: 1820,
         avg_ppi: 0.04,
         avg_credit: 25,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
       },
       "black-forest-labs/flux-1.1-pro": {
         id: "black-forest-labs/flux-1.1-pro",
@@ -195,6 +210,11 @@ export namespace ai {
         max_height: 1440,
         avg_ppi: 0.04,
         avg_credit: 25,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
       },
       "black-forest-labs/flux-schnell": {
         id: "black-forest-labs/flux-schnell",
@@ -226,6 +246,11 @@ export namespace ai {
         max_height: 1536,
         avg_ppi: 0.003,
         avg_credit: 2,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
       },
     } as const;
   }

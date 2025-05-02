@@ -61,6 +61,7 @@ import {
 } from "@/components/ui/sidebar";
 import ai from "@/lib/ai";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 export default function ImagePlayground() {
   const [state, dispatch] = useReducer(
@@ -116,24 +117,35 @@ export default function ImagePlayground() {
 
 function CanvasConsumer() {
   const credits = useCredits();
-  const { insertNode } = useDocument();
+  const editor = useDocument();
   const [prompt, setPrompt] = useState("");
-  const model = useImageModelConfig("gpt-image-1");
+  const model = useImageModelConfig("black-forest-labs/flux-schnell");
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
-    insertNode({
+    const id = editor.createNodeId();
+    editor.insertNode({
+      _$id: id,
       type: "image",
+      name: value.text,
+      width: model.width,
+      height: model.height,
+      fit: "cover",
     });
     setPrompt(value.text);
     generate({
       model: model.modelId,
       width: model.width,
       height: model.height,
+      aspect_ratio: model.aspect_ratio,
       prompt: value.text,
-    }).finally(() => {
-      credits.refresh();
-    });
+    })
+      .then((image) => {
+        editor.changeNodeSrc(id, image.src);
+      })
+      .finally(() => {
+        credits.refresh();
+      });
   };
 
   return (
@@ -240,9 +252,9 @@ function Chat({
 }) {
   const sizeGroups = useMemo(() => {
     const groups = {
-      square: [] as ai.image.SizeWithAspectRatio[],
-      horizontal: [] as ai.image.SizeWithAspectRatio[],
-      vertical: [] as ai.image.SizeWithAspectRatio[],
+      square: [] as ai.image.SizeSpec[],
+      horizontal: [] as ai.image.SizeSpec[],
+      vertical: [] as ai.image.SizeSpec[],
     };
     (model.card?.sizes ?? []).forEach((s) => {
       const [w, h, r] = s;
@@ -256,8 +268,8 @@ function Chat({
     <div className="min-w-96 flex flex-col gap-2 pointer-events-auto">
       <div className="flex items-center gap-2 rounded-lg p-1 border bg-muted">
         <Select
-          value={`${model.width}x${model.height}`}
-          onValueChange={model.setSizeFromValue}
+          value={model.aspect_ratio}
+          onValueChange={(v) => model.setSize(v as ai.image.AspectRatioString)}
         >
           <SelectTrigger className="w-min border-none">
             <SelectValue placeholder="Select size" />
@@ -267,7 +279,7 @@ function Chat({
               <SelectGroup>
                 <SelectLabel>Square</SelectLabel>
                 {sizeGroups.square.map(([w, h, r]) => (
-                  <SelectItem key={r} value={`${w}x${h}`}>
+                  <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
                 ))}
@@ -277,7 +289,7 @@ function Chat({
               <SelectGroup>
                 <SelectLabel>Horizontal</SelectLabel>
                 {sizeGroups.horizontal.map(([w, h, r]) => (
-                  <SelectItem key={r} value={`${w}x${h}`}>
+                  <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
                 ))}
@@ -287,7 +299,7 @@ function Chat({
               <SelectGroup>
                 <SelectLabel>Vertical</SelectLabel>
                 {sizeGroups.vertical.map(([w, h, r]) => (
-                  <SelectItem key={r} value={`${w}x${h}`}>
+                  <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
                 ))}
@@ -300,12 +312,19 @@ function Chat({
           onValueChange={(v) => model.select(v as ai.image.ImageModelId)}
         >
           <SelectTrigger className="w-min border-none">
-            <SelectValue />
+            <SelectValue>{model.card?.label ?? "Select model"}</SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="min-w-52">
             {model.models.map((m) => (
               <SelectItem key={m.id} value={m.id}>
-                {m.label}
+                <div className="w-full flex items-center justify-between gap-2">
+                  {m.label}
+                  <Badge className="flex items-center gap-1" variant="outline">
+                    <CommandIcon className="size-3" />
+                    {m.avg_credit}
+                  </Badge>
+                  <Badge variant="outline">~{m.speed_max}</Badge>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

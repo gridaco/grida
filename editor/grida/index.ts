@@ -947,8 +947,12 @@ export namespace grida.program.nodes {
    * Other properties are required.
    */
   type __TPrototypeNode<T> = Partial<Omit<i.IBaseNode, "id">> &
-    Partial<i.ISceneNode> &
-    T;
+    Partial<i.ISceneNode> & {
+      /**
+       * force the id for instanciation (optional)
+       */
+      _$id?: string;
+    } & T;
 
   type __base_scene_node_properties =
     | "id"
@@ -1937,6 +1941,8 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
+            width: 100,
+            height: 100,
             position: "absolute",
             ...prototype,
             id: id,
@@ -1982,7 +1988,7 @@ export namespace grida.program.nodes {
         nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>,
         depth: number = 0
       ): nodes.Node {
-        const id = nid(prototype, depth);
+        const id = prototype._$id || nid(prototype, depth);
         const node = createNodeDataFromPrototypeWithoutChildren(prototype, id);
         document.nodes[node.id] = node;
 
