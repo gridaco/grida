@@ -29,7 +29,7 @@ def cli(env_file):
     pbar = tqdm(desc="Embedding images", unit="image")
     while True:
         query = supabase.schema("grida_library").table("object") \
-            .select("id,path,mimetype") \
+            .select("id,path,mimetype,category") \
             .order("priority", desc=True) \
             .order("category", desc=True) \
             .order("id", desc=True) \
@@ -40,6 +40,7 @@ def cli(env_file):
             break
         obj = items[0]
 
+        category = obj.get("category")
         object_id = obj.get("id")
         # Skip if already indexed
         emb_check = supabase.schema("grida_library") \
@@ -72,6 +73,7 @@ def cli(env_file):
         except Exception as e:
             tqdm.write(f"[ERROR] {object_id}: {e}")
         finally:
+            tqdm.write(f"[INFO] {category}/{object_id} embedded.")
             pbar.update(1)
             offset += 1
     pbar.close()
