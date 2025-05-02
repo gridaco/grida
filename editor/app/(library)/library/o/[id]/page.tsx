@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getObject } from "@/app/(library)/actions";
+import { getObject } from "@/app/(library)/library/actions";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
@@ -131,7 +131,7 @@ export default async function ObjectPage({
       </div>
 
       <footer className="mt-10">
-        <Link href={object.url} download>
+        <Link href={object.download} download>
           <Button>Download</Button>
         </Link>
       </footer>

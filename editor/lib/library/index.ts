@@ -49,4 +49,11 @@ export namespace Library {
     updated_at: string;
     username: string;
   };
+
+  export type Category = {
+    id: string;
+    name: string;
+    created_at: string;
+    description: string | null;
+  };
 }

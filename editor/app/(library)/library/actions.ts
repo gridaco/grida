@@ -1,4 +1,5 @@
 "use server";
+import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
 
 export async function getObject(id: string) {
@@ -16,6 +17,9 @@ export async function getObject(id: string) {
   return {
     ...data,
     url: client.storage.from("library").getPublicUrl(data.path).data.publicUrl,
+    download: client.storage
+      .from("library")
+      .getPublicUrl(data.path, { download: true }).data.publicUrl,
   };
 }
 
@@ -46,10 +50,13 @@ export async function random({ text }: { text?: string }) {
   return {
     ...data,
     url: client.storage.from("library").getPublicUrl(data.path).data.publicUrl,
+    download: client.storage
+      .from("library")
+      .getPublicUrl(data.path, { download: true }).data.publicUrl,
   };
 }
 
-export async function listCategories() {
+export async function listCategories(): Promise<Library.Category[]> {
   const client = await createLibraryClient();
   const { data, error } = await client
     .from("category")
@@ -78,6 +85,9 @@ export async function list() {
     ...object,
     url: client.storage.from("library").getPublicUrl(object.path).data
       .publicUrl,
+    download: client.storage
+      .from("library")
+      .getPublicUrl(object.path, { download: true }).data.publicUrl,
   }));
 
   return {
@@ -86,8 +96,10 @@ export async function list() {
   };
 }
 
+const MAX_LIMIT = 100;
+
 export async function search({
-  limit,
+  limit = 100,
   text,
   category,
 }: {
@@ -107,7 +119,7 @@ export async function search({
   }
 
   if (limit) {
-    q.limit(limit);
+    q.limit(Math.min(limit, MAX_LIMIT));
   }
 
   if (text) {
@@ -127,6 +139,9 @@ export async function search({
     ...object,
     url: client.storage.from("library").getPublicUrl(object.path).data
       .publicUrl,
+    download: client.storage
+      .from("library")
+      .getPublicUrl(object.path, { download: true }).data.publicUrl,
   }));
 
   return {
