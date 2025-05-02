@@ -57,7 +57,8 @@ def cli(env_file):
         # Embed and insert embedding with error isolation
         try:
             path = obj.get("path")
-            public_url = f"{url}/storage/v1/object/public/{BUCKET_NAME}/{path}"
+            public_url = supabase.storage.from_(
+                BUCKET_NAME).get_public_url(path)
             vector = embed(public_url, obj["mimetype"])
             try:
                 embedding = vector.squeeze().cpu().tolist()
