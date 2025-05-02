@@ -29,7 +29,7 @@ def cli(env_file):
     while True:
         query = supabase.schema("grida_library").table("object") \
             .select("id,path,mimetype") \
-            .order("priority", desc=False) \
+            .order("priority", desc=True, nullsfirst=False) \
             .order("id", desc=False) \
             .like("mimetype", "image/%") \
             .limit(1)
