@@ -86,13 +86,10 @@ export async function similar(
 }> {
   const client = await createLibraryClient();
   const { data, error } = await client
-    .rpc(
-      "similar",
-      {
-        ref_id: id,
-      },
-      { get: true }
-    )
+    // Note: for some reason get: true doesn't work with this function.
+    .rpc("similar", {
+      ref_id: id,
+    })
     .select("*, author(*)")
     .limit(options.limit);
 

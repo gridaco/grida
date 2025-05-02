@@ -197,8 +197,6 @@ create or replace function grida_library.similar(
   ref_id uuid
 )
 returns setof grida_library.object
-language sql
-stable
 as $$
   with reference as (
     select embedding
@@ -211,4 +209,4 @@ as $$
        reference r
   where o.id <> ref_id and e.embedding is not null
   order by e.embedding <#> r.embedding;
-$$;
+$$ LANGUAGE plpgsql STABLE;

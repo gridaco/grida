@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Masonry } from "masonic";
+import React, { ComponentType } from "react";
+import { type MasonryProps } from "masonic";
 import type { Library } from "@/lib/library";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import dynamic from "next/dynamic";
+
+const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
+  () => import("masonic").then((mod) => mod.Masonry),
+  { ssr: false }
+);
 
 type ObjectDetail = Library.Object & {
   url: string;
