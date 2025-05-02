@@ -30,6 +30,7 @@ def cli(env_file):
         query = supabase.schema("grida_library").table("object") \
             .select("id,path,mimetype") \
             .order("priority", desc=False) \
+            .order("id", desc=False) \
             .like("mimetype", "image/%") \
             .limit(1)
         if last_id:
