@@ -26,7 +26,7 @@ export default function Gallery({
     </div>
   ),
 }: {
-  objects: ObjectDetail[] | undefined;
+  objects?: ObjectDetail[] | null;
   empty?: React.ReactNode;
 }) {
   return (

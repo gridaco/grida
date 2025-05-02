@@ -6,8 +6,7 @@ async function fetchAllObjects(): Promise<
   { id: string; updated_at: string }[]
 > {
   const allObjects = [];
-  // hard limit
-  const pageSize = 5000;
+  const pageSize = 1000;
   let from = 0;
   let to = pageSize - 1;
 

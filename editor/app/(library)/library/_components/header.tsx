@@ -10,7 +10,7 @@ export default function LibraryHeader() {
   return (
     <header className="flex items-center justify-between gap-4 px-4 md:px-6 py-2 sticky top-0 bg-background z-10 border-b">
       <div className="flex-none md:flex-1 flex justify-start">
-        <Link href="/home">
+        <Link href="/library">
           <GridaLogo className="size-5" />
         </Link>
       </div>
