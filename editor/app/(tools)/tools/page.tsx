@@ -7,7 +7,7 @@ import {
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Link from "next/link";
-import { CodeIcon, FrameIcon } from "lucide-react";
+import { CodeIcon, FrameIcon, ImageIcon } from "lucide-react";
 
 const menus = [
   {
@@ -20,7 +20,13 @@ const menus = [
     title: "Halftone Generator",
     description: "Generate halftone patterns from images.",
     link: "/tools/halftone",
-    icon: FrameIcon,
+    icon: ImageIcon,
+  },
+  {
+    title: "Image Playground",
+    description: "Test & Evaluate Image Models.",
+    link: "/playground/image",
+    icon: ImageIcon,
   },
   {
     title: "E.164 Phone Number Tool",
