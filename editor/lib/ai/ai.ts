@@ -61,7 +61,7 @@ export namespace ai {
 
     export type SizeString = `${number}x${number}`;
 
-    export type SizeWithAspectRatio = [number, number, AspectRatioString];
+    export type SizeSpec = [number, number, AspectRatioString];
 
     export type ImageModelCard = {
       id: ImageModelId;
@@ -70,13 +70,13 @@ export namespace ai {
       vendor: Vendor;
       provider: Provider;
       styles: string[] | null;
-      speed_label: "fast" | "medium" | "slow" | "slowest";
+      speed_label: "fastest" | "fast" | "medium" | "slow" | "slowest";
       speed_max: string;
       min_width: number;
       max_width: number;
       min_height: number;
       max_height: number;
-      sizes: SizeWithAspectRatio[] | null;
+      sizes: SizeSpec[] | null;
       avg_ppi: number;
       avg_credit: number;
     };
@@ -195,6 +195,37 @@ export namespace ai {
         max_height: 1440,
         avg_ppi: 0.04,
         avg_credit: 25,
+      },
+      "black-forest-labs/flux-schnell": {
+        id: "black-forest-labs/flux-schnell",
+        label: "Flux Schnell",
+        short_description:
+          "The fastest image generation model tailored for local development and personal use",
+        vendor: "black-forest-labs",
+        provider: "replicate",
+        speed_label: "fastest",
+        speed_max: "3s",
+        styles: null,
+        // flux-schnell does not take wxh, but aspect ratio (the w/h is based on 1mp request)
+        sizes: [
+          [1024, 1024, "1:1"],
+          [1344, 768, "16:9"],
+          [1536, 640, "21:9"],
+          [1216, 832, "3:2"],
+          [832, 1216, "2:3"],
+          [896, 1088, "4:5"],
+          [1088, 896, "5:4"],
+          [896, 1152, "3:4"],
+          [1152, 896, "4:3"],
+          [768, 1344, "9:16"],
+          [640, 1536, "9:21"],
+        ],
+        min_width: 320,
+        max_width: 1536,
+        min_height: 320,
+        max_height: 1536,
+        avg_ppi: 0.003,
+        avg_credit: 2,
       },
     } as const;
   }
