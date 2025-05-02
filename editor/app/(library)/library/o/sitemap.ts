@@ -3,7 +3,7 @@ import { Env } from "@/env";
 import { service_role } from "@/lib/supabase/server";
 
 async function fetchAllObjects(): Promise<
-  { id: string; updated_at: string }[]
+  { id: string; updated_at: string; priority: number | null }[]
 > {
   const allObjects = [];
   const pageSize = 1000;
@@ -13,7 +13,7 @@ async function fetchAllObjects(): Promise<
   while (true) {
     const { data, error } = await service_role.library
       .from("object")
-      .select("id, updated_at")
+      .select("id, updated_at, priority")
       .range(from, to);
 
     if (error) throw error;
@@ -40,7 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${Env.gridaco}/library/o/${object.id}`,
         changeFrequency: "yearly",
         lastModified: object.updated_at,
-        priority: 0.1,
+        priority: object.priority || 0,
       }) satisfies MetadataRoute.Sitemap[number]
   );
 }
