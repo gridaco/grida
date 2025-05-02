@@ -2046,6 +2046,7 @@ export type Database = {
           orientation: Database["grida_library"]["Enums"]["orientation"] | null
           path: string
           path_tokens: string[] | null
+          priority: number | null
           prompt: string | null
           public_domain: boolean
           score: number | null
@@ -2084,6 +2085,7 @@ export type Database = {
           orientation?: Database["grida_library"]["Enums"]["orientation"] | null
           path: string
           path_tokens?: string[] | null
+          priority?: number | null
           prompt?: string | null
           public_domain?: boolean
           score?: number | null
@@ -2122,6 +2124,7 @@ export type Database = {
           orientation?: Database["grida_library"]["Enums"]["orientation"] | null
           path?: string
           path_tokens?: string[] | null
+          priority?: number | null
           prompt?: string | null
           public_domain?: boolean
           score?: number | null
@@ -2147,6 +2150,32 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "author"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      object_embedding_clip_l14: {
+        Row: {
+          created_at: string | null
+          embedding: string | null
+          object_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          embedding?: string | null
+          object_id: string
+        }
+        Update: {
+          created_at?: string | null
+          embedding?: string | null
+          object_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_embedding_clip_l14_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: true
+            referencedRelation: "object"
             referencedColumns: ["id"]
           },
         ]
@@ -2184,6 +2213,49 @@ export type Database = {
           orientation: Database["grida_library"]["Enums"]["orientation"] | null
           path: string
           path_tokens: string[] | null
+          priority: number | null
+          prompt: string | null
+          public_domain: boolean
+          score: number | null
+          search_tsv: unknown | null
+          sys_annotations: string[]
+          title: string | null
+          transparency: boolean
+          updated_at: string
+          version: number
+          width: number
+          year: number | null
+        }[]
+      }
+      similar: {
+        Args: { ref_id: string }
+        Returns: {
+          alt: string | null
+          author_id: string | null
+          background: string | null
+          bytes: number
+          categories: unknown[]
+          category: string
+          color: string | null
+          colors: unknown[]
+          created_at: string
+          description: string | null
+          entropy: number | null
+          fill: string | null
+          generator: string | null
+          gravity_x: number | null
+          gravity_y: number | null
+          height: number
+          id: string
+          keywords: string[]
+          lang: string | null
+          license: string
+          mimetype: string
+          objects: string[]
+          orientation: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens: string[] | null
+          priority: number | null
           prompt: string | null
           public_domain: boolean
           score: number | null
