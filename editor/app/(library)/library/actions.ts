@@ -2,6 +2,17 @@
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
 
+export async function getCategory(id: string) {
+  const client = await createLibraryClient();
+  const { data } = await client
+    .from("category")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  return data;
+}
+
 export async function getObject(id: string) {
   const client = await createLibraryClient();
   const { data, error } = await client
