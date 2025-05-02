@@ -24,23 +24,21 @@ def cli(env_file):
     key = os.environ.get("SUPABASE_KEY")
     supabase: Client = create_client(url, key)
 
-    last_id = None
+    offset = 0
+    limit = 1
     pbar = tqdm(desc="Embedding images", unit="image")
     while True:
         query = supabase.schema("grida_library").table("object") \
             .select("id,path,mimetype") \
-            .order("priority", desc=True, nullsfirst=False) \
-            .order("id", desc=False) \
-            .like("mimetype", "image/%") \
-            .limit(1)
-        if last_id:
-            query = query.gt("id", last_id)
+            .order("priority", desc=True) \
+            .order("category", desc=True) \
+            .order("id", desc=True) \
+            .range(offset, offset + limit - 1)
         result = query.execute()
         items = result.data or []
         if not items:
             break
         obj = items[0]
-        last_id = obj["id"]
 
         object_id = obj.get("id")
         # Skip if already indexed
@@ -52,6 +50,7 @@ def cli(env_file):
             .execute()
         if emb_check:
             pbar.update(1)
+            offset += 1
             continue
 
         # Embed and insert embedding with error isolation
@@ -74,6 +73,7 @@ def cli(env_file):
             tqdm.write(f"[ERROR] {object_id}: {e}")
         finally:
             pbar.update(1)
+            offset += 1
     pbar.close()
 
     tqdm.write("All unfinished images have been embedded.")

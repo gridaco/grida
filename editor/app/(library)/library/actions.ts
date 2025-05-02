@@ -86,9 +86,13 @@ export async function similar(
 }> {
   const client = await createLibraryClient();
   const { data, error } = await client
-    .rpc("similar", {
-      ref_id: id,
-    })
+    .rpc(
+      "similar",
+      {
+        ref_id: id,
+      },
+      { get: true }
+    )
     .select("*, author(*)")
     .limit(options.limit);
 
