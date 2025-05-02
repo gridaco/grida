@@ -1,4 +1,5 @@
 import React from "react";
+import { type Metadata } from "next";
 import { getCategory, search } from "../actions";
 import { notFound } from "next/navigation";
 import Categories from "../_components/categories";
@@ -12,12 +13,13 @@ export async function generateMetadata({
   params,
 }: {
   params: Promise<Params>;
-}) {
+}): Promise<Metadata> {
   const { t } = await params;
   const category = await getCategory(t);
   if (!category) return notFound();
   return {
     title: `${category.name}`,
+    keywords: [category.name, "free"],
     description:
       category.description ||
       `Browse ${category.name} resources in the Grida Library. All resources are free for commercial use.`,
