@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { Masonry } from "masonic";
 import type { Library } from "@/lib/library";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import { Button } from "@/components/ui/button";
@@ -32,19 +35,23 @@ export default function Gallery({
   return (
     <div className="w-full min-h-96">
       {objects?.length === 0 && empty}
-      {(objects?.length ?? 0) > 0 && (
-        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4 space-y-4">
-          {objects?.map((object) => (
-            <div key={object.id} className="break-inside-avoid">
-              <Link
-                href={`/library/o/${object.id}`}
-                className="group transition-all"
-              >
-                <ImageCard object={object} />
-              </Link>
-            </div>
-          ))}
-        </div>
+      {objects && objects.length > 0 && (
+        <Masonry
+          columnGutter={16}
+          rowGutter={16}
+          maxColumnCount={6}
+          items={objects}
+          itemKey={(data) => data.id}
+          render={({ data }) => (
+            <Link
+              key={data.id}
+              href={`/library/o/${data.id}`}
+              className="group transition-all"
+            >
+              <ImageCard object={data} />
+            </Link>
+          )}
+        />
       )}
     </div>
   );
