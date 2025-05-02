@@ -39,12 +39,12 @@ export default async function LibraryCategoryPage({
 
   return (
     <div className="space-y-4">
-      <section className="px-6 py-10 pt-16 md:py-20 md:pt-32 flex flex-col items-center justify-center text-left md:text-center max-w-2xl mx-auto">
+      <section className="py-10 pt-16 md:py-20 md:pt-32 flex flex-col md:items-center justify-center text-left md:text-center max-w-2xl md:mx-auto">
         <div>
           <h1 className="text-xl md:text-4xl font-bold capitalize">
             {category.name}
           </h1>
-          <p className="mt-4 text-muted-foreground">
+          <p className="mt-2 md:mt-4 text-muted-foreground">
             {category.description ||
               "All resources in the Grida Library are free for commercial use."}
           </p>
