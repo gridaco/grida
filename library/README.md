@@ -90,7 +90,11 @@ python photos/unsplash.py xR4Yt3AEXLY --download --q=regular --access-key="..." 
 **optimize.py**: Optimize images.
 
 ```sh
-python photos/optimize.py ~/Public/library/category  ~/Public/library/category/out --max-size=3
+# optimize
+python photos/optimize.py optimize ~/Public/library/category  ~/Public/library/category/out --max-size=3
+
+# rmsmall - remove small images
+python photos/optimize.py rmsmall ~/Public/library/category
 ```
 
 **metadata.py**: Generate metadata for images.

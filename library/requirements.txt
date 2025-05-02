@@ -1,5 +1,6 @@
 click
 cairosvg
+diffusers
 glom
 ollama
 pillow
@@ -7,3 +8,5 @@ pylette
 python-dotenv
 supabase
 tqdm
+torch
+textual

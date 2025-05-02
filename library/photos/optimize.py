@@ -5,6 +5,33 @@ from pathlib import Path
 QUALITY = 80
 
 
+@click.group()
+def cli():
+    pass
+
+
+@cli.command(name="rmsmall")
+@click.argument("input_dir", type=click.Path(exists=True, file_okay=False))
+@click.option("--min-size", default=256, help="Minimum width or height in pixels")
+def clean_images(input_dir, min_size):
+    """Remove images smaller than min-size in width or height."""
+    input_dir = Path(input_dir)
+    count = 0
+
+    for img_path in input_dir.glob("**/*.*"):
+        try:
+            with Image.open(img_path) as img:
+                w, h = img.size
+                if w < min_size or h < min_size:
+                    print(f"Removing {img_path} ({w}x{h})")
+                    img_path.unlink()
+                    count += 1
+        except Exception as e:
+            print(f"Skipped {img_path}: {e}")
+
+    print(f"Removed {count} images smaller than {min_size}px.")
+
+
 def preserve_exif(src_img: Image.Image, dst_path: str, quality: int):
     exif = src_img.info.get("exif")
     if exif:
@@ -14,7 +41,7 @@ def preserve_exif(src_img: Image.Image, dst_path: str, quality: int):
         src_img.save(dst_path, format='JPEG', quality=quality, optimize=True)
 
 
-@click.command()
+@cli.command(name="optimize")
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.argument('output_dir', type=click.Path(file_okay=False))
 @click.option('--max-size', type=float, default=3.0, show_default=True, help="Max file size in MiB")
@@ -60,5 +87,5 @@ def process_file(input_file: Path, output_dir: Path, max_bytes: int, overwrite: 
             f"{input_file.name}: {orig // 1024}KB → {new // 1024}KB (resized to {int(ratio * 100)}%)")
 
 
-if __name__ == '__main__':
-    optimize_images()
+if __name__ == "__main__":
+    cli()

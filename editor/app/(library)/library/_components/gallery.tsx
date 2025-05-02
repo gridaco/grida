@@ -1,0 +1,95 @@
+import React from "react";
+import type { Library } from "@/lib/library";
+import { getBlurDataURLFromColor } from "@/utils/placeholder";
+import { Button } from "@/components/ui/button";
+import { DownloadIcon } from "@radix-ui/react-icons";
+import Image from "next/image";
+import Link from "next/link";
+
+type ObjectDetail = Library.Object & {
+  url: string;
+  download: string;
+  author: Library.Author | null;
+};
+
+export default function Gallery({
+  objects,
+  empty = (
+    <div className="w-full h-full min-h-96 flex items-center justify-center text-center text-muted-foreground">
+      <span>No results found.</span>
+    </div>
+  ),
+}: {
+  objects: ObjectDetail[] | undefined;
+  empty?: React.ReactNode;
+}) {
+  return (
+    <div className="w-full min-h-96">
+      {objects?.length === 0 && empty}
+      {(objects?.length ?? 0) > 0 && (
+        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4 space-y-4">
+          {objects?.map((object) => (
+            <div key={object.id} className="break-inside-avoid">
+              <Link
+                href={`/library/o/${object.id}`}
+                className="group transition-all"
+              >
+                <ImageCard object={object} />
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImageCard({ object }: { object: ObjectDetail }) {
+  const text =
+    object.description || object.alt || object.title || object.prompt;
+
+  return (
+    <div className="group relative overflow-hidden rounded-lg">
+      <Image
+        src={object.url}
+        alt={
+          object.alt ||
+          object.description ||
+          object.title ||
+          object.prompt ||
+          object.category
+        }
+        width={object.width}
+        height={object.height}
+        placeholder={object.color ? "blur" : undefined}
+        blurDataURL={
+          object.color ? getBlurDataURLFromColor(object.color) : undefined
+        }
+        className="w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+        <div className="w-full h-full flex flex-col justify-end ">
+          <p className="text-xs line-clamp-2 opacity-80">{text}</p>
+          {object.author && (
+            <Link
+              href={object.author.blog ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline mt-2"
+            >
+              @{object.author.name}
+            </Link>
+          )}
+          <div className="mt-4 flex justify-end">
+            <Link href={object.download} download>
+              <Button variant="ghost">
+                <DownloadIcon className="size-4 mr-2" />
+                Download
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
