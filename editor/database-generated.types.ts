@@ -2154,6 +2154,32 @@ export type Database = {
           },
         ]
       }
+      object_embedding: {
+        Row: {
+          created_at: string | null
+          embedding: string | null
+          object_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          embedding?: string | null
+          object_id: string
+        }
+        Update: {
+          created_at?: string | null
+          embedding?: string | null
+          object_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_embedding_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: true
+            referencedRelation: "object"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       object_embedding_clip_l14: {
         Row: {
           created_at: string | null
@@ -4867,6 +4893,24 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4877,24 +4921,6 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4909,7 +4935,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: string
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>
