@@ -8,8 +8,11 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from embedding import embed
 
+QUEUE_NAME = "grida_library_object_embedding_jobs"
+BUCLET_NAME = "library"
+
 # ----------------------------------------------
-# Worker for Supabase pgmq queue 'embedding_jobs' using Supabase Python client
+# Worker for Supabase pgmq queue 'grida_library_object_embedding_jobs' using Supabase Python client
 #
 # Task payload JSON format:
 # {
@@ -110,7 +113,7 @@ class EmbeddingWorker:
                         object_id = payload["object_id"]
                         object_path = payload["path"]
                         public_url = self.supabase.storage.from_(
-                            "library").get_public_url(object_path)
+                            BUCLET_NAME).get_public_url(object_path)
                         mimetype = payload.get("mimetype")
 
                         logger.info(
@@ -140,7 +143,6 @@ def cli(env):
     else:
         load_dotenv()
 
-    QUEUE_NAME = "grida_library_object_embedding_jobs"
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     POLL_BATCH_SIZE = int(os.getenv("POLL_BATCH_SIZE", "10"))
