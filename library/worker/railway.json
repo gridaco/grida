@@ -4,6 +4,6 @@
     "builder": "RAILPACK"
   },
   "deploy": {
-    "startCommand": "python worker.py"
+    "startCommand": "python src/worker.py"
   }
 }

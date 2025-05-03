@@ -144,7 +144,8 @@ def cli(env):
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     POLL_BATCH_SIZE = int(os.getenv("POLL_BATCH_SIZE", "10"))
-    VISIBILITY_TIMEOUT = int(os.getenv("VISIBILITY_TIMEOUT", "60"))  # seconds
+    VISIBILITY_TIMEOUT = int(
+        os.getenv("VISIBILITY_TIMEOUT", "3600"))  # seconds
 
     worker = EmbeddingWorker(
         supabase_url=SUPABASE_URL,
