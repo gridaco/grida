@@ -5,13 +5,22 @@ from supabase import create_client
 from library.worker.src.transform import b64
 
 
-@click.command()
+@click.group()
+def cli():
+    """Command line interface for the library worker."""
+    pass
+
+
+@click.command("dump")
 @click.option("--supabase-url", envvar="SUPABASE_URL", required=True)
 @click.option("--supabase-key", envvar="SUPABASE_KEY", required=True)
 @click.option("--output", "-o", default="input.jsonl")
 @click.option("--page-size", default=1000)
 @click.option("--embedding-length", default=1024)
-def main(supabase_url, supabase_key, output, page_size, embedding_length):
+def cli_dump(supabase_url, supabase_key, output, page_size, embedding_length):
+    """
+    Create a JSONL file with the input for the embedding model.
+    """
     sb = create_client(supabase_url, supabase_key)
     library = sb.schema("grida_library")
 
@@ -63,4 +72,4 @@ def main(supabase_url, supabase_key, output, page_size, embedding_length):
 
 
 if __name__ == "__main__":
-    main()
+    cli()
