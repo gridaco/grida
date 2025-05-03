@@ -13,15 +13,16 @@ Cost:
 - $0.0008 / 1K tokens
 """
 import os
-import base64
 import json
 import logging
-import requests
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from library.worker.src.transform import b64
 
 load_dotenv()
+
+MODEL_ID = "amazon.titan-embed-image-v1"
 
 
 class EmbedError(Exception):
@@ -35,21 +36,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-def embed(image_path, mimetype) -> list:
+def embed(image: str | bytes, mimetype) -> list:
     try:
-        if image_path.startswith("http://") or image_path.startswith("https://"):
-            image_bytes = requests.get(image_path, stream=True).content
-        else:
-            with open(image_path, "rb") as f:
-                image_bytes = f.read()
-
-        if mimetype == "image/svg+xml":
-            import cairosvg
-            image_bytes = cairosvg.svg2png(bytestring=image_bytes)
-
-        input_image = base64.b64encode(image_bytes).decode("utf-8")
-
-        model_id = "amazon.titan-embed-image-v1"
+        input_image = b64(image, mimetype)
         output_embedding_length = 1024
 
         body = json.dumps({
@@ -60,14 +49,14 @@ def embed(image_path, mimetype) -> list:
         })
 
         logger.info(
-            "Generating embeddings with Amazon Titan model %s", model_id)
+            "Generating embeddings with Amazon Titan model %s", MODEL_ID)
         bedrock = boto3.client(
             service_name="bedrock-runtime",
             region_name=os.getenv("AWS_REGION", "us-east-1"),
         )
         response = bedrock.invoke_model(
             body=body,
-            modelId=model_id,
+            modelId=MODEL_ID,
             accept="application/json",
             contentType="application/json"
         )

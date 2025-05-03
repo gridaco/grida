@@ -112,13 +112,16 @@ class EmbeddingWorker:
                             message_body, dict) else json.loads(message_body)
                         object_id = payload["object_id"]
                         object_path = payload["path"]
-                        public_url = self.supabase.storage.from_(
-                            BUCLET_NAME).get_public_url(object_path)
-                        mimetype = payload.get("mimetype")
+                        obj = self.supabase.storage.from_(BUCLET_NAME)\
+                            .download(
+                                object_path, options={
+                                    "transform": {"quality": 80}
+                                })
 
+                        mimetype = payload.get("mimetype")
                         logger.info(
-                            "Processing object_id=%s url=%s", object_id, public_url)
-                        vector = embed(public_url, mimetype)
+                            "Processing object_id=%s", object_id)
+                        vector = embed(obj, mimetype)
                         self.upsert_embedding(object_id, vector)
                         self.q_ack(message_id)
                         logger.info("Completed object_id=%s", object_id)
