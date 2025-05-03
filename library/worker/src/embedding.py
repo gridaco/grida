@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-def embed(image_path, mimetype):
+def embed(image_path, mimetype) -> list:
     try:
         if image_path.startswith("http://") or image_path.startswith("https://"):
             image_bytes = requests.get(image_path, stream=True).content
