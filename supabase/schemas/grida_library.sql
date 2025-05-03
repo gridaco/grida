@@ -11,14 +11,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_library GRANT ALL ON 
 
 
 ---------------------------------------------------------------------
--- [task queue - `grida_library_object_embedding_jobs`] --
+-- [task queue - `grida_library_object_worker_jobs`] --
 ---------------------------------------------------------------------
-select from pgmq.create('grida_library_object_embedding_jobs');
-alter table pgmq.q_grida_library_object_embedding_jobs enable row level security;
-grant select on table pgmq.a_grida_library_object_embedding_jobs to pg_monitor;
-grant select on table pgmq.q_grida_library_object_embedding_jobs to pg_monitor;
-grant delete, insert, references, select, trigger, truncate, update on table pgmq.a_grida_library_object_embedding_jobs to service_role;
-grant delete, insert, references, select, trigger, truncate, update on table pgmq.q_grida_library_object_embedding_jobs to service_role;
+select from pgmq.create('grida_library_object_worker_jobs');
+alter table pgmq.q_grida_library_object_worker_jobs enable row level security;
+grant select on table pgmq.a_grida_library_object_worker_jobs to pg_monitor;
+grant select on table pgmq.q_grida_library_object_worker_jobs to pg_monitor;
+grant delete, insert, references, select, trigger, truncate, update on table pgmq.a_grida_library_object_worker_jobs to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table pgmq.q_grida_library_object_worker_jobs to service_role;
 
 
 ---------------------------------------------------------------------
@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION enqueue_object_embedding_job()
 RETURNS trigger AS $$
 BEGIN
   PERFORM pgmq.send(
-    queue_name := 'grida_library_object_embedding_jobs',
+    queue_name := 'grida_library_object_worker_jobs',
     msg := json_build_object(
       'object_id', NEW.id,
       'path', NEW.path,

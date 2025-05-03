@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from embedding import embed
 
-QUEUE_NAME = "grida_library_object_embedding_jobs"
+QUEUE_NAME = "grida_library_object_worker_jobs"
 BUCLET_NAME = "library"
 
 # ----------------------------------------------
-# Worker for Supabase pgmq queue 'grida_library_object_embedding_jobs' using Supabase Python client
+# Worker for Supabase pgmq queue 'grida_library_object_worker_jobs' using Supabase Python client
 #
 # Task payload JSON format:
 # {
