@@ -112,15 +112,13 @@ class EmbeddingWorker:
             "object_id", count="exact").eq("object_id", object_id).execute()
         return res.count == 1
 
-    def upsert_metadata(self, object_id: str, metadata: dict):
-        res = self.library_client.table("object").upsert({
-            "id": object_id,
+    def update_metadata(self, object_id: str, metadata: dict):
+        return self.library_client.table("object").update({
             "color": metadata.get("color"),
             "colors": metadata.get("colors"),
             "transparency": metadata.get("transparency"),
             "orientation": metadata.get("orientation"),
-        }).execute()
-        return res.data
+        }).eq("id", object_id).execute()
 
     def run(self):
         while running:
@@ -162,7 +160,7 @@ class EmbeddingWorker:
 
                         try:
                             metadata = object_metadata(obj, mimetype)
-                            self.upsert_metadata(object_id, metadata)
+                            self.update_metadata(object_id, metadata)
                         except Exception as e:
                             logger.error(
                                 "metadata error (object_id=%s): %s", object_id, e)
