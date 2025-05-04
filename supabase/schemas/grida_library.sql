@@ -28,8 +28,8 @@ CREATE OR REPLACE FUNCTION enqueue_object_embedding_job()
 RETURNS trigger AS $$
 BEGIN
   PERFORM pgmq.send(
-    queue_name := 'grida_library_object_worker_jobs',
-    msg := json_build_object(
+    queue_name := 'grida_library_object_worker_jobs'::text,
+    msg := jsonb_build_object(
       'object_id', NEW.id,
       'path', NEW.path,
       'mimetype', NEW.mimetype
@@ -157,18 +157,6 @@ ADD COLUMN search_tsv tsvector GENERATED ALWAYS AS (
 
 CREATE INDEX object_search_idx ON grida_library.object USING GIN (search_tsv);
 
-
----------------------------------------------------------------------
--- [[LEGACY] Embedding - Vision Support - clip-vit-large-patch14] --
----------------------------------------------------------------------
-create table grida_library.object_embedding_clip_l14 (
-  object_id uuid primary key references grida_library.object(id) on delete cascade,
-  embedding vector(768),
-  created_at timestamptz default now()
-);
-
-ALTER TABLE grida_library.object_embedding_clip_l14 ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read" ON grida_library.object_embedding_clip_l14 FOR SELECT TO public USING (true);
 
 ---------------------------------------------------------------------
 -- [Embedding - Vision Support - amazon.titan-embed-image-v1] --

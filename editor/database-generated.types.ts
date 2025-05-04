@@ -2180,32 +2180,6 @@ export type Database = {
           },
         ]
       }
-      object_embedding_clip_l14: {
-        Row: {
-          created_at: string | null
-          embedding: string | null
-          object_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          embedding?: string | null
-          object_id: string
-        }
-        Update: {
-          created_at?: string | null
-          embedding?: string | null
-          object_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "object_embedding_clip_l14_object_id_fkey"
-            columns: ["object_id"]
-            isOneToOne: true
-            referencedRelation: "object"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
