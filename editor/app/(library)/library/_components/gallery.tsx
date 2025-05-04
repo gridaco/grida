@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
+import { Spinner } from "@/components/spinner";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
   () => import("masonic").then((mod) => mod.Masonry),
@@ -41,18 +42,27 @@ export default function Gallery({
 }) {
   return (
     <div className="w-full min-h-96">
-      {objects?.length === 0 && empty}
-      {objects && objects.length > 0 && (
-        <Masonry
-          columnGutter={16}
-          rowGutter={16}
-          maxColumnCount={6}
-          items={objects}
-          itemKey={(data) => data.id}
-          render={({ data, width }) => (
-            <ImageCard key={data.id} width={width} object={data} />
+      {objects ? (
+        <>
+          {objects.length > 0 ? (
+            <Masonry
+              columnGutter={16}
+              rowGutter={16}
+              maxColumnCount={6}
+              items={objects}
+              itemKey={(data) => data.id}
+              render={({ data, width }) => (
+                <ImageCard key={data.id} width={width} object={data} />
+              )}
+            />
+          ) : (
+            <>{empty}</>
           )}
-        />
+        </>
+      ) : (
+        <div className="w-full flex items-center justify-center">
+          <Spinner />
+        </div>
       )}
     </div>
   );
@@ -100,7 +110,6 @@ function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
             object.color ? getBlurDataURLFromColor(object.color) : undefined
           }
           className="w-full h-full object-cover absolute inset-0"
-          style={{ transition: "opacity 0.3s ease" }}
         />
         <meta itemProp="contentUrl" content={object.url} />
         <meta itemProp="license" content={object.license} />
@@ -110,11 +119,11 @@ function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
       </figcaption>
       <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 duration-300 p-4">
         <div className="w-full h-full flex flex-col justify-between">
-          <div className="pointer-events-auto">
+          <div>
             {object.generator && (
               <div>
                 <Tooltip delayDuration={10}>
-                  <TooltipTrigger>
+                  <TooltipTrigger className="pointer-events-auto">
                     <SparklesIcon className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent>

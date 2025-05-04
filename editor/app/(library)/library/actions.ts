@@ -6,12 +6,6 @@ type ObjectWithAuthor = Library.Object & {
   author: Library.Author | null;
 };
 
-type ObjectDetail = Library.Object & {
-  author: Library.Author | null;
-  url: string;
-  download: string;
-};
-
 export async function getCategory(id: string) {
   const client = await createLibraryClient();
   const { data } = await client
@@ -23,11 +17,49 @@ export async function getCategory(id: string) {
   return data;
 }
 
-export async function getObject(id: string) {
+export async function getObject(id: string): Promise<Library.ObjectDetail> {
   const client = await createLibraryClient();
   const { data, error } = await client
     .from("object")
-    .select("*, author(*)")
+    .select(
+      `
+        alt,
+        author_id,
+        background,
+        bytes,
+        categories,
+        category,
+        color,
+        colors,
+        created_at,
+        description,
+        entropy,
+        fill,
+        generator,
+        gravity_x,
+        gravity_y,
+        height,
+        id,
+        keywords,
+        lang,
+        license,
+        mimetype,
+        objects,
+        orientation,
+        path,
+        path_tokens,
+        prompt,
+        public_domain,
+        score,
+        title,
+        transparency,
+        updated_at,
+        version,
+        width,
+        year,
+        author(*)
+      `
+    )
     .eq("id", id)
     .single();
 
@@ -79,9 +111,9 @@ export async function random({ text }: { text?: string }) {
 
 export async function similar(
   id: string,
-  options: { limit: number } = { limit: 100 }
+  options: { limit: number } = { limit: 120 }
 ): Promise<{
-  data: ObjectDetail[] | null;
+  data: Library.ObjectDetail[] | null;
   error: any | null;
 }> {
   const client = await createLibraryClient();
@@ -147,10 +179,10 @@ export async function list() {
   };
 }
 
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 120;
 
 export async function search({
-  limit = 100,
+  limit = 120,
   text,
   category,
 }: {
