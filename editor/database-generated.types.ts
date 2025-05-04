@@ -2154,7 +2154,7 @@ export type Database = {
           },
         ]
       }
-      object_embedding_clip_l14: {
+      object_embedding: {
         Row: {
           created_at: string | null
           embedding: string | null
@@ -2172,7 +2172,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "object_embedding_clip_l14_object_id_fkey"
+            foreignKeyName: "object_embedding_object_id_fkey"
             columns: ["object_id"]
             isOneToOne: true
             referencedRelation: "object"
@@ -4867,6 +4867,24 @@ export type Database = {
       time_bucket_gapfill: {
         Args:
           | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
+              bucket_width: number
+              ts: number
+              start?: number
+              finish?: number
+            }
+          | {
               bucket_width: unknown
               ts: string
               start?: string
@@ -4877,24 +4895,6 @@ export type Database = {
               ts: string
               start?: string
               finish?: string
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
-            }
-          | {
-              bucket_width: number
-              ts: number
-              start?: number
-              finish?: number
             }
           | {
               bucket_width: unknown
@@ -4909,7 +4909,7 @@ export type Database = {
               start?: string
               finish?: string
             }
-        Returns: string
+        Returns: number
       }
       timescaledb_post_restore: {
         Args: Record<PropertyKey, never>

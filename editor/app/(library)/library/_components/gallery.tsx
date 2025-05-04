@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
+import { motion } from "motion/react";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
   () => import("masonic").then((mod) => mod.Masonry),
@@ -48,22 +49,36 @@ export default function Gallery({
           maxColumnCount={6}
           items={objects}
           itemKey={(data) => data.id}
-          render={({ data }) => <ImageCard key={data.id} object={data} />}
+          render={({ data, width }) => (
+            <ImageCard key={data.id} width={width} object={data} />
+          )}
         />
       )}
     </div>
   );
 }
 
-function ImageCard({ object }: { object: ObjectDetail }) {
+function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
+  const aspect_ratio = object.width / object.height;
+  const height = width / aspect_ratio;
+
   const text =
     object.description || object.alt || object.title || object.prompt;
 
   return (
-    <figure
+    <motion.figure
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      viewport={{ once: true }}
       className="group transition-all relative overflow-hidden rounded-lg"
       itemScope
       itemType="http://schema.org/ImageObject"
+      style={{
+        width: width,
+        height: height,
+      }}
     >
       <Link href={`/library/o/${object.id}`}>
         <Image
@@ -76,15 +91,16 @@ function ImageCard({ object }: { object: ObjectDetail }) {
             object.category ||
             "Image"
           }
-          width={object.width}
-          height={object.height}
+          width={width}
+          height={height}
           loading="lazy"
           decoding="async"
           placeholder={object.color ? "blur" : undefined}
           blurDataURL={
             object.color ? getBlurDataURLFromColor(object.color) : undefined
           }
-          className="w-full object-cover"
+          className="w-full h-full object-cover absolute inset-0"
+          style={{ transition: "opacity 0.3s ease" }}
         />
         <meta itemProp="contentUrl" content={object.url} />
         <meta itemProp="license" content={object.license} />
@@ -92,7 +108,7 @@ function ImageCard({ object }: { object: ObjectDetail }) {
       <figcaption className="sr-only" itemProp="caption">
         {text}
       </figcaption>
-      <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+      <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 duration-300 p-4">
         <div className="w-full h-full flex flex-col justify-between">
           <div className="pointer-events-auto">
             {object.generator && (
@@ -108,13 +124,14 @@ function ImageCard({ object }: { object: ObjectDetail }) {
               </div>
             )}
           </div>
-          <div className="pointer-events-auto">
+          <div>
             <p className="text-xs line-clamp-2 opacity-80">{text}</p>
             {object.author && (
               <span
                 itemProp="author"
                 itemScope
                 itemType="http://schema.org/Person"
+                className="pointer-events-auto"
               >
                 <Link
                   href={object.author.blog ?? "#"}
@@ -129,7 +146,7 @@ function ImageCard({ object }: { object: ObjectDetail }) {
             )}
             <div className="mt-4 flex justify-between items-center">
               <Tooltip delayDuration={10}>
-                <TooltipTrigger>
+                <TooltipTrigger className="pointer-events-auto">
                   <span className="text-[8px] opacity-80">
                     {object.license}
                   </span>
@@ -138,7 +155,11 @@ function ImageCard({ object }: { object: ObjectDetail }) {
                   Free for commercial use, no attribution required.
                 </TooltipContent>
               </Tooltip>
-              <Link href={object.download} download>
+              <Link
+                href={object.download}
+                download
+                className="pointer-events-auto"
+              >
                 <Button variant="ghost">
                   <DownloadIcon className="size-4 mr-2" />
                   Download
@@ -148,6 +169,6 @@ function ImageCard({ object }: { object: ObjectDetail }) {
           </div>
         </div>
       </div>
-    </figure>
+    </motion.figure>
   );
 }

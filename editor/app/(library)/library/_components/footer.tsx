@@ -10,6 +10,9 @@ export default function LibraryFooter() {
         <Link href="/library/license" className="hover:underline">
           License
         </Link>
+        <Link href="/library/random" className="hover:underline">
+          Random
+        </Link>
         <Link href="/tools" className="hover:underline">
           Tools
         </Link>

@@ -179,7 +179,7 @@ export async function search({
     });
   }
 
-  q.order("score", { ascending: false });
+  q.order("score", { ascending: false, nullsFirst: false });
 
   const { data, error, count } = await q;
 
