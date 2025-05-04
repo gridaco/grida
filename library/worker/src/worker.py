@@ -29,22 +29,26 @@ BUCLET_NAME = "library"
 # ----------------------------------------------
 
 
+# region logging
 class JsonFormatter(logging.Formatter):
     def format(self, record):
-        log_record = {
+        return json.dumps({
+            "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
-            "message": record.getMessage(),
-            "timestamp": self.formatTime(record, self.datefmt)
-        }
-        return json.dumps(log_record)
+            "name": record.name,
+            "message": record.getMessage()
+        })
 
 
-logger = logging.getLogger(__name__)
+# Set up structured logging for Railway
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.handlers.clear()
+
 handler = logging.StreamHandler(sys.stdout)
-formatter = JsonFormatter()
-handler.setFormatter(formatter)
+handler.setFormatter(JsonFormatter())
 logger.addHandler(handler)
-
+# endregion logging
 
 # Graceful shutdown flag
 global running
@@ -114,12 +118,9 @@ class EmbeddingWorker:
         return res.data
 
     def run(self):
-        logger.info("Worker started, polling queue '%s'...", self.queue_name)
-
         while running:
             try:
                 rows = self.q_read()
-                logger.info("Polled %d message(s) from queue", len(rows))
 
                 if not rows:
                     time.sleep(1)
@@ -141,7 +142,7 @@ class EmbeddingWorker:
 
                         mimetype: str = payload.get("mimetype")
                         logger.info(
-                            "Processing object_id=%s", object_id)
+                            "processing object_id=%s", object_id)
 
                         allok = True
                         try:
@@ -157,20 +158,20 @@ class EmbeddingWorker:
                             self.upsert_metadata(object_id, metadata)
                         except Exception as e:
                             logger.error(
-                                "Metadata error (object_id=%s): %s", object_id, e)
+                                "metadata error (object_id=%s): %s", object_id, e)
                             allok = False
 
                         if not allok:
                             logger.error(
-                                "Failed to process object_id=%s", object_id)
+                                "failed to process object_id=%s", object_id)
                             continue
 
                         self.q_ack(message_id)
-                        logger.info("Completed object_id=%s", object_id)
+                        logger.info("completed object_id=%s", object_id)
 
                     except Exception as task_err:
                         logger.error(
-                            "Task error (message_id=%s): %s", message_id, task_err)
+                            "error (message_id=%s): %s", message_id, task_err)
 
             except Exception as e:
                 logger.exception("Worker loop error: %s", e)
