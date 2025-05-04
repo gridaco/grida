@@ -39,22 +39,12 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 
-# Initialize logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
 formatter = JsonFormatter()
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-
-# no httpx logs
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpx").propagate = False
 
 # Graceful shutdown flag
 global running
