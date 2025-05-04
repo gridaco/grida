@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 import time
 import logging
 import signal
@@ -28,6 +29,16 @@ BUCLET_NAME = "library"
 # ----------------------------------------------
 
 
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "timestamp": self.formatTime(record, self.datefmt)
+        }
+        return json.dumps(log_record)
+
+
 # Initialize logging
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +46,13 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+formatter = JsonFormatter()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
+
+# no httpx logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpx").propagate = False
 
@@ -136,7 +153,7 @@ class EmbeddingWorker:
                         logger.info(
                             "Processing object_id=%s", object_id)
 
-                        allok = False
+                        allok = True
                         try:
                             vector = embed(obj, mimetype)
                             self.upsert_embedding(object_id, vector)
