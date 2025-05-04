@@ -36,6 +36,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx").propagate = False
 
 # Graceful shutdown flag
 global running
@@ -110,6 +112,7 @@ class EmbeddingWorker:
         while running:
             try:
                 rows = self.q_read()
+                logger.info("Polled %d message(s) from queue", len(rows))
 
                 if not rows:
                     time.sleep(1)
