@@ -130,7 +130,7 @@ class EmbeddingWorker:
                     continue
 
                 for msg in rows:
-                    message_id = msg.get("message_id")
+                    message_id = msg.get("msg_id")
                     message_body = msg.get("message")
                     try:
                         payload = message_body if isinstance(
@@ -172,7 +172,8 @@ class EmbeddingWorker:
                             continue
 
                         self.q_ack(message_id)
-                        logger.info("completed object_id=%s", object_id)
+                        logger.info(
+                            "completed (object_id=%s) (msg_id=%s)", object_id, message_id)
 
                     except Exception as task_err:
                         logger.error(
