@@ -108,13 +108,12 @@ def svg_metadata(file_bytes: bytes):
     cairosvg.svg2png(bytestring=file_bytes, write_to=buffer)
     buffer.seek(0)
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_png:
+    with tempfile.NamedTemporaryFile(suffix=".png") as tmp_png:
         tmp_png.write(buffer.read())
-        tmp_path = tmp_png.name
-
-    palette = extract_colors(image=tmp_path, palette_size=10)
-    key_color = rgb_to_hex(palette[0].rgb)
-    colors = [rgb_to_hex(c.rgb) for c in palette]
+        tmp_png.flush()
+        palette = extract_colors(image=tmp_png.name, palette_size=10)
+        key_color = rgb_to_hex(palette[0].rgb)
+        colors = [rgb_to_hex(c.rgb) for c in palette]
 
     fill = _svg_fill(file_bytes)
     if fill is None:
@@ -149,11 +148,10 @@ def _svg_visual_centroid(svg_bytes: bytes, raster_size: int = 512, snap_grid: in
                      output_width=raster_size, output_height=raster_size)
     buffer.seek(0)
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_png:
+    with tempfile.NamedTemporaryFile(suffix=".png") as tmp_png:
         tmp_png.write(buffer.read())
-        tmp_path = tmp_png.name
-
-    centroid = png_centroid(tmp_path)
+        tmp_png.flush()
+        centroid = png_centroid(tmp_png.name)
     cx_pct, cy_pct = centroid["percent"]
     return (snap(cx_pct), snap(cy_pct))
 
