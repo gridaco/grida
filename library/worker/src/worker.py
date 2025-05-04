@@ -114,7 +114,7 @@ class EmbeddingWorker:
 
     def upsert_metadata(self, object_id: str, metadata: dict):
         res = self.library_client.table("object").upsert({
-            "object_id": object_id,
+            "id": object_id,
             "color": metadata.get("color"),
             "colors": metadata.get("colors"),
             "transparency": metadata.get("transparency"),
