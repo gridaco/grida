@@ -1,13 +1,8 @@
 boto3
 click
+tqdm
 cairosvg
-diffusers
-glom
-ollama
 pillow
 pylette
 python-dotenv
 supabase
-tqdm
-torch
-textual

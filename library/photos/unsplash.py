@@ -14,6 +14,12 @@ UNSPLASH_COLLECTION_API = "https://api.unsplash.com/collections/{collection_id}/
 @click.option("--download", is_flag=True, default=False, help="Download the image file")
 @click.option("--q", type=click.Choice(["raw", "regular", "small"], case_sensitive=False), default="regular", help="Image quality to download")
 def main(collection_id, access_key, dir, download, q):
+    """
+    Download images from Unsplash.
+
+    @example
+    python unsplash.py xR4Yt3AEXLY --download --q=regular --access-key="..." --dir=/path/to/out
+    """
     output_path = Path(dir)
     output_path.mkdir(parents=True, exist_ok=True)
 

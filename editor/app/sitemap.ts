@@ -59,6 +59,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.5,
     },
+
+    // playground
+    {
+      url: "https://grida.co/playground",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/playground/image",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
     // resources
     {
       url: "https://grida.co/downloads",

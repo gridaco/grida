@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { random } from "../../actions";
+import { random } from "../actions";
 import { headers } from "next/headers";
 import { Env } from "@/env";
 
