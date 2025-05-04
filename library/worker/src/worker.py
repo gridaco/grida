@@ -45,9 +45,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.handlers.clear()
 
+# Set up structured logging for Railway
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(JsonFormatter())
 logger.addHandler(handler)
+
+# Suppress httpx logs
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx").propagate = False
 # endregion logging
 
 # Graceful shutdown flag
