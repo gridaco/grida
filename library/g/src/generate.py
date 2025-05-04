@@ -23,6 +23,7 @@ def get_device():
 
 
 # supported models
+_pt_flux_1_schnell = "black-forest-labs/FLUX.1-schnell"
 _pt_flux_1_dev = "black-forest-labs/FLUX.1-dev"
 _pt_sdxl_base_1 = "stabilityai/stable-diffusion-xl-base-1.0"
 
@@ -30,10 +31,11 @@ _pt_sdxl_base_1 = "stabilityai/stable-diffusion-xl-base-1.0"
 @click.command()
 @click.argument("prompt_or_file")
 @click.option("--steps", default=None, type=int, help="Number of inference steps (e.g. 50, 100)")
-@click.option("--model", required=True, type=click.Choice([_pt_flux_1_dev, _pt_sdxl_base_1]), help="Model to use")
+@click.option("--model", required=True, type=click.Choice([_pt_flux_1_dev, _pt_flux_1_schnell, _pt_sdxl_base_1]), help="Model to use")
+@click.option("--size", default="1024x1024", type=str, help="Image size (e.g. 512x512, 768x768, 1024x1024)")
 @click.option("--n", default=1, type=int, help="Number of images to generate per prompt")
 @click.option("--o", type=click.Path(), help="Output path")
-def generate(prompt_or_file, model, steps, n, o):
+def generate(prompt_or_file, size: str, model: str, steps, n, o):
     """
     Generate images from prompts using the specified model.
 
@@ -48,7 +50,12 @@ def generate(prompt_or_file, model, steps, n, o):
         n (int): Number of images to generate per prompt.
         o (str, optional): Output path to save images.
     """
+
+    # Parse size
+    width, height = map(int, size.split("x"))
+
     device = get_device()
+    # stable-diffusion
     if model == _pt_sdxl_base_1:
         pipe = StableDiffusionXLPipeline.from_pretrained(
             model,
@@ -56,7 +63,8 @@ def generate(prompt_or_file, model, steps, n, o):
             use_safetensors=True,
         )
         pipe.to(device)
-    elif model == _pt_flux_1_dev:
+    # flux.1
+    elif model.startswith("black-forest-labs/FLUX.1"):
         pipe = FluxPipeline.from_pretrained(
             model,
             torch_dtype=torch.bfloat16,
@@ -83,7 +91,11 @@ def generate(prompt_or_file, model, steps, n, o):
         prompts = [prompt_or_file]
 
     for idx, prompt in enumerate(prompts):
-        pipe_args = {"prompt": prompt}
+        pipe_args = {
+            "prompt": prompt,
+            "width": width,
+            "height": height,
+        }
         if steps is not None:
             pipe_args["num_inference_steps"] = steps
         if n:
