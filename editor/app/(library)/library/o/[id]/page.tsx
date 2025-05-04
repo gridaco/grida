@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getObject, similar } from "@/app/(library)/library/actions";
+import { getObject } from "@/app/(library)/library/actions";
 import { Button } from "@/components/ui/button";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
-import Gallery from "../../_components/gallery";
+import Similar from "./similar";
 import Link from "next/link";
 
 export async function generateMetadata({
@@ -20,8 +20,17 @@ export async function generateMetadata({
 
   const { author } = object;
 
+  const title: string =
+    object.title ||
+    object.description ||
+    object.alt ||
+    object.prompt ||
+    object.objects[0] ||
+    object.categories[0] ||
+    object.category;
+
   return {
-    title: object.title || object.description,
+    title: title,
     description: object.description,
     keywords: [object.license, "free", ...object.keywords, ...object.objects],
     category: object.category,
@@ -46,7 +55,6 @@ export default async function ObjectPage({
 }) {
   const object = await getObject(params.id);
   if (!object) return notFound();
-  const sims = await similar(object.id);
 
   const { author } = object;
 
@@ -69,7 +77,7 @@ export default async function ObjectPage({
           }
           width={object.width}
           height={object.height}
-          className="w-full object-cover rounded"
+          className="w-full object-cover rounded-xl"
           placeholder={object.color ? "blur" : undefined}
           blurDataURL={
             object.color ? getBlurDataURLFromColor(object.color) : undefined
@@ -142,7 +150,7 @@ export default async function ObjectPage({
         </footer>
       </section>
       <section>
-        <Gallery objects={sims.data} />
+        <Similar object_id={object.id} />
       </section>
     </div>
   );

@@ -4,10 +4,10 @@ export namespace Library {
     author_id: string | null;
     background: string | null;
     bytes: number;
-    categories: unknown[];
+    categories: string[];
     category: string;
     color: string | null;
-    colors: unknown[];
+    colors: string[];
     created_at: string;
     description: string | null;
     entropy: number | null;
@@ -28,8 +28,6 @@ export namespace Library {
     prompt: string | null;
     public_domain: boolean;
     score: number | null;
-    search_tsv: unknown | null;
-    sys_annotations: string[];
     title: string | null;
     transparency: boolean;
     updated_at: string;
@@ -55,5 +53,11 @@ export namespace Library {
     name: string;
     created_at: string;
     description: string | null;
+  };
+
+  export type ObjectDetail = Library.Object & {
+    author: Library.Author | null;
+    url: string;
+    download: string;
   };
 }

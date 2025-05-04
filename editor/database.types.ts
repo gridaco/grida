@@ -32,6 +32,7 @@ export type Database = MergeDeep<
           > & {
             color: string | null;
             colors: string[];
+            categories: string[];
           };
         };
       };

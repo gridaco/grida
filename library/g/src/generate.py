@@ -110,10 +110,10 @@ def generate(prompt_or_file, size: str, model: str, steps, n, o):
                 output_path = Path(o)
                 output_path.mkdir(parents=True, exist_ok=True)
                 filename = output_path / \
-                    f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.png"
+                    f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.jpg"
             else:
-                filename = f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.png"
-            image.save(filename)
+                filename = f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.jpg"
+            image.save(filename, format="JPEG", quality=85, optimize=True)
             print(f"Saved: {filename}")
 
 
