@@ -7,6 +7,7 @@ import click
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from embedding import embed
+from metadata import object_metadata
 
 QUEUE_NAME = "grida_library_object_worker_jobs"
 BUCLET_NAME = "library"
@@ -87,9 +88,19 @@ class EmbeddingWorker:
         return res.data
 
     def upsert_embedding(self, object_id: str, vector: list):
-        res = self.library_client.table("grida_object_embedding").upsert({
+        res = self.library_client.table("object_embedding").upsert({
             "object_id": object_id,
             "embedding": vector
+        }).execute()
+        return res.data
+
+    def upsert_metadata(self, object_id: str, metadata: dict):
+        res = self.library_client.table("object").upsert({
+            "object_id": object_id,
+            "color": metadata.get("color"),
+            "colors": metadata.get("colors"),
+            "transparency": metadata.get("transparency"),
+            "orientation": metadata.get("orientation"),
         }).execute()
         return res.data
 
@@ -118,11 +129,32 @@ class EmbeddingWorker:
                                     "transform": {"quality": 80}
                                 })
 
-                        mimetype = payload.get("mimetype")
+                        mimetype: str = payload.get("mimetype")
                         logger.info(
                             "Processing object_id=%s", object_id)
-                        vector = embed(obj, mimetype)
-                        self.upsert_embedding(object_id, vector)
+
+                        allok = False
+                        try:
+                            vector = embed(obj, mimetype)
+                            self.upsert_embedding(object_id, vector)
+                        except Exception as e:
+                            logger.error(
+                                "Embedding error (object_id=%s): %s", object_id, e)
+                            allok = False
+
+                        try:
+                            metadata = object_metadata(obj, mimetype)
+                            self.upsert_metadata(object_id, metadata)
+                        except Exception as e:
+                            logger.error(
+                                "Metadata error (object_id=%s): %s", object_id, e)
+                            allok = False
+
+                        if not allok:
+                            logger.error(
+                                "Failed to process object_id=%s", object_id)
+                            continue
+
                         self.q_ack(message_id)
                         logger.info("Completed object_id=%s", object_id)
 
