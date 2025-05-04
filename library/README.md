@@ -81,26 +81,20 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-**unsplash.py**: Download images from Unsplash.
-
-```sh
-python photos/unsplash.py xR4Yt3AEXLY --download --q=regular --access-key="..." --dir=/path/to/out
-```
-
 **optimize.py**: Optimize images.
 
 ```sh
 # optimize
-python photos/optimize.py optimize ~/Public/library/category  ~/Public/library/category/out --max-size=3
+python optimize.py optimize ~/Public/library/category  ~/Public/library/category/out --max-size=3
 
 # rmsmall - remove small images
-python photos/optimize.py rmsmall ~/Public/library/category
+python optimize.py rmsmall ~/Public/library/category
 ```
 
 **metadata.py**: Generate metadata for images.
 
 ```sh
-python photos/metadata.py /path/to/process
+python metadata.py /path/to/process --type=jpg
 ```
 
 outputs `.metadata.json` files.
