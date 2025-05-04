@@ -14,9 +14,7 @@ Cost:
 """
 import os
 import json
-import logging
 import boto3
-from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from embedding_transform import b64
 
@@ -32,50 +30,35 @@ class EmbedError(Exception):
         self.message = message
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-
 def embed(image: str | bytes, mimetype) -> list:
-    try:
-        input_image = b64(image, mimetype)
-        output_embedding_length = 1024
+    input_image = b64(image, mimetype)
+    output_embedding_length = 1024
 
-        body = json.dumps({
-            "inputImage": input_image,
-            "embeddingConfig": {
-                "outputEmbeddingLength": output_embedding_length,
-            }
-        })
+    body = json.dumps({
+        "inputImage": input_image,
+        "embeddingConfig": {
+            "outputEmbeddingLength": output_embedding_length,
+        }
+    })
 
-        logger.info(
-            "Generating embeddings with Amazon Titan model %s", MODEL_ID)
-        bedrock = boto3.client(
-            service_name="bedrock-runtime",
-            region_name=os.getenv("AWS_REGION", "us-east-1"),
-        )
-        response = bedrock.invoke_model(
-            body=body,
-            modelId=MODEL_ID,
-            accept="application/json",
-            contentType="application/json"
-        )
+    bedrock = boto3.client(
+        service_name="bedrock-runtime",
+        region_name=os.getenv("AWS_REGION", "us-east-1"),
+    )
+    response = bedrock.invoke_model(
+        body=body,
+        modelId=MODEL_ID,
+        accept="application/json",
+        contentType="application/json"
+    )
 
-        response_body = json.loads(response.get("body").read())
+    response_body = json.loads(response.get("body").read())
 
-        if response_body.get("message") is not None:
-            raise EmbedError(
-                f"Embeddings generation error: {response_body['message']}")
+    if response_body.get("message") is not None:
+        raise EmbedError(
+            f"Embeddings generation error: {response_body['message']}")
 
-        return response_body["embedding"]
-
-    except ClientError as err:
-        message = err.response["Error"]["Message"]
-        logger.error("A client error occurred: %s", message)
-        raise
-    except EmbedError as err:
-        logger.error(err.message)
-        raise
+    return response_body["embedding"]
 
 
 def __test__():
