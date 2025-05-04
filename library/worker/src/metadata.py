@@ -1,22 +1,28 @@
 import click
 import json
+import mimetypes
 import tempfile
 import numpy as np
 import cairosvg
-from io import BytesIO
-from PIL import Image
 from pathlib import Path
+from PIL import Image
 from Pylette import extract_colors
+from io import BytesIO
 from xml.etree import ElementTree as ET
 from typing import Tuple, Dict
-from PIL import Image
+
+
+def get_orientation(w, h):
+    if abs(w - h) < min(w, h) * 0.05:
+        return "square"
+    return "landscape" if w > h else "portrait"
 
 
 def rgb_to_hex(rgb: tuple[int, int, int]) -> str:
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
-def centroid_png(
+def png_centroid(
     png_path: Path | str,
     threshold: int = 16,      # ≥ threshold is treated as ‘ink’
     use_alpha: bool = True    # treat alpha channel as mask if present
@@ -60,7 +66,31 @@ def centroid_png(
     }
 
 
-def get_svg_metadata(file_path: Path):
+def image_metadata(file: Path):
+    with Image.open(file) as img:
+        width, height = img.size
+        orientation = get_orientation(width, height)
+        mimetype = mimetypes.guess_type(file)[0] or "image/jpeg"
+        # Use pylette to get dominant and palette
+        palette = extract_colors(image=file, palette_size=10)
+        key_color = rgb_to_hex(palette[0].rgb)
+        colors = [rgb_to_hex(c.rgb) for c in palette]
+        bytes = file.stat().st_size
+        transparency = img.info.get("transparency") is not None
+
+    return {
+        "mimetype": mimetype,
+        "color": key_color,
+        "colors": colors,
+        "width": width,
+        "height": height,
+        "orientation": orientation,
+        "bytes": bytes,
+        "transparency": transparency,
+    }
+
+
+def svg_metadata(file_path: Path):
     with open(file_path, "rb") as f:
         svg_bytes = f.read()
         size_bytes = len(svg_bytes)
@@ -89,13 +119,13 @@ def get_svg_metadata(file_path: Path):
     key_color = rgb_to_hex(palette[0].rgb)
     colors = [rgb_to_hex(c.rgb) for c in palette]
 
-    fill = get_fill(file_path)
+    fill = _svg_fill(file_path)
     if fill is None:
         fill = key_color
 
-    centroid = get_visual_centroid(file_path)
-    padding = get_visual_padding(file_path)
-    transparency = get_transparency(file_path)
+    centroid = _svg_visual_centroid(file_path)
+    padding = _svg_visual_padding(file_path)
+    transparency = _svg_transparency(file_path)
 
     orientation = get_orientation(width, height)
 
@@ -117,7 +147,7 @@ def get_svg_metadata(file_path: Path):
 
 
 # Helper to compute gravity center of SVG
-def get_visual_centroid(svg_path: Path, raster_size: int = 512, snap_grid: int = 24):
+def _svg_visual_centroid(svg_path: Path, raster_size: int = 512, snap_grid: int = 24):
     def snap(val): return round(val / snap_grid) * snap_grid
     # Render SVG to raster (PNG)
     buffer = BytesIO()
@@ -129,12 +159,12 @@ def get_visual_centroid(svg_path: Path, raster_size: int = 512, snap_grid: int =
         tmp_png.write(buffer.read())
         tmp_path = tmp_png.name
 
-    centroid = centroid_png(tmp_path)
+    centroid = png_centroid(tmp_path)
     cx_pct, cy_pct = centroid["percent"]
     return (snap(cx_pct), snap(cy_pct))
 
 
-def get_visual_padding(svg_path: Path, raster_size: int = 512):
+def _svg_visual_padding(svg_path: Path, raster_size: int = 512):
     # Render SVG to raster
     buffer = BytesIO()
     cairosvg.svg2png(url=str(svg_path), write_to=buffer,
@@ -162,7 +192,7 @@ def get_visual_padding(svg_path: Path, raster_size: int = 512):
     ]
 
 
-def get_transparency(svg_path: Path, raster_size: int = 512, threshold: int = 250) -> bool:
+def _svg_transparency(svg_path: Path, raster_size: int = 512, threshold: int = 250) -> bool:
     """
     Render the SVG and inspect the alpha channel.
     Returns True if *any* pixel alpha < threshold (i.e. visible transparency).
@@ -177,13 +207,7 @@ def get_transparency(svg_path: Path, raster_size: int = 512, threshold: int = 25
     return bool((alpha < threshold).any())
 
 
-def get_orientation(w, h):
-    if abs(w - h) < min(w, h) * 0.05:
-        return "square"
-    return "landscape" if w > h else "portrait"
-
-
-def get_fill(svg_path: Path) -> str | None:
+def _svg_fill(svg_path: Path) -> str | None:
     """
     Inspect all elements in the SVG and categorise fill usage.
 
@@ -213,17 +237,39 @@ def get_fill(svg_path: Path) -> str | None:
     return "mixed" if len(set(fills)) > 1 else ("currentColor" if list(set(fills))[0].lower() == "currentcolor" else None)
 
 
-@click.command()
-@click.argument("input_dir", type=click.Path(exists=True, file_okay=False))
-def main(input_dir):
+def object_metadata(file: Path):
+    """
+    Get metadata for an object file.
+    """
+    mimetype = mimetypes.guess_type(file)[0]
+    if mimetype is None:
+        raise ValueError(f"Unknown mimetype for {file}")
+
+    if mimetype.startswith("image/svg+xml"):
+        return svg_metadata(file)
+    elif mimetype.startswith("image/"):
+        return image_metadata(file)
+    else:
+        raise ValueError(f"Unsupported file type: {mimetype}")
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
+@click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
+def cli_any(input_dir, file_type):
     input_path = Path(input_dir)
-    for file in input_path.glob("*.svg"):
-        meta = get_svg_metadata(file)
-        out_path = file.with_name(file.stem + ".metadata.json")
-        with open(out_path, "w") as f:
-            json.dump(meta, f, indent=2)
-        print(f"Wrote {out_path.name}")
+    for file in input_path.glob(f"*.{file_type}"):
+        metadata = object_metadata(file)
+        metadata_path = file.with_name(file.stem + ".metadata.json")
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+        print(f"Created metadata for {file.name}")
 
 
 if __name__ == "__main__":
-    main()
+    cli()
