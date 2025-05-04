@@ -66,7 +66,7 @@ def png_centroid(
     }
 
 
-def image_metadata(file_bytes: bytes):
+def image_metadata(file_bytes: bytes, mimetype: str):
     """
     Get metadata for an image from raw bytes.
     """
@@ -74,22 +74,8 @@ def image_metadata(file_bytes: bytes):
     with Image.open(stream) as img:
         width, height = img.size
         orientation = get_orientation(width, height)
-
-        # Try to guess mimetype from header, fallback to jpeg
-        mimetype = None
-        try:
-            import imghdr
-            fmt = imghdr.what(None, h=file_bytes)
-            if fmt:
-                mimetype = mimetypes.types_map.get(f".{fmt}", None)
-        except Exception:
-            mimetype = None
-
-        if mimetype is None:
-            mimetype = "image/jpeg"
-
         stream.seek(0)
-        palette = extract_colors(image=stream, palette_size=10)
+        palette = extract_colors(image=file_bytes, palette_size=10)
         key_color = rgb_to_hex(palette[0].rgb)
         colors = [rgb_to_hex(c.rgb) for c in palette]
         bytes_len = len(file_bytes)
@@ -253,7 +239,7 @@ def object_metadata(file: Path | bytes, mimetype: str = None) -> Dict:
     if mimetype.startswith("image/svg+xml"):
         return svg_metadata(file_bytes)
     elif mimetype.startswith("image/"):
-        return image_metadata(file_bytes)
+        return image_metadata(file_bytes, mimetype)
     else:
         raise ValueError(f"Unsupported file type: {mimetype}")
 
