@@ -242,15 +242,18 @@ create or replace function grida_library.similar(
 )
 returns setof grida_library.object
 as $$
-  with reference as (
-    select embedding
-    from grida_library.object_embedding
-    where object_id = ref_id
-  )
-  select o.*
-  from grida_library.object o
-  join grida_library.object_embedding e on e.object_id = o.id,
-       reference r
-  where o.id <> ref_id and e.embedding is not null
-  order by e.embedding <#> r.embedding;
-$$ LANGUAGE plpgsql STABLE;
+BEGIN
+  RETURN QUERY
+    with reference as (
+      select embedding
+      from grida_library.object_embedding
+      where object_id = ref_id
+    )
+    select o.*
+    from grida_library.object o
+    join grida_library.object_embedding e on e.object_id = o.id,
+         reference r
+    where o.id <> ref_id and e.embedding is not null
+    order by e.embedding <#> r.embedding;
+END;
+$$ language plpgsql stable;
