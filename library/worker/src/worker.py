@@ -107,6 +107,11 @@ class EmbeddingWorker:
         }).execute()
         return res.data
 
+    def has_embedding(self, object_id: str):
+        res = self.library_client.table("object_embedding").select(
+            "object_id").eq("object_id", object_id).single().execute()
+        return res.data is not None
+
     def upsert_metadata(self, object_id: str, metadata: dict):
         res = self.library_client.table("object").upsert({
             "object_id": object_id,
@@ -146,8 +151,10 @@ class EmbeddingWorker:
 
                         allok = True
                         try:
-                            vector = embed(obj, mimetype)
-                            self.upsert_embedding(object_id, vector)
+                            # check if the embedding already exists - can happen when embedding ok, metadata fails
+                            if not self.has_embedding(object_id):
+                                vector = embed(obj, mimetype)
+                                self.upsert_embedding(object_id, vector)
                         except Exception as e:
                             logger.error(
                                 "Embedding error (object_id=%s): %s", object_id, e)
