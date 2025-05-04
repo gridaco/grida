@@ -66,16 +66,33 @@ def png_centroid(
     }
 
 
-def image_metadata(file: Path):
-    with Image.open(file) as img:
+def image_metadata(file_bytes: bytes):
+    """
+    Get metadata for an image from raw bytes.
+    """
+    stream = BytesIO(file_bytes)
+    with Image.open(stream) as img:
         width, height = img.size
         orientation = get_orientation(width, height)
-        mimetype = mimetypes.guess_type(file)[0] or "image/jpeg"
-        # Use pylette to get dominant and palette
-        palette = extract_colors(image=file, palette_size=10)
+
+        # Try to guess mimetype from header, fallback to jpeg
+        mimetype = None
+        try:
+            import imghdr
+            fmt = imghdr.what(None, h=file_bytes)
+            if fmt:
+                mimetype = mimetypes.types_map.get(f".{fmt}", None)
+        except Exception:
+            mimetype = None
+
+        if mimetype is None:
+            mimetype = "image/jpeg"
+
+        stream.seek(0)
+        palette = extract_colors(image=stream, palette_size=10)
         key_color = rgb_to_hex(palette[0].rgb)
         colors = [rgb_to_hex(c.rgb) for c in palette]
-        bytes = file.stat().st_size
+        bytes_len = len(file_bytes)
         transparency = img.info.get("transparency") is not None
 
     return {
@@ -85,17 +102,14 @@ def image_metadata(file: Path):
         "width": width,
         "height": height,
         "orientation": orientation,
-        "bytes": bytes,
+        "bytes": bytes_len,
         "transparency": transparency,
     }
 
 
-def svg_metadata(file_path: Path):
-    with open(file_path, "rb") as f:
-        svg_bytes = f.read()
-        size_bytes = len(svg_bytes)
-
-    svg_root = ET.fromstring(svg_bytes)
+def svg_metadata(file_bytes: bytes):
+    size_bytes = len(file_bytes)
+    svg_root = ET.fromstring(file_bytes)
     width = svg_root.attrib.get("width", "0")
     height = svg_root.attrib.get("height", "0")
     try:
@@ -104,34 +118,30 @@ def svg_metadata(file_path: Path):
     except ValueError:
         width = height = 0
 
-    # ── rasterise once (we already do this for padding) ────────────────
-    # Render SVG to raster (PNG)
     buffer = BytesIO()
-    cairosvg.svg2png(url=str(file_path), write_to=buffer)
+    cairosvg.svg2png(bytestring=file_bytes, write_to=buffer)
     buffer.seek(0)
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_png:
         tmp_png.write(buffer.read())
         tmp_path = tmp_png.name
 
-    # get the colors
     palette = extract_colors(image=tmp_path, palette_size=10)
     key_color = rgb_to_hex(palette[0].rgb)
     colors = [rgb_to_hex(c.rgb) for c in palette]
 
-    fill = _svg_fill(file_path)
+    fill = _svg_fill(file_bytes)
     if fill is None:
         fill = key_color
 
-    centroid = _svg_visual_centroid(file_path)
-    padding = _svg_visual_padding(file_path)
-    transparency = _svg_transparency(file_path)
+    centroid = _svg_visual_centroid(file_bytes)
+    padding = _svg_visual_padding(file_bytes)
+    transparency = _svg_transparency(file_bytes)
 
     orientation = get_orientation(width, height)
 
     return {
         "type": "svg",
-        "name": file_path.stem,
         "width": width,
         "height": height,
         "orientation": orientation,
@@ -146,12 +156,10 @@ def svg_metadata(file_path: Path):
     }
 
 
-# Helper to compute gravity center of SVG
-def _svg_visual_centroid(svg_path: Path, raster_size: int = 512, snap_grid: int = 24):
+def _svg_visual_centroid(svg_bytes: bytes, raster_size: int = 512, snap_grid: int = 24):
     def snap(val): return round(val / snap_grid) * snap_grid
-    # Render SVG to raster (PNG)
     buffer = BytesIO()
-    cairosvg.svg2png(url=str(svg_path), write_to=buffer,
+    cairosvg.svg2png(bytestring=svg_bytes, write_to=buffer,
                      output_width=raster_size, output_height=raster_size)
     buffer.seek(0)
 
@@ -164,15 +172,14 @@ def _svg_visual_centroid(svg_path: Path, raster_size: int = 512, snap_grid: int 
     return (snap(cx_pct), snap(cy_pct))
 
 
-def _svg_visual_padding(svg_path: Path, raster_size: int = 512):
-    # Render SVG to raster
+def _svg_visual_padding(svg_bytes: bytes, raster_size: int = 512):
     buffer = BytesIO()
-    cairosvg.svg2png(url=str(svg_path), write_to=buffer,
+    cairosvg.svg2png(bytestring=svg_bytes, write_to=buffer,
                      output_width=raster_size, output_height=raster_size)
     buffer.seek(0)
 
     img = Image.open(buffer).convert("LA")
-    np_img = np.array(img)[:, :, 1]  # alpha channel
+    np_img = np.array(img)[:, :, 1]
     binary = np_img > 16
 
     ys, xs = np.where(binary)
@@ -192,22 +199,22 @@ def _svg_visual_padding(svg_path: Path, raster_size: int = 512):
     ]
 
 
-def _svg_transparency(svg_path: Path, raster_size: int = 512, threshold: int = 250) -> bool:
+def _svg_transparency(svg_bytes: bytes, raster_size: int = 512, threshold: int = 250) -> bool:
     """
     Render the SVG and inspect the alpha channel.
     Returns True if *any* pixel alpha < threshold (i.e. visible transparency).
     """
     buffer = BytesIO()
-    cairosvg.svg2png(url=str(svg_path), write_to=buffer,
+    cairosvg.svg2png(bytestring=svg_bytes, write_to=buffer,
                      output_width=raster_size, output_height=raster_size)
     buffer.seek(0)
 
-    img = Image.open(buffer).convert("LA")          # luminance + alpha
-    alpha = np.array(img)[:, :, 1]                  # alpha channel
+    img = Image.open(buffer).convert("LA")
+    alpha = np.array(img)[:, :, 1]
     return bool((alpha < threshold).any())
 
 
-def _svg_fill(svg_path: Path) -> str | None:
+def _svg_fill(svg_bytes: bytes) -> str | None:
     """
     Inspect all elements in the SVG and categorise fill usage.
 
@@ -217,9 +224,7 @@ def _svg_fill(svg_path: Path) -> str | None:
     "mixed"          -> more than one non‑uniform fill value detected
     None             -> no element has an explicit fill, or single uniform non‑currentColor fill
     """
-    tree = ET.parse(svg_path)
-    root = tree.getroot()
-
+    root = ET.fromstring(svg_bytes)
     fills = []
     for elem in root.iter():
         fill = elem.attrib.get("fill")
@@ -233,22 +238,22 @@ def _svg_fill(svg_path: Path) -> str | None:
     if len(fills) == 1:
         return "currentColor" if fills[0].lower() == "currentcolor" else None
 
-    # multiple elements
     return "mixed" if len(set(fills)) > 1 else ("currentColor" if list(set(fills))[0].lower() == "currentcolor" else None)
 
 
-def object_metadata(file: Path):
+def object_metadata(file: Path | bytes, mimetype: str = None) -> Dict:
     """
     Get metadata for an object file.
     """
-    mimetype = mimetypes.guess_type(file)[0]
+    mimetype = mimetype or mimetypes.guess_type(file)[0]
     if mimetype is None:
         raise ValueError(f"Unknown mimetype for {file}")
 
+    file_bytes = file if isinstance(file, bytes) else file.read_bytes()
     if mimetype.startswith("image/svg+xml"):
-        return svg_metadata(file)
+        return svg_metadata(file_bytes)
     elif mimetype.startswith("image/"):
-        return image_metadata(file)
+        return image_metadata(file_bytes)
     else:
         raise ValueError(f"Unsupported file type: {mimetype}")
 
