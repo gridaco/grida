@@ -191,7 +191,7 @@ class EmbeddingWorker:
 
 @click.command()
 @click.option("--env", type=click.Path(exists=True), help="Path to the .env file")
-def cli(env):
+def ci(env):
     """Command line interface for the worker."""
     if env:
         load_dotenv(env, override=True)
@@ -215,4 +215,4 @@ def cli(env):
 
 
 if __name__ == "__main__":
-    cli()
+    ci()
