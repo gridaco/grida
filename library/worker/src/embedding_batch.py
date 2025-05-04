@@ -3,7 +3,7 @@ import click
 from pathlib import Path
 from tqdm import tqdm
 from supabase import create_client
-from transform import b64
+from embedding_transform import b64
 
 
 @click.group()

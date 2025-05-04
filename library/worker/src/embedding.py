@@ -18,7 +18,7 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
-from library.worker.src.transform import b64
+from embedding_transform import b64
 
 load_dotenv()
 
