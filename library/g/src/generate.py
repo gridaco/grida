@@ -104,16 +104,15 @@ def generate(prompt_or_file, size: str, model: str, steps, n, o):
         images = pipe(**pipe_args).images
         model_label = model.split("/")[-1]
 
+        __base_model_file_name = f"{model_label}-{steps if steps else 'default'}-{size}"
         for i, image in enumerate(images):
             if o:
                 output_path = Path(o)
-                if output_path.is_dir():
-                    filename = output_path / \
-                        f"{model_label}-{steps if steps else 'default'}-{safe_filename(prompt)}-{i:03}.png"
-                else:
-                    filename = output_path
+                output_path.mkdir(parents=True, exist_ok=True)
+                filename = output_path / \
+                    f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.png"
             else:
-                filename = f"{model_label}-{steps if steps else 'default'}-{safe_filename(prompt)}-{i:03}.png"
+                filename = f"{__base_model_file_name}-{safe_filename(prompt)}-{i:03}.png"
             image.save(filename)
             print(f"Saved: {filename}")
 
