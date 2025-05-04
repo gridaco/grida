@@ -52,7 +52,8 @@ map_unsplash = {
 @click.option('--partial-ok', is_flag=True, default=False, help="Ignore describe files")
 @click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
 @click.option('--license', show_default=True, help="Fallback License to apply")
-def cli(input_dir, partial_ok, file_type, license):
+@click.option('--generator', show_default=True, help="Fallback generator to apply")
+def cli(input_dir, partial_ok, file_type, license, generator):
     input_path = Path(input_dir)
 
     def extract_from_metadata(path):
@@ -123,8 +124,11 @@ def cli(input_dir, partial_ok, file_type, license):
         if not data.get("description") and data.get("name"):
             data["description"] = data.get("name")
 
-        if not data.get("license"):
+        if not data.get("license") and license:
             data["license"] = license
+
+        if not data.get("generator") and generator:
+            data["generator"] = generator
 
         with open(object_path, "w") as f:
             json.dump(data, f, indent=2)

@@ -249,7 +249,7 @@ def cli():
     pass
 
 
-@cli.command()
+@cli.command("dir")
 @click.argument('input_dir', type=click.Path(exists=True, file_okay=False))
 @click.option('--type', 'file_type', type=click.Choice(['jpg', 'png', 'svg']), default='jpg', show_default=True, help="File type to process")
 def cli_any(input_dir, file_type):

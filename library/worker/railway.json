@@ -5,5 +5,11 @@
   },
   "deploy": {
     "startCommand": "python src/worker.py"
+  },
+  "limitOverride": {
+    "containers": {
+      "cpu": 0.5,
+      "memoryBytes": 524288000
+    }
   }
 }
