@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import { similar } from "../../actions";
 import { type Library } from "@/lib/library";
-import Gallery from "../../_components/gallery";
+import Gallery, { GallerySkeleton } from "../../_components/gallery";
 
 export default function Similar({ object_id }: { object_id: string }) {
   const [sims, setSims] = React.useState<Library.ObjectDetail[]>();
@@ -15,5 +15,14 @@ export default function Similar({ object_id }: { object_id: string }) {
     });
   }, [object_id]);
 
-  return <Gallery objects={sims} />;
+  const next = async (range: [number, number]) => {
+    const objects = await similar(object_id, { range });
+    return objects.data!;
+  };
+
+  if (!sims) {
+    return <GallerySkeleton />;
+  }
+
+  return <Gallery objects={sims} next={next} />;
 }

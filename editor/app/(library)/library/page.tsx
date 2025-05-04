@@ -11,11 +11,21 @@ export default async function LibraryHomePage({
   };
 }) {
   const q_search = searchParams?.search;
-
+  const category = "textures";
   const objects = await search({
-    category: q_search ? undefined : "textures",
+    category: category,
     text: q_search,
   });
+
+  const next = async (range: [number, number]) => {
+    "use server";
+    const objects = await search({
+      category: category,
+      text: q_search,
+      range,
+    });
+    return objects.data;
+  };
 
   return (
     <div className="space-y-4">
@@ -35,7 +45,11 @@ export default async function LibraryHomePage({
         <Categories />
       </section>
       <section>
-        <Gallery objects={objects.data} />
+        <Gallery
+          objects={objects.data}
+          count={objects.count ?? undefined}
+          next={next}
+        />
       </section>
     </div>
   );

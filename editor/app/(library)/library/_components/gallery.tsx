@@ -1,7 +1,11 @@
 "use client";
 
 import React, { ComponentType } from "react";
-import { type MasonryProps } from "masonic";
+import {
+  useInfiniteLoader,
+  type MasonryProps,
+  type LoadMoreItemsCallback,
+} from "masonic";
 import type { Library } from "@/lib/library";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import { Button } from "@/components/ui/button";
@@ -29,46 +33,104 @@ type ObjectDetail = Library.Object & {
   author: Library.Author | null;
 };
 
+export function GallerySkeleton() {
+  return (
+    <div className="w-full flex items-center justify-center">
+      <Spinner />
+    </div>
+  );
+}
+
 export default function Gallery({
   objects,
+  next,
+  count,
   empty = (
     <div className="w-full h-full min-h-96 flex items-center justify-center text-center text-muted-foreground">
       <span>No results found.</span>
     </div>
   ),
 }: {
-  objects?: ObjectDetail[] | null;
+  objects: ObjectDetail[];
+  next?: (range: [number, number]) => Promise<ObjectDetail[]>;
   empty?: React.ReactNode;
+  count?: number;
 }) {
+  const loadingRef = React.useRef(false);
+  const [busy, setBusy] = React.useState(false);
+  const [fetchedItems, setFetchedItems] = React.useState(objects);
+
+  const maybeLoadMore = useInfiniteLoader<
+    Library.ObjectDetail,
+    LoadMoreItemsCallback<Library.ObjectDetail>
+  >(
+    async (startIndex, stopIndex) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      setBusy(true);
+
+      if (next) {
+        const nextItems = await next([startIndex, stopIndex - 1]);
+        setFetchedItems((current) => [...current, ...nextItems]);
+      }
+
+      loadingRef.current = false;
+      setBusy(false);
+    },
+    {
+      minimumBatchSize: 30,
+      isItemLoaded: (index, items) => index < items.length,
+      totalItems: count,
+    }
+  );
+
+  const items = React.useMemo(() => {
+    const seen = new Set<string>();
+    return fetchedItems.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [fetchedItems]);
+
   return (
     <div className="w-full min-h-96">
-      {objects ? (
+      {process.env.NODE_ENV === "development" && (
+        <div className="fixed right-0 top-0 z-50 p-4">
+          {fetchedItems.length} / {items.length}
+        </div>
+      )}
+      {objects.length > 0 ? (
         <>
-          {objects.length > 0 ? (
-            <Masonry
-              columnGutter={16}
-              rowGutter={16}
-              maxColumnCount={6}
-              items={objects}
-              itemKey={(data) => data.id}
-              render={({ data, width }) => (
-                <ImageCard key={data.id} width={width} object={data} />
-              )}
-            />
-          ) : (
-            <>{empty}</>
+          <Masonry
+            onRender={maybeLoadMore}
+            columnGutter={16}
+            rowGutter={16}
+            maxColumnCount={6}
+            items={items}
+            itemKey={(data) => data.id}
+            render={ImageCard}
+          />
+          {busy && (
+            <div className="py-20 w-full flex items-center justify-center mt-4">
+              <Spinner />
+            </div>
           )}
         </>
       ) : (
-        <div className="w-full flex items-center justify-center">
-          <Spinner />
-        </div>
+        <>{empty}</>
       )}
     </div>
   );
 }
 
-function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
+function ImageCard({
+  data: object,
+  width,
+}: {
+  width: number;
+  data: ObjectDetail;
+}) {
   const aspect_ratio = object.width / object.height;
   const height = width / aspect_ratio;
 
