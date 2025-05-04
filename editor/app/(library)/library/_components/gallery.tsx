@@ -82,7 +82,7 @@ function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       viewport={{ once: true }}
-      className="group transition-all relative overflow-hidden rounded-lg"
+      className="group relative overflow-hidden rounded-lg"
       itemScope
       itemType="http://schema.org/ImageObject"
       style={{
@@ -110,6 +110,11 @@ function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
             object.color ? getBlurDataURLFromColor(object.color) : undefined
           }
           className="w-full h-full object-cover absolute inset-0"
+          style={{
+            backgroundColor: object.transparency
+              ? "transparent"
+              : (object.color ?? undefined),
+          }}
         />
         <meta itemProp="contentUrl" content={object.url} />
         <meta itemProp="license" content={object.license} />
@@ -117,7 +122,7 @@ function ImageCard({ object, width }: { width: number; object: ObjectDetail }) {
       <figcaption className="sr-only" itemProp="caption">
         {text}
       </figcaption>
-      <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 duration-300 p-4">
+      <div className="absolute inset-0 pointer-events-none bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
         <div className="w-full h-full flex flex-col justify-between">
           <div>
             {object.generator && (

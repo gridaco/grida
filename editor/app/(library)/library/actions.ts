@@ -1,12 +1,13 @@
 "use server";
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
+import { cache } from "react";
 
 type ObjectWithAuthor = Library.Object & {
   author: Library.Author | null;
 };
 
-export async function getCategory(id: string) {
+export async function _getCategory(id: string) {
   const client = await createLibraryClient();
   const { data } = await client
     .from("category")
@@ -17,7 +18,9 @@ export async function getCategory(id: string) {
   return data;
 }
 
-export async function getObject(id: string): Promise<Library.ObjectDetail> {
+export const getCategory = cache(_getCategory);
+
+export async function _getObject(id: string): Promise<Library.ObjectDetail> {
   const client = await createLibraryClient();
   const { data, error } = await client
     .from("object")
@@ -76,6 +79,8 @@ export async function getObject(id: string): Promise<Library.ObjectDetail> {
   };
 }
 
+export const getObject = cache(_getObject);
+
 export async function random({ text }: { text?: string }) {
   const client = await createLibraryClient();
 
@@ -109,9 +114,9 @@ export async function random({ text }: { text?: string }) {
   };
 }
 
-export async function similar(
+export async function _similar(
   id: string,
-  options: { limit: number } = { limit: 120 }
+  options: { limit: number } = { limit: 60 }
 ): Promise<{
   data: Library.ObjectDetail[] | null;
   error: any | null;
@@ -139,7 +144,9 @@ export async function similar(
   };
 }
 
-export async function listCategories(): Promise<Library.Category[]> {
+export const similar = cache(_similar);
+
+export async function _listCategories(): Promise<Library.Category[]> {
   const client = await createLibraryClient();
   const { data, error } = await client
     .from("category")
@@ -154,35 +161,12 @@ export async function listCategories(): Promise<Library.Category[]> {
   return data;
 }
 
-export async function list() {
-  const client = await createLibraryClient();
-  const { data, error, count } = await client
-    .from("object")
-    .select("*, author(*)", { count: "estimated" });
+export const listCategories = cache(_listCategories);
 
-  if (error) {
-    throw error;
-  }
-
-  const objects = data.map((object) => ({
-    ...object,
-    url: client.storage.from("library").getPublicUrl(object.path).data
-      .publicUrl,
-    download: client.storage
-      .from("library")
-      .getPublicUrl(object.path, { download: true }).data.publicUrl,
-  }));
-
-  return {
-    data: objects,
-    count,
-  };
-}
-
-const MAX_LIMIT = 120;
+const MAX_LIMIT = 60;
 
 export async function search({
-  limit = 120,
+  limit = 60,
   text,
   category,
 }: {
