@@ -109,8 +109,8 @@ class EmbeddingWorker:
 
     def has_embedding(self, object_id: str):
         res = self.library_client.table("object_embedding").select(
-            "object_id").eq("object_id", object_id).single().execute()
-        return res.data is not None
+            "object_id", count="exact").eq("object_id", object_id).execute()
+        return res.count == 1
 
     def upsert_metadata(self, object_id: str, metadata: dict):
         res = self.library_client.table("object").upsert({
