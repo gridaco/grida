@@ -1,0 +1,27 @@
+accordion
+acoustic guitar
+banjo
+bass guitar
+cello
+clarinet
+drums
+electric guitar
+flute
+French horn
+harp
+keyboard
+maracas
+organ
+pan flute
+piano
+recorder
+saxophone
+sitār
+tambourine
+triangle
+trombone
+trumpet
+tuba
+ukulele
+violin
+xylophone
