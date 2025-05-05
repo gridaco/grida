@@ -1,0 +1,44 @@
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/**
+ * Hook to warn users about unsaved changes when leaving the page
+ * @param isDirty - Function that returns whether there are unsaved changes
+ * @param message - Optional custom warning message
+ */
+export function useUnsavedChangesWarning(
+  isDirty: () => boolean,
+  message = "You have unsaved changes. Are you sure you want to leave?"
+) {
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty()) {
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Handle Next.js App Router navigation
+    const handleNavigation = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest("a[href]");
+
+      if (link && isDirty() && !window.confirm(message)) {
+        e.preventDefault();
+        router.push(window.location.href);
+      }
+    };
+
+    document.addEventListener("click", handleNavigation);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleNavigation);
+    };
+  }, [isDirty, message, router]);
+}
