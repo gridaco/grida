@@ -1,11 +1,12 @@
 import click
 import json
-import os
-from tqdm import tqdm
+import time
+import mimetypes
 from pathlib import Path
 from tqdm import tqdm
 from supabase import create_client
 from embedding_transform import b64
+from embedding import embed, embed_text
 
 
 @click.group()
@@ -186,11 +187,33 @@ def test():
 @test.command("text")
 @click.argument("text", type=str)
 def test_text(text):
-    import time
-    from embedding import embed_text
     start = time.time()
     embedding = embed_text(text)
     end = time.time()
+    click.echo(embedding)
+    click.echo(f"Time taken: {end - start} seconds")
+    return embedding
+
+
+@test.command("image")
+@click.argument("image_path", type=click.Path(exists=True))
+@click.option("--text", "-t", type=str, help="Optional text to use alongside the image")
+def test_image(image_path, text):
+    """Test image embedding with optional text."""
+    path = Path(image_path)
+    mimetype, _ = mimetypes.guess_type(path)
+    if mimetype is None:
+        click.echo(
+            f"Error: Could not determine MIME type for {path}", err=True)
+        return
+
+    with open(path, "rb") as f:
+        image_data = f.read()
+
+    start = time.time()
+    embedding = embed(image_data, mimetype, text)
+    end = time.time()
+
     click.echo(embedding)
     click.echo(f"Time taken: {end - start} seconds")
     return embedding
