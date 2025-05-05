@@ -39,6 +39,15 @@ export default async function LibraryCategoryPage({
     category: t,
   });
 
+  const next = async (range: [number, number]) => {
+    "use server";
+    const objects = await search({
+      category: t,
+      range,
+    });
+    return objects.data;
+  };
+
   return (
     <div className="space-y-4">
       <section className="py-10 pt-16 md:py-20 md:pt-32 flex flex-col md:items-center justify-center text-left md:text-center max-w-2xl md:mx-auto">
@@ -56,7 +65,11 @@ export default async function LibraryCategoryPage({
         <Categories />
       </section>
       <section>
-        <Gallery objects={objects.data} />
+        <Gallery
+          objects={objects.data}
+          next={next}
+          count={objects.count ?? undefined}
+        />
       </section>
     </div>
   );

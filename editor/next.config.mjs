@@ -43,6 +43,13 @@ const nextConfig = withMDX()({
   },
   async redirects() {
     return [
+      // /login => /sign-in
+      {
+        source: "/login",
+        destination: "/sign-in",
+        permanent: true,
+      },
+      // /d
       {
         source: "/d",
         destination: "/",

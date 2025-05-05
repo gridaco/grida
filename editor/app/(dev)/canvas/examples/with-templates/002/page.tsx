@@ -4,7 +4,6 @@ import React from "react";
 import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import Editor from "../../../editor";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
-
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 
 const document: IDocumentEditorInit = {
@@ -284,6 +283,8 @@ function CustomComponent__Referrer(componentprops: any) {
             id: "dummy",
             title: "DUMMY",
             description: null,
+            www_name: "dummy",
+            www_route_path: "/dummy",
             enabled: true,
             max_invitations_per_referrer: 10,
             layout_id: null,

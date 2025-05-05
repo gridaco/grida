@@ -161,6 +161,8 @@ function TemplateEditor({
                   scheduling_open_at: null,
                   scheduling_tz: null,
                   public: undefined,
+                  www_name: null,
+                  www_route_path: null,
                 }}
                 locale={values?.locale ?? "en"}
               />
