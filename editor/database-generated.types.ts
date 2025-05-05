@@ -4287,7 +4287,7 @@ export type Database = {
     }
     Functions: {
       citext: {
-        Args: { "": unknown } | { "": string } | { "": boolean }
+        Args: { "": string } | { "": boolean } | { "": unknown }
         Returns: string
       }
       citext_hash: {
@@ -4342,26 +4342,6 @@ export type Database = {
         Args: { user_id: string }
         Returns: number[]
       }
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
       jsonb_array_objects_only: {
         Args: { arr: Json[] }
         Returns: boolean
@@ -4393,18 +4373,6 @@ export type Database = {
       rls_via_customer: {
         Args: { p_customer_id: string }
         Returns: boolean
-      }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
       }
       update_customer_tags: {
         Args: { p_customer_uid: string; p_project_id: number; p_tags: string[] }
