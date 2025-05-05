@@ -22,10 +22,12 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { MoreHorizontal } from "lucide-react";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
-import Link from "next/link";
-import toast from "react-hot-toast";
 import { useProject } from "@/scaffolds/workspace";
 import { documentpreviewlink } from "@/lib/internal/url";
+import { useExportCSV } from "@/scaffolds/platform/data/use-export-csv";
+import { DownloadIcon } from "lucide-react";
+import Link from "next/link";
+import toast from "react-hot-toast";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -171,7 +173,48 @@ export function ReferrersTable() {
     refreshkey: true,
   });
   const { tokens } = useReferrers(campaign.id);
-  //
+  const client = useMemo(() => createBrowserWestReferralClient(), []);
+
+  const { exportToCSV, isExporting, progress, error } =
+    useExportCSV<ReferrerWithCustomer>({
+      fetchData: async (page, pageSize) => {
+        const { data, error, count } = await client
+          .from("referrer")
+          .select(
+            `
+            *,
+            customer:customer(*)
+          `,
+            { count: "exact" }
+          )
+          .eq("campaign_id", campaign.id)
+          .order("created_at", { ascending: false })
+          .range((page - 1) * pageSize, page * pageSize - 1);
+
+        if (error) throw error;
+        return {
+          data: data as ReferrerWithCustomer[],
+          count: count || 0,
+        };
+      },
+      transformToCSV: (referrer) => [
+        referrer.customer.name || "-",
+        referrer.code,
+        referrer.customer.email || "-",
+        referrer.customer_id,
+        referrer.created_at,
+        referrer.invitation_count.toString(),
+      ],
+      headers: [
+        "Name",
+        "Code",
+        "Email",
+        "Customer ID",
+        "Created At",
+        "Invitation Count",
+      ],
+      pageSize: 100,
+    });
 
   const onImport = async (ids: string[]) => {
     return await fetch(
@@ -197,8 +240,19 @@ export function ReferrersTable() {
       />
       <header className="w-full flex justify-between items-center mb-4">
         <div />
-        <Button onClick={importCustomersDialog.openDialog}>Import</Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={exportToCSV}
+            disabled={isExporting}
+            variant="outline"
+          >
+            <DownloadIcon className="size-4 me-2" />
+            {isExporting ? `Exporting... (${progress})` : "Export CSV"}
+          </Button>
+          <Button onClick={importCustomersDialog.openDialog}>Import</Button>
+        </div>
       </header>
+      {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
       <DataTable columns={columns} data={tokens ?? []} />
     </div>
   );
