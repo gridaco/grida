@@ -61,6 +61,43 @@ def embed(image: str | bytes, mimetype) -> list:
     return response_body["embedding"]
 
 
+def embed_text(text: str) -> list:
+    """
+    Generate text embeddings using Amazon Titan Multimodal Embeddings G1 via AWS Bedrock.
+
+    Args:
+        text: The input text to generate embeddings for
+
+    Returns:
+        list: A 1024-dimensional embedding vector
+
+    Raises:
+        EmbedError: If the embedding generation fails
+    """
+    body = json.dumps({
+        "inputText": text
+    })
+
+    bedrock = boto3.client(
+        service_name="bedrock-runtime",
+        region_name=os.getenv("AWS_REGION", "us-east-1"),
+    )
+    response = bedrock.invoke_model(
+        body=body,
+        modelId=MODEL_ID,
+        accept="application/json",
+        contentType="application/json"
+    )
+
+    response_body = json.loads(response.get("body").read())
+
+    if response_body.get("message") is not None:
+        raise EmbedError(
+            f"Text embeddings generation error: {response_body['message']}")
+
+    return response_body["embedding"]
+
+
 def __test__():
     test_url = "https://mozagqllybnbytfcmvdh.supabase.co/storage/v1/object/public/library/generated/22bc3204-c64e-4184-8405-e46ceaa126df.webp"
     emb = embed(test_url, "image/webp")

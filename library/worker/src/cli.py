@@ -178,5 +178,23 @@ def sync_embeddings(embeddings_file, supabase_url, supabase_key):
                     f"[error] failed to sync {obj.get('recordId', '<unknown>')}: {e}")
 
 
+@cli.group()
+def test():
+    pass
+
+
+@test.command("text")
+@click.argument("text", type=str)
+def test_text(text):
+    import time
+    from embedding import embed_text
+    start = time.time()
+    embedding = embed_text(text)
+    end = time.time()
+    click.echo(embedding)
+    click.echo(f"Time taken: {end - start} seconds")
+    return embedding
+
+
 if __name__ == "__main__":
     cli()
