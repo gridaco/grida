@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { unparse } from "papaparse";
 
 /**
  * Maximum number of rows allowed for client-side CSV export.
@@ -131,11 +132,21 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
         setProgress((page - 1) * pageSize);
       }
 
-      // Convert data to CSV format
-      const csvContent = [
-        config.headers.join(","),
-        ...allData.map((item) => config.transformToCSV(item).join(",")),
-      ].join("\n");
+      // Convert data to CSV format using papaparse
+      const csvData = allData.map((item) => config.transformToCSV(item));
+      const csvContent = unparse(
+        {
+          fields: config.headers,
+          data: csvData,
+        },
+        {
+          quotes: true, // Quote fields to handle special characters
+          escapeChar: '"', // Use double quotes for escaping
+          delimiter: ",",
+          newline: "\n",
+          header: true,
+        }
+      );
 
       // Create and download CSV file
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

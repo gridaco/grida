@@ -296,7 +296,6 @@ function Body({
                             placeholder="Describe your campaign..."
                             className="resize-none"
                             {...field}
-                            value={field.value || ""}
                           />
                         </FormControl>
                         <FormDescription>
