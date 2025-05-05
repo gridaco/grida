@@ -20,7 +20,7 @@
 
 
 -- Enable the "timescaledb" extension
-create extension timescaledb;
+CREATE EXTENSION IF NOT EXISTS timescaledb WITH SCHEMA extensions;
 
 CREATE SCHEMA IF NOT EXISTS grida_west;
 ALTER SCHEMA "grida_west" OWNER TO "postgres";

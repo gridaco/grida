@@ -1,7 +1,8 @@
 "use client";
 import dynamic from "next/dynamic";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { DesktopDragArea } from "@/host/desktop-drag-area";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 const PlaygroundCanvas = dynamic(
   () => import("@/scaffolds/playground-canvas/playground"),
@@ -13,12 +14,7 @@ const PlaygroundCanvas = dynamic(
 export default function Editor(
   props: React.ComponentProps<typeof PlaygroundCanvas>
 ) {
-  useEffect(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      return "";
-    });
-  }, []);
+  useUnsavedChangesWarning(() => true);
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">

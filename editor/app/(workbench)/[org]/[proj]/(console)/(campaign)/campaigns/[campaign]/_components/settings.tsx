@@ -53,6 +53,7 @@ import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 // Timezone options
 const timezones = [
@@ -158,6 +159,29 @@ export default function CampaignSettings() {
   );
 }
 
+function ComingSoonCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Coming Soon</CardTitle>
+        <CardDescription>This feature is under development</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="rounded-full bg-muted p-4 mb-4">
+            <InfoIcon className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">Feature in Development</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            We&apos;re working on this feature. Please check back later for
+            updates.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Body({
   campaign_id,
   defaultValues,
@@ -168,11 +192,21 @@ function Body({
   onSubmit: (data: CampaignFormValues) => Promise<boolean>;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
 
   const form = useForm<CampaignFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues,
   });
+
+  // Track form dirty state
+  const isDirty = form.formState.isDirty;
+
+  // Use the unsaved changes warning hook
+  useUnsavedChangesWarning(
+    () => isDirty,
+    "You have unsaved campaign settings. Are you sure you want to leave?"
+  );
 
   async function handleSubmit(data: CampaignFormValues) {
     setIsSubmitting(true);
@@ -180,6 +214,8 @@ function Body({
 
     if (ok) {
       toast.success("Campaign settings saved");
+      // Reset form state after successful save
+      form.reset(data);
     } else {
       console.error("Error saving campaign settings");
       toast.error("Error saving settings");
@@ -195,27 +231,15 @@ function Body({
         <CardDescription>
           Configure the settings for your campaign.
         </CardDescription>
-        <Tabs defaultValue="general">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger disabled value="milestone">
-              Quest Milestone
-            </TabsTrigger>
-            <TabsTrigger disabled value="rewards">
-              Rewards
-            </TabsTrigger>
-            <TabsTrigger disabled value="challenges">
-              Challenges
-            </TabsTrigger>
-            <TabsTrigger disabled value="events">
-              Events
-            </TabsTrigger>
-            <TabsTrigger disabled value="security">
-              Security
-            </TabsTrigger>
-            <TabsTrigger disabled value="advanced">
-              Advanced
-            </TabsTrigger>
+            <TabsTrigger value="milestone">Quest Milestone</TabsTrigger>
+            <TabsTrigger value="rewards">Rewards</TabsTrigger>
+            <TabsTrigger value="challenges">Challenges</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
@@ -225,357 +249,392 @@ function Body({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
           <CardContent className="space-y-8">
-            {/* General Settings Section */}
-            <div>
-              <h3 className="text-lg font-medium">General Settings</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Configure the basic settings for your campaign.
-              </p>
-              <div className="space-y-8">
-                <FormItem>
-                  <FormLabel>Campaign ID</FormLabel>
-                  <Input readOnly disabled value={campaign_id} />
-                  <FormDescription>
-                    Your campaign&apos;s unique identifier.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+            {activeTab === "general" && (
+              <div>
+                <h3 className="text-lg font-medium">General Settings</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure the basic settings for your campaign.
+                </p>
+                <div className="space-y-8">
+                  <FormItem>
+                    <FormLabel>Campaign ID</FormLabel>
+                    <Input readOnly disabled value={campaign_id} />
+                    <FormDescription>
+                      Your campaign&apos;s unique identifier.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
 
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Campaign Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Spring 2025 Campaign" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Enter a title for your campaign (1-40 characters).
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Describe your campaign..."
-                          className="resize-none"
-                          {...field}
-                          value={field.value || ""}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Provide a brief description of your campaign.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Campaign Status
-                        </FormLabel>
-                        <FormDescription>
-                          Enable or disable this campaign.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Scheduling Section */}
-            <div>
-              <h3 className="text-lg font-medium">Campaign Scheduling</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Set the start and end dates for your campaign.
-              </p>
-              <div className="space-y-8">
-                <FormField
-                  control={form.control}
-                  name="scheduling_open_at"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value
-                                ? format(field.value, "PPP")
-                                : "Select start date"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value || undefined}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        When the campaign will start.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="scheduling_close_at"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>End Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value
-                                ? format(field.value, "PPP")
-                                : "Select end date"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value || undefined}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        When the campaign will end.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="scheduling_tz"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Timezone</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value || undefined}
-                      >
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Campaign Title</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select timezone" />
-                          </SelectTrigger>
+                          <Input
+                            placeholder="Spring 2025 Campaign"
+                            {...field}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          {timezones.map((tz) => (
-                            <SelectItem key={tz.value} value={tz.value}>
-                              {tz.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        The timezone for the campaign schedule.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormDescription>
+                          Enter a title for your campaign (1-40 characters).
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe your campaign..."
+                            className="resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Provide a brief description of your campaign.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="enabled"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Campaign Status
+                          </FormLabel>
+                          <FormDescription>
+                            Enable or disable this campaign.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-lg font-medium">Campaign Scheduling</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Set the start and end dates for your campaign.
+                    </p>
+                    <div className="space-y-8">
+                      <FormField
+                        control={form.control}
+                        name="scheduling_open_at"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Start Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value
+                                      ? format(field.value, "PPP")
+                                      : "Select start date"}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value || undefined}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormDescription>
+                              When the campaign will start.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="scheduling_close_at"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>End Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value
+                                      ? format(field.value, "PPP")
+                                      : "Select end date"}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value || undefined}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormDescription>
+                              When the campaign will end.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="scheduling_tz"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Timezone</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value || undefined}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select timezone" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {timezones.map((tz) => (
+                                  <SelectItem key={tz.value} value={tz.value}>
+                                    {tz.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              The timezone for the campaign schedule.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <Separator />
+            {activeTab === "milestone" && <ComingSoonCard />}
+            {activeTab === "rewards" && <ComingSoonCard />}
+            {activeTab === "challenges" && <ComingSoonCard />}
+            {activeTab === "events" && <ComingSoonCard />}
 
-            {/* Advanced Settings Section */}
-            <div>
-              <h3 className="text-lg font-medium">Advanced Settings</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Configure advanced options for your campaign.
-              </p>
-              <div className="space-y-8">
-                <FormField
-                  control={form.control}
-                  name="max_invitations_per_referrer"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Maximum Supply for New Mint Tokens</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Enter maximum supply"
-                          {...field}
-                          value={field.value === null ? "" : field.value}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value === ""
-                                ? null
-                                : Number.parseInt(e.target.value)
-                            )
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Maximum number of tokens per host. Leave empty for
-                        unlimited.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="is_invitee_profile_exposed_to_public_dangerously"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center">
-                          <FormLabel className="text-base mr-2">
-                            Expose Invitee Profiles Publicly
-                          </FormLabel>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-xs">
-                                  Warning: This will make participant names
-                                  visible to the public. Use with caution.
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+            {activeTab === "security" && (
+              <div>
+                <h3 className="text-lg font-medium">Security Settings</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure security and privacy settings for your campaign.
+                </p>
+                <div className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="is_invitee_profile_exposed_to_public_dangerously"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center">
+                            <FormLabel className="text-base mr-2">
+                              Expose Invitee Profiles Publicly
+                            </FormLabel>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">
+                                    Warning: This will make participant names
+                                    visible to the public. Use with caution.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <FormDescription className="text-yellow-700 dark:text-yellow-400">
+                            This is potentially dangerous and exposes user data
+                            publicly.
+                          </FormDescription>
                         </div>
-                        <FormDescription className="text-yellow-700 dark:text-yellow-400">
-                          This is potentially dangerous and exposes user data
-                          publicly.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="is_referrer_profile_exposed_to_public_dangerously"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center">
-                          <FormLabel className="text-base mr-2">
-                            Expose Referrer Profiles Publicly
-                          </FormLabel>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-xs">
-                                  Warning: This will make participant names
-                                  visible to the public. Use with caution.
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                  <FormField
+                    control={form.control}
+                    name="is_referrer_profile_exposed_to_public_dangerously"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center">
+                            <FormLabel className="text-base mr-2">
+                              Expose Referrer Profiles Publicly
+                            </FormLabel>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">
+                                    Warning: This will make participant names
+                                    visible to the public. Use with caution.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <FormDescription className="text-yellow-700 dark:text-yellow-400">
+                            This is potentially dangerous and exposes user data
+                            publicly.
+                          </FormDescription>
                         </div>
-                        <FormDescription className="text-yellow-700 dark:text-yellow-400">
-                          This is potentially dangerous and exposes user data
-                          publicly.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
 
-                <FormField
-                  control={form.control}
-                  name="public"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Public JSON Data</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          className="font-mono h-32 resize-none"
-                          placeholder="{}"
-                          value={JSON.stringify(field.value, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              field.onChange(JSON.parse(e.target.value));
-                            } catch (error) {
-                              // Allow invalid JSON during editing
-                              console.log(
-                                "Invalid JSON, not updating form value"
-                              );
+            {activeTab === "advanced" && (
+              <div>
+                <h3 className="text-lg font-medium">Advanced Settings</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure advanced options for your campaign.
+                </p>
+                <div className="space-y-8">
+                  <FormField
+                    control={form.control}
+                    name="max_invitations_per_referrer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Maximum Supply for New Mint Tokens
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Enter maximum supply"
+                            {...field}
+                            value={field.value === null ? "" : field.value}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value === ""
+                                  ? null
+                                  : Number.parseInt(e.target.value)
+                              )
                             }
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Additional JSON data for the campaign. Must be valid
-                        JSON.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Maximum number of tokens per host. Leave empty for
+                          unlimited.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="public"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Public JSON Data</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            className="font-mono h-32 resize-none"
+                            placeholder="{}"
+                            value={JSON.stringify(field.value, null, 2)}
+                            onChange={(e) => {
+                              try {
+                                field.onChange(JSON.parse(e.target.value));
+                              } catch (error) {
+                                // Allow invalid JSON during editing
+                                console.log(
+                                  "Invalid JSON, not updating form value"
+                                );
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Additional JSON data for the campaign. Must be valid
+                          JSON.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
 
           <CardFooter className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Campaign Settings"}
+            <Button
+              type="submit"
+              disabled={!isDirty || isSubmitting}
+              className="min-w-[120px]"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <Spinner className="h-4 w-4" />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </CardFooter>
         </form>

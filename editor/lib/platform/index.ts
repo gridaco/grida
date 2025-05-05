@@ -587,6 +587,8 @@ export namespace Platform.WEST.Referral {
     scheduling_open_at: string | null;
     scheduling_tz: string | null;
     public: Record<string, string> | unknown;
+    www_name: string | null;
+    www_route_path: string | null;
   };
 
   export type TokenEvent = {
@@ -680,7 +682,16 @@ export namespace Platform.WEST.Referral {
       }).then((res) => res.json());
     }
 
-    invite(code: string): Promise<{ data: Invitation }> {
+    invite(code: string): Promise<{
+      data: {
+        code: string;
+        sharable: {
+          title: string;
+          text: string;
+          url: string;
+        };
+      };
+    }> {
       return fetch(`${this.BASE_URL}/t/invite`, {
         method: "POST",
         headers: {
@@ -694,7 +705,16 @@ export namespace Platform.WEST.Referral {
     refresh(
       code: string,
       invitation_id: string
-    ): Promise<{ data: Invitation }> {
+    ): Promise<{
+      data: {
+        code: string;
+        sharable: {
+          title: string;
+          text: string;
+          url: string;
+        };
+      };
+    }> {
       return fetch(`${this.BASE_URL}/t/refresh`, {
         method: "POST",
         headers: {

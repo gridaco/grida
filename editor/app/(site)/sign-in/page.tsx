@@ -1,12 +1,14 @@
-import Image from "next/image";
+import React from "react";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
-import Link from "next/link";
 import { GridaLogo } from "@/components/grida-logo";
 import { ContinueWithGoogleButton } from "@/scaffolds/auth/continue-with-google-button";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
 import type { Metadata } from "next";
+import Link from "next/link";
+import Image from "next/image";
+import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
+import { createClient } from "@/lib/supabase/server";
 
 type SearchParams = {
   redirect_uri?: string;
@@ -18,6 +20,9 @@ export const metadata: Metadata = {
   description: "Sign in to Grida",
 };
 
+const USE_INSIDERS_AUTH =
+  process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1";
+
 export default async function SigninPage({
   searchParams,
 }: {
@@ -26,7 +31,15 @@ export default async function SigninPage({
   const { next, redirect_uri } = await searchParams;
   const q = new URLSearchParams(await searchParams).toString();
 
-  if (process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1") {
+  const client = await createClient();
+
+  const auth = await client.auth.getUser();
+
+  if (auth.data.user) {
+    return redirect("/");
+  }
+
+  if (USE_INSIDERS_AUTH) {
     return redirect("/insiders/auth/basic" + (q ? "?" + q : ""));
   }
 
