@@ -18,6 +18,7 @@ import {
   MessageCircleQuestionIcon,
   PlugZapIcon,
   ShoppingBagIcon,
+  SparklesIcon,
   TicketIcon,
 } from "lucide-react";
 
@@ -49,10 +50,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
         <div className="flex items-baseline gap-2">
           {from && <span className="text-foreground text-base">From</span>}
           {showDollarSign ? (
-            <span className="h1 font-mono">
-              {plan !== "Enterprise" ? "$" : ""}
-              {price}
-            </span>
+            <span className="h1 font-mono">{price}</span>
           ) : (
             <span className="text-foreground-light">{price}</span>
           )}
@@ -93,9 +91,15 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
           <>
             <MobileHeader
               plan="Free"
-              price={"0"}
+              price={"$0"}
               priceDescription={""}
               description={"Perfect for hobby projects and experiments"}
+            />
+            <PricingTableRowMobile
+              category={pricing.ai}
+              plan={"free"}
+              icon={<SparklesIcon className="w-4 h-4" />}
+              sectionId="ai"
             />
             <PricingTableRowMobile
               category={pricing.highlight}
@@ -143,7 +147,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <MobileHeader
               plan="Pro"
               from={false}
-              price={"20"}
+              price={"$20"}
               priceDescription={"per seat/months"}
               description={
                 "Everything you need to scale your project into production"
@@ -193,7 +197,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <MobileHeader
               plan="Team"
               from={false}
-              price={"60"}
+              price={"$60"}
               priceDescription={"per seat/month"}
               description={
                 "Collaborate with different permissions and access patterns"
@@ -318,7 +322,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                         {plan.name}
                       </h3>
                       <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
-                        {plan.name !== "Enterprise" && "$"}
                         {plan.priceMonthly}
                       </span>
                     </div>
@@ -338,6 +341,11 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             </tr>
           </thead>
           <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
+            <PricingTableRowDesktop
+              category={pricing.ai}
+              icon={<SparklesIcon className="w-4 h-4" />}
+              sectionId="ai"
+            />
             <PricingTableRowDesktop
               category={pricing.highlight}
               icon={<Component1Icon className="w-4 h-4" />}

@@ -32,7 +32,7 @@ import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
-import { iosvg } from "@/grida-io-svg";
+import iosvg from "@grida/io-svg";
 import toast from "react-hot-toast";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida/utils/supports";

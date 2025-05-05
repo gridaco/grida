@@ -1,4 +1,6 @@
 "use client";
+
+import React, { useEffect, useMemo, useState } from "react";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -9,15 +11,21 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/utils/cn";
-import React from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
+import {
+  ResourceTypeIcon,
+  ResourceTypeIconName,
+} from "@/components/resource-type-icon";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { type Session } from "@supabase/supabase-js";
 
 type Item = {
+  icon?: ResourceTypeIconName;
   title: string;
   href: string;
   description?: string;
@@ -25,22 +33,44 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
-  sitemap.items.west,
   sitemap.items.forms,
   sitemap.items.database,
+  // sitemap.items.west,
 ];
 
 const resources: Item[] = [
-  sitemap.items.docs,
+  sitemap.items.library,
+  sitemap.items.tools,
   sitemap.items.downloads,
-  sitemap.items.joinslack,
+  sitemap.items.docs,
   sitemap.items.thebundle,
+  sitemap.items.joinslack,
   sitemap.items.contact,
 ];
 
-export default function Header() {
+function useSession() {
+  const client = useMemo(() => createBrowserClient(), []);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    client.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, [client.auth]);
+
+  return session;
+}
+
+export default function Header({ className }: { className?: string }) {
+  const session = useSession();
   return (
-    <div className="absolute top-0 left-0 right-0 z-50">
+    <div className={cn("absolute top-0 left-0 right-0 z-50", className)}>
       <header className="py-4 px-4 lg:py-8 lg:px-24">
         {/* desktop */}
         <div className="hidden md:flex container mx-auto justify-between items-center">
@@ -56,10 +86,18 @@ export default function Header() {
                     Features
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[300px] p-3">
+                    <ul className="flex flex-col w-[320px] p-3">
                       {features.map((component) => (
                         <ListItem
                           key={component.title}
+                          icon={
+                            component.icon ? (
+                              <ResourceTypeIcon
+                                type={component.icon}
+                                className="size-4"
+                              />
+                            ) : undefined
+                          }
                           title={component.title}
                           href={component.href}
                         >
@@ -74,13 +112,15 @@ export default function Header() {
                     Resources
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="flex flex-col w-[150px] p-3">
+                    <ul className="flex flex-col w-[320px] p-3">
                       {resources.map((component) => (
                         <ListItem
                           key={component.title}
                           title={component.title}
                           href={component.href}
-                        />
+                        >
+                          {component.description}
+                        </ListItem>
                       ))}
                     </ul>
                   </NavigationMenuContent>
@@ -95,7 +135,7 @@ export default function Header() {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link href={sitemap.links.github} target="_blank">
+                  <Link href={sitemap.links.github_grida} target="_blank">
                     <Button variant="ghost" size="icon">
                       <GitHubLogoIcon className="text-foreground w-5 h-5" />
                     </Button>
@@ -104,12 +144,12 @@ export default function Header() {
               </NavigationMenuList>
             </NavigationMenu>
             <div className="flex gap-2">
-              <Link href={sitemap.links.signin} className="hidden md:block">
-                <Button variant="ghost">Sign in</Button>
-              </Link>
-              <Link href={sitemap.links.cta}>
-                <Button className="font-normal">Get Started</Button>
-              </Link>
+              {!session && (
+                <Link href={sitemap.links.signin} className="hidden md:block">
+                  <Button variant="ghost">Sign in</Button>
+                </Link>
+              )}
+              <CTA isSignedIn={!!session} />
             </div>
           </div>
         </div>
@@ -181,10 +221,28 @@ export default function Header() {
   );
 }
 
+function CTA({ isSignedIn }: { isSignedIn: boolean }) {
+  if (isSignedIn) {
+    return (
+      <Link href={sitemap.links.dashboard}>
+        <Button className="font-normal">Dashboard</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <Link href={sitemap.links.cta}>
+      <Button className="font-normal">Get Started</Button>
+    </Link>
+  );
+}
+
 const ListItem = React.forwardRef<
   React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a">
->(({ className, title, children, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<"a"> & {
+    icon?: React.ReactNode;
+  }
+>(({ className, icon, title, children, ...props }, ref) => {
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -196,7 +254,10 @@ const ListItem = React.forwardRef<
           )}
           {...props}
         >
-          <span className="text-sm font-medium leading-none">{title}</span>
+          <div className="flex items-center gap-2">
+            {icon && <div className="inline">{icon}</div>}
+            <span className="text-sm font-medium leading-none">{title}</span>
+          </div>
           <p className="line-clamp-2 leading-snug text-muted-foreground text-xs">
             {children}
           </p>

@@ -1,4 +1,5 @@
 type Pricing = {
+  ai: PricingCategory;
   highlight: PricingCategory;
   integrations: PricingCategory;
   storage: PricingCategory;
@@ -32,8 +33,63 @@ type PricingFeature = {
 };
 
 export const pricing: Pricing = {
+  ai: {
+    title: "AI",
+    features: [
+      {
+        title: "Free Monthly Credits",
+        plans: {
+          free: "500",
+          pro: "10,000",
+          team: "35,000",
+          enterprise: "Unlimited",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Generated Image License",
+        plans: {
+          free: "Public (CC0)",
+          pro: "Full ownership",
+          team: "Full ownership",
+          enterprise: "Full ownership",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Models",
+        plans: {
+          free: "Mini",
+          pro: "All",
+          team: "All",
+          enterprise: "All",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Credits Rollover",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Buy extra credits",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+    ],
+  },
   highlight: {
-    title: "Features",
+    title: "Forms",
     features: [
       {
         title: "Visual Editor",
@@ -76,17 +132,7 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "JavaScript SDK",
-        plans: {
-          free: true,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "React & React Native SDK",
+        title: "SDK",
         plans: {
           free: true,
           pro: true,
@@ -98,7 +144,7 @@ export const pricing: Pricing = {
       {
         title: "Webhooks",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -114,16 +160,6 @@ export const pricing: Pricing = {
           enterprise: true,
         },
         usage_based: false,
-      },
-      {
-        title: "Smart Customer Identity",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: true,
       },
       {
         title: "Connect Customer Identity",
@@ -193,7 +229,7 @@ export const pricing: Pricing = {
     ],
   },
   storage: {
-    title: "File Response & Storage",
+    title: "Storage",
     features: [
       {
         title: "Receive file uploads",
@@ -208,9 +244,9 @@ export const pricing: Pricing = {
       {
         title: "File Storage Included",
         plans: {
-          free: "100MB",
+          free: "1GB",
           pro: "30GB",
-          team: "1TB",
+          team: "500GB",
           enterprise: "Unlimited",
         },
         usage_based: false,
@@ -224,8 +260,8 @@ export const pricing: Pricing = {
         title: "Connect to Google sheets",
         plans: {
           free: false,
-          pro: true,
-          team: true,
+          pro: false,
+          team: false,
           enterprise: true,
         },
         usage_based: false,
@@ -253,8 +289,8 @@ export const pricing: Pricing = {
       {
         title: "Supabase Integration",
         plans: {
-          free: false,
-          pro: false,
+          free: true,
+          pro: true,
           team: true,
           enterprise: true,
         },

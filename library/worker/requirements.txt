@@ -1,0 +1,8 @@
+boto3
+click
+tqdm
+cairosvg
+pillow
+pylette
+python-dotenv
+supabase

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "E.164 Phone Number Tool",
   description: "Format phone numbers to E.164 format",
   keywords:
-    "phone number, e.164, international, format, online phone number tool",
+    "phone number, e.164, international, format, online phone number tool, online",
 };
 
 export default function PhoneNumberToolPage() {

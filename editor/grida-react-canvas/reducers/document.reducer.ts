@@ -32,7 +32,7 @@ import { layout } from "@grida/cmath/_layout";
 import { domapi } from "../domapi";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
-import { vn } from "@/grida/vn";
+import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import "core-js/features/object/group-by";

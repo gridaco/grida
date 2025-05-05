@@ -3,55 +3,10 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
-import * as k from "./k";
 import { FileIO } from "@/lib/file";
 import { StorageClient } from "@supabase/storage-js";
-
-function useStorageClient() {
-  return useMemo(() => createBrowserClient().storage, []);
-}
-
-function useUpload(
-  bucket: string,
-  path: string | ((file: File) => string | Promise<string>)
-) {
-  const storage = useStorageClient();
-
-  return useCallback(
-    async (file: File): Promise<FileIO.UploadResult> => {
-      if (!file) throw new Error("No file provided");
-      const _path = typeof path === "function" ? await path(file) : path;
-      if (!_path) throw new Error("No path provided");
-      return await storage
-        .from(bucket)
-        .upload(_path, file, {
-          contentType: file.type,
-        })
-        .then(({ data, error }) => {
-          if (error) {
-            throw new Error("Failed to upload file");
-          }
-          const publicUrl = storage.from(bucket).getPublicUrl(_path)
-            .data.publicUrl;
-
-          const result = {
-            object_id: data.id,
-            bucket,
-            path: data.path,
-            fullPath: data.fullPath,
-            publicUrl,
-          } satisfies FileIO.UploadResult;
-
-          return result;
-        })
-        .catch((e) => {
-          console.error("upload error", e);
-          throw e;
-        });
-    },
-    [storage, bucket, path]
-  );
-}
+import { Env } from "@/env";
+import { useStorageClient, useUpload } from "@/scaffolds/platform/storage";
 
 function useCreateAsset() {
   const [state] = useEditorState();
@@ -96,7 +51,9 @@ const __make_asset_uploader = ({
     const { data: asset, error } = await createAsset({ file, is_public });
     if (error) throw error;
 
-    const bucket = is_public ? k.BUCKET_ASSETS_PUBLIC : k.BUCKET_ASSETS;
+    const bucket = is_public
+      ? Env.storage.BUCKET_ASSETS_PUBLIC
+      : Env.storage.BUCKET_ASSETS;
     const path = asset.id;
 
     return await storage
@@ -173,17 +130,7 @@ export function useDocumentAssetUpload(): {
 export function useGridaFormsPublicUpload() {
   const [state] = useEditorState();
   return useUpload(
-    k.BUCKET_GRIDA_FORMS,
+    Env.storage.BUCKET_GRIDA_FORMS,
     () => `${state.form.form_id}/${nanoid()}`
   );
-}
-
-/**
- * public, temporary file uploader to playground bucket
- * for internal dev or public tmp playgrounds
- */
-export function useDummyPublicUpload() {
-  return useUpload(k.BUCKET_DUMMY, () => {
-    return `public/${v4()}`;
-  });
 }

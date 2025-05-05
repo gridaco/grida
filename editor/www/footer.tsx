@@ -52,6 +52,12 @@ export default function Footer() {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Product</h3>
                 <Link
+                  href={sitemap.links.downlaods}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Downloads
+                </Link>
+                <Link
                   href={sitemap.links.changelog}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
@@ -67,16 +73,16 @@ export default function Footer() {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Resources</h3>
                 <Link
-                  href={sitemap.links.downlaods}
+                  href={sitemap.links.library}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
-                  Downloads
+                  Library
                 </Link>
                 <Link
-                  href={sitemap.links.studio}
+                  href={sitemap.links.tools}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
-                  Grida Studios
+                  Tools
                 </Link>
                 <Link
                   href={sitemap.links.thebundle}
@@ -140,6 +146,12 @@ export default function Footer() {
                   className="text-xs md:text-sm text-muted-foreground"
                 >
                   Blog
+                </Link>
+                <Link
+                  href={sitemap.links.studio}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Grida Studios
                 </Link>
               </FooterColumn>
               <FooterColumn>

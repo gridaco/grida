@@ -223,12 +223,16 @@ function EditorUXServer({ focus }: { focus: { node?: string } }) {
   const { select } = useDocument();
   const { fit } = useTransform();
 
-  useEffect(() => {
-    if (focus.node) {
-      select([focus.node]);
-      fit([focus.node], { margin: 64, animate: true });
-    }
-  }, [focus.node]);
+  useEffect(
+    () => {
+      if (focus.node) {
+        select([focus.node]);
+        fit([focus.node], { margin: 64, animate: true });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [focus.node]
+  );
   //
   return <></>;
 }

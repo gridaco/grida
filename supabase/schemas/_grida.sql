@@ -1,3 +1,7 @@
+-- extensions
+create extension if not exists vector with schema extensions;
+
+
 CREATE SCHEMA IF NOT EXISTS _grida;
 GRANT USAGE ON SCHEMA _grida TO anon, authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA _grida TO anon, authenticated, service_role;

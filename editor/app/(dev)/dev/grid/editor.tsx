@@ -26,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/scaffolds/mediapicker";
-import { useDummyPublicUpload } from "@/scaffolds/asset";
 import {
   Select,
   SelectContent,
@@ -34,13 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  TextAlignCenterIcon,
-  TextAlignJustifyIcon,
-  TextAlignLeftIcon,
-  TextAlignRightIcon,
   TextAlignBottomIcon,
   TextAlignMiddleIcon,
   TextAlignTopIcon,
@@ -51,6 +45,7 @@ import {
 import { RgbaColorPicker } from "react-colorful";
 import * as CSS from "./blocks/css";
 import { TextAlignControl } from "@/scaffolds/sidecontrol/controls/text-align";
+import { useDummyPublicUpload } from "@/scaffolds/platform/storage";
 
 export function PageBuilder() {
   return (

@@ -11,7 +11,7 @@ import type {
   BlendMode,
 } from "@figma/rest-api-spec";
 import { cmath } from "@grida/cmath";
-import { grida } from "@/grida";
+import { grida } from "editor/grida";
 
 export namespace iofigma {
   export namespace restful {
@@ -108,8 +108,8 @@ export namespace iofigma {
           case "SOLID": {
             return {
               type: "solid",
-              color: grida.program.cg.rgbaf_multiply_alpha(
-                grida.program.cg.rgbaf_to_rgba8888(paint.color),
+              color: cmath.color.rgbaf_multiply_alpha(
+                cmath.color.rgbaf_to_rgba8888(paint.color),
                 // opacity is present only when it is not 1
                 paint.opacity ?? 1
               ),
@@ -129,8 +129,8 @@ export namespace iofigma {
               stops: paint.gradientStops.map((stop) => {
                 return {
                   offset: stop.position,
-                  color: grida.program.cg.rgbaf_multiply_alpha(
-                    grida.program.cg.rgbaf_to_rgba8888(stop.color),
+                  color: cmath.color.rgbaf_multiply_alpha(
+                    cmath.color.rgbaf_to_rgba8888(stop.color),
                     // opacity is present only when it is not 1
                     paint.opacity ?? 1
                   ),
@@ -316,8 +316,8 @@ export namespace iofigma {
                 first_visible_stroke?.type === "SOLID"
                   ? {
                       borderWidth: strokeWeight ?? 0,
-                      borderColor: grida.program.cg.rgbaf_multiply_alpha(
-                        grida.program.cg.rgbaf_to_rgba8888(
+                      borderColor: cmath.color.rgbaf_multiply_alpha(
+                        cmath.color.rgbaf_to_rgba8888(
                           first_visible_stroke.color
                         ),
                         first_visible_stroke.opacity ?? 1
@@ -471,8 +471,8 @@ export namespace iofigma {
                 first_visible_stroke?.type === "SOLID"
                   ? {
                       borderWidth: strokeWeight ?? 0,
-                      borderColor: grida.program.cg.rgbaf_multiply_alpha(
-                        grida.program.cg.rgbaf_to_rgba8888(
+                      borderColor: cmath.color.rgbaf_multiply_alpha(
+                        cmath.color.rgbaf_to_rgba8888(
                           first_visible_stroke.color
                         ),
                         first_visible_stroke.opacity ?? 1
@@ -547,8 +547,8 @@ export namespace iofigma {
                   first_visible_stroke?.type === "SOLID"
                     ? {
                         borderWidth: strokeWeight ?? 0,
-                        borderColor: grida.program.cg.rgbaf_multiply_alpha(
-                          grida.program.cg.rgbaf_to_rgba8888(
+                        borderColor: cmath.color.rgbaf_multiply_alpha(
+                          cmath.color.rgbaf_to_rgba8888(
                             first_visible_stroke.color
                           ),
                           first_visible_stroke.opacity ?? 1

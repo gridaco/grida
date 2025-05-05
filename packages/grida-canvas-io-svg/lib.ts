@@ -1,11 +1,12 @@
-import { grida } from "@/grida";
 import { parse, type INode } from "svgson";
 import parseStyle, { type Declaration } from "inline-style-parser";
-import { vn } from "@/grida/vn";
 // @ts-ignore
 import * as svgo from "svgo/dist/svgo.browser.js";
 import type { Config, Output } from "svgo";
-import { css } from "@/grida/css";
+import type { grida } from "editor/grida"; // FIXME: remove dependency
+import { cmath } from "@grida/cmath";
+import vn from "@grida/vn";
+import colors from "color-name";
 
 /**
  * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute
@@ -292,7 +293,7 @@ type SVGElementAttributes = {
 
 interface SVGFactoryUserContext {
   name: string;
-  currentColor: grida.program.cg.RGBA8888;
+  currentColor: cmath.color.RGBA8888;
 }
 
 interface SVGFactoryContext extends SVGFactoryUserContext {
@@ -347,10 +348,7 @@ export namespace iosvg {
           return { type: "solid", color: context.currentColor };
         default:
           const namedcolor = (
-            css.namedcolors as Record<
-              string,
-              [number, number, number] | undefined
-            >
+            colors as Record<string, [number, number, number] | undefined>
           )[paint];
           if (namedcolor) {
             return {
@@ -367,7 +365,7 @@ export namespace iosvg {
           if (paint.startsWith("#")) {
             return {
               type: "solid",
-              color: grida.program.cg.hex_to_rgba8888(paint),
+              color: cmath.color.hex_to_rgba8888(paint),
             };
           }
       }

@@ -1,8 +1,13 @@
 {
   "name": "@grida/transparency-grid",
   "description": "Transparency Grid component for Infinite Canvas",
+  "dependencies": {
+    "color-parse": "^2.0.2"
+  },
   "devDependencies": {
+    "@types/node": "^22",
     "@types/react": "^18",
+    "@webgpu/types": "^0.1.60",
     "react": "^18.2.0"
   }
 }

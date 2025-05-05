@@ -3219,6 +3219,148 @@ export namespace cmath.packing.ext {
   }
 }
 
+export namespace cmath.color {
+  /**
+   * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
+   */
+  export type TRGBA = {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+  };
+
+  /**
+   * Floating-Point RGBA (Normalized RGBA)
+   * Used in computer graphics pipelines, shading, and rendering.
+   */
+  export type RGBAf = {
+    /**
+     * Red channel value, between 0 and 1.
+     */
+    r: number;
+    /**
+     * Green channel value, between 0 and 1.
+     */
+    g: number;
+    /**
+     * Blue channel value, between 0 and 1.
+     */
+    b: number;
+    /**
+     * Alpha channel value, between 0 and 1.
+     */
+    a: number;
+  };
+
+  /**
+   * 8-bit Integer RGBA (Standard RGBA)
+   * Used in web and raster graphics, including CSS and images.
+   */
+  export type RGBA8888 = {
+    /**
+     * Red channel value, between 0 and 255.
+     */
+    r: number;
+    /**
+     * Green channel value, between 0 and 255.
+     */
+    g: number;
+    /**
+     * Blue channel value, between 0 and 255.
+     */
+    b: number;
+    /**
+     * Alpha channel value, between 0 and 1.
+     */
+    a: number;
+  };
+
+  /**
+   * Converts a HEX color string to an RGBA8888 object.
+   *
+   * Supports both short (`#RGB`) and long (`#RRGGBB`) HEX formats.
+   *
+   * @param hex - The HEX color string to convert. Must start with `#` and be 3 or 6 characters long after the `#`.
+   * @returns An object containing `r`, `g`, `b`, and `a` properties.
+   *
+   * @throws {Error} If the input HEX string is invalid.
+   *
+   * @example
+   * ```typescript
+   * hex_to_rgba8888("#F80"); // { r: 255, g: 136, b: 0, a: 1 }
+   * hex_to_rgba8888("#FF8800"); // { r: 255, g: 136, b: 0, a: 1 }
+   * ```
+   */
+  export function hex_to_rgba8888(hex: string): cmath.color.RGBA8888 {
+    const normalizedHex = hex.replace("#", "");
+    let r, g, b;
+
+    if (normalizedHex.length === 3) {
+      // Expand short hex to long hex
+      r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
+      g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
+      b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
+    } else if (normalizedHex.length === 6) {
+      r = parseInt(normalizedHex.substring(0, 2), 16);
+      g = parseInt(normalizedHex.substring(2, 4), 16);
+      b = parseInt(normalizedHex.substring(4, 6), 16);
+    } else {
+      throw new Error("Invalid hex format. Expected #RGB or #RRGGBB.");
+    }
+
+    return { r, g, b, a: 1 };
+  }
+
+  export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {
+    return [rgba.r, rgba.g, rgba.b, Math.round(rgba.a * 255)];
+  }
+
+  /**
+   * Converts a normalized RGBA color to an 8-bit integer RGBA color.
+   * @param rgba - The normalized RGBA color to convert.
+   * @returns The 8-bit integer RGBA color.
+   * @see {@link RGBAf}
+   * @see {@link RGBA8888}
+   * @example
+   * ```typescript
+   * const rgba: RGBAf = { r: 1, g: 0.5, b: 0, a: 0.75 };
+   * const rgba8888: RGBA8888 = rgbaf_to_rgba8888(rgba);
+   * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
+   * ```
+   */
+  export function rgbaf_to_rgba8888(rgba: RGBAf): RGBA8888 {
+    return {
+      r: Math.round(rgba.r * 255),
+      g: Math.round(rgba.g * 255),
+      b: Math.round(rgba.b * 255),
+      a: rgba.a,
+    };
+  }
+
+  export function rgbaf_multiply_alpha(color: TRGBA, alpha: number): TRGBA {
+    return {
+      r: color.r,
+      g: color.g,
+      b: color.b,
+      a: color.a * alpha,
+    };
+  }
+
+  /**
+   *
+   * @param color
+   * @returns hex color string with the leading `#`
+   * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"#ffffff"`
+   *
+   */
+  export function rgba8888_to_hex(color: RGBA8888): string {
+    const a = Math.round(color.a * 255);
+
+    return `#${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
+  }
+}
+
 /**
  * Rasterization utilities for drawing lines between points (e.g., "connect the dots")
  * in integer pixel coordinates, returning the set of covered pixels.

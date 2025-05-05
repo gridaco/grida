@@ -1,11 +1,11 @@
 "use client";
 
+import React, { useState } from "react";
 import { PricingCard, PricingCardButton } from "@/www/pricing/pricing-card";
 import { plans as nosave_plans, save_plans } from "@/www/data/plans";
-import Link from "next/link";
-import { useState } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import PricingComparisonTable from "./pricing-comparison-table";
-import { Switch } from "@/components/ui/switch";
+import Link from "next/link";
 
 export function Pricing() {
   const [save, setSave] = useState(true);
@@ -22,13 +22,27 @@ export function Pricing() {
             expand to reach millions.
           </p>
           <label className="inline-flex items-center cursor-pointer">
-            <span className="me-3 text-sm text-gray-900 dark:text-gray-300">
-              Monthly
-            </span>
-            <Switch checked={save} onCheckedChange={setSave} />
-            <span className="ms-3 text-sm text-gray-900 dark:text-gray-300">
-              Annual Billing
-            </span>
+            <ToggleGroup
+              type="single"
+              defaultValue="monthly"
+              value={save ? "yearly" : "monthly"}
+              onValueChange={(t) => {
+                setSave(t === "yearly");
+              }}
+            >
+              <ToggleGroupItem value="monthly" className="font-semibold">
+                Pay monthly
+              </ToggleGroupItem>
+              <ToggleGroupItem value="yearly" className="font-semibold">
+                Pay yearly
+                <span
+                  data-active={save ? "true" : "false"}
+                  className="ms-1 text-xs font-normal text-foreground data-[active='true']:text-blue-500"
+                >
+                  save 20%
+                </span>
+              </ToggleGroupItem>
+            </ToggleGroup>
           </label>
         </div>
         <div className="columns-1 md:columns-2 xl:columns-4 gap-6 space-y-10 w-full">
@@ -37,7 +51,7 @@ export function Pricing() {
               key={plan.id}
               plan={plan.name}
               price={{
-                primary: `$${plan.priceMonthly}`,
+                primary: `${plan.priceMonthly}`,
                 secondary: plan.costUnit,
               }}
               features={plan.features}
