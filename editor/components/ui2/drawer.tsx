@@ -5,12 +5,21 @@ import { cn } from "@/utils";
 const Drawer = ({
   shouldScaleBackground = true,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-);
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
+  // https://github.com/emilkowalski/vaul/issues/497#issuecomment-2452503724
+  React.useLayoutEffect(() => {
+    document.addEventListener("focusin", (e) => e.stopImmediatePropagation());
+    document.addEventListener("focusout", (e) => e.stopImmediatePropagation());
+  }, []);
+
+  return (
+    <DrawerPrimitive.Root
+      shouldScaleBackground={shouldScaleBackground}
+      {...props}
+    />
+  );
+};
+
 Drawer.displayName = "Drawer";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
