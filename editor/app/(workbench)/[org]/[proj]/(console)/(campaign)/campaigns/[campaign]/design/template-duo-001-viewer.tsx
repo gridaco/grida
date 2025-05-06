@@ -387,7 +387,7 @@ function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
             role: "incoming",
           },
           {
-            message: message || "{{message}}",
+            message: message || "{{url}}",
             role: "outgoing",
           },
         ]}

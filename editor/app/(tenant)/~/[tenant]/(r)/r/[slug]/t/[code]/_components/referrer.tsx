@@ -30,6 +30,9 @@ export default function ReferrerPage({
         share: {
           data: template.components["referrer-share"],
         },
+        share_message: {
+          data: template.components["referrer-share-message"],
+        },
       }}
       locale={template.locale}
       data={context}

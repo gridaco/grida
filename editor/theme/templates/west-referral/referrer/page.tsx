@@ -36,22 +36,20 @@ type WebSharePayload = {
 };
 
 function renderSharable({
-  template,
+  template: template_text,
   context,
 }: {
-  template: unknown | null;
+  template?: string | null;
   context: Platform.WEST.Referral.SharableContext;
 }): WebSharePayload {
-  if (!template) {
+  if (!template_text) {
     return {
       url: context.url,
     };
   }
 
   return {
-    // FIXME: content template
-    title: "Polestar 시승하고 경품 받아가세요 🎁",
-    text: `${context.referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
+    text: template(template_text, context),
     url: context.url,
   };
 }
@@ -59,7 +57,9 @@ function renderSharable({
 async function mkshare({
   client,
   referrer_code,
+  template,
 }: {
+  template?: string | null;
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
 }): Promise<WebSharePayload> {
@@ -67,7 +67,7 @@ async function mkshare({
   const { data } = await client.invite(referrer_code);
 
   return renderSharable({
-    template: null,
+    template: template,
     context: data.sharable,
   });
 }
@@ -76,7 +76,9 @@ async function reshare({
   client,
   referrer_code,
   invitation_id,
+  template,
 }: {
+  template?: string | null;
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
   invitation_id: string;
@@ -85,7 +87,7 @@ async function reshare({
   const { data } = await client.refresh(referrer_code, invitation_id);
 
   return renderSharable({
-    template: null,
+    template: template,
     context: data.sharable,
   });
 }
@@ -183,6 +185,9 @@ export interface Props {
   share?: {
     data: TemplateData.West_Referrral__Duo_001["components"]["referrer-share"];
   };
+  share_message?: {
+    data: TemplateData.West_Referrral__Duo_001["components"]["referrer-share-message"];
+  };
 }
 
 export default function ReferrerPageTemplate({
@@ -216,6 +221,7 @@ export default function ReferrerPageTemplate({
     return mkshare({
       client: client,
       referrer_code: code!,
+      template: design.share_message?.data?.message,
     }).then((sharable) => {
       share_or_copy(sharable)
         .then(({ type }) => {
@@ -382,6 +388,8 @@ export default function ReferrerPageTemplate({
                                         client: client,
                                         referrer_code: code!,
                                         invitation_id: inv.id,
+                                        template:
+                                          design.share_message?.data?.message,
                                       }).then((sharable) => {
                                         share_or_copy(sharable).then(
                                           ({ type }) => {
