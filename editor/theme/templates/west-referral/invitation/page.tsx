@@ -151,7 +151,7 @@ export default function InvitationPageTemplate({
   //   return <>Already used.</>;
   // }
 
-  // TODO:
+  // FIXME:
   const reward_value = 100000;
   const reward_currency = "KRW";
   const reward_description = "TMAP EV 충전 포인트";

@@ -141,7 +141,7 @@ function TemplateEditor({
             <TabsTrigger value="referrer">Referrer</TabsTrigger>
             <TabsTrigger value="referrer-share">Referrer Share</TabsTrigger>
             <TabsTrigger value="invitation-ux-overlay">
-              Invitation Ticket
+              Invitation Card
             </TabsTrigger>
             <TabsTrigger value="invitation">Invitation</TabsTrigger>
             <TabsTrigger value="theme">Theme</TabsTrigger>
