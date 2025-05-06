@@ -68,7 +68,7 @@ export default function ShareDialog({
           <DrawerFooter className="pt-2">
             <Button onClick={onConfirmClick} disabled={!confirmed || busy}>
               {busy && <Spinner className="me-2" />}
-              {data?.cta ?? "CTA"}
+              {data?.cta ?? "Share"}
             </Button>
             <DrawerClose asChild>
               <Button variant="outline">{t.cancel}</Button>
