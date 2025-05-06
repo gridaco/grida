@@ -58,19 +58,34 @@ function TemplateEditorRoot() {
     useWWWTemplate<TemplateData.West_Referrral__Duo_001>(template_id);
 
   if (template.loading || !template.data) {
-    return <Spinner />;
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
   }
 
   return <TemplateEditor template={template} />;
 }
 
-type EditorTab = "referrer" | "invitation-ux-overlay" | "invitation" | "theme";
-type CanvasComponent = "referrer" | "invitation-ux-overlay" | "invitation";
+type EditorTab =
+  | "referrer"
+  | "referrer-share"
+  | "invitation-ux-overlay"
+  | "invitation"
+  | "theme";
+type CanvasComponent =
+  | "referrer"
+  | "referrer-share"
+  | "invitation-ux-overlay"
+  | "invitation";
 
 function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
   switch (tab) {
     case "referrer":
       return { node: "referrer" };
+    case "referrer-share":
+      return { node: "referrer-share" };
     case "invitation-ux-overlay":
       return {
         node: "invitation-ux-overlay",
@@ -115,7 +130,7 @@ function TemplateEditor({
   useUnsavedChangesWarning(() => template.dirty);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col">
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as EditorTab)}
@@ -124,6 +139,7 @@ function TemplateEditor({
         <header className="flex-none flex justify-between items-center p-4 border-b">
           <TabsList>
             <TabsTrigger value="referrer">Referrer</TabsTrigger>
+            <TabsTrigger value="referrer-share">Referrer Share</TabsTrigger>
             <TabsTrigger value="invitation-ux-overlay">
               Invitation Ticket
             </TabsTrigger>
@@ -259,6 +275,59 @@ function TemplateEditor({
                             html: value,
                           });
                         }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="referrer-share" className="m-0">
+                <CardHeader>
+                  <CardTitle>Referrer Share</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="flex flex-col gap-8">
+                    <div className="grid gap-2">
+                      <Label>Article</Label>
+                      <CMSRichText
+                        value={
+                          values?.components?.["referrer-share"]?.article
+                            ?.html ?? ""
+                        }
+                        uploader={template.upload}
+                        onValueChange={(value) => {
+                          props.set("components.referrer-share.article", {
+                            type: "richtext",
+                            html: value,
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Consent</Label>
+                      <Textarea
+                        value={
+                          values?.components?.["referrer-share"]?.consent ?? ""
+                        }
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share.consent",
+                            e.target.value
+                          );
+                        }}
+                        placeholder="Enter your consent"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Button Text</Label>
+                      <Input
+                        value={values?.components?.referrer?.cta}
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share.cta",
+                            e.target.value
+                          );
+                        }}
+                        placeholder="Button Text"
                       />
                     </div>
                   </div>

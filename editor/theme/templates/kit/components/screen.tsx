@@ -1,3 +1,5 @@
+import React from "react";
+
 export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
   return (
     <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden">
@@ -6,13 +8,16 @@ export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function ScreenRoot({ children }: React.PropsWithChildren<{}>) {
+export const ScreenRoot = React.forwardRef<
+  HTMLDivElement,
+  React.PropsWithChildren<{}>
+>(({ children }, ref) => {
   return (
-    <div className="@container/screen relative w-full h-full">
+    <div className="@container/screen relative w-full h-full" ref={ref}>
       <div className="relative w-full h-full @lg/screen:p-4">{children}</div>
     </div>
   );
-}
+});
 
 export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
   return (

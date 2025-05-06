@@ -277,7 +277,6 @@ function CustomComponent__Referrer(componentprops: any) {
           },
         }}
         locale="en"
-        slug="dummy"
         data={{
           campaign: {
             id: "dummy",
