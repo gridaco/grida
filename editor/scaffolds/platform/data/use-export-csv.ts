@@ -46,7 +46,8 @@ type ExportConfig<T> = {
 
   /**
    * Optional page size for pagination.
-   * Defaults to 100 if not specified.
+   * Defaults to 1000 if not specified.
+   * @default 1000
    */
   pageSize?: number;
 };
@@ -116,7 +117,7 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     setIsComplete(false);
 
     try {
-      const pageSize = config.pageSize || 100;
+      const pageSize = config.pageSize || 1000;
 
       // First fetch to get total count
       const { data: firstPage, count } = await config.fetchData(1, pageSize);
