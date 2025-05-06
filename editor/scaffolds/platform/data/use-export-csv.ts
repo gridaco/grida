@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { unparse } from "papaparse";
 
 /**
@@ -46,10 +46,17 @@ type ExportConfig<T> = {
 
   /**
    * Optional page size for pagination.
-   * Defaults to 1000 if not specified.
-   * @default 1000
+   * Defaults to 100 if not specified.
    */
   pageSize?: number;
+
+  /**
+   * Optional sleep duration in milliseconds between page fetches.
+   * This helps prevent server overload when fetching large datasets.
+   *
+   * @default 100
+   */
+  interval?: number;
 };
 
 /**
@@ -60,6 +67,7 @@ type ExportConfig<T> = {
  * - CSV file generation and download
  * - Error handling
  * - Hard limit enforcement
+ * - Optional sleep between page fetches to prevent server overload
  *
  * @template T - The type of data being exported
  * @param config - Configuration object for the export process
@@ -80,7 +88,8 @@ type ExportConfig<T> = {
  *     item.email,
  *     item.created_at
  *   ],
- *   headers: ['Name', 'Email', 'Created At']
+ *   headers: ['Name', 'Email', 'Created At'],
+ *   sleepBetweenPages: 1000 // Sleep 1 second between pages
  * });
  * ```
  */
@@ -96,6 +105,9 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     setError(null);
     setIsComplete(false);
   };
+
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
   /**
    * Exports data to CSV file.
@@ -117,7 +129,8 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     setIsComplete(false);
 
     try {
-      const pageSize = config.pageSize || 1000;
+      const pageSize = config.pageSize || 100;
+      const interval = config.interval || 100;
 
       // First fetch to get total count
       const { data: firstPage, count } = await config.fetchData(1, pageSize);
@@ -137,6 +150,11 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
 
       // Fetch remaining pages
       for (let page = 2; page <= totalPages; page++) {
+        // Sleep between pages if configured
+        if (interval > 0) {
+          await sleep(interval);
+        }
+
         const { data } = await config.fetchData(page, pageSize);
         allData = [...allData, ...data];
         setProgress((page - 1) * pageSize);
