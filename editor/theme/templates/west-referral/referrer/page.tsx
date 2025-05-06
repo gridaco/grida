@@ -403,7 +403,7 @@ export default function ReferrerPageTemplate({
                 </article>
               )}
             </Standard.Section>
-            {design.footer && (
+            {/* {design.footer && (
               <Standard.FooterTemplate
                 logo={design.favicon}
                 links={[
@@ -423,7 +423,7 @@ export default function ReferrerPageTemplate({
                 instagram={design.footer.link_instagram}
                 paragraph={design.footer.paragraph?.html}
               />
-            )}
+            )} */}
           </main>
         </ScreenScrollable>
         <ShareDialog
