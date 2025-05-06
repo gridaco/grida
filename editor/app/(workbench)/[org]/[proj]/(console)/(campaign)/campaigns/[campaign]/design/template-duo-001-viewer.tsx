@@ -46,7 +46,7 @@ const document: IDocumentEditorInit = {
         properties: {},
         props: {},
         overrides: {},
-        top: -1000,
+        top: 0,
         left: 0,
       },
       invitation: {
@@ -64,7 +64,7 @@ const document: IDocumentEditorInit = {
         props: {},
         overrides: {},
         top: 0,
-        left: 0,
+        left: 1000,
       },
       "invitation-ux-overlay": {
         id: "invitation-ux-overlay",
@@ -78,7 +78,7 @@ const document: IDocumentEditorInit = {
         width: 375,
         height: 812,
         top: 0,
-        left: -500,
+        left: 1500,
         properties: {},
         props: {},
         overrides: {},

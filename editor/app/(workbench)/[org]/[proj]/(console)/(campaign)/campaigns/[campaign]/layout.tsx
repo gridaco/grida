@@ -59,7 +59,7 @@ export default async function CampaignLayout({
   return (
     <CampaignProvider campaign={data}>
       <SidebarProvider>
-        <div className="flex flex-1 overflow-y-auto">
+        <div className="flex flex-1 h-full overflow-hidden">
           <div className="h-full flex flex-1 w-full">
             <Sidebar>
               <SidebarHeader>
@@ -149,11 +149,7 @@ export default async function CampaignLayout({
                 <AboutGridaWestCard />
               </SidebarFooter>
             </Sidebar>
-            <div className="flex flex-col overflow-hidden w-full h-full">
-              <div className="w-full h-full overflow-x-hidden overflow-y-auto">
-                {children}
-              </div>
-            </div>
+            <div className="flex flex-col h-full w-full">{children}</div>
           </div>
         </div>
       </SidebarProvider>

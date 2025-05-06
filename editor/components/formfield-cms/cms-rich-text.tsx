@@ -29,12 +29,12 @@ export function CMSRichText({
   );
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full max-w-full overflow-x-hidden">
       <MinimalTiptapEditor
         value={value}
         onChange={(content) => onValueChange?.(content as string)}
         className="w-full"
-        editorContentClassName="p-5"
+        editorContentClassName="p-5 w-full"
         output="html"
         placeholder={placeholder}
         shouldRerenderOnTransaction={false}
@@ -42,7 +42,7 @@ export function CMSRichText({
         autofocus={autofocus}
         editable={!disabled}
         uploader={uploader ? _uploader : undefined}
-        editorClassName="focus:outline-none prose"
+        editorClassName="focus:outline-none prose max-w-none"
       />
     </div>
   );
