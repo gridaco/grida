@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
@@ -142,10 +142,15 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
 ];
 
 function useReferrers(campaign_id: string) {
-  const [participants, setParticipants] = useState<
-    ReferrerWithCustomer[] | null
-  >(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [referrers, setReferrers] = useState<ReferrerWithCustomer[] | null>(
+    null
+  );
   const client = useMemo(() => createBrowserWestReferralClient(), []);
+
+  const refresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     client
@@ -160,11 +165,11 @@ function useReferrers(campaign_id: string) {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) return;
-        setParticipants(data as ReferrerWithCustomer[]);
+        setReferrers(data as ReferrerWithCustomer[]);
       });
-  }, [client, campaign_id]);
+  }, [client, campaign_id, refreshKey]);
 
-  return { tokens: participants };
+  return { referrers, refresh };
 }
 
 export function ReferrersTable() {
@@ -172,7 +177,7 @@ export function ReferrersTable() {
   const importCustomersDialog = useDialogState("import-customers", {
     refreshkey: true,
   });
-  const { tokens } = useReferrers(campaign.id);
+  const { referrers, refresh } = useReferrers(campaign.id);
   const client = useMemo(() => createBrowserWestReferralClient(), []);
 
   const { exportToCSV, isExporting, progress, error } =
@@ -226,9 +231,14 @@ export function ReferrersTable() {
           customer_ids: ids,
         } satisfies Platform.WEST.Referral.ImportParticipantsRequestBody),
       }
-    ).then((res) => {
-      return res.ok;
-    });
+    )
+      .then((res) => {
+        return res.ok;
+      })
+      .finally(() => {
+        // refresh the participants
+        refresh();
+      });
   };
 
   return (
@@ -253,7 +263,7 @@ export function ReferrersTable() {
         </div>
       </header>
       {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-      <DataTable columns={columns} data={tokens ?? []} />
+      <DataTable columns={columns} data={referrers ?? []} />
     </div>
   );
 }
