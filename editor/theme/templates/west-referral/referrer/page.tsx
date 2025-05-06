@@ -29,17 +29,47 @@ import * as Standard from "../standard";
 import ShareDialog from "./share";
 import toast from "react-hot-toast";
 
+type WebSharePayload = {
+  title?: string;
+  text?: string;
+  url?: string;
+};
+
+function renderSharable({
+  template,
+  context,
+}: {
+  template: unknown | null;
+  context: Platform.WEST.Referral.SharableContext;
+}): WebSharePayload {
+  if (!template) {
+    return {
+      url: context.url,
+    };
+  }
+
+  return {
+    // FIXME: content template
+    title: "Polestar 시승하고 경품 받아가세요 🎁",
+    text: `${context.referrer_name} 님 께서 Polestar 시승 이벤트에 초대합니다!`,
+    url: context.url,
+  };
+}
+
 async function mkshare({
   client,
   referrer_code,
 }: {
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
-}) {
+}): Promise<WebSharePayload> {
   if (!client) throw new Error("client is not defined");
-  const { data: invitation } = await client.invite(referrer_code);
+  const { data } = await client.invite(referrer_code);
 
-  return invitation.sharable;
+  return renderSharable({
+    template: null,
+    context: data.sharable,
+  });
 }
 
 async function reshare({
@@ -50,21 +80,19 @@ async function reshare({
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
   invitation_id: string;
-}) {
+}): Promise<WebSharePayload> {
   if (!client) throw new Error("client is not defined");
-  const { data: invitation } = await client.refresh(
-    referrer_code,
-    invitation_id
-  );
+  const { data } = await client.refresh(referrer_code, invitation_id);
 
-  return invitation.sharable;
+  return renderSharable({
+    template: null,
+    context: data.sharable,
+  });
 }
 
-async function share_or_copy(sharable: {
-  title: string;
-  text: string;
-  url: string;
-}): Promise<{ type: "clipboard" | "share" }> {
+async function share_or_copy(
+  sharable: WebSharePayload
+): Promise<{ type: "clipboard" | "share" }> {
   if (navigator.share) {
     await navigator.share(sharable);
     return { type: "share" };
