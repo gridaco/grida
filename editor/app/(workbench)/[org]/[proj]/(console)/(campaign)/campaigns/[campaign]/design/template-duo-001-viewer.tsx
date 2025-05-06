@@ -27,6 +27,7 @@ import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import { useTransform } from "@/grida-react-canvas/provider";
+import MessageAppFrame from "@/components/frames/message-app-frame";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -67,6 +68,23 @@ const document: IDocumentEditorInit = {
         top: 0,
         left: 500,
       },
+      "referrer-share-message": {
+        id: "referrer-share-message",
+        name: "Referrer Share Message",
+        type: "template_instance",
+        template_id: "grida_west_referral.duo-000.referrer-share-message",
+        position: "absolute",
+        removable: false,
+        active: true,
+        locked: false,
+        width: 375,
+        height: 812,
+        properties: {},
+        props: {},
+        overrides: {},
+        top: 0,
+        left: 1000,
+      },
       "invitation-ux-overlay": {
         id: "invitation-ux-overlay",
         name: "Invitation Coupon (Dialog)",
@@ -79,7 +97,7 @@ const document: IDocumentEditorInit = {
         width: 375,
         height: 812,
         top: 0,
-        left: 1500,
+        left: 2000,
         properties: {},
         props: {},
         overrides: {},
@@ -99,7 +117,7 @@ const document: IDocumentEditorInit = {
         props: {},
         overrides: {},
         top: 0,
-        left: 2000,
+        left: 2500,
       },
     },
     entry_scene_id: "main",
@@ -111,6 +129,7 @@ const document: IDocumentEditorInit = {
         children: [
           "referrer",
           "referrer-share",
+          "referrer-share-message",
           "invitation",
           "invitation-ux-overlay",
         ],
@@ -133,6 +152,14 @@ const document: IDocumentEditorInit = {
     },
     ["grida_west_referral.duo-000.referrer-share"]: {
       name: "Referrer Share Dialog",
+      type: "template",
+      properties: {},
+      default: {},
+      version: "0.0.0",
+      nodes: {},
+    },
+    ["grida_west_referral.duo-000.referrer-share-message"]: {
+      name: "Referrer Share Message",
       type: "template",
       properties: {},
       default: {},
@@ -206,6 +233,8 @@ export function CampaignTemplateDuo001Viewer({
               CustomComponent_Viewer__Referrer,
             "grida_west_referral.duo-000.referrer-share":
               CustomComponent_Viewer__ReferrerShare,
+            "grida_west_referral.duo-000.referrer-share-message":
+              CustomComponent_Viewer__ReferrerShareMessage,
             "grida_west_referral.duo-000.invitation":
               CustomComponent_Viewer__Invitation,
             "grida_west_referral.duo-000.invitation-ux-overlay":
@@ -326,6 +355,42 @@ function CustomComponent_Viewer__ReferrerShare(componentprops: any) {
           consent: props?.components?.["referrer-share"]?.consent,
           cta: props?.components?.["referrer-share"]?.cta,
         }}
+      />
+    </div>
+  );
+}
+
+function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
+  const { campaign, props, locale } = useViewerContext();
+
+  const message = props?.components?.["referrer-share-message"]?.message;
+
+  return (
+    <div
+      className="rounded shadow border relative overflow-hidden"
+      style={{
+        ...componentprops.style,
+        width: 375,
+        height: 812,
+      }}
+      {...queryattributes(componentprops)}
+    >
+      <MessageAppFrame
+        sender={{
+          avatar: "JD",
+          name: "John Doe",
+          phone: "+1 234 567 890",
+        }}
+        messages={[
+          {
+            message: "Hello, how are you?",
+            role: "incoming",
+          },
+          {
+            message: message || "{{message}}",
+            role: "outgoing",
+          },
+        ]}
       />
     </div>
   );

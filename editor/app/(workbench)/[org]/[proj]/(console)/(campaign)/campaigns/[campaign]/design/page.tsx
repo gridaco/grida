@@ -71,12 +71,14 @@ function TemplateEditorRoot() {
 type EditorTab =
   | "referrer"
   | "referrer-share"
+  | "referrer-share-message"
   | "invitation-ux-overlay"
   | "invitation"
   | "theme";
 type CanvasComponent =
   | "referrer"
   | "referrer-share"
+  | "referrer-share-message"
   | "invitation-ux-overlay"
   | "invitation";
 
@@ -86,6 +88,8 @@ function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
       return { node: "referrer" };
     case "referrer-share":
       return { node: "referrer-share" };
+    case "referrer-share-message":
+      return { node: "referrer-share-message" };
     case "invitation-ux-overlay":
       return {
         node: "invitation-ux-overlay",
@@ -139,7 +143,10 @@ function TemplateEditor({
         <header className="flex-none flex justify-between items-center p-4 border-b">
           <TabsList>
             <TabsTrigger value="referrer">Referrer</TabsTrigger>
-            <TabsTrigger value="referrer-share">Referrer Share</TabsTrigger>
+            <TabsTrigger value="referrer-share">Before Share</TabsTrigger>
+            <TabsTrigger value="referrer-share-message">
+              Share Message
+            </TabsTrigger>
             <TabsTrigger value="invitation-ux-overlay">
               Invitation Card
             </TabsTrigger>
@@ -328,6 +335,31 @@ function TemplateEditor({
                           );
                         }}
                         placeholder="Button Text"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="referrer-share-message" className="m-0">
+                <CardHeader>
+                  <CardTitle>Referrer Share Message</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="flex flex-col gap-8">
+                    <div className="grid gap-2">
+                      <Label>Message</Label>
+                      <Textarea
+                        placeholder="Enter your message"
+                        value={
+                          values?.components?.["referrer-share-message"]
+                            ?.message ?? ""
+                        }
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share-message.message",
+                            e.target.value
+                          );
+                        }}
                       />
                     </div>
                   </div>

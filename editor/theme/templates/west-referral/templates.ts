@@ -32,6 +32,9 @@ export namespace TemplateData {
         consent?: string;
         cta?: string;
       };
+      "referrer-share-message"?: {
+        message?: string;
+      };
       ["invitation-ux-overlay"]?: {
         image?: {
           type: "image";
