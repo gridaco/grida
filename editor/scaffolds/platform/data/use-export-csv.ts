@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { unparse } from "papaparse";
 
 /**
@@ -87,6 +87,14 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const reset = () => {
+    setIsExporting(false);
+    setProgress(0);
+    setError(null);
+    setIsComplete(false);
+  };
 
   /**
    * Exports data to CSV file.
@@ -105,6 +113,7 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     setIsExporting(true);
     setProgress(0);
     setError(null);
+    setIsComplete(false);
 
     try {
       const pageSize = config.pageSize || 100;
@@ -167,6 +176,7 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
       );
       throw error;
     } finally {
+      setIsComplete(true);
       setIsExporting(false);
       setProgress(0);
     }
@@ -181,5 +191,9 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     progress,
     /** Error message if the export failed, null if successful */
     error,
+    /** Whether the export has completed successfully */
+    isComplete,
+    /** Reset the export state */
+    reset,
   };
 }
