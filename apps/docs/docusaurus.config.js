@@ -9,7 +9,7 @@ const footer = {
       title: "Company",
       items: [
         {
-          label: "Grida.co",
+          label: "Grida",
           to: "https://grida.co",
         },
       ],
@@ -64,8 +64,8 @@ const config = {
       navbar: {
         logo: {
           alt: "Grida Logo",
-          src: "img/logo.svg",
-          srcDark: "img/logo-on-dark.svg",
+          src: "img/navbar-logo.svg",
+          srcDark: "img/navbar-logo-dark.svg",
           href: "https://grida.co/",
           target: "_self",
         },
@@ -89,9 +89,9 @@ const config = {
             label: "Reference",
           },
           {
-            href: "https://app.grida.co/sign-in?redirect_uri=https://grida.co/docs",
+            href: "https://grida.co/sign-in",
             position: "left",
-            label: "Sign in",
+            label: "Sign In",
           },
           {
             type: "localeDropdown",
