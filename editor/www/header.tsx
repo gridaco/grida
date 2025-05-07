@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -21,8 +19,7 @@ import {
   ResourceTypeIcon,
   ResourceTypeIconName,
 } from "@/components/resource-type-icon";
-import { createBrowserClient } from "@/lib/supabase/client";
-import { type Session } from "@supabase/supabase-js";
+import HeaderCTA from "./header-cta";
 
 type Item = {
   icon?: ResourceTypeIconName;
@@ -48,27 +45,7 @@ const resources: Item[] = [
   sitemap.items.contact,
 ];
 
-function useSession() {
-  const client = useMemo(() => createBrowserClient(), []);
-  const [session, setSession] = useState<Session | null>(null);
-
-  useEffect(() => {
-    client.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, [client.auth]);
-
-  return session;
-}
-
 export default function Header({ className }: { className?: string }) {
-  const session = useSession();
   return (
     <div className={cn("absolute top-0 left-0 right-0 z-50", className)}>
       <header className="container mx-auto py-4 px-4 xl:py-8">
@@ -143,14 +120,7 @@ export default function Header({ className }: { className?: string }) {
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
-            <div className="flex gap-2">
-              {!session && (
-                <Link href={sitemap.links.signin} className="hidden md:block">
-                  <Button variant="ghost">Sign in</Button>
-                </Link>
-              )}
-              <CTA isSignedIn={!!session} />
-            </div>
+            <HeaderCTA />
           </div>
         </div>
         {/* mobile */}
@@ -218,22 +188,6 @@ export default function Header({ className }: { className?: string }) {
         </div>
       </header>
     </div>
-  );
-}
-
-function CTA({ isSignedIn }: { isSignedIn: boolean }) {
-  if (isSignedIn) {
-    return (
-      <Link href={sitemap.links.dashboard}>
-        <Button className="font-normal">Dashboard</Button>
-      </Link>
-    );
-  }
-
-  return (
-    <Link href={sitemap.links.cta}>
-      <Button className="font-normal">Get Started</Button>
-    </Link>
   );
 }
 
