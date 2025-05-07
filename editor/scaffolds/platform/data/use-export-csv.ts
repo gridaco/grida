@@ -51,8 +51,8 @@ type ExportConfig<T> = {
   pageSize?: number;
 
   /**
-   * Optional sleep duration in milliseconds between page fetches.
-   * This helps prevent server overload when fetching large datasets.
+   * Optional interval (in ms) to wait between page fetches.
+   * Helps to avoid hammering the backend when exporting large datasets.
    *
    * @default 100
    */
@@ -89,7 +89,7 @@ type ExportConfig<T> = {
  *     item.created_at
  *   ],
  *   headers: ['Name', 'Email', 'Created At'],
- *   sleepBetweenPages: 1000 // Sleep 1 second between pages
+ *   interval: 1000 // Sleep 1 second between pages
  * });
  * ```
  */

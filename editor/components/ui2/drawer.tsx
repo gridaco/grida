@@ -8,8 +8,16 @@ const Drawer = ({
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
   // https://github.com/emilkowalski/vaul/issues/497#issuecomment-2452503724
   React.useLayoutEffect(() => {
-    document.addEventListener("focusin", (e) => e.stopImmediatePropagation());
-    document.addEventListener("focusout", (e) => e.stopImmediatePropagation());
+    const handleFocusIn = (e: FocusEvent) => e.stopImmediatePropagation();
+    const handleFocusOut = (e: FocusEvent) => e.stopImmediatePropagation();
+
+    document.addEventListener("focusin", handleFocusIn, true);
+    document.addEventListener("focusout", handleFocusOut, true);
+
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn, true);
+      document.removeEventListener("focusout", handleFocusOut, true);
+    };
   }, []);
 
   return (
