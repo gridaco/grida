@@ -15,7 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: "https://grida.co/blog",
-      changeFrequency: "weekly",
+      changeFrequency: "monthly",
       priority: 0.5,
     },
     {
@@ -88,23 +88,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: "https://grida.co/ai/models",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: "https://grida.co/tools",
-      changeFrequency: "daily",
+      changeFrequency: "monthly",
       priority: 0.5,
     },
     {
       url: "https://grida.co/tools/blobs",
-      changeFrequency: "daily",
+      changeFrequency: "yearly",
       priority: 0.5,
     },
     {
       url: "https://grida.co/tools/halftone",
-      changeFrequency: "daily",
+      changeFrequency: "yearly",
       priority: 0.5,
     },
     {
       url: "https://grida.co/tools/e164",
-      changeFrequency: "daily",
+      changeFrequency: "yearly",
       priority: 0.5,
     },
   ];
