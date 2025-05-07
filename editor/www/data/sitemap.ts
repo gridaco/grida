@@ -15,6 +15,8 @@ export namespace sitemap {
     pricing: "/pricing",
     slack: "/join-slack",
     docs: "/docs",
+    // TODO:
+    docs_canvas_sdk: "/docs/canvas/sdk",
     contact: "/contact",
     database: "/database",
     privacy: "/privacy",
