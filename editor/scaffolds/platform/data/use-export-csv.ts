@@ -49,6 +49,14 @@ type ExportConfig<T> = {
    * Defaults to 100 if not specified.
    */
   pageSize?: number;
+
+  /**
+   * Optional interval (in ms) to wait between page fetches.
+   * Helps to avoid hammering the backend when exporting large datasets.
+   *
+   * @default 100
+   */
+  interval?: number;
 };
 
 /**
@@ -59,6 +67,7 @@ type ExportConfig<T> = {
  * - CSV file generation and download
  * - Error handling
  * - Hard limit enforcement
+ * - Optional sleep between page fetches to prevent server overload
  *
  * @template T - The type of data being exported
  * @param config - Configuration object for the export process
@@ -79,7 +88,8 @@ type ExportConfig<T> = {
  *     item.email,
  *     item.created_at
  *   ],
- *   headers: ['Name', 'Email', 'Created At']
+ *   headers: ['Name', 'Email', 'Created At'],
+ *   interval: 1000 // Sleep 1 second between pages
  * });
  * ```
  */
@@ -87,6 +97,17 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const reset = () => {
+    setIsExporting(false);
+    setProgress(0);
+    setError(null);
+    setIsComplete(false);
+  };
+
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
   /**
    * Exports data to CSV file.
@@ -105,9 +126,11 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     setIsExporting(true);
     setProgress(0);
     setError(null);
+    setIsComplete(false);
 
     try {
       const pageSize = config.pageSize || 100;
+      const interval = config.interval || 100;
 
       // First fetch to get total count
       const { data: firstPage, count } = await config.fetchData(1, pageSize);
@@ -127,6 +150,11 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
 
       // Fetch remaining pages
       for (let page = 2; page <= totalPages; page++) {
+        // Sleep between pages if configured
+        if (interval > 0) {
+          await sleep(interval);
+        }
+
         const { data } = await config.fetchData(page, pageSize);
         allData = [...allData, ...data];
         setProgress((page - 1) * pageSize);
@@ -167,6 +195,7 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
       );
       throw error;
     } finally {
+      setIsComplete(true);
       setIsExporting(false);
       setProgress(0);
     }
@@ -181,5 +210,9 @@ export function useExportCSV<T>(config: ExportConfig<T>) {
     progress,
     /** Error message if the export failed, null if successful */
     error,
+    /** Whether the export has completed successfully */
+    isComplete,
+    /** Reset the export state */
+    reset,
   };
 }

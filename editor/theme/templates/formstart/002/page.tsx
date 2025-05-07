@@ -207,30 +207,30 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
                 />
               </Avatar>
             </span>
-            안녕하세요 고객님, 폴스타 서울 정우주 입니다.
+            안녕하세요 고객님, ACME 서울 정우주 입니다.
           </DrawerTitle>
           <DrawerDescription>
-            고객님을 Polestar 3 를 시승회에 초대 드립니다. 궁굼한점이
-            있으신가요? 아래 버튼을 눌러 문의 주세요.
+            고객님을 ACME 3 를 시승회에 초대 드립니다. 궁굼한점이 있으신가요?
+            아래 버튼을 눌러 문의 주세요.
           </DrawerDescription>
         </DrawerHeader>
         <div className="p-4 flex flex-col gap-2 text-muted-foreground">
           <li className="flex items-center gap-2">
             <PhoneIcon className="w-4 h-4" />
-            <Link href={"tel:010-7146-1470"}>
-              <span>010-7146-1470</span>
+            <Link href={"tel:010-1234-5678"}>
+              <span>010-1234-5678</span>
             </Link>
           </li>
           <li className="flex items-center gap-2">
             <KakaoTalkLogo className="w-4 h-4" />
-            <Link href={"tel:010-7146-1470"}>
-              <span>010-7146-1470</span>
+            <Link href={"tel:010-1234-5678"}>
+              <span>010-1234-5678</span>
             </Link>
           </li>
           <li className="flex items-center gap-2">
             <GlobeIcon className="w-4 h-4" />
-            <Link href={"https://www.polestar.com"}>
-              <span>www.polestar.com</span>
+            <Link href={"https://acme.com"}>
+              <span>www.acme.com</span>
             </Link>
           </li>
         </div>

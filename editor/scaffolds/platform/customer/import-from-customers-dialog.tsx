@@ -130,7 +130,7 @@ export function ImportFromCustomersDialog({
             <div className="rounded-md border">
               <ScrollArea className="h-[400px]">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-secondary">
+                  <TableHeader className="sticky top-0 bg-secondary z-10">
                     <TableRow>
                       <TableHead className="w-[50px]">
                         <Checkbox

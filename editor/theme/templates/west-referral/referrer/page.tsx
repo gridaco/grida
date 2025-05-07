@@ -13,67 +13,88 @@ import {
   ScreenRoot,
   ScreenScrollable,
 } from "@/theme/templates/kit/components";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Platform } from "@/lib/platform";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ShineBorder } from "@/www/ui/shine-border";
 import NumberFlow from "@number-flow/react";
 import { motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
-import { Spinner } from "@/components/spinner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { mutate } from "swr";
 import { TicketCheckIcon } from "lucide-react";
 import { template } from "@/utils/template";
+import { TemplateData } from "../templates";
 import * as Standard from "../standard";
+import ShareDialog from "./share";
 import toast from "react-hot-toast";
+
+type WebSharePayload = {
+  title?: string;
+  text?: string;
+  url?: string;
+};
+
+function renderSharable({
+  template: template_text,
+  context,
+}: {
+  template?: string | null;
+  context: Platform.WEST.Referral.SharableContext;
+}): WebSharePayload {
+  if (!template_text) {
+    return {
+      url: context.url,
+    };
+  }
+
+  return {
+    text: template(template_text, context),
+    url: context.url,
+  };
+}
 
 async function mkshare({
   client,
   referrer_code,
+  template,
 }: {
+  template?: string | null;
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
-}) {
+}): Promise<WebSharePayload> {
   if (!client) throw new Error("client is not defined");
-  const { data: invitation } = await client.invite(referrer_code);
+  const { data } = await client.invite(referrer_code);
 
-  return invitation.sharable;
+  return renderSharable({
+    template: template,
+    context: data.sharable,
+  });
 }
 
 async function reshare({
   client,
   referrer_code,
   invitation_id,
+  template,
 }: {
+  template?: string | null;
   client?: Platform.WEST.Referral.WestReferralClient;
   referrer_code: string;
   invitation_id: string;
-}) {
+}): Promise<WebSharePayload> {
   if (!client) throw new Error("client is not defined");
-  const { data: invitation } = await client.refresh(
-    referrer_code,
-    invitation_id
-  );
+  const { data } = await client.refresh(referrer_code, invitation_id);
 
-  return invitation.sharable;
+  return renderSharable({
+    template: template,
+    context: data.sharable,
+  });
 }
 
-async function share_or_copy(sharable: {
-  title: string;
-  text: string;
-  url: string;
-}): Promise<{ type: "clipboard" | "share" }> {
+async function share_or_copy(
+  sharable: WebSharePayload
+): Promise<{ type: "clipboard" | "share" }> {
   if (navigator.share) {
     await navigator.share(sharable);
     return { type: "share" };
@@ -161,20 +182,21 @@ export interface Props {
     link_terms?: string;
     paragraph?: { html: string };
   };
+  share?: {
+    data: TemplateData.West_Referrral__Duo_001["components"]["referrer-share"];
+  };
+  share_message?: {
+    data: TemplateData.West_Referrral__Duo_001["components"]["referrer-share-message"];
+  };
 }
 
 export default function ReferrerPageTemplate({
   data,
   design,
-  slug,
   locale,
   client,
 }: {
   data: Platform.WEST.Referral.ReferrerPublicRead;
-  /**
-   * @deprecated
-   */
-  slug: string;
   design: Props;
   locale: keyof typeof dictionary;
   client?: Platform.WEST.Referral.WestReferralClient;
@@ -191,7 +213,6 @@ export default function ReferrerPageTemplate({
   const referrer_name = _referrer_name || t.an_anonymous;
 
   const { max_invitations_per_referrer: max_supply } = campaign;
-
   const is_unlimited = max_supply === null;
   const available_count = (max_supply ?? Infinity) - (invitation_count ?? 0);
   const is_available = available_count > 0;
@@ -200,6 +221,7 @@ export default function ReferrerPageTemplate({
     return mkshare({
       client: client,
       referrer_code: code!,
+      template: design.share_message?.data?.message,
     }).then((sharable) => {
       share_or_copy(sharable)
         .then(({ type }) => {
@@ -366,6 +388,8 @@ export default function ReferrerPageTemplate({
                                         client: client,
                                         referrer_code: code!,
                                         invitation_id: inv.id,
+                                        template:
+                                          design.share_message?.data?.message,
                                       }).then((sharable) => {
                                         share_or_copy(sharable).then(
                                           ({ type }) => {
@@ -415,7 +439,7 @@ export default function ReferrerPageTemplate({
                 </article>
               )}
             </Standard.Section>
-            {design.footer && (
+            {/* {design.footer && (
               <Standard.FooterTemplate
                 logo={design.favicon}
                 links={[
@@ -435,83 +459,17 @@ export default function ReferrerPageTemplate({
                 instagram={design.footer.link_instagram}
                 paragraph={design.footer.paragraph?.html}
               />
-            )}
+            )} */}
           </main>
-          <ConfirmDrawer
-            {...beforeShareDialog.props}
-            onConfirm={triggerShare}
-          />
         </ScreenScrollable>
+        <ShareDialog
+          {...beforeShareDialog.props}
+          onConfirm={triggerShare}
+          data={design.share?.data}
+          locale={locale}
+        />
       </ScreenMobileFrame>
     </ScreenRoot>
-  );
-}
-
-function ConfirmDrawer({
-  onConfirm,
-  ...props
-}: React.ComponentProps<typeof Drawer> & {
-  onConfirm: () => Promise<void>;
-}) {
-  const [confirmed, setConfirmed] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-
-  const onConfirmClick = async () => {
-    setBusy(true);
-    onConfirm().finally(() => {
-      setBusy(false);
-    });
-  };
-
-  return (
-    <Drawer {...props}>
-      <DrawerContent>
-        <div className="mx-auto w-full">
-          <DrawerHeader className="text-left">
-            <DrawerTitle>시승 초대 전 꼭 확인해주세요</DrawerTitle>
-            <hr />
-            <DrawerDescription>
-              <ul className="list-disc pl-4">
-                <li>
-                  시승 초대하기가 완료되면 초대권 1장이 차감되며, 차감된
-                  초대권은 복구되지 않습니다.
-                </li>
-                <li>
-                  3명 이상이 시승을 완료해도 최대 3명까지만 인정되어 혜택이
-                  제공됩니다.
-                </li>
-                <li>
-                  본 이벤트 페이지를 통해 초대된 고객이 시승을 완료해야만 참여로
-                  인정됩니다.
-                </li>
-              </ul>
-            </DrawerDescription>
-          </DrawerHeader>
-          <section className="p-4 ">
-            <div className="flex flex-col gap-4">
-              <label className="flex items-center gap-2">
-                <Checkbox
-                  id="confirm-check"
-                  onCheckedChange={(checked) => setConfirmed(!!checked)}
-                />
-                <span className="text-sm text-muted-foreground">
-                  위 내용을 확인하였습니다
-                </span>
-              </label>
-            </div>
-          </section>
-          <DrawerFooter className="pt-2">
-            <Button onClick={onConfirmClick} disabled={!confirmed || busy}>
-              {busy && <Spinner className="me-2" />}
-              초대장 보내기
-            </Button>
-            <DrawerClose asChild>
-              <Button variant="outline">취소</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </div>
-      </DrawerContent>
-    </Drawer>
   );
 }
 

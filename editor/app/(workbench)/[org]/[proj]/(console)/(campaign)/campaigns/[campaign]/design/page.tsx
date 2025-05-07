@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 export default function CampaignLayoutDesignerPage() {
   const { layout_id } = useCampaign();
@@ -43,13 +44,11 @@ export default function CampaignLayoutDesignerPage() {
   }
 
   return (
-    <main className="w-full h-full flex relative bg-background">
-      <div className="w-full my-10 container mx-auto">
-        <WWWLayoutProvider id={layout_id}>
-          <TemplateEditorRoot />
-        </WWWLayoutProvider>
-      </div>
-    </main>
+    <div className="h-screen flex flex-col overflow-hidden">
+      <WWWLayoutProvider id={layout_id}>
+        <TemplateEditorRoot />
+      </WWWLayoutProvider>
+    </div>
   );
 }
 
@@ -59,19 +58,38 @@ function TemplateEditorRoot() {
     useWWWTemplate<TemplateData.West_Referrral__Duo_001>(template_id);
 
   if (template.loading || !template.data) {
-    return <Spinner />;
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
   }
 
   return <TemplateEditor template={template} />;
 }
 
-type EditorTab = "referrer" | "invitation-ux-overlay" | "invitation" | "theme";
-type CanvasComponent = "referrer" | "invitation-ux-overlay" | "invitation";
+type EditorTab =
+  | "referrer"
+  | "referrer-share"
+  | "referrer-share-message"
+  | "invitation-ux-overlay"
+  | "invitation"
+  | "theme";
+type CanvasComponent =
+  | "referrer"
+  | "referrer-share"
+  | "referrer-share-message"
+  | "invitation-ux-overlay"
+  | "invitation";
 
 function getCanvasFocus(tab: EditorTab): { node: CanvasComponent } | null {
   switch (tab) {
     case "referrer":
       return { node: "referrer" };
+    case "referrer-share":
+      return { node: "referrer-share" };
+    case "referrer-share-message":
+      return { node: "referrer-share-message" };
     case "invitation-ux-overlay":
       return {
         node: "invitation-ux-overlay",
@@ -113,18 +131,24 @@ function TemplateEditor({
     | TemplateData.West_Referrral__Duo_001
     | undefined;
 
+  useUnsavedChangesWarning(() => template.dirty);
+
   return (
-    <div className="w-full h-full">
+    <div className="h-full flex flex-col">
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as EditorTab)}
-        className="w-full h-full flex flex-col gap-4"
+        className="h-full flex flex-col overflow-hidden"
       >
-        <header className="w-full flex justify-between items-center">
+        <header className="flex-none flex justify-between items-center p-4 border-b">
           <TabsList>
             <TabsTrigger value="referrer">Referrer</TabsTrigger>
+            <TabsTrigger value="referrer-share">Before Share</TabsTrigger>
+            <TabsTrigger value="referrer-share-message">
+              Share Message
+            </TabsTrigger>
             <TabsTrigger value="invitation-ux-overlay">
-              Invitation Ticket
+              Invitation Card
             </TabsTrigger>
             <TabsTrigger value="invitation">Invitation</TabsTrigger>
             <TabsTrigger value="theme">Theme</TabsTrigger>
@@ -143,9 +167,9 @@ function TemplateEditor({
             {template.saving ? "Saving..." : "Save & Publish Changes"}
           </Button>
         </header>
-        <div className="w-full h-full flex gap-10">
+        <div className="flex-1 h-full flex gap-4 p-4 overflow-hidden">
           {focus && (
-            <aside className="flex-[2]">
+            <aside className="flex-[2] overflow-hidden">
               <CampaignTemplateDuo001Viewer
                 focus={focus}
                 props={props}
@@ -168,9 +192,9 @@ function TemplateEditor({
               />
             </aside>
           )}
-          <aside className="flex-1 flex flex-col gap-4 w-full overflow-y-scroll">
-            <TabsContent value="referrer" className="m-0">
-              <Card>
+          <aside className="flex-1 flex flex-col w-full">
+            <Card className="flex flex-1 overflow-scroll flex-col">
+              <TabsContent value="referrer" className="m-0">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
                     <span>Referrer</span>
@@ -187,7 +211,7 @@ function TemplateEditor({
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1">
                   <div className="flex flex-col gap-8">
                     <div className="grid gap-2">
                       <Label>Image</Label>
@@ -262,10 +286,86 @@ function TemplateEditor({
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="invitation-ux-overlay" className="m-0">
-              <Card>
+              </TabsContent>
+              <TabsContent value="referrer-share" className="m-0">
+                <CardHeader>
+                  <CardTitle>Referrer Share</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="flex flex-col gap-8">
+                    <div className="grid gap-2">
+                      <Label>Article</Label>
+                      <CMSRichText
+                        value={
+                          values?.components?.["referrer-share"]?.article
+                            ?.html ?? ""
+                        }
+                        uploader={template.upload}
+                        onValueChange={(value) => {
+                          props.set("components.referrer-share.article", {
+                            type: "richtext",
+                            html: value,
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Consent</Label>
+                      <Textarea
+                        value={
+                          values?.components?.["referrer-share"]?.consent ?? ""
+                        }
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share.consent",
+                            e.target.value
+                          );
+                        }}
+                        placeholder="Enter your consent"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Button Text</Label>
+                      <Input
+                        value={values?.components?.referrer?.cta}
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share.cta",
+                            e.target.value
+                          );
+                        }}
+                        placeholder="Button Text"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="referrer-share-message" className="m-0">
+                <CardHeader>
+                  <CardTitle>Referrer Share Message</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="flex flex-col gap-8">
+                    <div className="grid gap-2">
+                      <Label>Message</Label>
+                      <Textarea
+                        placeholder="Enter your message"
+                        value={
+                          values?.components?.["referrer-share-message"]
+                            ?.message ?? ""
+                        }
+                        onChange={(e) => {
+                          props.set(
+                            "components.referrer-share-message.message",
+                            e.target.value
+                          );
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="invitation-ux-overlay" className="m-0">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
                     <span>Invitation Ticket</span>
@@ -282,7 +382,7 @@ function TemplateEditor({
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-y-auto">
                   <div className="flex flex-col gap-8">
                     <div className="grid gap-2">
                       <Label>Ticket Image</Label>
@@ -308,10 +408,8 @@ function TemplateEditor({
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="invitation" className="m-0">
-              <Card>
+              </TabsContent>
+              <TabsContent value="invitation" className="m-0">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
                     <span>Invitation</span>
@@ -328,7 +426,7 @@ function TemplateEditor({
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-y-auto">
                   <div className="flex flex-col gap-8">
                     <div className="grid gap-2">
                       <Label>Image</Label>
@@ -409,14 +507,12 @@ function TemplateEditor({
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="theme" className="m-0 max-w-screen-md">
-              <Card>
+              </TabsContent>
+              <TabsContent value="theme" className="m-0 max-w-screen-md">
                 <CardHeader>
                   <CardTitle>Theme</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-y-auto">
                   <div className="grid gap-2">
                     <NavbarLogoEditor
                       logo={values?.theme?.navbar?.logo}
@@ -460,8 +556,8 @@ function TemplateEditor({
                     </Link>
                   </div>
                 </CardContent>
-              </Card>
-            </TabsContent>
+              </TabsContent>
+            </Card>
           </aside>
         </div>
       </Tabs>
