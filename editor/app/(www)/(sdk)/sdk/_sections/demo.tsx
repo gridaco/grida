@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShineBorder } from "@/www/ui/shine-border";
+import { PlayFilledIcon } from "@/components/icons";
 
 export default function SectionMainDemo() {
   const [isLocked, setIsLocked] = useState(true);
@@ -42,7 +43,10 @@ export default function SectionMainDemo() {
             className="absolute inset-0 from-background/80 to-background/20 bg-gradient-to-t z-20 flex items-center justify-center cursor-pointer"
             onClick={unlockDemo}
           >
-            <Button>Try it out</Button>
+            <Button>
+              <PlayFilledIcon className="w-4 h-4 mr-2" />
+              Try it out
+            </Button>
           </div>
         )}
         <div

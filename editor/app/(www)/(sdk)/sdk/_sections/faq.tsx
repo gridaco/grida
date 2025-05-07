@@ -15,7 +15,7 @@ const faqs = [
   {
     question: "Is Grida Canvas SDK free to use?",
     answer:
-      "Yes, Grida Canvas SDK is completely open-source and free to use. You can use it in both personal and commercial projects under the MIT license.",
+      "Yes, Grida Canvas SDK is completely open-source and free to use. You can use it in both personal and commercial projects under the Apache 2.0 license.",
   },
   {
     question: "What are the main features of Grida Canvas SDK?",
@@ -30,7 +30,23 @@ const faqs = [
   {
     question: "How do I get started with Grida Canvas SDK?",
     answer:
-      "You can get started by installing the SDK through npm or yarn, and following our comprehensive documentation. We also provide example projects and tutorials to help you get up and running quickly.",
+      "You can get started by installing the starter-kit, and following our comprehensive documentation. We also provide example projects and tutorials to help you get up and running quickly.",
+  },
+  {
+    question: "Do I need to subscribe to use Grida Canvas SDK?",
+    answer:
+      "No, Grida Canvas SDK is completely free to use. However, we also provide Backend-as-a-Service for your canvas app. This includes document cloud, CDN, and real-time collaboration.",
+  },
+  {
+    question: "What Graphics Backend do you use?",
+    answer:
+      "We use DOM / SVG / HTML / CSS as our primary graphics backend. This will give you 100% compatibility with the web standards.",
+  },
+  {
+    question:
+      "Does Grida Canvas SDK support WebGL / WebGPU (Accelerated Graphics)?",
+    answer:
+      "Not yet, but some of our components are built on top of WebGPU, and we are gradually adding more.",
   },
 ];
 

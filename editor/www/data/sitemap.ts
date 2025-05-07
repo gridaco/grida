@@ -8,6 +8,7 @@ export namespace sitemap {
     dashboard: "/dashboard",
     downlaods: "/downloads",
     ai_models: "/ai/models",
+    sdk: "/sdk",
     tools: "/tools",
     library: "/library",
     releases_latest: "https://github.com/gridaco/grida/releases/latest",

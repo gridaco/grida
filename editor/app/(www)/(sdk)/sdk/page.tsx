@@ -4,7 +4,6 @@ import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Hero from "./_sections/hero";
 import Features from "./_sections/features";
-import CodeExample from "./_sections/snippets";
 import SectionMainDemo from "./_sections/demo";
 import FAQ from "./_sections/faq";
 import { type Metadata } from "next";
@@ -32,12 +31,10 @@ export default function SDKPage() {
   return (
     <main className="overflow-x-hidden">
       <Header className="relative" />
-      <div className="w-full relative">
-        <Section container className="overflow-visible">
-          <Hero />
-        </Section>
-      </div>
-      <Section container className="mt-32">
+      <Section container className="overflow-visible mt-16">
+        <Hero />
+      </Section>
+      <Section container className="mt-16">
         <SectionMainDemo />
       </Section>
       <Section container className="mt-32">

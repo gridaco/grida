@@ -32,11 +32,11 @@ function HeroBackground() {
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(579 236) rotate(85) scale(522 865)"
           >
-            <stop stopColor="#CDBAFF" />
-            <stop stopColor="#A06EFF" stopOpacity="1" />
-            <stop offset="0.36" stopColor="#8298FF" stopOpacity="1" />{" "}
-            <stop offset="0.61" stopColor="#60CFFF" stopOpacity="0.9" />{" "}
-            <stop offset="1" stopColor="#9EF3E8" stopOpacity="0.8" />{" "}
+            <stop stopColor="#F0F7FF" />
+            <stop stopColor="#E1EFFF" stopOpacity="1" />
+            <stop offset="0.36" stopColor="#C5D9FF" stopOpacity="1" />
+            <stop offset="0.61" stopColor="#A3C4FF" stopOpacity="0.9" />
+            <stop offset="1" stopColor="#7BA4FF" stopOpacity="0.8" />
           </radialGradient>
           <radialGradient
             id="dark"
@@ -46,10 +46,10 @@ function HeroBackground() {
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(579 236) rotate(85) scale(522 865)"
           >
-            <stop stopColor="#4F3791" />
-            <stop offset="0.36" stopColor="#425397" />
-            <stop offset="0.61" stopColor="#3383A0" />
-            <stop offset="1" stopColor="#34D7C4" />
+            <stop stopColor="#1F2937" />
+            <stop offset="0.36" stopColor="#111827" />
+            <stop offset="0.61" stopColor="#0F172A" />
+            <stop offset="1" stopColor="#020617" />
           </radialGradient>
         </defs>
         <path d={path} fill="var(--gradient)" filter="url(#blur)" />

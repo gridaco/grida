@@ -114,7 +114,11 @@ export default function Header({ className }: { className?: string }) {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link href={sitemap.links.github_grida} target="_blank">
+                  <Link
+                    href={sitemap.links.github_grida}
+                    target="_blank"
+                    aria-label="GitHub"
+                  >
                     <Button variant="ghost" size="icon">
                       <GitHubLogoIcon className="text-foreground w-5 h-5" />
                     </Button>
