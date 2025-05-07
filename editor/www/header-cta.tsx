@@ -1,8 +1,9 @@
 "use client";
 
-import useSession from "@/lib/supabase/use-session";
+import React from "react";
 import { sitemap } from "./data/sitemap";
 import { Button } from "@/components/ui/button";
+import useSession from "@/lib/supabase/use-session";
 import Link from "next/link";
 
 export default function HeaderCTA() {

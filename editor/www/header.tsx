@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import {
   NavigationMenu,
@@ -8,17 +10,17 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { cn } from "@/utils/cn";
 import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
-import Link from "next/link";
 import { sitemap } from "./data/sitemap";
+import { cn } from "@/utils/cn";
 import {
   ResourceTypeIcon,
   ResourceTypeIconName,
 } from "@/components/resource-type-icon";
+import Link from "next/link";
 import HeaderCTA from "./header-cta";
 
 type Item = {
