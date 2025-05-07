@@ -563,8 +563,6 @@ export namespace Platform.WEST.Referral {
     description: string | null;
     enabled: boolean;
     created_at: string;
-    invitation_email_template: unknown | null;
-    invitation_share_template: unknown | null;
     layout_id: string | null;
     is_invitee_profile_exposed_to_public_dangerously: boolean;
     is_referrer_profile_exposed_to_public_dangerously: boolean;
@@ -655,6 +653,12 @@ export namespace Platform.WEST.Referral {
     created_at: string;
   };
 
+  export type SharableContext = {
+    referrer_name: string;
+    invitation_code: string;
+    url: string;
+  };
+
   const _x_grida_west_campaign_id = "x-grida-west-campaign-id";
   const _x_grida_west_token_code = "x-grida-west-token-code";
 
@@ -685,11 +689,7 @@ export namespace Platform.WEST.Referral {
     invite(code: string): Promise<{
       data: {
         code: string;
-        sharable: {
-          title: string;
-          text: string;
-          url: string;
-        };
+        sharable: SharableContext;
       };
     }> {
       return fetch(`${this.BASE_URL}/t/invite`, {
@@ -708,11 +708,7 @@ export namespace Platform.WEST.Referral {
     ): Promise<{
       data: {
         code: string;
-        sharable: {
-          title: string;
-          text: string;
-          url: string;
-        };
+        sharable: SharableContext;
       };
     }> {
       return fetch(`${this.BASE_URL}/t/refresh`, {

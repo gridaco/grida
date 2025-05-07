@@ -2361,8 +2361,6 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
-          invitation_email_template: Json | null
-          invitation_share_template: Json | null
           is_invitee_profile_exposed_to_public_dangerously: boolean
           is_referrer_profile_exposed_to_public_dangerously: boolean
           layout_id: string | null
@@ -2383,8 +2381,6 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id: string
-          invitation_email_template?: Json | null
-          invitation_share_template?: Json | null
           is_invitee_profile_exposed_to_public_dangerously?: boolean
           is_referrer_profile_exposed_to_public_dangerously?: boolean
           layout_id?: string | null
@@ -2405,8 +2401,6 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
-          invitation_email_template?: Json | null
-          invitation_share_template?: Json | null
           is_invitee_profile_exposed_to_public_dangerously?: boolean
           is_referrer_profile_exposed_to_public_dangerously?: boolean
           layout_id?: string | null

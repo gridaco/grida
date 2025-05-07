@@ -8,8 +8,5 @@
   },
   "background": {
     "src": "/templates/sample-brand-the-bundle/collection/001.png"
-  },
-  "__background": {
-    "src": "https://sdl-assets.ams3.cdn.digitaloceanspaces.com/sdl/2021/08/sdl-polestar-interior-steering-2000x1333.jpg"
   }
 }

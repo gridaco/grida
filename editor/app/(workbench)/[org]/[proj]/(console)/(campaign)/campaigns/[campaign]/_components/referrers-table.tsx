@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,15 @@ import { useExportCSV } from "@/scaffolds/platform/data/use-export-csv";
 import { DownloadIcon } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;
@@ -142,10 +151,15 @@ const columns: ColumnDef<ReferrerWithCustomer>[] = [
 ];
 
 function useReferrers(campaign_id: string) {
-  const [participants, setParticipants] = useState<
-    ReferrerWithCustomer[] | null
-  >(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [referrers, setReferrers] = useState<ReferrerWithCustomer[] | null>(
+    null
+  );
   const client = useMemo(() => createBrowserWestReferralClient(), []);
+
+  const refresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     client
@@ -160,11 +174,116 @@ function useReferrers(campaign_id: string) {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) return;
-        setParticipants(data as ReferrerWithCustomer[]);
+        setReferrers(data as ReferrerWithCustomer[]);
       });
-  }, [client, campaign_id]);
+  }, [client, campaign_id, refreshKey]);
 
-  return { tokens: participants };
+  return { referrers, refresh };
+}
+
+function useReferrersExport(campaign_id: string) {
+  const client = useMemo(() => createBrowserWestReferralClient(), []);
+
+  return useExportCSV<ReferrerWithCustomer>({
+    fetchData: async (page, pageSize) => {
+      const { data, error, count } = await client
+        .from("referrer")
+        .select(
+          `
+          *,
+          customer:customer(*)
+        `,
+          { count: "exact" }
+        )
+        .eq("campaign_id", campaign_id)
+        .order("created_at", { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+
+      if (error) throw error;
+      return {
+        data: data as ReferrerWithCustomer[],
+        count: count || 0,
+      };
+    },
+    transformToCSV: (referrer) => [
+      referrer.code,
+      referrer.customer.uid || "-",
+      referrer.customer.name || "-",
+      referrer.customer.phone || "-",
+      referrer.customer.email || "-",
+      referrer.created_at,
+      referrer.invitation_count.toString(),
+    ],
+    headers: [
+      "code",
+      "customer.uid",
+      "customer.name",
+      "customer.phone",
+      "customer.email",
+      "created_at",
+      "invitation_count",
+    ],
+    pageSize: 100,
+  });
+}
+
+function ExportDialog({
+  onExport,
+  isExporting,
+  progress,
+  error,
+  isComplete,
+  ...props
+}: {
+  onExport: () => void;
+  isExporting: boolean;
+  progress: number;
+  error: string | null;
+  isComplete: boolean;
+} & React.ComponentProps<typeof Dialog>) {
+  const isStale = !isExporting && !isComplete;
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Export Referrers</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {isExporting ? (
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                Exporting all referrers... {Math.min(progress, 100)}%
+              </div>
+              <Progress value={Math.min(progress, 100)} />
+            </div>
+          ) : isComplete ? (
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                All done! Your export is complete.
+              </div>
+              <Progress value={100} />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Export all referrers to a CSV file. The export will include all
+                referrer details including customer information.
+              </p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          {isStale && (
+            <Button onClick={onExport} className="w-full">
+              Start Export
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function ReferrersTable() {
@@ -172,49 +291,11 @@ export function ReferrersTable() {
   const importCustomersDialog = useDialogState("import-customers", {
     refreshkey: true,
   });
-  const { tokens } = useReferrers(campaign.id);
-  const client = useMemo(() => createBrowserWestReferralClient(), []);
-
-  const { exportToCSV, isExporting, progress, error } =
-    useExportCSV<ReferrerWithCustomer>({
-      fetchData: async (page, pageSize) => {
-        const { data, error, count } = await client
-          .from("referrer")
-          .select(
-            `
-            *,
-            customer:customer(*)
-          `,
-            { count: "exact" }
-          )
-          .eq("campaign_id", campaign.id)
-          .order("created_at", { ascending: false })
-          .range((page - 1) * pageSize, page * pageSize - 1);
-
-        if (error) throw error;
-        return {
-          data: data as ReferrerWithCustomer[],
-          count: count || 0,
-        };
-      },
-      transformToCSV: (referrer) => [
-        referrer.customer.name || "-",
-        referrer.code,
-        referrer.customer.email || "-",
-        referrer.customer_id,
-        referrer.created_at,
-        referrer.invitation_count.toString(),
-      ],
-      headers: [
-        "Name",
-        "Code",
-        "Email",
-        "Customer ID",
-        "Created At",
-        "Invitation Count",
-      ],
-      pageSize: 100,
-    });
+  const exportDialog = useDialogState("export-referrers", {
+    refreshkey: true,
+  });
+  const { referrers, refresh } = useReferrers(campaign.id);
+  const exporter = useReferrersExport(campaign.id);
 
   const onImport = async (ids: string[]) => {
     return await fetch(
@@ -226,9 +307,14 @@ export function ReferrersTable() {
           customer_ids: ids,
         } satisfies Platform.WEST.Referral.ImportParticipantsRequestBody),
       }
-    ).then((res) => {
-      return res.ok;
-    });
+    )
+      .then((res) => {
+        return res.ok;
+      })
+      .finally(() => {
+        // refresh the participants
+        refresh();
+      });
   };
 
   return (
@@ -238,22 +324,32 @@ export function ReferrersTable() {
         {...importCustomersDialog.props}
         onImport={onImport}
       />
+      <ExportDialog
+        key={exportDialog.refreshkey}
+        {...exportDialog.props}
+        onExport={exporter.exportToCSV}
+        isExporting={exporter.isExporting}
+        progress={exporter.progress}
+        error={exporter.error}
+        isComplete={exporter.isComplete}
+      />
       <header className="w-full flex justify-between items-center mb-4">
         <div />
         <div className="flex gap-2">
           <Button
-            onClick={exportToCSV}
-            disabled={isExporting}
             variant="outline"
+            onClick={() => {
+              exporter.reset();
+              exportDialog.openDialog();
+            }}
           >
             <DownloadIcon className="size-4 me-2" />
-            {isExporting ? `Exporting... (${progress})` : "Export CSV"}
+            Export CSV
           </Button>
           <Button onClick={importCustomersDialog.openDialog}>Import</Button>
         </div>
       </header>
-      {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-      <DataTable columns={columns} data={tokens ?? []} />
+      <DataTable columns={columns} data={referrers ?? []} />
     </div>
   );
 }

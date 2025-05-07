@@ -24,6 +24,17 @@ export namespace TemplateData {
           html: string;
         };
       };
+      "referrer-share"?: {
+        article?: {
+          type: "richtext";
+          html: string;
+        };
+        consent?: string;
+        cta?: string;
+      };
+      "referrer-share-message"?: {
+        message?: string;
+      };
       ["invitation-ux-overlay"]?: {
         image?: {
           type: "image";

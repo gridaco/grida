@@ -2,6 +2,7 @@ import React, { useEffect, useReducer } from "react";
 import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
+import ShareDialog from "@/theme/templates/west-referral/referrer/share";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
 import {
@@ -26,6 +27,7 @@ import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import { useTransform } from "@/grida-react-canvas/provider";
+import MessageAppFrame from "@/components/frames/message-app-frame";
 
 const document: IDocumentEditorInit = {
   editable: true,
@@ -46,8 +48,59 @@ const document: IDocumentEditorInit = {
         properties: {},
         props: {},
         overrides: {},
-        top: -1000,
+        top: 0,
         left: 0,
+      },
+      "referrer-share": {
+        id: "referrer-share",
+        name: "Referrer Share Dialog",
+        type: "template_instance",
+        template_id: "grida_west_referral.duo-000.referrer-share",
+        position: "absolute",
+        removable: false,
+        active: true,
+        locked: false,
+        width: 375,
+        height: "auto",
+        properties: {},
+        props: {},
+        overrides: {},
+        top: 0,
+        left: 500,
+      },
+      "referrer-share-message": {
+        id: "referrer-share-message",
+        name: "Referrer Share Message",
+        type: "template_instance",
+        template_id: "grida_west_referral.duo-000.referrer-share-message",
+        position: "absolute",
+        removable: false,
+        active: true,
+        locked: false,
+        width: 375,
+        height: 812,
+        properties: {},
+        props: {},
+        overrides: {},
+        top: 0,
+        left: 1000,
+      },
+      "invitation-ux-overlay": {
+        id: "invitation-ux-overlay",
+        name: "Invitation Coupon (Dialog)",
+        type: "template_instance",
+        template_id: "grida_west_referral.duo-000.invitation-ux-overlay",
+        position: "absolute",
+        removable: false,
+        active: true,
+        locked: false,
+        width: 375,
+        height: 812,
+        top: 0,
+        left: 2000,
+        properties: {},
+        props: {},
+        overrides: {},
       },
       invitation: {
         id: "invitation",
@@ -64,24 +117,7 @@ const document: IDocumentEditorInit = {
         props: {},
         overrides: {},
         top: 0,
-        left: 0,
-      },
-      "invitation-ux-overlay": {
-        id: "invitation-ux-overlay",
-        name: "Invitation Coupon (Dialog)",
-        type: "template_instance",
-        template_id: "grida_west_referral.duo-000.invitation-ux-overlay",
-        position: "absolute",
-        removable: false,
-        active: true,
-        locked: false,
-        width: 375,
-        height: 812,
-        top: 0,
-        left: -500,
-        properties: {},
-        props: {},
-        overrides: {},
+        left: 2500,
       },
     },
     entry_scene_id: "main",
@@ -90,7 +126,13 @@ const document: IDocumentEditorInit = {
         type: "scene",
         id: "main",
         name: "Referrer's Page",
-        children: ["referrer", "invitation", "invitation-ux-overlay"],
+        children: [
+          "referrer",
+          "referrer-share",
+          "referrer-share-message",
+          "invitation",
+          "invitation-ux-overlay",
+        ],
         guides: [],
         constraints: {
           children: "multiple",
@@ -102,6 +144,22 @@ const document: IDocumentEditorInit = {
   templates: {
     ["grida_west_referral.duo-000.referrer"]: {
       name: "Referrer",
+      type: "template",
+      properties: {},
+      default: {},
+      version: "0.0.0",
+      nodes: {},
+    },
+    ["grida_west_referral.duo-000.referrer-share"]: {
+      name: "Referrer Share Dialog",
+      type: "template",
+      properties: {},
+      default: {},
+      version: "0.0.0",
+      nodes: {},
+    },
+    ["grida_west_referral.duo-000.referrer-share-message"]: {
+      name: "Referrer Share Message",
       type: "template",
       properties: {},
       default: {},
@@ -173,6 +231,10 @@ export function CampaignTemplateDuo001Viewer({
           templates={{
             "grida_west_referral.duo-000.referrer":
               CustomComponent_Viewer__Referrer,
+            "grida_west_referral.duo-000.referrer-share":
+              CustomComponent_Viewer__ReferrerShare,
+            "grida_west_referral.duo-000.referrer-share-message":
+              CustomComponent_Viewer__ReferrerShareMessage,
             "grida_west_referral.duo-000.invitation":
               CustomComponent_Viewer__Invitation,
             "grida_west_referral.duo-000.invitation-ux-overlay":
@@ -256,21 +318,8 @@ function CustomComponent_Viewer__Referrer(componentprops: any) {
           logo: props.theme?.navbar?.logo,
           article: props?.components?.referrer?.article,
           cta: props?.components?.referrer?.cta ?? "Join Now",
-          // brand_name: "Apple",
-          // favicon: {
-          //   src: "https://www.apple.com/favicon.ico",
-          //   srcDark: "https://www.apple.com/favicon.ico",
-          // },
-          // footer: {
-          //   link_privacy: "/privacy",
-          //   link_instagram: "https://www.instagram.com/polestarcars/",
-          //   paragraph: {
-          //     html: "1. Hearing Aid and Hearing Test: The Hearing Aid feature has received FDA authorization. The Hearing Test and Hearing Aid features are supported on AirPods Pro 2 with the latest firmware paired with a compatible iPhone or iPad with iOS 18 or iPadOS 18 and later and are intended for people 18 years old or older. The Hearing Aid feature is also supported on a compatible Mac with macOS Sequoia and later. It is intended for people with perceived mild to moderate hearing loss.",
-          //   },
-          // },
         }}
         locale={locale}
-        slug="dummy"
         data={{
           campaign: campaign,
           code: Platform.WEST.Referral.TEST_CODE_REFERRER,
@@ -280,6 +329,68 @@ function CustomComponent_Viewer__Referrer(componentprops: any) {
           id: "123",
           referrer_name: "DUMMY",
         }}
+      />
+    </div>
+  );
+}
+
+function CustomComponent_Viewer__ReferrerShare(componentprops: any) {
+  const { campaign, props, locale } = useViewerContext();
+
+  return (
+    <div
+      className="rounded shadow border relative overflow-hidden"
+      style={{
+        ...componentprops.style,
+        minHeight: 812,
+      }}
+      {...queryattributes(componentprops)}
+    >
+      <ShareDialog
+        defaultOpen
+        open
+        locale={locale}
+        data={{
+          article: props?.components?.["referrer-share"]?.article,
+          consent: props?.components?.["referrer-share"]?.consent,
+          cta: props?.components?.["referrer-share"]?.cta,
+        }}
+      />
+    </div>
+  );
+}
+
+function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
+  const { campaign, props, locale } = useViewerContext();
+
+  const message = props?.components?.["referrer-share-message"]?.message;
+
+  return (
+    <div
+      className="rounded shadow border relative overflow-hidden"
+      style={{
+        ...componentprops.style,
+        width: 375,
+        height: 812,
+      }}
+      {...queryattributes(componentprops)}
+    >
+      <MessageAppFrame
+        sender={{
+          avatar: "JD",
+          name: "John Doe",
+          phone: "+1 234 567 890",
+        }}
+        messages={[
+          {
+            message: "Hello, how are you?",
+            role: "incoming",
+          },
+          {
+            message: message || "{{url}}",
+            role: "outgoing",
+          },
+        ]}
       />
     </div>
   );
@@ -304,18 +415,6 @@ function CustomComponent_Viewer__Invitation(componentprops: any) {
           article: props?.components?.invitation?.article,
           cta: props?.components?.invitation?.cta ?? "Join Now",
           image: props?.components?.invitation?.image,
-          // brand_name: "Apple",
-          // favicon: {
-          //   src: "https://www.apple.com/favicon.ico",
-          //   srcDark: "https://www.apple.com/favicon.ico",
-          // },
-          // footer: {
-          //   link_privacy: "/privacy",
-          //   link_instagram: "https://www.instagram.com/polestarcars/",
-          //   paragraph: {
-          //     html: "1. Hearing Aid and Hearing Test: The Hearing Aid feature has received FDA authorization. The Hearing Test and Hearing Aid features are supported on AirPods Pro 2 with the latest firmware paired with a compatible iPhone or iPad with iOS 18 or iPadOS 18 and later and are intended for people 18 years old or older. The Hearing Aid feature is also supported on a compatible Mac with macOS Sequoia and later. It is intended for people with perceived mild to moderate hearing loss.",
-          //   },
-          // },
         }}
         locale={locale}
         data={{

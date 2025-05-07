@@ -17,7 +17,7 @@ type Params = {
 };
 
 export default function LayoutPage({ params }: { params: Params }) {
-  const { code, slug } = params;
+  const { code } = params;
   const { template } = useLayout();
   const campaign = useCampaignAgent();
   const client = useMemo(
@@ -66,7 +66,6 @@ export default function LayoutPage({ params }: { params: Params }) {
       return (
         <ScreenWindowRoot>
           <ReferrerPage
-            slug={slug}
             context={data.data}
             client={client}
             template={template.data as TemplateData.West_Referrral__Duo_001}
