@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useReducer } from "react";
-import { ChatBox } from "@/components/chat";
+import {
+  ChatBoxFooter,
+  ChatBox,
+  ChatBoxSubmit,
+  ChatBoxTextArea,
+} from "@/components/chat";
 import { CommandIcon } from "lucide-react";
 import {
   Tooltip,
@@ -50,17 +55,13 @@ import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewpor
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
-import Toolbar, {
-  ToolbarPosition,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import {
   Sidebar,
   SidebarContent,
-  SidebarInset,
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import ai from "@/lib/ai";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
 export default function ImagePlayground() {
@@ -158,14 +159,18 @@ function CanvasConsumer() {
             <EditorSurfaceContextMenu>
               <div className="w-full h-full flex flex-col relative bg-black/5">
                 <ViewportRoot className="relative w-full h-full overflow-hidden">
-                  <Credits credits={credits} />
                   <EditorSurface />
                   <AutoInitialFitTransformer>
                     <StandaloneSceneContent />
                   </AutoInitialFitTransformer>
                   <ToolbarPosition>
                     {/* <Toolbar /> */}
-                    <Chat model={model} loading={loading} onCommit={onCommit} />
+                    <Chat
+                      model={model}
+                      loading={loading}
+                      onCommit={onCommit}
+                      credits={credits}
+                    />
                   </ToolbarPosition>
                 </ViewportRoot>
               </div>
@@ -219,25 +224,34 @@ function SidebarRight() {
   );
 }
 
-function Credits({ credits }: { credits: ReturnType<typeof useCredits> }) {
+function Credits({
+  credits,
+  className,
+}: {
+  credits: ReturnType<typeof useCredits>;
+  className?: string;
+}) {
   return (
-    <div className="absolute top-4 right-4 pointer-events-auto z-50">
-      <Tooltip>
-        <TooltipTrigger>
-          <div className="px-2 py-1 bg-muted rounded-md border flex gap-1 items-center">
-            <CommandIcon className="size-3" />
-            <span className="text-sm font-mono">
-              {credits.remaining?.toString()}
-            </span>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="start">
-          <div className="text-sm font-mono">
-            {credits.remaining?.toString()} free credits remaining
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </div>
+    <Tooltip>
+      <TooltipTrigger>
+        <div
+          className={cn(
+            "px-2 py-1 bg-secondary rounded-md flex gap-1 items-center pointer-events-auto",
+            className
+          )}
+        >
+          <CommandIcon className="size-3" />
+          <span className="text-sm font-mono">
+            {credits.remaining?.toString()}
+          </span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        <div className="text-sm font-mono">
+          {credits.remaining?.toString()} free credits remaining
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -245,10 +259,12 @@ function Chat({
   model,
   loading,
   onCommit,
+  credits,
 }: {
   model: ReturnType<typeof useImageModelConfig>;
   loading: boolean;
   onCommit: (value: { text: string }) => void;
+  credits: ReturnType<typeof useCredits>;
 }) {
   const sizeGroups = useMemo(() => {
     const groups = {
@@ -330,11 +346,14 @@ function Chat({
           </SelectContent>
         </Select>
       </div>
-      <ChatBox
-        disabled={loading}
-        onValueCommit={onCommit}
-        placeholder="Describe what you want to see..."
-      />
+      <ChatBox disabled={loading} onValueCommit={onCommit}>
+        <ChatBoxTextArea />
+        <ChatBoxFooter>
+          <div className="flex-1" />
+          <Credits credits={credits} className="mr-2" />
+          <ChatBoxSubmit />
+        </ChatBoxFooter>
+      </ChatBox>
     </div>
   );
 }
