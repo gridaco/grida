@@ -71,9 +71,9 @@ export default function Header({ className }: { className?: string }) {
   const session = useSession();
   return (
     <div className={cn("absolute top-0 left-0 right-0 z-50", className)}>
-      <header className="py-4 px-4 lg:py-8 lg:px-24">
+      <header className="container mx-auto py-4 px-4 xl:py-8">
         {/* desktop */}
-        <div className="hidden md:flex container mx-auto justify-between items-center">
+        <div className="hidden md:flex justify-between items-center">
           <Link href="/home" className="flex items-center justify-center gap-2">
             <GridaLogo className="w-5 h-5" />
             <span className="text-lg font-bold">Grida</span>
