@@ -6,9 +6,11 @@ import { createBrowserClient } from "@/lib/supabase/client";
 export function ContinueWithGoogleButton({
   next,
   redirect_uri,
+  onSuccess,
 }: {
   next?: string;
   redirect_uri?: string;
+  onSuccess?: () => void;
 }) {
   const client = createBrowserClient();
 
@@ -26,12 +28,18 @@ export function ContinueWithGoogleButton({
     <button
       className="flex px-4 py-2 rounded items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow"
       onClick={() => {
-        client.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: url.toString(),
-          },
-        });
+        client.auth
+          .signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo: url.toString(),
+            },
+          })
+          .then((d) => {
+            if (!d.error) {
+              onSuccess?.();
+            }
+          });
       }}
     >
       <GoogleLogo />
