@@ -43,6 +43,28 @@ const useChatBox = () => {
   return context;
 };
 
+/**
+ * @param value - The value to commit.
+ * @returns A boolean indicating whether the value was committed.
+ *
+ * Return `false` to not clear the input after the commit button press. return anything else (void / numbers, ....) for normal flow.
+ */
+type OnValueCommit = (value: {
+  text: string;
+  attachments: Attachment[];
+}) => void | false | Promise<void> | Promise<false>;
+
+interface ChatBoxProps {
+  disabled?: boolean;
+  /**
+   * Return `false` to not clear the input after the commit button press. return anything else (void / numbers, ....) for normal flow.
+   */
+  onValueCommit?: OnValueCommit;
+  uploader?: FileIO.BucketFileUploaderFn;
+  placeholder?: string;
+  accept?: string;
+}
+
 function ChatBox({
   children,
   disabled,
@@ -51,13 +73,8 @@ function ChatBox({
   placeholder = "Chat with your prompt...",
   accept,
   className,
-}: {
+}: ChatBoxProps & {
   children: React.ReactNode;
-  disabled?: boolean;
-  onValueCommit?: (value: { text: string; attachments: Attachment[] }) => void;
-  uploader?: FileIO.BucketFileUploaderFn;
-  placeholder?: string;
-  accept?: string;
   className?: string;
 }) {
   const [attachment, setAttachment] = React.useState<Attachment>();
@@ -98,12 +115,13 @@ function ChatBox({
     setAttachment(undefined);
   };
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     if (disabled) return;
-    onValueCommit?.({
+    const result = await onValueCommit?.({
       text,
       attachments: attachment ? [attachment] : [],
     });
+    if (result === false) return;
     clear();
   };
 
