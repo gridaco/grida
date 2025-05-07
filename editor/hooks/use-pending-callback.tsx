@@ -1,9 +1,11 @@
 import { useState } from "react";
 
+type Fn = (...args: any[]) => any;
+
 /**
  * State for managing a pending callback
  */
-interface PendingCallbackState<T extends Function = Function> {
+interface PendingCallbackState<T extends Fn = Fn> {
   /** The callback function to be executed */
   callback: T | null;
   /** Whether the callback is currently being executed */
@@ -13,7 +15,7 @@ interface PendingCallbackState<T extends Function = Function> {
 /**
  * Handlers for managing a pending callback
  */
-interface PendingCallbackHandlers<T extends Function = Function> {
+interface PendingCallbackHandlers<T extends Fn = Fn> {
   /** Set the callback function to be executed */
   setCallback: (callback: T | null) => void;
   /** Execute the pending callback if one exists and is not already executing */
@@ -37,7 +39,7 @@ interface PendingCallbackHandlers<T extends Function = Function> {
  * await handlers.executeCallback();
  * ```
  */
-function usePendingCallback<T extends Function = Function>(): [
+function usePendingCallback<T extends Fn = Fn>(): [
   PendingCallbackState<T>,
   PendingCallbackHandlers<T>,
 ] {

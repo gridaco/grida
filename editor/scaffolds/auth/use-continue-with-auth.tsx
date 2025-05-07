@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsOpen(true);
         });
       }
-    }) as unknown as T;
+    }) as T;
   };
 
   const handleAuthSuccess = async () => {
