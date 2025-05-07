@@ -1,8 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const darkCodeTheme = require("prism-react-renderer/themes/dracula");
-const lightCodeTheme = require("prism-react-renderer/themes/github");
+import { themes as prismThemes } from "prism-react-renderer";
 
 const footer = {
   links: [
@@ -107,9 +106,8 @@ const config = {
         hideOnScroll: true,
       },
       prism: {
-        additionalLanguages: ["dart", "kotlin", "swift"],
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
+        theme: prismThemes.github,
+        darkTheme: prismThemes.dracula,
       },
       colorMode: {
         defaultMode: "light",
