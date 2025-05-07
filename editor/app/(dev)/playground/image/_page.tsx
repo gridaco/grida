@@ -63,6 +63,10 @@ import {
 } from "@/components/ui/sidebar";
 import ai from "@/lib/ai";
 import { Badge } from "@/components/ui/badge";
+import {
+  useContinueWithAuth,
+  AuthProvider,
+} from "@/scaffolds/auth/use-continue-with-auth";
 
 export default function ImagePlayground() {
   const [state, dispatch] = useReducer(
@@ -89,9 +93,11 @@ export default function ImagePlayground() {
 
   return (
     <main className="w-screen h-screen overflow-hidden select-none">
-      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
-        <CanvasConsumer />
-      </StandaloneDocumentEditor>
+      <AuthProvider>
+        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+          <CanvasConsumer />
+        </StandaloneDocumentEditor>
+      </AuthProvider>
     </main>
   );
 
@@ -117,6 +123,7 @@ export default function ImagePlayground() {
 }
 
 function CanvasConsumer() {
+  const { withAuth, session } = useContinueWithAuth();
   const credits = useCredits();
   const editor = useDocument();
   const [prompt, setPrompt] = useState("");
@@ -168,8 +175,8 @@ function CanvasConsumer() {
                     <Chat
                       model={model}
                       loading={loading}
-                      onCommit={onCommit}
-                      credits={credits}
+                      onCommit={withAuth(onCommit)}
+                      credits={session ? credits : null}
                     />
                   </ToolbarPosition>
                 </ViewportRoot>
@@ -263,8 +270,10 @@ function Chat({
 }: {
   model: ReturnType<typeof useImageModelConfig>;
   loading: boolean;
-  onCommit: (value: { text: string }) => void;
-  credits: ReturnType<typeof useCredits>;
+  onCommit: (value: {
+    text: string;
+  }) => Promise<void> | Promise<false> | void | false;
+  credits: ReturnType<typeof useCredits> | null;
 }) {
   const sizeGroups = useMemo(() => {
     const groups = {
@@ -350,7 +359,7 @@ function Chat({
         <ChatBoxTextArea />
         <ChatBoxFooter>
           <div className="flex-1" />
-          <Credits credits={credits} className="mr-2" />
+          {credits && <Credits credits={credits} className="mr-2" />}
           <ChatBoxSubmit />
         </ChatBoxFooter>
       </ChatBox>

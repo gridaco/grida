@@ -3,15 +3,19 @@
 import { Env } from "@/env";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export function ContinueWithGoogleButton({
-  next,
-  redirect_uri,
-  onSuccess,
-}: {
+type ContinueWithGoogleButtonProps = {
+  skipBrowserRedirect?: boolean;
   next?: string;
   redirect_uri?: string;
   onSuccess?: () => void;
-}) {
+};
+
+export function ContinueWithGoogleButton({
+  skipBrowserRedirect,
+  next,
+  redirect_uri,
+  onSuccess,
+}: ContinueWithGoogleButtonProps) {
   const client = createBrowserClient();
 
   const url = new URL(`${Env.web.HOST}/auth/callback`);
@@ -33,11 +37,39 @@ export function ContinueWithGoogleButton({
             provider: "google",
             options: {
               redirectTo: url.toString(),
+              skipBrowserRedirect: skipBrowserRedirect,
             },
           })
-          .then((d) => {
-            if (!d.error) {
-              onSuccess?.();
+          .then(({ data, error }) => {
+            if (!error) {
+              if (skipBrowserRedirect) {
+                // Open popup
+                const popup = window.open(
+                  data.url,
+                  "Sign in with Google",
+                  "width=600,height=600"
+                );
+
+                // Listen for auth state changes
+                const {
+                  data: { subscription },
+                } = client.auth.onAuthStateChange((event, session) => {
+                  if (event === "SIGNED_IN" && session) {
+                    popup?.close();
+                    onSuccess?.();
+                  }
+                });
+
+                // Cleanup subscription when popup is closed
+                const checkPopup = setInterval(() => {
+                  if (popup?.closed) {
+                    clearInterval(checkPopup);
+                    subscription.unsubscribe();
+                  }
+                }, 1000);
+              } else {
+                onSuccess?.();
+              }
             }
           });
       }}

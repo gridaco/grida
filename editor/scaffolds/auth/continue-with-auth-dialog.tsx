@@ -40,6 +40,7 @@ export function ContinueWithAuthDialog({
           <ContinueWithGoogleButton
             next={next}
             redirect_uri={redirect_uri}
+            skipBrowserRedirect={true}
             onSuccess={onSuccess}
           />
         </div>
