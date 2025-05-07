@@ -95,7 +95,7 @@ export default function mixed<T extends Record<string, any>, S>(
   if (!objects.length) return {} as MixedProperties<T, S>;
 
   const allKeys = Array.from(
-    new Set(objects.flatMap((obj) => Object.keys(obj)))
+    new Set(objects.flatMap((obj) => Object.keys(obj ?? {})))
   ).filter((k) => k !== idKey && !should_ignore_key(k, ignoredKeys));
 
   const result: Record<string, MixedProperty<any, any>> = {};

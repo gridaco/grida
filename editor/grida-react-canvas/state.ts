@@ -883,12 +883,14 @@ export interface IDocumentEditorInit
   extends Pick<IEditorConfig, "editable" | "debug">,
     Partial<Pick<IEditorConfig, "features">>,
     grida.program.document.IDocumentTemplatesRepository {
-  document: Pick<
-    grida.program.document.Document,
-    "nodes" | "scenes" | "entry_scene_id"
-  > &
-    Partial<grida.program.document.IBitmapsRepository>;
+  document: Pick<grida.program.document.Document, "nodes" | "entry_scene_id"> &
+    Partial<grida.program.document.IBitmapsRepository> & {
+      scenes: Record<string, IDocumentSceneInit>;
+    };
 }
+
+type IDocumentSceneInit = Partial<grida.program.document.Scene> &
+  Pick<grida.program.document.Scene, "id" | "name" | "constraints">;
 
 export interface IDocumentEditorState
   extends IEditorConfig,
@@ -945,7 +947,7 @@ export function initDocumentEditorState({
     gesture_modifiers: DEFAULT_GESTURE_MODIFIERS,
     ruler: "off",
     pixelgrid: "on",
-    when_not_removable: "ignore",
+    when_not_removable: "deactivate",
     document_ctx: document.Context.from(doc).snapshot(),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",

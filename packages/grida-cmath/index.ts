@@ -3294,22 +3294,29 @@ export namespace cmath.color {
    */
   export function hex_to_rgba8888(hex: string): cmath.color.RGBA8888 {
     const normalizedHex = hex.replace("#", "");
-    let r, g, b;
+    let r,
+      g,
+      b,
+      a = 255;
 
     if (normalizedHex.length === 3) {
-      // Expand short hex to long hex
       r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
       g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
       b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
-    } else if (normalizedHex.length === 6) {
+    } else if (normalizedHex.length === 6 || normalizedHex.length === 8) {
       r = parseInt(normalizedHex.substring(0, 2), 16);
       g = parseInt(normalizedHex.substring(2, 4), 16);
       b = parseInt(normalizedHex.substring(4, 6), 16);
+      if (normalizedHex.length === 8) {
+        a = parseInt(normalizedHex.substring(6, 8), 16);
+      }
     } else {
-      throw new Error("Invalid hex format. Expected #RGB or #RRGGBB.");
+      throw new Error(
+        "Invalid hex format. Expected #RGB, #RRGGBB or #RRGGBBAA."
+      );
     }
 
-    return { r, g, b, a: 1 };
+    return { r, g, b, a: a / 255 };
   }
 
   export function rgba_to_unit8_chunk(rgba: RGBA8888): cmath.Vector4 {

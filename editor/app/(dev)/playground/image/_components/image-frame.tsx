@@ -35,6 +35,7 @@ export function GenerationImageFrame({
     if (image) {
       pause();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [image]);
 
   return (

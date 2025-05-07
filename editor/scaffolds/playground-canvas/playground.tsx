@@ -98,7 +98,6 @@ import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
@@ -158,8 +157,6 @@ export default function CanvasPlayground({
   templates,
   src,
 }: CanvasPlaygroundProps) {
-  useDisableSwipeBack();
-
   const [pref, setPref] = useState<Preferences>({ debug: false });
   const [ui, setUI] = useState<UIConfig>({
     sidebar: "visible",
@@ -898,6 +895,7 @@ function useReflectIconsData() {
   return icons;
 }
 
+// TODO: use grida library api
 function reflect_icon_link(icon: ReflectUIIconData) {
   const base = "https://reflect-icons.s3.us-west-1.amazonaws.com";
   const ext = "svg";
@@ -909,6 +907,7 @@ function reflect_icon_link(icon: ReflectUIIconData) {
   }
 }
 
+// TODO: use grida library api
 function useGridaStdShapes() {
   const base = "https://grida-std.s3.us-west-1.amazonaws.com/shapes-basic";
   const json = `${base}/info.json`;

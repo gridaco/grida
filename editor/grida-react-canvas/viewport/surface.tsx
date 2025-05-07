@@ -56,6 +56,7 @@ import {
 } from "./ui/floating-bar";
 import { grida } from "@/grida";
 import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
+import { BezierCurvedLine } from "./ui/network-curve";
 
 const DRAG_THRESHOLD = 2;
 
@@ -143,6 +144,7 @@ export function EditorSurface() {
     pointer,
     ruler,
     pixelgrid,
+    edges,
     marquee,
     hovered_node_id,
     dropzone,
@@ -327,8 +329,16 @@ export function EditorSurface() {
           touchAction: "none",
           outline: "none",
           cursor: cursor,
+          overflowX: "scroll",
+          overflowY: "hidden",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehaviorX: "contain",
+        }}
+        onScroll={(e) => {
+          (e.target as HTMLDivElement).scrollLeft = 0;
         }}
       >
+        <NetworkOverlay edges={edges} transform={transform} />
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
@@ -1017,6 +1027,54 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
+function NetworkOverlay({
+  edges,
+  transform,
+}: {
+  edges: grida.program.document.Edge2D[] | undefined | null;
+  transform: cmath.Transform;
+}) {
+  return (
+    <>
+      {edges?.map((edge) => {
+        return <Edge key={edge.id} transform={transform} {...edge} />;
+      })}
+    </>
+  );
+}
+
+function Edge({
+  id,
+  a,
+  b,
+  transform,
+}: grida.program.document.Edge2D & {
+  transform: cmath.Transform;
+}) {
+  // normalize a/b to surface space position
+  const { getNodeById } = useDocument();
+
+  const get_pos = (p: grida.program.document.EdgePoint) => {
+    switch (p.type) {
+      case "position":
+        return vector2ToSurfaceSpace([p.x, p.y], transform);
+      case "anchor":
+        try {
+          const n = getNodeById(p.target);
+          const cx = (n as any).left + (n as any).width / 2;
+          const cy = (n as any).top + (n as any).height / 2;
+          return vector2ToSurfaceSpace([cx, cy], transform);
+        } catch (e) {}
+    }
+  };
+
+  const _a = get_pos(a);
+  const _b = get_pos(b);
+  if (!_a || !_b) return null;
+
+  return <BezierCurvedLine id={id} a={_a} b={_b} />;
+}
+
 function SortOverlay(props: SurfaceSelectionGroup) {
   const {
     ids,
@@ -1299,7 +1357,7 @@ function PixelGridOverlay() {
   const { transform, scaleX } = useTransform();
   const viewport = useViewport();
   return (
-    <div className="fixed inset-0">
+    <div role="pixel-grid" className="fixed inset-0 pointer-events-none">
       {scaleX > 4 && (
         <PixelGrid
           transform={transform}

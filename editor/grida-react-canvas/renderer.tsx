@@ -115,13 +115,11 @@ export function StandaloneSceneBackground({
         className="absolute inset-0 pointer-events-none overflow-hidden -z-10"
       >
         {/* root bg - transparency grid */}
-        {opacity < 1 && (
-          <TransparencyGrid
-            transform={transform}
-            width={width ?? 0}
-            height={height ?? 0}
-          />
-        )}
+        <TransparencyGrid
+          transform={transform}
+          width={width ?? 0}
+          height={height ?? 0}
+        />
         {/* background color */}
         <div
           className="absolute inset-0 overflow-hidden"

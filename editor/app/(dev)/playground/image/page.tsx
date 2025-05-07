@@ -1,5 +1,7 @@
 import React from "react";
 import { type Metadata } from "next";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ImagePlayground from "./_page";
 
 export const metadata: Metadata = {
@@ -8,5 +10,11 @@ export const metadata: Metadata = {
 };
 
 export default function ImagePlaygroundPage() {
-  return <ImagePlayground />;
+  return (
+    <TooltipProvider>
+      <SidebarProvider>
+        <ImagePlayground />
+      </SidebarProvider>
+    </TooltipProvider>
+  );
 }

@@ -29,7 +29,7 @@ export async function generateMetadata({
     .single();
 
   if (error) {
-    console.error("www not found", tenant, error);
+    console.warn("www not found", tenant, error);
     return notFound();
   }
 

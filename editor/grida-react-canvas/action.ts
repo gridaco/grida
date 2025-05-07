@@ -551,6 +551,7 @@ export type DocumentEditorInsertNodeAction = {
   type: "insert";
 } & (
   | {
+      id?: string;
       prototype: grida.program.nodes.NodePrototype;
     }
   | {

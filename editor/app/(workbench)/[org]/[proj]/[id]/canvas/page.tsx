@@ -25,7 +25,6 @@ import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 
 function useSync(document: grida.program.document.Document | undefined) {
   const [{ document_id }, dispatch] = useEditorState();
@@ -81,7 +80,6 @@ function Ready() {
 
   useSync(state.documents["canvas"]?.state?.document);
   useEditorHotKeys();
-  useDisableSwipeBack();
 
   const {
     documents: { canvas: document },

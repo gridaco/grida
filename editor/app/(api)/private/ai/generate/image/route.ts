@@ -10,18 +10,28 @@ import { createLibraryClient, service_role } from "@/lib/supabase/server";
 import { v4 } from "uuid";
 import { ai_credit_limit } from "../../ratelimit";
 import mime from "mime-types";
+import imageSize from "image-size";
 import ai from "@/lib/ai";
 
 export type GenerateImageApiRequestBody = {
   prompt: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+  aspect_ratio?: ai.image.AspectRatioString;
   model: ai.image.ProviderModel | ai.image.ImageModelId;
 };
 
 export type GenerateImageApiResponse = {
   data: {
-    object: any;
+    object: {
+      id: string;
+      bytes: number;
+      width: number;
+      height: number;
+      mimetype: string;
+    };
+    width: number;
+    height: number;
     publicUrl: string;
     timestamp: string;
     modelId: string;
@@ -39,7 +49,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "login required" }, { status: 401 });
   }
 
-  const rate = await ai_credit_limit();
+  const model = getImageModel(body.model);
+  if (!model) throw new Error("Model not found");
+
+  const rate = await ai_credit_limit(model.card.avg_credit);
   if (!rate) {
     return NextResponse.json(
       { message: "something went wrong" },
@@ -62,27 +75,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const model = getImageModel(body.model);
-  if (!model) throw new Error("Model not found");
-
   // generate image
   const generation = await generateImage({
     prompt: body.prompt,
     width: body.width,
     height: body.height,
-    model: model,
+    aspect_ratio: body.aspect_ratio,
+    model: model.model,
   });
 
   const meta = generation.responses[0];
+
+  const { width, height } = imageSize(generation.image.uint8Array);
 
   // save to library
   const { object, publicUrl } = await upload_generated_to_library({
     client: service_role.library,
     request: {
-      model: model.modelId,
+      model: model.model.modelId,
       prompt: body.prompt,
-      width: body.width,
-      height: body.height,
+      width: width,
+      height: height,
     },
     file: generation.image,
   });
@@ -92,35 +105,40 @@ export async function POST(req: NextRequest) {
     data: {
       object,
       publicUrl,
+      width: width,
+      height: height,
       modelId: meta.modelId,
       timestamp: meta.timestamp.toISOString(),
     },
   } satisfies GenerateImageApiResponse);
 }
 
-function getImageModel(
-  model: ai.image.ProviderModel | ai.image.ImageModelId
-): ImageModel | null {
+function getImageModel(model: ai.image.ProviderModel | ai.image.ImageModelId): {
+  card: ai.image.ImageModelCard;
+  model: ImageModel;
+} | null {
   if (typeof model === "string") {
     const card = ai.image.models[model];
     if (!card) return null;
     switch (card.provider) {
       case "openai":
-        return openai.image(card.id);
+        return { model: openai.image(card.id), card };
       case "replicate":
-        return replicate.image(card.id);
+        return { model: replicate.image(card.id), card };
       default:
         return null;
     }
-  }
-
-  switch (model.provider) {
-    case "openai":
-      return openai.image(model.modelId);
-    case "replicate":
-      return replicate.image(model.modelId);
-    default:
-      return null;
+  } else {
+    const card = ai.image.models[model.modelId];
+    if (!card) return null;
+    switch (model.provider) {
+      case "openai":
+        return { model: openai.image(model.modelId), card };
+      case "replicate":
+        return { model: replicate.image(model.modelId), card };
+      default:
+        return null;
+    }
   }
 }
 
@@ -189,16 +207,22 @@ async function generateImage({
   prompt,
   width,
   height,
+  aspect_ratio,
 }: {
   model: ImageModel;
   prompt: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+  aspect_ratio?: ai.image.AspectRatioString;
 }) {
+  const size: ai.image.SizeString | undefined =
+    width && height ? `${width}x${height}` : undefined;
+
   return await experimental_generateImage({
     model: model,
     prompt: prompt,
-    size: `${width}x${height}`,
+    size: size,
+    aspectRatio: aspect_ratio,
     n: 1,
   });
 }

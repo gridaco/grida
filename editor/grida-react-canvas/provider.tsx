@@ -36,6 +36,7 @@ import iosvg from "@grida/io-svg";
 import toast from "react-hot-toast";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida/utils/supports";
+import nid from "./reducers/tools/id";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
@@ -1427,6 +1428,10 @@ export function useDocument() {
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
+  const createNodeId = useCallback(() => {
+    return nid();
+  }, []);
+
   const loadScene = useCallback(
     (scene: string) => {
       dispatch({
@@ -1997,6 +2002,8 @@ export function useDocument() {
       //
       setOpacity,
       //
+      createNodeId,
+      getNodeById,
       getNodeDepth,
       getNodeAbsoluteRotation,
       insertNode,
@@ -2053,6 +2060,8 @@ export function useDocument() {
     //
     setOpacity,
     //
+    createNodeId,
+    getNodeById,
     getNodeDepth,
     getNodeAbsoluteRotation,
     insertNode,
@@ -2379,7 +2388,7 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
   const scene = useCurrentScene();
 
-  const { guides } = scene;
+  const { guides, edges } = scene;
 
   const {
     pointer,
@@ -2823,6 +2832,8 @@ export function useEventTarget() {
       startGuideGesture,
       deleteGuide,
       //
+      edges,
+      //
       pixelgrid,
       setPixelGridState,
       //
@@ -2883,6 +2894,8 @@ export function useEventTarget() {
     guides,
     startGuideGesture,
     deleteGuide,
+    //
+    edges,
     //
     pixelgrid,
     setPixelGridState,

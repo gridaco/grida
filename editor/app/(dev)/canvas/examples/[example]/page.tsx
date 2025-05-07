@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Editor from "../../editor";
 import { canvas_examples } from "@/scaffolds/playground/k";
 import { notFound } from "next/navigation";
+import Editor from "../../editor";
 
 type Params = {
   example: string;

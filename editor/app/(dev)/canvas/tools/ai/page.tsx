@@ -10,7 +10,7 @@ import { PresetShare } from "./_components/preset-share";
 import { presets } from "./_data/presets";
 import { ModelParams } from "./_components/model-params";
 import { Label } from "@/components/ui/label";
-import { ChatBox } from "@/components/chat";
+import { MinimalChatBox } from "@/components/chat";
 import { readStreamableValue } from "ai/rsc";
 import { Canvas } from "./_components/canvas";
 import { generate, type UserAttachment } from "./generate";
@@ -187,7 +187,7 @@ export default function PlaygroundPage() {
                   )}
                 </div>
               </div>
-              <ChatBox
+              <MinimalChatBox
                 disabled={streamBusy}
                 uploader={uploader}
                 onValueCommit={(value) => onPrompt(systemall, value)}

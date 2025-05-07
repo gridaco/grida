@@ -85,6 +85,12 @@ export default function Footer() {
                   Tools
                 </Link>
                 <Link
+                  href={sitemap.links.ai_models}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  AI Models
+                </Link>
+                <Link
                   href={sitemap.links.thebundle}
                   className="text-xs md:text-sm text-muted-foreground"
                 >

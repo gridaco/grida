@@ -286,6 +286,30 @@ export namespace grida.program.document {
     guides: Array<Guide2D>;
   }
 
+  export type EdgePointPosition2D = {
+    type: "position";
+    x: number;
+    y: number;
+  };
+
+  export type EdgePointNodeAnchor = {
+    type: "anchor";
+    target: nodes.NodeID;
+  };
+
+  export type EdgePoint = EdgePointPosition2D | EdgePointNodeAnchor;
+
+  export interface Edge2D {
+    id: string;
+    readonly type: "edge";
+    a: EdgePoint;
+    b: EdgePoint;
+  }
+
+  export interface IEdges {
+    edges: Array<Edge2D>;
+  }
+
   /**
    * Represents a normalized document structure where all nodes are stored in a flat map
    * with a single `root_id` as the entry point for traversal.
@@ -382,7 +406,10 @@ export namespace grida.program.document {
   /**
    * The [Scene] node. (a.k.a Page) this is defined directly without the repository. hence, its id is not required to be globally unique across the nodes.
    */
-  export interface Scene extends document.ISceneBackground, document.I2DGuides {
+  export interface Scene
+    extends document.ISceneBackground,
+      document.I2DGuides,
+      document.IEdges {
     type: "scene";
 
     /**
@@ -427,6 +454,7 @@ export namespace grida.program.document {
       // default, fallback values
       type: "scene",
       guides: [],
+      edges: [],
       constraints: { children: "multiple" },
       children: [],
       ...init,
@@ -919,8 +947,12 @@ export namespace grida.program.nodes {
    * Other properties are required.
    */
   type __TPrototypeNode<T> = Partial<Omit<i.IBaseNode, "id">> &
-    Partial<i.ISceneNode> &
-    T;
+    Partial<i.ISceneNode> & {
+      /**
+       * force the id for instanciation (optional)
+       */
+      _$id?: string;
+    } & T;
 
   type __base_scene_node_properties =
     | "id"
@@ -1381,6 +1413,18 @@ export namespace grida.program.nodes {
     keyof TSubset
   > &
     TNew;
+
+  // type ConnectorPoint = {
+  //   type: "position";
+  //   x: number;
+  //   y: number;
+  // };
+
+  // export interface ConnectorNode {
+  //   readonly type: "connector";
+  //   a: ConnectorPoint;
+  //   b: ConnectorPoint;
+  // }
 
   // /**
   //  * @deprecated - not ready - do not use in production
@@ -1897,6 +1941,8 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
+            width: 100,
+            height: 100,
             position: "absolute",
             ...prototype,
             id: id,
@@ -1929,6 +1975,7 @@ export namespace grida.program.nodes {
           name: "tmp",
           children: [],
           guides: [],
+          edges: [],
           constraints: {
             children: "multiple",
           },
@@ -1941,7 +1988,7 @@ export namespace grida.program.nodes {
         nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>,
         depth: number = 0
       ): nodes.Node {
-        const id = nid(prototype, depth);
+        const id = prototype._$id || nid(prototype, depth);
         const node = createNodeDataFromPrototypeWithoutChildren(prototype, id);
         document.nodes[node.id] = node;
 
@@ -2004,6 +2051,37 @@ export namespace grida.program.nodes {
       }
 
       return prototype as nodes.NodePrototype;
+    }
+
+    export function createContainerNode(
+      id: string,
+      partial: Partial<ContainerNode> = {}
+    ): ContainerNode {
+      return {
+        type: "container",
+        id: id,
+        name: "container",
+        active: true,
+        locked: false,
+        expanded: false,
+        rotation: 0,
+        zIndex: 0,
+        opacity: 1,
+        position: "absolute",
+        layout: "flow",
+        direction: "horizontal",
+        mainAxisAlignment: "start",
+        mainAxisGap: 0,
+        crossAxisAlignment: "start",
+        crossAxisGap: 0,
+        padding: 0,
+        width: 100,
+        height: 100,
+        cornerRadius: 0,
+        style: {},
+        children: [],
+        ...partial,
+      };
     }
   }
 }
