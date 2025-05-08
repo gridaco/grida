@@ -4,8 +4,6 @@ import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 import { notFound } from "next/navigation";
 import { createFormsClient } from "@/lib/supabase/server";
 
-export const revalidate = 0;
-
 export async function GET(
   request: NextRequest,
   context: {

@@ -9,8 +9,6 @@ import palettes from "@/theme/palettes";
 import { CustomCSS } from "@/theme/customcss";
 import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";
 
-export const revalidate = 0;
-
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 const lora = Lora({ subsets: ["latin"], display: "swap" });
 const inconsolata = Inconsolata({ subsets: ["latin"], display: "swap" });

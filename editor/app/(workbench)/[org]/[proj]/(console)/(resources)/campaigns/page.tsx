@@ -9,12 +9,7 @@ import { Button } from "@/components/ui/button";
 import EmptyWelcome from "@/components/empty";
 import useSWR from "swr";
 
-type Params = {
-  org: string;
-  proj: string;
-};
-
-export default function CampaignsPage({ params }: { params: Params }) {
+export default function CampaignsPage() {
   const client = createBrowserWestReferralClient();
   const { id: project_id } = useProject();
 

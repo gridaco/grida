@@ -42,8 +42,6 @@ import { xsb_table_conn_init } from "@/scaffolds/editor/init";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Win32LinuxWindowSafeArea } from "@/scaffolds/desktop";
 
-export const revalidate = 0;
-
 const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata({

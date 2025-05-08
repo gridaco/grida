@@ -49,8 +49,6 @@ import { RawdataProcessing } from "@/lib/forms/rawdata";
 
 type Params = { id: string };
 
-export const revalidate = 0;
-
 const cjk = ["ko", "ja"];
 
 interface FormClientFetchResponse {

@@ -47,7 +47,7 @@ async function reqformdata(
 export async function POST(req: NextRequest, context: Context) {
   const origin = req.nextUrl.origin;
   const next = req.nextUrl.searchParams.get("next");
-  const headerslist = headers();
+  const headerslist = await headers();
   const accept = haccept(headerslist.get("accept"));
   const contenttype = hcontenttype(headerslist.get("content-type"));
   const formdata = await reqformdata(req, contenttype);

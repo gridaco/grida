@@ -12,8 +12,6 @@ import type {
 } from "@/types";
 import { UpsertDto } from "@/types/supabase-ext";
 
-export const revalidate = 0;
-
 type Params = { form_id: string };
 
 export async function POST(
