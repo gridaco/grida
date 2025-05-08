@@ -652,9 +652,6 @@ importers:
       '@tosspayments/payment-widget-sdk':
         specifier: ^0.10.2
         version: 0.10.2(typescript@5.7.3)
-      '@types/mdx':
-        specifier: ^2.0.11
-        version: 2.0.13
       '@uidotdev/usehooks':
         specifier: ^2.4.1
         version: 2.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -697,9 +694,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.1.0
         version: 12.4.3(@types/react@18.2.58)(immer@9.0.21)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      add:
-        specifier: ^2.0.6
-        version: 2.0.6
       ai:
         specifier: 4.3.9
         version: 4.3.9(react@18.3.1)(zod@3.24.2)
@@ -1043,6 +1037,9 @@ importers:
       '@types/mapbox-gl':
         specifier: ^3.1.0
         version: 3.4.1
+      '@types/mdx':
+        specifier: ^2.0.11
+        version: 2.0.13
       '@types/mime-types':
         specifier: ^2.1.4
         version: 2.1.4
@@ -9151,9 +9148,6 @@ packages:
     resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-
-  add@2.0.6:
-    resolution: {integrity: sha512-j5QzrmsokwWWp6kUcJQySpbG+xfOBqqKnup3OIk1pz+kB/80SLorZ9V8zHFLO92Lcd+hbvq8bT+zOGoPkmBV0Q==}
 
   address@1.2.2:
     resolution: {integrity: sha512-4B/qKCfeE/ODUaAUpSwfzazo5x29WD4r3vXiWsB7I2mSDAihwEqKO+g8GELZUQSSAo5e1XTYh3ZVfLyxBc12nA==}
@@ -31752,8 +31746,6 @@ snapshots:
   acorn@8.14.0: {}
 
   acorn@8.14.1: {}
-
-  add@2.0.6: {}
 
   address@1.2.2: {}
 
