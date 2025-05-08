@@ -4,7 +4,6 @@ packages:
   - "editor"
   - "apps/backgrounds"
   - "apps/docs"
-  - "apps/site"
   - "apps/blog"
   - "apps/viewer"
   - "packages/*"
