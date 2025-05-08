@@ -10,11 +10,10 @@ import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import Similar from "./similar";
 import Link from "next/link";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
+export async function generateMetadata(props: {
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  const params = await props.params;
   const object = await getObject(params.id);
   if (!object) return notFound();
 
@@ -48,11 +47,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function ObjectPage({
-  params,
-}: {
-  params: { id: string };
+export default async function ObjectPage(props: {
+  params: Promise<{ id: string }>;
 }) {
+  const params = await props.params;
   const object = await getObject(params.id);
   if (!object) return notFound();
 

@@ -1,12 +1,5 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
-
-const PlaygroundCanvas = dynamic(
-  () => import("@/scaffolds/playground-canvas/playground"),
-  {
-    ssr: false,
-  }
-);
+import PlaygroundCanvas from "@/scaffolds/playground-canvas/playground-nossr";
 
 export const metadata: Metadata = {
   title: "Canvas Playground",

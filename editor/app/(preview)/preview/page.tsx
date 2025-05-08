@@ -1,8 +1,16 @@
 "use client";
 
-import { PlaygroundPreviewSlave } from "@/scaffolds/playground/preview";
-import clsx from "clsx";
 import { ThemeProvider } from "@/components/theme-provider";
+import dynamic from "next/dynamic";
+import clsx from "clsx";
+import React from "react";
+
+const PlaygroundPreviewSlave = dynamic(
+  () => import("@/scaffolds/playground/preview/slave"),
+  {
+    ssr: false,
+  }
+);
 
 export default function PlaygroundPreview() {
   return (

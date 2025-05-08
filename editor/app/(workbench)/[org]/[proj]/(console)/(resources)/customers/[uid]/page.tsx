@@ -45,7 +45,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { createBrowserClient } from "@/lib/supabase/client";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, use } from "react";
 import toast from "react-hot-toast";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import CustomerEditDialog, {
@@ -217,7 +217,8 @@ function MarketingStatusDot({
   );
 }
 
-export default function CustomerDetailPage({ params }: { params: Params }) {
+export default function CustomerDetailPage(props0: { params: Promise<Params> }) {
+  const params = use(props0.params);
   const { uid } = params;
 
   const router = useRouter();

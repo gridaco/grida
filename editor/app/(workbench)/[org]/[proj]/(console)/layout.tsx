@@ -22,7 +22,7 @@ export default async function Layout({
   params: Promise<Params>;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <div className="h-screen flex flex-col">
           <ThemeProvider

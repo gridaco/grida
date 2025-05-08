@@ -286,7 +286,12 @@ export namespace XSupabase {
           const [bucket, bucket_objects] = entry;
           const paths = bucket_objects.map((o) => o.path);
           tasks_by_bucket.push(
-            this.storage.from(bucket).createSignedUrls(paths, expiresIn)
+            this.storage
+              .from(bucket)
+              .createSignedUrls(
+                paths,
+                expiresIn
+              ) as Promise<CreateSignedUrlsResult>
           );
         }
         //

@@ -20,7 +20,6 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   ArrowDownIcon,
   PlusCircledIcon,
@@ -340,7 +339,9 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
                     value={typeof value === "string" ? value : ""}
                     onChange={(e) => handleValueChange(i, e.target.value)}
                     onKeyDown={(e) => handleKeyPress(e, i)}
-                    ref={(el) => (inputRefs.current[i] = el)}
+                    ref={(el) => {
+                      inputRefs.current[i] = el;
+                    }}
                   />
                   {canDeleteValue && (
                     <div

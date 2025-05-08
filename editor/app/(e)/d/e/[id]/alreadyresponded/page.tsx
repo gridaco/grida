@@ -1,9 +1,4 @@
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import i18next from "i18next";
@@ -13,14 +8,12 @@ import type { FormLinkURLParams } from "@/lib/forms/url";
 
 type Params = { id: string };
 
-export default async function AlreadyRespondedPage({
-  params,
-  searchParams,
-}: {
+export default async function AlreadyRespondedPage(props: {
   params: Promise<Params>;
-  searchParams?: FormLinkURLParams["alreadyresponded"];
+  searchParams?: Promise<FormLinkURLParams["alreadyresponded"]>;
 }) {
-  const { id: form_id } = await params;
+  const searchParams = await props.searchParams;
+  const { id: form_id } = await props.params;
   const { fingerprint, customer_id, session_id } = searchParams || {};
   await ssr_page_init_i18n({ form_id });
 

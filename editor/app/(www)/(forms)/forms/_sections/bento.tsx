@@ -209,7 +209,9 @@ export default function Content2() {
           {categories.map((category, index) => (
             <button
               key={category}
-              ref={(el) => (tabsRef.current[index] = el)}
+              ref={(el) => {
+                tabsRef.current[index] = el;
+              }}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 font-normal transition-all ${
                 activeTabIndex === index
                   ? "bg-black text-white dark:invert"

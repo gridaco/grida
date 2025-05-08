@@ -1016,6 +1016,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
         }
         case "richtext": {
           return (
+            // FIXME: [next15]
             <RichTextEditCell
               row_id={row.__gf_id}
               field_id={column.key}

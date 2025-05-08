@@ -1,5 +1,4 @@
 packages:
-  - "legacy/www"
   - "desktop"
   - "editor"
   - "apps/backgrounds"
@@ -8,8 +7,9 @@ packages:
   - "apps/viewer"
   - "packages/*"
   - "packages/lib/*"
-  - "ui/editor-ui/packages/*"
   - "ui/*"
+  # - "ui/editor-ui/packages/*"
+  # - "legacy/www"
   # - "legacy/web"
   # - "legacy/editor"
   # - "legacy/editor-packages/*"

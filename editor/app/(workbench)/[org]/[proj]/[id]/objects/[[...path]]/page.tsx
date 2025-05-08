@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useReducer,
   useState,
+  use,
 } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -134,17 +135,16 @@ const BUCLET = {
   private: "storage-private",
 };
 
-export default function FileExplorer({
-  params,
-}: {
+export default function FileExplorer(props: {
   // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
+  params: Promise<{
     id: string;
     org: string;
     proj: string;
     path?: string[];
-  };
+  }>;
 }) {
+  const params = use(props.params);
   const [{ document_id }] = useEditorState();
 
   const api: StorageApi = useMemo(() => {
@@ -154,7 +154,7 @@ export default function FileExplorer({
     //   alert("not ready");
     // };
     // __api["rmrf"] = rmrf;
-    return __api as StorageApi;
+    return __api as unknown as StorageApi;
   }, []);
 
   const { path = [] } = params;

@@ -79,10 +79,11 @@ export function ThemeEditorProvider({
   initialState: Pick<ThemeEditorState, "theme">;
   onChange?: (state: ThemeEditorState) => void;
 }) {
-  const [state, dispatch] = useReducer<
-    React.Reducer<ThemeEditorState, Action>,
-    ThemeEditorState
-  >(reducer, { ...initialState, colorscheme }, (initial) => initial);
+  const [state, dispatch] = useReducer(
+    reducer,
+    { ...initialState, colorscheme },
+    (initial) => initial
+  );
 
   useEffect(() => {
     onChange?.(state);

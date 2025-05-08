@@ -12,32 +12,38 @@ type Params = {
   field_id: string;
 };
 
-type Context = {
-  params: Promise<Params>;
-};
-
-export function POST(req: NextRequest, context: Context) {
-  return handler(req, context, {
+export async function POST(
+  req: NextRequest,
+  segmentData: {
+    params: Promise<Params>;
+  }
+) {
+  return handler(req, await segmentData.params, {
     upsert: false,
   });
 }
 
-export function PUT(req: NextRequest, context: Context) {
-  return handler(req, context, {
+export async function PUT(
+  req: NextRequest,
+  segmentData: {
+    params: Promise<Params>;
+  }
+) {
+  return handler(req, await segmentData.params, {
     upsert: true,
   });
 }
 
 async function handler(
   req: NextRequest,
-  context: Context,
+  params: Params,
   options?: { upsert: boolean }
 ) {
   const body = (await req.json()) as CreateSignedUploadUrlRequest;
 
   const { file } = body;
 
-  const { form_id, row_id, field_id } = await context.params;
+  const { form_id, row_id, field_id } = params;
 
   const formsClient = await createFormsClient();
 

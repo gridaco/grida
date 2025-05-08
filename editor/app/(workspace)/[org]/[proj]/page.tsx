@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { use } from "react";
 import Link from "next/link";
 import {
   ChevronDownIcon,
@@ -19,20 +19,21 @@ import { DocumentsGrid } from "@/app/(workspace)/[org]/_components/documents-gri
 import { SettingsIcon } from "lucide-react";
 import Head from "next/head";
 
-export default function ProjectDashboardPage({
-  params,
-  searchParams,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
-    org: string;
-    proj: string;
-  };
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  searchParams: {
-    layout?: "grid" | "list";
-  };
-}) {
+export default function ProjectDashboardPage(
+  props: {
+    // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
+    params: Promise<{
+      org: string;
+      proj: string;
+    }>;
+    // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
+    searchParams: Promise<{
+      layout?: "grid" | "list";
+    }>;
+  }
+) {
+  const searchParams = use(props.searchParams);
+  const params = use(props.params);
   const { loading, projects, documents, refresh } = useWorkspace();
   const { org: organization_name, proj: project_name } = params;
 

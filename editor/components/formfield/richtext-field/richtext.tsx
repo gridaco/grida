@@ -7,8 +7,9 @@ import {
   BlockNoteEditor,
   BlockNoteSchema,
   defaultBlockSpecs,
-  locales,
 } from "@blocknote/core";
+import { en } from "@blocknote/core/locales";
+
 import { useEffect, useState } from "react";
 import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
 import { RichTextStagedFileUtils } from "@/services/form";
@@ -54,10 +55,10 @@ export function RichTextEditorField({
     initialContent: initialContent,
     // disableExtensions: [],
     dictionary: {
-      ...locales.en,
+      ...en,
       placeholders: {
-        ...locales.en.placeholders,
-        default: placeholder || locales.en.placeholders.default,
+        ...en.placeholders,
+        default: placeholder || en.placeholders.default,
       },
     },
     animations: false,

@@ -1,20 +1,22 @@
 "use client";
 
-import React from "react";
+import React, { use } from "react";
 import { useEditorState } from "@/scaffolds/editor";
 import Invalid from "@/components/invalid";
 import { GDocSchemaTable, GDocTable } from "@/scaffolds/editor/state";
 
-export default function Layout({
-  params,
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
-    tablename: string;
-  };
-}>) {
+export default function Layout(
+  props: Readonly<{
+    children: React.ReactNode;
+    params: Promise<{
+      tablename: string;
+    }>;
+  }>
+) {
+  const params = use(props.params);
+
+  const { children } = props;
+
   const [{ tables }] = useEditorState();
   const { tablename } = params;
 

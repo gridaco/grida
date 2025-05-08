@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, use } from "react";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 import useSWR from "swr";
 import { Platform } from "@/lib/platform";
@@ -16,7 +16,8 @@ type Params = {
   slug: string;
 };
 
-export default function LayoutPage({ params }: { params: Params }) {
+export default function LayoutPage(props: { params: Promise<Params> }) {
+  const params = use(props.params);
   const { code } = params;
   const { template } = useLayout();
   const campaign = useCampaignAgent();

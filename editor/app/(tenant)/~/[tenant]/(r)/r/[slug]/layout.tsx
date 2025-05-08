@@ -59,11 +59,12 @@ async function fetchCampaign({ params }: { params: Params }) {
   };
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<Params>;
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<Params>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const { campaign } = await fetchCampaign({ params: await params });
 
   // const og_image = data?.og_image
@@ -82,13 +83,18 @@ export async function generateMetadata({
   };
 }
 
-export default async function Layout({
-  params,
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-  params: Promise<Params>;
-}>) {
+export default async function Layout(
+  props: Readonly<{
+    children: React.ReactNode;
+    params: Promise<Params>;
+  }>
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   const { route, campaign, template } = await fetchCampaign({
     params: await params,
   });
