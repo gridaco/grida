@@ -20,7 +20,7 @@ import {
 } from "@/theme/templates/kit/components";
 import { cn } from "@/utils";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import ReactPlayer from "react-player";
 import {
   FormCampaignStartPageContextProvider,

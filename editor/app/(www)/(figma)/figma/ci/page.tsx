@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { RefreshCw } from "lucide-react";
 import Header from "@/www/header";
 import Footer from "@/www/footer";

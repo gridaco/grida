@@ -17,7 +17,7 @@ import {
 import { useCampaignMeta } from "@/theme/templates/kit/campaign";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import _messages from "./messages.json";
 import { Features } from "@/lib/features/scheduling";
 import { useTranslation } from "react-i18next";

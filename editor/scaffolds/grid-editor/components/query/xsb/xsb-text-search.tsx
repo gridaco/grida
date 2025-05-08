@@ -25,7 +25,7 @@ import assert from "assert";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { useExpandableInput } from "@/components/extension/search-input";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { cn } from "@/utils";
 import { useTableDefinition } from "@/scaffolds/data-query";
 
@@ -148,7 +148,7 @@ export function XSBTextSearchInput({
                   column === null && localsearch_on
                     ? EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY
                         .description!
-                    : column ?? undefined
+                    : (column ?? undefined)
                 }
                 onValueChange={_onColumnChange}
               >

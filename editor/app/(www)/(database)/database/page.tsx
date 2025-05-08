@@ -1,21 +1,17 @@
 "use client";
-import Header from "@/www/header";
 import React, { useState, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button as FancyButton } from "@/www/ui/button";
-import { motion } from "framer-motion";
-import Link from "next/link";
+import { motion } from "motion/react";
 import { sitemap } from "@/www/data/sitemap";
 import { ArrowRight } from "lucide-react";
-import { Section, SectionHeader } from "@/www/ui/section";
-import { GridaLogo } from "@/components/grida-logo";
+import { Section } from "@/www/ui/section";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
-import Image from "next/image";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FooterWithCTA from "@/www/footer-with-cta";
 import { FormPageBackground } from "@/scaffolds/e/form/background";
+import Header from "@/www/header";
+import FooterWithCTA from "@/www/footer-with-cta";
+import Image from "next/image";
+import Link from "next/link";
 
 export default function A() {
   return (

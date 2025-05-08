@@ -5,7 +5,7 @@ import { Carousel, CarouselContent, CarouselItem } from "@/www/ui/carousel";
 import { type CarouselApi } from "@/www/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import { cn } from "@/utils";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 import __src_1 from "@/public/www/.home/pixel-drawing.png";
 import __src_2 from "@/public/www/.home/ux-ui-builder.png";

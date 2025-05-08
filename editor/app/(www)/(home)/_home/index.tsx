@@ -8,7 +8,7 @@ import Content3 from "./content-3";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils";
 import { Pixelify_Sans } from "next/font/google";

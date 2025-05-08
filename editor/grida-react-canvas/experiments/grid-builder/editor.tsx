@@ -18,7 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import useMergedRef from "@/hooks/use-merged-ref";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 type TransformOrigin = [0 | 1, 0 | 1];
 

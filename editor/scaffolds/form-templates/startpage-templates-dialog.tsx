@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";

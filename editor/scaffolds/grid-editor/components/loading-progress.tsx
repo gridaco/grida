@@ -1,6 +1,6 @@
 import React from "react";
 import { LoadingProgress as Progress } from "@/components/extension/loading-progress";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 export function GridLoadingProgressLine({ loading }: { loading?: boolean }) {
   return (

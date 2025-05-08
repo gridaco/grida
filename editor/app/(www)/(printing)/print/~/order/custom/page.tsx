@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { ArrowRight, Upload, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

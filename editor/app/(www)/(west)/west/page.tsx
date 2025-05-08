@@ -2,16 +2,16 @@
 
 import React from "react";
 import { useState, useRef, useEffect } from "react";
-import { motion, useInView } from "framer-motion";
-import FooterWithCTA from "@/www/footer-with-cta";
-import Image from "next/image";
+import { motion } from "motion/react";
 import { ArrowRight, GiftIcon, Link2, Percent, Star } from "lucide-react";
 import { sitemap } from "@/www/data/sitemap";
-import Header from "@/www/header";
 import { GridaLogo } from "@/components/grida-logo";
-import Link from "next/link";
 import { Button as FancyButton } from "@/www/ui/button";
 import { Button } from "@/components/ui/button";
+import FooterWithCTA from "@/www/footer-with-cta";
+import Header from "@/www/header";
+import Image from "next/image";
+import Link from "next/link";
 
 import {
   Card,

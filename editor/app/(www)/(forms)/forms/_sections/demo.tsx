@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import Playground from "@/scaffolds/playground";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 const Prompt = dynamic(() => import("@/app/(www)/(forms)/forms/ai/prompt"), {

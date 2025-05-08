@@ -14,7 +14,7 @@ import {
 } from "@/theme/templates/kit/components";
 import { cn } from "@/utils";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { FormCampaignStartPageContextProvider } from "@/theme/templates/kit/campaign";
 import type { FormStartPage } from "..";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
