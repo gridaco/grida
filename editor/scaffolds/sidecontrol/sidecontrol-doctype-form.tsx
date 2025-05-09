@@ -123,13 +123,11 @@ function SelectedFormBlockProperties() {
           <PropertyLine>
             <PropertyLineLabel>Hidden</PropertyLineLabel>
             <Popover>
-              <PopoverTrigger>
-                <div>
-                  <Button variant="outline">
-                    <MixIcon className="me-2" />
-                    {_v_hidden_set ? <>Update</> : <>Set logic</>}
-                  </Button>
-                </div>
+              <PopoverTrigger asChild>
+                <Button variant="outline">
+                  <MixIcon className="me-2" />
+                  {_v_hidden_set ? <>Update</> : <>Set logic</>}
+                </Button>
               </PopoverTrigger>
               <PopoverContent collisionPadding={16} className="w-full">
                 <div className="flex gap-4">

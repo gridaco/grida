@@ -18,6 +18,8 @@ export function FormEditorAgentThemeProvider({
 
   return (
     <AgentThemeProvider
+      palette={state.theme.palette}
+      background={state.theme.background}
       appearance={state.theme.appearance}
       font={font}
       customcss={customcss}

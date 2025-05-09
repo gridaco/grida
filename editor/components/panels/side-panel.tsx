@@ -142,7 +142,9 @@ export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function PanelHeaderTitle({ children }: React.PropsWithChildren<{}>) {
-  return <h2 className="text-lg font-semibold">{children}</h2>;
+  return (
+    <Dialog.Title className="text-lg font-semibold">{children}</Dialog.Title>
+  );
 }
 
 export function PanelHeaderActions({ children }: React.PropsWithChildren<{}>) {

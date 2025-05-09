@@ -670,7 +670,7 @@ function ConnectSchema({
             </Badge>
           </div>
           <Collapsible className="mt-4">
-            <CollapsibleTrigger>
+            <CollapsibleTrigger asChild>
               <Button variant="link" size="sm">
                 <CodeIcon className="me-2 align-middle" /> View Details
               </Button>

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { MixIcon } from "@radix-ui/react-icons";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
@@ -301,6 +301,7 @@ function CustomizeTemplate({
   return (
     <Dialog {...props}>
       <DialogContent className="min-w-full h-screen p-0" hideCloseButton>
+        <DialogTitle className="sr-only">Customize</DialogTitle>
         <TemplateEditor
           context={{
             title,
