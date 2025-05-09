@@ -3,7 +3,8 @@
   "private": true,
   "license": "Apache 2.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
   },
   "scripts": {
     "test": "pnpm -r --filter 'packages/*' run test"
