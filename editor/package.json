@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:no-turbopack": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -177,7 +178,7 @@
     "react-i18next": "^13.5.0",
     "react-map-gl": "^7.1.7",
     "react-medium-image-zoom": "^5.2.11",
-    "react-pdf": "^7.7.1",
+    "react-pdf": "^9.2.1",
     "react-phone-number-input": "^3.4.12",
     "react-player": "^2.14.1",
     "react-rnd": "^10.5.2",
