@@ -5,7 +5,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function useDeleteBlock() {
   const [state, dispatch] = useEditorState();

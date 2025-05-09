@@ -6,7 +6,7 @@ import { sitemap } from "@/www/data/sitemap";
 import { ArrowRight } from "lucide-react";
 import { Section } from "@/www/ui/section";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { FormPageBackground } from "@/scaffolds/e/form/background";
 import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";

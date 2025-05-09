@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import * as CardPrimitives from "@/components/ui/card";
 import type { DGResponseRow } from "../grid";
 import type { FormFieldDefinition } from "@/types";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Data } from "@/lib/data";
 import {
   Tooltip,

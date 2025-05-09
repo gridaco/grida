@@ -1,4 +1,4 @@
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import clsx from "clsx";
 
 export const cls_input =

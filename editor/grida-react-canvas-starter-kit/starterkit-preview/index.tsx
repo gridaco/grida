@@ -27,7 +27,7 @@ import { useCurrentScene } from "@/grida-react-canvas/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 
 const min = { width: 100, height: 100 };

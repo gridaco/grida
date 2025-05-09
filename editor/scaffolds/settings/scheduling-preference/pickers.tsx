@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,

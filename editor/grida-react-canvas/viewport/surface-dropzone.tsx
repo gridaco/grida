@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useDataTransferEventTarget } from "../provider";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function EditorSurfaceDropzone({
   className,

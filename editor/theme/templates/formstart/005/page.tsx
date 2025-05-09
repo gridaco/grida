@@ -21,7 +21,7 @@ import { motion } from "motion/react";
 import _messages from "./messages.json";
 import { Features } from "@/lib/features/scheduling";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";

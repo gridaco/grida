@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { useStopwatch } from "react-timer-hook";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import Image from "next/image";
 
 export function GenerationImageFrame({

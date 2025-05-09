@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
 

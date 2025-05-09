@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { type PortableNode } from "../schema";
 
 const DEFAULT_IFRAME_HTML = `

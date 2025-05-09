@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { RGBAChip } from "./utils/paint-chip";
 import { RGBAColorControl } from "./color";
 import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";

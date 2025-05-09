@@ -6,7 +6,7 @@ import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 import "./styles.css";
 import React from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 // import { BlockNoteView } from "@blocknote/shadcn";
 // https://github.com/TypeCellOS/BlockNote/issues/880

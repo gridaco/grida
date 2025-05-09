@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 export interface LinkEditorProps extends React.HTMLAttributes<HTMLDivElement> {
   defaultUrl?: string;

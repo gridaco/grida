@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Toggle } from "@/components/ui/toggle";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 interface ToolbarButtonProps
   extends React.ComponentPropsWithoutRef<typeof Toggle> {

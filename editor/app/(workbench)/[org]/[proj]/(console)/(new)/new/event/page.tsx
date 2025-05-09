@@ -19,7 +19,7 @@ import {
   StickyNoteIcon,
   TicketIcon,
 } from "lucide-react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { CaretSortIcon } from "@radix-ui/react-icons";

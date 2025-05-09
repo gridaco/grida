@@ -12,7 +12,7 @@ import {
   useSelection,
 } from "../provider";
 import toast from "react-hot-toast";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function EditorSurfaceContextMenu({
   children,

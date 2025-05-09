@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 // import { Command, CommandList, CommandItem, CommandGroup, CommandEmpty } from '../ui/command';
 import { TagInputStyleClassesProps, type Tag as TagType } from "./tag-input";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 

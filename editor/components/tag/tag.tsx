@@ -5,7 +5,7 @@ import {
   TagInputStyleClassesProps,
   type Tag as TagType,
 } from "./tag-input";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 import { cva } from "class-variance-authority";
 

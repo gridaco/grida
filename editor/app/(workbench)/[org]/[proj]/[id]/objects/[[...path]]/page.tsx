@@ -24,7 +24,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,

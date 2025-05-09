@@ -1,7 +1,7 @@
 import React from "react";
 import { DiamondIcon, Fingerprint, Hash, Key, Table2 } from "lucide-react";
 import { Handle, Node, NodeProps } from "@xyflow/react";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import type { TableNodeData } from "./types";
 import { toShorter } from "@/lib/pg-meta/k/alias";
 

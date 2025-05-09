@@ -54,7 +54,7 @@ import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import {
   Sidebar,

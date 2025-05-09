@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   LinearGradientPaintIcon,
   RadialGradientPaintIcon,

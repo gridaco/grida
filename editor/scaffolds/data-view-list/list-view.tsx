@@ -13,7 +13,7 @@ import { useTableDefinition } from "../data-query";
 import type { FormFieldDefinition } from "@/types";
 import type { DGResponseRow } from "../grid";
 import assert from "assert";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { analyze } from "../data-card/analyze";
 
 export function DataListView({

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpIcon, ImageUpIcon } from "lucide-react";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import TextareaAutoResize from "react-textarea-autosize";
 import toast from "react-hot-toast";
 import Image from "next/image";

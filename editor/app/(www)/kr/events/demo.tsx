@@ -8,7 +8,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TopBottomFadingGradientOverlay } from "./gradient";
 import bentomainbg from "../../../../public/affiliate/poc/images/bento-fullsize-video-card-background.png";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function Demo() {
   return (

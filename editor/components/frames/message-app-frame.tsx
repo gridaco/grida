@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import React from "react";
 import clsx from "clsx";
 import { ArrowUpIcon, ChevronLeft } from "lucide-react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export default function MessageAppFrame({
   sender,

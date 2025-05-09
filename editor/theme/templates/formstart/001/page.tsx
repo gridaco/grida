@@ -18,7 +18,7 @@ import {
   digit2,
   BackgroundVideo,
 } from "@/theme/templates/kit/components";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
 import ReactPlayer from "react-player";

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Data } from "@/lib/data";
 import { XSBSearchTableSheet, XSBListUsersSheet } from "@/scaffolds/x-supabase";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 type SQLForeignKeyValue = string | number | undefined;
 

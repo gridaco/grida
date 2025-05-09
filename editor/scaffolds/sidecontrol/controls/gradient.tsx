@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { grida } from "@/grida";
 import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { PropertyNumber } from "../ui";

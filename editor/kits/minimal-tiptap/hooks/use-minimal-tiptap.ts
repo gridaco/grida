@@ -18,7 +18,7 @@ import {
   ResetMarksOnEnter,
   FileHandler,
 } from "../extensions";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { fileToBase64, getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
 import { toast } from "react-hot-toast";

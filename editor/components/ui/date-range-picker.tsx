@@ -24,7 +24,7 @@ import {
   ChevronDownIcon,
   CheckIcon,
 } from "@radix-ui/react-icons";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export interface DateRangePickerProps {
   /** Click handler for applying the updates from DateRangePicker. */

@@ -11,7 +11,7 @@ import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader } from "@/www/ui/section";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Marquee } from "@/www/ui/marquee";
 import { ArrowRightIcon, CalendarIcon } from "@radix-ui/react-icons";
 import {

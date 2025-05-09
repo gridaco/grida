@@ -5,7 +5,7 @@ import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { FormPageBackground } from "../e/form/background";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { useTheme } from "next-themes";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 import type { NextFont } from "@next/font/dist/types";

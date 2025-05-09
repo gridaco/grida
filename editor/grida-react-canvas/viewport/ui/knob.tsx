@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import type { cmath } from "@grida/cmath";
 import { cursors } from "@/grida-react-canvas/components/cursor";
 

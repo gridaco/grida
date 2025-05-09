@@ -13,7 +13,7 @@ import { SectionFive } from "./components/section/five";
 import { LinkBubbleMenu } from "./components/bubble-menu/link-bubble-menu";
 import { useMinimalTiptapEditor } from "./hooks/use-minimal-tiptap";
 import { MeasuredContainer } from "./components/measured-container";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export interface MinimalTiptapProps
   extends Omit<UseMinimalTiptapEditorProps, "onUpdate"> {

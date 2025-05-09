@@ -17,7 +17,7 @@ import {
   UnsetAllMarks,
   ResetMarksOnEnter,
 } from "./extensions";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { type MinimalTiptapProps } from "./minimal-tiptap";
 
 const createHeadlessExtensions = ({ placeholder }: { placeholder: string }) => [

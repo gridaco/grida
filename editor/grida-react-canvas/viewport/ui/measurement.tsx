@@ -3,7 +3,7 @@ import {
   guide_line_xylr,
 } from "@grida/cmath/_measurement";
 import { MeterLabel } from "./meter";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { cmath } from "@grida/cmath";
 import { useTransform } from "@/grida-react-canvas/provider";
 import { useLayoutEffect, useState } from "react";

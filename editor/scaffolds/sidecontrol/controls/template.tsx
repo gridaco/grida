@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   DataProvider,
   ProgramDataContextHost,

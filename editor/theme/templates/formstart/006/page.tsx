@@ -12,7 +12,7 @@ import {
   LinearBoxScaleDecoration,
   Header,
 } from "@/theme/templates/kit/components";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
 import { FormCampaignStartPageContextProvider } from "@/theme/templates/kit/campaign";

@@ -5,7 +5,7 @@ import { useEditorState } from "../editor";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { CommandItem } from "@/components/ui/command";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function InsertMenuTrigger({ className }: { className?: string }) {
   const [state, dispatch] = useEditorState();

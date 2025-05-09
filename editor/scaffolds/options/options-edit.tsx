@@ -48,7 +48,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { produce, type Draft } from "immer";
 import { draftid } from "@/utils/id";
 import { FolderIcon } from "lucide-react";

@@ -8,7 +8,7 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
 import * as tw from "./k/tailwindcss";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { PaintChip } from "./utils/paint-chip";
 import {
   Popover,

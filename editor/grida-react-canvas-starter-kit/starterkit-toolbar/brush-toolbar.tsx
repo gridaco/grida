@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { useDocument, useEventTarget } from "@/grida-react-canvas/provider";
 import {
   DotsHorizontalIcon,

@@ -19,7 +19,7 @@ import { provisional } from "@/services/customer/utils";
 import { useEditorState } from "../editor";
 import type { Platform } from "@/lib/platform";
 import useSWR from "swr";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function CustomerEditPanel({
   customer_id,

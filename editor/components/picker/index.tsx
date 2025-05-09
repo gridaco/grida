@@ -14,7 +14,7 @@ import {
   MoreHorizontal,
   Check,
 } from "lucide-react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { vfs } from "@/lib/vfs";
 
 type PathTokens = string[];

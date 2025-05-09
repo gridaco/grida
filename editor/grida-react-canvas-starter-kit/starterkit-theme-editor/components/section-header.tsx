@@ -1,4 +1,4 @@
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 export function SectionHeader({
   className,

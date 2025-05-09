@@ -3,7 +3,7 @@
 import * as React from "react";
 import { PopoverProps } from "@radix-ui/react-popover";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,

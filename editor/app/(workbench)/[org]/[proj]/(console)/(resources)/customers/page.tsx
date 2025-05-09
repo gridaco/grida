@@ -54,7 +54,7 @@ import { subscribeTable } from "@/lib/supabase/realtime";
 import { Badge } from "@/components/ui/badge";
 import { DateFormatRadioGroup } from "@/scaffolds/data-format/ui/date-format";
 import { DateTimeZoneRadioGroup } from "@/scaffolds/data-format/ui/date-timezone";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
 import toast from "react-hot-toast";
 import { Platform } from "@/lib/platform";

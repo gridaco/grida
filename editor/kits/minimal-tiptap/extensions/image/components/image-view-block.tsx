@@ -3,7 +3,7 @@ import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import type { ElementDimensions } from "../hooks/use-drag-resize";
 import { useDragResize } from "../hooks/use-drag-resize";
 import { ResizeHandle } from "./resize-handle";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import { Controlled as ControlledZoom } from "react-medium-image-zoom";
 import { ActionButton, ActionWrapper, ImageActions } from "./image-actions";
 import { useImageActions } from "../hooks/use-image-actions";

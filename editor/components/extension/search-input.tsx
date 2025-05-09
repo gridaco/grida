@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function SearchInput({
   className,

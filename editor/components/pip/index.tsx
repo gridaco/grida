@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { useDrag } from "@use-gesture/react";
 import { useMeasure, useThrottle } from "@uidotdev/usehooks";
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { useSingleSelection } from "../surface-hooks";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 interface BarProps {
   node_id: string;

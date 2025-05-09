@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { InstagramIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

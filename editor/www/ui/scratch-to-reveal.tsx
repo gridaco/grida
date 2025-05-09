@@ -2,7 +2,7 @@
 
 "use client";
 
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import { motion, useAnimation } from "motion/react";
 import React, { useEffect, useRef, useState } from "react";
 

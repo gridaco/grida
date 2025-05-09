@@ -54,7 +54,7 @@ import { useTheme } from "next-themes";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PreferenceBody,

@@ -13,7 +13,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cmath } from "@grida/cmath";
 import { Input } from "@/components/ui/input";
 import { useEventTarget, useTransform } from "@/grida-react-canvas/provider";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function ZoomControl({ className }: { className?: string }) {
   const { transform, scale, fit, zoomIn, zoomOut } = useTransform();

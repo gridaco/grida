@@ -34,7 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 const users = [
   {
