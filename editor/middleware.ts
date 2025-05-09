@@ -7,7 +7,6 @@ import { Env } from "./env";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";
-const IS_HOSTED = process.env.VERCEL === "1";
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   console.warn(
@@ -44,13 +43,21 @@ export async function middleware(req: NextRequest) {
 
   const res = await updateSession(req);
 
-  // #region tanent
+  // #region tanent matching
 
   const host = req.headers.get("host") || "";
   const url = new URL(`https://${host}`);
   const hostname = url.hostname;
 
-  const tanentwww = TanantMiddleware.analyze(url, !IS_HOSTED);
+  // ignore if vercel preview url
+  if (
+    Env.server.IS_HOSTED &&
+    (host === process.env.VERCEL_URL || host === process.env.VERCEL_BRANCH_URL)
+  ) {
+    return res;
+  }
+
+  const tanentwww = TanantMiddleware.analyze(url, !Env.server.IS_HOSTED);
 
   // www.grida.site => grida.co
   if (tanentwww.name === "www") {

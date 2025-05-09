@@ -9,6 +9,20 @@ export namespace Env {
       ? // VERCEL_URL does not have protocol
         "https://" + process.env.VERCEL_URL
       : "http://localhost:3000";
+
+    /**
+     * vercel url with protocol scheme
+     * @example
+     * https://git-branch-name.vercel.app
+     *
+     * only available on hosted environment
+     */
+    export const VERCEL_URL = "https://" + process.env.VERCEL_URL; // VERCEL_URL does not have protocol
+
+    /**
+     * if running on a hosted (vercel) environment
+     */
+    export const IS_HOSTED = process.env.VERCEL === "1";
   }
 
   export namespace storage {

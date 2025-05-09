@@ -6,6 +6,7 @@ import {
   SheetContent,
   SheetFooter,
   SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ export function CustomerEditPanel({
   return (
     <Sheet {...props}>
       <SheetContent className="overflow-y-scroll">
+        <SheetTitle className="sr-only">Customer Panel</SheetTitle>
         <SheetHeader>
           {/* <SheetTitle>{title}</SheetTitle> */}
           {/* <SheetDescription></SheetDescription> */}
