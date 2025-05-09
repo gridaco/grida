@@ -30,12 +30,9 @@ const checkname = async (name: string) => {
 
 type SearchParams = { error?: string };
 
-export default function NewOrganizationSetupPage(
-  props: {
-    // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-    searchParams: Promise<SearchParams>;
-  }
-) {
+export default function NewOrganizationSetupPage(props: {
+  searchParams: Promise<SearchParams>;
+}) {
   const searchParams = use(props.searchParams);
   const [name, setName] = useState("");
   const [ok, setOK] = useState(false);

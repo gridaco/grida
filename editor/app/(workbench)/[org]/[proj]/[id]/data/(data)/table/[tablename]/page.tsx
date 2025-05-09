@@ -24,14 +24,11 @@ import { useMemo, use } from "react";
 import { Spinner } from "@/components/spinner";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 
-export default function SchemaTablePage(
-  props: {
-    // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-    params: Promise<{
-      tablename: string;
-    }>;
-  }
-) {
+export default function SchemaTablePage(props: {
+  params: Promise<{
+    tablename: string;
+  }>;
+}) {
   const params = use(props.params);
   const [{ tables }] = useEditorState();
   const { tablename } = params;

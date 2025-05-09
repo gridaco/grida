@@ -13,14 +13,11 @@ import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import "@xyflow/react/dist/style.css";
 
-export default function TableDefinitionPage(
-  props: {
-    // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-    params: Promise<{
-      tablename: string;
-    }>;
-  }
-) {
+export default function TableDefinitionPage(props: {
+  params: Promise<{
+    tablename: string;
+  }>;
+}) {
   const params = use(props.params);
   const [{ tables, supabase_project }] = useEditorState();
   const { tablename } = params;
