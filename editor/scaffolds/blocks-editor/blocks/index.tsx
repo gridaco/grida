@@ -12,7 +12,7 @@ import { VideoBlock } from "./video-block";
 import { DividerBlock } from "./divider-block";
 import { HeaderBlock } from "./header-block";
 import { PdfBlock } from "./pdf-block";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 
 export function BlocksCanvas({
   children,
@@ -97,7 +97,7 @@ export function Block(props: EditorFlatFormBlock) {
           ref={setActivatorNodeRef}
           {...listeners}
           {...attributes}
-          className={clsx(
+          className={cn(
             "absolute left-44 right-44 top-3 flex items-center justify-center",
             "cursor-move",
             "opacity-0 p-1 group-hover:opacity-100"

@@ -1,11 +1,11 @@
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 
 export function Spinner({ className }: { className?: string }) {
   return (
     <div role="status" className="inline">
       <svg
         aria-hidden="true"
-        className={clsx(
+        className={cn(
           "inline w-4 h-4 text-ring animate-spin fill-accent",
           className
         )}

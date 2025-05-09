@@ -12,7 +12,7 @@ import React, {
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { request_toss_payments_checkout_session } from "@/lib/agent/integrations/payments/tosspayments/api";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 import {
@@ -95,7 +95,7 @@ export function GridaFormsFormView(
       <div
         id="form-view"
         data-cjk={props.config.optimize_for_cjk}
-        className={clsx(
+        className={cn(
           "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
           "w-full h-full md:h-auto grow md:grow-0",
           "relative",
@@ -303,7 +303,7 @@ function Footer({
 }) {
   return (
     <footer
-      className={clsx(
+      className={cn(
         "sticky bottom-0",
         "flex gap-2 p-4 pt-4 border-t",
         "justify-end bg-background",
@@ -315,7 +315,7 @@ function Footer({
       <FormSubmit className="w-full md:w-auto">{translation.submit}</FormSubmit>
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
-        className={clsx(
+        className={cn(
           "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
           "w-full md:w-auto",
           "data-[pay-hidden='true']:hidden"
@@ -339,7 +339,7 @@ function FormPrev({
     <Button
       variant="outline"
       data-next-hidden={!has_previous}
-      className={clsx("data-[next-hidden='true']:hidden", className)}
+      className={cn("data-[next-hidden='true']:hidden", className)}
       onClick={onPrevious}
     >
       {children}
@@ -361,7 +361,7 @@ function FormNext({
       data-next-hidden={!has_next}
       form={html_form_id}
       type="submit"
-      className={clsx("data-[next-hidden='true']:hidden", className)}
+      className={cn("data-[next-hidden='true']:hidden", className)}
     >
       {children}
     </Button>
@@ -382,7 +382,7 @@ function FormSubmit({
       disabled={submit_hidden || is_submitting}
       form={html_form_id}
       type="submit"
-      className={clsx(
+      className={cn(
         "min-w-10",
         "data-[submit-hidden='true']:hidden",
         "disabled:opacity-50 disabled:cursor-not-allowed",
@@ -458,7 +458,7 @@ function BlockRenderer({
           data-gf-section-id={block.id}
           data-gf-section-contains-payment={block.attributes?.contains_payment}
           data-active-section={is_current_section}
-          className={clsx(
+          className={cn(
             "data-[active-section='false']:hidden",
             "rounded",
             stylesheet?.section

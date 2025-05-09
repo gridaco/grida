@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 
 export const GridaLogo = ({
   className,
@@ -12,7 +12,7 @@ export const GridaLogo = ({
       width={size}
       height={size}
       viewBox="0 0 42 42"
-      className={clsx("fill-foreground", className)}
+      className={cn("fill-foreground", className)}
       xmlns="http://www.w3.org/2000/svg"
     >
       <path

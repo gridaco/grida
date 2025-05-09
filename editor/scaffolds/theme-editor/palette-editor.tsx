@@ -1,18 +1,18 @@
+import React, { useEffect, useState } from "react";
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import React, { use, useEffect, useState } from "react";
 import { HslColorPicker } from "react-colorful";
-import { z } from "zod";
-import type { Palette, Theme } from "@/theme/palettes/types";
-import palettes from "@/theme/palettes";
-import clsx from "clsx";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { z } from "zod";
+import { cn } from "@/components/lib/utils";
+import type { Theme } from "@/theme/palettes/types";
+import palettes from "@/theme/palettes";
 
 export function ThemePalette({
   dark: _dark,
@@ -54,7 +54,7 @@ export function ThemePalette({
                     setPresetId(key);
                     onPresetChange?.(key);
                   }}
-                  className={clsx(
+                  className={cn(
                     "w-6 h-6 border-2 rounded-full",
                     "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
                   )}

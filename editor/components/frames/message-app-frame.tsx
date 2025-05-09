@@ -1,8 +1,7 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { AvatarFallback, Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import React from "react";
-import clsx from "clsx";
 import { ArrowUpIcon, ChevronLeft } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
@@ -68,7 +67,7 @@ export default function MessageAppFrame({
         </div>
       </div>
       <div
-        className={clsx(
+        className={cn(
           "bg-white dark:bg-black border-t border-gray-200 dark:border-gray-800",
           hideInput ? "hidden" : "block"
         )}

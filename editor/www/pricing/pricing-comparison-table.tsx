@@ -1,7 +1,5 @@
 "use client";
 
-// The original code is from supabase/www (Licensed under Apache 2.0)
-import clsx from "clsx";
 import React, { useState } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";

@@ -10,7 +10,6 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
   AlertDialogAction,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import toast from "react-hot-toast";
 import { useDatagridTable, useEditorState } from "../editor";
@@ -20,12 +19,10 @@ import {
   Cross2Icon,
   DownloadIcon,
   PieChartIcon,
-  PlusIcon,
-  TrashIcon,
 } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import {
   TableViews,
   GridQueryLimitSelect,
@@ -258,7 +255,7 @@ export function GridEditor({
                 <GridLayout.HeaderMenus>
                   {has_selected_rows ? (
                     <div
-                      className={clsx(
+                      className={cn(
                         "flex items-center",
                         !has_selected_rows || selectionDisabled ? "hidden" : ""
                       )}
@@ -643,7 +640,7 @@ function TableMod() {
         <button
           type="button"
           onClick={openNewTuplePanel}
-          className={clsx(
+          className={cn(
             buttonVariants({ variant: "default", size: "sm" }),
             "border rounded-s-lg rounded-e-none focus:z-10 focus:ring-2",
             "gap-2"
@@ -655,7 +652,7 @@ function TableMod() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className={clsx(
+              className={cn(
                 buttonVariants({ variant: "default", size: "sm" }),
                 "pl-1.5 pr-1.5 py-1 border-t border-b border-r rounded-s-none rounded-e-lg focus:z-10 focus:ring-2"
               )}

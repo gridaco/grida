@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "@/components/theme-provider";
 import dynamic from "next/dynamic";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import React from "react";
 
 const PlaygroundPreviewSlave = dynamic(
@@ -15,7 +15,7 @@ const PlaygroundPreviewSlave = dynamic(
 export default function PlaygroundPreview() {
   return (
     <main
-      className={clsx("min-h-screen flex flex-col items-center pt-10 md:pt-16")}
+      className={cn("min-h-screen flex flex-col items-center pt-10 md:pt-16")}
     >
       <ThemeProvider
         attribute="class"

@@ -4,7 +4,6 @@ import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
 import toast from "react-hot-toast";
-import clsx from "clsx";
 import { cn } from "@/components/lib/utils";
 
 export function useDeleteBlock() {
@@ -60,7 +59,7 @@ export function BlockHeader({
 }: React.PropsWithChildren<{ border?: boolean }>) {
   return (
     <div
-      className={clsx(
+      className={cn(
         "flex w-full justify-between items-center gap-4",
         border && "pb-4 border-b"
       )}
@@ -84,7 +83,7 @@ export function FlatBlockBase({
     <div
       data-invalid={invalid}
       data-focused={focused}
-      className={clsx(
+      className={cn(
         "group/block rounded-md flex flex-col gap-4 w-full p-4 bg-background transition-all",
         "shadow-[0_0_0_1px_theme('colors.border')]",
         "hover:shadow-[0_0_0_2px_theme('colors.border')]",

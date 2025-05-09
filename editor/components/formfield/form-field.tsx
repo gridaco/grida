@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   FormFieldDataSchema,
   FormInputType,
@@ -5,7 +6,6 @@ import {
   Option,
   PaymentFieldData,
 } from "@/types";
-import React, { useEffect, useState } from "react";
 import { Select as HtmlSelect } from "../vanilla/select";
 import {
   Select,
@@ -19,7 +19,7 @@ import {
 import { SignatureCanvas } from "./signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
@@ -1005,7 +1005,7 @@ function HtmlTextarea({
 
   return (
     <textarea
-      className={clsx(
+      className={cn(
         "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         cls_input_ios_zoom_disable
       )}
@@ -1026,7 +1026,7 @@ function HtmlInput({
 
   return (
     <input
-      className={clsx(
+      className={cn(
         "h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         cls_input_ios_zoom_disable
       )}

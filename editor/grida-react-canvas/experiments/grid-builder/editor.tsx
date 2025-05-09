@@ -15,10 +15,10 @@ import { useGesture } from "@use-gesture/react";
 import { nanoid } from "nanoid";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import clsx from "clsx";
-import useMergedRef from "@/hooks/use-merged-ref";
+import { cn } from "@/components/lib/utils";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "motion/react";
+import useMergedRef from "@/hooks/use-merged-ref";
 
 type TransformOrigin = [0 | 1, 0 | 1];
 
@@ -869,7 +869,7 @@ function Cell({ pos, index }: { pos: GridPosition; index: number }) {
     <div
       data-hover={is_hover}
       data-marqueed={is_in_marquee}
-      className={clsx(
+      className={cn(
         "data-[hover='true']:bg-gray-500/15",
         "data-[marqueed='true']:bg-gray-500/15"
       )}

@@ -4,9 +4,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import clsx from "clsx";
 import { cookies } from "next/headers";
 import { getPlatform } from "@/host/platform";
+import { cn } from "@/components/lib/utils";
 import PlatformProvider from "@/host/platform-provider";
 import "../editor.css";
 
@@ -27,7 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={clsx(
+        className={cn(
           inter.className,
           // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
           "h-screen overflow-hidden"

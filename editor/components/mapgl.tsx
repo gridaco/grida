@@ -1,8 +1,8 @@
 "use client";
 
-import clsx from "clsx";
 import React from "react";
 import Map, { ViewState } from "react-map-gl";
+import { cn } from "@/components/lib/utils";
 
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -32,7 +32,7 @@ export function MapGL({
   initialViewState?: Partial<ViewState>;
 }>) {
   return (
-    <div className={clsx("flex flex-col overflow-hidden h-full", className)}>
+    <div className={cn("flex flex-col overflow-hidden h-full", className)}>
       <Map
         id={id}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
