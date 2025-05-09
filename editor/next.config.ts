@@ -1,10 +1,14 @@
-import withMDX from "@next/mdx";
+import type { NextConfig } from "next";
+import createMDX from "@next/mdx";
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 
-/** @type {import('next').NextConfig} */
-const nextConfig = withMDX()({
+const withMDX = createMDX({
+  // Add markdown plugins here, as desired
+});
+
+const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
   experimental: {
     mdxRs: true,
@@ -169,6 +173,6 @@ const nextConfig = withMDX()({
     config.resolve.alias.handlebars = "handlebars/dist/handlebars.js";
     return config;
   },
-});
+};
 
-export default nextConfig;
+export default withMDX(nextConfig as any);

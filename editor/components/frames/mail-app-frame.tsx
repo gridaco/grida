@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { AvatarImage, AvatarFallback, Avatar } from "@/components/ui/avatar";
-import React, { useMemo } from "react";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { GridaLogo } from "../grida-logo";
 import {
   ArchiveIcon,
@@ -49,7 +49,7 @@ export default function MailAppFrame({
       className="grid h-full w-full lg:data-[sidebar-hidden='false']:grid-cols-[320px_1fr]"
     >
       <div
-        className={clsx(
+        className={cn(
           "hidden border-r bg-gray-100/40 lg:block dark:bg-gray-800/40"
         )}
         style={{

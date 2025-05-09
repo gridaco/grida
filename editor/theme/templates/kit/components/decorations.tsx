@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Rotate } from "./motion";
 

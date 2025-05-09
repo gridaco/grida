@@ -4,13 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Overview from "./_components/overview";
 import { useCampaign } from "./store";
 
-type Params = {
-  org: string;
-  proj: string;
-  campaign: string;
-};
-
-export default function CampaignsPage({ params }: { params: Params }) {
+export default function CampaignsPage() {
   const campaign = useCampaign();
   return (
     <main className="container mx-auto my-10">

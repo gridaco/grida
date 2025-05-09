@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import React from "react";
 
 export function Section({

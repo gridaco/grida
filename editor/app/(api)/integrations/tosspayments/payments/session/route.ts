@@ -6,8 +6,6 @@ import {
 import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
 
-export const revalidate = 0;
-
 const INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY =
   process.env.INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY;
 

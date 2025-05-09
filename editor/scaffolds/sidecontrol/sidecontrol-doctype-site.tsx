@@ -15,7 +15,7 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import { useDocument } from "@/grida-react-canvas";
 import parsecolor from "color-parse";
 import { PreviewButton } from "@/grida-react-canvas-starter-kit/starterkit-preview";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 export function SideControlDoctypeSite() {
   const [open, setOpen] = React.useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import { motion, MotionStyle, Transition } from "motion/react";
 
 interface BorderBeamProps {

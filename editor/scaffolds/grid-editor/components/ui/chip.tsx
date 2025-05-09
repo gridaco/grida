@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { IconButtonDotBadge } from "./dotbadge";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 
 export function QueryChip({

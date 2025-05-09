@@ -44,7 +44,7 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { editorlink } from "@/lib/forms/url";
 import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 
@@ -243,7 +243,7 @@ export function FieldBlock({
           </DropdownMenu>
         </BlockAction>
       </BlockHeader>
-      <div className={clsx("w-full bg-background rounded px-4 py-10")}>
+      <div className={cn("w-full bg-background rounded px-4 py-10")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">

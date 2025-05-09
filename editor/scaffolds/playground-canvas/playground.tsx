@@ -105,7 +105,7 @@ import {
   UserCustomTemplatesProps,
 } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@/grida-io-model";

@@ -5,7 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { IconButtonDotBadge } from "./dotbadge";
 import { ArrowDownUpIcon, ListFilterIcon } from "lucide-react";
 

@@ -18,8 +18,6 @@ import {
   schemaname_validation_messages,
 } from "@/services/utils/regex";
 
-export const revalidate = 0;
-
 export type NewDocumentRequest =
   | {
       project_id: number;

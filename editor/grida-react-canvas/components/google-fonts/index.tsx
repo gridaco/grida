@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import * as Fonts from "@/grida-fonts";
 
 const GoogleFontsManagerProviderContext = React.createContext<{

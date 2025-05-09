@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useReducer,
   useState,
+  use,
 } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -23,7 +24,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -134,17 +135,15 @@ const BUCLET = {
   private: "storage-private",
 };
 
-export default function FileExplorer({
-  params,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
+export default function FileExplorer(props: {
+  params: Promise<{
     id: string;
     org: string;
     proj: string;
     path?: string[];
-  };
+  }>;
 }) {
+  const params = use(props.params);
   const [{ document_id }] = useEditorState();
 
   const api: StorageApi = useMemo(() => {
@@ -154,7 +153,7 @@ export default function FileExplorer({
     //   alert("not ready");
     // };
     // __api["rmrf"] = rmrf;
-    return __api as StorageApi;
+    return __api as unknown as StorageApi;
   }, []);
 
   const { path = [] } = params;

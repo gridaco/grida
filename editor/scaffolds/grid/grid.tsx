@@ -59,7 +59,7 @@ import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./grid-empty-state";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   StandaloneDataGridStateProvider,
   useCellRootProps,

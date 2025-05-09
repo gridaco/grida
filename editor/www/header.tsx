@@ -15,7 +15,7 @@ import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { sitemap } from "./data/sitemap";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import {
   ResourceTypeIcon,
   ResourceTypeIconName,

@@ -1,5 +1,5 @@
-import { cn } from "@/utils";
-import clsx from "clsx";
+import React from "react";
+import { cn } from "@/components/lib/utils";
 
 export const cls_input =
   "bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:opacity-50 disabled:bg-neutral-200 disabled:border-neutral-300 disabled:text-neutral-500";
@@ -23,7 +23,7 @@ export function PreferenceBox({
   return (
     <section
       data-warning={warning || beta}
-      className={clsx(
+      className={cn(
         "bg-card rounded-md border border-overlay shadow-sm overflow-hidden mb-8 !m-0",
         "data-[warning='true']:border-yellow-400 data-[warning='true']:bg-yellow-50 data-[warning='true']:text-yellow-900 data-[warning='true']:dark:bg-yellow-700 data-[warning='true']:dark:text-yellow-200 data-[warning='true']:dark:border-yellow-600",
         disabled && "opacity-50 pointer-events- cursor-not-allowed"

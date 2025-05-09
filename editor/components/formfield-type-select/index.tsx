@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { supported_field_types, fieldlabels } from "@/k/supported_field_types";
 import type { FormInputType } from "@/types";

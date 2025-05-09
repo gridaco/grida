@@ -1,14 +1,15 @@
 import * as React from "react";
-import { Button, Tailwind } from "@react-email/components";
 
 interface EmailTemplateProps {
   firstName: string;
 }
 
-export const EmailTemplate: React.FC<Readonly<EmailTemplateProps>> = ({
+export default function EmailTemplateCustomerPortalVerification({
   firstName,
-}) => (
-  <div>
-    <h1>Welcome, {firstName}!</h1>
-  </div>
-);
+}: Readonly<EmailTemplateProps>) {
+  return (
+    <div>
+      <h1>Welcome, {firstName}!</h1>
+    </div>
+  );
+}

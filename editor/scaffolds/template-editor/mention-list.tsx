@@ -1,10 +1,10 @@
-import clsx from "clsx";
 import React, {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useState,
 } from "react";
+import { cn } from "@/components/lib/utils";
 
 const MentionList = forwardRef(function MentionList(props: any, ref) {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -63,7 +63,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
       {props.items.length ? (
         props.items.map((item: any, index: number) => (
           <button
-            className={clsx(
+            className={cn(
               "bg-transparent rounded-sm m-0 py-1 px-2 text-left w-full",
               index === selectedIndex ? "border" : ""
             )}

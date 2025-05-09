@@ -20,7 +20,7 @@ import { createBrowserFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export default function BlocksEditorRoot() {
   return (

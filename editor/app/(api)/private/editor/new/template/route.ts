@@ -1,8 +1,6 @@
 import { FormDocumentSetupAssistantService } from "@/services/new";
 import { NextRequest, NextResponse } from "next/server";
 
-export const revalidate = 0;
-
 export async function POST(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const project_id = Number(request.nextUrl.searchParams.get("project_id"));

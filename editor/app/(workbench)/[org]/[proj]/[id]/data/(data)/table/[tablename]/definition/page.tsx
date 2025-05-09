@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, use } from "react";
 import { useEditorState } from "@/scaffolds/editor";
 import { GDocSchemaTable } from "@/scaffolds/editor/state";
 import assert from "assert";
@@ -13,14 +13,12 @@ import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import "@xyflow/react/dist/style.css";
 
-export default function TableDefinitionPage({
-  params,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
+export default function TableDefinitionPage(props: {
+  params: Promise<{
     tablename: string;
-  };
+  }>;
 }) {
+  const params = use(props.params);
   const [{ tables, supabase_project }] = useEditorState();
   const { tablename } = params;
 

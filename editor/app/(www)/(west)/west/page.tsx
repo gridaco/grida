@@ -21,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import CustomDomainDemo from "./custom-domain-demo";
 import { AnalysisIcon } from "@/www/icons";
 import Hello from "./hello";

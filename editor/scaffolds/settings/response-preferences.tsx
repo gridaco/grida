@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -8,7 +8,7 @@ import {
   PreferenceBoxHeader,
   PreferenceDescription,
 } from "@/components/preferences";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -98,7 +98,7 @@ export function RestrictNumberOfResponseByCustomer() {
                 {enabled ? "Enabled" : "Disabled"}
               </Label>
             </div>
-            <div className={clsx(!enabled && "hidden")}>
+            <div className={cn(!enabled && "hidden")}>
               <Controller
                 name="max"
                 control={control}

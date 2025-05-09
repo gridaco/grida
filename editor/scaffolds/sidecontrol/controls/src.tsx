@@ -3,7 +3,7 @@
 import React, { createContext, useEffect } from "react";
 import { tokens } from "@grida/tokens";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { useFilePicker } from "use-file-picker";

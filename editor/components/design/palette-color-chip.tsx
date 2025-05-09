@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 type HSL = { h: number; s: number; l: number };
 

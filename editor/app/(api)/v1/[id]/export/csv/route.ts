@@ -7,8 +7,6 @@ import { createFormsClient } from "@/lib/supabase/server";
 
 type Params = { id: string };
 
-export const revalidate = 0;
-
 export async function GET(
   req: NextRequest,
   context: {

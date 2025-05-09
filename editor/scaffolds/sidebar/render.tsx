@@ -50,10 +50,10 @@ export function renderMenuGroup<T extends TMenuData>(
         <SidebarMenu>
           {menu.children.map((item: MenuItem<T> | MenuSeparator, i) => {
             if (item.type === "separator") {
-              return <hr />;
+              return <hr key={i} />;
             }
             return (
-              <SidebarMenuItem>
+              <SidebarMenuItem key={item.id.toString()}>
                 {renderMenuItem ? (
                   renderMenuItem({ item, onSelect: () => onSelect?.(item) })
                 ) : (

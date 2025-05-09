@@ -3,13 +3,14 @@ import { search } from "./actions";
 import Categories from "./_components/categories";
 import Gallery from "./_components/gallery";
 
-export default async function LibraryHomePage({
-  searchParams,
-}: {
-  searchParams: {
-    search?: string;
-  };
-}) {
+export default async function LibraryHomePage(
+  props: {
+    searchParams: Promise<{
+      search?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const q_search = searchParams?.search;
   const category = "textures";
   const objects = await search({

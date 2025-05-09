@@ -27,7 +27,7 @@ import {
 } from "@/grida-react-canvas/toolbar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEventTarget } from "@/grida-react-canvas/provider";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function ToolbarPosition({
   className,

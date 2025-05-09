@@ -45,7 +45,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { createBrowserClient } from "@/lib/supabase/client";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, use } from "react";
 import toast from "react-hot-toast";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import CustomerEditDialog, {
@@ -78,7 +78,7 @@ import { useProject } from "@/scaffolds/workspace";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useTags } from "@/scaffolds/workspace";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 type Params = {
   uid: string;
@@ -217,7 +217,10 @@ function MarketingStatusDot({
   );
 }
 
-export default function CustomerDetailPage({ params }: { params: Params }) {
+export default function CustomerDetailPage(props0: {
+  params: Promise<Params>;
+}) {
+  const params = use(props0.params);
   const { uid } = params;
 
   const router = useRouter();

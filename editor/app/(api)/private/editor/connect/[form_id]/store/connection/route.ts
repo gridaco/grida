@@ -10,8 +10,6 @@ import { generated_form_store_name } from "@/services/utils/generated-form-store
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-export const revalidate = 0;
-
 type Params = { form_id: string };
 
 export async function POST(

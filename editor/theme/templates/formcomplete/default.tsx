@@ -1,6 +1,5 @@
 import React from "react";
 import i18next from "i18next";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -50,32 +49,36 @@ export function Component({
   p,
   button,
   href,
-}: {
+}: Partial<{
   h1: string;
   p: string;
   button: string;
   href: string;
-}) {
+}>) {
   return (
     <Card className="w-full max-w-md p-4">
       <CardHeader className="flex flex-col items-center">
         <CheckIcon className="w-12 h-12 my-4 text-foreground" />
-        <h1
-          className="text-lg text-center font-bold text-foreground tracking-tight"
-          dangerouslySetInnerHTML={{
-            __html: h1,
-          }}
-        />
-        <span // p
-          className="text-sm text-center text-muted-foreground"
-          dangerouslySetInnerHTML={{
-            __html: p,
-          }}
-        />
+        {h1 && (
+          <h1
+            className="text-lg text-center font-bold text-foreground tracking-tight"
+            dangerouslySetInnerHTML={{
+              __html: h1,
+            }}
+          />
+        )}
+        {p && (
+          <span // p
+            className="text-sm text-center text-muted-foreground"
+            dangerouslySetInnerHTML={{
+              __html: p,
+            }}
+          />
+        )}
       </CardHeader>
       <CardContent className="p-0" />
       <CardFooter className="flex w-full p-0">
-        {href && (
+        {href && button && (
           // use a instead of Link to prevent app from crashing on object href (this can happen on editor)
           <a className="w-full" href={href}>
             <Button

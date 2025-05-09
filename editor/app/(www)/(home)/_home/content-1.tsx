@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Carousel, CarouselContent, CarouselItem } from "@/www/ui/carousel";
 import { type CarouselApi } from "@/www/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { motion } from "motion/react";
 
 import __src_1 from "@/public/www/.home/pixel-drawing.png";

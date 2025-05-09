@@ -5,7 +5,7 @@ import { SelectContent, SelectItem } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Button } from "@/components/ui/button";
 import { CaretDownIcon } from "@radix-ui/react-icons";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { TChange, TMixed } from "./utils/types";
 import { PropertyNumber } from "../ui";
 

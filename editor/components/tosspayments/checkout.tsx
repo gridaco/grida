@@ -14,7 +14,7 @@ import {
   ANONYMOUS,
   PaymentWidgetInstance,
 } from "@tosspayments/payment-widget-sdk";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 
 interface TossPaymentsCheckoutSessionContext
@@ -137,7 +137,7 @@ export function TossPaymentsPayButton({
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const session = useTossPaymentsCheckoutSession();
 
-  const classname = clsx(
+  const classname = cn(
     "w-full",
     "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
     "disabled:opacity-50 disabled:cursor-not-allowed",

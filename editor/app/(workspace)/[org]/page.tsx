@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { use } from "react";
 import Link from "next/link";
 import {
   ChevronDownIcon,
@@ -25,19 +25,15 @@ import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DocumentsGrid } from "./_components/documents-grid";
 
-export default function OrganizationDashboardPage({
-  params,
-  searchParams,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
+export default function OrganizationDashboardPage(props: {
+  params: Promise<{
     org: string;
-  };
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     layout?: "grid" | "list";
-  };
+  }>;
 }) {
+  const searchParams = use(props.searchParams);
   const layout = searchParams.layout ?? "list";
 
   const { loading, organization, projects, documents, refresh } =

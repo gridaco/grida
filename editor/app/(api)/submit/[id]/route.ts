@@ -61,8 +61,6 @@ import { Env } from "@/env";
 
 type Params = { id: string };
 
-export const revalidate = 0;
-
 export async function GET(
   req: NextRequest,
   context: {

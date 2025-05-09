@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { ChevronDownIcon, GearIcon, Share2Icon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -7,10 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import clsx from "clsx";
-import Link from "next/link";
+import { cn } from "@/components/lib/utils";
 import { editorlink, formlink } from "@/lib/forms/url";
 import { useEditorState } from "@/scaffolds/editor";
+import Link from "next/link";
 
 export function PreviewButton() {
   const [state] = useEditorState();
@@ -24,7 +25,7 @@ export function PreviewButton() {
       <Link href={built_in_agent_url} target="_blank">
         <button
           type="button"
-          className={clsx(
+          className={cn(
             "h-7 inline-flex items-center px-4 py-2 text-sm font-medium border rounded-s-lg focus:z-10 focus:ring-2",
             "gap-2"
           )}

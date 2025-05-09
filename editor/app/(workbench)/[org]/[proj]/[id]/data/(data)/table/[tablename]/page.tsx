@@ -20,18 +20,16 @@ import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { DGResponseRow } from "@/scaffolds/grid/types";
 import assert from "assert";
-import { useMemo } from "react";
+import { useMemo, use } from "react";
 import { Spinner } from "@/components/spinner";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 
-export default function SchemaTablePage({
-  params,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  params: {
+export default function SchemaTablePage(props: {
+  params: Promise<{
     tablename: string;
-  };
+  }>;
 }) {
+  const params = use(props.params);
   const [{ tables }] = useEditorState();
   const { tablename } = params;
 

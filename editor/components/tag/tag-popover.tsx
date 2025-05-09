@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { TagInputStyleClassesProps, type Tag as TagType } from "./tag-input";
 import { TagList, TagListProps } from "./tag-list";
 import { Button } from "../ui/button";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 type TagPopoverProps = {
   children: React.ReactNode;

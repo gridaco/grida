@@ -2,7 +2,7 @@
 // https://github.com/launch-ui/launch-ui/blob/main/components/ui/footer.tsx
 //
 
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import * as React from "react";
 
 const Footer = React.forwardRef<

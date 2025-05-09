@@ -30,7 +30,7 @@ import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewpor
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import Toolbar, {
   ToolbarPosition,

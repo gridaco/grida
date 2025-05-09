@@ -18,7 +18,7 @@ import {
   SYSTEM_GF_CUSTOMER_PHONE_KEY,
   SYSTEM_GF_CUSTOMER_NAME_KEY,
 } from "@/k/system";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   Popover,
   PopoverContent,

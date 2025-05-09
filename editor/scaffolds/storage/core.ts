@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import type StorageFileApi from "@supabase/storage-js/dist/module/packages/StorageFileApi";
 import { produce } from "immer";
 import { vfs } from "@/lib/vfs";
+import type { StorageClient } from "@supabase/storage-js";
+
+type StorageFileApi = ReturnType<StorageClient["from"]>;
 
 const EMPTY_FOLDER_PLACEHOLDER_FILE = ".emptyFolderPlaceholder";
 

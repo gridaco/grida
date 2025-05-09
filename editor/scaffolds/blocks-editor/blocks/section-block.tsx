@@ -20,7 +20,7 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 
 export function SectionBlock({ id }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
@@ -39,7 +39,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
         e.stopPropagation();
         setFocus();
       }}
-      className={clsx(
+      className={cn(
         "p-4 rounded-md border-primary border-2 bg-background shadow-md",
         'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
       )}

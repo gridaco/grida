@@ -2,13 +2,11 @@
 
 import Image from "next/image";
 import React from "react";
-import clsx from "clsx";
 import * as k from "./data";
 import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TopBottomFadingGradientOverlay } from "./gradient";
 import bentomainbg from "../../../../public/affiliate/poc/images/bento-fullsize-video-card-background.png";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function Demo() {
   return (
@@ -96,7 +94,7 @@ export function Demo() {
                           alt={`${category}-sub2`}
                           text1={sub.title}
                           text2={sub.description}
-                          className={clsx(
+                          className={cn(
                             "relative rounded-xl shadow-lg w-full border overflow-hidden",
                             "md:h-[320px]",
                             i === 0 ? "lg:col-start-1 lg:col-span-2" : ""

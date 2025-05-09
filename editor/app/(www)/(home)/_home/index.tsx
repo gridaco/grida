@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Pixelify_Sans } from "next/font/google";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";

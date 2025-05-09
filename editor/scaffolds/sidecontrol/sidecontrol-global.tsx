@@ -54,7 +54,7 @@ import { useTheme } from "next-themes";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PreferenceBody,
@@ -495,9 +495,7 @@ function Background() {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem key={"noop"} value={""}>
-            None
-          </SelectItem>
+          <SelectItem value="none">None</SelectItem>
           {backgrounds.map((background, i) => (
             <SelectItem key={background.embed} value={background.embed}>
               <div>
@@ -542,7 +540,7 @@ function SectionStyle() {
           <SelectValue placeholder="None" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={""}>None</SelectItem>
+          <SelectItem value="visible">None</SelectItem>
           {sections.map((section, i) => (
             <SelectItem key={i} value={section.css}>
               {section.name}

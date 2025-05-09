@@ -3,7 +3,7 @@
 import React from "react";
 import { domapi } from "../domapi";
 import { ViewportSurfaceContext } from "./context";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 
 export function ViewportRoot({
   className,

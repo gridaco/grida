@@ -10,11 +10,15 @@ export function FormPageBackground({
   src,
 }: TemplatePageBackgroundSchema) {
   const renderBackground = () => {
+    if (src === "none") {
+      return null;
+    }
+
     switch (element) {
       case "iframe":
         return <FormPageBackgroundIframe src={src!} />;
       default:
-        return <></>;
+        return null;
     }
   };
 

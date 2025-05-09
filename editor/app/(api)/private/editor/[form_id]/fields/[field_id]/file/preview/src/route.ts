@@ -9,8 +9,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 const expiresIn = 60 * 60;
 
-export const revalidate = expiresIn;
-
 type Params = { form_id: string; field_id: string };
 
 export async function GET(

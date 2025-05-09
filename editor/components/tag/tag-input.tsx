@@ -8,7 +8,7 @@ import { TagPopover } from "./tag-popover";
 import { TagList } from "./tag-list";
 import { tagVariants } from "./tag";
 import { Autocomplete } from "./autocomplete";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 
 export enum Delimiter {
   Comma = ",",

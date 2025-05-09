@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";

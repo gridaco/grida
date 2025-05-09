@@ -8,10 +8,11 @@ import {
   SYSTEM_X_GF_GEO_REGION_KEY,
   SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
-import { qboolean, qval } from "@/utils/qs";
+import { qboolean } from "@/utils/qs";
 import assert from "assert";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import type { NextRequest } from "next/server";
+import { geolocation, ipAddress } from "@vercel/functions";
 import { parseGFKeys } from "@/lib/forms/gfkeys";
 import { haccept } from "@/utils/h";
 
@@ -54,10 +55,10 @@ export function meta(
     accept: haccept(req.headers.get("accept")),
     useragent: req.headers.get("user-agent"),
     ip:
-      req.ip ||
+      ipAddress(req) ||
       req.headers.get("x-real-ip") ||
       req.headers.get("x-forwarded-for"),
-    geo: req.geo,
+    geo: geolocation(req),
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
     platform_powered_by: "web_client",

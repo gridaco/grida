@@ -26,7 +26,7 @@ import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { useExpandableInput } from "@/components/extension/search-input";
 import { motion } from "motion/react";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { useTableDefinition } from "@/scaffolds/data-query";
 
 export function XSBTextSearchInput({

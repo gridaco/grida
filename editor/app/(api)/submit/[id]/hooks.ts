@@ -1,8 +1,8 @@
-import { EmailTemplate } from "@/theme/templates-email/formcomplete/default";
 import { Bird } from "@/clients/bird";
 import { toArrayOf } from "@/types/utility";
 import { Env } from "@/env";
 import { resend } from "@/clients/resend";
+import EmailTemplate from "@/theme/templates-email/formcomplete/default";
 
 const bird = new Bird(
   process.env.BIRD_WORKSPACE_ID as string,
@@ -75,7 +75,6 @@ export namespace OnSubmitProcessors {
       from: typeof from === "string" ? from : `${from.name} <${from.email}>`,
       to: Array.isArray(to) ? to : [to],
       subject: type,
-      text: undefined as any, // bug
       react: EmailTemplate({ firstName: "John" }),
     });
 

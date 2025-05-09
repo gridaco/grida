@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { ColorPicker } from "./color-picker";
 import { css } from "@/grida/css";
 import HexValueInput from "./utils/hex";

@@ -1,5 +1,5 @@
 import { CustomCSS } from "@/theme/customcss";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { useMemo } from "react";
 
 export function CustomCSSProvider({

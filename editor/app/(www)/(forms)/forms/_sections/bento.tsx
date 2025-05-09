@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
+
 import bentomainbg from "@/app/(www)/(forms)/_sections/bento-bg.png";
 
 interface DemoCardData {
@@ -209,7 +210,9 @@ export default function Content2() {
           {categories.map((category, index) => (
             <button
               key={category}
-              ref={(el) => (tabsRef.current[index] = el)}
+              ref={(el) => {
+                tabsRef.current[index] = el;
+              }}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 font-normal transition-all ${
                 activeTabIndex === index
                   ? "bg-black text-white dark:invert"
@@ -278,7 +281,7 @@ export default function Content2() {
                   alt={`${categories[activeTabIndex]}-sub2`}
                   text1={sub.title}
                   text2={sub.description}
-                  className={clsx(
+                  className={cn(
                     "relative rounded-xl shadow-lg w-full border overflow-hidden",
                     "md:h-[320px]",
                     i === 0 ? "lg:col-start-1 lg:col-span-2" : ""
@@ -307,7 +310,7 @@ function BentoCardKeyword({
 
   return (
     <span>
-      <h1 className={clsx(gradientClasses, "inline-block", className)}>
+      <h1 className={cn(gradientClasses, "inline-block", className)}>
         {children}
       </h1>
     </span>

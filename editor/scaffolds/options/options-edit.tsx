@@ -4,7 +4,6 @@ import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   Cross1Icon,
   CrossCircledIcon,
-  DividerHorizontalIcon,
   DragHandleDots2Icon,
   GearIcon,
   ImageIcon,
@@ -12,7 +11,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { Switch } from "@/components/ui/switch";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import {
   arrayMove,
   SortableContext,
@@ -48,7 +47,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils";
 import { produce, type Draft } from "immer";
 import { draftid } from "@/utils/id";
 import { FolderIcon } from "lucide-react";
@@ -519,7 +517,7 @@ function OptionEditItem({
             />
           </label>
           <div
-            className={clsx(
+            className={cn(
               mode === "simple" && "hidden",
               "relative gap-2 flex-[2]"
             )}
@@ -552,7 +550,7 @@ function OptionEditItem({
             </div>
           </div>
 
-          <SlotSwitch className={clsx(mode === "simple" && "hidden")}>
+          <SlotSwitch className={cn(mode === "simple" && "hidden")}>
             <Switch checked={disabled} onCheckedChange={setDisabled} />
           </SlotSwitch>
 
@@ -561,9 +559,7 @@ function OptionEditItem({
           </button>
         </div>
         {src && (
-          <div
-            className={clsx("flex gap-1 mt-2", mode === "simple" && "hidden")}
-          >
+          <div className={cn("flex gap-1 mt-2", mode === "simple" && "hidden")}>
             <span className="flex-1" />
             <div className="flex-[2]">
               <div className="relative">
@@ -720,7 +716,7 @@ function OptgroupEditItem({
             </div>
           )}
           <Input
-            className={clsx("block w-full font-mono", !detailed && "pl-8")}
+            className={cn("block w-full font-mono", !detailed && "pl-8")}
             type="text"
             placeholder="Group Label"
             value={label}

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   Dispatch,
   SetStateAction,

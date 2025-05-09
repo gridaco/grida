@@ -5,8 +5,6 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
 
-export const revalidate = 0;
-
 export async function GET(req: NextRequest) {
   const headersList = await headers();
   const campaign_id = headersList.get("x-grida-west-campaign-id");

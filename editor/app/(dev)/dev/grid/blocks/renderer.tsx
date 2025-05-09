@@ -13,7 +13,7 @@ import type {
   GridaFormsGalleryBlock,
 } from "./types";
 import { Button } from "@/components/ui/button";
-import clsx from "clsx";
+import { cn } from "@/components/lib/utils";
 import * as CSS from "./css";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -89,7 +89,7 @@ function GridaGridTypographyBlock({
 
   return (
     <div
-      className={clsx(
+      className={cn(
         "w-full h-full"
         // "px-4"
       )}
@@ -121,7 +121,7 @@ function GridaGridTypographyBlock({
 function GridaGridButtonBlock({ label }: GridaGridButtonBlock) {
   return (
     <div
-      className={clsx(
+      className={cn(
         "flex w-full h-full items-center justify-center "
         // "px-4"
       )}
@@ -135,7 +135,7 @@ function GridaFormsStartButtonBlock({ status }: GridaFormsStartButtonBlock) {
   const label = status.ok.label;
   return (
     <div
-      className={clsx(
+      className={cn(
         "flex w-full h-full items-center justify-center "
         // "px-4"
       )}
@@ -180,7 +180,7 @@ function GridaFormsTimerBlock({}: GridaFormsTimerBlock) {
 
   return (
     <div
-      className={clsx(
+      className={cn(
         "flex w-full h-full items-center justify-center"
         // "px-4"
       )}
@@ -198,7 +198,7 @@ function GridaFormsTimerBlock({}: GridaFormsTimerBlock) {
 
 function GridaFormsGalleryBlock({ pictures }: GridaFormsGalleryBlock) {
   return (
-    <div className={clsx("flex w-full h-full items-center justify-center")}>
+    <div className={cn("flex w-full h-full items-center justify-center")}>
       {pictures.map(({ src }, i) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img key={i} className="w-full h-full object-cover" src={src} alt="" />

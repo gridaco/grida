@@ -7,7 +7,7 @@ import {
 import { Data } from "@/lib/data";
 import type { DGResponseRow } from "../grid";
 import { LineContent } from "../data-card/line";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import type { FormFieldDefinition } from "@/types";
 import { MediaRenderer } from "../data-card/media";
 

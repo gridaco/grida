@@ -2,8 +2,6 @@ import { createFormsClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-export const revalidate = 0;
-
 export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
 

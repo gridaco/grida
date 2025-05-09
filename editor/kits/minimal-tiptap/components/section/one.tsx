@@ -5,7 +5,7 @@ import type { FormatAction } from "../../types";
 import type { VariantProps } from "class-variance-authority";
 import type { toggleVariants } from "@/components/ui/toggle";
 import { CaretDownIcon, LetterCaseCapitalizeIcon } from "@radix-ui/react-icons";
-import { cn } from "@/utils/cn";
+import { cn } from "@/components/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,

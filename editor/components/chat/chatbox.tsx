@@ -2,12 +2,12 @@ import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUpIcon, ImageUpIcon } from "lucide-react";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { cn } from "@/utils/cn";
-import Image from "next/image";
-import TextareaAutoResize from "react-textarea-autosize";
 import { useFilePicker } from "use-file-picker";
-import type { FileIO } from "@/lib/file";
+import { cn } from "@/components/lib/utils";
+import TextareaAutoResize from "react-textarea-autosize";
 import toast from "react-hot-toast";
+import Image from "next/image";
+import type { FileIO } from "@/lib/file";
 
 export type Attachment = {
   type: "file" | "image";
@@ -30,7 +30,7 @@ export type ChatBoxContextValue = {
   clear: () => void;
   openFilePicker: () => void;
   acceptsImage: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 const ChatBoxContext = React.createContext<ChatBoxContextValue | null>(null);

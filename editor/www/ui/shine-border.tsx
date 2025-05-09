@@ -2,7 +2,7 @@
 
 "use client";
 
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import * as React from "react";
 
 interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {

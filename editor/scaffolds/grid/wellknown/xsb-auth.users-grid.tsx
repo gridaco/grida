@@ -22,7 +22,7 @@ import { CellRoot } from "../cells";
 import { GridaXSupabase } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import {
   StandaloneDataGridStateProvider,
   useDataGridState,

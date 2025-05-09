@@ -4,9 +4,10 @@ import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FileIO } from "@/lib/file";
-import { StorageClient } from "@supabase/storage-js";
 import { Env } from "@/env";
 import { useStorageClient, useUpload } from "@/scaffolds/platform/storage";
+
+type StorageClient = ReturnType<typeof useStorageClient>;
 
 function useCreateAsset() {
   const [state] = useEditorState();

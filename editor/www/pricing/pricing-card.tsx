@@ -1,8 +1,7 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { CheckIcon } from "@radix-ui/react-icons";
-import clsx from "clsx";
-import React from "react";
-import { ShineBorder } from "../ui/shine-border";
+import { ShineBorder } from "@/www/ui/shine-border";
 
 interface PricingCardFeatureItem {
   name: string;

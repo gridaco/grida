@@ -46,7 +46,7 @@ export const BitmapViewer: React.FC<BitmapViewerProps> = ({
   frame,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<BitmapRenderer>();
+  const rendererRef = useRef<BitmapRenderer | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -57,7 +57,7 @@ export const BitmapViewer: React.FC<BitmapViewerProps> = ({
       if (containerRef.current) {
         containerRef.current.innerHTML = "";
       }
-      rendererRef.current = undefined;
+      rendererRef.current = null;
     };
   }, [width, height, data, frame]);
 

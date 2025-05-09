@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import {
   Breadcrumb,
@@ -30,12 +30,10 @@ const checkname = async (name: string) => {
 
 type SearchParams = { error?: string };
 
-export default function NewOrganizationSetupPage({
-  searchParams,
-}: {
-  // TODO: [next15](https://nextjs.org/docs/app/building-your-application/upgrading/version-15#asynchronous-page)
-  searchParams: SearchParams;
+export default function NewOrganizationSetupPage(props: {
+  searchParams: Promise<SearchParams>;
 }) {
+  const searchParams = use(props.searchParams);
   const [name, setName] = useState("");
   const [ok, setOK] = useState(false);
   const [error, setError] = useState(!!searchParams.error);

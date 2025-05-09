@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ErrorViewProps = {
@@ -55,7 +55,7 @@ export function FormPageDeveloperErrorDialog({
     <Dialog>
       <DialogTrigger>
         <Button variant="destructive" size="icon">
-          <ExclamationTriangleIcon color="white" className="w-4 h-4" />
+          <TriangleAlertIcon color="white" className="w-4 h-4" />
         </Button>
       </DialogTrigger>
       <DialogContent>

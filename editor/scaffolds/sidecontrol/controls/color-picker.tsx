@@ -3,7 +3,7 @@ import HexValueInput from "./utils/hex";
 import { RgbaColorPicker } from "react-colorful";
 import { grida } from "@/grida";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
+import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEyeDropper } from "./utils/eyedropper";
