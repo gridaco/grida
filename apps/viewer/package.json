@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "packageManager": "pnpm@10.10.0",
   "dependencies": {
     "@uidotdev/usehooks": "^2.4.1",
     "lucide-react": "^0.367.0",
