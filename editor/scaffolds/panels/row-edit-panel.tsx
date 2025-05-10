@@ -37,7 +37,7 @@ import { AvatarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
 import { Toggle } from "@/components/ui/toggle";
-import { FormView } from "../e/form";
+import { FormView } from "@/scaffolds/e/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormSession, useRequestFormSession } from "../e/form/load";
 import { toast } from "sonner";

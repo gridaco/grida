@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -19,8 +19,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { FormView } from "@/scaffolds/e/form";
 import {
   ScreenMobileFrame,
   ScreenScrollable,
@@ -31,24 +30,11 @@ import { toast } from "sonner";
 import { TicketCheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
 import Link from "next/link";
-import {
-  SYSTEM_GF_CUSTOMER_NAME_KEY,
-  SYSTEM_GF_CUSTOMER_PHONE_KEY,
-} from "@/k/system";
-import { PhoneInput } from "@/components/extension/phone-input";
-import { Spinner } from "@/components/spinner";
 import * as Standard from "@/theme/templates/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { template } from "@/utils/template";
-
-interface GuestForm {
-  name: string;
-  phone: string;
-}
-
-// FIXME:
-const fixme_external_link =
-  "https://www.polestar.com/kr/test-drive/booking/ps4/at-polestar";
+import { useFormSession, useRequestFormSession } from "@/scaffolds/e/form/load";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const dictionary = {
   ko: {
@@ -123,29 +109,6 @@ export default function InvitationPageTemplate({
   const router = useRouter();
 
   const signupformDialog = useDialogState("signupform");
-
-  const onClaim = async (geust: GuestForm) => {
-    // const formid = (campaign.public as CampaignPublicData)["signup-form-id"];
-    const formdata = new FormData();
-    formdata.append(SYSTEM_GF_CUSTOMER_NAME_KEY, geust.name);
-    formdata.append(SYSTEM_GF_CUSTOMER_PHONE_KEY, geust.phone);
-    const submission = await fetch(`/v1/submit/${data.signup_form_id}`, {
-      method: "POST",
-      body: formdata,
-    }).then((res) => {
-      return res.json();
-    });
-
-    const customer_id = submission.data.customer_id;
-
-    const ok = await client?.claim?.(code, customer_id);
-    if (ok) {
-      toast.success(t.event_signup_success);
-      router.replace(fixme_external_link);
-    } else {
-      toast.error(t.event_signup_fail);
-    }
-  };
 
   // if (token.is_burned) {
   //   return <>Already used.</>;
@@ -258,7 +221,7 @@ export default function InvitationPageTemplate({
               )}
             </Card>
 
-            {/* TODO: use challenges */}
+            {/* FIXME: use challenges */}
             {is_claimed && (
               <div className="my-4">
                 <Card className="relative overflow-hidden">
@@ -273,12 +236,13 @@ export default function InvitationPageTemplate({
                     <p className="text-sm text-muted-foreground">
                       이벤트 참여가 완료되었습니다. 폴스타에서 시승을 완료해
                       주세요. 이후 문자를 통해 안내 드리겠습니다.
-                      <br />
+                      {/* FIXME: */}
+                      {/* <br />
                       <br />
                       시승 신청을 완료하지 못하였나요?{" "}
                       <Link href={fixme_external_link} className="underline">
                         다시 신청하기
-                      </Link>
+                      </Link> */}
                     </p>
                   </CardContent>
                 </Card>
@@ -286,7 +250,10 @@ export default function InvitationPageTemplate({
             )}
           </Standard.Section>
 
-          <SignUpForm {...signupformDialog.props} onSubmit={onClaim} />
+          <SignUpForm
+            {...signupformDialog.props}
+            form_id={data.signup_form_id}
+          />
 
           <Standard.Section>
             <header className="border-b py-2 my-4 text-sm text-muted-foreground">
@@ -318,151 +285,103 @@ export default function InvitationPageTemplate({
 }
 
 function SignUpForm({
+  form_id,
   onSubmit,
   ...props
 }: React.ComponentProps<typeof Drawer> & {
+  form_id: string;
   onSubmit?: (data: { name: string; phone: string }) => Promise<void>;
 }) {
-  const [isBusy, setIsBusy] = useState(false);
-  const [step, setStep] = React.useState(0);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-
-  const steps = [
-    { title: "시승 신청자 정보를 입력해주세요" },
-    {
-      title: "시승 예약 전 꼭 확인해주세요",
-      description: "모든 내용 확인 시 시승 예약이 가능합니다",
-    },
-  ];
-
-  const [checkedItems, setCheckedItems] = React.useState({
-    first: false,
-    second: false,
-  });
-
-  const step1valid = name.trim() !== "" && phone.trim() !== "";
-  const step2valid = checkedItems.first && checkedItems.second;
-
-  const canContinue = (step === 0 && step1valid) || (step === 1 && step2valid);
-
-  const stepdata = steps[step];
-
-  const handleSubmit = () => {
-    if (onSubmit && step1valid && step2valid) {
-      setIsBusy(true);
-      onSubmit({ name, phone }).finally(() => {
-        setIsBusy(false);
-        props.onOpenChange?.(false);
-        setStep(0);
-      });
-    }
-  };
-
-  const onNext = () => {
-    const max = steps.length - 1;
-    if (step < max) {
-      setStep((prev) => prev + 1);
-    } else {
-      handleSubmit();
-    }
-  };
-
-  const onPrev = () => {
-    if (step > 0) {
-      setStep((prev) => prev - 1);
-    } else {
-      props.onOpenChange?.(false);
-    }
-  };
-
-  const onCheckboxChange = (key: "first" | "second") => {
-    setCheckedItems((prev) => ({ ...prev, [key]: !prev[key] }));
+  const onClaim = async () => {
+    // const customer_id = submission.data.customer_id;
+    // const ok = await client?.claim?.(code, customer_id);
+    // if (ok) {
+    //   toast.success(t.event_signup_success);
+    //   router.replace(fixme_external_link);
+    // } else {
+    //   toast.error(t.event_signup_fail);
+    // }
   };
 
   return (
-    <Drawer {...props}>
-      <DrawerContent>
-        <DrawerHeader className="text-left">
-          <DrawerTitle>{stepdata.title}</DrawerTitle>
-          <DrawerDescription>{stepdata.description}</DrawerDescription>
-        </DrawerHeader>
-        <div className="px-4 my-4">
-          {step === 0 && (
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">이름</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="홍길동"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">핸드폰 번호</Label>
-                <div className="grid gap-2">
-                  <PhoneInput
-                    id="phone"
-                    defaultCountry="KR"
-                    placeholder="01012345678"
-                    required
-                    value={phone}
-                    onChange={(phone) => setPhone(phone)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+    <FormViewProvider form_id={form_id}>
+      <Drawer {...props}>
+        <DrawerContent>
+          <DrawerTitle className="sr-only">Mission Signup Form</DrawerTitle>
+          {/*  */}
+          <FormView.Body
+            onSubmit={(e) => {
+              e.preventDefault();
 
-          {step === 1 && (
-            <div className="grid gap-4">
-              <label className="flex items-start gap-2">
-                <Checkbox
-                  checked={checkedItems.first}
-                  onCheckedChange={() => onCheckboxChange("first")}
-                />
-                <span className="text-sm text-muted-foreground">
-                  개인정보 수집에 동의합니다. (응모자 식별 정보: 이름, 연락처)
-                </span>
-              </label>
-              <label className="flex items-start gap-2">
-                <Checkbox
-                  checked={checkedItems.second}
-                  onCheckedChange={() => onCheckboxChange("second")}
-                />
-                <span className="text-sm text-muted-foreground">
-                  반드시 현재 입력하신 시승 신청자 정보와 동일한 <br />{" "}
-                  &quot;이름과 핸드폰 번호&quot;로 시승 예약을 해야 이벤트
-                  참여가 인정됩니다.
-                </span>
-              </label>
-            </div>
-          )}
+              const formdata = new FormData(e.target as HTMLFormElement);
+              // onSubmit?.(formdata);
+            }}
+            className="max-w-full"
+            config={{
+              is_powered_by_branding_enabled: false,
+            }}
+          />
+
+          <DrawerFooter className="pt-2">
+            <FormView.Prev>Previous</FormView.Prev>
+            <FormView.Next>Next</FormView.Next>
+            <FormView.Submit>Save</FormView.Submit>
+            {/*  */}
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </FormViewProvider>
+  );
+}
+
+function FormViewProvider({
+  form_id,
+  children,
+}: React.PropsWithChildren<{
+  form_id: string;
+}>) {
+  const { session, clearSessionStorage } = useRequestFormSession(form_id);
+  const {
+    data: res,
+    error: servererror,
+    isLoading,
+  } = useFormSession(form_id, {
+    mode: "signed",
+    session_id: session,
+    // TODO: not implemented
+    user_id: "",
+  });
+
+  useEffect(() => {
+    return () => {
+      clearSessionStorage();
+    };
+  }, []);
+
+  const { data, error } = res || {};
+
+  if (isLoading || !session || !data) {
+    return (
+      <main className="h-screen min-h-screen">
+        <div className="p-4 overflow-auto flex-1">
+          <Skeleton className="w-full h-96" />
         </div>
-        <DrawerFooter className="pt-2">
-          <div className="w-full flex items-center gap-2">
-            <Button variant="outline" onClick={onPrev}>
-              이전으로
-            </Button>
-            <Button
-              onClick={onNext}
-              disabled={!canContinue || isBusy}
-              className="w-full"
-            >
-              {isBusy ? (
-                <>
-                  <Spinner className="me-2" />
-                  신청중...
-                </>
-              ) : (
-                <>다음으로</>
-              )}
-            </Button>
-          </div>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+      </main>
+    );
+  }
+
+  const { blocks, tree, fields, default_values } = data;
+
+  return (
+    <FormView.Root
+      form_id={form_id}
+      session_id={session}
+      fields={fields}
+      defaultValues={default_values}
+      blocks={blocks}
+      tree={tree}
+    >
+      {children}
+    </FormView.Root>
   );
 }

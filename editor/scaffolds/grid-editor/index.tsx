@@ -663,11 +663,11 @@ function TableMod() {
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="end">
             <DropdownMenuItem onSelect={openNewTuplePanel}>
-              <Rows3Icon className="w-4 h-4 align-middle me-2" />
+              <Rows3Icon className="size-4" />
               Insert Row
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={openNewAttributePanel}>
-              <Columns3Icon className="w-4 h-4 align-middle me-2" />
+              <Columns3Icon className="size-4" />
               Insert Column
             </DropdownMenuItem>
           </DropdownMenuContent>
