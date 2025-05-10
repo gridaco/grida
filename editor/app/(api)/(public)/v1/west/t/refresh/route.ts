@@ -1,7 +1,7 @@
 import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
-import type { Platform } from "@/lib/platform";
+import { Platform } from "@/lib/platform";
 import assert from "assert";
 
 const IS_HOSTED = process.env.VERCEL === "1";
@@ -12,13 +12,23 @@ const IS_HOSTED = process.env.VERCEL === "1";
 export async function POST(req: NextRequest) {
   //
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
-  const code = headersList.get("x-grida-west-token-code");
-  const invitation_id = headersList.get("x-grida-west-invitation-id");
+  const campaign_id = headersList.get(
+    Platform.headers["x-grida-west-campaign-id"]
+  );
+  const code = headersList.get(Platform.headers["x-grida-west-token-code"]);
+  const invitation_id = headersList.get(
+    Platform.headers["x-grida-west-invitation-id"]
+  );
 
-  assert(campaign_id, "x-grida-west-campaign-id is required");
-  assert(code, "x-grida-west-token-code is required");
-  assert(invitation_id, "x-grida-west-invitation-id is required");
+  assert(
+    campaign_id,
+    `${Platform.headers["x-grida-west-campaign-id"]} is required`
+  );
+  assert(code, `${Platform.headers["x-grida-west-token-code"]} is required`);
+  assert(
+    invitation_id,
+    `${Platform.headers["x-grida-west-invitation-id"]} is required`
+  );
 
   const { data: _data, error: refresh_err } = await service_role.west_referral
     .rpc("refresh", {

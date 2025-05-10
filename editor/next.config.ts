@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import createMDX from "@next/mdx";
-
+import { Platform } from "@/lib/platform";
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 
@@ -174,7 +174,11 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Access-Control-Allow-Headers",
-            value: "Content-Type, Authorization",
+            value: [
+              "Content-Type",
+              "Authorization",
+              ...Object.values(Platform.headers),
+            ].join(", "),
           },
         ],
       },

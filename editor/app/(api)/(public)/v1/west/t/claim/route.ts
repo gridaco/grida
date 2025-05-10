@@ -2,18 +2,23 @@ import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
-
+import { Platform } from "@/lib/platform";
 /**
  * [claim]
  */
 export async function POST(req: NextRequest) {
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
-  const customer_id = headersList.get("x-grida-customer-id");
-  const code = headersList.get("x-grida-west-token-code");
+  const campaign_id = headersList.get(
+    Platform.headers["x-grida-west-campaign-id"]
+  );
+  const customer_id = headersList.get(Platform.headers["x-grida-customer-id"]);
+  const code = headersList.get(Platform.headers["x-grida-west-token-code"]);
 
-  assert(campaign_id, "x-grida-west-campaign-id is required");
-  assert(code, "x-grida-west-token-code is required");
+  assert(
+    campaign_id,
+    `${Platform.headers["x-grida-west-campaign-id"]} is required`
+  );
+  assert(code, `${Platform.headers["x-grida-west-token-code"]} is required`);
 
   if (!customer_id) {
     return NextResponse.json({ error: "forbidden" }, { status: 400 });
