@@ -145,41 +145,19 @@ export function CreateNewDocumentButton({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={8}>
+        <DropdownMenuContent align="end" sideOffset={8} className="min-w-52">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Forms / Events</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_form}>
               <ResourceTypeIcon type="v0_form" className="size-4" />
-              Blank Form
+              Form
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                new_formn_with_template("headless");
-              }}
-            >
-              <ResourceTypeIcon type="dev" className="size-4" />
-              Blank Headless Form
+            <DropdownMenuItem onSelect={new_default_cavas}>
+              <ResourceTypeIcon type="v0_canvas" className="size-4" />
+              Design
+              <Badge variant="outline" className="ms-auto">
+                canary
+              </Badge>
             </DropdownMenuItem>
-            <Link href="/forms/ai" target="_blank">
-              <DropdownMenuItem>
-                <ResourceTypeIcon type="ai" className="size-4" />
-                Create with AI
-              </DropdownMenuItem>
-            </Link>
-            <DropdownMenuSeparator />
-            <Link href={`/${organization_name}/${project_name}/new/referral`}>
-              <DropdownMenuItem>
-                <ResourceTypeIcon type="campaign" className="size-4" />
-                Referral
-                <Badge variant="outline" className="ms-auto">
-                  beta
-                </Badge>
-              </DropdownMenuItem>
-            </Link>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Database / Storage</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
               <ResourceTypeIcon type="database" className="size-4" />
               Database
@@ -194,6 +172,33 @@ export function CreateNewDocumentButton({
                 beta
               </Badge>
             </DropdownMenuItem>
+            <Link href={`/${organization_name}/${project_name}/new/referral`}>
+              <DropdownMenuItem>
+                <ResourceTypeIcon type="campaign" className="size-4" />
+                Campaign
+                <Badge variant="outline" className="ms-auto">
+                  beta
+                </Badge>
+              </DropdownMenuItem>
+            </Link>
+          </DropdownMenuGroup>
+          <DropdownMenuGroup hidden>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Dev</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => {
+                new_formn_with_template("headless");
+              }}
+            >
+              <ResourceTypeIcon type="dev" className="size-4" />
+              Blank Headless Form
+            </DropdownMenuItem>
+            <Link href="/forms/ai" target="_blank">
+              <DropdownMenuItem>
+                <ResourceTypeIcon type="ai" className="size-4" />
+                Create with AI
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem
               disabled={IS_PRODUCTION}
               onSelect={() => alert("coming soon")}
@@ -202,17 +207,6 @@ export function CreateNewDocumentButton({
               Localization
               <Badge variant="outline" className="ms-auto">
                 soon
-              </Badge>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </DropdownMenuGroup>
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Design</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={new_default_cavas}>
-              <ResourceTypeIcon type="v0_canvas" className="size-4" />
-              Canvas
-              <Badge variant="outline" className="ms-auto">
-                canary
               </Badge>
             </DropdownMenuItem>
           </DropdownMenuGroup>
