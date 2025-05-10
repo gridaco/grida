@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCampaignAgent } from "../../store";
 import { useLayout } from "@/scaffolds/tenant";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
+import { Env } from "@/env";
 
 type Params = {
   code: string;
@@ -22,7 +23,10 @@ export default function LayoutPage(props: { params: Promise<Params> }) {
   const { template } = useLayout();
   const campaign = useCampaignAgent();
   const client = useMemo(
-    () => new Platform.WEST.Referral.WestReferralClient(campaign.id),
+    () =>
+      new Platform.WEST.Referral.WestReferralClient(campaign.id, {
+        base_url: `${Env.web.HOST}/v1/west`,
+      }),
     [campaign.id]
   );
 
