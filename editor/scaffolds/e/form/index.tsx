@@ -53,7 +53,7 @@ export function Agent({
 
   if (isLoading || !session || !data) {
     return (
-      <main className="h-screen min-h-screen">
+      <main className="h-dvh min-h-dvh">
         <div className="prose mx-auto p-4 pt-10 md:pt-16 h-full overflow-auto flex-1">
           <SkeletonCard />
         </div>

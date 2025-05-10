@@ -20,7 +20,7 @@ export default async function BadRequestPage({
   await ssr_page_init_i18n({ form_id });
 
   return (
-    <main className="container mx-auto flex items-center justify-center w-screen h-screen">
+    <main className="container mx-auto flex items-center justify-center w-dvw min-h-dvh">
       <Card className="w-full max-w-md p-4">
         <CardHeader className="flex flex-col items-center">
           <h2 className="text-lg text-center font-bold tracking-tight">
