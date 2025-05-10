@@ -6,10 +6,19 @@ import Papa from "papaparse";
 
 export namespace Platform {
   export const headers = {
+    // grida.customer
+    "x-grida-customer-id": "x-grida-customer-id",
+    // grida.west
     "x-grida-west-campaign-id": "x-grida-west-campaign-id",
     "x-grida-west-token-code": "x-grida-west-token-code",
     "x-grida-west-invitation-id": "x-grida-west-invitation-id",
-    "x-grida-customer-id": "x-grida-customer-id",
+    // grida.form
+    "x-gf-geo-latitude": "x-gf-geo-latitude",
+    "x-gf-geo-longitude": "x-gf-geo-longitude",
+    "x-gf-geo-city": "x-gf-geo-city",
+    "x-gf-geo-region": "x-gf-geo-region",
+    "x-gf-geo-country": "x-gf-geo-country",
+    "x-gf-simulator": "x-gf-simulator",
   } as const;
 }
 

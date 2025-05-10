@@ -1,13 +1,8 @@
 import {
   SYSTEM_GF_SESSION_KEY,
   SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY,
-  SYSTEM_X_GF_GEO_CITY_KEY,
-  SYSTEM_X_GF_GEO_COUNTRY_KEY,
-  SYSTEM_X_GF_GEO_LATITUDE_KEY,
-  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_X_GF_GEO_REGION_KEY,
-  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
+import { Platform } from "@/lib/platform";
 import { qboolean } from "@/utils/qs";
 import assert from "assert";
 import type { Geo, PlatformPoweredBy } from "@/types";
@@ -66,11 +61,17 @@ export function meta(
 
   // optionally, developer can override the ip and geo via data body.
   // gf geo
-  const __GF_GEO_LATITUDE = req.headers.get(SYSTEM_X_GF_GEO_LATITUDE_KEY);
-  const __GF_GEO_LONGITUDE = req.headers.get(SYSTEM_X_GF_GEO_LONGITUDE_KEY);
-  const __GF_GEO_REGION = req.headers.get(SYSTEM_X_GF_GEO_REGION_KEY);
-  const __GF_GEO_COUNTRY = req.headers.get(SYSTEM_X_GF_GEO_COUNTRY_KEY);
-  const __GF_GEO_CITY = req.headers.get(SYSTEM_X_GF_GEO_CITY_KEY);
+  const __GF_GEO_LATITUDE = req.headers.get(
+    Platform.headers["x-gf-geo-latitude"]
+  );
+  const __GF_GEO_LONGITUDE = req.headers.get(
+    Platform.headers["x-gf-geo-longitude"]
+  );
+  const __GF_GEO_REGION = req.headers.get(Platform.headers["x-gf-geo-region"]);
+  const __GF_GEO_COUNTRY = req.headers.get(
+    Platform.headers["x-gf-geo-country"]
+  );
+  const __GF_GEO_CITY = req.headers.get(Platform.headers["x-gf-geo-city"]);
 
   if (
     __GF_GEO_LATITUDE ||
@@ -96,7 +97,9 @@ export function meta(
   }
 
   // gf simulator flag
-  const __GF_SIMULATOR_FLAG = req.headers.get(SYSTEM_X_GF_SIMULATOR_FLAG_KEY);
+  const __GF_SIMULATOR_FLAG = req.headers.get(
+    Platform.headers["x-gf-simulator"]
+  );
   if (__GF_SIMULATOR_FLAG) {
     if (qboolean(String(__GF_SIMULATOR_FLAG))) {
       meta.platform_powered_by = "simulator";

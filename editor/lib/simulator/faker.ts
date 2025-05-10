@@ -1,15 +1,8 @@
 import { FieldSupports } from "@/k/supported_field_types";
 import { FormRenderTree } from "../forms";
 import { faker } from "@faker-js/faker";
-import {
-  SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_X_GF_GEO_CITY_KEY,
-  SYSTEM_X_GF_GEO_COUNTRY_KEY,
-  SYSTEM_X_GF_GEO_LATITUDE_KEY,
-  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_X_GF_GEO_REGION_KEY,
-  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
-} from "@/k/system";
+import { SYSTEM_GF_CUSTOMER_UUID_KEY } from "@/k/system";
+import { Platform } from "@/lib/platform";
 
 export type FakeLocationPlan =
   | { type: "world" }
@@ -41,12 +34,12 @@ export class CustomerFaker {
         [SYSTEM_GF_CUSTOMER_UUID_KEY]: this.identity,
       },
       headers: {
-        [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
-        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: lat.toString(),
-        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: lon.toString(),
-        [SYSTEM_X_GF_GEO_REGION_KEY]: faker.location.state(),
-        [SYSTEM_X_GF_GEO_COUNTRY_KEY]: faker.location.country(),
-        [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
+        [Platform.headers["x-gf-geo-city"]]: faker.location.city(),
+        [Platform.headers["x-gf-geo-latitude"]]: lat.toString(),
+        [Platform.headers["x-gf-geo-longitude"]]: lon.toString(),
+        [Platform.headers["x-gf-geo-region"]]: faker.location.state(),
+        [Platform.headers["x-gf-geo-country"]]: faker.location.country(),
+        [Platform.headers["x-gf-simulator"]]: "1",
       },
     };
     //

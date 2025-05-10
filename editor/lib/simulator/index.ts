@@ -1,12 +1,12 @@
-import { SYSTEM_X_GF_SIMULATOR_FLAG_KEY } from "@/k/system";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
-import assert from "assert";
 import { FormDocument } from "@/types";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { type FakeLocationPlan, FormDataFaker, CustomerFaker } from "./faker";
+import { Platform } from "../platform";
+import assert from "assert";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
@@ -233,7 +233,7 @@ export class Simulator {
       },
       headers: {
         ...customerdata.headers,
-        [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
+        [Platform.headers["x-gf-simulator"]]: "1",
         accept: "application/json",
       },
       bot_id: customerdata.data.__gf_customer_uuid,
