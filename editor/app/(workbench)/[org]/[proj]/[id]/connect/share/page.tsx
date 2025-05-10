@@ -43,13 +43,19 @@ export default function WithLink() {
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Built-in Page URL</>} />
             <PreferenceBody>
-              <p className="mb-2 opacity-80">
-                Share this link with your users to let them fill out the form.
-                <br />
-              </p>
-              <div className="w-full flex flex-col gap-2">
-                <CopyToClipboardInput value={url} />
-                <CopyToClipboardInput value={url_tenant} />
+              <div className="w-full flex flex-col gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Your custom domain URL (may change)
+                  </label>
+                  <CopyToClipboardInput value={url_tenant} />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Static URL (always available)
+                  </label>
+                  <CopyToClipboardInput value={url} />
+                </div>
               </div>
             </PreferenceBody>
           </PreferenceBox>
