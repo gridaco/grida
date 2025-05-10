@@ -21,7 +21,7 @@ export function FormAgentGlobalWindowMessagingInterface({
 }: React.PropsWithChildren<{}>) {
   useEffect(() => {
     const cb_onload_interface_ready = () => {
-      console.log("[MESSAGE] | forms.grida.co | onload");
+      console.log("[MESSAGE] | grida.co/forms | onload");
       FormAgentMessagingInterface.emit({
         type: "form_view_loaded",
         loaded: true,
@@ -35,7 +35,7 @@ export function FormAgentGlobalWindowMessagingInterface({
     };
 
     const cb_hashchange = (ev: HashChangeEvent) => {
-      console.log("[MESSAGE] | forms.grida.co | hashchange", ev);
+      console.log("[MESSAGE] | grida.co/forms | hashchange", ev);
       FormAgentMessagingInterface.emit({
         type: "hashchange",
         newURL: ev.newURL,

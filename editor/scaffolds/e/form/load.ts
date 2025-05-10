@@ -32,7 +32,7 @@ export function useRequestFormSession(form_id: string) {
     }
 
     // console.log("fetching session");
-    fetch(`/v1/${form_id}/session`).then((res) => {
+    fetch(`${Env.web.HOST}/v1/${form_id}/session`).then((res) => {
       res.json().then(({ data }: EditorApiResponse<{ id: string }>) => {
         if (data?.id) {
           set_session(data.id);
