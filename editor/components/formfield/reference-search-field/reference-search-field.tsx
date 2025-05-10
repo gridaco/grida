@@ -4,6 +4,7 @@ import { GridaXSupabase } from "@/types";
 import { SearchInput } from "@/components/extension/search-input";
 import { InputSkeleton } from "@/components/extension/input-skeleton";
 import { FormsSecureXSBSQLForeignKeySearchInput } from "./xsb-secured";
+import { Env } from "@/env";
 import useSWR from "swr";
 
 /**
@@ -25,7 +26,7 @@ function useSearchMeta({
 }) {
   return useSWR<GridaXSupabase.Forms.XSBSearchMetaResult>(
     session_id
-      ? `/v1/session/${session_id}/field/${field_id}/search/meta`
+      ? `${Env.web.HOST}/v1/session/${session_id}/field/${field_id}/search/meta`
       : undefined,
     async (url: string) => {
       const res = await fetch(url);

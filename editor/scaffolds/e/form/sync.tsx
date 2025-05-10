@@ -1,6 +1,9 @@
+"use client";
+
 import React, { useEffect } from "react";
 import { useFormAgentState } from "@/lib/formstate";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
+import { Env } from "@/env";
 
 export function SessionDataSyncProvider({
   session_id,
@@ -20,7 +23,7 @@ export function SessionDataSyncProvider({
       value: string | number | boolean | string[] | undefined | null
     ) => {
       try {
-        fetch(`/v1/session/${session_id}/field/${field_id}`, {
+        fetch(`${Env.web.HOST}/v1/session/${session_id}/field/${field_id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",

@@ -4,7 +4,14 @@ import type { Authentication } from "../auth";
 import { unflatten } from "flat";
 import Papa from "papaparse";
 
-export namespace Platform {}
+export namespace Platform {
+  export const headers = {
+    "x-grida-west-campaign-id": "x-grida-west-campaign-id",
+    "x-grida-west-token-code": "x-grida-west-token-code",
+    "x-grida-west-invitation-id": "x-grida-west-invitation-id",
+    "x-grida-customer-id": "x-grida-customer-id",
+  } as const;
+}
 
 /**
  * the supported csv features and implementations
@@ -659,9 +666,6 @@ export namespace Platform.WEST.Referral {
     url: string;
   };
 
-  const _x_grida_west_campaign_id = "x-grida-west-campaign-id";
-  const _x_grida_west_token_code = "x-grida-west-token-code";
-
   export class WestReferralClient {
     readonly BASE_URL: string;
     constructor(
@@ -680,8 +684,8 @@ export namespace Platform.WEST.Referral {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_id]: this.campaign_id,
-          [_x_grida_west_token_code]: code,
+          [Platform.headers["x-grida-west-campaign-id"]]: this.campaign_id,
+          [Platform.headers["x-grida-west-token-code"]]: code,
         },
       }).then((res) => res.json());
     }
@@ -696,8 +700,8 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_id]: this.campaign_id,
-          [_x_grida_west_token_code]: code,
+          [Platform.headers["x-grida-west-campaign-id"]]: this.campaign_id,
+          [Platform.headers["x-grida-west-token-code"]]: code,
         },
       }).then((res) => res.json());
     }
@@ -715,9 +719,9 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_id]: this.campaign_id,
-          [_x_grida_west_token_code]: code,
-          "x-grida-west-invitation-id": invitation_id,
+          [Platform.headers["x-grida-west-campaign-id"]]: this.campaign_id,
+          [Platform.headers["x-grida-west-token-code"]]: code,
+          [Platform.headers["x-grida-west-invitation-id"]]: invitation_id,
         },
       }).then((res) => res.json());
     }
@@ -727,9 +731,9 @@ export namespace Platform.WEST.Referral {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_id]: this.campaign_id,
-          "x-grida-customer-id": owner_id,
-          [_x_grida_west_token_code]: code,
+          [Platform.headers["x-grida-west-campaign-id"]]: this.campaign_id,
+          [Platform.headers["x-grida-customer-id"]]: owner_id,
+          [Platform.headers["x-grida-west-token-code"]]: code,
         },
       }).then((res) => {
         return res.ok;
@@ -745,8 +749,8 @@ export namespace Platform.WEST.Referral {
         }),
         headers: {
           "Content-Type": "application/json",
-          [_x_grida_west_campaign_id]: this.campaign_id,
-          [_x_grida_west_token_code]: code,
+          [Platform.headers["x-grida-west-campaign-id"]]: this.campaign_id,
+          [Platform.headers["x-grida-west-token-code"]]: code,
         },
       });
       //

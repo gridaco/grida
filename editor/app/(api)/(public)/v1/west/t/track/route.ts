@@ -2,6 +2,7 @@ import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import assert from "assert";
+import { Platform } from "@/lib/platform";
 
 /**
  * [track]
@@ -9,11 +10,16 @@ import assert from "assert";
 export async function POST(req: NextRequest) {
   const { name, data } = await req.json();
   const headersList = await headers();
-  const campaign_id = headersList.get("x-grida-west-campaign-id");
-  const code = headersList.get("x-grida-west-token-code");
+  const campaign_id = headersList.get(
+    Platform.headers["x-grida-west-campaign-id"]
+  );
+  const code = headersList.get(Platform.headers["x-grida-west-token-code"]);
 
-  assert(code, "x-grida-west-token-code is required");
-  assert(campaign_id, "x-grida-west-campaign-id is required");
+  assert(code, `${Platform.headers["x-grida-west-token-code"]} is required`);
+  assert(
+    campaign_id,
+    `${Platform.headers["x-grida-west-campaign-id"]} is required`
+  );
 
   const { error: track_err } = await service_role.west_referral.rpc("track", {
     p_campaign_id: campaign_id,
