@@ -26,7 +26,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { DatePicker, TZPicker, TimePicker } from "./pickers";
 import { useEditorState } from "@/scaffolds/editor";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function SchedulingPreferences() {
   const [state, dispatch] = useEditorState();
@@ -105,25 +105,24 @@ export function SchedulingPreferences() {
       scheduling_tz: openTz, // Save the timezone used
     };
 
-    const updating =
-      PrivateEditorApi.Settings.updateFormAccessScheduling(payload);
+    const updating = PrivateEditorApi.Settings.updateFormAccessScheduling(
+      payload
+    ).then(() => {
+      dispatch({
+        type: "editor/form/campaign/preferences",
+        is_scheduling_enabled: payload.enabled,
+        scheduling_open_at: payload.open_at,
+        scheduling_close_at: payload.close_at,
+        scheduling_tz: payload.scheduling_tz,
+      });
+    });
 
     try {
-      await toast
-        .promise(updating, {
-          loading: "Saving...",
-          success: "Saved!",
-          error: "Failed to save",
-        })
-        .then(() => {
-          dispatch({
-            type: "editor/form/campaign/preferences",
-            is_scheduling_enabled: payload.enabled,
-            scheduling_open_at: payload.open_at,
-            scheduling_close_at: payload.close_at,
-            scheduling_tz: payload.scheduling_tz,
-          });
-        });
+      await toast.promise(updating, {
+        loading: "Saving...",
+        success: "Saved!",
+        error: "Failed to save",
+      });
 
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}

@@ -1,5 +1,5 @@
 import { ThemeProvider } from "@/components/theme-provider";
-import { ToasterWithMax } from "@/components/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
@@ -44,7 +44,7 @@ export default async function Layout({
                 </div>
               </div>
               <EditorHelpFab />
-              <ToasterWithMax position="bottom-center" max={5} />
+              <Toaster position="bottom-center" />
             </TooltipProvider>
           </ThemeProvider>
         </div>

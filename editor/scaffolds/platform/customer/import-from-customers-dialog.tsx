@@ -27,7 +27,7 @@ import { SearchInput } from "@/components/extension/search-input";
 import { useCustomers } from "./use-customer-feed";
 import { useProject } from "@/scaffolds/workspace";
 import { format } from "date-fns";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function ImportFromCustomersDialog({
   onImport,

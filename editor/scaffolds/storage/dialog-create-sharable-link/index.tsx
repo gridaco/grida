@@ -8,7 +8,7 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { wellkown } from "@/utils/mimetype";
 import { useStorageEditor } from "../core";
 import { Safari, SafariToolbar } from "@/components/frames/safari";

@@ -16,7 +16,7 @@ import {
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
 import { tokens } from "@grida/tokens";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";

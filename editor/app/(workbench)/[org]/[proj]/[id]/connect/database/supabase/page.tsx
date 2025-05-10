@@ -32,7 +32,7 @@ import {
   QuestionMarkCircledIcon,
   TableIcon,
 } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { SupabaseLogo } from "@/components/logos";
 import Link from "next/link";
 import {
@@ -103,16 +103,14 @@ const testSupabaseConnection = async ({
       anonKey,
       schemas: [schema_name],
     }
-  );
+  ).catch(console.error);
 
   try {
-    await toast
-      .promise(parsing, {
-        loading: "Testing...",
-        success: "Valid Connection",
-        error: "Failed to connect to Supabase",
-      })
-      .catch(console.error);
+    await toast.promise(parsing, {
+      loading: "Testing...",
+      success: "Valid Connection",
+      error: "Failed to connect to Supabase",
+    });
 
     return await parsing;
   } catch (e) {
@@ -211,36 +209,32 @@ function ConnectSupabase() {
       project_id: project_id,
       sb_anon_key: anonKey,
       sb_project_url: url,
+    }).then((res) => {
+      setXSBProject(res.data.data);
     });
 
-    toast
-      .promise(res, {
-        loading: "Creating Connection...",
-        success: "Connection Created",
-        error: "Failed to create connection",
-      })
-      .then((res) => {
-        setXSBProject(res.data.data);
-      });
+    toast.promise(res, {
+      loading: "Creating Connection...",
+      success: "Connection Created",
+      error: "Failed to create connection",
+    });
   };
 
   const onRemoveConnectionClick = async () => {
     const res = PrivateEditorApi.XSupabase.deleteXSBProjectConnection(
       xsbproject!.id
-    );
+    ).then(() => {
+      setXSBProject(null);
+      setUrl("");
+      setAnonKey("");
+      set_schema_definitions(null);
+    });
 
-    toast
-      .promise(res, {
-        loading: "Removing Connection...",
-        success: "Connection Removed",
-        error: "Failed to remove connection",
-      })
-      .then(() => {
-        setXSBProject(null);
-        setUrl("");
-        setAnonKey("");
-        set_schema_definitions(null);
-      });
+    toast.promise(res, {
+      loading: "Removing Connection...",
+      success: "Connection Removed",
+      error: "Failed to remove connection",
+    });
   };
 
   return (

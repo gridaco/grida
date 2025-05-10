@@ -1,7 +1,7 @@
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ToasterWithMax } from "@/components/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { cookies } from "next/headers";
@@ -46,8 +46,8 @@ export default async function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
+              <Toaster position="bottom-center" />
               {children}
-              <ToasterWithMax position="bottom-center" max={5} />
             </ThemeProvider>
           </div>
         </PlatformProvider>

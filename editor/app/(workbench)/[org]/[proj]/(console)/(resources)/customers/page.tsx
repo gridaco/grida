@@ -56,7 +56,7 @@ import { DateFormatRadioGroup } from "@/scaffolds/data-format/ui/date-format";
 import { DateTimeZoneRadioGroup } from "@/scaffolds/data-format/ui/date-timezone";
 import { cn } from "@/components/lib/utils";
 import CustomerEditDialog from "@/scaffolds/platform/customer/customer-edit-dialog";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Platform } from "@/lib/platform";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TableQueryChips } from "@/scaffolds/grid-editor/components/query/query-chips";

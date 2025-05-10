@@ -18,7 +18,7 @@ import {
   RocketIcon,
   SlashIcon,
 } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { forms_examples } from "./k";
 import { generate } from "@/app/actions";

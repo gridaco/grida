@@ -48,7 +48,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useForm, Controller } from "react-hook-form";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { useRouter } from "next/navigation";
 import { renderMenuGroup } from "./render";

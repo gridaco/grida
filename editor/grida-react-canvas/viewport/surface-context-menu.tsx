@@ -11,7 +11,7 @@ import {
   useDocument,
   useSelection,
 } from "../provider";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
 
 export function EditorSurfaceContextMenu({

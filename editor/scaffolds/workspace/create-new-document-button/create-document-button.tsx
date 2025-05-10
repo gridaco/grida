@@ -36,7 +36,7 @@ import {
   NewDocumentRequest,
   NewDocumentResponse,
 } from "@/app/(api)/private/editor/new/route";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";

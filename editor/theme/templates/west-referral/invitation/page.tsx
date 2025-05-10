@@ -27,7 +27,7 @@ import {
 } from "@/theme/templates/kit/components";
 import { Platform } from "@/lib/platform";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { TicketCheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
 import Link from "next/link";

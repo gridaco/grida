@@ -5,7 +5,7 @@ import {
   useSelection,
   useTransform,
 } from "../provider";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { grida } from "@/grida";
 import { useEffect, useRef } from "react";
 import { cmath } from "@grida/cmath";

@@ -43,7 +43,7 @@ import {
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { draftid } from "@/utils/id";
 import {
   OptionsEdit,

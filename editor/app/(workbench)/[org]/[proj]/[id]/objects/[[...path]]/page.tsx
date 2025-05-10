@@ -78,7 +78,7 @@ import StorageEditorProvider, {
   useSeedList,
   useStorageEditor,
 } from "@/scaffolds/storage/core";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useQueryState } from "@/utils/use-query-state";
 import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
 import { vfs } from "@/lib/vfs";

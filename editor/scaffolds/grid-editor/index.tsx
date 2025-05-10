@@ -11,7 +11,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
 import {

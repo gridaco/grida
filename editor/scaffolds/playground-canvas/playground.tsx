@@ -82,7 +82,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import { prototypes } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import {
   keybindings_sheet,
   useEditorHotKeys,

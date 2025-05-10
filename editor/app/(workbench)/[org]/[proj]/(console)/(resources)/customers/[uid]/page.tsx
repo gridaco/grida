@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { createBrowserClient } from "@/lib/supabase/client";
 import React, { useCallback, useMemo, useState, use } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import CustomerEditDialog, {
   CustomerEditDialogDTO,

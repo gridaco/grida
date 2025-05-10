@@ -36,7 +36,7 @@ import {
   useStandaloneSchemaDataQuery,
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { XSBTextSearchInput } from "@/scaffolds/grid-editor/components/query/xsb/xsb-text-search";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";

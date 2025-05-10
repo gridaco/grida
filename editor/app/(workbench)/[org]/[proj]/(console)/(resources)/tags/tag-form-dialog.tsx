@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useTags } from "@/scaffolds/workspace";
 import type { Platform } from "@/lib/platform";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 const tagFormSchema = z.object({
   name: z

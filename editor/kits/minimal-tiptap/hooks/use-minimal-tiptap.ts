@@ -21,7 +21,7 @@ import {
 import { cn } from "@/components/lib/utils";
 import { fileToBase64, getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   value?: Content;
@@ -79,11 +79,11 @@ const createExtensions = ({
     },
     onValidationError(errors: any[]) {
       errors.forEach((error) => {
-        toast.error("Image validation error");
-        // toast.error("Image validation error", {
-        //   position: "bottom-right",
-        //   description: error.reason,
-        // });
+        // toast.error("Image validation error");
+        toast.error("Image validation error", {
+          position: "bottom-right",
+          description: error.reason,
+        });
       });
     },
     onActionSuccess({ action }: { action: string }) {
@@ -92,11 +92,11 @@ const createExtensions = ({
         copyLink: "Copy Link",
         download: "Download",
       };
-      toast.success(mapping[action as keyof typeof mapping]);
-      // toast.success(mapping[action], {
-      //   position: "bottom-right",
-      //   description: "Image action success",
-      // });
+      // toast.success(mapping[action as keyof typeof mapping]);
+      toast.success(mapping[action as keyof typeof mapping], {
+        position: "bottom-right",
+        description: "Image action success",
+      });
     },
     onActionError(error: any, { action }: { action: string }) {
       const mapping = {
@@ -104,11 +104,11 @@ const createExtensions = ({
         copyLink: "Copy Link",
         download: "Download",
       };
-      toast.error(`Failed to ${mapping[action as keyof typeof mapping]}`);
-      // toast.error(`Failed to ${mapping[action]}`, {
-      //   position: "bottom-right",
-      //   description: error.message,
-      // });
+      // toast.error(`Failed to ${mapping[action as keyof typeof mapping]}`);
+      toast.error(`Failed to ${mapping[action as keyof typeof mapping]}`, {
+        position: "bottom-right",
+        description: error.message,
+      });
     },
   }),
   FileHandler.configure({
@@ -135,11 +135,11 @@ const createExtensions = ({
     },
     onValidationError: (errors) => {
       errors.forEach((error) => {
-        toast.error("Image validation error");
-        // toast.error("Image validation error", {
-        //   position: "bottom-right",
-        //   description: error.reason,
-        // });
+        // toast.error("Image validation error");
+        toast.error("Image validation error", {
+          position: "bottom-right",
+          description: error.reason,
+        });
       });
     },
   }),

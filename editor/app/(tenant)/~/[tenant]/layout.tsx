@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { ToasterWithMax } from "@/components/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
@@ -84,7 +84,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ToasterWithMax />
+          <Toaster position="bottom-center" />
           {children}
         </ThemeProvider>
       </body>

@@ -30,7 +30,7 @@ import assert from "assert";
 import { Metadata } from "next";
 import { SavingIndicator } from "@/scaffolds/workbench/saving-indicator";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ToasterWithMax } from "@/components/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { cn } from "@/components/lib/utils";
@@ -552,7 +552,7 @@ function BaseLayout({
             </div>
           </div>
           <EditorHelpFab />
-          <ToasterWithMax position="bottom-center" max={5} />
+          <Toaster position="bottom-center" />
         </SidebarProvider>
       </ThemeProvider>
     </div>

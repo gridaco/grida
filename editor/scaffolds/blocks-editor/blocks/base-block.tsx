@@ -3,7 +3,7 @@
 import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
 
 export function useDeleteBlock() {

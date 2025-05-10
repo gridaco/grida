@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { cn } from "@/components/lib/utils";

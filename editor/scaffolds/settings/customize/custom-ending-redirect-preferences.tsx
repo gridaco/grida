@@ -17,7 +17,7 @@ import { useForm, Controller } from "react-hook-form";
 import { useEditorState } from "@/scaffolds/editor";
 import { Spinner } from "@/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function EndingRedirectPreferences() {
   const [state, dispatch] = useEditorState();
@@ -47,21 +47,19 @@ export function EndingRedirectPreferences() {
     const req = PrivateEditorApi.Settings.updateFormRedirectAfterSubmission({
       form_id: form.form_id,
       ...data,
+    }).then(() => {
+      dispatch({
+        type: "editor/form/ending/preferences",
+        ...data,
+      });
     });
 
     try {
-      await toast
-        .promise(req, {
-          loading: "Saving...",
-          success: "Saved",
-          error: "Failed",
-        })
-        .then(() => {
-          dispatch({
-            type: "editor/form/ending/preferences",
-            ...data,
-          });
-        });
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
 
       // Reset form state to the new values after successful submission
       reset(data);

@@ -28,7 +28,7 @@ import {
   useDataGridState,
   useMasking,
 } from "../providers";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import "../grid.css";
 
 type ColumnData = {

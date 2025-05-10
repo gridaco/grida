@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePolicyStore } from "./store";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export function AuthPolicyList() {

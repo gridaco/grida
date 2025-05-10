@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/hover-card";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useForm, Controller } from "react-hook-form";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
 import { editorlink } from "@/lib/forms/url";
@@ -50,22 +50,21 @@ export function RestrictNumberOfResponseByCustomer() {
       PrivateEditorApi.Settings.updateFormAccessMaxResponsesByCustomer({
         form_id: form.form_id,
         ...data,
+      }).then(() => {
+        dispatch({
+          type: "editor/form/campaign/preferences",
+          is_max_form_responses_by_customer_enabled: data.enabled,
+          max_form_responses_by_customer: data.max,
+        });
       });
 
     try {
-      await toast
-        .promise(req, {
-          loading: "Saving...",
-          success: "Saved",
-          error: "Failed",
-        })
-        .then(() => {
-          dispatch({
-            type: "editor/form/campaign/preferences",
-            is_max_form_responses_by_customer_enabled: data.enabled,
-            max_form_responses_by_customer: data.max,
-          });
-        });
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}
   };
@@ -211,22 +210,20 @@ export function MaxRespoonses() {
     const req = PrivateEditorApi.Settings.updateFormAccessMaxResponsesInTotal({
       form_id: form.form_id,
       ...data,
+    }).then(() => {
+      dispatch({
+        type: "editor/form/campaign/preferences",
+        is_max_form_responses_in_total_enabled: data.enabled,
+        max_form_responses_in_total: data.max,
+      });
     });
 
     try {
-      await toast
-        .promise(req, {
-          loading: "Saving...",
-          success: "Saved",
-          error: "Failed",
-        })
-        .then(() => {
-          dispatch({
-            type: "editor/form/campaign/preferences",
-            is_max_form_responses_in_total_enabled: data.enabled,
-            max_form_responses_in_total: data.max,
-          });
-        });
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}
   };

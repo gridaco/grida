@@ -26,7 +26,7 @@ import { RowEditPanel } from "../panels/row-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import { MediaViewerProvider } from "@/components/mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";

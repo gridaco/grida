@@ -21,7 +21,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/spinner";
 import { template } from "@/utils/template";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 type Step = "email" | "otp";
 
