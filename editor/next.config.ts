@@ -159,13 +159,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  turbopack: {
-    resolveAlias: {
-      // #region pdfjs @see https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
-      canvas: "./empty-module.ts",
-      // #endregion
-    },
-  },
   headers: async () => {
     return [
       {
@@ -186,6 +179,17 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  turbopack: {
+    resolveAlias: {
+      // #region pdfjs @see https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
+      canvas: "./empty-module.ts",
+      // #endregion
+    },
+  },
+  webpack: (config) => {
+    config.resolve.alias.handlebars = "handlebars/dist/handlebars.js";
+    return config;
   },
 };
 

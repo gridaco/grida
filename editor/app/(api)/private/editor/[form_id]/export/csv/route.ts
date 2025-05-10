@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_local_index } from "@/utils/fmt";
 import { createFormsClient } from "@/lib/supabase/server";
+import Papa from "papaparse";
 
-type Params = { id: string };
+type Params = { form_id: string };
 
 export async function GET(
   req: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
     params: Promise<Params>;
   }
 ) {
-  const { id } = await context.params;
+  const { form_id } = await context.params;
   const formsClient = await createFormsClient();
   //
   const { data } = await formsClient
@@ -25,10 +25,11 @@ export async function GET(
         responses: response(*, fields:response_field(*))
       `
     )
-    .eq("id", id)
+    .eq("id", form_id)
     .single();
 
   if (!data) {
+    console.warn("export/csv form notfound", form_id);
     return notFound();
   }
 
@@ -60,9 +61,10 @@ export async function GET(
     ];
   });
 
-  const csvContent = stringify([headers, ...rows], {
-    header: false,
-    columns: headers,
+  // Convert to CSV using PapaParse
+  const csvContent = Papa.unparse({
+    fields: headers,
+    data: rows,
   });
 
   // BOM for CJK characters in file content
@@ -70,7 +72,7 @@ export async function GET(
 
   const csvContentWithBOM = BOM + csvContent;
 
-  const filename = `${id}-responses.csv`;
+  const filename = `${form_id}-responses.csv`;
   // `${title}-responses.csv` // this throws on non unicode characters
 
   return new NextResponse(csvContentWithBOM, {
