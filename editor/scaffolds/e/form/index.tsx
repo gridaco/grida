@@ -22,15 +22,18 @@ import type {
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
 import { StandaloneDocumentEditor } from "@/grida-react-canvas/provider";
 import { grida } from "@/grida";
+import { FormAgentGeo } from "@/lib/formstate/core/geo";
 
 export function Agent({
   form_id,
   params,
   translation,
+  geo,
 }: {
   form_id: string;
   params: { [key: string]: string };
   translation: FormViewTranslation;
+  geo?: FormAgentGeo;
 }) {
   const { session } = useRequestFormSession(form_id);
   const { result: fingerprint } = useFingerprint();
@@ -70,6 +73,7 @@ export function Agent({
     <Ready
       form_id={form_id}
       session={session}
+      geo={geo}
       data={data}
       error={error}
       translation={translation}
@@ -80,12 +84,14 @@ export function Agent({
 function Ready({
   form_id,
   session,
+  geo,
   data,
   error,
   translation,
 }: {
   form_id: string;
   session: string;
+  geo?: FormAgentGeo;
   data: FormAgentPrefetchData;
   error?: FormClientFetchResponseError | null;
   translation: FormViewTranslation;
@@ -106,6 +112,7 @@ function Ready({
         <FormPage
           form_id={form_id}
           session={session}
+          geo={geo}
           data={data}
           error={error}
           translation={translation}
@@ -182,12 +189,14 @@ function FormStartPage({
 function FormPage({
   form_id,
   session,
+  geo,
   data,
   error,
   translation,
 }: {
   form_id: string;
   session: string;
+  geo?: FormAgentGeo;
   data: FormAgentPrefetchData;
   error?: FormClientFetchResponseError | null;
   translation: FormViewTranslation;
@@ -247,6 +256,7 @@ function FormPage({
           action={submit_action}
           form_id={form_id}
           session_id={session}
+          geo={geo}
           fields={fields}
           defaultValues={default_values}
           blocks={blocks}

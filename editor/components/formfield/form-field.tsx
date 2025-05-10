@@ -39,11 +39,7 @@ import {
   makeResolver,
   makeUploader,
 } from "./file-upload-field";
-import {
-  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
-  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
-  GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
-} from "@/k/env";
+import { GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD } from "@/k/env";
 import type { FileResolveStrategy, FileUploadStrategy } from "@/lib/forms";
 import assert from "assert";
 import {
@@ -301,20 +297,9 @@ function MonoFormField({
           );
         }
 
-        if (process.env.NODE_ENV === "development") {
-          // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
-          return (
-            // @ts-ignore
-            <PhoneField
-              {...(sharedInputProps as React.ComponentProps<"input">)}
-            />
-          );
-        }
-
         return (
           // @ts-ignore
-          <Input
-            type={type}
+          <PhoneField
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
