@@ -10,11 +10,11 @@ const INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY =
   process.env.INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY;
 
 function build_toss_payments_success_url() {
-  return `${Env.server.HOST}/integrations/tosspayments/payments/success`;
+  return `${Env.server.HOST}/v1/integrations/tosspayments/payments/success`;
 }
 
 function build_toss_payments_fail_url() {
-  return `${Env.server.HOST}/integrations/tosspayments/payments/fail`;
+  return `${Env.server.HOST}/v1/integrations/tosspayments/payments/fail`;
 }
 
 async function get_tosspayments_customer_key(
