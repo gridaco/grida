@@ -78,7 +78,6 @@ const default_field_init: {
   textarea: { type: "textarea" },
   tel: {
     type: "tel",
-    placeholder: "123-456-7890",
   },
   url: {
     type: "url",

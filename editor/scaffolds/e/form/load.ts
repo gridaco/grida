@@ -32,7 +32,7 @@ export function useRequestFormSession(form_id: string) {
     }
 
     // console.log("fetching session");
-    fetch(makeurl_formsessioninit(form_id)).then((res) => {
+    fetch(`/v1/${form_id}/session`).then((res) => {
       res.json().then(({ data }: EditorApiResponse<{ id: string }>) => {
         if (data?.id) {
           set_session(data.id);
@@ -47,10 +47,6 @@ export function useRequestFormSession(form_id: string) {
     session,
     clearSessionStorage: () => sessionStorage.removeItem(storekey),
   };
-}
-
-function makeurl_formsessioninit(form_id: string) {
-  return Env.web.HOST + `/v1/${form_id}/session`;
 }
 
 export function makeurl_forminit({

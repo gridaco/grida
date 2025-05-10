@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { service_role } from "@/lib/supabase/server";
-import { Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -63,6 +63,13 @@ export async function generateMetadata({
     title: is_powered_by_branding_enabled ? `${title} | Grida Forms` : title,
   };
 }
+
+export const viewport: Viewport = {
+  initialScale: 1,
+  width: "device-width",
+  maximumScale: 1,
+  viewportFit: "cover",
+};
 
 export default async function Layout({
   params,
