@@ -13,6 +13,6 @@ export async function GET(
   return NextResponse.json({
     url: `${Env.web.HOST}/d/e/${form_id}`,
     embed: `${Env.web.HOST}/v1/embed/${form_id}`,
-    submit: `${Env.web.HOST}/submit/${form_id}`,
+    submit: `${Env.web.HOST}/v1/submit/${form_id}`,
   });
 }

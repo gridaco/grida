@@ -22,7 +22,7 @@ export namespace OnSubmit {
     response_id: string;
     session_id: string;
   }) {
-    return fetch(`${Env.server.HOST}/submit/${form_id}/hooks/clearsession`, {
+    return fetch(`${Env.server.HOST}/v1/submit/${form_id}/hooks/clearsession`, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -41,7 +41,7 @@ export namespace OnSubmit {
     form_id: string;
     response_id: string;
   }) {
-    return fetch(`${Env.server.HOST}/submit/${form_id}/hooks/postindexing`, {
+    return fetch(`${Env.server.HOST}/v1/submit/${form_id}/hooks/postindexing`, {
       headers: {
         "Content-Type": "application/json",
       },

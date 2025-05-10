@@ -245,7 +245,7 @@ function FormPage({
     }
   }
 
-  const submit_action = "/submit/" + form_id;
+  const submit_action = `${Env.web.HOST}/v1/submit/${form_id}`;
 
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">

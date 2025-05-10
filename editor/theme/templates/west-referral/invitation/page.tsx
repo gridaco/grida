@@ -129,7 +129,7 @@ export default function InvitationPageTemplate({
     const formdata = new FormData();
     formdata.append(SYSTEM_GF_CUSTOMER_NAME_KEY, geust.name);
     formdata.append(SYSTEM_GF_CUSTOMER_PHONE_KEY, geust.phone);
-    const submission = await fetch(`/submit/${data.signup_form_id}`, {
+    const submission = await fetch(`/v1/submit/${data.signup_form_id}`, {
       method: "POST",
       body: formdata,
     }).then((res) => {

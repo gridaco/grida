@@ -36,6 +36,7 @@ export default async function SubmitCompletePage({
     .single();
 
   if (error || !data) {
+    console.warn("d/e/[id]/complete form not found: ", error);
     return notFound();
   }
 
@@ -63,6 +64,7 @@ export default async function SubmitCompletePage({
     .single();
 
   if (!response) {
+    console.warn("d/e/[id]/complete response not found: ", response_id);
     return notFound();
   }
 

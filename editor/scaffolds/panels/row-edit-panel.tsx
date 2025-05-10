@@ -85,7 +85,7 @@ export function RowEditPanel({
               )}
               <EditRowForm
                 onSubmit={(data) => {
-                  const promise = fetch(`/submit/${table_id}`, {
+                  const promise = fetch(`/v1/submit/${table_id}`, {
                     method: "POST",
                     body: data,
                   });

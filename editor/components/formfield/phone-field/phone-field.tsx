@@ -46,7 +46,6 @@ export function PhoneField({
         value={value}
         defaultCountry={defaultCountry}
         onChange={(value) => {
-          console.log("onChange", value);
           setValue(value);
           onValueChange?.(value);
         }}
