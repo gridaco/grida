@@ -12,7 +12,7 @@ export async function GET(
   const { id: form_id } = await context.params;
   return NextResponse.json({
     url: `${Env.web.HOST}/d/e/${form_id}`,
-    embed: `${Env.web.HOST}/embed/${form_id}`,
+    embed: `${Env.web.HOST}/v1/embed/${form_id}`,
     submit: `${Env.web.HOST}/submit/${form_id}`,
   });
 }

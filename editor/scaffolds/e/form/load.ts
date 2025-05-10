@@ -11,7 +11,7 @@ import type { EditorApiResponse } from "@/types/private/api";
 import type {
   FormAgentPrefetchData,
   FormClientFetchResponseError,
-} from "@/app/(api)/v1/[id]/route";
+} from "@/app/(api)/(public)/v1/[id]/route";
 import { Env } from "@/env";
 
 export function useRequestFormSession(form_id: string) {

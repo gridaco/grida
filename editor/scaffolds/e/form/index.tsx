@@ -18,7 +18,7 @@ import { AgentPagesFlow, useAgentFlow } from "@/lib/formstate/core/flow";
 import type {
   FormAgentPrefetchData,
   FormClientFetchResponseError,
-} from "@/app/(api)/v1/[id]/route";
+} from "@/app/(api)/(public)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
 import { StandaloneDocumentEditor } from "@/grida-react-canvas/provider";
 import { grida } from "@/grida";

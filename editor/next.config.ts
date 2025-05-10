@@ -80,13 +80,6 @@ const nextConfig: NextConfig = {
         destination: "/:org/:proj/:id/connect/share",
         permanent: false,
       },
-      {
-        // REMOVE ME when migration is complete.
-        // 1. db, 2. site static values
-        source: "/theme/embed/backgrounds/:path*",
-        destination: "https://bg.grida.co/embed/:path*",
-        permanent: false,
-      },
       // static pages from docs
       {
         source: "/terms",
