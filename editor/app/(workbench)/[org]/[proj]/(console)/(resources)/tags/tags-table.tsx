@@ -144,14 +144,14 @@ export function TagsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditingTag(tag)}>
-                          <Pencil className="mr-2 h-4 w-4" />
+                          <Pencil className="size-4" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeletingTag(tag)}
                           className="text-destructive focus:text-destructive"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

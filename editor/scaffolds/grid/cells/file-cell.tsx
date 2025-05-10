@@ -244,24 +244,24 @@ function FileItem({
                 onEnterFullScreen();
               }}
             >
-              <EnterFullScreenIcon className="me-2" />
+              <EnterFullScreenIcon className="size-3.5" />
               Full Screen
             </DropdownMenuItem>
             <a href={file.download} target="_blank" rel="noreferrer" download>
               <DropdownMenuItem>
-                <DownloadIcon className="me-2" />
+                <DownloadIcon className="size-3.5" />
                 Download
               </DropdownMenuItem>
             </a>
             <a href={file.srcset.original} target="_blank" rel="noreferrer">
               <DropdownMenuItem>
-                <OpenInNewWindowIcon className="me-2" />
+                <OpenInNewWindowIcon className="size-3.5" />
                 View Original
               </DropdownMenuItem>
             </a>
             {file.upsert && (
               <DropdownMenuItem onClick={() => setReplaceFileDialogOpen(true)}>
-                <ReloadIcon className="me-2" />
+                <ReloadIcon className="size-3.5" />
                 Replace
               </DropdownMenuItem>
             )}

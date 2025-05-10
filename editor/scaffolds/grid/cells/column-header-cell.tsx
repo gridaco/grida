@@ -81,11 +81,11 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
         <DropdownMenuPortal>
           <DropdownMenuContent className="z-50">
             <DropdownMenuItem onClick={onEditClick}>
-              <Pencil1Icon className="me-2 align-middle" />
+              <Pencil1Icon className="size-3.5" />
               Edit Field
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDeleteClick}>
-              <TrashIcon className="me-2 align-middle" />
+              <TrashIcon className="size-3.5" />
               Delete Field
             </DropdownMenuItem>
           </DropdownMenuContent>

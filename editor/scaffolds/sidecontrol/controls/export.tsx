@@ -249,7 +249,7 @@ export function ExportNodeControl({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
-            <CodeIcon className="me-2" />
+            <CodeIcon className="size-3.5" />
             Advanced
           </DropdownMenuItem>
         </DropdownMenuContent>

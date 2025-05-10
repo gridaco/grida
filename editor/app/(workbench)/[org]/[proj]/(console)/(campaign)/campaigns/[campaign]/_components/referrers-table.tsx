@@ -69,7 +69,7 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
             open(link, "_blank");
           }}
         >
-          <OpenInNewWindowIcon className="size-4 me-2" />
+          <OpenInNewWindowIcon className="size-4" />
           Open URL
         </DropdownMenuItem>
         <DropdownMenuItem

@@ -482,13 +482,13 @@ const EntityNodeItemComponent = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onRenameClick}>
-                <InputIcon className="me-2" />
+                <InputIcon className="size-3.5" />
                 Rename
               </DropdownMenuItem>
               {/* <DropdownMenuItem>Move</DropdownMenuItem> */}
               {/* <DropdownMenuItem>Download</DropdownMenuItem> */}
               <DropdownMenuItem onSelect={onDeleteClick}>
-                <TrashIcon className="me-2" />
+                <TrashIcon className="size-3.5" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -498,13 +498,13 @@ const EntityNodeItemComponent = ({
       <ContextMenuContent>
         {/* <ContextMenuItem>Open</ContextMenuItem> */}
         <ContextMenuItem onSelect={onRenameClick}>
-          <InputIcon className="me-2" />
+          <InputIcon className="size-3.5 me-2" />
           Rename
         </ContextMenuItem>
         {/* <ContextMenuItem>Move</ContextMenuItem> */}
         {/* <ContextMenuItem>Download</ContextMenuItem> */}
         <ContextMenuItem onSelect={onDeleteClick}>
-          <TrashIcon className="me-2" />
+          <TrashIcon className="size-3.5 me-2" />
           Delete
         </ContextMenuItem>
       </ContextMenuContent>

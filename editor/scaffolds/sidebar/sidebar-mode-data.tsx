@@ -301,7 +301,7 @@ export function ModeData() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="end">
                   <DropdownMenuItem disabled>
-                    <Pencil1Icon className="me-2" />
+                    <Pencil1Icon className="size-3.5" />
                     Rename Table
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -315,7 +315,7 @@ export function ModeData() {
                       });
                     }}
                   >
-                    <TrashIcon className="me-2" />
+                    <TrashIcon className="size-3.5" />
                     Delete Table
                   </DropdownMenuItem>
                 </DropdownMenuContent>

@@ -83,7 +83,7 @@ export function ImageBlock({
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                  <TrashIcon className="me-2 align-middle" />
+                  <TrashIcon className="size-3.5" />
                   Delete Block
                 </DropdownMenuItem>
               </DropdownMenuContent>

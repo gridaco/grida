@@ -416,7 +416,7 @@ export function NavProjects({
                       project_id={project.id}
                     >
                       <DropdownMenuItem>
-                        <PlusIcon className="mr-2" />
+                        <PlusIcon className="size-3.5" />
                         <span>New Document</span>
                       </DropdownMenuItem>
                     </CreateNewDocumentButton>
@@ -428,12 +428,12 @@ export function NavProjects({
                         });
                       }}
                     >
-                      <Pencil2Icon className="mr-2" />
+                      <Pencil2Icon className="size-3.5" />
                       <span>Rename</span>
                     </DropdownMenuItem>
                     <Link href={`/${orgname}/${project.name}/dash`}>
                       <DropdownMenuItem>
-                        <GearIcon className="mr-2" />
+                        <GearIcon className="size-3.5" />
                         <span>Console</span>
                       </DropdownMenuItem>
                     </Link>
@@ -447,7 +447,7 @@ export function NavProjects({
                       }}
                       className="text-destructive"
                     >
-                      <Trash2Icon className="size-3.5 me-2" />
+                      <Trash2Icon className="size-3.5" />
                       <span>Delete Project</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>

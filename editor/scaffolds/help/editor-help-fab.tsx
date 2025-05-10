@@ -122,25 +122,25 @@ export function HelpFab() {
           </Link> */}
           <Link href={sitemap.links.slack} target="_blank">
             <DropdownMenuItem>
-              <SlackIcon className="inline align-middle w-4 h-4 me-1" />
+              <SlackIcon className="size-4" />
               Chat with us
             </DropdownMenuItem>
           </Link>
           <Link href={sitemap.links.issues_new} target="_blank">
             <DropdownMenuItem>
-              <GitHubLogoIcon className="align-middle me-1" />
+              <GitHubLogoIcon className="size-4" />
               Open new Issue on Github
             </DropdownMenuItem>
           </Link>
           <Link href={sitemap.links.issues_new} target="_blank">
             <DropdownMenuItem>
-              <GitHubLogoIcon className="align-middle me-1" />
+              <GitHubLogoIcon className="size-4" />
               Request a feature
             </DropdownMenuItem>
           </Link>
           <Link href={sitemap.links.book15} target="_blank">
             <DropdownMenuItem>
-              <CalendarIcon className="align-middle me-1" />
+              <CalendarIcon className="size-4" />
               Book a meeting
             </DropdownMenuItem>
           </Link>

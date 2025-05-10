@@ -149,10 +149,7 @@ export function CreateNewDocumentButton({
           <DropdownMenuGroup>
             <DropdownMenuLabel>Forms / Events</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_form}>
-              <ResourceTypeIcon
-                type="v0_form"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="v0_form" className="size-4" />
               Blank Form
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -160,28 +157,19 @@ export function CreateNewDocumentButton({
                 new_formn_with_template("headless");
               }}
             >
-              <ResourceTypeIcon
-                type="dev"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="dev" className="size-4" />
               Blank Headless Form
             </DropdownMenuItem>
             <Link href="/forms/ai" target="_blank">
               <DropdownMenuItem>
-                <ResourceTypeIcon
-                  type="ai"
-                  className="w-4 h-4 me-2 align-middle"
-                />
+                <ResourceTypeIcon type="ai" className="size-4" />
                 Create with AI
               </DropdownMenuItem>
             </Link>
             <DropdownMenuSeparator />
             <Link href={`/${organization_name}/${project_name}/new/referral`}>
               <DropdownMenuItem>
-                <ResourceTypeIcon
-                  type="campaign"
-                  className="w-4 h-4 me-2 align-middle"
-                />
+                <ResourceTypeIcon type="campaign" className="size-4" />
                 Referral
                 <Badge variant="outline" className="ms-auto">
                   beta
@@ -193,20 +181,14 @@ export function CreateNewDocumentButton({
           <DropdownMenuGroup>
             <DropdownMenuLabel>Database / Storage</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
-              <ResourceTypeIcon
-                type="database"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="database" className="size-4" />
               Database
               <Badge variant="outline" className="ms-auto">
                 beta
               </Badge>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={newBucketDialog.openDialog}>
-              <ResourceTypeIcon
-                type="v0_bucket"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="v0_bucket" className="size-4" />
               Storage
               <Badge variant="outline" className="ms-auto">
                 beta
@@ -216,10 +198,7 @@ export function CreateNewDocumentButton({
               disabled={IS_PRODUCTION}
               onSelect={() => alert("coming soon")}
             >
-              <ResourceTypeIcon
-                type="i18n"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="i18n" className="size-4" />
               Localization
               <Badge variant="outline" className="ms-auto">
                 soon
@@ -230,10 +209,7 @@ export function CreateNewDocumentButton({
           <DropdownMenuGroup>
             <DropdownMenuLabel>Design</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_cavas}>
-              <ResourceTypeIcon
-                type="v0_canvas"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="v0_canvas" className="size-4" />
               Canvas
               <Badge variant="outline" className="ms-auto">
                 canary

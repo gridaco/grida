@@ -359,7 +359,7 @@ function NewButton({ onNewData }: { onNewData?: () => void }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="end">
             <DropdownMenuItem onSelect={onImportFromCSVClick}>
-              <UploadIcon className="me-2" />
+              <UploadIcon />
               Import from CSV
             </DropdownMenuItem>
           </DropdownMenuContent>
