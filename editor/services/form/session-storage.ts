@@ -7,6 +7,7 @@ import {
 } from "@/k/env";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Env } from "@/env";
 
 interface SessionStoragePath {
   session_id: string;
@@ -14,10 +15,10 @@ interface SessionStoragePath {
 }
 
 export const requesterurl = ({ session_id, field_id }: SessionStoragePath) =>
-  `/v1/session/${session_id}/field/${field_id}/file/upload/signed-url`;
+  `${Env.web.HOST}/v1/session/${session_id}/field/${field_id}/file/upload/signed-url`;
 
 export const resolverurl = ({ session_id, field_id }: SessionStoragePath) =>
-  `/v1/session/${session_id}/field/${field_id}/file/preview/public-url`;
+  `${Env.web.HOST}/v1/session/${session_id}/field/${field_id}/file/preview/public-url`;
 
 /**
  * build the path for the temporary storage object
