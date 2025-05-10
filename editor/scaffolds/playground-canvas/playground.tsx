@@ -82,7 +82,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import { prototypes } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import {
   keybindings_sheet,
   useEditorHotKeys,
@@ -306,14 +306,14 @@ export default function CanvasPlayground({
                                         onClick={importFromJson.openDialog}
                                         className="text-xs"
                                       >
-                                        <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                        <FileIcon className="size-3.5" />
                                         Open .grida
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
                                         onClick={onExport}
                                         className="text-xs"
                                       >
-                                        <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                        <DownloadIcon className="size-3.5" />
                                         Save as .grida
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
@@ -322,7 +322,7 @@ export default function CanvasPlayground({
                                         }
                                         className="text-xs"
                                       >
-                                        <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                                        <FigmaLogoIcon className="size-3.5" />
                                         Import Figma
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
@@ -330,14 +330,14 @@ export default function CanvasPlayground({
                                         onClick={settingsDialog.openDialog}
                                         className="text-xs"
                                       >
-                                        <GearIcon className="me-2" />
+                                        <GearIcon className="size-3.5" />
                                         Settings
                                       </DropdownMenuItem>
 
                                       <DropdownMenuSeparator />
                                       <DropdownMenuSub>
                                         <DropdownMenuSubTrigger className="text-xs">
-                                          <OpenInNewWindowIcon className="me-2" />
+                                          <OpenInNewWindowIcon className="size-3.5" />
                                           Tools
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent>
@@ -346,7 +346,7 @@ export default function CanvasPlayground({
                                             target="_blank"
                                           >
                                             <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="me-2" />
+                                              <OpenInNewWindowIcon className="size-3.5" />
                                               AI
                                             </DropdownMenuItem>
                                           </Link>
@@ -355,7 +355,7 @@ export default function CanvasPlayground({
                                             target="_blank"
                                           >
                                             <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="me-2" />
+                                              <OpenInNewWindowIcon className="size-3.5" />
                                               IO Figma
                                             </DropdownMenuItem>
                                           </Link>
@@ -364,7 +364,7 @@ export default function CanvasPlayground({
                                             target="_blank"
                                           >
                                             <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="me-2" />
+                                              <OpenInNewWindowIcon className="size-3.5" />
                                               IO SVG
                                             </DropdownMenuItem>
                                           </Link>
@@ -373,7 +373,7 @@ export default function CanvasPlayground({
                                             target="_blank"
                                           >
                                             <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="me-2" />
+                                              <OpenInNewWindowIcon className="size-3.5" />
                                               P666 Daemon
                                             </DropdownMenuItem>
                                           </Link>
@@ -381,7 +381,7 @@ export default function CanvasPlayground({
                                       </DropdownMenuSub>
                                       <DropdownMenuSub>
                                         <DropdownMenuSubTrigger className="text-xs">
-                                          <MixIcon className="me-2" />
+                                          <MixIcon className="size-3.5" />
                                           Examples
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent>
@@ -394,7 +394,7 @@ export default function CanvasPlayground({
                                               target="_blank"
                                             >
                                               <DropdownMenuItem className="text-xs">
-                                                <OpenInNewWindowIcon className="me-2" />
+                                                <OpenInNewWindowIcon className="size-3.5" />
                                                 {example.name}
                                               </DropdownMenuItem>
                                             </Link>
@@ -407,7 +407,7 @@ export default function CanvasPlayground({
                                         target="_blank"
                                       >
                                         <DropdownMenuItem className="text-xs">
-                                          <GitHubLogoIcon className="me-2" />
+                                          <GitHubLogoIcon className="size-3.5" />
                                           GitHub
                                         </DropdownMenuItem>
                                       </Link>
@@ -416,7 +416,7 @@ export default function CanvasPlayground({
                                         target="_blank"
                                       >
                                         <DropdownMenuItem className="text-xs">
-                                          <SlackIcon className="me-2 w-4 h-4" />
+                                          <SlackIcon className="size-3.5" />
                                           Slack Community
                                         </DropdownMenuItem>
                                       </Link>

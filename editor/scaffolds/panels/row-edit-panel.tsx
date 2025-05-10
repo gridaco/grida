@@ -40,7 +40,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { FormView } from "../e/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormSession, useRequestFormSession } from "../e/form/load";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;
 
@@ -85,7 +85,7 @@ export function RowEditPanel({
               )}
               <EditRowForm
                 onSubmit={(data) => {
-                  const promise = fetch(`/submit/${table_id}`, {
+                  const promise = fetch(`/v1/submit/${table_id}`, {
                     method: "POST",
                     body: data,
                   });

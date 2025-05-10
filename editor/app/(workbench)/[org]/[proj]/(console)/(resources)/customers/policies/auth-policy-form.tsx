@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AuthPolicyJsonEditor } from "./auth-policy-json-editor";
 import { Platform } from "@/lib/platform";
 import { usePolicyStore } from "./store";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface AuthPolicyFormProps {
   policyId?: string;

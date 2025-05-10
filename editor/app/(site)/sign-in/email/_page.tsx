@@ -18,7 +18,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";

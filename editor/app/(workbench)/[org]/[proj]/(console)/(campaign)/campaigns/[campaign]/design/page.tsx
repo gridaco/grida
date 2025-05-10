@@ -25,7 +25,7 @@ import {
 } from "@/scaffolds/platform/www";
 import assert from "assert";
 import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";
 import {
   Select,

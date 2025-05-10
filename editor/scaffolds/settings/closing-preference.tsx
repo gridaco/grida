@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { PrivateEditorApi } from "@/lib/private";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useForm, Controller } from "react-hook-form";
 import { Spinner } from "@/components/spinner";
 import { useEditorState } from "@/scaffolds/editor";
@@ -35,21 +35,19 @@ export function ClosingFormPreferences() {
     const req = PrivateEditorApi.Settings.updateFormAccessForceClose({
       form_id: form.form_id,
       closed: data.is_force_closed,
+    }).then(() => {
+      dispatch({
+        type: "editor/form/campaign/preferences",
+        is_force_closed: data.is_force_closed,
+      });
     });
 
     try {
-      await toast
-        .promise(req, {
-          loading: "Saving...",
-          success: "Saved",
-          error: "Failed",
-        })
-        .then(() => {
-          dispatch({
-            type: "editor/form/campaign/preferences",
-            is_force_closed: data.is_force_closed,
-          });
-        });
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
 
       // Reset form state to the new values after successful submission
       reset(data);

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 async function fetchnode({
   filekey,

@@ -6,7 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { CrossCircledIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function AboutGridaWestCard() {
   const [donotshowagain, set] = useLocalStorage(

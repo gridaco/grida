@@ -12,7 +12,7 @@ import { Spinner } from "@/components/spinner";
 import { JSONValue } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 // expand
 export function JsonPopupEditorCell({

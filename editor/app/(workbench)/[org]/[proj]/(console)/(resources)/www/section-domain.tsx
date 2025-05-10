@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pencil2Icon } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function SiteDomainsSection({
   name,

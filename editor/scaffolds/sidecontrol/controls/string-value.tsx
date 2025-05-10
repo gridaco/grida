@@ -140,21 +140,21 @@ export function StringValueControl({
           </DropdownMenuSub> */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <LockClosedIcon className="me-2 w-4 h-4" />
+              <LockClosedIcon className="size-4" />
               Constants
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="boolean" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="boolean" className="size-4" />
                   True
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="boolean" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="boolean" className="size-4" />
                   False
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="null" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="null" className="size-4" />
                   Null
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -166,7 +166,7 @@ export function StringValueControl({
               onValueChange?.(undefined);
             }}
           >
-            <ReloadIcon className="me-2 w-4 h-4" />
+            <ReloadIcon className="size-4" />
             Reset
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -174,7 +174,7 @@ export function StringValueControl({
               onValueChange?.("Text");
             }}
           >
-            <InputIcon className="me-2 w-4 h-4" />
+            <InputIcon className="size-4" />
             Type Manually
           </DropdownMenuItem>
         </DropdownMenuContent>

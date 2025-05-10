@@ -22,9 +22,9 @@ export default function WithLink() {
   const [state] = useEditorState();
   const { form } = state;
 
-  const { data } = useSWR(`/v1/${form.form_id}/share`, fetcher);
+  const { data } = useSWR(`/private/editor/${form.form_id}/share`, fetcher);
 
-  const { url, submit, embed } = data || {};
+  const { url, url_tenant, submit, embed } = data || {};
 
   return (
     <main className="max-w-2xl mx-auto">
@@ -43,11 +43,20 @@ export default function WithLink() {
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Built-in Page URL</>} />
             <PreferenceBody>
-              <p className="mb-2 opacity-80">
-                Share this link with your users to let them fill out the form.
-                <br />
-              </p>
-              <CopyToClipboardInput value={url} />
+              <div className="w-full flex flex-col gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Your custom domain URL (may change)
+                  </label>
+                  <CopyToClipboardInput value={url_tenant} />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm text-muted-foreground">
+                    Static URL (always available)
+                  </label>
+                  <CopyToClipboardInput value={url} />
+                </div>
+              </div>
             </PreferenceBody>
           </PreferenceBox>
           <PreferenceBox>
@@ -62,8 +71,8 @@ export default function WithLink() {
         <SectorHeader>
           <SectorHeading>Headless usage</SectorHeading>
           <SectorDescription>
-            Using <code className="font-mono">/submit</code> api, you can start
-            collecting forms without the need of backend
+            Using <code className="font-mono">/v1/submit</code> api, you can
+            start collecting forms without the need of backend
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>

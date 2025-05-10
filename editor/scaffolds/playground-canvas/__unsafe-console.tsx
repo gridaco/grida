@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useEditorApi } from "@/grida-react-canvas/provider";
 import { AutoHeightThemedMonacoEditor } from "@/components/monaco";
 

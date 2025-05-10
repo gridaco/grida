@@ -1,6 +1,7 @@
 import { FormBlockTree } from "@/lib/forms/types";
 import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import type { FormFieldDefinition } from "@/types";
+import type { FormAgentGeo } from "./geo";
 
 export type VirtualFileValueProxy = {
   // standard
@@ -16,6 +17,7 @@ export interface FormAgentState {
   form_id: string;
   session_id?: string;
   tree: FormBlockTree<ClientRenderBlock[]>;
+  geo: FormAgentGeo | undefined;
   // do not change the keys
   // #/fields/[key]/value
   fields: {
@@ -45,6 +47,7 @@ export interface FormAgentState {
 export function initdummy(): FormAgentState {
   return {
     form_id: "",
+    geo: undefined,
     fields: {},
     blocks: {},
     rawfiles: {},
@@ -60,6 +63,7 @@ export function initdummy(): FormAgentState {
 export function init({
   form_id,
   session_id,
+  geo,
   fields,
   blocks,
   tree,
@@ -67,6 +71,7 @@ export function init({
 }: {
   form_id: string;
   session_id?: string;
+  geo?: FormAgentGeo | undefined | null;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -115,6 +120,7 @@ export function init({
   return {
     form_id,
     session_id,
+    geo: geo ?? undefined,
     tree,
     rawfiles: {},
     fields: fields_state,

@@ -71,8 +71,8 @@ export default function ProjectDashboardPage() {
         </header>
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {menus.map((menu, i) => (
-            <Link href={menu.link} key={i}>
-              <Card>
+            <Link href={menu.link} key={i} className="h-full">
+              <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <menu.icon className="size-5" />

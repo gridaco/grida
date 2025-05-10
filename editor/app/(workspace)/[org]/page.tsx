@@ -111,7 +111,7 @@ export default function OrganizationDashboardPage(props: {
                     >
                       <Button className="gap-1">
                         <PlusIcon />
-                        Create New
+                        Create
                         <ChevronDownIcon />
                       </Button>
                     </CreateNewDocumentButton>

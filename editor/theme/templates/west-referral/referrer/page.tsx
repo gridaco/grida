@@ -27,7 +27,7 @@ import { template } from "@/utils/template";
 import { TemplateData } from "../templates";
 import * as Standard from "../standard";
 import ShareDialog from "./share";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 type WebSharePayload = {
   title?: string;

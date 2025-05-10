@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useForm, Controller } from "react-hook-form";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { FormMethod } from "@/types";
 import { Spinner } from "@/components/spinner";

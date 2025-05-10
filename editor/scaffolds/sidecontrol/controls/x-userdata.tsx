@@ -12,7 +12,7 @@ import { Editor as MonacoEditor } from "@monaco-editor/react";
 import { DialogClose } from "@radix-ui/react-dialog";
 import assert from "assert";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 function validate(value: string | undefined): any | false {
   if (value === undefined) return undefined;

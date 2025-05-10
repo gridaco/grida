@@ -36,7 +36,7 @@ import {
   NewDocumentRequest,
   NewDocumentResponse,
 } from "@/app/(api)/private/editor/new/route";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -145,98 +145,68 @@ export function CreateNewDocumentButton({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={8}>
+        <DropdownMenuContent align="end" sideOffset={8} className="min-w-52">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Forms / Events</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_form}>
-              <ResourceTypeIcon
-                type="v0_form"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Blank Form
+              <ResourceTypeIcon type="v0_form" className="size-4" />
+              Form
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                new_formn_with_template("headless");
-              }}
-            >
-              <ResourceTypeIcon
-                type="dev"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Blank Headless Form
+            <DropdownMenuItem onSelect={new_default_cavas}>
+              <ResourceTypeIcon type="v0_canvas" className="size-4" />
+              Design
+              <Badge variant="outline" className="ms-auto">
+                canary
+              </Badge>
             </DropdownMenuItem>
-            <Link href="/forms/ai" target="_blank">
-              <DropdownMenuItem>
-                <ResourceTypeIcon
-                  type="ai"
-                  className="w-4 h-4 me-2 align-middle"
-                />
-                Create with AI
-              </DropdownMenuItem>
-            </Link>
-            <DropdownMenuSeparator />
-            <Link href={`/${organization_name}/${project_name}/new/referral`}>
-              <DropdownMenuItem>
-                <ResourceTypeIcon
-                  type="campaign"
-                  className="w-4 h-4 me-2 align-middle"
-                />
-                Referral
-                <Badge variant="outline" className="ms-auto">
-                  beta
-                </Badge>
-              </DropdownMenuItem>
-            </Link>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Database / Storage</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
-              <ResourceTypeIcon
-                type="database"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="database" className="size-4" />
               Database
               <Badge variant="outline" className="ms-auto">
                 beta
               </Badge>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={newBucketDialog.openDialog}>
-              <ResourceTypeIcon
-                type="v0_bucket"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="v0_bucket" className="size-4" />
               Storage
               <Badge variant="outline" className="ms-auto">
                 beta
               </Badge>
             </DropdownMenuItem>
+            <Link href={`/${organization_name}/${project_name}/new/referral`}>
+              <DropdownMenuItem>
+                <ResourceTypeIcon type="campaign" className="size-4" />
+                Campaign
+                <Badge variant="outline" className="ms-auto">
+                  beta
+                </Badge>
+              </DropdownMenuItem>
+            </Link>
+          </DropdownMenuGroup>
+          <DropdownMenuGroup hidden>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Dev</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => {
+                new_formn_with_template("headless");
+              }}
+            >
+              <ResourceTypeIcon type="dev" className="size-4" />
+              Blank Headless Form
+            </DropdownMenuItem>
+            <Link href="/forms/ai" target="_blank">
+              <DropdownMenuItem>
+                <ResourceTypeIcon type="ai" className="size-4" />
+                Create with AI
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem
               disabled={IS_PRODUCTION}
               onSelect={() => alert("coming soon")}
             >
-              <ResourceTypeIcon
-                type="i18n"
-                className="w-4 h-4 me-2 align-middle"
-              />
+              <ResourceTypeIcon type="i18n" className="size-4" />
               Localization
               <Badge variant="outline" className="ms-auto">
                 soon
-              </Badge>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </DropdownMenuGroup>
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Design</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={new_default_cavas}>
-              <ResourceTypeIcon
-                type="v0_canvas"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Canvas
-              <Badge variant="outline" className="ms-auto">
-                canary
               </Badge>
             </DropdownMenuItem>
           </DropdownMenuGroup>

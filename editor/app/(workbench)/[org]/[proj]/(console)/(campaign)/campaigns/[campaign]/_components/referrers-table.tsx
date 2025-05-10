@@ -27,7 +27,7 @@ import { documentpreviewlink } from "@/lib/internal/url";
 import { useExportCSV } from "@/scaffolds/platform/data/use-export-csv";
 import { DownloadIcon } from "lucide-react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +69,7 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
             open(link, "_blank");
           }}
         >
-          <OpenInNewWindowIcon className="size-4 me-2" />
+          <OpenInNewWindowIcon className="size-4" />
           Open URL
         </DropdownMenuItem>
         <DropdownMenuItem

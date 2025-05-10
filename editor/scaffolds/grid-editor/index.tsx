@@ -11,7 +11,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
 import {
@@ -558,7 +558,8 @@ function GridaFormsResponsesExportCSV() {
 
   return (
     <Link
-      href={`/v1/${table_id}/export/csv`}
+      // href={`/v1/${table_id}/export/csv`}
+      href={`/private/editor/${table_id}/export/csv`}
       download
       target="_blank"
       prefetch={false}

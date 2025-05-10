@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { createBrowserClient } from "@/lib/supabase/client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useEditorState } from "./editor";
 
 export function EditableDocumentTitle({

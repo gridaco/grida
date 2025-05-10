@@ -28,7 +28,7 @@ import {
   useStandaloneSchemaDataQuery,
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useXSBListUsers } from "@/scaffolds/x-supabase";
 import { DataPlatformProvider } from "@/scaffolds/data-query";
 

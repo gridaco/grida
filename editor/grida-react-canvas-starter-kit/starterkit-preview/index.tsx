@@ -20,7 +20,7 @@ import {
   EnterFullScreenIcon,
   PlayIcon,
 } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
 import { document } from "@/grida-react-canvas/document-query";
 import { useCurrentScene } from "@/grida-react-canvas/provider";

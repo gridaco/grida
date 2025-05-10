@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePolicyStore } from "./store";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export function AuthPolicyList() {
@@ -138,7 +138,7 @@ export function AuthPolicyList() {
                       <DropdownMenuContent align="end">
                         <Link href={`./policies/${policy.id}`}>
                           <DropdownMenuItem>
-                            <Pencil className="mr-2 h-4 w-4" />
+                            <Pencil className="size-4" />
                             Edit
                           </DropdownMenuItem>
                         </Link>
@@ -146,7 +146,7 @@ export function AuthPolicyList() {
                           onClick={() => handleDeleteClick(policy.id)}
                           className="text-destructive focus:text-destructive"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

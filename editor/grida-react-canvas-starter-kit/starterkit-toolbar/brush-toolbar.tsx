@@ -26,7 +26,7 @@ import { Slider } from "@/components/ui/slider";
 import { cmath } from "@grida/cmath";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function useSliderState() {
   const [active, setActive] = useState(false);

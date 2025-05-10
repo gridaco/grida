@@ -80,13 +80,6 @@ const nextConfig: NextConfig = {
         destination: "/:org/:proj/:id/connect/share",
         permanent: false,
       },
-      {
-        // REMOVE ME when migration is complete.
-        // 1. db, 2. site static values
-        source: "/theme/embed/backgrounds/:path*",
-        destination: "https://bg.grida.co/embed/:path*",
-        permanent: false,
-      },
       // static pages from docs
       {
         source: "/terms",
@@ -166,10 +159,35 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  headers: async () => {
+    return [
+      {
+        source: "/v1/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*",
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
+        ],
+      },
+    ];
+  },
+  turbopack: {
+    resolveAlias: {
+      // #region pdfjs @see https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
+      canvas: "./empty-module.ts",
+      // #endregion
+    },
+  },
   webpack: (config) => {
-    // https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
-    config.resolve.alias.canvas = false;
-    // https://github.com/handlebars-lang/handlebars.js/issues/953#issuecomment-239874313
     config.resolve.alias.handlebars = "handlebars/dist/handlebars.js";
     return config;
   },

@@ -48,7 +48,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
 import { Spinner } from "@/components/spinner";

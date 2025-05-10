@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import useSWR from "swr";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
@@ -231,14 +231,7 @@ function useSyncCellChangesEffect(
           const _ = sync(cell.id, {
             value: cell.value,
             option_id: cell.form_field_option_id,
-          });
-
-          toast
-            .promise(_, {
-              loading: "Updating...",
-              success: "Updated",
-              error: "Failed",
-            })
+          })
             .then((data) => {
               // TODO:
               // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
@@ -246,6 +239,12 @@ function useSyncCellChangesEffect(
             .catch((error) => {
               // else revert the change
             });
+
+          toast.promise(_, {
+            loading: "Updating...",
+            success: "Updated",
+            error: "Failed",
+          });
         }
       });
     });
@@ -503,15 +502,11 @@ export function FormResponseFeedProvider({
           }
         );
 
-        toast.promise(
-          newresponse,
-          {
-            loading: "Fetching new response...",
-            success: "New response",
-            error: "Failed to fetch new response",
-          },
-          { id: data.id }
-        );
+        toast.promise(newresponse, {
+          loading: "Fetching new response...",
+          success: "New response",
+          error: "Failed to fetch new response",
+        });
       }, 100);
     },
     onUpdate: (data) => {
@@ -575,24 +570,24 @@ export function FormResponseSessionFeedProvider({
         from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
         to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
-    }).then(({ data, count }) => {
-      dispatch({
-        type: "editor/table/space/feed/sessions",
-        data: data as any,
-        reset: true,
-        count: count!,
-      });
-    });
-
-    toast
-      .promise(feed, {
-        loading: "Fetching sessions...",
-        success: "Sessions fetched",
-        error: "Failed to fetch sessions",
+    })
+      .then(({ data, count }) => {
+        dispatch({
+          type: "editor/table/space/feed/sessions",
+          data: data as any,
+          reset: true,
+          count: count!,
+        });
       })
       .finally(() => {
         setLoading(false);
       });
+
+    toast.promise(feed, {
+      loading: "Fetching sessions...",
+      success: "Sessions fetched",
+      error: "Failed to fetch sessions",
+    });
   }, [
     dispatch,
     fetchResponseSessions,
@@ -801,25 +796,25 @@ export function GridaSchemaTableFeedProvider({
         from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
         to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
-    }).then(({ data, count }) => {
-      dispatch({
-        type: "editor/table/space/feed",
-        table_id: table_id,
-        data: data as any,
-        reset: true,
-        count: count!,
-      });
-    });
-
-    toast
-      .promise(feed, {
-        loading: "Loading...",
-        success: "Loaded",
-        error: "Failed to load",
+    })
+      .then(({ data, count }) => {
+        dispatch({
+          type: "editor/table/space/feed",
+          table_id: table_id,
+          data: data as any,
+          reset: true,
+          count: count!,
+        });
       })
       .finally(() => {
         setLoading(false);
       });
+
+    toast.promise(feed, {
+      loading: "Loading...",
+      success: "Loaded",
+      error: "Failed to load",
+    });
   }, [dispatch, fetchTableRows, setLoading, table_id, datagrid_query]);
 
   useSubscription({
@@ -837,15 +832,11 @@ export function GridaSchemaTableFeedProvider({
           }
         );
 
-        toast.promise(
-          newresponse,
-          {
-            loading: "Fetching new Entry",
-            success: "New Entry",
-            error: "Failed to fetch new Entry",
-          },
-          { id: data.id }
-        );
+        toast.promise(newresponse, {
+          loading: "Fetching new Entry",
+          success: "New Entry",
+          error: "Failed to fetch new Entry",
+        });
       }, 100);
     },
     onUpdate: (data) => {

@@ -65,7 +65,7 @@ export function WorkspaceMenu({
         <DropdownMenuSeparator />
         <Link href="/organizations/new">
           <DropdownMenuItem>
-            <PlusIcon className="inline w-4 h-4 me-2" />
+            <PlusIcon className="size-4" />
             New organization
           </DropdownMenuItem>
         </Link>

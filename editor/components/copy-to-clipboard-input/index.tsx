@@ -1,9 +1,10 @@
 "use client";
 
-import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
 import React, { useState } from "react";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export function CopyToClipboardInput({ value }: { value: string }) {
   const [isCopied, setIsCopied] = useState(false);
@@ -11,6 +12,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
   const onCopyClick = () => {
     navigator.clipboard.writeText(value);
     setIsCopied(true);
+    toast.success("Copied to clipboard");
     setTimeout(() => {
       setIsCopied(false);
     }, 2000);

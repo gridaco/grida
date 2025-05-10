@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import type {
   EndingPageI18nOverrides,
   EndingPageTemplateID,

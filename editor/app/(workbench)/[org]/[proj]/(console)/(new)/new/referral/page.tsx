@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { CampaignWizard } from "./campaign-wizard";
 import { useProject } from "@/scaffolds/workspace";
 import { Platform } from "@/lib/platform";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import WelcomeDialog from "./welcome-dialog";
 
 export default function NewCampaignPage() {

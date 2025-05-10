@@ -685,9 +685,6 @@ importers:
       csstype:
         specifier: 3.1.0
         version: 3.1.0
-      csv-stringify:
-        specifier: ^6.4.6
-        version: 6.5.2
       d3-array:
         specifier: ^3.2.4
         version: 3.2.4
@@ -835,9 +832,6 @@ importers:
       react-hook-form:
         specifier: ^7.52.1
         version: 7.56.3(react@19.1.0)
-      react-hot-toast:
-        specifier: ^2.4.0
-        version: 2.5.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-hotkeys-hook:
         specifier: ^4.6.1
         version: 4.6.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -851,8 +845,8 @@ importers:
         specifier: ^5.2.11
         version: 5.2.14(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-pdf:
-        specifier: ^7.7.1
-        version: 7.7.3(@types/react@19.1.3)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        specifier: ^9.2.1
+        version: 9.2.1(@types/react@19.1.3)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-phone-number-input:
         specifier: ^3.4.12
         version: 3.4.12(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1213,10 +1207,10 @@ importers:
         version: 27.5.2
       jest:
         specifier: ^27.1.0
-        version: 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+        version: 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       ts-jest:
         specifier: ^27.0.5
-        version: 27.1.5(@babel/core@7.27.1)(@types/jest@27.5.2)(babel-jest@27.5.1(@babel/core@7.27.1))(jest@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)))(typescript@5.8.3)
+        version: 27.1.5(@babel/core@7.27.1)(@types/jest@27.5.2)(babel-jest@27.5.1(@babel/core@7.27.1))(jest@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)))(typescript@5.8.3)
       typescript:
         specifier: ^5
         version: 5.8.3
@@ -8786,9 +8780,6 @@ packages:
   csstype@3.1.3:
     resolution: {integrity: sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==}
 
-  csv-stringify@6.5.2:
-    resolution: {integrity: sha512-RFPahj0sXcmUyjrObAK+DOWtMvMIFV328n4qZJhgX3x2RqkQgOTU2mCUmiFR0CzM6AzChlRSUErjiJeEt8BaQA==}
-
   currently-unhandled@0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
     engines: {node: '>=0.10.0'}
@@ -10550,11 +10541,6 @@ packages:
 
   glsl-noise@0.0.0:
     resolution: {integrity: sha512-b/ZCF6amfAUb7dJM/MxRs7AetQEahYzJ8PtgfrmEdtw6uyGOr+ZSGtgjFm6mfsBkxJ4d2W7kg+Nlqzqvn3Bc0w==}
-
-  goober@2.1.16:
-    resolution: {integrity: sha512-erjk19y1U33+XAMe1VTvIONHYoSqE4iS7BYUZfHaqeohLmnC0FdxEh7rQU+6MZ4OajItzjZFSRtVANrQwNq6/g==}
-    peerDependencies:
-      csstype: ^3.0.10
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -13601,10 +13587,6 @@ packages:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
     engines: {node: '>=8'}
 
-  path2d-polyfill@2.0.1:
-    resolution: {integrity: sha512-ad/3bsalbbWhmBo0D6FZ4RNMwsLsPpL6gnvhuSaU5Vm7b06Kr5ubSltQQ0T7YKsiJQO+g22zJ4dJKNTXIyOXtA==}
-    engines: {node: '>=8'}
-
   path2d@0.2.2:
     resolution: {integrity: sha512-+vnG6S4dYcYxZd+CZxzXCNKdELYZSKfohrk98yajCo1PtRoDgCTrrwOvK1GT0UoAdVszagDVllQc0U1vaX4NUQ==}
     engines: {node: '>=6'}
@@ -13616,10 +13598,6 @@ packages:
   pbkdf2@3.1.2:
     resolution: {integrity: sha512-iuh7L6jA7JEGu2WxDwtQP1ddOpaJNC4KlDEFfdQajSGgGPNi4OyDc2R7QnbY2bR9QjBVGwgvTdNJZoE7RaxUMA==}
     engines: {node: '>=0.12'}
-
-  pdfjs-dist@3.11.174:
-    resolution: {integrity: sha512-TdTZPf1trZ8/UFu5Cx/GXB7GZM30LT+wWUNfsi6Bq8ePLnb+woNKtDymI2mxZYBpMbonNFqKmiz684DIfnd8dA==}
-    engines: {node: '>=18'}
 
   pdfjs-dist@4.8.69:
     resolution: {integrity: sha512-IHZsA4T7YElCKNNXtiLgqScw4zPd3pG9do8UrznC757gMd7UPeHSL2qwNNMJo4r79fl8oj1Xx+1nh2YkzdMpLQ==}
@@ -14676,13 +14654,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
 
-  react-hot-toast@2.5.2:
-    resolution: {integrity: sha512-Tun3BbCxzmXXM7C+NI4qiv6lT0uwGh4oAfeJyNOjYUejTsm35mK9iCaYLGv8cBz9L5YxZLx/2ii7zsIwPtPUdw==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: '>=16'
-      react-dom: '>=16'
-
   react-hotkeys-hook@4.6.2:
     resolution: {integrity: sha512-FmP+ZriY3EG59Ug/lxNfrObCnW9xQShgk7Nb83+CkpfkcCpfS95ydv+E9JuXA5cp8KtskU7LGlIARpkc92X22Q==}
     peerDependencies:
@@ -14775,16 +14746,6 @@ packages:
 
   react-pageflip@2.0.3:
     resolution: {integrity: sha512-k81mHhRvUM52y8jyzTCh5t4O0lepkLhp+XGSUzq2C3uD+iW99Cv0jfRlqFCjZbD5N3jKkIFr7/3giucoXKDP3Q==}
-
-  react-pdf@7.7.3:
-    resolution: {integrity: sha512-a2VfDl8hiGjugpqezBTUzJHYLNB7IS7a2t7GD52xMI9xHg8LdVaTMsnM9ZlNmKadnStT/tvX5IfV0yLn+JvYmw==}
-    peerDependencies:
-      '@types/react': 19.1.3
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
 
   react-pdf@9.2.1:
     resolution: {integrity: sha512-AJt0lAIkItWEZRA5d/mO+Om4nPCuTiQ0saA+qItO967DTjmGjnhmF+Bi2tL286mOTfBlF5CyLzJ35KTMaDoH+A==}
@@ -21926,7 +21887,7 @@ snapshots:
       jest-util: 29.7.0
       slash: 3.0.0
 
-  '@jest/core@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))':
+  '@jest/core@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))':
     dependencies:
       '@jest/console': 27.5.1
       '@jest/reporters': 27.5.1
@@ -21940,13 +21901,13 @@ snapshots:
       exit: 0.1.2
       graceful-fs: 4.2.11
       jest-changed-files: 27.5.1
-      jest-config: 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      jest-config: 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       jest-haste-map: 27.5.1
       jest-message-util: 27.5.1
       jest-regex-util: 27.5.1
       jest-resolve: 27.5.1
       jest-resolve-dependencies: 27.5.1
-      jest-runner: 27.5.1(canvas@2.11.2(encoding@0.1.13))
+      jest-runner: 27.5.1(canvas@2.11.2)
       jest-runtime: 27.5.1
       jest-snapshot: 27.5.1
       jest-util: 27.5.1
@@ -28867,8 +28828,6 @@ snapshots:
 
   csstype@3.1.3: {}
 
-  csv-stringify@6.5.2: {}
-
   currently-unhandled@0.4.1:
     dependencies:
       array-find-index: 1.0.2
@@ -31157,10 +31116,6 @@ snapshots:
 
   glsl-noise@0.0.0: {}
 
-  goober@2.1.16(csstype@3.1.3):
-    dependencies:
-      csstype: 3.1.3
-
   gopd@1.2.0: {}
 
   got@11.8.6:
@@ -32409,16 +32364,16 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  jest-cli@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
+  jest-cli@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
     dependencies:
-      '@jest/core': 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      '@jest/core': 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       '@jest/test-result': 27.5.1
       '@jest/types': 27.5.1
       chalk: 4.1.2
       exit: 0.1.2
       graceful-fs: 4.2.11
       import-local: 3.2.0
-      jest-config: 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      jest-config: 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       jest-util: 27.5.1
       jest-validate: 27.5.1
       prompts: 2.4.2
@@ -32449,7 +32404,7 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-config@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
+  jest-config@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
     dependencies:
       '@babel/core': 7.27.1
       '@jest/test-sequencer': 27.5.1
@@ -32461,13 +32416,13 @@ snapshots:
       glob: 7.2.3
       graceful-fs: 4.2.11
       jest-circus: 27.5.1
-      jest-environment-jsdom: 27.5.1(canvas@2.11.2(encoding@0.1.13))
+      jest-environment-jsdom: 27.5.1(canvas@2.11.2)
       jest-environment-node: 27.5.1
       jest-get-type: 27.5.1
       jest-jasmine2: 27.5.1
       jest-regex-util: 27.5.1
       jest-resolve: 27.5.1
-      jest-runner: 27.5.1(canvas@2.11.2(encoding@0.1.13))
+      jest-runner: 27.5.1(canvas@2.11.2)
       jest-util: 27.5.1
       jest-validate: 27.5.1
       micromatch: 4.0.8
@@ -32552,7 +32507,7 @@ snapshots:
       jest-util: 29.7.0
       pretty-format: 29.7.0
 
-  jest-environment-jsdom@27.5.1(canvas@2.11.2(encoding@0.1.13)):
+  jest-environment-jsdom@27.5.1(canvas@2.11.2):
     dependencies:
       '@jest/environment': 27.5.1
       '@jest/fake-timers': 27.5.1
@@ -32560,7 +32515,7 @@ snapshots:
       '@types/node': 22.15.16
       jest-mock: 27.5.1
       jest-util: 27.5.1
-      jsdom: 16.7.0(canvas@2.11.2(encoding@0.1.13))
+      jsdom: 16.7.0(canvas@2.11.2)
     transitivePeerDependencies:
       - bufferutil
       - canvas
@@ -32794,7 +32749,7 @@ snapshots:
       resolve.exports: 2.0.3
       slash: 3.0.0
 
-  jest-runner@27.5.1(canvas@2.11.2(encoding@0.1.13)):
+  jest-runner@27.5.1(canvas@2.11.2):
     dependencies:
       '@jest/console': 27.5.1
       '@jest/environment': 27.5.1
@@ -32806,7 +32761,7 @@ snapshots:
       emittery: 0.8.1
       graceful-fs: 4.2.11
       jest-docblock: 27.5.1
-      jest-environment-jsdom: 27.5.1(canvas@2.11.2(encoding@0.1.13))
+      jest-environment-jsdom: 27.5.1(canvas@2.11.2)
       jest-environment-node: 27.5.1
       jest-haste-map: 27.5.1
       jest-leak-detector: 27.5.1
@@ -33050,11 +33005,11 @@ snapshots:
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
-  jest@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
+  jest@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)):
     dependencies:
-      '@jest/core': 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      '@jest/core': 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       import-local: 3.2.0
-      jest-cli: 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      jest-cli: 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
     transitivePeerDependencies:
       - bufferutil
       - canvas
@@ -33107,7 +33062,7 @@ snapshots:
 
   jsbn@1.1.0: {}
 
-  jsdom@16.7.0(canvas@2.11.2(encoding@0.1.13)):
+  jsdom@16.7.0(canvas@2.11.2):
     dependencies:
       abab: 2.0.6
       acorn: 8.14.0
@@ -35289,9 +35244,6 @@ snapshots:
 
   path-type@4.0.0: {}
 
-  path2d-polyfill@2.0.1:
-    optional: true
-
   path2d@0.2.2:
     optional: true
 
@@ -35307,14 +35259,6 @@ snapshots:
       ripemd160: 2.0.2
       safe-buffer: 5.2.1
       sha.js: 2.4.11
-
-  pdfjs-dist@3.11.174(encoding@0.1.13):
-    optionalDependencies:
-      canvas: 2.11.2(encoding@0.1.13)
-      path2d-polyfill: 2.0.1
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
 
   pdfjs-dist@4.8.69:
     optionalDependencies:
@@ -36489,13 +36433,6 @@ snapshots:
     dependencies:
       react: 19.1.0
 
-  react-hot-toast@2.5.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
-    dependencies:
-      csstype: 3.1.3
-      goober: 2.1.16(csstype@3.1.3)
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-
   react-hotkeys-hook@4.6.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
       react: 19.1.0
@@ -36570,25 +36507,6 @@ snapshots:
   react-pageflip@2.0.3:
     dependencies:
       page-flip: 2.0.7
-
-  react-pdf@7.7.3(@types/react@19.1.3)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
-    dependencies:
-      clsx: 2.1.1
-      dequal: 2.0.3
-      make-cancellable-promise: 1.3.2
-      make-event-props: 1.6.2
-      merge-refs: 1.3.0(@types/react@19.1.3)
-      pdfjs-dist: 3.11.174(encoding@0.1.13)
-      prop-types: 15.8.1
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-      tiny-invariant: 1.3.3
-      warning: 4.0.3
-    optionalDependencies:
-      '@types/react': 19.1.3
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
 
   react-pdf@9.2.1(@types/react@19.1.3)(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
@@ -38889,11 +38807,11 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  ts-jest@27.1.5(@babel/core@7.27.1)(@types/jest@27.5.2)(babel-jest@27.5.1(@babel/core@7.27.1))(jest@27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)))(typescript@5.8.3):
+  ts-jest@27.1.5(@babel/core@7.27.1)(@types/jest@27.5.2)(babel-jest@27.5.1(@babel/core@7.27.1))(jest@27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3)))(typescript@5.8.3):
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
-      jest: 27.5.1(canvas@2.11.2(encoding@0.1.13))(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
+      jest: 27.5.1(canvas@2.11.2)(ts-node@10.9.2(@types/node@22.15.16)(typescript@5.8.3))
       jest-util: 27.5.1
       json5: 2.2.3
       lodash.memoize: 4.1.2

@@ -44,7 +44,7 @@ import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useStopwatch, useTimer } from "react-timer-hook";
 
 type SimulatorStatus = "none" | "idle" | "running" | "paused";

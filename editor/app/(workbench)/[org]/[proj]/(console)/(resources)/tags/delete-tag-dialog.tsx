@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Platform } from "@/lib/platform";
 import { useTags } from "@/scaffolds/workspace";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface DeleteTagDialogProps {
   tag: Platform.Tag.TagWithUsageCount;

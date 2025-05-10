@@ -22,7 +22,7 @@ import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import { useProject } from "@/scaffolds/workspace";
 import { documentpreviewlink } from "@/lib/internal/url";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,

@@ -10,7 +10,7 @@ import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context
 import { TProperties, TProperty, TSchema } from "@/lib/spock";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { FormExpression } from "@/lib/forms/expression";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { tokens } from "@grida/tokens";
 
 function useFormSchema() {

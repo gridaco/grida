@@ -326,12 +326,12 @@ export function FormFieldBlockMenuItems({
     <>
       {form_field_id && (
         <DropdownMenuItem onClick={onFieldEditClick}>
-          <Pencil1Icon className="me-2 align-middle" />
+          <Pencil1Icon className="size-3.5" />
           Edit Field Definition
         </DropdownMenuItem>
       )}
       <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
-        <TrashIcon className="me-2 align-middle" />
+        <TrashIcon className="size-3.5" />
         Delete Block
       </DropdownMenuItem>
     </>

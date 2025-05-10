@@ -5,7 +5,7 @@ import { tokens } from "@grida/tokens";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useFilePicker } from "use-file-picker";
 
 /**

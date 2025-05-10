@@ -670,7 +670,7 @@ export namespace Platform.WEST.Referral {
         base_url: string;
       }
     ) {
-      this.BASE_URL = config?.base_url ?? "/api/west";
+      this.BASE_URL = config?.base_url ?? "https://grida.co/v1/west";
     }
 
     read(code: string): Promise<{

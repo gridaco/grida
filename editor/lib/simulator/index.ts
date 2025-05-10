@@ -254,7 +254,7 @@ async function submit(form_id: string, data: any, headers: any = {}) {
     formdata.append(key, data[key]);
   }
 
-  return fetch(`/submit/${form_id}`, {
+  return fetch(`/v1/submit/${form_id}`, {
     method: "POST",
     body: formdata,
     headers,

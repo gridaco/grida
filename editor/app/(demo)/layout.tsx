@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ToasterWithMax } from "@/components/toaster";
+import { Toaster } from "@/components/ui/sonner";
 
 import "../editor.css";
 
@@ -26,13 +26,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ToasterWithMax position="bottom-center" max={5} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
+          <Toaster position="bottom-center" />
           {children}
         </ThemeProvider>
       </body>

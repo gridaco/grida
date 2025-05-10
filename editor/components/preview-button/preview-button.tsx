@@ -53,7 +53,7 @@ export function PreviewButton() {
             })}
           >
             <DropdownMenuItem>
-              <Share2Icon className="me-2 align-middle" />
+              <Share2Icon className="size-3.5" />
               Share
             </DropdownMenuItem>
           </Link>
@@ -65,7 +65,7 @@ export function PreviewButton() {
             })}
           >
             <DropdownMenuItem>
-              <GearIcon className="me-2 align-middle" />
+              <GearIcon className="size-3.5" />
               Configure Agent
             </DropdownMenuItem>
           </Link>

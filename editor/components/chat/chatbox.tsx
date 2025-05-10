@@ -5,7 +5,7 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
 import { cn } from "@/components/lib/utils";
 import TextareaAutoResize from "react-textarea-autosize";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import Image from "next/image";
 import type { FileIO } from "@/lib/file";
 

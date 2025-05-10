@@ -1,7 +1,5 @@
 "use client";
 
-import FormField from "@/components/formfield";
-import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import React, {
   useCallback,
   useEffect,
@@ -9,6 +7,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import FormField from "@/components/formfield";
+import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
@@ -47,6 +47,8 @@ import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
 import { Spinner } from "@/components/spinner";
+import { PhoneFieldDefaultCountryProvider } from "@/components/formfield/phone-field";
+import type { FormAgentGeo } from "@/lib/formstate/core/geo";
 
 const html_form_id = "form";
 
@@ -81,6 +83,7 @@ const default_form_view_translation_en: FormViewTranslation = {
 type FormViewRootProps = {
   form_id: string;
   session_id?: string;
+  geo?: FormAgentGeo;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -126,6 +129,7 @@ export function FormViewRoot({
 function Providers({
   form_id,
   session_id,
+  geo,
   fields,
   blocks,
   children,
@@ -134,6 +138,7 @@ function Providers({
 }: React.PropsWithChildren<{
   form_id: string;
   session_id?: string;
+  geo?: FormAgentGeo;
   defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
@@ -162,13 +167,15 @@ function Providers({
           defaultValues,
         })}
       >
-        <FormAgentMessagingInterfaceProvider />
-        <MediaLoadPluginProvider />
-        <SessionDataSyncProvider session_id={session_id}>
-          <TossPaymentsCheckoutProvider initial={checkoutSession}>
-            {children}
-          </TossPaymentsCheckoutProvider>
-        </SessionDataSyncProvider>
+        <PhoneFieldDefaultCountryProvider defaultCountry={geo?.country}>
+          <FormAgentMessagingInterfaceProvider />
+          <MediaLoadPluginProvider />
+          <SessionDataSyncProvider session_id={session_id}>
+            <TossPaymentsCheckoutProvider initial={checkoutSession}>
+              {children}
+            </TossPaymentsCheckoutProvider>
+          </SessionDataSyncProvider>
+        </PhoneFieldDefaultCountryProvider>
       </FormAgentProvider>
     </>
   );
