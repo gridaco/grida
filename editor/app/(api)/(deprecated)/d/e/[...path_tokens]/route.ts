@@ -11,12 +11,12 @@ export async function GET(
   request: NextRequest,
   segmentData: {
     params: Promise<{
-      id: string;
       path_tokens?: string[];
     }>;
   }
 ) {
-  const { id, path_tokens = [] } = await segmentData.params;
+  const { path_tokens: _path_tokens = [] } = await segmentData.params;
+  const [id, ...path_tokens] = _path_tokens;
 
   try {
     const { baseUrl } = await query_d_e(id);
