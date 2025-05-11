@@ -139,7 +139,7 @@ function GradientStopsSlider({
       {stops.map((stop, index) => (
         <SliderPrimitive.Thumb
           key={index}
-          className="block h-4 w-4 rounded-full border-2 border-background outline outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+          className="block size-4 rounded-full border-2 border-background outline outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
           style={{
             background: css.toRGBAString(stop.color),
           }}

@@ -41,7 +41,7 @@ export function ChartPartialDataAlert({
 
   return (
     <Alert className="bg-background/80 backdrop-blur-sm max-w-md">
-      <InfoCircledIcon className="h-4 w-4" />
+      <InfoCircledIcon className="size-4" />
       <AlertTitle>
         Filter Adjustment: Displaying {count} out of {estimated_count} rows
       </AlertTitle>

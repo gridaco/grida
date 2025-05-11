@@ -42,7 +42,7 @@ export function TableViews() {
           <TabsTrigger key={tb.id.toString()} value={tb.name}>
             <ResourceTypeIcon
               type={tb.icon}
-              className="inline align-middle w-4 min-w-4 h-4 me-2"
+              className="inline align-middle w-4 min-size-4 me-2"
             />
             {tb.readonly && (
               <span className="me-2 text-xs font-mono text-muted-foreground">
@@ -56,7 +56,7 @@ export function TableViews() {
               <TabsTrigger key={view.id} value={view.id}>
                 <ResourceTypeIcon
                   type={view.type}
-                  className="inline align-middle w-4 h-4 me-2"
+                  className="inline align-middle size-4 me-2"
                 />
                 {view.label}
               </TabsTrigger>
@@ -85,19 +85,19 @@ function AddViewButton() {
       <DropdownMenuContent className="min-w-40">
         <DropdownMenuLabel>New View</DropdownMenuLabel>
         <DropdownMenuItem>
-          <ResourceTypeIcon type="table" className="me-2 w-4 h-4" />
+          <ResourceTypeIcon type="table" className="me-2 size-4" />
           Table
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <ResourceTypeIcon type="chart" className="me-2 w-4 h-4" />
+          <ResourceTypeIcon type="chart" className="me-2 size-4" />
           Chart
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <ResourceTypeIcon type="view-list" className="me-2 w-4 h-4" />
+          <ResourceTypeIcon type="view-list" className="me-2 size-4" />
           List
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <ResourceTypeIcon type="view-gallery" className="me-2 w-4 h-4" />
+          <ResourceTypeIcon type="view-gallery" className="me-2 size-4" />
           Gallery
         </DropdownMenuItem>
       </DropdownMenuContent>

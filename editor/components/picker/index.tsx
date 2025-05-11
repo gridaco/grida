@@ -145,9 +145,9 @@ const Breadcrumb: React.FC = () => {
     <div className="flex items-center text-sm mb-4">
       {visible.map((crumb, idx) => (
         <React.Fragment key={idx}>
-          {idx > 0 && <ChevronRight className="h-4 w-4 mx-1" />}
+          {idx > 0 && <ChevronRight className="size-4 mx-1" />}
           {crumb === "..." ? (
-            <MoreHorizontal className="h-4 w-4 mx-1" />
+            <MoreHorizontal className="size-4 mx-1" />
           ) : (
             <button
               onClick={() => navigateToBreadcrumb(currentPath.indexOf(crumb))}
@@ -209,12 +209,12 @@ const FileList: React.FC<FileListProps> = ({ accept, loading }) => {
             }}
           >
             {node.type === "folder" ? (
-              <Folder className="mr-2 h-4 w-4 text-yellow-500" />
+              <Folder className="mr-2 size-4 text-yellow-500" />
             ) : (
-              <File className="mr-2 h-4 w-4" />
+              <File className="mr-2 size-4" />
             )}
             <span className="text-sm grow">{node.name}</span>
-            {selectedNodes.includes(node) && <Check className="h-4 w-4" />}
+            {selectedNodes.includes(node) && <Check className="size-4" />}
           </button>
         </li>
       ))}

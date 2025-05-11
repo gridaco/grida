@@ -47,7 +47,7 @@ export function IntegrationsSearch() {
       onSubmit={handleSearch}
       className="relative w-full md:w-[200px] lg:w-[300px]"
     >
-      <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
       <Input
         type="search"
         placeholder="Search integrations..."
@@ -63,7 +63,7 @@ export function IntegrationsSearch() {
           className="absolute right-0 top-0 h-9 w-9"
           onClick={clearSearch}
         >
-          <X className="h-4 w-4" />
+          <X className="size-4" />
           <span className="sr-only">Clear search</span>
         </Button>
       )}

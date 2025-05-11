@@ -107,7 +107,7 @@ function LayoutMenu() {
       <DropdownMenuTrigger asChild>
         <DropdownMenuItem className="relative pl-8">
           <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-            <PaletteIcon className="w-4 h-4" />
+            <PaletteIcon className="size-4" />
           </span>
           Layout & Design
           <Badge variant="outline" className="ms-2">
@@ -198,7 +198,7 @@ function _ViewDefinition({ tablename }: { tablename: string }) {
   const menuitem = (
     <DropdownMenuItem className="relative pl-8" disabled={!supports_definition}>
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-        <CodeIcon className="w-4 h-4" />
+        <CodeIcon className="size-4" />
       </span>
       Definition & API
       <Badge variant="outline" className="ms-2">

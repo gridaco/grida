@@ -536,7 +536,7 @@ function SelectionExport() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="default" size="sm">
-          <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+          <DownloadIcon className="size-4 align-middle inline-flex me-2" />
           Export
         </Button>
       </DropdownMenuTrigger>
@@ -565,7 +565,7 @@ function GridaFormsResponsesExportCSV() {
       prefetch={false}
     >
       <Button variant="outline" size="sm">
-        <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+        <DownloadIcon className="size-4 align-middle inline-flex me-2" />
         Export to CSV
       </Button>
     </Link>

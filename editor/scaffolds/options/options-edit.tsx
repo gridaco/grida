@@ -704,7 +704,7 @@ function OptgroupEditItem({
                 "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
               }
             >
-              <FolderIcon className="me-2 w-4 h-4" />
+              <FolderIcon className="me-2 size-4" />
               Group
             </div>
           </label>
@@ -712,7 +712,7 @@ function OptgroupEditItem({
         <label className="flex-[2] relative">
           {!detailed && (
             <div className="absolute left-2 top-0 bottom-0 flex items-center justify-center">
-              <FolderIcon className="text-muted-foreground w-4 h-4" />
+              <FolderIcon className="text-muted-foreground size-4" />
             </div>
           )}
           <Input

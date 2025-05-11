@@ -69,7 +69,7 @@ export function FormFieldAssistant({
   return (
     <div className="w-full border rounded-lg p-4 shadow-sm bg-background">
       <div className="flex items-center mb-4">
-        <LightningBoltIcon className="w-4 h-4 mr-2" />
+        <LightningBoltIcon className="size-4 mr-2" />
         <span className="font-semibold">Ask AI</span>
       </div>
       <div className="grid gap-3">

@@ -240,7 +240,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={`lucide lucide-chevron-down h-4 w-4 shrink-0 opacity-50 ${isPopoverOpen ? "rotate-180" : "rotate-0"}`}
+                className={`lucide lucide-chevron-down size-4 shrink-0 opacity-50 ${isPopoverOpen ? "rotate-180" : "rotate-0"}`}
               >
                 <path d="m6 9 6 6 6-6"></path>
               </svg>

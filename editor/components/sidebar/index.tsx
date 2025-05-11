@@ -244,11 +244,11 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       onClick={onSelect}
     >
       {has_icon_slot && (
-        <div className="relative w-4 h-4 me-2">
+        <div className="relative size-4 me-2">
           {expandable && (
             <button
               type="button"
-              className="absolute z-10 w-4 h-4 me-2 opacity-0 group-hover/menu-item:opacity-100"
+              className="absolute z-10 size-4 me-2 opacity-0 group-hover/menu-item:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpandChange?.(!expanded);
@@ -261,7 +261,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
             {icon && (
               <div
                 data-expandable={expandable}
-                className="w-4 h-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover/menu-item:opacity-0"
+                className="size-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover/menu-item:opacity-0"
               >
                 {icon}
               </div>

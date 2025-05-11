@@ -397,7 +397,7 @@ export default function CustomerDetailPage(props0: {
         <div className="flex items-center gap-2">
           <Link href={"./"}>
             <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
             </Button>
           </Link>
           <div>
@@ -421,7 +421,7 @@ export default function CustomerDetailPage(props0: {
                 className="flex items-center gap-1"
               >
                 More actions
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -441,7 +441,7 @@ export default function CustomerDetailPage(props0: {
               size="sm"
               className="rounded-r-none border-r-0"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="size-4" />
             </Button>
             <Button
               disabled
@@ -449,7 +449,7 @@ export default function CustomerDetailPage(props0: {
               size="sm"
               className="rounded-l-none"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
         </div>
@@ -553,7 +553,7 @@ export default function CustomerDetailPage(props0: {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreHorizontal className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -591,7 +591,7 @@ export default function CustomerDetailPage(props0: {
                           toast.success("Copied email to clipboard");
                         }}
                       >
-                        <Copy className="h-4 w-4" />
+                        <Copy className="size-4" />
                       </Button>
                     )}
                   </div>
@@ -659,7 +659,7 @@ export default function CustomerDetailPage(props0: {
                 size="icon"
                 onClick={editTagsDialog.openDialog}
               >
-                <Edit2Icon className="h-4 w-4" />
+                <Edit2Icon className="size-4" />
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -690,7 +690,7 @@ export default function CustomerDetailPage(props0: {
                     size="icon"
                     onClick={editNotesDialog.openDialog}
                   >
-                    <Edit2Icon className="h-4 w-4" />
+                    <Edit2Icon className="size-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Edit notes</TooltipContent>
@@ -745,7 +745,7 @@ export default function CustomerDetailPage(props0: {
                 size="icon"
                 onClick={editMetadataDialog.openDialog}
               >
-                <Edit2Icon className="h-4 w-4" />
+                <Edit2Icon className="size-4" />
               </Button>
             </div>
             {customer.metadata ? (

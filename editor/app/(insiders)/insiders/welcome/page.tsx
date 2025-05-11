@@ -25,7 +25,7 @@ export default function WelcomeContent() {
           <div className="grid gap-2">
             <Link href="/dashboard" className="w-full justify-start">
               <Button variant="outline" className="w-full">
-                <HomeIcon className="mr-2 h-4 w-4" />
+                <HomeIcon className="mr-2 size-4" />
                 Home
               </Button>
             </Link>
@@ -35,7 +35,7 @@ export default function WelcomeContent() {
               className="w-full justify-start"
             >
               <Button variant="outline" className="w-full">
-                <Users className="mr-2 h-4 w-4" />
+                <Users className="mr-2 size-4" />
                 Join Community Chat
               </Button>
             </Link>
@@ -45,7 +45,7 @@ export default function WelcomeContent() {
               className="w-full justify-start"
             >
               <Button variant="outline" className="w-full">
-                <Zap className="mr-2 h-4 w-4" />
+                <Zap className="mr-2 size-4" />
                 Explore Good-First-Issues
               </Button>
             </Link>
@@ -55,7 +55,7 @@ export default function WelcomeContent() {
               className="w-full justify-start"
             >
               <Button variant="outline" className="w-full">
-                <CalendarDays className="mr-2 h-4 w-4" />
+                <CalendarDays className="mr-2 size-4" />
                 Schedule a Meeting
               </Button>
             </Link>

@@ -47,7 +47,7 @@ function DefaultRenderer({
     <>
       <CheckIcon
         className={cn(
-          "mr-2 h-4 w-4 min-w-4",
+          "mr-2 size-4 min-w-4",
           selected ? "opacity-100" : "opacity-0"
         )}
       />
@@ -195,7 +195,7 @@ export function VirtualizedCombobox({
           <span className="text-ellipsis overflow-hidden">
             {value ? options.find((option) => option === value) : placeholder}
           </span>
-          <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <CaretSortIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

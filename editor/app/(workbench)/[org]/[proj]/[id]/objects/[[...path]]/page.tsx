@@ -111,14 +111,14 @@ function Tools() {
     <>
       <nav className="flex flex-wrap gap-4">
         <div className={__tools_card_classes} onClick={openFilePicker}>
-          <UploadIcon className="w-4 h-4" />
+          <UploadIcon className="size-4" />
           <span className="text-xs text-muted-foreground">Upload</span>
         </div>
         <div
           className={__tools_card_classes}
           onClick={createFolderDialog.openDialog}
         >
-          <FolderIcon className="w-4 h-4" />
+          <FolderIcon className="size-4" />
           <span className="text-xs text-muted-foreground">Create Folder</span>
         </div>
       </nav>
@@ -306,9 +306,9 @@ function Folder() {
                 onClick={() => storage.refresh()}
               >
                 {storage.loading ? (
-                  <Spinner className="h-4 w-4 me-2" />
+                  <Spinner className="size-4 me-2" />
                 ) : (
-                  <ReloadIcon className="h-4 w-4 me-2" />
+                  <ReloadIcon className="size-4 me-2" />
                 )}
                 Reload
               </Button>
@@ -318,7 +318,7 @@ function Folder() {
                 onClick={() => setView("grid")}
                 className={cn(view === "grid" && "bg-muted")}
               >
-                <GridIcon className="h-4 w-4" />
+                <GridIcon className="size-4" />
               </Button>
               <Button
                 variant="outline"
@@ -326,14 +326,14 @@ function Folder() {
                 onClick={() => setView("list")}
                 className={cn(view === "list" && "bg-muted")}
               >
-                <ListIcon className="h-4 w-4" />
+                <ListIcon className="size-4" />
               </Button>
             </div>
           </div>
           {storage.public && (
             <div className="py-4">
               <Alert>
-                <LockOpen1Icon className="w-4 h-4" />
+                <LockOpen1Icon className="size-4" />
                 <AlertTitle>Public Bucket</AlertTitle>
                 <AlertDescription>
                   This bucket is public and only meant for serving public files.{" "}
@@ -456,7 +456,7 @@ const EntityNodeItemComponent = ({
               <span className="w-1/2 text-sm font-medium truncate">
                 <MimeTypeIcon
                   type={node.type === "folder" ? "folder" : node.mimetype}
-                  className="inline align-middle me-2 w-4 h-4"
+                  className="inline align-middle me-2 size-4"
                 />
                 {node.name}
               </span>
@@ -477,7 +477,7 @@ const EntityNodeItemComponent = ({
                 className="absolute right-1 top-1 h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DotsHorizontalIcon className="h-4 w-4" />
+                <DotsHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -780,7 +780,7 @@ function ConfirmDeleteDialog({
         <DialogContent>
           <DialogHeader className="overflow-hidden">
             <DialogTitle className="truncate">
-              <ExclamationTriangleIcon className="inline align-middle me-2 w-4 h-4" />
+              <ExclamationTriangleIcon className="inline align-middle me-2 size-4" />
               Delete {data.name}
             </DialogTitle>
             <DialogDescription>This action cannot be undone.</DialogDescription>

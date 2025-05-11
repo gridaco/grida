@@ -288,11 +288,11 @@ function CreateNewDatabaseDialog({
           >
             <TabsList>
               <TabsTrigger value="database">
-                <ResourceTypeIcon type="database" className="w-4 h-4 me-2" />
+                <ResourceTypeIcon type="database" className="size-4 me-2" />
                 Database
               </TabsTrigger>
               <TabsTrigger value="table">
-                <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                <ResourceTypeIcon type="table" className="size-4 me-2" />
                 Table
               </TabsTrigger>
             </TabsList>
@@ -325,7 +325,7 @@ function CreateNewDatabaseDialog({
             <TabsContent value="table" className="py-4">
               <article className="prose prose-sm dark:prose-invert">
                 <p>
-                  <InfoCircledIcon className="inline w-4 h-4 me-1" />
+                  <InfoCircledIcon className="inline size-4 me-1" />
                   To add a new table, open a database and click &lsquo;+&rsquo;
                   button.
                 </p>

@@ -152,8 +152,8 @@ export function DataQueryOrderByMenu({
         <section className="flex flex-col">
           <DataQueryAddOrderbyMenu asChild {...props}>
             <Button variant="ghost" size="sm" className="flex justify-start">
-              <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
-              to sort by
+              <PlusIcon className="size-4 me-2 align-middle" /> Pick a column to
+              sort by
             </Button>
           </DataQueryAddOrderbyMenu>
           {isset && (
@@ -164,7 +164,7 @@ export function DataQueryOrderByMenu({
                 className="flex justify-start"
                 onClick={onOrderbyClear}
               >
-                <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
+                <TrashIcon className="size-4 me-2 align-middle" /> Delete sort
               </Button>
             </PopoverClose>
           )}

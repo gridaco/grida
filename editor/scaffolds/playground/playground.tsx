@@ -353,7 +353,7 @@ export function Playground({
                             setLogs([]);
                           }}
                         >
-                          <BanIcon className="h-4 w-4" />
+                          <BanIcon className="size-4" />
                         </Button>
                       </div>
                       <div className="w-full h-full overflow-y-scroll">

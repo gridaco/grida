@@ -131,8 +131,8 @@ function Footer() {
   return (
     <footer className="container max-w-4xl mx-auto border-t px-4 py-8 text-muted-foreground">
       <aside className="flex gap-2">
-        <TwitterLogoIcon className="w-4 h-4" />
-        <YoutubeIcon className="w-4 h-4" />
+        <TwitterLogoIcon className="size-4" />
+        <YoutubeIcon className="size-4" />
       </aside>
     </footer>
   );

@@ -96,7 +96,7 @@ function OptionCard({
     >
       {selected && (
         <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 z-10">
-          <Check className="w-4 h-4" />
+          <Check className="size-4" />
         </div>
       )}
       {children}

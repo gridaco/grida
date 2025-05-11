@@ -83,7 +83,7 @@ function MediaAVContent({
     <span className="group">
       <div className="relative inline-flex w-5 h-5 me-1 align-middle">
         <div className="visible group-hover:invisible">
-          <FileTypeIcon type={type} className="w-4 h-4" />
+          <FileTypeIcon type={type} className="size-4" />
         </div>
         <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
           <Button

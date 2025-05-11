@@ -119,7 +119,7 @@ export function TagsTable() {
                     </Badge>
                     {/* <div className="flex items-center gap-2">
                       <div
-                        className="w-4 h-4 rounded-full"
+                        className="size-4 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
                       <span className="font-medium">{tag.name}</span>
@@ -138,7 +138,7 @@ export function TagsTable() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="size-4" />
                           <span className="sr-only">Open menu</span>
                         </Button>
                       </DropdownMenuTrigger>

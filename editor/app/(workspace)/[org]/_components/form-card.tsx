@@ -146,7 +146,7 @@ function Badges({
       </Badge>
       {has_connection_supabase && (
         <Badge variant="outline" className="p-1">
-          <ResourceTypeIcon type="form-x-supabase" className="w-4 h-4" />
+          <ResourceTypeIcon type="form-x-supabase" className="size-4" />
         </Badge>
       )}
       {is_public && (

@@ -108,7 +108,7 @@ function WaitlistCard() {
               {" "}
               <Button variant="ghost" className="h-auto text-base">
                 Book a Demo
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 size-4" />
               </Button>
             </a>
           </div>

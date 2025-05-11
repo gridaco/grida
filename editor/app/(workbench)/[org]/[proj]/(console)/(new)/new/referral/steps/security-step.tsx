@@ -154,7 +154,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
           <div className="space-y-6">
             <div className="p-4 border rounded-md">
               <h5 className="text-sm font-medium mb-2 flex items-center">
-                <Users className="h-4 w-4 mr-1" />
+                <Users className="size-4 mr-1" />
                 What invitees will see
               </h5>
               <div className="p-3 bg-muted/10 rounded-md">
@@ -186,7 +186,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
 
             <div className="p-4 border rounded-md">
               <h5 className="text-sm font-medium mb-2 flex items-center">
-                <User className="h-4 w-4 mr-1" />
+                <User className="size-4 mr-1" />
                 What referrers will see
               </h5>
               <div className="p-3 bg-muted/10 rounded-md">

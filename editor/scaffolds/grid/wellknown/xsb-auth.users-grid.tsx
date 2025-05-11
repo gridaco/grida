@@ -83,7 +83,7 @@ const _column_provider = {
         <div className="flex items-center gap-2">
           {val.map((p) => (
             <div key={p} className="flex items-center gap-1 rounded-xs p-1">
-              <AuthProviderIcon type={p} className="w-4 h-4 text-foreground" />
+              <AuthProviderIcon type={p} className="size-4 text-foreground" />
               <Highlight
                 text={p}
                 tokens={highlightTokens}
@@ -232,7 +232,7 @@ function HeaderCell({ column }: RenderHeaderCellProps<any>) {
     <CellRoot className="flex items-center gap-1.5">
       <UserPropertyIcon
         property={key as keyof XSBUserRow}
-        className="min-w-4 w-4 h-4"
+        className="min-w-4 size-4"
       />
       {name && <span className="font-normal">{name}</span>}
     </CellRoot>

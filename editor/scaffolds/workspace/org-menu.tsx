@@ -54,9 +54,7 @@ export function WorkspaceMenu({
                     alt={org.display_name}
                   />
                   {org.display_name}
-                  {iscurrent && (
-                    <CheckIcon className="inline w-4 h-4 ms-auto" />
-                  )}
+                  {iscurrent && <CheckIcon className="inline size-4 ms-auto" />}
                 </DropdownMenuItem>
               </Link>
             );

@@ -188,7 +188,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
                           size="sm"
                           onClick={() => removeMilestone(index)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="size-4" />
                         </Button>
                       )}
                     </div>
@@ -263,7 +263,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
                 className="w-full"
                 onClick={addMilestone}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="size-4 mr-2" />
                 Add Milestone
               </Button>
             </div>

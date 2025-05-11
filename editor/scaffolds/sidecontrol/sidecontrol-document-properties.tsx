@@ -83,7 +83,7 @@ export function DocumentProperties({ className }: { className?: string }) {
               variant="ghost"
               size="xs"
               onClick={addProperty}
-              className="w-4 h-4 p-0"
+              className="size-4 p-0"
             >
               <PlusIcon />
             </Button>
@@ -173,7 +173,7 @@ function PropertyDefinitionBlock({
           <SidebarSectionHeaderActions className="gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="w-4 h-4 p-0">
+                <Button variant="ghost" size="xs" className="size-4 p-0">
                   <GearIcon />
                 </Button>
               </DropdownMenuTrigger>
@@ -194,7 +194,7 @@ function PropertyDefinitionBlock({
             <Button
               variant="ghost"
               size="xs"
-              className="w-4 h-4 p-0"
+              className="size-4 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove?.();

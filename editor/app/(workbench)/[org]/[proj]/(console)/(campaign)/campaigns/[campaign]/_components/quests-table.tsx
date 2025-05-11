@@ -188,9 +188,9 @@ export function QuestsTable() {
                       onClick={() => toggleQuestExpand(quest.id)}
                     >
                       {expandedQuests.includes(quest.id) ? (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="size-4" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="size-4" />
                       )}
                       <span className="sr-only">Toggle details</span>
                     </Button>
@@ -235,7 +235,7 @@ export function QuestsTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <Users className="size-4 text-muted-foreground" />
                       <span>
                         {quest.invitation_count} /{" "}
                         {max_invitations_per_referrer ?? "∞"}
@@ -256,7 +256,7 @@ export function QuestsTable() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="size-4" />
                           <span className="sr-only">Open menu</span>
                         </Button>
                       </DropdownMenuTrigger>
@@ -327,19 +327,19 @@ export function QuestsTable() {
                                   <TableCell>
                                     {challenge.is_claimed ? (
                                       <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                        <CheckCircle2 className="size-4 text-green-500" />
                                         {/* <span>{challenge.steps[0].date}</span> */}
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-amber-500" />
+                                        <Clock className="size-4 text-amber-500" />
                                         <span>Pending</span>
                                       </div>
                                     )}
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-2">
-                                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                      <AlertCircle className="size-4 text-muted-foreground" />
                                       <span className="text-muted-foreground">
                                         Not Started
                                       </span>

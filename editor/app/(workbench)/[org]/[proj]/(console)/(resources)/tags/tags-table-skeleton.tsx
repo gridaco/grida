@@ -1,5 +1,12 @@
-import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function TagsTableSkeleton() {
   return (
@@ -18,7 +25,7 @@ export function TagsTableSkeleton() {
             <TableRow key={index}>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <Skeleton className="size-4 rounded-full" />
                   <Skeleton className="h-4 w-24" />
                 </div>
               </TableCell>
@@ -36,6 +43,5 @@ export function TagsTableSkeleton() {
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }
-

@@ -65,7 +65,7 @@ export default function PropertyAccessDropdownMenu<T extends object>({
         <>
           <PropertyTypeIcon
             type={"type" in item.data ? item.data.type : "$ref"}
-            className="me-2 w-4 h-4"
+            className="me-2 size-4"
           />
           {item.name}
         </>

@@ -577,7 +577,7 @@ function CustomCSS() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
-          <Pencil2Icon className="w-4 h-4 inline me-2 align-middle" />
+          <Pencil2Icon className="size-4 inline me-2 align-middle" />
           Custom CSS
         </Button>
       </DialogTrigger>
@@ -590,7 +590,7 @@ function CustomCSS() {
             You can Use{" "}
             <Link className="underline" href="/playground" target="_blank">
               Playground
-              <OpenInNewWindowIcon className="w-4 h-4 inline align-middle ms-1" />
+              <OpenInNewWindowIcon className="size-4 inline align-middle ms-1" />
             </Link>{" "}
             to test your CSS
           </DialogDescription>
@@ -663,7 +663,7 @@ function Settings() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
-          <GearIcon className="w-4 h-4 inline me-2 align-middle" />
+          <GearIcon className="size-4 inline me-2 align-middle" />
           Settings
         </Button>
       </DialogTrigger>

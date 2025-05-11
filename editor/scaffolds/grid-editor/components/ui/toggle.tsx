@@ -44,7 +44,7 @@ export function DataQueryPredicatesMenuTriggerButton({
     <QueryToggle tooltip="Filter">
       <ListFilterIcon
         data-state={active ? "on" : "off"}
-        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
+        className="size-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
       />
     </QueryToggle>
   );
@@ -59,7 +59,7 @@ export function DataQueryOrderbyMenuTriggerButton({
     <QueryToggle tooltip="Sort">
       <ArrowDownUpIcon
         data-state={active ? "on" : "off"}
-        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
+        className="size-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
       />
     </QueryToggle>
   );

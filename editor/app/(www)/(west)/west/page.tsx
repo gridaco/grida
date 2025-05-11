@@ -552,7 +552,7 @@ function InteractiveCardDemo() {
                                 className="border-primary-foreground"
                                 onClick={handleNext}
                               >
-                                Next <ArrowRight className="ml-2 h-4 w-4" />
+                                Next <ArrowRight className="ml-2 size-4" />
                               </Button>
                             </CardFooter>
                           </Card>
@@ -743,7 +743,7 @@ function WestCTA() {
             <Link href={sitemap.links.signin}>
               <Button className="flex-1 group" size="lg">
                 Get Started
-                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 size-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
             <Link href={sitemap.links.book30}>

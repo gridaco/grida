@@ -193,7 +193,7 @@ export function DataQueryPredicatesMenu({
                 size="sm"
                 className="w-full flex justify-start"
               >
-                <PlusIcon className="w-4 h-4 me-2 align-middle" />
+                <PlusIcon className="size-4 me-2 align-middle" />
                 Add Filter
               </Button>
             </DataQueryPrediateAddMenu>
@@ -205,7 +205,7 @@ export function DataQueryPredicatesMenu({
                   className="w-full flex justify-start"
                   onClick={onClear}
                 >
-                  <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete
+                  <TrashIcon className="size-4 me-2 align-middle" /> Delete
                   filter
                 </Button>
               </PopoverClose>
@@ -249,7 +249,7 @@ export function DataQueryPrediateAddMenu({
               key={key}
               onSelect={() => onAdd({ column: key, op: "eq", value: null })}
             >
-              <div className="w-4 h-4 flex items-center justify-center gap-2">
+              <div className="size-4 flex items-center justify-center gap-2">
                 {property.pk && <KeyIcon className="w-3 h-3" />}
                 {property.fk && <Link2Icon className="w-3 h-3" />}
               </div>

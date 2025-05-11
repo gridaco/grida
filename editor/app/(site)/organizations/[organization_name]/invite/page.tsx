@@ -63,7 +63,7 @@ function Nav({ organization_name }: { organization_name: string }) {
         <BreadcrumbList>
           <BreadcrumbItem>
             <Link href="/">
-              <GridaLogo className="w-4 h-4" />
+              <GridaLogo className="size-4" />
             </Link>
           </BreadcrumbItem>
           <BreadcrumbSeparator />

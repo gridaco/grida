@@ -88,7 +88,7 @@ export default function Dashboard() {
             href="#"
             className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
           >
-            <Package2 className="h-4 w-4 transition-all group-hover:scale-110" />
+            <Package2 className="size-4 transition-all group-hover:scale-110" />
             <span className="sr-only">Acme Inc</span>
           </Link>
           <Tooltip>
@@ -243,7 +243,7 @@ export default function Dashboard() {
             </BreadcrumbList>
           </Breadcrumb>
           <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search..."
@@ -678,7 +678,7 @@ export default function Dashboard() {
                   <dl className="grid gap-3">
                     <div className="flex items-center justify-between">
                       <dt className="flex items-center gap-1 text-muted-foreground">
-                        <CreditCard className="h-4 w-4" />
+                        <CreditCard className="size-4" />
                         Visa
                       </dt>
                       <dd>**** **** **** 4532</dd>

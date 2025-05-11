@@ -38,7 +38,7 @@ function Item({ option, selected }: ItemRendererProps) {
     <>
       <CheckIcon
         className={cn(
-          "mr-2 h-4 w-4 min-w-4",
+          "mr-2 size-4 min-w-4",
           selected ? "opacity-100" : "opacity-0"
         )}
       />

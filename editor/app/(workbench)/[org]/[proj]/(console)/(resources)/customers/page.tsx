@@ -190,7 +190,7 @@ function Body() {
                             <TabsTrigger value="default">
                               <ResourceTypeIcon
                                 type={"user"}
-                                className="inline align-middle w-4 min-w-4 h-4 me-2"
+                                className="inline align-middle w-4 min-size-4 me-2"
                               />
                               Customer
                             </TabsTrigger>

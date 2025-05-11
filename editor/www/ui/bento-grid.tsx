@@ -108,7 +108,7 @@ const BentoCardCTA = ({
       <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
         <a href={href}>
           {label}
-          <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
+          <ArrowRightIcon className="ms-2 size-4 rtl:rotate-180" />
         </a>
       </Button>
     </div>

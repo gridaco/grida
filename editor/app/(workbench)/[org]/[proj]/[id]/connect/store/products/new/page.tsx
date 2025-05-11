@@ -348,7 +348,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
                       className="absolute top-0 right-2 bottom-0 flex items-center justify-center"
                       onClick={() => handleValueDelete(i)}
                     >
-                      <button className="w-4 h-4 ">
+                      <button className="size-4 ">
                         <TrashIcon />
                       </button>
                     </div>

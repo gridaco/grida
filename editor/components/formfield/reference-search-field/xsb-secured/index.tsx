@@ -53,7 +53,7 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
       )}
 
       <div className="relative group">
-        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground pointer-events-none" />
         <Input
           type="search"
           placeholder="Search for reference..."

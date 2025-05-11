@@ -68,7 +68,7 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
                       className="h-8 px-2 text-muted-foreground hover:text-foreground"
                     >
                       {model.sizes.length} sizes
-                      <InfoCircledIcon className="ml-1 h-4 w-4" />
+                      <InfoCircledIcon className="ml-1 size-4" />
                     </Button>
                   </HoverCardTrigger>
                   <HoverCardContent className="w-80" sideOffset={5}>

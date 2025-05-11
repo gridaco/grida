@@ -79,11 +79,11 @@ export function SQLLiteralInput({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="true">
-              <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <CheckboxIcon className="inline-flex align-middle size-4 me-1" />
               true
             </SelectItem>
             <SelectItem value="false">
-              <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <BoxIcon className="inline-flex align-middle size-4 me-1" />
               false
             </SelectItem>
           </SelectContent>
@@ -106,15 +106,15 @@ export function SQLLiteralInput({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="true" disabled={!config.accepts_boolean}>
-              <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <CheckboxIcon className="inline-flex align-middle size-4 me-1" />
               true
             </SelectItem>
             <SelectItem value="false" disabled={!config.accepts_boolean}>
-              <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <BoxIcon className="inline-flex align-middle size-4 me-1" />
               false
             </SelectItem>
             <SelectItem value="null">
-              <ValueNoneIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <ValueNoneIcon className="inline-flex align-middle size-4 me-1" />
               null
             </SelectItem>
             {/* https://github.com/PostgREST/postgrest/issues/3747 */}
@@ -123,7 +123,7 @@ export function SQLLiteralInput({
               // TODO: should be done with negate
               disabled
             >
-              <ValueIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              <ValueIcon className="inline-flex align-middle size-4 me-1" />
               not null
             </SelectItem>
           </SelectContent>

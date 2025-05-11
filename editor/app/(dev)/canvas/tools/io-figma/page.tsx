@@ -23,7 +23,7 @@ export default function IOFigmaPage() {
         <header className="flex items-center justify-between p-4 border-b">
           <div className="flex gap-4 items-center">
             <Link href="/canvas">
-              <GridaLogo className="w-4 h-4" />
+              <GridaLogo className="size-4" />
             </Link>
             <div className="flex flex-col">
               <span className="text-sm font-bold font-mono">

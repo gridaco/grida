@@ -899,7 +899,7 @@ function DBSchemaSelect({
             </SelectItem>
           ))}
           <SelectItem value={__add_custom}>
-            <PlusIcon className="me-2 inline align-middle w-4 h-4" />
+            <PlusIcon className="me-2 inline align-middle size-4" />
             Register custom schema
           </SelectItem>
         </SelectContent>
@@ -981,12 +981,12 @@ function NewCustomSchemaDialog({
           </DialogClose>
           {isvalid ? (
             <Button disabled={testing} onClick={onUseClick}>
-              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              {testing && <Spinner className="size-4 me-2 align-middle" />}
               Add this schema
             </Button>
           ) : (
             <Button disabled={testing || !custom} onClick={onTest}>
-              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              {testing && <Spinner className="size-4 me-2 align-middle" />}
               Test Connection
             </Button>
           )}

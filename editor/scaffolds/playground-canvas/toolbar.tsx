@@ -216,7 +216,7 @@ export function PlaygroundToolbar({
           {/* <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" className="px-3">
-                <OpenAILogo className="w-4 h-4" />
+                <OpenAILogo className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent

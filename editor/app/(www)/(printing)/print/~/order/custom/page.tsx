@@ -211,7 +211,7 @@ export default function CustomOrderPage() {
           className="ml-auto"
         >
           {currentStep === steps.length - 1 ? "Submit Order" : "Next"}
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="ml-2 size-4" />
         </Button>
       </div>
 
@@ -243,7 +243,7 @@ export default function CustomOrderPage() {
           <Link href={sitemap.links.studio} target="_blank">
             <Button variant="link" className="p-0">
               Visit our Studio
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="ml-2 size-4" />
             </Button>
           </Link>
         </div>

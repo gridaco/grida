@@ -102,7 +102,7 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <HelpCircle className="h-4 w-4" />
+                  <HelpCircle className="size-4" />
                   <span className="sr-only">More information</span>
                 </Button>
               </TooltipTrigger>
@@ -172,9 +172,9 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
             >
               <span className="font-medium">Industry Benchmarks</span>
               {isExamplesOpen ? (
-                <ChevronUp className="h-4 w-4 opacity-70" />
+                <ChevronUp className="size-4 opacity-70" />
               ) : (
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                <ChevronDown className="size-4 opacity-70" />
               )}
             </Button>
           </CollapsibleTrigger>

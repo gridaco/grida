@@ -203,7 +203,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             }`}
                             disabled={schedulingType !== "scheduled"}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-2 size-4" />
                             {data.scheduling.scheduling_open_at ? (
                               format(
                                 new Date(data.scheduling.scheduling_open_at),
@@ -243,7 +243,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             }`}
                             disabled={schedulingType !== "scheduled"}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-2 size-4" />
                             {data.scheduling.scheduling_close_at ? (
                               format(
                                 new Date(data.scheduling.scheduling_close_at),

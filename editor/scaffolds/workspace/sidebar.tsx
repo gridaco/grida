@@ -371,7 +371,7 @@ export function NavProjects({
       {allowNew && (
         <CreateNewProjectDialog org={orgname}>
           <SidebarGroupAction>
-            <PlusIcon className="w-4 h-4" />
+            <PlusIcon className="size-4" />
           </SidebarGroupAction>
         </CreateNewProjectDialog>
       )}
@@ -391,7 +391,7 @@ export function NavProjects({
                   <Link href={project.url}>
                     <ResourceTypeIcon
                       type="project"
-                      className="inline align-middle w-4 h-4"
+                      className="inline align-middle size-4"
                     />
                     <span>{project.name}</span>
                   </Link>
@@ -468,7 +468,7 @@ export function NavProjects({
                           <Link href={page.url}>
                             <ResourceTypeIcon
                               type={page.doctype}
-                              className="inline align-middle w-4 h-4"
+                              className="inline align-middle size-4"
                             />
                             <span>{page.title}</span>
                           </Link>

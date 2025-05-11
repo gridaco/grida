@@ -361,11 +361,11 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: DGSystemColumnKey }) {
   switch (key) {
     case "__gf_display_id":
-      return <KeyIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />;
+      return <KeyIcon className="min-w-4 size-4 text-workbench-accent-sky" />;
     case "__gf_created_at":
-      return <CalendarIcon className="min-w-4 w-4 h-4" />;
+      return <CalendarIcon className="min-w-4 size-4" />;
     case "__gf_customer_id":
-      return <AvatarIcon className="min-w-4 w-4 h-4" />;
+      return <AvatarIcon className="min-w-4 size-4" />;
   }
 }
 
@@ -595,7 +595,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         <CellRoot {...rootprops}>
           <FileTypeIcon
             type="richtext"
-            className="inline w-4 h-4 align-middle me-2"
+            className="inline size-4 align-middle me-2"
           />{" "}
           DOCUMENT
         </CellRoot>
@@ -691,7 +691,7 @@ function MediaCellContent({
               <span key={i} className="group">
                 <div className="relative inline-flex w-5 h-5 me-1 align-middle">
                   <div className="visible group-hover:invisible">
-                    <FileTypeIcon type={type} className="w-4 h-4" />
+                    <FileTypeIcon type={type} className="size-4" />
                   </div>
                   <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
                     <Button
@@ -748,7 +748,7 @@ function FileCellContent({
               <span key={i}>
                 <FileTypeIcon
                   type={type}
-                  className="inline w-4 h-4 align-middle me-2"
+                  className="inline size-4 align-middle me-2"
                 />
                 <span>{f.name}</span>
               </span>

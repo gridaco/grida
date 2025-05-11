@@ -72,7 +72,7 @@ export function StringValueControl({
           {schema && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+                <PropertyTypeIcon type="object" className="me-2 size-4" />
                 props
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
@@ -98,30 +98,30 @@ export function StringValueControl({
               );
             }}
           >
-            <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+            <PropertyTypeIcon type="object" className="me-2 size-4" />
             Page
           </PropertyAccessDropdownMenu> */}
           {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <TokensIcon className="me-2 w-4 h-4" />
+              <TokensIcon className="me-2 size-4" />
               Item (in list)
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="number" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="number" className="me-2 size-4" />
                   property.a
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="string" className="me-2 size-4" />
                   property.b
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="string" className="me-2 size-4" />
                   property.c
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="any" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="any" className="me-2 size-4" />
                   property.d
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -129,7 +129,7 @@ export function StringValueControl({
           </DropdownMenuSub> */}
           {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <CookieIcon className="me-2 w-4 h-4" />
+              <CookieIcon className="me-2 size-4" />
               Sample Data
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>

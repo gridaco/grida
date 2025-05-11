@@ -176,7 +176,7 @@ export default function Overview() {
                   {event.name}
                 </CardTitle>
                 <div
-                  className="h-4 w-4 rounded-full"
+                  className="size-4 rounded-full"
                   style={{
                     backgroundColor: generateChartConfig(data.data)[event.name]
                       ?.color,

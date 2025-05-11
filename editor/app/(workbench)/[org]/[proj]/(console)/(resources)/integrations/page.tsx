@@ -32,7 +32,7 @@ export default function IntegrationsPage() {
           <IntegrationsSearch />
           <Button variant="outline" asChild>
             <Link href="#">
-              <FileText className="mr-2 h-4 w-4" />
+              <FileText className="mr-2 size-4" />
               View Documentation
             </Link>
           </Button>
@@ -91,7 +91,7 @@ export default function IntegrationsPage() {
           <Link href={sitemap.links.contact} target="_blank">
             <Button>
               Request Integration
-              <ExternalLink className="ml-2 h-4 w-4" />
+              <ExternalLink className="ml-2 size-4" />
             </Button>
           </Link>
         </div>

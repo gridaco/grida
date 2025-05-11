@@ -37,19 +37,19 @@ export function ContentAudio({
           </PlayerArtwork>
           <div className="flex-1 w-full h-auto flex justify-center items-center">
             <PlayerPrevTrigger disabled>
-              <ChevronFirstIcon className="w-4 h-4" />
+              <ChevronFirstIcon className="size-4" />
             </PlayerPrevTrigger>
             <PlayerTrigger
               renderer={(playing) =>
                 playing ? (
-                  <PauseFilledIcon className="w-4 h-4" />
+                  <PauseFilledIcon className="size-4" />
                 ) : (
-                  <PlayFilledIcon className="w-4 h-4" />
+                  <PlayFilledIcon className="size-4" />
                 )
               }
             />
             <PlayerNextTrigger disabled>
-              <ChevronLastIcon className="w-4 h-4" />
+              <ChevronLastIcon className="size-4" />
             </PlayerNextTrigger>
           </div>
         </div>

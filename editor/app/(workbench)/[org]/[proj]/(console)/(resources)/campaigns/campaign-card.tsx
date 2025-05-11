@@ -44,7 +44,7 @@ export function CampaignCard({
         <div className="space-y-4">
           <div className="flex justify-between text-sm">
             {/* <div className="flex items-center gap-1">
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="size-4 text-muted-foreground" />
               <span>{campaign.referrals} referrals</span>
             </div> */}
           </div>

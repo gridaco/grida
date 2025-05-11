@@ -116,7 +116,7 @@ function FaviconPreview({
           width={16}
           height={16}
           alt="favicon"
-          className="w-4 h-4"
+          className="size-4"
         />
       </div>
       <Image src={background} width={360} height={220} alt="favicon preview" />

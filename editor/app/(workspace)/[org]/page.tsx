@@ -82,7 +82,7 @@ export default function OrganizationDashboardPage(props: {
                     </div>
                     <CreateNewProjectDialog org={organization.name}>
                       <Button variant="outline">
-                        <PlusIcon className="inline w-4 h-4 me-2" />
+                        <PlusIcon className="inline size-4 me-2" />
                         Create your first project
                       </Button>
                     </CreateNewProjectDialog>

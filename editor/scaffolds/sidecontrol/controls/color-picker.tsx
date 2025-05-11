@@ -55,7 +55,7 @@ export function ColorPicker({
               });
             }}
           >
-            <PipetteIcon className="w-4 h-4" />
+            <PipetteIcon className="size-4" />
           </Button>
           <div
             className={cn(
@@ -86,7 +86,7 @@ export function ColorPicker({
               <Tooltip key={option.id}>
                 <TooltipTrigger>
                   <div
-                    className="w-4 h-4"
+                    className="size-4"
                     onClick={() => onColorChange?.(option.color)}
                   >
                     <div

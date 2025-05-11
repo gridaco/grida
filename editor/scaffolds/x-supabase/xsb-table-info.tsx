@@ -52,12 +52,12 @@ export function XSBTableInfo({ table }: { table: GridaXSupabase.JSONSChema }) {
               <TableRow key={prop}>
                 <TableCell>
                   {meta.pk && (
-                    <KeyIcon className="me-1 inline align-middle w-4 h-4" />
+                    <KeyIcon className="me-1 inline align-middle size-4" />
                   )}
                   {meta.fk && (
                     <Tooltip>
                       <TooltipTrigger>
-                        <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                        <LinkIcon className="me-1 inline align-middle size-4" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <div className="max-w-40 overflow-scroll">

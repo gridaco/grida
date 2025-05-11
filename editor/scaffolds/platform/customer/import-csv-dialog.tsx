@@ -156,7 +156,7 @@ export function ImportCSVDialog({
             </ScrollArea>
 
             <Alert>
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="size-4" />
               <AlertTitle>Review your data</AlertTitle>
               <AlertDescription>
                 Please review the data before importing. This action cannot be
@@ -323,7 +323,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">
-        <Upload className="mr-2 h-4 w-4" />
+        <Upload className="mr-2 size-4" />
         Select CSV File
       </Button>
     </div>
