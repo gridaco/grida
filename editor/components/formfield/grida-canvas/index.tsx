@@ -31,7 +31,11 @@ import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui-editor/dialog";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";

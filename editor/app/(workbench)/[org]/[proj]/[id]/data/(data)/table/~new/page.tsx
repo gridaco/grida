@@ -10,7 +10,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Button } from "@/components/ui/button";
 import artwork from "../../../../../../../../../public/images/abstract-database-illustration.png";

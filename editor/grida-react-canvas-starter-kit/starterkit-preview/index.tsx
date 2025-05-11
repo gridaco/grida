@@ -13,7 +13,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Cross2Icon,

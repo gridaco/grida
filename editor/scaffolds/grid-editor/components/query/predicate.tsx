@@ -13,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import {
   Select,
   SelectContent,
@@ -178,10 +178,6 @@ export function DataQueryPredicatesMenu({
                       size="icon"
                       variant="outline"
                       onClick={() => onRemove(i)}
-                      className={WorkbenchUI.buttonVariants({
-                        variant: "outline",
-                        size: "icon",
-                      })}
                     >
                       <Cross2Icon />
                     </Button>

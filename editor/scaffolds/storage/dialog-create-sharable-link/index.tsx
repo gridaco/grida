@@ -6,7 +6,7 @@ import {
   DialogClose,
   DialogContent,
   DialogHeader,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { wellkown } from "@/utils/mimetype";
