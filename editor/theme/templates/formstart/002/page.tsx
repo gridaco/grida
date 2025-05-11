@@ -76,7 +76,7 @@ export default function _002() {
                     <div>
                       <ModeratorDrawer>
                         <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
+                          <Avatar className="size-8">
                             <AvatarImage
                               src="/templates/sample-faces/anthony-le-lmdHAyY57KQ-unsplash.jpg"
                               className="object-cover"
@@ -200,7 +200,7 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
         <DrawerHeader className="text-start">
           <DrawerTitle>
             <span className="inline-flex align-middle me-2">
-              <Avatar className="w-8 h-8">
+              <Avatar className="size-8">
                 <AvatarImage
                   src="/templates/sample-faces/anthony-le-lmdHAyY57KQ-unsplash.jpg"
                   className="object-cover"

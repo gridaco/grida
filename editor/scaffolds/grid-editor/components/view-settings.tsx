@@ -176,9 +176,9 @@ function _LayoutMenuContent() {
               key={i}
               value={view.type}
               variant="outline"
-              className="w-16 h-16 flex-col gap-1"
+              className="size-16 flex-col gap-1"
             >
-              <ResourceTypeIcon type={view.icon} className="w-6 h-6" />
+              <ResourceTypeIcon type={view.icon} className="size-6" />
               <span className="text-muted-foreground text-xs">
                 {view.label}
               </span>

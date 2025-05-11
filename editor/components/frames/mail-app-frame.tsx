@@ -59,7 +59,7 @@ export default function MailAppFrame({
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-[60px] items-center border-b px-6">
             <Link className="flex items-center gap-2 font-semibold" href="#">
-              <InboxIcon className="h-6 w-6" />
+              <InboxIcon className="size-6" />
               <span className="">Mail</span>
             </Link>
           </div>
@@ -112,7 +112,7 @@ export default function MailAppFrame({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                className="rounded-full border border-gray-200 w-8 h-8 dark:border-gray-800"
+                className="rounded-full border border-gray-200 size-8 dark:border-gray-800"
                 size="icon"
                 variant="ghost"
               >

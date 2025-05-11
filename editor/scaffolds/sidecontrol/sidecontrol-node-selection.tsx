@@ -250,7 +250,7 @@ function SelectionMixedProperties({
                 disabled={locked.mixed}
                 pressed={locked.mixed ? true : locked.value}
                 onPressedChange={change.locked}
-                className="w-6 h-6 p-0.5 aspect-square"
+                className="size-6 p-0.5 aspect-square"
               >
                 {locked ? (
                   <LockClosedIcon className="size-3" />
@@ -769,7 +769,7 @@ function SelectedNodeProperties({
                 size="sm"
                 pressed={locked}
                 onPressedChange={actions.locked}
-                className="w-6 h-6 p-0.5 aspect-square"
+                className="size-6 p-0.5 aspect-square"
               >
                 {locked ? (
                   <LockClosedIcon className="size-3" />

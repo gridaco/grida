@@ -55,7 +55,7 @@ export function CornerRadiusControl({
               disabled={disabled}
               variant={mode === "each" ? "secondary" : "ghost"}
               size="icon"
-              className="w-8 h-8 min-w-8"
+              className="size-8 min-w-8"
             >
               <CornersIcon />
             </Button>

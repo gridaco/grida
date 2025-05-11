@@ -84,7 +84,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <MessageCircleIcon className="inline me-2 w-5 h-5 align-middle" />
+                  <MessageCircleIcon className="inline me-2 size-5 align-middle" />
                   SMS Notifications
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
@@ -138,7 +138,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <EnvelopeClosedIcon className="inline me-2 w-5 h-5 align-middle" />
+                  <EnvelopeClosedIcon className="inline me-2 size-5 align-middle" />
                   Email Notifications
                 </>
               }
@@ -222,7 +222,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <WhatsAppLogo className="inline me-2 w-5 h-5 align-middle" />
+                  <WhatsAppLogo className="inline me-2 size-5 align-middle" />
                   WhatsApp
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
@@ -238,7 +238,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <KakaoTalkLogo className="inline me-2 w-5 h-5 align-middle" />
+                  <KakaoTalkLogo className="inline me-2 size-5 align-middle" />
                   Kakao Talk
                   <Badge variant="outline" className="ms-2 align-middle">
                     Enterprise

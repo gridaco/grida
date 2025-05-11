@@ -43,7 +43,7 @@ function ImageResourcePicker({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={value}
-              className="w-5 h-5 rounded-full object-contain"
+              className="size-5 rounded-full object-contain"
               alt=""
             />
           ) : (

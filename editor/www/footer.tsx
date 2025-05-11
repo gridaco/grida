@@ -31,21 +31,21 @@ export default function Footer() {
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">GitHub</span>
-                    <GitHubLogoIcon className="h-5 w-5" />
+                    <GitHubLogoIcon className="size-5" />
                   </Link>
                   <Link
                     href={sitemap.links.x}
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">Twitter</span>
-                    <TwitterLogoIcon className="h-5 w-5" />
+                    <TwitterLogoIcon className="size-5" />
                   </Link>
                   <Link
                     href={sitemap.links.slack}
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">Slack Community</span>
-                    <SlackIcon className="h-5 w-5" />
+                    <SlackIcon className="size-5" />
                   </Link>
                 </div>
               </FooterColumn>

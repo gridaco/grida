@@ -193,7 +193,7 @@ export function Playground({
               </span>
             </button>
           </Link>
-          <SlashIcon className="h-6 w-6 opacity-20" />
+          <SlashIcon className="size-6 opacity-20" />
           <div className="ms-1">
             <Select
               disabled={busy}
@@ -230,7 +230,7 @@ export function Playground({
         <div className="flex-1 flex justify-center">
           {busy ? (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 border-2 border-t-[#333] rounded-full animate-spin" />
+              <div className="size-6 border-2 border-t-[#333] rounded-full animate-spin" />
               <span className="text-sm opacity-80">Generating...</span>
             </div>
           ) : (

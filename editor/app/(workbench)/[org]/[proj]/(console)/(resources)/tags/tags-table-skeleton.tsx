@@ -36,7 +36,7 @@ export function TagsTableSkeleton() {
                 <Skeleton className="h-5 w-20" />
               </TableCell>
               <TableCell>
-                <Skeleton className="h-8 w-8" />
+                <Skeleton className="size-8" />
               </TableCell>
             </TableRow>
           ))}

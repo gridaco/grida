@@ -39,7 +39,7 @@ export function FontSizeControl({
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>
-            <Button variant="ghost" size="xs" className="w-6 h-6 m-0.5 p-0">
+            <Button variant="ghost" size="xs" className="size-6 m-0.5 p-0">
               <CaretDownIcon />
             </Button>
           </SelectPrimitive.SelectTrigger>

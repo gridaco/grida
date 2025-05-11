@@ -404,7 +404,7 @@ function CreateNewSchemaTableDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex gap-2 items-center">
-            <ResourceTypeIcon type="table" className="w-5 h-5" />
+            <ResourceTypeIcon type="table" className="size-5" />
             Create New CMS Table
           </DialogTitle>
         </DialogHeader>
@@ -549,7 +549,7 @@ function ConnectNewSupabaseTableDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            <SupabaseLogo className="w-5 h-5 me-2 inline-flex" />
+            <SupabaseLogo className="size-5 me-2 inline-flex" />
             Connect Supabase Table
           </DialogTitle>
           <DialogDescription>

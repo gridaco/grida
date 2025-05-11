@@ -22,7 +22,7 @@ export function InsertPanel({
           }}
         >
           {React.createElement(block.icon, {
-            className: "w-6 h-6 me-2",
+            className: "size-6 me-2",
           })}
           <span className="text-sm">{block.label}</span>
         </Button>

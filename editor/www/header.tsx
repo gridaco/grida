@@ -54,7 +54,7 @@ export default function Header({ className }: { className?: string }) {
         {/* desktop */}
         <div className="hidden md:flex justify-between items-center">
           <Link href="/home" className="flex items-center justify-center gap-2">
-            <GridaLogo className="w-5 h-5" />
+            <GridaLogo className="size-5" />
             <span className="text-lg font-bold">Grida</span>
           </Link>
           <div className="flex gap-4 lg:gap-12 items-center">
@@ -120,7 +120,7 @@ export default function Header({ className }: { className?: string }) {
                     aria-label="GitHub"
                   >
                     <Button variant="ghost" size="icon">
-                      <GitHubLogoIcon className="text-foreground w-5 h-5" />
+                      <GitHubLogoIcon className="text-foreground size-5" />
                     </Button>
                   </Link>
                 </NavigationMenuItem>
@@ -132,7 +132,7 @@ export default function Header({ className }: { className?: string }) {
         {/* mobile */}
         <div className="md:hidden flex justify-between items-center">
           <Link href="/home" className="flex items-center justify-center gap-2">
-            <GridaLogo className="w-5 h-5" />
+            <GridaLogo className="size-5" />
             <span className="text-lg font-bold">Grida</span>
           </Link>
           <Drawer>

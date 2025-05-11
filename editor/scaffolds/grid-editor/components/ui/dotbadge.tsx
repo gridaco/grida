@@ -10,7 +10,7 @@ export function IconButtonDotBadge({
   return (
     <DotIcon
       data-accent={accent}
-      className="absolute w-8 h-8 -top-2 -right-2 pointer-events-none select-none data-[accent='sky']:text-workbench-accent-sky data-[accent='orange']:text-workbench-accent-orange data-[accent='red']:text-workbench-accent-red"
+      className="absolute size-8 -top-2 -right-2 pointer-events-none select-none data-[accent='sky']:text-workbench-accent-sky data-[accent='orange']:text-workbench-accent-orange data-[accent='red']:text-workbench-accent-red"
       style={offset}
     />
   );

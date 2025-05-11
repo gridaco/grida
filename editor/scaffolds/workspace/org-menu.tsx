@@ -49,7 +49,7 @@ export function WorkspaceMenu({
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem>
                   <OrganizationAvatar
-                    className="inline w-7 h-7 me-2 border shadow-sm rounded-sm"
+                    className="inline size-7 me-2 border shadow-sm rounded-sm"
                     avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />

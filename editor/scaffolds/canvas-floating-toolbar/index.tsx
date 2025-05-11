@@ -66,7 +66,7 @@ export function SamplesSelect() {
 export function CursorToggle() {
   return (
     <Toggle className="rounded-full">
-      <MousePointer2Icon className="w-5 h-5" />
+      <MousePointer2Icon className="size-5" />
     </Toggle>
   );
 }
@@ -75,10 +75,10 @@ export function ViewportToggle() {
   return (
     <ToggleGroup type="single">
       <ToggleGroupItem value="lg" className="rounded-full">
-        <LaptopMinimalIcon className="w-5 h-5" />
+        <LaptopMinimalIcon className="size-5" />
       </ToggleGroupItem>
       <ToggleGroupItem value="sm" className="rounded-full">
-        <SmartphoneIcon className="w-5 h-5" />
+        <SmartphoneIcon className="size-5" />
       </ToggleGroupItem>
     </ToggleGroup>
   );

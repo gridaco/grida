@@ -79,7 +79,7 @@ const BentoCardContent = ({
       )}
     >
       {Icon && (
-        <Icon className="h-8 w-8 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
+        <Icon className="size-8 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
       )}
       <h3 className="text-lg font-semibold text-neutral-700 dark:text-neutral-300">
         {name}

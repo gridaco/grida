@@ -67,7 +67,7 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
             type="button"
             variant="outline"
             size="icon"
-            className="w-6 h-6"
+            className="size-6"
             onClick={() => setOpen(true)}
           >
             <Link2Icon />

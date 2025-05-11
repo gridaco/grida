@@ -29,7 +29,7 @@ export function IntegrationsCommingSoonDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="mx-auto bg-primary/10 p-3 rounded-full mb-4">
-            <Puzzle className="h-6 w-6 text-primary" />
+            <Puzzle className="size-6 text-primary" />
           </div>
           <DialogTitle className="text-center text-xl">
             Custom Integrations Available
@@ -48,22 +48,22 @@ export function IntegrationsCommingSoonDialog() {
 
           <div className="grid grid-cols-3 gap-4 py-2">
             <div className="flex flex-col items-center text-center">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <MessageSquareText className="h-5 w-5 text-primary" />
+              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                <MessageSquareText className="size-5 text-primary" />
               </div>
               <span className="text-xs">Tell us what you need</span>
             </div>
 
             <div className="flex flex-col items-center text-center">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <Building2 className="h-5 w-5 text-primary" />
+              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                <Building2 className="size-5 text-primary" />
               </div>
               <span className="text-xs">We build it for you</span>
             </div>
 
             <div className="flex flex-col items-center text-center">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <Rocket className="h-5 w-5 text-primary" />
+              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                <Rocket className="size-5 text-primary" />
               </div>
               <span className="text-xs">Launch together</span>
             </div>

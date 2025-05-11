@@ -29,7 +29,7 @@ export function GridCard({
         <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
           <ResourceTypeIcon
             type={doctype}
-            className="w-10 h-10 text-muted-foreground group-hover:text-foreground transition-colors"
+            className="size-10 text-muted-foreground group-hover:text-foreground transition-colors"
           />
         </div>
       )}
@@ -85,7 +85,7 @@ export function RowCard({
         />
       ) : (
         <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
-          <ResourceTypeIcon type={doctype} className="w-5 h-5" />
+          <ResourceTypeIcon type={doctype} className="size-5" />
         </div>
       )}
       <div className="flex-1 px-6 font-medium whitespace-nowrap">

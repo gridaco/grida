@@ -90,7 +90,7 @@ export function ColorPicker({
                     onClick={() => onColorChange?.(option.color)}
                   >
                     <div
-                      className="w-5 h-5 rounded-xs border"
+                      className="size-5 rounded-xs border"
                       style={{
                         background: `rgba(${option.color.r}, ${option.color.g}, ${option.color.b}, ${option.color.a})`,
                       }}

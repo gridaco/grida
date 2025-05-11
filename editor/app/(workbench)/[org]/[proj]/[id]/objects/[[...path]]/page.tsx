@@ -444,7 +444,7 @@ const EntityNodeItemComponent = ({
               <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded-sm">
                 <MimeTypeIcon
                   type={node.type === "folder" ? "folder" : node.mimetype}
-                  className="w-6 h-6"
+                  className="size-6"
                 />
               </div>
               <span className="w-full mt-2 text-sm font-medium truncate">
@@ -474,7 +474,7 @@ const EntityNodeItemComponent = ({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="absolute right-1 top-1 h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+                className="absolute right-1 top-1 size-8 p-0 opacity-0 group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <DotsHorizontalIcon className="size-4" />
@@ -589,7 +589,7 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            <FolderIcon className="w-5 h-5 inline me-2 align-middle" />
+            <FolderIcon className="size-5 inline me-2 align-middle" />
             Create folder
           </DialogTitle>
         </DialogHeader>
@@ -640,7 +640,7 @@ function FolderEmptyState() {
 
   return (
     <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
-      <UploadIcon className="w-8 h-8" />
+      <UploadIcon className="size-8" />
       <h6 className="text-lg text-muted-foreground">
         Drop files here to upload
       </h6>
@@ -652,7 +652,7 @@ function FolderEmptyState() {
 function FolderLoadingState() {
   return (
     <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
-      <Spinner className="w-8 h-8" />
+      <Spinner className="size-8" />
       <h6 className="text-xs text-muted-foreground">Loading...</h6>
     </div>
   );
@@ -736,10 +736,10 @@ function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
       className="w-full flex items-center gap-4 data-[status='completed']:text-muted-foreground"
     >
       <div>
-        {staus === "progress" && <Spinner className="w-5 h-5" />}
-        {staus === "completed" && <CheckCircledIcon className="w-5 h-5" />}
+        {staus === "progress" && <Spinner className="size-5" />}
+        {staus === "completed" && <CheckCircledIcon className="size-5" />}
         {staus === "failed" && (
-          <CrossCircledIcon className="w-5 h-5 text-destructive" />
+          <CrossCircledIcon className="size-5 text-destructive" />
         )}
       </div>
       <div className="flex-1 flex flex-col gap-1 overflow-hidden">

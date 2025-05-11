@@ -410,7 +410,7 @@ export function DataQueryPredicateChip({
             variant="ghost"
             size="icon"
             onClick={onRemove}
-            className="w-6 h-6 min-w-6 min-h-6"
+            className="size-6 min-w-6 min-h-6"
           >
             <TrashIcon className="size-3" />
           </Button>

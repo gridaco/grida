@@ -84,7 +84,7 @@ export function SupabaseStorageSettings({
   return (
     <PanelPropertySection>
       <PanelPropertySectionTitle>
-        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        <SupabaseLogo className="inline me-2 size-5 align-middle" />
         Supabase Storage
       </PanelPropertySectionTitle>
       <PanelPropertyFields>

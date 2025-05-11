@@ -53,10 +53,10 @@ const _column_avatar = {
 
     return (
       <CellRoot className="flex items-center justify-center">
-        <Avatar className="h-6 w-6 aspect-square">
+        <Avatar className="size-6 aspect-square">
           <AvatarImage src={val} alt="Avatar" />
           <AvatarFallback>
-            <AvatarIcon className="w-8 h-8 text-muted-foreground" />
+            <AvatarIcon className="size-8 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
       </CellRoot>

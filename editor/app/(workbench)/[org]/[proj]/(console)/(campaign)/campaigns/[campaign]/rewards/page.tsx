@@ -25,7 +25,7 @@ export default function Page() {
             <CardContent>
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="rounded-full bg-muted p-4 mb-4">
-                  <GiftIcon className="h-8 w-8 text-muted-foreground" />
+                  <GiftIcon className="size-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium mb-2">
                   Rewards Coming Soon

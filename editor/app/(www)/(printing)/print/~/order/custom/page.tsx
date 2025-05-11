@@ -56,17 +56,13 @@ export default function CustomOrderPage() {
           {steps.map((step, index) => (
             <div key={step} className="flex flex-col items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                className={`size-8 rounded-full flex items-center justify-center ${
                   index <= currentStep
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {index < currentStep ? (
-                  <Check className="w-5 h-5" />
-                ) : (
-                  index + 1
-                )}
+                {index < currentStep ? <Check className="size-5" /> : index + 1}
               </div>
               <span className="text-sm mt-2 text-muted-foreground">{step}</span>
             </div>
@@ -151,7 +147,7 @@ export default function CustomOrderPage() {
         {currentStep === 2 && (
           <div className="space-y-6">
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 text-center">
-              <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+              <Upload className="mx-auto size-12 text-muted-foreground" />
               <h3 className="mt-2 text-sm font-semibold">Upload your files</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 Drag and drop or click to upload

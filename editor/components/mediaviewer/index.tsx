@@ -310,7 +310,7 @@ export function StandaloneMediaView({
                 <CardTitle>
                   <FileTypeIcon
                     type="audio"
-                    className="inline mr-2 align-middle w-5 h-5"
+                    className="inline mr-2 align-middle size-5"
                   />
                   Audio
                 </CardTitle>

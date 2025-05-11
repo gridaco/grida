@@ -565,7 +565,7 @@ function OptionEditItem({
               <div className="relative">
                 <Button
                   onClick={clearSrc}
-                  className="absolute z-10 top-0 right-0 w-6 h-6 p-0 m-1"
+                  className="absolute z-10 top-0 right-0 size-6 p-0 m-1"
                   variant="ghost"
                   type="button"
                 >

@@ -147,7 +147,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Target className="h-6 w-6 text-primary" />
+          <Target className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Choose Your Platform</h3>
@@ -185,7 +185,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
         <TabsContent value="built-in" className="mt-6 space-y-6">
           <div className="flex items-start gap-4 p-4 bg-green-50 border border-green-100 rounded-md">
             <div className="bg-green-100 p-2 rounded-full">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <CheckCircle2 className="size-5 text-green-600" />
             </div>
             <div>
               <h4 className="text-base font-medium">
@@ -240,7 +240,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
         <TabsContent value="custom" className="mt-6 space-y-6">
           <div className="flex items-start gap-4 p-4 bg-blue-50 border border-blue-100 rounded-md">
             <div className="bg-blue-100 p-2 rounded-full">
-              <Laptop className="h-5 w-5 text-blue-600" />
+              <Laptop className="size-5 text-blue-600" />
             </div>
             <div>
               <h4 className="text-base font-medium">
@@ -330,7 +330,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="size-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => removeTrigger(trigger.name)}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -492,7 +492,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
         <TabsContent value="offline" className="mt-6 space-y-6">
           <div className="flex items-start gap-4 p-4 bg-amber-50 border border-amber-100 rounded-md">
             <div className="bg-amber-100 p-2 rounded-full">
-              <ClipboardList className="h-5 w-5 text-amber-600" />
+              <ClipboardList className="size-5 text-amber-600" />
             </div>
             <div>
               <h4 className="text-base font-medium">
@@ -577,7 +577,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="size-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => removeTrigger(trigger.name)}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />

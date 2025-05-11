@@ -89,7 +89,7 @@ export default async function ObjectPage(props: {
           <div className="flex gap-2 mt-4">
             {object.color && (
               <div
-                className="w-8 h-8 rounded-full"
+                className="size-8 rounded-full"
                 style={{
                   backgroundColor: object.color,
                 }}
@@ -99,7 +99,7 @@ export default async function ObjectPage(props: {
             {object.colors.map((color, i) => (
               <div
                 key={i}
-                className="w-8 h-8 rounded-full"
+                className="size-8 rounded-full"
                 style={{ backgroundColor: color }}
               />
             ))}

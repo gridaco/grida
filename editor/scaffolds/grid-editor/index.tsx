@@ -265,7 +265,7 @@ export function GridEditor({
                           <Button
                             size="icon"
                             variant="outline"
-                            className="w-7 h-7"
+                            className="size-7"
                             onClick={onClearSelection}
                           >
                             <Cross2Icon />

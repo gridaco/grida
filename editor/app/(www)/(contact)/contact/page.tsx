@@ -77,7 +77,7 @@ function Contact() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <SlackIcon className="w-8 h-8 mb-4" />
+            <SlackIcon className="size-8 mb-4" />
             <CardTitle>Join Slack</CardTitle>
             <CardDescription>Connect with our community</CardDescription>
           </CardHeader>
@@ -96,7 +96,7 @@ function Contact() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <Calendar className="w-8 h-8 mb-4" />
+            <Calendar className="size-8 mb-4" />
             <CardTitle>Book a Meeting</CardTitle>
             <CardDescription>Schedule time with our team</CardDescription>
           </CardHeader>

@@ -29,7 +29,7 @@ export default function WelcomeNewPage() {
   return (
     <>
       <EmptyWelcome
-        art={<TableIcon className="w-10 h-10 text-muted-foreground" />}
+        art={<TableIcon className="size-10 text-muted-foreground" />}
         title={"Create your first table"}
         paragraph={"Let's get started by creating your first table."}
       />

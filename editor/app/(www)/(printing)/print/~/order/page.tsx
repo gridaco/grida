@@ -249,7 +249,7 @@ export default function OrderPage() {
                   {pp.map((prop) => (
                     <OptionCard
                       key={prop.name}
-                      className="w-14 h-14 overflow-hidden rounded-sm"
+                      className="size-14 overflow-hidden rounded-sm"
                     >
                       <Image
                         src={prop.image}

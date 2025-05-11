@@ -137,7 +137,7 @@ export function DataQueryOrderByMenu({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="w-6 h-6"
+                    className="size-6"
                     onClick={() => {
                       onOrderbyRemove(col);
                     }}

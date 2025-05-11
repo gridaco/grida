@@ -89,9 +89,9 @@ export function FormFieldAssistant({
           disabled={isLoading}
         >
           {isLoading ? (
-            <Spinner className="w-5 h-5" />
+            <Spinner className="size-5" />
           ) : (
-            <MagicWandIcon className="w-5 h-5" />
+            <MagicWandIcon className="size-5" />
           )}
           <span className="ml-2">Generate</span>
         </Button>

@@ -64,7 +64,7 @@ export const ActionButton = React.memo(
             ref={ref}
             variant="ghost"
             className={cn(
-              "relative flex h-7 w-7 flex-row rounded-none p-0 text-muted-foreground hover:text-foreground",
+              "relative flex size-7 flex-row rounded-none p-0 text-muted-foreground hover:text-foreground",
               "bg-transparent hover:bg-transparent",
               className
             )}

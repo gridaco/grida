@@ -153,7 +153,7 @@ function SectionA() {
           <Link href={sitemap.links.canvas}>
             <Button variant="link" className="mt-20">
               Open your Canvas
-              <ArrowRightIcon className="h-5 w-5" />
+              <ArrowRightIcon className="size-5" />
             </Button>
           </Link>
         }

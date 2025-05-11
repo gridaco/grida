@@ -93,7 +93,7 @@ export function CreateNewProjectDialog({
             <div className="relative">
               <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center">
                 {pending && (
-                  <Spinner className="inline me-2 align-middle w-2 h-2" />
+                  <Spinner className="inline me-2 align-middle size-2" />
                 )}
               </div>
               <Input

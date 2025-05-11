@@ -29,7 +29,7 @@ export function ContinueWithAuthDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center justify-center mb-4">
-            <GridaLogo className="h-8 w-8" />
+            <GridaLogo className="size-8" />
           </div>
           <DialogTitle className="text-center">Sign in required</DialogTitle>
           <DialogDescription className="text-center">

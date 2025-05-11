@@ -246,7 +246,7 @@ function ConnectSupabase() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>
-                <SupabaseLogo className="w-5 h-5 inline me-2 align-middle" />
+                <SupabaseLogo className="size-5 inline me-2 align-middle" />
                 Connect Supabase
               </span>
               {is_connected && (
@@ -501,7 +501,7 @@ function ConnectServiceRoleKey({
     <Card>
       <CardHeader>
         <CardTitle>
-          <LockClosedIcon className="inline me-2 align-middle w-5 h-5" />
+          <LockClosedIcon className="inline me-2 align-middle size-5" />
           Service Role Key
         </CardTitle>
         <CardDescription>
@@ -633,7 +633,7 @@ function ConnectSchema({
       <Card>
         <CardHeader>
           <CardTitle>
-            <SupabaseLogo className="inline me-2 align-middle w-5 h-5" />
+            <SupabaseLogo className="inline me-2 align-middle size-5" />
             DB Schemas
           </CardTitle>
           <CardDescription>

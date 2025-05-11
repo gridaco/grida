@@ -57,7 +57,7 @@ function Hero() {
             rel="noopener noreferrer"
             className="flex items-center text-white gap-2"
           >
-            <Github className="h-5 w-5" />
+            <Github className="size-5" />
             <span>600 Stars</span>
           </a>
 

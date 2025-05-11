@@ -315,7 +315,7 @@ function EyedropButton() {
   return (
     <div
       onPointerDown={mod}
-      className="w-5 h-5 rounded-sm border-2 border-primary/20"
+      className="size-5 rounded-sm border-2 border-primary/20"
     />
   );
 }

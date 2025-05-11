@@ -184,7 +184,7 @@ function FilePreview({
 
     return (
       <div className="w-full flex justify-center gap-2 p-2 items-center">
-        <FileIcon className="w-8 h-8" />
+        <FileIcon className="size-8" />
         <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
           {file.name}
         </span>

@@ -63,7 +63,7 @@ function TagsTableSkeleton() {
                 <div className="h-6 w-16 bg-muted animate-pulse rounded-md" />
               </TableCell>
               <TableCell>
-                <div className="h-8 w-8 bg-muted animate-pulse rounded-md" />
+                <div className="size-8 bg-muted animate-pulse rounded-md" />
               </TableCell>
             </TableRow>
           ))}

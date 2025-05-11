@@ -59,7 +59,7 @@ export function StripeCardForm() {
               </div>
               <IdCardIcon
                 aria-hidden="true"
-                className="absolute right-0 h-6 w-6 mr-3 text-neutral-400"
+                className="absolute right-0 size-6 mr-3 text-neutral-400"
               />
             </div>
           </label>

@@ -393,7 +393,7 @@ export const SidebarMenuItemAction = React.forwardRef(
         {...props}
         variant="ghost"
         size="sm"
-        className={cn("w-5 h-5 p-0", props.className)}
+        className={cn("size-5 p-0", props.className)}
       >
         {children}
       </Button>

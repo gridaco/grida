@@ -102,7 +102,7 @@ export default function ContactPage() {
             <CardContent className="p-0">
               {/* Replace this with an actual map integration */}
               <div className="bg-muted h-[300px] flex items-center justify-center">
-                <MapPin className="w-12 h-12 text-primary" />
+                <MapPin className="size-12 text-primary" />
               </div>
             </CardContent>
           </Card>

@@ -210,7 +210,7 @@ function MarketingStatusDot({
     <div
       data-state={value ? "on" : "off"}
       className={cn(
-        "w-2 h-2 rounded-full data-[state=on]:bg-green-700 data-[state=off]:bg-yellow-700",
+        "size-2 rounded-full data-[state=on]:bg-green-700 data-[state=off]:bg-yellow-700",
         className
       )}
     />
@@ -396,7 +396,7 @@ export default function CustomerDetailPage(props0: {
       <header className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <Link href={"./"}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="size-8">
               <ArrowLeft className="size-4" />
             </Button>
           </Link>
@@ -585,7 +585,7 @@ export default function CustomerDetailPage(props0: {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
+                        className="size-6"
                         onClick={() => {
                           navigator.clipboard.writeText(customer.email!);
                           toast.success("Copied email to clipboard");

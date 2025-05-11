@@ -188,7 +188,7 @@ function Variants() {
         </CardFooter>
       </Card>
       <div className="w-full flex justify-center my-5">
-        <ArrowDownIcon className="w-5 h-5" />
+        <ArrowDownIcon className="size-5" />
       </div>
       <Card>
         <CardHeader>

@@ -22,7 +22,7 @@ export default function Maintenance() {
         <CardContent>
           <CardHeader className="text-center">
             <div className="flex items-center justify-center my-4">
-              <GridaLogo className="h-6 w-6 text-primary" />
+              <GridaLogo className="size-6 text-primary" />
             </div>
             <CardTitle>We&apos;ll be back soon!</CardTitle>
             <CardDescription>

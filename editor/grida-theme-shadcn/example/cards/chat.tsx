@@ -217,7 +217,7 @@ export function CardsChat() {
                       </p>
                     </div>
                     {selectedUsers.includes(user) ? (
-                      <Check className="ml-auto flex h-5 w-5 text-primary" />
+                      <Check className="ml-auto flex size-5 text-primary" />
                     ) : null}
                   </CommandItem>
                 ))}

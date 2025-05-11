@@ -355,7 +355,7 @@ function StepCard({
 }) {
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm group">
-      <div className="mb-4 relative flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-300/10 text-xl font-bold transition-all duration-300 overflow-hidden">
+      <div className="mb-4 relative flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-300/10 text-xl font-bold transition-all duration-300 overflow-hidden">
         <span className="group-hover:opacity-0 group-hover:scale-90 transition-all duration-300 ease-in-out">
           {number}
         </span>
@@ -392,11 +392,11 @@ function TestimonialCard({
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="flex mb-4 text-slate-600">
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
       </div>
       <p className="mb-4 italic text-muted-foreground">&quot;{quote}&quot;</p>
       <div>
@@ -570,7 +570,7 @@ function InteractiveCardDemo() {
                           setTimeout(() => setActiveCard(index), 300);
                         }}
                         className={cn(
-                          "w-2 h-2 rounded-full transition-all",
+                          "size-2 rounded-full transition-all",
                           index === activeCard
                             ? "bg-black w-6"
                             : "bg-muted dark:bg-muted/10"

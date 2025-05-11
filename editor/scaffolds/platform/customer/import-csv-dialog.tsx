@@ -311,8 +311,8 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         className="hidden"
       />
 
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-        <File className="h-6 w-6 text-muted-foreground" />
+      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
+        <File className="size-6 text-muted-foreground" />
       </div>
 
       <div className="mt-4 flex flex-col items-center justify-center text-sm">

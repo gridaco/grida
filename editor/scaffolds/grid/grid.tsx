@@ -446,7 +446,7 @@ function FloatingIconButton({
     <Button
       variant="outline"
       size="icon"
-      className="p-1 w-5 h-5"
+      className="p-1 size-5"
       onClick={onClick}
     >
       {children}
@@ -689,7 +689,7 @@ function MediaCellContent({
           files: (f, i) => {
             return (
               <span key={i} className="group">
-                <div className="relative inline-flex w-5 h-5 me-1 align-middle">
+                <div className="relative inline-flex size-5 me-1 align-middle">
                   <div className="visible group-hover:invisible">
                     <FileTypeIcon type={type} className="size-4" />
                   </div>
@@ -697,7 +697,7 @@ function MediaCellContent({
                     <Button
                       variant="default"
                       size="icon"
-                      className="w-5 h-5 p-0.5 rounded-xs"
+                      className="size-5 p-0.5 rounded-xs"
                       onClick={() => {
                         openInPictureInPicture(
                           {

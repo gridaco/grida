@@ -73,7 +73,7 @@ export function ListItem({
 
               return (
                 <TooltipContainer
-                  className="min-w-6 w-6 h-6 rounded-xs overflow-hidden"
+                  className="min-w-6 size-6 rounded-xs overflow-hidden"
                   label={field.name}
                 >
                   <MediaRenderer

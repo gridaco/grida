@@ -60,7 +60,7 @@ export function IntegrationsSearch() {
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-0 top-0 h-9 w-9"
+          className="absolute right-0 top-0 size-9"
           onClick={clearSearch}
         >
           <X className="size-4" />
