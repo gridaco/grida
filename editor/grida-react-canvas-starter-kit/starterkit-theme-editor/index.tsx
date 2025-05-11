@@ -42,7 +42,7 @@ import {
   SectionHeaderDescription,
   SectionHeaderTitle,
 } from "./components/section-header";
-import colors, { ColorPalette } from "@/k/tailwindcolors";
+import colors, { ColorPalette } from "@/theme/tailwindcolors";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { ThemeEditorProvider, ThemeEditorState, useThemeEditor } from "./state";

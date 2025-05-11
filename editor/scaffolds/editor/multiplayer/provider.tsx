@@ -18,7 +18,7 @@ import colors, {
   neutral_colors,
   randomcolorname,
   type ColorPalette,
-} from "@/k/tailwindcolors";
+} from "@/theme/tailwindcolors";
 
 export type IMultiplayerCursorPresence = {
   cursor_id: string;
