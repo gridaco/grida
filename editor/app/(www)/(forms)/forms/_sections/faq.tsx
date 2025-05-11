@@ -13,7 +13,7 @@ export function FAQ() {
             <span>What is Grida Forms?</span>
             <svg
               data-accordion-icon
-              className="w-3 h-3 rotate-180 shrink-0"
+              className="size-3 rotate-180 shrink-0"
               aria-hidden="true"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"

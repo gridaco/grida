@@ -465,7 +465,7 @@ export function FieldEditPanel({
                     </button>
                     <button type="reset">
                       <Badge className="h-full" variant="secondary">
-                        <ReloadIcon className="w-3 h-3" />
+                        <ReloadIcon className="size-3" />
                       </Badge>
                     </button>
                   </div>

@@ -288,7 +288,7 @@ export function ModeData() {
               {item.data.readonly && (
                 <Tooltip>
                   <TooltipTrigger>
-                    <EyeOpenIcon className="min-w-3 w-3 h-3 ms-1 inline text-muted-foreground" />
+                    <EyeOpenIcon className="min-w-3 size-3 ms-1 inline text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent>Readonly VIEW</TooltipContent>
                 </Tooltip>

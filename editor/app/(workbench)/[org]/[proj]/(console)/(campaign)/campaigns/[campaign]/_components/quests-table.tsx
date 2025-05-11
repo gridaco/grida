@@ -379,7 +379,7 @@ export function QuestsTable() {
                                       variant="ghost"
                                       className="text-xs h-8"
                                     >
-                                      <Plus className="h-3 w-3 mr-1" />
+                                      <Plus className="size-3 mr-1" />
                                       Send New Invitation (
                                       {quest.maxInvites -
                                         quest.invitedCount}{" "}

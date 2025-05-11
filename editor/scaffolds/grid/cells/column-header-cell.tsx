@@ -66,7 +66,7 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
         {readonly && (
           <Tooltip>
             <TooltipTrigger>
-              <LockClosedIcon className="w-3 h-3 text-muted-foreground" />
+              <LockClosedIcon className="size-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>readonly</TooltipContent>
           </Tooltip>

@@ -102,7 +102,7 @@ function MediaAVContent({
               );
             }}
           >
-            <PlayFilledIcon className="w-3 h-3" />
+            <PlayFilledIcon className="size-3" />
           </Button>
         </div>
       </div>

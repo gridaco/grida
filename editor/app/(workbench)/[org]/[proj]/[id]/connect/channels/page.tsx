@@ -290,7 +290,7 @@ function TestSMS({ form_id }: { form_id: string }) {
     <Dialog>
       <DialogTrigger>
         <Badge variant={"outline"}>
-          <LightningBoltIcon className="w-3 h-3 inline align-middle me-2" />
+          <LightningBoltIcon className="size-3 inline align-middle me-2" />
           Test
         </Badge>
       </DialogTrigger>
@@ -375,7 +375,7 @@ function AboutSMSFees() {
     <Collapsible>
       <CollapsibleTrigger>
         <Badge variant={"outline"}>
-          <QuestionMarkCircledIcon className="w-3 h-3 inline align-middle me-2" />
+          <QuestionMarkCircledIcon className="size-3 inline align-middle me-2" />
           Learn more about SMS Fees
         </Badge>
       </CollapsibleTrigger>

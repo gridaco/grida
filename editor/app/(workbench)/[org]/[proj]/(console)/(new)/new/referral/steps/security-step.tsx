@@ -217,7 +217,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                           key={invitee.id}
                           className="flex items-center gap-3 relative"
                         >
-                          <ChevronRight className="h-3 w-3 text-muted-foreground absolute -ml-5" />
+                          <ChevronRight className="size-3 text-muted-foreground absolute -ml-5" />
                           <Avatar className="h-6 w-6">
                             {data.is_invitee_profile_exposed_to_public_dangerously && (
                               <AvatarImage

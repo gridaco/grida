@@ -432,7 +432,7 @@ function DefaultPropertyCustomerCell({
           });
         }}
       >
-        <ArrowRightIcon className="w-3 h-3" />
+        <ArrowRightIcon className="size-3" />
       </FloatingIconButton>
     </CellRoot>
   );
@@ -656,7 +656,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
           {fk && (
             <ReferencedRowLookupPopover relation={fk} value={value}>
               <FloatingIconButton onClick={onFKClick}>
-                <ArrowRightIcon className="w-3 h-3" />
+                <ArrowRightIcon className="size-3" />
               </FloatingIconButton>
             </ReferencedRowLookupPopover>
           )}

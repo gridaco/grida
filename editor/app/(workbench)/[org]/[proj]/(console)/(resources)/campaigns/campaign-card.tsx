@@ -51,7 +51,7 @@ export function CampaignCard({
           <div className="flex justify-between text-sm text-muted-foreground">
             {campaign.open_at && (
               <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
+                <Clock className="size-3" />
                 <span>
                   Started {new Date(campaign.open_at).toLocaleDateString()}
                 </span>

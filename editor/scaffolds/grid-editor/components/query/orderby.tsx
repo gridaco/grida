@@ -142,7 +142,7 @@ export function DataQueryOrderByMenu({
                       onOrderbyRemove(col);
                     }}
                   >
-                    <TrashIcon className="w-3 h-3" />
+                    <TrashIcon className="size-3" />
                   </Button>
                 </div>
               );
@@ -227,7 +227,7 @@ export function DataQueryOrderbyChip(props: IDataQueryOrderbyConsumer) {
   return (
     <DataQueryOrderByMenu {...props}>
       <QueryChip active={isset}>
-        <SortIcon type={icon} className="w-3 h-3 me-1" />
+        <SortIcon type={icon} className="size-3 me-1" />
         {multiple ? <>{length} sorts</> : <>{first.column}</>}
       </QueryChip>
     </DataQueryOrderByMenu>

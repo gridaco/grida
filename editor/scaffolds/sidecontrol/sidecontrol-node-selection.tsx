@@ -253,9 +253,9 @@ function SelectionMixedProperties({
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockClosedIcon className="w-3 h-3" />
+                  <LockClosedIcon className="size-3" />
                 ) : (
-                  <LockOpen1Icon className="w-3 h-3" />
+                  <LockOpen1Icon className="size-3" />
                 )}
               </Toggle>
               {/* <small className="ms-2 font-mono">{id}</small> */}
@@ -772,9 +772,9 @@ function SelectedNodeProperties({
                 className="w-6 h-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockClosedIcon className="w-3 h-3" />
+                  <LockClosedIcon className="size-3" />
                 ) : (
-                  <LockOpen1Icon className="w-3 h-3" />
+                  <LockOpen1Icon className="size-3" />
                 )}
               </Toggle>
             </PropertyLine>
@@ -1235,7 +1235,7 @@ function SelectionColors() {
                   select(ids);
                 }}
               >
-                <Crosshair2Icon className="w-3 h-3" />
+                <Crosshair2Icon className="size-3" />
               </Button>
             </div>
           </PropertyLine>
@@ -1284,7 +1284,7 @@ function ConfigurableProperty({
               onClick={() => {
                 setOpen(true);
               }}
-              className="w-3 h-3"
+              className="size-3"
             />
           </div>
         </TooltipContent>

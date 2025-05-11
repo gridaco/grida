@@ -154,7 +154,7 @@ function Badges({
           variant="outline"
           className="text-xs text-muted-foreground font-normal font-mono px-1.5"
         >
-          <LockOpen1Icon className="me-1 w-3 h-3" />
+          <LockOpen1Icon className="me-1 size-3" />
           Public
         </Badge>
       )}

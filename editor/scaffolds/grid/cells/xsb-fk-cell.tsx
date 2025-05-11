@@ -78,7 +78,7 @@ export function XSBForeignKeyPopupEditCell({
                 variant="outline"
                 className="text-xs text-muted-foreground font-mono"
               >
-                <LinkIcon className="w-3 h-3 mr-1" />
+                <LinkIcon className="size-3 mr-1" />
                 {supabase_schema_name}.{relation.referenced_table}.
                 {relation.referenced_column}
               </Badge>
@@ -100,7 +100,7 @@ export function XSBForeignKeyPopupEditCell({
                   setSheetOpen(true);
                 }}
               >
-                <LinkIcon className="w-3 h-3" />
+                <LinkIcon className="size-3" />
               </Button>
             </div>
             <footer className="flex justify-between p-2 border-t">

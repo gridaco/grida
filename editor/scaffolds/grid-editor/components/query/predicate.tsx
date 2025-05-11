@@ -250,8 +250,8 @@ export function DataQueryPrediateAddMenu({
               onSelect={() => onAdd({ column: key, op: "eq", value: null })}
             >
               <div className="size-4 flex items-center justify-center gap-2">
-                {property.pk && <KeyIcon className="w-3 h-3" />}
-                {property.fk && <Link2Icon className="w-3 h-3" />}
+                {property.pk && <KeyIcon className="size-3" />}
+                {property.fk && <Link2Icon className="size-3" />}
               </div>
               <span className="ms-2">{key}</span>
               <span className="ms-2 text-xs text-muted-foreground">
@@ -412,7 +412,7 @@ export function DataQueryPredicateChip({
             onClick={onRemove}
             className="w-6 h-6 min-w-6 min-h-6"
           >
-            <TrashIcon className="w-3 h-3" />
+            <TrashIcon className="size-3" />
           </Button>
         </div>
         {requires_value && (

@@ -373,7 +373,7 @@ function AdvancedExportDialog({
             <Collapsible>
               <CollapsibleTrigger>
                 <small>
-                  <QuestionMarkCircledIcon className="w-3 h-3 me-2 inline" />
+                  <QuestionMarkCircledIcon className="size-3 me-2 inline" />
                   Learn More About Grida XPath
                 </small>
               </CollapsibleTrigger>
