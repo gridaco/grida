@@ -97,7 +97,7 @@ export function ImageBlock({
           onOpenChange={setPickerOpen}
           onUseImage={onChangeImage}
         />
-        <div className="rounded p-4 overflow-hidden border border-black/20">
+        <div className="rounded-sm p-4 overflow-hidden border border-black/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             // width="100%"

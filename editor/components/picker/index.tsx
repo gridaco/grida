@@ -196,7 +196,7 @@ const FileList: React.FC<FileListProps> = ({ accept, loading }) => {
         <li key={node.key}>
           <button
             className={cn(
-              "flex items-center w-full text-left px-2 py-1 rounded",
+              "flex items-center w-full text-left px-2 py-1 rounded-sm",
               node.type === "file" ? "text-blue-600" : "text-gray-800",
               selectedNodes.includes(node) && "bg-blue-100",
               "hover:bg-gray-100"

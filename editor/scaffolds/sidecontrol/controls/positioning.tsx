@@ -170,7 +170,7 @@ function ConstraintsBox({
           onClick={() => onConstraintChange?.("right", !constraint.right)}
         />
       </div>
-      <div className="w-1/3 aspect-square rounded border" />
+      <div className="w-1/3 aspect-square rounded-sm border" />
     </div>
   );
 }

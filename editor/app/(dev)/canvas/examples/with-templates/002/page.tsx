@@ -243,7 +243,7 @@ function CustomComponent__Referrer(componentprops: any) {
   console.log("props", componentprops);
   return (
     <div
-      className="rounded shadow border"
+      className="rounded-sm shadow border"
       style={{
         ...componentprops.style,
       }}
@@ -308,7 +308,7 @@ function CustomComponent__Referrer(componentprops: any) {
 function CustomComponent__Tabs(props: any) {
   return (
     <div
-      className="rounded shadow border"
+      className="rounded-sm shadow border"
       style={{
         ...props.style,
       }}
@@ -322,7 +322,7 @@ function CustomComponent__Tabs(props: any) {
 function CustomComponent__Join_Main(props: any) {
   return (
     <div
-      className="rounded shadow border"
+      className="rounded-sm shadow border"
       style={{
         ...props.style,
       }}
@@ -343,7 +343,7 @@ function CustomComponent__Join_Main(props: any) {
 function CustomComponent__Join_Hello(props: any) {
   return (
     <div
-      className="rounded shadow border"
+      className="rounded-sm shadow border"
       style={{
         ...props.style,
       }}
@@ -365,7 +365,7 @@ function CustomComponent__Join_Hello(props: any) {
 function CustomComponent__Portal(props: any) {
   return (
     <div
-      className="rounded shadow border"
+      className="rounded-sm shadow border"
       style={{
         ...props.style,
       }}

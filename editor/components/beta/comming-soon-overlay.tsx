@@ -16,7 +16,7 @@ export function AlphaDisabledFeature({
         <Badge className="mb-2" variant={"outline"}>
           Alpha
         </Badge>
-        <div className="border flex flex-col bg-background/80 shadow rounded items-center justify-center p-10">
+        <div className="border flex flex-col bg-background/80 shadow rounded-sm items-center justify-center p-10">
           <h1 className="text-2xl font-bold">
             This feature is not available yet
           </h1>

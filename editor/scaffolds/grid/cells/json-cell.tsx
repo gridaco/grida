@@ -69,7 +69,7 @@ export function JsonPopupEditorCell({
         asChild
         className="min-w-48 w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
-        <div className="bg-background border rounded shadow-lg overflow-hidden">
+        <div className="bg-background border rounded-sm shadow-lg overflow-hidden">
           <BlockKeys
             outside="escape"
             onEscape={cancelChanges}

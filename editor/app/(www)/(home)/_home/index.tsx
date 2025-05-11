@@ -116,7 +116,7 @@ function SquareCard({
 }) {
   return (
     <Link href={href} className="w-full flex flex-col gap-3 lg:gap-4 group">
-      <div className="relative w-full aspect-square rounded shadow border overflow-hidden">
+      <div className="relative w-full aspect-square rounded-sm shadow border overflow-hidden">
         <span className="absolute w-full h-full -z-10">{background}</span>
         <span className="absolute z-10">{foreground}</span>
       </div>

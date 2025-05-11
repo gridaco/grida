@@ -140,7 +140,7 @@ export function SidebarMenuGridItem({
       className={cn(
         "aspect-square",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-secondary text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded-sm hover:bg-secondary text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex flex-col items-center justify-center",
         className
@@ -230,7 +230,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       className={cn(
         "flex items-center",
         "relative group/menu-item",
-        "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
+        "w-full px-2 py-1 rounded-sm text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "hover:bg-sidebar-accent hover:text-accent-foreground data-[hovered='true']:bg-sidebar-accent data-[hovered='true']:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
@@ -318,7 +318,7 @@ export function SidebarSectionHeaderItem({
     <div
       className={cn(
         "relative group",
-        "w-full px-2 py-1 my-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 my-1 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
         className
@@ -370,7 +370,7 @@ export function SidebarMenuItemActions({
     <div
       {...props}
       className={cn(
-        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-sidebar opacity-0 group-hover/menu-item:opacity-100 group-hover/menu-item:bg-sidebar-accent transition-opacity rounded",
+        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-sidebar opacity-0 group-hover/menu-item:opacity-100 group-hover/menu-item:bg-sidebar-accent transition-opacity rounded-sm",
         className
       )}
     >

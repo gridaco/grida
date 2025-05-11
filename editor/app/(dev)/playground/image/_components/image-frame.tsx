@@ -41,7 +41,7 @@ export function GenerationImageFrame({
   return (
     <figure
       className={cn(
-        "relative w-full h-auto min-h-64 aspect-square overflow-hidden rounded",
+        "relative w-full h-auto min-h-64 aspect-square overflow-hidden rounded-sm",
         className
       )}
     >

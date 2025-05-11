@@ -507,7 +507,7 @@ function OrganizationSwitcher({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton className="w-fit px-1.5">
               <OrganizationAvatar
-                className="inline size-6 border shadow-sm rounded"
+                className="inline size-6 border shadow-sm rounded-sm"
                 avatar_url={organization.avatar_url}
                 alt={organization.display_name}
               />
@@ -530,7 +530,7 @@ function OrganizationSwitcher({
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem className="gap-2 p-2">
                   <OrganizationAvatar
-                    className="inline size-6 border shadow-sm rounded"
+                    className="inline size-6 border shadow-sm rounded-sm"
                     avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />

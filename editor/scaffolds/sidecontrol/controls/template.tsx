@@ -136,7 +136,7 @@ function TemplateCard({
       >
         <div
           className={cn(
-            "border rounded p-4 group-hover:border-accent-foreground",
+            "border rounded-sm p-4 group-hover:border-accent-foreground",
             selected && "bg-accent"
           )}
         >

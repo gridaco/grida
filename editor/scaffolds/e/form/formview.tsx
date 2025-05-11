@@ -467,7 +467,7 @@ function BlockRenderer({
           data-active-section={is_current_section}
           className={cn(
             "data-[active-section='false']:hidden",
-            "rounded",
+            "rounded-sm",
             stylesheet?.section
           )}
         >
@@ -609,7 +609,7 @@ function BlockRenderer({
       return (
         <div
           {...__shared_root_attr}
-          className="rounded overflow-hidden border border-black/20 aspect-video"
+          className="rounded-sm overflow-hidden border border-black/20 aspect-video"
         >
           <ReactPlayer
             width={"100%"}
@@ -629,7 +629,7 @@ function BlockRenderer({
         <object
           {...__shared_root_attr}
           data={block.data + "#toolbar=0&navpanes=0&scrollbar=0"}
-          className="w-full h-full aspect-[1/1.2] max-h-screen rounded overflow-hidden border shadow-sm box-content"
+          className="w-full h-full aspect-[1/1.2] max-h-screen rounded-sm overflow-hidden border shadow-sm box-content"
           type="application/pdf"
           width="100%"
           height="100%"

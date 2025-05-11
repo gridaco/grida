@@ -260,7 +260,7 @@ function NextEventState({ className }: { className?: string }) {
         {cal_text && (
           <CalendarBoxIcon month={cal_text.month} day={cal_text.day} />
         )}
-        <div className="inline-flex items-center min-h-10 gap-2 bg-background border px-4 py-2 rounded text-xs">
+        <div className="inline-flex items-center min-h-10 gap-2 bg-background border px-4 py-2 rounded-sm text-xs">
           {state_text}
         </div>
       </div>

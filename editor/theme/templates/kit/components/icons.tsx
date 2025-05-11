@@ -8,7 +8,7 @@ export function CalendarBoxIcon({
   day: string;
 }) {
   return (
-    <div className="rounded border w-10 h-10 uppercase overflow-hidden">
+    <div className="rounded-sm border w-10 h-10 uppercase overflow-hidden">
       <div id="month" className="flex justify-center items-center bg-primary">
         <span className="text-[0.5rem] text-primary-foreground">{month}</span>
       </div>
@@ -21,7 +21,7 @@ export function CalendarBoxIcon({
 
 export function LocationBoxIcon() {
   return (
-    <div className="rounded border w-10 h-10 uppercase">
+    <div className="rounded-sm border w-10 h-10 uppercase">
       <span className="w-full h-full flex items-center justify-center">
         <SewingPinFilledIcon />
       </span>

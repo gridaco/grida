@@ -30,7 +30,7 @@ export default async function NewOrganizationSetupInvitePage({
         <h1 className="text-xl font-bold">Welcome to {organization_name}</h1>
       </header>
       <form className="flex flex-col gap-8">
-        <section className="flex flex-col gap-2 py-4 px-4 border rounded shadow-sm">
+        <section className="flex flex-col gap-2 py-4 px-4 border rounded-sm shadow-sm">
           <h2 className="font-semibold">Add organization members</h2>
           <p className="text-sm text-muted-foreground">
             Organization members will be able to view repositories, organize

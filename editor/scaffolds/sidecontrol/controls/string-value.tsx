@@ -59,7 +59,7 @@ export function StringValueControl({
         <DropdownMenuTrigger disabled={disabled} asChild>
           <button
             disabled={disabled}
-            className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded-sm flex items-center justify-center z-10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <BoltIcon className="w-3.5 h-3.5 text-muted-foreground" />
           </button>

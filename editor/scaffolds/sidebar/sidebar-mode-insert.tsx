@@ -122,7 +122,7 @@ export function ModeInsertBlocks() {
                     >
                       <BlockTypeIcon
                         type={block_type}
-                        className="p-2 w-8 h-8 rounded"
+                        className="p-2 w-8 h-8 rounded-sm"
                       />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
                         {blocklabels[block_type]}
@@ -166,7 +166,7 @@ export function ModeInsertBlocks() {
                     >
                       <FormFieldTypeIcon
                         type={field_type}
-                        className="p-2 w-8 h-8 rounded"
+                        className="p-2 w-8 h-8 rounded-sm"
                       />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
                         {fieldlabels[field_type]}
@@ -183,7 +183,7 @@ export function ModeInsertBlocks() {
                         <div>
                           <FormFieldTypeIcon
                             type={field_type}
-                            className="inline align-middle me-2 w-8 h-8 p-2 border rounded shadow-sm"
+                            className="inline align-middle me-2 w-8 h-8 p-2 border rounded-sm shadow-sm"
                           />
                           <span className="font-bold">
                             {fieldlabels[field_type]}

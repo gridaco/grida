@@ -16,7 +16,7 @@ export function GridCard({
   doctype,
 }: GDocument & { thumbnail?: string }) {
   return (
-    <div className="group rounded border bg-background shadow-md h-full">
+    <div className="group rounded-sm border bg-background shadow-md h-full">
       {thumbnail ? (
         <Image
           className="object-cover w-full h-full"

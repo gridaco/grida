@@ -79,7 +79,7 @@ export default function ProjectDashboardPage(props: {
         {loading ? (
           <>
             <div>
-              <Skeleton className="w-full h-32 rounded" />
+              <Skeleton className="w-full h-32 rounded-sm" />
             </div>
           </>
         ) : (

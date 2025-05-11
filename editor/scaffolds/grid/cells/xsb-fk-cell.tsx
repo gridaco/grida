@@ -71,7 +71,7 @@ export function XSBForeignKeyPopupEditCell({
           <BlockKeys
             onEnter={onCommit}
             onEscape={cancelChanges}
-            className="bg-background border rounded shadow-lg overflow-hidden"
+            className="bg-background border rounded-sm shadow-lg overflow-hidden"
           >
             <header className="p-2 border-b">
               <Badge

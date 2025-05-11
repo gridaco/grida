@@ -85,7 +85,7 @@ function MediaAVContent({
         <div className="visible group-hover:invisible">
           <FileTypeIcon type={type} className="w-4 h-4" />
         </div>
-        <div className="absolute inset-0 rounded hidden group-hover:flex items-center">
+        <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
           <Button
             variant="default"
             size="icon"

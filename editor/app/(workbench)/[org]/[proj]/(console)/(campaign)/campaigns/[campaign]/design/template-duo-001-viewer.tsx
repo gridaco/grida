@@ -304,7 +304,7 @@ function CustomComponent_Viewer__Referrer(componentprops: any) {
 
   return (
     <div
-      className="rounded shadow border bg-background"
+      className="rounded-sm shadow border bg-background"
       style={{
         ...componentprops.style,
       }}
@@ -339,7 +339,7 @@ function CustomComponent_Viewer__ReferrerShare(componentprops: any) {
 
   return (
     <div
-      className="rounded shadow border relative overflow-hidden"
+      className="rounded-sm shadow border relative overflow-hidden"
       style={{
         ...componentprops.style,
         minHeight: 812,
@@ -367,7 +367,7 @@ function CustomComponent_Viewer__ReferrerShareMessage(componentprops: any) {
 
   return (
     <div
-      className="rounded shadow border relative overflow-hidden"
+      className="rounded-sm shadow border relative overflow-hidden"
       style={{
         ...componentprops.style,
         width: 375,
@@ -401,7 +401,7 @@ function CustomComponent_Viewer__Invitation(componentprops: any) {
 
   return (
     <div
-      className="rounded shadow border bg-background"
+      className="rounded-sm shadow border bg-background"
       style={{
         ...componentprops.style,
       }}
@@ -438,7 +438,7 @@ function CustomComponent_Viewer__InvitationUXOverlay(componentprops: any) {
 
   return (
     <div
-      className="rounded shadow border bg-background"
+      className="rounded-sm shadow border bg-background"
       style={{
         ...componentprops.style,
       }}

@@ -329,7 +329,7 @@ function SectionResponseMetadataJson({ json }: { json: Record<string, any> }) {
       <PanelPropertyFields>
         <PanelPropertyField label={"raw.json (readonly)"}>
           <ThemedMonacoEditor
-            className="rounded overflow-hidden shadow-sm border"
+            className="rounded-sm overflow-hidden shadow-sm border"
             height={400}
             defaultLanguage="json"
             defaultValue={JSON.stringify(json, null, 2)}

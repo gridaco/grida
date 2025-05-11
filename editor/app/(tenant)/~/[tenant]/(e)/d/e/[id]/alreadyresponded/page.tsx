@@ -31,7 +31,7 @@ export default async function AlreadyRespondedPage(props: {
             <summary className="list-none flex items-center justify-center">
               <InfoCircledIcon className="" />
             </summary>
-            <div className="mt-2 border border-dashed rounded p-2">
+            <div className="mt-2 border border-dashed rounded-sm p-2">
               <article className="text-start prose prose-sm dark:prose-invert">
                 <small>
                   <strong>{i18next.t("support_metadata")}</strong>

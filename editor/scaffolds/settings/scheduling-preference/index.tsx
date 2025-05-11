@@ -309,7 +309,7 @@ function OnYourLocalTime({
               {openAtLocal && (
                 <li>
                   Open At:{" "}
-                  <span className="border rounded px-2 py-1">
+                  <span className="border rounded-sm px-2 py-1">
                     <CalendarIcon className="inline me-2 align-middle" />
                     {tzFormat(openAtLocal, "PPP HH:mm:ss", {
                       timeZone: browserTz,
@@ -320,7 +320,7 @@ function OnYourLocalTime({
               {closeAtLocal && (
                 <li>
                   Close At:{" "}
-                  <span className="border rounded px-2 py-1">
+                  <span className="border rounded-sm px-2 py-1">
                     <CalendarIcon className="inline me-2 align-middle" />
                     {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
                       timeZone: browserTz,

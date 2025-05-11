@@ -39,7 +39,7 @@ export default function TransparencyGridDemoPage() {
 
   return (
     <main ref={ref} className="relative w-dvw h-dvh">
-      <div className="absolute top-4 left-4 z-10 bg-background rounded border p-1 text-xs font-mono">
+      <div className="absolute top-4 left-4 z-10 bg-background rounded-sm border p-1 text-xs font-mono">
         <div className="flex gap-2">
           <button
             onClick={() => {

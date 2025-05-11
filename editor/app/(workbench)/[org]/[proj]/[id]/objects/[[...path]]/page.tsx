@@ -441,7 +441,7 @@ const EntityNodeItemComponent = ({
         >
           {view === "grid" ? (
             <div className="flex flex-col items-center">
-              <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded">
+              <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded-sm">
                 <MimeTypeIcon
                   type={node.type === "folder" ? "folder" : node.mimetype}
                   className="w-6 h-6"
@@ -747,7 +747,7 @@ function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
         <div className="flex items-center gap-2 text-muted-foreground">
           <Badge
             variant="outline"
-            className="uppercase rounded text-[9px] px-1 py-0.5"
+            className="uppercase rounded-sm text-[9px] px-1 py-0.5"
           >
             {l_type}
           </Badge>

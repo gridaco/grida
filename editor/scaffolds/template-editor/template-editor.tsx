@@ -264,7 +264,7 @@ export function TemplateEditor({
                     <Label htmlFor={key} className="mb-2">
                       {key}
                     </Label>
-                    <div className="border rounded overflow-hidden">
+                    <div className="border rounded-sm overflow-hidden">
                       <TemplateTextEditor
                         id={key}
                         value={value}

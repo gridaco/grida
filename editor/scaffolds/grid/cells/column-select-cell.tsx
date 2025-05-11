@@ -65,7 +65,7 @@ export function SelectColumnCell({
               <Tooltip.Arrow />
               <div
                 className={
-                  "bg-background rounded border py-1 px-2 leading-none shadow"
+                  "bg-background rounded-sm border py-1 px-2 leading-none shadow"
                 }
               >
                 <span className="text-xs text-foreground">Expand row</span>

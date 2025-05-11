@@ -532,7 +532,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
           className="w-full h-full p-2 flex gap-2 items-center"
         >
           <div
-            className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
+            className="aspect-square min-w-4 rounded-sm bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
           <span>
@@ -693,7 +693,7 @@ function MediaCellContent({
                   <div className="visible group-hover:invisible">
                     <FileTypeIcon type={type} className="w-4 h-4" />
                   </div>
-                  <div className="absolute inset-0 rounded hidden group-hover:flex items-center">
+                  <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
                     <Button
                       variant="default"
                       size="icon"
@@ -785,7 +785,7 @@ function ImageCellContent({
                 <img
                   src={f.srcset.thumbnail}
                   alt={f.name}
-                  className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                  className="h-full min-w-8 aspect-square rounded-sm overflow-hidden object-cover bg-neutral-500"
                   loading="lazy"
                 />
               </figure>

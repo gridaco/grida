@@ -1,7 +1,7 @@
 import { cva } from "class-variance-authority";
 
 export namespace WorkbenchUI {
-  export const inputVariants = cva("rounded w-full", {
+  export const inputVariants = cva("rounded-sm w-full", {
     variants: {
       variant: {
         input: "shadow-sm border border-input",

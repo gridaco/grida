@@ -63,7 +63,7 @@ export function BrowseStartPageTemplatesDialog({
         <DialogHeader className="p-4 w-full relative">
           <DialogTitle>Browse Templates</DialogTitle>
           <div className="absolute top-2 flex w-full justify-center">
-            <header className="flex w-min items-center justify-center gap-4 px-4 py-2 border rounded">
+            <header className="flex w-min items-center justify-center gap-4 px-4 py-2 border rounded-sm">
               <Button
                 variant="ghost"
                 size="icon"

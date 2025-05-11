@@ -233,7 +233,7 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
       >
         <div
           className={cn(
-            "relative flex h-full cursor-default flex-col items-center gap-2 rounded",
+            "relative flex h-full cursor-default flex-col items-center gap-2 rounded-sm",
             {
               "outline outline-2 outline-offset-1 outline-primary":
                 selected || isResizing,
@@ -265,7 +265,7 @@ export const ImageViewBlock: React.FC<NodeViewProps> = ({
               >
                 <img
                   className={cn(
-                    "h-auto rounded object-contain transition-shadow",
+                    "h-auto rounded-sm object-contain transition-shadow",
                     {
                       "opacity-0": !imageState.imageLoaded || imageState.error,
                     }

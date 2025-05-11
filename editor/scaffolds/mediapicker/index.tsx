@@ -145,7 +145,7 @@ function FromFilePicker({
         </button>
       ) : (
         <button
-          className="flex flex-col gap-2 items-center justify-center border-2 border-dashed rounded w-full h-full"
+          className="flex flex-col gap-2 items-center justify-center border-2 border-dashed rounded-sm w-full h-full"
           onClick={openFilePicker}
         >
           {loading ? (

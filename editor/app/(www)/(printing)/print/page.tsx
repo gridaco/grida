@@ -677,7 +677,7 @@ function PromotedTemplateCard({
   return (
     <Card
       className={cn(
-        "group relative w-full h-full overflow-hidden rounded md:rounded-lg",
+        "group relative w-full h-full overflow-hidden rounded-sm md:rounded-lg",
         className
       )}
     >

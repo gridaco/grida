@@ -218,7 +218,7 @@ export function SafariToolbar({
         </div>
       </div>
       <div className="flex-1 max-w-screen-sm">
-        <div className="rounded bg-muted w-full h-6 px-10 flex items-center gap-2 justify-center max-w-full truncate text-muted-foreground overflow-hidden">
+        <div className="rounded-sm bg-muted w-full h-6 px-10 flex items-center gap-2 justify-center max-w-full truncate text-muted-foreground overflow-hidden">
           <LockClosedIcon />
           <span className="text-xs truncate">{url}</span>
         </div>

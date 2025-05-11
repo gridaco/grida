@@ -222,7 +222,7 @@ function FileItem({
   return (
     <div
       //
-      className="flex items-start hover:bg-secondary rounded"
+      className="flex items-start hover:bg-secondary rounded-sm"
     >
       {/* TODO: dnd & sort */}
       {/* <Button variant="ghost" size="icon" className="cursor-move">

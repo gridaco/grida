@@ -1,9 +1,9 @@
 .minimal-tiptap-editor .ProseMirror code.inline {
-  @apply rounded border border-[var(--mt-code-color)] bg-[var(--mt-code-background)] px-1 py-0.5 text-sm;
+  @apply rounded-sm border border-[var(--mt-code-color)] bg-[var(--mt-code-background)] px-1 py-0.5 text-sm;
 }
 
 .minimal-tiptap-editor .ProseMirror pre {
-  @apply relative overflow-auto rounded border font-mono text-sm;
+  @apply relative overflow-auto rounded-sm border font-mono text-sm;
   @apply border-[var(--mt-pre-border)] bg-[var(--mt-pre-background)] text-[var(--mt-pre-color)];
   @apply hyphens-none whitespace-pre text-left;
 }

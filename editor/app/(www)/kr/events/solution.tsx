@@ -75,13 +75,13 @@ function SolutionCard({
   title: React.ReactNode;
 }) {
   return (
-    <div className="max-w-80 w-full px-4 py-4 border bg-white/5 border-muted rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+    <div className="max-w-80 w-full px-4 py-4 border bg-white/5 border-muted rounded-sm shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
       <Image
         src={cover}
         alt={alt ?? ""}
         width={400}
         height={400}
-        className="w-full h-48 rounded object-cover"
+        className="w-full h-48 rounded-sm object-cover"
       />
       <p className="font-semibold text-2xl mt-3">{title}</p>
       <div className="flex justify-end text-sm mt-12 opacity-50">

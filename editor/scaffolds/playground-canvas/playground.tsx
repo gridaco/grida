@@ -783,7 +783,7 @@ function LibraryContent() {
                     >
                       {/* <BlockTypeIcon
                   type={block_type}
-                  className="p-2 w-8 h-8 rounded"
+                  className="p-2 w-8 h-8 rounded-sm"
                 /> */}
                       <ButtonIcon />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">

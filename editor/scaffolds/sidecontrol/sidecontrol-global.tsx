@@ -348,7 +348,7 @@ function Palette() {
                 primary={paletteobj[colorscheme]["--primary"]}
                 secondary={paletteobj[colorscheme]["--secondary"]}
                 background={paletteobj[colorscheme]["--background"]}
-                className="min-w-12 w-12 h-12 rounded border"
+                className="min-w-12 w-12 h-12 rounded-sm border"
               />
               <span className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
                 {palette}
@@ -382,7 +382,7 @@ function Palette() {
                           onPaletteChange(key as any);
                         }}
                         selected={key === palette}
-                        className="w-10 h-10 rounded"
+                        className="w-10 h-10 rounded-sm"
                       />
                       <span className="text-ellipsis overflow-hidden">
                         {key}
@@ -483,7 +483,7 @@ function Background() {
                   height={48}
                   src={selected.preview[0]}
                   alt={selected.title}
-                  className="rounded border"
+                  className="rounded-sm border"
                 />
                 <span className="text-xs text-muted-foreground">
                   {selected.title}
@@ -504,7 +504,7 @@ function Background() {
                   height={100}
                   src={background.preview[0]}
                   alt={background.title}
-                  className="rounded border"
+                  className="rounded-sm border"
                 />
                 <span className="text-xs text-muted-foreground">
                   {background.title}
@@ -597,7 +597,7 @@ function CustomCSS() {
         </DialogHeader>
         <div>
           <ThemedMonacoEditor
-            className="rounded overflow-hidden border"
+            className="rounded-sm overflow-hidden border"
             width="100%"
             height={500}
             defaultLanguage="scss"
