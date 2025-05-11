@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
+import { Progress } from "@/components/ui-editor/progress";
 import { SearchInput } from "@/components/extension/search-input";
 import { useCustomers } from "./use-customer-feed";
 import { useProject } from "@/scaffolds/workspace";

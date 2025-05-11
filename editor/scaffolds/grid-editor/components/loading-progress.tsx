@@ -1,5 +1,5 @@
 import React from "react";
-import { LoadingProgress as Progress } from "@/components/extension/loading-progress";
+import { Progress } from "@/components/ui-editor/progress";
 import { motion } from "motion/react";
 
 export function GridLoadingProgressLine({ loading }: { loading?: boolean }) {
