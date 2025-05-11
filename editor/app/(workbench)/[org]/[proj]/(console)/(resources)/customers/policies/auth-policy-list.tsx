@@ -171,11 +171,10 @@ export function AuthPolicyList() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground"
-            >
-              Delete
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

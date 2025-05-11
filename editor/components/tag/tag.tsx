@@ -19,7 +19,7 @@ export const tagVariants = cva(
         primary:
           "bg-primary border-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50",
         destructive:
-          "bg-destructive border-destructive text-destructive-foreground hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50",
+          "bg-destructive border-destructive text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50",
       },
       size: {
         sm: "text-xs h-7",
