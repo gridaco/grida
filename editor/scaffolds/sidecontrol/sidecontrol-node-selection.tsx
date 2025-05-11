@@ -67,7 +67,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { ZoomControl } from "./controls/ext-zoom";
 import { SchemaProvider, useSchema } from "./schema";
 import { BoltIcon } from "lucide-react";

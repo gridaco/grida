@@ -13,7 +13,7 @@ import {
   PropertySeparator,
   PropertyTextarea,
 } from "./ui";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { CubeIcon, GearIcon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserDataControl } from "./controls/x-userdata";

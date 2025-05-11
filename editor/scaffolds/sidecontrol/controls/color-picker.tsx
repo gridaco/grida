@@ -5,7 +5,7 @@ import { grida } from "@/grida";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { useEyeDropper } from "./utils/eyedropper";
 import {
   Tooltip,

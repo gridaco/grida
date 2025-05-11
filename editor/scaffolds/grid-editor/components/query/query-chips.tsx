@@ -1,6 +1,6 @@
 import { DataQueryOrderbyChip } from "./orderby";
 import { DataQueryPrediateAddMenu, DataQueryPredicateChip } from "./predicate";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Separator } from "@/components/ui/separator";
 import {

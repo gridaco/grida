@@ -57,7 +57,7 @@ import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { ShineBorder } from "@/www/ui/shine-border";
 import type {
   GDocument,

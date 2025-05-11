@@ -56,7 +56,7 @@ export function LengthPercentageControl({
   const { value: _value, type: _type } = val(value);
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center gap-2">
       <Input
         type={_type}
         value={_value}

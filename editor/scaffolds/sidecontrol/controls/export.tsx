@@ -1,7 +1,7 @@
 import { toPng, toSvg } from "html-to-image";
 import type { Options } from "html-to-image/lib/types";
 import { saveAs } from "file-saver";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { toast } from "sonner";
 import {
   DropdownMenu,

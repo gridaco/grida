@@ -20,7 +20,7 @@ import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
 import { tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-react-canvas/nodes/use-computed";

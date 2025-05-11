@@ -8,7 +8,7 @@ import {
   SquareIcon,
   TransparencyGridIcon,
 } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { BitmapEditorBrush, BitmapEditorRuntimeBrush } from "@grida/bitmap";
 import {
   createGrainBrushTexture,

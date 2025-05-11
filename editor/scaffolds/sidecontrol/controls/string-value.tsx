@@ -264,7 +264,7 @@ function TemplateExpressionValue({
 }) {
   return (
     <div className="flex h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-      <div className="px-1 flex overflow-hidden space-x-1">
+      <div className="px-1 flex overflow-hidden gap-1">
         {value.templateSpans.map((span, i) => {
           switch (span.kind) {
             case "StringLiteral":

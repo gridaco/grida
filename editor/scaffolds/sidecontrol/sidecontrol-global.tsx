@@ -725,7 +725,7 @@ function Settings() {
                   heading={<>{`"Powered by Grida" Branding`}</>}
                 />
                 <PreferenceBody>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <Switch
                       id="is_powered_by_branding_enabled"
                       name="is_powered_by_branding_enabled"
