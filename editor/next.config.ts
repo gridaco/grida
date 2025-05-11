@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig, type SentryBuildOptions } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
 import { Platform } from "@/lib/platform";
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
+const USE_TELEMETRY = process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
 
 const withMDX = createMDX({
   // Add markdown plugins here, as desired
@@ -198,12 +199,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(withMDX(nextConfig as any), {
+const sentry_build_options = {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "grida",
-  project: "grida",
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -218,7 +219,8 @@ export default withSentryConfig(withMDX(nextConfig as any), {
   // This can increase your server load as well as your hosting bill.
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
-  tunnelRoute: "/monitoring",
+  // [DOES NOT WORK WITH CURRENT CONFIGURATION - ENABLE THIS LATER]
+  // tunnelRoute: "/monitoring",
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
@@ -228,4 +230,8 @@ export default withSentryConfig(withMDX(nextConfig as any), {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
-});
+} satisfies SentryBuildOptions;
+
+export default USE_TELEMETRY
+  ? withSentryConfig(withMDX(nextConfig as any), sentry_build_options)
+  : withMDX(nextConfig as any);
