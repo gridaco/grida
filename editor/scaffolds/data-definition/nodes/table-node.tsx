@@ -24,7 +24,7 @@ const TableNode = ({
   return (
     <>
       {data.is_referenced ? (
-        <header className="text-[0.55rem] px-2 py-1 border rounded-sm bg-background flex gap-1 items-center">
+        <header className="text-[0.55rem] px-2 py-1 border rounded-xs bg-background flex gap-1 items-center">
           {data.name}
           {targetPosition && (
             <Handle

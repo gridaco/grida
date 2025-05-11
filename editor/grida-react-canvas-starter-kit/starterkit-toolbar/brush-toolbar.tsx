@@ -280,7 +280,7 @@ function BrushItem({
       {...props}
       data-selected={selected}
       className={cn(
-        "w-full rounded-sm hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent select-none",
+        "w-full rounded-xs hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent select-none",
         className
       )}
     >

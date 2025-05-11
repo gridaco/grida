@@ -697,7 +697,7 @@ function MediaCellContent({
                     <Button
                       variant="default"
                       size="icon"
-                      className="w-5 h-5 p-0.5 rounded-sm"
+                      className="w-5 h-5 p-0.5 rounded-xs"
                       onClick={() => {
                         openInPictureInPicture(
                           {

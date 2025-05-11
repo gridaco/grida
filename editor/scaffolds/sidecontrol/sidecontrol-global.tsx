@@ -737,7 +737,7 @@ function Settings() {
                     </Label>
                   </div>
                   {is_powered_by_branding_enabled && (
-                    <div className="mt-10 flex items-center justify-center select-none p-4 border rounded-sm">
+                    <div className="mt-10 flex items-center justify-center select-none p-4 border rounded-xs">
                       <PoweredByGridaWaterMark />
                     </div>
                   )}

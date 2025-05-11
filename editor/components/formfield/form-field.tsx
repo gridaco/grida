@@ -240,7 +240,7 @@ function MonoFormField({
           <img
             src={src}
             alt={label || name}
-            className="mt-1 w-12 h-12 aspect-square rounded-sm"
+            className="mt-1 w-12 h-12 aspect-square rounded-xs"
           />
         )}
       </>
@@ -638,7 +638,7 @@ function MonoFormField({
                 <img
                   src={item.src}
                   alt={item.label || item.value}
-                  className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                  className="mt-1 w-12 h-12 aspect-square rounded-xs"
                 />
               )}
             </span>
@@ -827,7 +827,7 @@ function SafeValueSelect({
                   <img
                     src={option.src}
                     alt={option.label || option.value}
-                    className="w-6 h-6 aspect-square rounded-sm mr-2"
+                    className="w-6 h-6 aspect-square rounded-xs mr-2"
                   />
                   {option.label || option.value}
                 </div>

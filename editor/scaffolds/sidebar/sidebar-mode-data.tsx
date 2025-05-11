@@ -176,7 +176,7 @@ export function ModeData() {
 
   function EmptyState() {
     return (
-      <div className="py-4 border border-dashed rounded-sm flex flex-col gap-2 items-center justify-center w-full">
+      <div className="py-4 border border-dashed rounded-xs flex flex-col gap-2 items-center justify-center w-full">
         <span className="text-center">
           <h4 className="text-muted-foreground text-xs font-bold">No tables</h4>
           <p className="text-muted-foreground text-xs">

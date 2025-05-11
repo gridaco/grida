@@ -576,7 +576,7 @@ function OptionEditItem({
                   <img
                     src={src}
                     alt=""
-                    className="w-full h-full object-contain rounded-sm overflow-hidden pointer-events-none select-none"
+                    className="w-full h-full object-contain rounded-xs overflow-hidden pointer-events-none select-none"
                   />
                 </div>
               </div>

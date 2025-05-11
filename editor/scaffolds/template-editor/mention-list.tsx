@@ -64,7 +64,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
         props.items.map((item: any, index: number) => (
           <button
             className={cn(
-              "bg-transparent rounded-sm m-0 py-1 px-2 text-left w-full",
+              "bg-transparent rounded-xs m-0 py-1 px-2 text-left w-full",
               index === selectedIndex ? "border" : ""
             )}
             key={index}
@@ -74,7 +74,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
           </button>
         ))
       ) : (
-        <div className="bg-transparent rounded-sm m-0 py-1 px-2 text-left w-full">
+        <div className="bg-transparent rounded-xs m-0 py-1 px-2 text-left w-full">
           No result
         </div>
       )}

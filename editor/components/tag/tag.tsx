@@ -28,7 +28,7 @@ export const tagVariants = cva(
         xl: "text-lg h-10",
       },
       shape: {
-        default: "rounded-sm",
+        default: "rounded-xs",
         rounded: "rounded-lg",
         square: "rounded-none",
         pill: "rounded-full",

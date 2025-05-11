@@ -82,7 +82,7 @@ const _column_provider = {
       <CellRoot className="flex items-center">
         <div className="flex items-center gap-2">
           {val.map((p) => (
-            <div key={p} className="flex items-center gap-1 rounded-sm p-1">
+            <div key={p} className="flex items-center gap-1 rounded-xs p-1">
               <AuthProviderIcon type={p} className="w-4 h-4 text-foreground" />
               <Highlight
                 text={p}

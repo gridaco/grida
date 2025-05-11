@@ -149,7 +149,7 @@ function ContentCard({
   className,
 }: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <div className={cn("p-4 flex flex-col gap-4 rounded-sm", className)}>
+    <div className={cn("p-4 flex flex-col gap-4 rounded-xs", className)}>
       {children}
     </div>
   );

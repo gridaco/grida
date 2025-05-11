@@ -410,7 +410,7 @@ function PaletteToggleGroup({
               {Object.entries(colors).map(([k, color]) => (
                 <div
                   key={k}
-                  className="w-4 h-4 rounded-sm"
+                  className="w-4 h-4 rounded-xs"
                   style={{
                     backgroundColor: color,
                   }}

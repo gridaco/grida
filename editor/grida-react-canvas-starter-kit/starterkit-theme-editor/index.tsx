@@ -353,7 +353,7 @@ function Typography() {
             Customize your theme typography
           </SectionHeaderDescription>
         </SectionHeader>
-        <div className="max-w-md border border-dashed rounded-sm p-4">
+        <div className="max-w-md border border-dashed rounded-xs p-4">
           <article className="prose dark:prose-invert">
             <h1>Prose Preview</h1>
             <p>This paragraph demonstrates TailwindCSS prose styling.</p>
