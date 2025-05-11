@@ -296,7 +296,7 @@ export function GridEditor({
                     </div>
                   ) : (
                     <>
-                      <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                      <div className="flex justify-center items-center divide-x *:px-2 *:first:pl-0 *:last:pr-0">
                         <TableViews />
                         <TableQueryToggles />
                       </div>

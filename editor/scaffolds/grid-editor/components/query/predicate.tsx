@@ -357,7 +357,7 @@ export function DataQueryPredicateChip({
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
         <div className="flex justify-between w-full">
           <div className="flex gap-2 items-center w-full overflow-hidden">
-            <span className="text-xs text-muted-foreground  overflow-hidden overflow-ellipsis">
+            <span className="text-xs text-muted-foreground  overflow-hidden text-ellipsis">
               {predicate.column}
             </span>
             <Select
@@ -367,7 +367,7 @@ export function DataQueryPredicateChip({
               <SelectPrimitive.Trigger>
                 <Badge
                   variant="outline"
-                  className="px-1 w-full overflow-ellipsis text-xs text-muted-foreground whitespace-nowrap"
+                  className="px-1 w-full text-ellipsis text-xs text-muted-foreground whitespace-nowrap"
                 >
                   <SelectValue>
                     {Predicate.K.operators[predicate.op].symbol}

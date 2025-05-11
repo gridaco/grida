@@ -22,7 +22,7 @@ export function SidebarRoot({
       className={cn(
         "relative w-60 h-full shrink-0 overflow-y-scroll",
         // apply slightly dimmed background for main content
-        "bg-workbench-panel",
+        "bg-sidebar",
         side === "left" ? "border-e" : "border-s",
         className
       )}
@@ -41,7 +41,7 @@ export function SidebarHeader({
       className={cn(
         "sticky top-0 w-full px-2 py-2 border-b z-10",
         // apply slightly dimmed background for main content
-        "bg-workbench-panel backdrop-blur-md",
+        "bg-sidebar backdrop-blur-md",
         className
       )}
     >

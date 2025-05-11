@@ -31,8 +31,8 @@ export function DefinitionFlow({
     []
   );
 
-  const miniMapNodeColor = "hsl(var(--secondary))";
-  const miniMapMaskColor = "hsl(var(--secondary-forground))";
+  const miniMapNodeColor = "var(--secondary)";
+  const miniMapMaskColor = "var(--secondary-forground)";
 
   useEffect(() => {
     const { nodes, edges } = layout(tables, mainTableKey);
@@ -52,7 +52,7 @@ export function DefinitionFlow({
           animated: true,
           deletable: false,
           style: {
-            stroke: "hsl(var(--primary) / 0.5)",
+            stroke: "color-mix(in oklch, var(--primary) 50%, transparent)",
             strokeWidth: 0.5,
           },
         }}
@@ -73,7 +73,7 @@ export function DefinitionFlow({
           zoomable
           nodeColor={miniMapNodeColor}
           maskColor={miniMapMaskColor}
-          bgColor="hsl(var(--background))"
+          bgColor="var(--background)"
           className="border rounded-md shadow-sm"
         />
       </ReactFlow>

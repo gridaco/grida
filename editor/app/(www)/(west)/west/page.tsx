@@ -330,7 +330,7 @@ function FeatureCard({
           <p className="text-muted-foreground mb-4 text-sm">{description}</p>
         </div>
         {imageSrc && (
-          <div className="flex-shrink-0 w-[200px] h-[200px] lg:w-[300px] lg:h-[300px] relative hover:scale-105 duration-500 transition-all">
+          <div className="shrink-0 w-[200px] h-[200px] lg:w-[300px] lg:h-[300px] relative hover:scale-105 duration-500 transition-all">
             <Image
               src={imageSrc}
               alt={`${title} image`}
@@ -605,7 +605,7 @@ function HorizontalCard({
   imageSrc?: string;
 }) {
   return (
-    <div className="card flex-shrink-0 flex items-end gap-6">
+    <div className="card shrink-0 flex items-end gap-6">
       <div className="flex-1">
         <div className="text-3xl mb-2">{icon}</div>
         <h3 className="text-xl font-bold mb-2">{title}</h3>
@@ -688,7 +688,7 @@ function HorizontalScrollDemo() {
                 display: none;
               }
             `}</style>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center pl-20 py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center pl-20 py-20">
               <HorizontalCard
                 icon="📊"
                 title="Campaign Analytics"
@@ -696,7 +696,7 @@ function HorizontalScrollDemo() {
                 imageSrc="/www/.west/demo-1.png"
               />
             </div>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center py-20">
               <HorizontalCard
                 icon="💸"
                 title="Interactive Campaign Rewards"
@@ -704,7 +704,7 @@ function HorizontalScrollDemo() {
                 imageSrc="/www/.west/demo-2.png"
               />
             </div>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center pr-20 py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center pr-20 py-20">
               <HorizontalCard
                 icon="🗂️"
                 title="Powerful Customer management"

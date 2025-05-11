@@ -324,7 +324,7 @@ export function Playground({
                 }}
               />
             </div>
-            <Collapsible className="flex-shrink-0 overflow-hidden">
+            <Collapsible className="shrink-0 overflow-hidden">
               <CollapsibleTrigger className="w-full">
                 <header className="flex justify-between items-center border-y p-2">
                   <div>

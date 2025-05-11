@@ -1,9 +1,9 @@
-// https://magicui.design/docs/components/shine-border
-
 "use client";
 
-import { cn } from "@/components/lib/utils";
+// https://magicui.design/docs/components/shine-border
 import * as React from "react";
+
+import { cn } from "@/components/lib/utils";
 
 interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
@@ -42,18 +42,20 @@ export function ShineBorder({
         {
           "--border-width": `${borderWidth}px`,
           "--duration": `${duration}s`,
-          "--mask-linear-gradient": `linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)`,
-          "--background-radial-gradient": `radial-gradient(transparent,transparent, ${Array.isArray(shineColor) ? shineColor.join(",") : shineColor},transparent,transparent)`,
-          backgroundImage: "var(--background-radial-gradient)",
+          backgroundImage: `radial-gradient(transparent,transparent, ${
+            Array.isArray(shineColor) ? shineColor.join(",") : shineColor
+          },transparent,transparent)`,
           backgroundSize: "300% 300%",
-          mask: "var(--mask-linear-gradient)",
+          mask: `linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)`,
+          WebkitMask: `linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)`,
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
+          padding: "var(--border-width)",
           ...style,
         } as React.CSSProperties
       }
       className={cn(
-        "pointer-events-none absolute inset-0 size-full rounded-[inherit] p-[--border-width] will-change-[background-position] motion-safe:animate-shine",
+        "pointer-events-none absolute inset-0 size-full rounded-[inherit] will-change-[background-position] motion-safe:animate-shine",
         className
       )}
       {...props}

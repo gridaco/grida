@@ -279,7 +279,7 @@ export function DataChartview() {
             </div>
           )}
         </div>
-        <aside className="flex-shrink-0 flex flex-col gap-4 w-60 max-w-xs pl-4 border-l">
+        <aside className="shrink-0 flex flex-col gap-4 w-60 max-w-xs pl-4 border-l">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
           <hr />
           <Label className="text-muted-foreground">Main Axis</Label>
