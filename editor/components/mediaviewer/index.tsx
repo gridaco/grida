@@ -163,7 +163,7 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
       {!isPip && (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogPortal>
-            <DialogOverlay className="fixed inset-0 bg-black bg-opacity-75 z-50" />
+            <DialogOverlay className="fixed inset-0 bg-black/75 z-50" />
             <DialogContent className="fixed inset-0 flex items-center justify-center z-50">
               <DialogClose className="absolute top-4 right-4">
                 <Button variant="outline" size="icon">

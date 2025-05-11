@@ -90,7 +90,7 @@ export function XSBReferenceTableGrid<
 
   return (
     <DataGrid<R>
-      className="flex-grow select-none text-xs text-foreground/80"
+      className="grow select-none text-xs text-foreground/80"
       columns={columns}
       rows={rows}
       onCellDoubleClick={({ row }) => {

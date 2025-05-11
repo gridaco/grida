@@ -114,7 +114,7 @@ export const PricingTableRowMobile = (props: any) => {
       className="mt-8 w-full -scroll-mt-5"
       id={`${props.sectionId}-mobile`}
     >
-      <caption className="bg-background border-default divide-border dark:divide-opacity-25 dark:border-white dark:border-opacity-25 border-t border-b px-4 py-3 text-left text-sm font-medium text-foreground">
+      <caption className="bg-background border-default divide-border dark:divide-border/25 dark:border-white/25 border-t border-b px-4 py-3 text-left text-sm font-medium text-foreground">
         <span className="flex items-center gap-2">
           {props.icon && props.icon}
           <span className="text-foreground font-normal">{category.title}</span>
@@ -130,7 +130,7 @@ export const PricingTableRowMobile = (props: any) => {
           </th>
         </tr>
       </thead>
-      <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
+      <tbody className="border-default divide-border dark:divide-white/25 divide-y first:divide-y-0">
         {category.features.map((feat: any, i: number) => {
           return (
             <tr

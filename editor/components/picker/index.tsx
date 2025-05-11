@@ -213,7 +213,7 @@ const FileList: React.FC<FileListProps> = ({ accept, loading }) => {
             ) : (
               <File className="mr-2 h-4 w-4" />
             )}
-            <span className="text-sm flex-grow">{node.name}</span>
+            <span className="text-sm grow">{node.name}</span>
             {selectedNodes.includes(node) && <Check className="h-4 w-4" />}
           </button>
         </li>

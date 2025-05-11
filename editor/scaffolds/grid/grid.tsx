@@ -275,7 +275,7 @@ export function DataGrid({
         <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
           <RDG
             className={cn(
-              "flex-grow select-none text-xs text-foreground/80",
+              "grow select-none text-xs text-foreground/80",
               className
             )}
             rowKeyGetter={rowKeyGetter}

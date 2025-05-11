@@ -84,7 +84,7 @@ const ImageGrid = () => {
       {imageUrls.map((column, colIndex) => (
         <div
           key={colIndex}
-          className="grid flex-shrink-0 grid-cols-1 gap-y-6 lg:gap-y-8"
+          className="grid shrink-0 grid-cols-1 gap-y-6 lg:gap-y-8"
         >
           {column.map((src, index) => (
             <div key={index} className=" h-96 w-72 overflow-hidden rounded-lg">

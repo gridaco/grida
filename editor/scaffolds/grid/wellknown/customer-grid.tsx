@@ -159,7 +159,7 @@ export function CustomerGrid({
   return (
     <StandaloneDataGridStateProvider>
       <DataGrid<DGCustomerRow>
-        className="flex-grow select-none text-xs text-foreground/80"
+        className="grow select-none text-xs text-foreground/80"
         columns={columns}
         selectedRows={selectedRows}
         onSelectedRowsChange={(rows) => {

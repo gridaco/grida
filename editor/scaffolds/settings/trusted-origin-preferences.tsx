@@ -6,12 +6,11 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
-  cls_textarea,
 } from "@/components/preferences";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
-export function TrustedOriginPreferences({}: {}) {
+export function TrustedOriginPreferences() {
   return (
     <PreferenceBox beta disabled>
       <PreferenceBoxHeader heading={<>Trusted origins</>} />
@@ -24,17 +23,14 @@ export function TrustedOriginPreferences({}: {}) {
           <section>
             <div>
               <label>
-                <textarea
-                  name="allowed_origins_txt_csv"
-                  className={cls_textarea}
-                />
+                <Textarea disabled name="allowed_origins_txt_csv" />
               </label>
             </div>
           </section>
         </div>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="redirect-uri" type="submit" className={cls_save_button}>
+        <Button form="redirect-uri" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

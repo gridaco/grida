@@ -342,7 +342,7 @@ function MultiplayerLayer() {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       {/* {process.env.NODE_ENV === "development" && (
-        <div className="absolute z-50 left-0 top-0 p-2 bg-black bg-opacity-50 text-white text-xs w-40 overflow-scroll">
+        <div className="absolute z-50 left-0 top-0 p-2 bg-black/50 text-white text-xs w-40 overflow-scroll">
           <pre>
             {JSON.stringify({ ...player, plalette: undefined }, null, 2)}
           </pre>

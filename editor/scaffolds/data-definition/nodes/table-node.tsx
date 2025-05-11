@@ -77,7 +77,7 @@ const TableNode = ({
                     strokeWidth={1}
                     className={cn(
                       // 'sb-grid-column-header__inner__primary-key'
-                      "flex-shrink-0",
+                      "shrink-0",
                       "text-muted-foreground"
                     )}
                   />
@@ -86,7 +86,7 @@ const TableNode = ({
                   <DiamondIcon
                     size={8}
                     strokeWidth={1}
-                    className="flex-shrink-0 text-muted-foreground"
+                    className="shrink-0 text-muted-foreground"
                   />
                 )}
                 {!column.is_nullable && (
@@ -94,14 +94,14 @@ const TableNode = ({
                     size={8}
                     strokeWidth={1}
                     fill="currentColor"
-                    className="flex-shrink-0 text-muted-foreground"
+                    className="shrink-0 text-muted-foreground"
                   />
                 )}
                 {column.is_unique && (
                   <Fingerprint
                     size={8}
                     strokeWidth={1}
-                    className="flex-shrink-0 text-muted-foreground"
+                    className="shrink-0 text-muted-foreground"
                   />
                 )}
               </div>

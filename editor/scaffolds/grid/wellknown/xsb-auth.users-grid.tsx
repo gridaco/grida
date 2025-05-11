@@ -201,7 +201,7 @@ export function XSBAuthUsersGrid({
       highlightTokens={highlightTokens}
     >
       <DataGrid
-        className="flex-grow select-none text-xs text-foreground/80"
+        className="grow select-none text-xs text-foreground/80"
         columns={columns}
         rows={rows}
         renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}

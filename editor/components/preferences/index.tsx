@@ -1,15 +1,6 @@
 import React from "react";
 import { cn } from "@/components/lib/utils";
 
-export const cls_input =
-  "bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:opacity-50 disabled:bg-neutral-200 disabled:border-neutral-300 disabled:text-neutral-500";
-
-export const cls_textarea =
-  "block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500";
-
-export const cls_save_button =
-  "py-2.5 px-5 text-sm font-medium text-neutral-900 focus:outline-none bg-white rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-neutral-100 dark:focus:ring-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-600 dark:hover:text-white dark:hover:bg-neutral-700";
-
 export function PreferenceBox({
   warning,
   beta,
@@ -41,11 +32,9 @@ export function PreferenceBody({ children }: React.PropsWithChildren<{}>) {
 export function PreferenceBoxHeader({
   heading,
   description,
-  headingBadge,
   actions,
 }: {
   heading?: React.ReactNode;
-  headingBadge?: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
@@ -59,11 +48,6 @@ export function PreferenceBoxHeader({
               <PreferenceDescription>{description}</PreferenceDescription>
             )}
           </div>
-          {headingBadge && (
-            <div className="inline-flex items-center rounded-full bg-opacity-10 bg-surface-200 text-foreground-light border border-strong px-2.5 py-0.5 text-xs">
-              {headingBadge}
-            </div>
-          )}
         </div>
         {/* trailing */}
         {actions}

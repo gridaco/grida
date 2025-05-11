@@ -1,15 +1,7 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useState } from "react";
-import { cls_save_button } from "@/components/preferences";
+import React, { useEffect, useState } from "react";
 import type { Option } from "@/types";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Table,
   TableBody,

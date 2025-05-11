@@ -48,7 +48,7 @@ export default async function SigninPage({
       <div className="flex flex-col flex-1 bg-alternative">
         <div className="absolute top-0 w-full px-8 mx-auto sm:px-6 lg:px-8 mt-14">
           <nav className="relative flex items-center justify-between sm:h-10">
-            <div className="flex items-center flex-grow shrink-0 lg:grow-0">
+            <div className="flex items-center grow shrink-0 lg:grow-0">
               <div className="flex items-center justify-between w-full md:w-auto">
                 <Link className="flex gap-2 items-center" href="/">
                   <GridaLogo />
@@ -120,7 +120,7 @@ export default async function SigninPage({
               </p>
             </div>
           </main>
-          <aside className="flex-col items-center justify-center flex-1 flex-shrink hidden basis-1/4 xl:flex">
+          <aside className="flex-col items-center justify-center flex-1 shrink hidden basis-1/4 xl:flex">
             <div
               className="relative flex flex-col gap-6 h-full"
               style={{

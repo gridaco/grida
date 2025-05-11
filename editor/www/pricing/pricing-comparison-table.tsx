@@ -69,7 +69,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
       <div className="lg:hidden">
         {/* Free - Mobile  */}
         <div className="bg-background p-2 sticky top-0 z-10 pt-4">
-          <div className="bg-surface-100 rounded-lg border dark:border-white dark:border-opacity-25 py-2 px-4 flex justify-between items-center">
+          <div className="bg-surface-100 rounded-lg border dark:border-white/25 py-2 px-4 flex justify-between items-center">
             <label className="text-foreground-lighter">Change plan</label>
             <select
               id="change-plan"
@@ -338,7 +338,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               ))}
             </tr>
           </thead>
-          <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
+          <tbody className="border-default divide-border dark:divide-white/25 divide-y first:divide-y-0">
             <PricingTableRowDesktop
               category={pricing.ai}
               icon={<SparklesIcon className="w-4 h-4" />}

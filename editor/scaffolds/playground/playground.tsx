@@ -274,7 +274,7 @@ export function Playground({
       <div className="flex-1 flex max-h-full overflow-hidden">
         <aside className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            <div className="relative flex-grow overflow-y-auto">
+            <div className="relative grow overflow-y-auto">
               {fileName === "variables.css" && (
                 <div className="absolute z-20 top-16 right-4 max-w-lg">
                   <ThemePalette

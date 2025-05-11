@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_input,
 } from "@/components/preferences";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -103,7 +102,6 @@ export function EndingRedirectPreferences() {
                     onChange={field.onChange}
                     placeholder="https://.."
                     pattern="https://.*"
-                    className={cls_input}
                   />
                   <PreferenceDescription>
                     Redirect to a custom URL after form submission. Leave empty

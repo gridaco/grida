@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,16 +67,17 @@ export default function Prompt({ autoFocus }: { autoFocus?: boolean }) {
       </form>
       <div className="flex flex-wrap items-center justify-center gap-1">
         {shortcuts4.map(({ name, content }) => (
-          <button
+          <Badge
+            variant="outline"
             onClick={() => {
               setInput(content);
             }}
-            className="flex items-center gap-2 text-sm border rounded-full px-2 py-1 text-opacity-50 text-black dark:text-white dark:text-opacity-75 hover:text-opacity-100 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="cursor-pointer flex items-center gap-2 text-sm text-muted-foreground rounded-full transition-colors"
             key={name}
           >
             {name}
             <ArrowTopRightIcon />
-          </button>
+          </Badge>
         ))}
       </div>
     </Card>
