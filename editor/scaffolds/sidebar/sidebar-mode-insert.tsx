@@ -138,7 +138,7 @@ export function ModeInsertBlocks() {
                   <div className="flex justify-between items-center">
                     <span className="font-bold">{blocklabels[block_type]}</span>
                     <Button size="sm" variant="outline">
-                      <PlusIcon className="inline align-middle me-2 size-4" />
+                      <PlusIcon className="inline align-middle size-4" />
                       Add
                     </Button>
                   </div>

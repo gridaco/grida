@@ -350,7 +350,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 onClick={addGoal}
                 disabled={data.challenges.length >= 5}
               >
-                <Plus className="size-4 mr-2" />
+                <Plus className="size-4" />
                 Add Goal
               </Button>
             </div>
@@ -597,7 +597,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 onClick={addGoal}
                 disabled={data.challenges.length >= 5}
               >
-                <Plus className="size-4 mr-2" />
+                <Plus className="size-4" />
                 Add Goal
               </Button>
             </div>

@@ -259,7 +259,7 @@ function ConnectSupabase() {
                     target="_blank"
                   >
                     <Button variant="link">
-                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      <OpenInNewWindowIcon />
                       OpenAPI
                     </Button>
                   </Link>
@@ -268,7 +268,7 @@ function ConnectSupabase() {
                     target="_blank"
                   >
                     <Button variant="link">
-                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      <OpenInNewWindowIcon />
                       Dashboard
                     </Button>
                   </Link>
@@ -659,14 +659,14 @@ function ConnectSchema({
               className="font-mono cursor-pointer"
               onClick={newCustomSchemaDialog.openDialog}
             >
-              <PlusCircledIcon className="me-2" />
+              <PlusCircledIcon />
               Add Custom Schema
             </Badge>
           </div>
           <Collapsible className="mt-4">
             <CollapsibleTrigger asChild>
               <Button variant="link" size="sm">
-                <CodeIcon className="me-2 align-middle" /> View Details
+                <CodeIcon /> View Details
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -899,7 +899,7 @@ function DBSchemaSelect({
             </SelectItem>
           ))}
           <SelectItem value={__add_custom}>
-            <PlusIcon className="me-2 inline align-middle size-4" />
+            <PlusIcon />
             Register custom schema
           </SelectItem>
         </SelectContent>

@@ -132,7 +132,7 @@ export function ReferrerRewardStep({
               size="sm"
               onClick={addMilestone}
             >
-              <Plus className="size-4 mr-2" />
+              <Plus className="size-4" />
               Add Milestone
             </Button>
           </div>

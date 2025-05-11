@@ -272,7 +272,7 @@ export function QuestsTable() {
                             open(link, "_blank");
                           }}
                         >
-                          <OpenInNewWindowIcon className="size-4 me-2" />
+                          <OpenInNewWindowIcon className="size-4" />
                           Open URL
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled>

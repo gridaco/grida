@@ -20,12 +20,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
 
   return (
     <div className="relative">
-      <Input
-        id="npm-install-copy-text"
-        type="text"
-        defaultValue={value}
-        readOnly
-      />
+      <Input id="npm-install-copy-text" type="text" value={value} readOnly />
       <Button
         variant="outline"
         size="icon"

@@ -125,7 +125,7 @@ export function PropertyEnum<T extends string>({
           const disabled = typeof e === "string" ? false : e.disabled;
           return (
             <SelectItem key={value} value={value} disabled={disabled}>
-              {hasIcon && icon && <div className="me-2">{icon}</div>}
+              {hasIcon && icon && <>{icon}</>}
               {label ?? value}
             </SelectItem>
           );

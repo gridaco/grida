@@ -79,7 +79,7 @@ export function TypeSelect({
                 >
                   <CheckIcon
                     className={cn(
-                      "mr-2 size-4",
+                      "size-4",
                       value === opt.value ? "opacity-100" : "opacity-0"
                     )}
                   />

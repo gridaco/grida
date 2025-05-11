@@ -33,7 +33,7 @@ export default function IOFigmaPage() {
             </div>
           </div>
           <Button onClick={dialog.openDialog}>
-            <FigmaLogoIcon className="me-2" />
+            <FigmaLogoIcon />
             Import Figma
           </Button>
         </header>

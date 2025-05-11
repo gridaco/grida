@@ -439,13 +439,13 @@ export function NavProjects({
                     </Link>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
+                      variant="destructive"
                       onSelect={() => {
                         deleteProjectDialog.openDialog({
                           id: project.id,
                           match: `DELETE ${project.name}`,
                         });
                       }}
-                      className="text-destructive"
                     >
                       <Trash2Icon className="size-3.5" />
                       <span>Delete Project</span>

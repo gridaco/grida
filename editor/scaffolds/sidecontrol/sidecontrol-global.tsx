@@ -275,6 +275,7 @@ function FontFamilyControl() {
       type="single"
       value={state.theme.fontFamily}
       onValueChange={(value) => onFontChange(value as any)}
+      className="w-full"
     >
       <ToggleGroupItem value={"inter"} className="h-full w-1/3">
         <div className="flex flex-col items-center justify-center gap-2 p-1">
@@ -340,7 +341,7 @@ function Palette() {
         onPaletteChange(v as any);
       }}
     >
-      <SelectTrigger className={cn(paletteobj && "h-16 px-2 py-2")}>
+      <SelectTrigger className={cn("w-full", paletteobj && "!h-16 px-2 py-2")}>
         <SelectValue>
           {paletteobj ? (
             <div className="flex items-center gap-2">
@@ -422,20 +423,20 @@ function AppearanceControl() {
         onAppearanceChange(v as Appearance);
       }}
     >
-      <SelectTrigger>
+      <SelectTrigger className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={"light"}>
-          <SunIcon className="inline-flex me-2 align-middle" />
+          <SunIcon />
           Light
         </SelectItem>
         <SelectItem value={"dark"}>
-          <MoonIcon className="inline-flex me-2 align-middle" />
+          <MoonIcon />
           Dark
         </SelectItem>
         <SelectItem value={"system"}>
-          <DesktopIcon className="inline-flex me-2 align-middle" />
+          <DesktopIcon />
           System
         </SelectItem>
       </SelectContent>
@@ -474,7 +475,7 @@ function Background() {
         value={background?.src}
         onValueChange={onBackgroundSrcChange}
       >
-        <SelectTrigger className={cn(selected && "h-16 px-2 py-2")}>
+        <SelectTrigger className={cn("w-full", selected && "!h-16 px-2 py-2")}>
           <SelectValue placeholder="None">
             {selected ? (
               <div className="flex items-center gap-2">
@@ -536,7 +537,7 @@ function SectionStyle() {
   return (
     <>
       <Select name="css" value={css} onValueChange={onSectionStyleChange}>
-        <SelectTrigger>
+        <SelectTrigger className="w-full">
           <SelectValue placeholder="None" />
         </SelectTrigger>
         <SelectContent>
@@ -577,7 +578,7 @@ function CustomCSS() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
-          <Pencil2Icon className="size-4 inline me-2 align-middle" />
+          <Pencil2Icon className="size-4 inline align-middle" />
           Custom CSS
         </Button>
       </DialogTrigger>

@@ -83,9 +83,9 @@ export function XSBTableInfo({ table }: { table: GridaXSupabase.JSONSChema }) {
         </TableBody>
       </Table>
       <Collapsible className="mt-4">
-        <CollapsibleTrigger>
+        <CollapsibleTrigger asChild>
           <Button variant="link" size="sm">
-            <CodeIcon className="me-2 align-middle" /> Raw JSON
+            <CodeIcon className="align-middle" /> Raw JSON
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>

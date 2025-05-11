@@ -67,14 +67,14 @@ export default async function DownloadsPage() {
                 {os ? (
                   <Link href={links.default!.url}>
                     <Button size="lg">
-                      <OSIcon os={os} className="mr-2 size-4" /> Download for{" "}
+                      <OSIcon os={os} className="size-4" /> Download for{" "}
                       {oslabel[os]}
                     </Button>
                   </Link>
                 ) : (
                   <Link href={sitemap.links.releases_latest}>
                     <Button size="lg">
-                      <DownloadIcon className="mr-2 size-4" /> Download
+                      <DownloadIcon className="size-4" /> Download
                     </Button>
                   </Link>
                 )}
@@ -133,44 +133,43 @@ function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
       {/* macOS Universal */}
       <Link href={links.mac_dmg_universal} download>
         <Button size="lg" variant="outline">
-          <Apple className="mr-2 size-4" /> Download for macOS (Universal)
+          <Apple className="size-4" /> Download for macOS (Universal)
         </Button>
       </Link>
 
       {/* macOS Apple Silicon */}
       <Link href={links.mac_dmg_arm64} download>
         <Button size="lg" variant="outline">
-          <Apple className="mr-2 size-4" /> Download for macOS (Apple Silicon)
+          <Apple className="size-4" /> Download for macOS (Apple Silicon)
         </Button>
       </Link>
 
       {/* macOS Intel */}
       <Link href={links.mac_dmg_x64} download>
         <Button size="lg" variant="outline">
-          <Apple className="mr-2 size-4" /> Download for macOS (Intel-based
-          Macs)
+          <Apple className="size-4" /> Download for macOS (Intel-based Macs)
         </Button>
       </Link>
 
       {/* Windows x64 */}
       <Link href={links.windows_exe_x64} download>
         <Button size="lg" variant="outline">
-          <Windows className="mr-2 size-4" /> Download for Windows (x64)
+          <Windows className="size-4" /> Download for Windows (x64)
         </Button>
       </Link>
 
       {/* Windows Debian */}
       <Link href={links.linux_deb_x64} download>
         <Button size="lg" variant="outline">
-          <Linux className="mr-2 size-4" /> Download for Linux (Debian / Ubuntu)
+          <Linux className="size-4" /> Download for Linux (Debian / Ubuntu)
         </Button>
       </Link>
 
       {/* Windows Red Hat */}
       <Link href={links.linux_rpm_x64} download>
         <Button size="lg" variant="outline">
-          <Linux className="mr-2 size-4" /> Download for Linux (Red Hat / Fedora
-          / SUSE)
+          <Linux className="size-4" /> Download for Linux (Red Hat / Fedora /
+          SUSE)
         </Button>
       </Link>
     </div>

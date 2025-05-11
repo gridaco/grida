@@ -229,7 +229,7 @@ export default function CreateViewerLinkDialog({
           <div>
             <DialogClose asChild>
               <Button variant="ghost" size="sm">
-                <Cross2Icon className="me-2" />
+                <Cross2Icon />
                 Cancel
               </Button>
             </DialogClose>

@@ -29,7 +29,7 @@ export function AlignControl({
   onDistributeEvenly?: (axis: "x" | "y") => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="w-full flex items-center justify-center gap-2">
       <div className="flex items-center gap-0 justify-center">
         <Item
           disabled={disabled}
@@ -127,7 +127,7 @@ function Item({
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
-          size="xs"
+          size="icon"
           className="p-1"
           disabled={disabled}
           onClick={onClick}

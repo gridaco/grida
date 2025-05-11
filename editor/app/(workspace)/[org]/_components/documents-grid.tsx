@@ -162,15 +162,15 @@ export function DocumentsGrid({
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
+                variant="destructive"
                 onSelect={() => {
                   deleteDialog.openDialog({
                     id: doc.id,
                     match: `DELETE ${doc.title}`,
                   });
                 }}
-                className="text-destructive"
               >
-                <TrashIcon className="me-2" />
+                <TrashIcon />
                 Delete
               </ContextMenuItem>
             </ContextMenuContent>

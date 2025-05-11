@@ -4,20 +4,6 @@ import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "@radix-ui/react-icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export function TableViews() {
   const tb = useDatagridTable();
@@ -64,43 +50,6 @@ export function TableViews() {
           })} */}
         </TabsList>
       </Tabs>
-      {/* <AddViewButton /> */}
     </div>
-  );
-}
-
-function AddViewButton() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <PlusIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Add new view</TooltipContent>
-        </Tooltip>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-40">
-        <DropdownMenuLabel>New View</DropdownMenuLabel>
-        <DropdownMenuItem>
-          <ResourceTypeIcon type="table" className="me-2 size-4" />
-          Table
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ResourceTypeIcon type="chart" className="me-2 size-4" />
-          Chart
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ResourceTypeIcon type="view-list" className="me-2 size-4" />
-          List
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ResourceTypeIcon type="view-gallery" className="me-2 size-4" />
-          Gallery
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

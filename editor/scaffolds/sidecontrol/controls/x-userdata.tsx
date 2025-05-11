@@ -89,10 +89,10 @@ export function UserDataControl({
           }}
         />
         <DialogFooter>
-          <DialogClose>
+          <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <DialogClose disabled={!valid}>
+          <DialogClose disabled={!valid} asChild>
             <Button disabled={!valid} onClick={onSaveClick}>
               Save
             </Button>

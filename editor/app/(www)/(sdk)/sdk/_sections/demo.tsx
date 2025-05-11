@@ -44,7 +44,7 @@ export default function SectionMainDemo() {
             onClick={unlockDemo}
           >
             <Button>
-              <PlayFilledIcon className="size-4 mr-2" />
+              <PlayFilledIcon className="size-4" />
               Try it out
             </Button>
           </div>

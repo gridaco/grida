@@ -143,8 +143,8 @@ export function AuthPolicyList() {
                           </DropdownMenuItem>
                         </Link>
                         <DropdownMenuItem
+                          variant="destructive"
                           onClick={() => handleDeleteClick(policy.id)}
-                          className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="size-4" />
                           Delete

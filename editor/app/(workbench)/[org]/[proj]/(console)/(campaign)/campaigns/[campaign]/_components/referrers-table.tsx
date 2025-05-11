@@ -343,7 +343,7 @@ export function ReferrersTable() {
               exportDialog.openDialog();
             }}
           >
-            <DownloadIcon className="size-4 me-2" />
+            <DownloadIcon className="size-4" />
             Export CSV
           </Button>
           <Button onClick={importCustomersDialog.openDialog}>Import</Button>

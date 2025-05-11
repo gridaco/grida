@@ -306,6 +306,7 @@ export function ModeData() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    variant="destructive"
                     disabled={item.data.rules.delete_restricted}
                     onSelect={() => {
                       deleteTableDialog.openDialog({

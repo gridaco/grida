@@ -258,14 +258,14 @@ export function Playground({
             disabled={!is_modified || busy}
             variant="secondary"
           >
-            <Link2Icon className="mr-2" />
+            <Link2Icon />
             Share
           </Button>
           <form action={`/playground/publish`} method="POST">
             <input type="hidden" name="src" value={__schema_txt || undefined} />
             <input type="hidden" name="gist" value={initial?.slug} />
             <Button disabled={busy}>
-              <RocketIcon className="mr-2" />
+              <RocketIcon />
               Publish
             </Button>
           </form>

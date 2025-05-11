@@ -426,7 +426,7 @@ export default function CustomerDetailPage(props0: {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem
-                className="text-destructive"
+                variant="destructive"
                 onSelect={deleteCustomerDialog.openDialog}
               >
                 Delete Customer

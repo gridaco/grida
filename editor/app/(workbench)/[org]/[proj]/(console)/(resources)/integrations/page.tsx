@@ -30,12 +30,12 @@ export default function IntegrationsPage() {
         </div>
         <div className="flex items-center space-x-2">
           <IntegrationsSearch />
-          <Button variant="outline" asChild>
-            <Link href="#">
-              <FileText className="mr-2 size-4" />
+          <Link href="#">
+            <Button variant="outline" asChild>
+              <FileText className="size-4" />
               View Documentation
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </div>
 

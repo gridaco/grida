@@ -323,7 +323,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">
-        <Upload className="mr-2 size-4" />
+        <Upload className="size-4" />
         Select CSV File
       </Button>
     </div>

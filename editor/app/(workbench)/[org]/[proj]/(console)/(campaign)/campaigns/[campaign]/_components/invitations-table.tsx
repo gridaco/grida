@@ -77,7 +77,7 @@ function ActionsCell({
             open(link, "_blank");
           }}
         >
-          <OpenInNewWindowIcon className="size-4 me-2" />
+          <OpenInNewWindowIcon className="size-4" />
           Open URL
         </DropdownMenuItem>
         <DropdownMenuItem disabled>View owner</DropdownMenuItem>
@@ -304,7 +304,7 @@ export function InvitationsTable() {
               exportDialog.openDialog();
             }}
           >
-            <DownloadIcon className="size-4 me-2" />
+            <DownloadIcon className="size-4" />
             Export CSV
           </Button>
         </div>

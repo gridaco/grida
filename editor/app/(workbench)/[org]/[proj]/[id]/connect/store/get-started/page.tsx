@@ -53,15 +53,13 @@ export default function StoreGetStartedPage() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogTitle>
-                <h2 className="text-2xl font-bold">Create or Connect Store</h2>
-              </DialogTitle>
+              <DialogTitle>Create or Connect Store</DialogTitle>
               <DialogDescription>
                 Connect Store to track inventory, sell products (physical /
                 virtyal / tickets), and manage orders.
-                <Tooltip defaultOpen={false}>
+                <Tooltip>
                   <TooltipTrigger asChild>
-                    <InfoCircledIcon className=" inline" />
+                    <InfoCircledIcon className="inline ms-2" />
                   </TooltipTrigger>
                   <TooltipContent>
                     For none physical products, it is a good practice to create
@@ -128,10 +126,8 @@ function ConnectStoreForm() {
           <h4>
             <span>Create New Store for this Form</span>
           </h4>
-          <div>
-            <Label htmlFor="name">
-              <span>Name</span>
-            </Label>
+          <div className="grid gap-2">
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
               name="name"

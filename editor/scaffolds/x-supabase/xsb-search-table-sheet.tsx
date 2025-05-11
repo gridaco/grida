@@ -200,7 +200,7 @@ function XSBSearchTableDataGrid({
                         size="xs"
                         className="text-muted-foreground"
                       >
-                        <PlusIcon className="size-3 me-2" />
+                        <PlusIcon className="size-3" />
                         Add filter
                       </Button>
                     </DataQueryPrediateAddMenu>

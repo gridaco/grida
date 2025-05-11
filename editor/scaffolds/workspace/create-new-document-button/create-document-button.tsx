@@ -288,11 +288,11 @@ function CreateNewDatabaseDialog({
           >
             <TabsList>
               <TabsTrigger value="database">
-                <ResourceTypeIcon type="database" className="size-4 me-2" />
+                <ResourceTypeIcon type="database" className="size-4" />
                 Database
               </TabsTrigger>
               <TabsTrigger value="table">
-                <ResourceTypeIcon type="table" className="size-4 me-2" />
+                <ResourceTypeIcon type="table" className="size-4" />
                 Table
               </TabsTrigger>
             </TabsList>

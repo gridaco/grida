@@ -148,8 +148,8 @@ export function TagsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          variant="destructive"
                           onClick={() => setDeletingTag(tag)}
-                          className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="size-4" />
                           Delete

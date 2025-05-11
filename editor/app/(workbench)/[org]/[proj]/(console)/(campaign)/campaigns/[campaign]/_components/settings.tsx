@@ -350,7 +350,7 @@ function Body({
                                     variant={"outline"}
                                     className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
                                   >
-                                    <CalendarIcon className="mr-2 size-4" />
+                                    <CalendarIcon className="size-4" />
                                     {field.value
                                       ? format(field.value, "PPP")
                                       : "Select start date"}
@@ -390,7 +390,7 @@ function Body({
                                     variant={"outline"}
                                     className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
                                   >
-                                    <CalendarIcon className="mr-2 size-4" />
+                                    <CalendarIcon className="size-4" />
                                     {field.value
                                       ? format(field.value, "PPP")
                                       : "Select end date"}

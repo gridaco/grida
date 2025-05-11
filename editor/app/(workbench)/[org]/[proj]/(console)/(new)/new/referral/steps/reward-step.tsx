@@ -263,7 +263,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
                 className="w-full"
                 onClick={addMilestone}
               >
-                <Plus className="size-4 mr-2" />
+                <Plus className="size-4" />
                 Add Milestone
               </Button>
             </div>

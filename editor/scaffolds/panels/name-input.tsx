@@ -139,7 +139,7 @@ export function NameInput({
                 <>
                   <CommandGroup>
                     <CommandItem key={"current"} onSelect={onSelect}>
-                      <PlusIcon className="mr-2 size-4" />
+                      <PlusIcon className="size-4" />
                       <span>{value}</span>
                     </CommandItem>
                   </CommandGroup>
@@ -154,7 +154,7 @@ export function NameInput({
                   SYSTEM_GF_CUSTOMER_NAME_KEY,
                 ].map((key) => (
                   <CommandItem key={key} onSelect={onSelect}>
-                    <PersonIcon className="mr-2 size-4" />
+                    <PersonIcon className="size-4" />
                     <span>{key}</span>
                   </CommandItem>
                 ))}
@@ -192,7 +192,7 @@ export function NameInput({
                           value={key}
                           onSelect={onSelect}
                         >
-                          <Link1Icon className="mr-2 size-4" />
+                          <Link1Icon className="size-4" />
                           <span>{key}</span>{" "}
                           <small className="ms-1 text-muted-foreground">
                             {property?.type} | {property?.format}
@@ -249,7 +249,7 @@ function XSupabaseAuthUsersTableProperties({
                 value={column}
                 onSelect={onSelect}
               >
-                <Link1Icon className="mr-2 size-4" />
+                <Link1Icon className="size-4" />
                 <span>{key}</span>{" "}
                 <small className="ms-1 text-muted-foreground">
                   {property?.type} | {property?.format}

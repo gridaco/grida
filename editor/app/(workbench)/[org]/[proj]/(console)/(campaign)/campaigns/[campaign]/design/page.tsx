@@ -204,7 +204,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Referrer
                         </Button>
                       </Link>
@@ -375,7 +375,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Invitation
                         </Button>
                       </Link>
@@ -419,7 +419,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Invitation
                         </Button>
                       </Link>

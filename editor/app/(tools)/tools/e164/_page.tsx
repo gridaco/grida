@@ -146,7 +146,7 @@ export default function PhoneNumberTool() {
 
               <div className="relative flex-1">
                 <Button variant="outline" className="w-full">
-                  <Upload className="mr-2 size-4" />
+                  <Upload className="size-4" />
                   Upload File
                 </Button>
                 <input
@@ -180,7 +180,7 @@ export default function PhoneNumberTool() {
               disabled={!outputText}
               className="w-full"
             >
-              <Download className="mr-2 size-4" />
+              <Download className="size-4" />
               Download Results
             </Button>
           </div>
