@@ -61,7 +61,7 @@ export function SectionHeaderBadge({ children }: React.PropsWithChildren<{}>) {
   return (
     <Badge
       variant="secondary"
-      className="text-base md:text-lg font-medium rounded-full"
+      className="text-base font-medium rounded-full px-2"
     >
       {children}
     </Badge>

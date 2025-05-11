@@ -80,7 +80,7 @@ function SectionMainDemo() {
         ease: "easeOut",
       }}
     >
-      <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
+      <Card className="mx-auto p-0 max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
         {/* Overlay for lock */}
         {isLocked && (
           <div

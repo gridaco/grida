@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { PricingCard, PricingCardButton } from "@/www/pricing/pricing-card";
 import { plans as nosave_plans, save_plans } from "@/www/data/plans";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import PricingComparisonTable from "./pricing-comparison-table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 
 export function Pricing() {
@@ -22,27 +22,28 @@ export function Pricing() {
             expand to reach millions.
           </p>
           <label className="inline-flex items-center cursor-pointer">
-            <ToggleGroup
-              type="single"
+            <Tabs
               defaultValue="monthly"
               value={save ? "yearly" : "monthly"}
               onValueChange={(t) => {
                 setSave(t === "yearly");
               }}
             >
-              <ToggleGroupItem value="monthly" className="font-semibold">
-                Pay monthly
-              </ToggleGroupItem>
-              <ToggleGroupItem value="yearly" className="font-semibold">
-                Pay yearly
-                <span
-                  data-active={save ? "true" : "false"}
-                  className="ms-1 text-xs font-normal text-foreground data-[active='true']:text-blue-500"
-                >
-                  save 20%
-                </span>
-              </ToggleGroupItem>
-            </ToggleGroup>
+              <TabsList>
+                <TabsTrigger value="monthly" className="font-semibold">
+                  Pay monthly
+                </TabsTrigger>
+                <TabsTrigger value="yearly" className="font-semibold">
+                  Pay yearly
+                  <span
+                    data-active={save ? "true" : "false"}
+                    className="ms-1 text-xs font-normal text-foreground data-[active='true']:text-blue-500"
+                  >
+                    save 20%
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </label>
         </div>
         <div className="columns-1 md:columns-2 xl:columns-4 gap-6 space-y-10 w-full">
