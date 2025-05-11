@@ -7,8 +7,6 @@ import { cn } from "@/components/lib/utils";
 
 import {
   Sheet,
-  SheetPortal,
-  SheetOverlay,
   SheetTrigger,
   SheetClose,
   SheetHeader,
@@ -44,7 +42,7 @@ const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
 >(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
+  <SheetPrimitive.Portal>
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
@@ -56,14 +54,12 @@ const SheetContent = React.forwardRef<
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
     </SheetPrimitive.Content>
-  </SheetPortal>
+  </SheetPrimitive.Portal>
 ));
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 export {
   Sheet,
-  SheetPortal,
-  SheetOverlay,
   SheetTrigger,
   SheetClose,
   SheetContent,
