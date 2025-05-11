@@ -10,8 +10,8 @@ export namespace WorkbenchUI {
         "paint-container": "!p-0.5",
       },
       size: {
-        xs: "text-[11px] h-6 px-1.5 min-w-none",
-        sm: "text-xs h-8 px-2 min-w-none",
+        xs: "!text-[11px] !h-6 px-1.5 min-w-none",
+        sm: "!text-xs !h-8 px-2 min-w-none",
       },
     },
     defaultVariants: {
@@ -24,10 +24,10 @@ export namespace WorkbenchUI {
     variants: {
       variant: {
         trigger:
-          "flex h-8 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+          "flex !h-8 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       },
       size: {
-        sm: "h-8 text-xs",
+        sm: "!h-8 text-xs",
       },
     },
     defaultVariants: {
