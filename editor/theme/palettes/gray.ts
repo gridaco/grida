@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 const gray = {
   light: {
     "--background": { h: 0, s: 0, l: 100 },
@@ -15,7 +18,6 @@ const gray = {
     "--accent": { h: 220, s: 14.3, l: 95.9 },
     "--accent-foreground": { h: 220.9, s: 39.3, l: 11 },
     "--destructive": { h: 0, s: 84.2, l: 60.2 },
-    "--destructive-foreground": { h: 210, s: 20, l: 98 },
     "--border": { h: 220, s: 13, l: 91 },
     "--input": { h: 220, s: 13, l: 91 },
     "--ring": { h: 224, s: 71.4, l: 4.1 },
@@ -37,7 +39,6 @@ const gray = {
     "--accent": { h: 215, s: 27.9, l: 16.9 },
     "--accent-foreground": { h: 210, s: 20, l: 98 },
     "--destructive": { h: 0, s: 62.8, l: 30.6 },
-    "--destructive-foreground": { h: 210, s: 20, l: 98 },
     "--border": { h: 215, s: 27.9, l: 16.9 },
     "--input": { h: 215, s: 27.9, l: 16.9 },
     "--ring": { h: 216, s: 12.2, l: 83.9 },

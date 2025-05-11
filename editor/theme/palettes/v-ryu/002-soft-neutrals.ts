@@ -17,7 +17,6 @@ const softnetrals = {
     "--accent": { h: 0, s: 0, l: 15.69 },
     "--accent-foreground": { h: 7.76, s: 70.25, l: 76.27 },
     "--destructive": { h: 360, s: 71.59, l: 34.51 },
-    "--destructive-foreground": { h: 19, s: 100, l: 96.49 },
     "--ring": { h: 0, s: 0, l: 15.69 },
     "--radius": "0.5rem",
   },
@@ -39,7 +38,6 @@ const softnetrals = {
     "--accent": { h: 42, s: 45.45, l: 95.69 },
     "--accent-foreground": { h: 7.76, s: 70.25, l: 76.27 },
     "--destructive": { h: 0, s: 71.59, l: 34.51 },
-    "--destructive-foreground": { h: 20, s: 100, l: 96.47 },
     "--ring": { h: 42, s: 45.45, l: 95.69 },
   },
 } as const;

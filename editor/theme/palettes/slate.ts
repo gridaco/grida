@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 const slate = {
   light: {
     "--background": { h: 0, s: 0, l: 100 },
@@ -15,7 +18,6 @@ const slate = {
     "--accent": { h: 210, s: 40, l: 96.1 },
     "--accent-foreground": { h: 222.2, s: 47.4, l: 11.2 },
     "--destructive": { h: 0, s: 84.2, l: 60.2 },
-    "--destructive-foreground": { h: 210, s: 40, l: 98 },
     "--border": { h: 214.3, s: 31.8, l: 91.4 },
     "--input": { h: 214.3, s: 31.8, l: 91.4 },
     "--ring": { h: 222.2, s: 84, l: 4.9 },
@@ -37,7 +39,6 @@ const slate = {
     "--accent": { h: 217.2, s: 32.6, l: 17.5 },
     "--accent-foreground": { h: 210, s: 40, l: 98 },
     "--destructive": { h: 0, s: 62.8, l: 30.6 },
-    "--destructive-foreground": { h: 210, s: 40, l: 98 },
     "--border": { h: 217.2, s: 32.6, l: 17.5 },
     "--input": { h: 217.2, s: 32.6, l: 17.5 },
     "--ring": { h: 212.7, s: 26.8, l: 83.9 },

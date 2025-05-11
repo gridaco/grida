@@ -60,7 +60,7 @@ const data = [
 const chartConfig = {
   goal: {
     label: "Goal",
-    color: "var(--primary)",
+    color: "hsl(var(--primary))",
   },
 } satisfies ChartConfig;
 
@@ -78,7 +78,7 @@ export function CardsActivityGoal() {
         <CardDescription>Set your daily activity goal.</CardDescription>
       </CardHeader>
       <CardContent className="pb-2">
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center space-x-2">
           <Button
             variant="outline"
             size="icon"

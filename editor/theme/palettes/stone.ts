@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 const stone = {
   light: {
     "--background": { h: 0, s: 0, l: 100 },
@@ -15,7 +18,6 @@ const stone = {
     "--accent": { h: 60, s: 4.8, l: 95.9 },
     "--accent-foreground": { h: 24, s: 9.8, l: 10 },
     "--destructive": { h: 0, s: 84.2, l: 60.2 },
-    "--destructive-foreground": { h: 60, s: 9.1, l: 97.8 },
     "--border": { h: 20, s: 5.9, l: 90 },
     "--input": { h: 20, s: 5.9, l: 90 },
     "--ring": { h: 20, s: 14.3, l: 4.1 },
@@ -37,7 +39,6 @@ const stone = {
     "--accent": { h: 12, s: 6.5, l: 15.1 },
     "--accent-foreground": { h: 60, s: 9.1, l: 97.8 },
     "--destructive": { h: 0, s: 62.8, l: 30.6 },
-    "--destructive-foreground": { h: 60, s: 9.1, l: 97.8 },
     "--border": { h: 12, s: 6.5, l: 15.1 },
     "--input": { h: 12, s: 6.5, l: 15.1 },
     "--ring": { h: 24, s: 5.7, l: 82.9 },
