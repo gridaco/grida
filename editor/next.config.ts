@@ -219,8 +219,7 @@ const sentry_build_options = {
   // This can increase your server load as well as your hosting bill.
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
-  // [DOES NOT WORK WITH CURRENT CONFIGURATION - ENABLE THIS LATER]
-  // tunnelRoute: "/monitoring",
+  tunnelRoute: "/monitoring",
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
