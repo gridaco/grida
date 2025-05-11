@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
+import { Platform } from "@/lib/platform";
 import { withSentryConfig, type SentryBuildOptions } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
-import { Platform } from "@/lib/platform";
+
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 const USE_TELEMETRY = process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
@@ -199,38 +200,35 @@ const nextConfig: NextConfig = {
   },
 };
 
-const sentry_build_options = {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
+  ? ({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      silent: !process.env.CI, // Only print logs for uploading source maps in CI
+      widenClientFileUpload: false,
+      sourcemaps: {
+        disable:
+          process.env.NODE_ENV === "development" ||
+          process.env.VERCEL_ENV === "preview",
+      },
 
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+      // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+      // This can increase your server load as well as your hosting bill.
+      // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
+      // side errors will fail.
+      tunnelRoute: "/monitoring",
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+      // Automatically tree-shake Sentry logger statements to reduce bundle size
+      disableLogger: true,
 
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+      // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
+      // See the following for more information:
+      // https://docs.sentry.io/product/crons/
+      // https://vercel.com/docs/cron-jobs
+      automaticVercelMonitors: true,
+    } satisfies SentryBuildOptions)
+  : null;
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: "/monitoring",
-
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-  // See the following for more information:
-  // https://docs.sentry.io/product/crons/
-  // https://vercel.com/docs/cron-jobs
-  automaticVercelMonitors: true,
-} satisfies SentryBuildOptions;
-
-export default USE_TELEMETRY
+export default sentry_build_options
   ? withSentryConfig(withMDX(nextConfig as any), sentry_build_options)
   : withMDX(nextConfig as any);
