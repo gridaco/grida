@@ -41,7 +41,7 @@ export default function HalftoneToolPage() {
     <main>
       <Header />
       <div className="container mx-auto py-40 min-h-screen flex flex-col items-center justify-center">
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="w-full grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {menus.map((menu, i) => (
             <Link href={menu.link} key={i}>
               <Card>
