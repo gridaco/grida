@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Tenant } from "@/lib/tenant";
-import "../../../ui.css";
+import "../../../globals.css";
 
 type Params = {
   tenant: string;
