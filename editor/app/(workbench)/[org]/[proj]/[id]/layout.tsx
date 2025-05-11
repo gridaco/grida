@@ -520,10 +520,7 @@ function BaseLayout({
   return (
     <div className="h-screen flex flex-col">
       <ThemeProvider
-        attribute="class"
         defaultTheme={appearance}
-        enableSystem
-        disableTransitionOnChange
         storageKey={`theme-workbench-${docid}`}
       >
         <SidebarProvider>

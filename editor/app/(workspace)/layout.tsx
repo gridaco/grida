@@ -40,12 +40,7 @@ export default async function RootLayout({
         <SpeedInsights />
         <PlatformProvider {...platform}>
           <div className="h-screen flex flex-col">
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
+            <ThemeProvider>
               <Toaster position="bottom-center" />
               {children}
             </ThemeProvider>

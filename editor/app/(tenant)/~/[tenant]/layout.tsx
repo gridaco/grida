@@ -86,12 +86,7 @@ export default function RootLayout({
         )}
         <Analytics />
         <SpeedInsights />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider>
           <Toaster position="bottom-center" />
           {children}
         </ThemeProvider>

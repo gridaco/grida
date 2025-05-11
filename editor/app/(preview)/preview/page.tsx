@@ -17,13 +17,7 @@ export default function PlaygroundPreview() {
     <main
       className={cn("min-h-screen flex flex-col items-center pt-10 md:pt-16")}
     >
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        storageKey="playground-embed-theme"
-        enableSystem
-        disableTransitionOnChange
-      >
+      <ThemeProvider storageKey="playground-embed-theme">
         <PlaygroundPreviewSlave />
       </ThemeProvider>
     </main>

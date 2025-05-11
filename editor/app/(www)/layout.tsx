@@ -20,14 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
       {process.env.NEXT_PUBLIC_GAID && (
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />

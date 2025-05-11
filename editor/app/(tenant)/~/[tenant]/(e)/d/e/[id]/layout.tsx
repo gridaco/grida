@@ -138,11 +138,8 @@ export default async function Layout({
         />
         <FormAgentGlobalWindowMessagingInterface>
           <ThemeProvider
-            attribute="class"
             defaultTheme={appearance}
-            enableSystem
             storageKey={`theme-form-agent-${id}`}
-            disableTransitionOnChange
           >
             {children}
           </ThemeProvider>
