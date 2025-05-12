@@ -1,7 +1,7 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
 import { document } from "../../document-query";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import assert from "assert";
 
 export function self_insertSubDocument<S extends IDocumentEditorState>(

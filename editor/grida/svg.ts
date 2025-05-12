@@ -1,7 +1,7 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
-import { cmath } from "@grida/cmath";
-import type { grida } from "./index";
+import type grida from "@grida/schema";
 import type cg from "@grida/cg";
+import { cmath } from "@grida/cmath";
 
 export namespace svg {
   export namespace d {

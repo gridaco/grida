@@ -418,6 +418,9 @@ importers:
       '@grida/ruler':
         specifier: workspace:*
         version: link:../packages/grida-canvas-ruler
+      '@grida/schema':
+        specifier: workspace:*
+        version: link:../packages/grida-canvas-schema
       '@grida/tokens':
         specifier: workspace:*
         version: link:../packages/grida-tokens
@@ -1082,9 +1085,9 @@ importers:
       '@grida/cg':
         specifier: workspace:*
         version: link:../grida-canvas-cg
-      editor:
+      '@grida/schema':
         specifier: workspace:*
-        version: link:../../editor
+        version: link:../grida-canvas-schema
 
   packages/grida-canvas-io-svg:
     dependencies:
@@ -1110,12 +1113,12 @@ importers:
       '@grida/cg':
         specifier: workspace:*
         version: link:../grida-canvas-cg
+      '@grida/schema':
+        specifier: workspace:*
+        version: link:../grida-canvas-schema
       '@types/color-name':
         specifier: ^2.0.0
         version: 2.0.0
-      editor:
-        specifier: workspace:*
-        version: link:../../editor
 
   packages/grida-canvas-pixelgrid:
     devDependencies:
@@ -1143,6 +1146,24 @@ importers:
       react:
         specifier: ^18.2.0
         version: 18.3.1
+
+  packages/grida-canvas-schema:
+    devDependencies:
+      '@grida/cg':
+        specifier: workspace:*
+        version: link:../grida-canvas-cg
+      '@grida/cmath':
+        specifier: workspace:*
+        version: link:../grida-cmath
+      '@grida/tokens':
+        specifier: workspace:*
+        version: link:../grida-tokens
+      '@grida/vn':
+        specifier: workspace:*
+        version: link:../grida-canvas-vn
+      csstype:
+        specifier: 3.1.0
+        version: 3.1.0
 
   packages/grida-canvas-tailwind: {}
 

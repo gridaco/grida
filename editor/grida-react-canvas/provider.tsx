@@ -18,7 +18,7 @@ import {
   SurfaceRaycastTargeting,
 } from "./state";
 import type { tokens } from "@grida/tokens";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
@@ -3508,6 +3508,99 @@ export function useComputedNode(
   return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
+namespace internal {
+  /**
+   * @deprecated
+   * @returns
+   * This model does not work. it's a proof of concept. - will be removed
+   */
+  export function __createApiProxyNode_experimental(
+    node: grida.program.nodes.Node,
+    context: {
+      dispatcher: DocumentDispatcher;
+    }
+  ): grida.program.nodes.Node {
+    const p = new Proxy(
+      { ...node },
+      {
+        get(target, prop, receiver) {
+          return Reflect.get(target, prop, receiver);
+        },
+        set(target, prop, value, receiver) {
+          switch (prop as keyof grida.program.nodes.UnknwonNode) {
+            case "width":
+              context.dispatcher({
+                type: "node/change/size",
+                axis: "width",
+                node_id: node.id,
+                value: value,
+              });
+              return true;
+            case "height":
+              context.dispatcher({
+                type: "node/change/size",
+                axis: "height",
+                node_id: node.id,
+                value: value,
+              });
+              return true;
+            case "top":
+            case "right":
+            case "bottom":
+            case "left":
+              context.dispatcher({
+                type: "node/change/positioning",
+                node_id: node.id,
+                positioning: {
+                  position: "absolute",
+                  [prop]: value,
+                },
+              });
+              return true;
+            case "opacity": {
+              context.dispatcher({
+                type: "node/change/opacity",
+                node_id: node.id,
+                opacity: value,
+              });
+              return true;
+            }
+            case "rotation": {
+              context.dispatcher({
+                type: "node/change/rotation",
+                node_id: node.id,
+                rotation: value,
+              });
+              return true;
+            }
+            case "fill": {
+              context.dispatcher({
+                type: "node/change/fill",
+                node_id: node.id,
+                fill: value,
+              });
+              return true;
+            }
+            case "cornerRadius": {
+              context.dispatcher({
+                type: "node/change/cornerRadius",
+                node_id: node.id,
+                cornerRadius: value,
+              });
+              return true;
+            }
+            default:
+              console.error(`Unsupported property: ${prop.toString()}`);
+          }
+
+          return false;
+        },
+      }
+    );
+    return p;
+  }
+}
+
 export function useTemplateDefinition(template_id: string) {
   const {
     state: { templates },
@@ -3527,12 +3620,9 @@ export function useEditorApi() {
     useCallback(
       (id: grida.program.api.NodeID) => {
         const nodedata = document.state.document.nodes[id];
-        return grida.program.api.internal.__createApiProxyNode_experimental(
-          nodedata,
-          {
-            dispatcher,
-          }
-        );
+        return internal.__createApiProxyNode_experimental(nodedata, {
+          dispatcher,
+        });
       },
       [document.state.document.nodes]
     );

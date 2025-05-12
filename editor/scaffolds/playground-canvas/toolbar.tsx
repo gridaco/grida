@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
 import { Cross2Icon, FrameIcon, MixIcon } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";

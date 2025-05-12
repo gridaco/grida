@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@grida/cg": "workspace:*",
-    "@types/color-name": "^2.0.0",
-    "editor": "workspace:*"
+    "@grida/schema": "workspace:*",
+    "@types/color-name": "^2.0.0"
   }
 }

@@ -6,7 +6,7 @@ import {
   useTransform,
 } from "../provider";
 import { toast } from "sonner";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
 import { cmath } from "@grida/cmath";

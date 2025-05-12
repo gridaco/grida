@@ -1,5 +1,5 @@
 "use client";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { produce } from "immer";
 import {
   DependencyList,

@@ -1,4 +1,4 @@
-import type { grida } from "..";
+import type grida from "@grida/schema";
 
 type NodeType = grida.program.nodes.NodeType;
 

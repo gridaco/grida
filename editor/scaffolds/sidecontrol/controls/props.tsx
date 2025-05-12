@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import { StringValueControl } from "./string-value";
 import type { tokens } from "@grida/tokens";

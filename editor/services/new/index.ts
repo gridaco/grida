@@ -11,7 +11,7 @@ import {
   isValidSchemaName,
   schemaname_validation_messages,
 } from "../utils/regex";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { GridFileStorageQueueProvider } from "@/scaffolds/grid/providers";
 
 /**

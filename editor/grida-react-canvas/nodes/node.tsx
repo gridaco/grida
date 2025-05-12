@@ -2,7 +2,7 @@
 
 import React, { ReactNode, useMemo } from "react";
 import type { TemplateComponent } from "../template-builder/with-template";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";

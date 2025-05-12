@@ -7,6 +7,6 @@
   "devDependencies": {
     "@figma/rest-api-spec": "^0.21.0",
     "@grida/cg": "workspace:*",
-    "editor": "workspace:*"
+    "@grida/schema": "workspace:*"
   }
 }

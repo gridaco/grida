@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/drawer";
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import { ACME } from "@/components/logos/acme";
 
 const userprops =

@@ -9,7 +9,7 @@ import { cn } from "@/components/lib/utils";
 import { CheckIcon } from "@radix-ui/react-icons";
 import React, { createContext } from "react";
 import { TMixed } from "./utils/types";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 interface FontFamilyInfo {
   family: string;

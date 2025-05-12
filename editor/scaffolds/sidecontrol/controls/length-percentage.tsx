@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
 

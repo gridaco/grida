@@ -1,5 +1,5 @@
 import type { tokens } from "@grida/tokens";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import type {
   ToolMode,

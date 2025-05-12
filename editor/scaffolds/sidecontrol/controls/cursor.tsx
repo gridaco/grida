@@ -9,7 +9,7 @@ import { cursors } from "./k/cursors";
 import Image from "next/image";
 import { WorkbenchUI } from "@/components/workbench";
 import React from "react";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { TMixed } from "./utils/types";
 import type cg from "@grida/cg";
 

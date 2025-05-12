@@ -1,5 +1,5 @@
 import type { SchemaAction } from "../action";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import produce from "immer";
 
 export default function schemaReducer(

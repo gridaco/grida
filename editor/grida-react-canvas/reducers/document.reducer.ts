@@ -14,7 +14,7 @@ import {
   DEFAULT_SNAP_NUDGE_THRESHOLD,
   type IDocumentEditorState,
 } from "../state";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import assert from "assert";
 import { document } from "../document-query";
 import nodeReducer from "./node.reducer";

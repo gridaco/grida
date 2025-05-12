@@ -41,7 +41,7 @@ import {
 import { SandboxWrapper } from "@/scaffolds/form-templates/sandbox";
 import { BrowseStartPageTemplatesDialog } from "@/scaffolds/form-templates/startpage-templates-dialog";
 import { ErrorBoundary } from "react-error-boundary";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import {
   Collapsible,
   CollapsibleContent,

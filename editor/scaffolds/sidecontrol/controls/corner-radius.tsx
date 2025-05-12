@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import cg from "@grida/cg";
 import {
   CornerTopLeftIcon,

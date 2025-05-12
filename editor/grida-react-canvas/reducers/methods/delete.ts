@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import { document } from "@/grida-react-canvas/document-query";
 import assert from "assert";
 

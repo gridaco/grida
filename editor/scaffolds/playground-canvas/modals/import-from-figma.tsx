@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import * as Figma from "figma-api";
 import type { Node } from "@figma/rest-api-spec";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,

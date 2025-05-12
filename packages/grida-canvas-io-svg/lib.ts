@@ -3,8 +3,7 @@ import parseStyle, { type Declaration } from "inline-style-parser";
 // @ts-ignore
 import * as svgo from "svgo/dist/svgo.browser.js";
 import type { Config, Output } from "svgo";
-// FIXME: remove dependency
-import type { grida } from "editor/grida";
+import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { cmath } from "@grida/cmath";
 import vn from "@grida/vn";

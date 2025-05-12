@@ -1,7 +1,7 @@
 import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { tokens } from "@grida/tokens";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 type UUID = string;
 

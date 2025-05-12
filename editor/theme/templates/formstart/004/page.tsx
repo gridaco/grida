@@ -16,7 +16,7 @@ import {
 } from "@/theme/templates/kit/components";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 
 const cards = [
   {

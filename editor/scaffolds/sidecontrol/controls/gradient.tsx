@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";

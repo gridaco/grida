@@ -2,7 +2,7 @@ import type {
   GestureCurve,
   IDocumentEditorState,
 } from "@/grida-react-canvas/state";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
 

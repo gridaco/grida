@@ -1,5 +1,5 @@
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import cg from "@grida/cg";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GradientControl } from "./gradient";

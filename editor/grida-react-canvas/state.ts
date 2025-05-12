@@ -1,5 +1,5 @@
 import type { Action, EditorAction } from "./action";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type cg from "@grida/cg";

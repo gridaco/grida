@@ -11,9 +11,8 @@ import type {
   BlendMode,
 } from "@figma/rest-api-spec";
 import { cmath } from "@grida/cmath";
-// FIXME: remove dependency
-import { grida } from "editor/grida";
 import type cg from "@grida/cg";
+import type grida from "@grida/schema";
 
 export namespace iofigma {
   export namespace restful {

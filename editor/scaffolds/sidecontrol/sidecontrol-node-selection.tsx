@@ -55,7 +55,7 @@ import { supports } from "@/grida/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import assert from "assert";
 import {
   useCurrentScene,

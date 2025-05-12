@@ -1,9 +1,19 @@
 import type { tokens } from "@grida/tokens";
 import type vn from "@grida/vn";
 import type cg from "@grida/cg";
-// TODO: remove this dependency
-import type { DocumentDispatcher } from "@/grida-react-canvas";
-import { cmath } from "@grida/cmath";
+import type cmath from "@grida/cmath";
+import * as CSS from "csstype";
+
+export interface CSSProperties extends CSS.Properties<string | number> {
+  /**
+   * The index signature was removed to enable closed typing for style
+   * using CSSType. You're able to use type assertion or module augmentation
+   * to add properties or an index signature of your own.
+   *
+   * For examples and more information, visit:
+   * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors
+   */
+}
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
@@ -595,7 +605,7 @@ export namespace grida.program.document {
   export type IComputedNodeReactRenderProps<N extends nodes.Node> =
     IGlobalRenderingContext &
       INodeWithHtmlDocumentQueryDataAttributes<N> & {
-        style: React.CSSProperties;
+        style: CSSProperties;
         //
       };
 
@@ -750,7 +760,7 @@ export namespace grida.program.css {
   export type ExplicitlySupportedCSSProperties = Partial<
     Pick<
       // TODO: Drop the React dependency and use css-types instead
-      React.CSSProperties,
+      CSSProperties,
       // explicitly prohibited
       // - "opacity"
       // - "zIndex"
@@ -2096,99 +2106,6 @@ const cloneWithUndefinedValues = (
 
 export namespace grida.program.api {
   export type NodeID = string & {};
-
-  export namespace internal {
-    /**
-     * @deprecated
-     * @returns
-     * This model does not work. it's a proof of concept. - will be removed
-     */
-    export function __createApiProxyNode_experimental(
-      node: nodes.Node,
-      context: {
-        dispatcher: DocumentDispatcher;
-      }
-    ): nodes.Node {
-      const p = new Proxy(
-        { ...node },
-        {
-          get(target, prop, receiver) {
-            return Reflect.get(target, prop, receiver);
-          },
-          set(target, prop, value, receiver) {
-            switch (prop as keyof nodes.UnknwonNode) {
-              case "width":
-                context.dispatcher({
-                  type: "node/change/size",
-                  axis: "width",
-                  node_id: node.id,
-                  value: value,
-                });
-                return true;
-              case "height":
-                context.dispatcher({
-                  type: "node/change/size",
-                  axis: "height",
-                  node_id: node.id,
-                  value: value,
-                });
-                return true;
-              case "top":
-              case "right":
-              case "bottom":
-              case "left":
-                context.dispatcher({
-                  type: "node/change/positioning",
-                  node_id: node.id,
-                  positioning: {
-                    position: "absolute",
-                    [prop]: value,
-                  },
-                });
-                return true;
-              case "opacity": {
-                context.dispatcher({
-                  type: "node/change/opacity",
-                  node_id: node.id,
-                  opacity: value,
-                });
-                return true;
-              }
-              case "rotation": {
-                context.dispatcher({
-                  type: "node/change/rotation",
-                  node_id: node.id,
-                  rotation: value,
-                });
-                return true;
-              }
-              case "fill": {
-                context.dispatcher({
-                  type: "node/change/fill",
-                  node_id: node.id,
-                  fill: value,
-                });
-                return true;
-              }
-              case "cornerRadius": {
-                context.dispatcher({
-                  type: "node/change/cornerRadius",
-                  node_id: node.id,
-                  cornerRadius: value,
-                });
-                return true;
-              }
-              default:
-                console.error(`Unsupported property: ${prop.toString()}`);
-            }
-
-            return false;
-          },
-        }
-      );
-      return p;
-    }
-  }
 
   export interface IStandaloneEditorApi {
     selection: ReadonlyArray<NodeID>;

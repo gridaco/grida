@@ -1,5 +1,5 @@
 import { cmath } from "@grida/cmath";
-import type { grida } from "./index";
+import type grida from "@grida/schema";
 import type cg from "@grida/cg";
 import colors from "color-name";
 

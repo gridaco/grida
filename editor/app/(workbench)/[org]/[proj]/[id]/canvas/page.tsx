@@ -13,7 +13,7 @@ import { createBrowserCanvasClient } from "@/lib/supabase/client";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { CanvasDocumentSnapshotSchema } from "@/types";
 import equal from "deep-equal";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,

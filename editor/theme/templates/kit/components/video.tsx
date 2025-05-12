@@ -1,6 +1,6 @@
 "use client";
 
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import ReactPlayer from "react-player";
 
 export function BackgroundVideo({

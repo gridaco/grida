@@ -1,5 +1,5 @@
 import { produce, type Draft } from "immer";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
 import { v4 } from "uuid";
