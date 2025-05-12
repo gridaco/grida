@@ -2,9 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
 import { createWWWClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Tenant } from "@/lib/tenant";
@@ -13,8 +10,6 @@ import "../../../globals.css";
 type Params = {
   tenant: string;
 };
-
-const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata({
   params,
@@ -79,18 +74,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        {process.env.NEXT_PUBLIC_GAID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
-        )}
-        <Analytics />
-        <SpeedInsights />
-        <ThemeProvider>
-          <Toaster position="bottom-center" />
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
+    <>
+      {process.env.NEXT_PUBLIC_GAID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
+      )}
+      <Analytics />
+      <SpeedInsights />
+      {children}
+    </>
   );
 }
