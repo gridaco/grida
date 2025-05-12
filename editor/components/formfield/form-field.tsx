@@ -808,7 +808,7 @@ function SafeValueSelect({
       defaultValue={(defaultValue || undefined) as string}
       onValueChange={onValueChange}
     >
-      <SelectTrigger>
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
