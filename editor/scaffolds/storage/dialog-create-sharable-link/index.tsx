@@ -221,10 +221,7 @@ export default function CreateViewerLinkDialog({
 
   return (
     <Dialog {...props}>
-      <DialogContent
-        className="flex flex-col max-w-none min-h-screen !rounded-none p-4"
-        hideCloseButton
-      >
+      <DialogContent hideCloseButton fullScreen className="flex flex-col p-4">
         <DialogHeader className="flex flex-row justify-between">
           <div>
             <DialogClose asChild>
