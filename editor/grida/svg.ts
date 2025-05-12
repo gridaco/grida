@@ -1,6 +1,7 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import { cmath } from "@grida/cmath";
 import type { grida } from "./index";
+import type cg from "@grida/cg";
 
 export namespace svg {
   export namespace d {
@@ -91,13 +92,11 @@ export namespace svg {
   }
 
   export namespace gradient {
-    export function stringifyGradientStop(stop: grida.program.cg.GradientStop) {
+    export function stringifyGradientStop(stop: cg.GradientStop) {
       return `<stop offset="${stop.offset * 100}%" stop-color="rgba(${stop.color.r}, ${stop.color.g}, ${stop.color.b}, ${stop.color.a})" />`;
     }
 
-    export function stringifyLinearGradient(
-      paint: grida.program.cg.LinearGradientPaint
-    ) {
+    export function stringifyLinearGradient(paint: cg.LinearGradientPaint) {
       const { id, stops, transform } = paint;
 
       // De-structure the 2x3 transform matrix:
@@ -119,9 +118,7 @@ ${gradientStops}
   </linearGradient>`;
     }
 
-    export function stringifyRadialGradient(
-      paint: grida.program.cg.RadialGradientPaint
-    ) {
+    export function stringifyRadialGradient(paint: cg.RadialGradientPaint) {
       const { id, stops } = paint;
 
       // Creating gradient stops
@@ -147,7 +144,7 @@ ${gradientStops}
      * );
      *
      */
-    export function defs(paint: grida.program.cg.Paint): {
+    export function defs(paint: cg.Paint): {
       defs: string | undefined;
       ref: string;
     } {

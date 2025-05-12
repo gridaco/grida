@@ -1,9 +1,9 @@
 import React from "react";
-import { grida } from "@/grida";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
+import type cg from "@grida/cg";
 
-type NFontWeight = grida.program.cg.NFontWeight;
+type NFontWeight = cg.NFontWeight;
 
 export function FontWeightControl({
   value,

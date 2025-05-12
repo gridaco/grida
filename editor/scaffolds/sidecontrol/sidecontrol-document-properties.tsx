@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useDocument, useNode } from "@/grida-react-canvas";
 import { grida } from "@/grida";
+import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";
 import {
   DropdownMenu,
@@ -363,7 +364,7 @@ function PropertyDefinitionValueInput<T = unknown>({
     case "rgba":
       return (
         <RGBAColorControl
-          value={value as grida.program.cg.RGBA8888}
+          value={value as cg.RGBA8888}
           onValueChange={(v) => onValueChange(v as unknown as T)}
         />
       );

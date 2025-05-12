@@ -10,6 +10,7 @@
     "svgson": "^5.3.1"
   },
   "devDependencies": {
+    "@grida/cg": "workspace:*",
     "@types/color-name": "^2.0.0",
     "editor": "workspace:*"
   }

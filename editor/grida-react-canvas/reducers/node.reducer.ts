@@ -1,8 +1,9 @@
 import { produce, type Draft } from "immer";
 import { grida } from "@/grida";
 import type { NodeChangeAction } from "../action";
-import assert from "assert";
+import type cg from "@grida/cg";
 import { v4 } from "uuid";
+import assert from "assert";
 
 export default function nodeReducer<
   N extends Partial<grida.program.nodes.Node>,
@@ -177,15 +178,15 @@ export default function nodeReducer<
           case "radial_gradient":
             draft.fill = {
               ...(action.fill as
-                | grida.program.cg.LinearGradientPaint
-                | grida.program.cg.RadialGradientPaint),
+                | cg.LinearGradientPaint
+                | cg.RadialGradientPaint),
               id: `gradient-${v4()}`,
             };
             break;
           case "solid":
             draft.fill = action.fill as
               | grida.program.nodes.i.props.SolidPaintToken
-              | grida.program.cg.SolidPaint;
+              | cg.SolidPaint;
             break;
         }
         break;
@@ -222,8 +223,8 @@ export default function nodeReducer<
               case "radial_gradient":
                 draft.stroke = {
                   ...(action.stroke as
-                    | grida.program.cg.LinearGradientPaint
-                    | grida.program.cg.RadialGradientPaint),
+                    | cg.LinearGradientPaint
+                    | cg.RadialGradientPaint),
                   id: `gradient-${v4()}`,
                 };
                 break;
@@ -232,7 +233,7 @@ export default function nodeReducer<
                 // @ts-expect-error
                 draft.stroke = action.stroke as
                   | grida.program.nodes.i.props.SolidPaintToken
-                  | grida.program.cg.SolidPaint;
+                  | cg.SolidPaint;
                 break;
             }
             break;

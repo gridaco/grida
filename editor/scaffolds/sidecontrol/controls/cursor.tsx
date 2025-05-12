@@ -11,8 +11,9 @@ import { WorkbenchUI } from "@/components/workbench";
 import React from "react";
 import { grida } from "@/grida";
 import { TMixed } from "./utils/types";
+import type cg from "@grida/cg";
 
-type MouseCursor = grida.program.cg.SystemMouseCursor;
+type MouseCursor = cg.SystemMouseCursor;
 
 export function CursorControl({
   value,

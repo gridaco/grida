@@ -1,8 +1,8 @@
-import { grida } from "@/grida";
 import { css } from "@/grida/css";
+import type cg from "@grida/cg";
 import { TransparencyGridIcon } from "@radix-ui/react-icons";
 
-export function PaintChip({ paint }: { paint: grida.program.cg.Paint }) {
+export function PaintChip({ paint }: { paint: cg.Paint }) {
   switch (paint.type) {
     case "solid":
       return <RGBAChip rgba={paint.color} />;
@@ -13,7 +13,7 @@ export function PaintChip({ paint }: { paint: grida.program.cg.Paint }) {
   }
 }
 
-export function RGBAChip({ rgba }: { rgba: grida.program.cg.RGBA8888 }) {
+export function RGBAChip({ rgba }: { rgba: cg.RGBA8888 }) {
   return (
     <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">
       <div
@@ -30,7 +30,7 @@ export function RGBAChip({ rgba }: { rgba: grida.program.cg.RGBA8888 }) {
 export function LinearGradientPaintChip({
   paint,
 }: {
-  paint: grida.program.cg.LinearGradientPaint;
+  paint: cg.LinearGradientPaint;
 }) {
   return (
     <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">
@@ -48,7 +48,7 @@ export function LinearGradientPaintChip({
 export function RadialGradientPaintChip({
   paint,
 }: {
-  paint: grida.program.cg.RadialGradientPaint;
+  paint: cg.RadialGradientPaint;
 }) {
   return (
     <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">

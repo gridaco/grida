@@ -7,6 +7,7 @@ import {
 } from "../provider";
 import { toast } from "sonner";
 import { grida } from "@/grida";
+import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
 import { cmath } from "@grida/cmath";
 
@@ -541,7 +542,7 @@ export function useEditorHotKeys() {
                 actions.fill({
                   type: "solid",
                   color: rgba,
-                } satisfies grida.program.cg.SolidPaint);
+                } satisfies cg.SolidPaint);
               }
               // copy to clipboard if no selection
               else {

@@ -1,6 +1,6 @@
 import { WorkbenchUI } from "@/components/workbench";
-import { RGBAColorControl } from "./color";
 import { grida } from "@/grida";
+import cg from "@grida/cg";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GradientControl } from "./gradient";
 import {
@@ -53,8 +53,8 @@ export function PaintControl({
   }
 }
 
-type ComputedPaint = grida.program.cg.Paint;
-type ComputedPaintWithoutID = grida.program.cg.PaintWithoutID;
+type ComputedPaint = cg.Paint;
+type ComputedPaintWithoutID = cg.PaintWithoutID;
 type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
 
 function ComputedPaintControl({
@@ -67,7 +67,7 @@ function ComputedPaintControl({
   removable?: boolean;
 }) {
   const onTypeChange = useCallback(
-    (type: grida.program.cg.Paint["type"]) => {
+    (type: cg.Paint["type"]) => {
       const to = type;
 
       switch (value?.type) {
@@ -214,7 +214,7 @@ function ComputedPaintControl({
             )}
             onClick={onAddPaint}
           >
-            <PaintChip paint={grida.program.cg.paints.transparent} />
+            <PaintChip paint={cg.paints.transparent} />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>

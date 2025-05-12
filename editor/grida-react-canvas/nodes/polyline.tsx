@@ -2,6 +2,7 @@ import React from "react";
 import queryattributes from "./utils/attributes";
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
+import type cg from "@grida/cg";
 
 /**
  * @deprecated - not ready - do not use in production
@@ -15,10 +16,10 @@ interface PolylineNode
     grida.program.nodes.i.IOpacity,
     grida.program.nodes.i.IZIndex,
     grida.program.nodes.i.IRotation,
-    grida.program.nodes.i.IFill<grida.program.cg.Paint>,
+    grida.program.nodes.i.IFill<cg.Paint>,
     grida.program.nodes.i.IStroke {
   type: "polyline";
-  points: grida.program.cg.Vector2[];
+  points: cg.Vector2[];
 }
 
 /**

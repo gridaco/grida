@@ -1,17 +1,17 @@
 import React from "react";
-import { grida } from "@/grida";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
+import type cg from "@grida/cg";
 
 export function BoxFitControl({
   value = "none",
   onValueChange,
 }: {
-  value?: TMixed<grida.program.cg.BoxFit>;
-  onValueChange?: (value: grida.program.cg.BoxFit) => void;
+  value?: TMixed<cg.BoxFit>;
+  onValueChange?: (value: cg.BoxFit) => void;
 }) {
   return (
-    <PropertyEnum<grida.program.cg.BoxFit>
+    <PropertyEnum<cg.BoxFit>
       enum={[
         {
           value: "none",

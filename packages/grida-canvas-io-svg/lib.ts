@@ -3,7 +3,9 @@ import parseStyle, { type Declaration } from "inline-style-parser";
 // @ts-ignore
 import * as svgo from "svgo/dist/svgo.browser.js";
 import type { Config, Output } from "svgo";
-import type { grida } from "editor/grida"; // FIXME: remove dependency
+// FIXME: remove dependency
+import type { grida } from "editor/grida";
+import type cg from "@grida/cg";
 import { cmath } from "@grida/cmath";
 import vn from "@grida/vn";
 import colors from "color-name";
@@ -320,14 +322,14 @@ export namespace iosvg {
     export function stroke(
       stroke: string | undefined,
       context: SVGFactoryContext
-    ): grida.program.cg.Paint | undefined {
+    ): cg.Paint | undefined {
       return paint(stroke, context);
     }
 
     export function fill(
       fill: string | undefined,
       context: SVGFactoryContext
-    ): grida.program.cg.Paint | undefined {
+    ): cg.Paint | undefined {
       return paint(fill, context, "currentColor");
     }
 
@@ -338,7 +340,7 @@ export namespace iosvg {
        * fallback value when the paint is undefined
        */
       fallback: "none" | "currentColor" = "none"
-    ): grida.program.cg.Paint | undefined {
+    ): cg.Paint | undefined {
       paint = paint ?? fallback;
       switch (paint) {
         case "none":
@@ -451,7 +453,7 @@ export namespace iosvg {
           const fill = _fill ?? fillstyle?.value;
 
           const fillRule =
-            (attributes["fill-rule"] as grida.program.cg.FillRule) ?? "nonzero";
+            (attributes["fill-rule"] as cg.FillRule) ?? "nonzero";
 
           const vectorNetwork = vn.fromSVGPathData(d!);
           const bbox = vn.getBBox(vectorNetwork);

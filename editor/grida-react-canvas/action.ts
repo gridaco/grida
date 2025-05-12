@@ -1,5 +1,6 @@
 import type { tokens } from "@grida/tokens";
 import type { grida } from "@/grida";
+import type cg from "@grida/cg";
 import type {
   ToolMode,
   GestureCornerRadius,
@@ -183,7 +184,7 @@ export type EditorRedoAction = {
  */
 export type EditorClipAction = {
   type: "clip/color";
-  color: grida.program.cg.RGBA8888;
+  color: cg.RGBA8888;
 };
 
 // #region copy cut paste
@@ -635,7 +636,7 @@ interface INodeChangeStrokeWidthAction extends INodeID {
 }
 
 interface INodeChangeStrokeCapAction extends INodeID {
-  strokeCap: grida.program.cg.StrokeCap;
+  strokeCap: cg.StrokeCap;
 }
 
 interface INodeChangeBorderAction extends INodeID {
@@ -643,7 +644,7 @@ interface INodeChangeBorderAction extends INodeID {
 }
 
 interface INodeChangeFitAction extends INodeID {
-  fit: grida.program.cg.BoxFit;
+  fit: cg.BoxFit;
 }
 
 interface ITextNodeChangeFontFamilyAction extends INodeID {
@@ -651,17 +652,17 @@ interface ITextNodeChangeFontFamilyAction extends INodeID {
 }
 
 interface ITextNodeChangeFontWeightAction extends INodeID {
-  fontWeight: grida.program.cg.NFontWeight;
+  fontWeight: cg.NFontWeight;
 }
 interface ITextNodeChangeFontSizeAction extends INodeID {
   fontSize: TChange<number>;
 }
 interface ITextNodeChangeTextAlignAction extends INodeID {
-  textAlign: grida.program.cg.TextAlign;
+  textAlign: cg.TextAlign;
 }
 
 interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
-  textAlignVertical: grida.program.cg.TextAlignVertical;
+  textAlignVertical: cg.TextAlignVertical;
 }
 
 interface ITextNodeChangeLineHeightAction extends INodeID {
@@ -715,7 +716,7 @@ interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
 }
 
 interface INodeChangeMouseCursorAction extends INodeID {
-  cursor: grida.program.cg.SystemMouseCursor;
+  cursor: cg.SystemMouseCursor;
 }
 
 interface INodeChangeStyleAction extends INodeID {

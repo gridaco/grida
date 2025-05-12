@@ -8,6 +8,7 @@ import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
 import { useUserCustomTemplates } from "../renderer";
 import { css } from "@/grida/css";
+import type cg from "@grida/cg";
 
 class RendererNotFound extends Error {
   constructor(message: string) {
@@ -29,7 +30,7 @@ interface NodeElementProps<P extends Record<string, any>> {
   top?: number;
   width?: grida.program.nodes.i.ICSSDimension["width"];
   height?: grida.program.nodes.i.ICSSDimension["height"];
-  fill?: grida.program.cg.Paint;
+  fill?: cg.Paint;
 }
 
 export function NodeElement<P extends Record<string, any>>({
