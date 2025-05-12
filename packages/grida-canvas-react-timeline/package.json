@@ -2,7 +2,7 @@
   "name": "@grida/react-timeline",
   "description": "React Timeline Editor",
   "devDependencies": {
-    "@types/react": "^18",
-    "react": "^18.2.0"
+    "@types/react": "^19",
+    "react": "19.1.0"
   }
 }
