@@ -1,6 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme inline {
+  /* #region https://ui.aceternity.com/components/aurora-background */
+  --animate-aurora: aurora 60s linear infinite;
+  @keyframes aurora {
+    from {
+      background-position:
+        50% 50%,
+        50% 50%;
+    }
+    to {
+      background-position:
+        350% 50%,
+        350% 50%;
+    }
+  }
+  /* #endregion */
+}
 
 :root {
   --foreground-rgb: 0, 0, 0;
@@ -18,4 +34,12 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+.disable-interactions {
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }

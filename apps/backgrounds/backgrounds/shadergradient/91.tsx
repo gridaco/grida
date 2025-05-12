@@ -9,10 +9,6 @@ export default function _91() {
         position: "absolute",
         top: 0,
       }}
-      // https://github.com/ruucm/shadergradient/issues/87
-      onCreated={(_: any) => {
-        _.gl.domElement.style.pointerEvents = "none"; // Disable interactions
-      }}
     >
       <ShaderGradient
         control="query"

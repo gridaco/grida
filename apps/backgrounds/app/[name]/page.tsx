@@ -1,13 +1,14 @@
 import React from "react";
 import data from "@/backgrounds";
 import { notFound } from "next/navigation";
-export default function BackgroundViewPage({
-  params,
-}: {
-  params: {
-    name: string;
-  };
-}) {
+export default async function BackgroundViewPage(
+  props: {
+    params: Promise<{
+      name: string;
+    }>;
+  }
+) {
+  const params = await props.params;
   const name = params.name;
   const bg = data.find((bg) => bg.name === name);
 
