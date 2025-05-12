@@ -5,7 +5,9 @@ import createMDX from "@next/mdx";
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
-const USE_TELEMETRY = process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
+const USE_TELEMETRY =
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
 
 const withMDX = createMDX({
   // Add markdown plugins here, as desired
