@@ -6,7 +6,7 @@ export function ScheduleDialog({
 }: React.ComponentProps<typeof Dialog>) {
   return (
     <Dialog {...props}>
-      <DialogContent></DialogContent>
+      <DialogContent>TODO</DialogContent>
     </Dialog>
   );
 }

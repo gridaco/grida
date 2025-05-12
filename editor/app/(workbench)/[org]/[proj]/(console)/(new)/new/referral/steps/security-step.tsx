@@ -74,7 +74,7 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Shield className="h-6 w-6 text-primary" />
+          <Shield className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Security Settings</h3>
@@ -154,12 +154,12 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
           <div className="space-y-6">
             <div className="p-4 border rounded-md">
               <h5 className="text-sm font-medium mb-2 flex items-center">
-                <Users className="h-4 w-4 mr-1" />
+                <Users className="size-4 mr-1" />
                 What invitees will see
               </h5>
               <div className="p-3 bg-muted/10 rounded-md">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="size-8">
                     {data.is_referrer_profile_exposed_to_public_dangerously && (
                       <AvatarImage
                         src={referrers[0].image}
@@ -186,13 +186,13 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
 
             <div className="p-4 border rounded-md">
               <h5 className="text-sm font-medium mb-2 flex items-center">
-                <User className="h-4 w-4 mr-1" />
+                <User className="size-4 mr-1" />
                 What referrers will see
               </h5>
               <div className="p-3 bg-muted/10 rounded-md">
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="size-8">
                       <AvatarImage
                         src={referrers[0].image}
                         alt={referrers[0].name}
@@ -217,8 +217,8 @@ export function SecurityStep({ data, updateData }: SecurityStepProps) {
                           key={invitee.id}
                           className="flex items-center gap-3 relative"
                         >
-                          <ChevronRight className="h-3 w-3 text-muted-foreground absolute -ml-5" />
-                          <Avatar className="h-6 w-6">
+                          <ChevronRight className="size-3 text-muted-foreground absolute -ml-5" />
+                          <Avatar className="size-6">
                             {data.is_invitee_profile_exposed_to_public_dangerously && (
                               <AvatarImage
                                 src={invitee.image}

@@ -51,7 +51,7 @@ export function RadialGradientPaintIcon({
     <div
       data-active={active}
       className={cn(
-        "w-4 aspect-square rounded-full border shadow bg-gradient-radial ",
+        "w-4 aspect-square rounded-full border shadow bg-radial",
         "from-muted-foreground/20 to-muted-foreground/80",
         "data-[active='true']:border-workbench-accent-sky data-[active='true']:from-workbench-accent-sky/20 data-[active='true']:to-workbench-accent-sky/80",
         className

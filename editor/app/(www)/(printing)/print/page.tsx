@@ -450,7 +450,7 @@ function SectionCustomOrder() {
           className="w-min border border-black bg-transparent rounded-full z-10"
         >
           Contact us for more
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="ml-2 size-4" />
         </Button>
         <div className="pointer-events-none absolute inset-0 transform-gpu transition-all duration-300 group-hover:dark:bg-neutral-800/10" />
       </div>
@@ -677,7 +677,7 @@ function PromotedTemplateCard({
   return (
     <Card
       className={cn(
-        "group relative w-full h-full overflow-hidden rounded md:rounded-lg",
+        "group relative w-full h-full overflow-hidden rounded-sm md:rounded-lg",
         className
       )}
     >

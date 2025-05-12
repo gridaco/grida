@@ -122,7 +122,7 @@ export function ModeInsertBlocks() {
                     >
                       <BlockTypeIcon
                         type={block_type}
-                        className="p-2 w-8 h-8 rounded"
+                        className="p-2 size-8 rounded-sm"
                       />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
                         {blocklabels[block_type]}
@@ -138,7 +138,7 @@ export function ModeInsertBlocks() {
                   <div className="flex justify-between items-center">
                     <span className="font-bold">{blocklabels[block_type]}</span>
                     <Button size="sm" variant="outline">
-                      <PlusIcon className="inline align-middle me-2 w-4 h-4" />
+                      <PlusIcon className="inline align-middle size-4" />
                       Add
                     </Button>
                   </div>
@@ -166,7 +166,7 @@ export function ModeInsertBlocks() {
                     >
                       <FormFieldTypeIcon
                         type={field_type}
-                        className="p-2 w-8 h-8 rounded"
+                        className="p-2 size-8 rounded-sm"
                       />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
                         {fieldlabels[field_type]}
@@ -183,7 +183,7 @@ export function ModeInsertBlocks() {
                         <div>
                           <FormFieldTypeIcon
                             type={field_type}
-                            className="inline align-middle me-2 w-8 h-8 p-2 border rounded shadow-sm"
+                            className="inline align-middle me-2 size-8 p-2 border rounded-sm shadow-sm"
                           />
                           <span className="font-bold">
                             {fieldlabels[field_type]}
@@ -194,7 +194,7 @@ export function ModeInsertBlocks() {
                           variant="outline"
                           onClick={addFieldBlock.bind(null, field_type)}
                         >
-                          <PlusIcon className="inline align-middle me-2 w-4 h-4" />
+                          <PlusIcon className="inline align-middle me-2 size-4" />
                           Add
                         </Button>
                       </div>

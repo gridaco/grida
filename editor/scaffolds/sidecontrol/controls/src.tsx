@@ -127,7 +127,7 @@ function Thumb({ src }: { src: string }) {
       src={src}
       width={40}
       height={40}
-      className="object-cover w-5 h-5 overflow-hidden rounded border"
+      className="object-cover size-5 overflow-hidden rounded-sm border"
       alt="thumb"
     />
   );
@@ -135,6 +135,6 @@ function Thumb({ src }: { src: string }) {
 
 function ThumbPlaceholder() {
   return (
-    <div className="w-5 h-5 overflow-hidden rounded border bg-secondary" />
+    <div className="size-5 overflow-hidden rounded-sm border bg-secondary" />
   );
 }

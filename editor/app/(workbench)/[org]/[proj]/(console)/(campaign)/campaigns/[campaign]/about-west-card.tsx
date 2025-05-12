@@ -17,7 +17,7 @@ export function AboutGridaWestCard() {
   if (donotshowagain) return null;
 
   return (
-    <Card className="group/card relative overflow-hidden bg-transparent dark:bg-white/50">
+    <Card className="group/card relative overflow-hidden bg-transparent dark:bg-white/50 p-0">
       <ShineBorder />
       <div className="z-20 absolute inset-0 flex flex-col">
         <div className="opacity-0 pointer-events-none absolute z-20 top-2 right-2 group-hover/card:opacity-100 group-hover/card:pointer-events-auto transition-all">

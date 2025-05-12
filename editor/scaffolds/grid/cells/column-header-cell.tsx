@@ -66,7 +66,7 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
         {readonly && (
           <Tooltip>
             <TooltipTrigger>
-              <LockClosedIcon className="w-3 h-3 text-muted-foreground" />
+              <LockClosedIcon className="size-3 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>readonly</TooltipContent>
           </Tooltip>
@@ -105,19 +105,19 @@ function Icon({
   type: FormInputType;
 }) {
   if (pk) {
-    return <KeyIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />;
+    return <KeyIcon className="min-w-4 size-4 text-workbench-accent-sky" />;
   }
 
   if (fk) {
     switch (fk) {
       case "x-supabase.auth.users":
-        return <AvatarIcon className="w-4 h-4 text-workbench-accent-sky" />;
+        return <AvatarIcon className="size-4 text-workbench-accent-sky" />;
       default:
         return (
-          <LinkIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
+          <LinkIcon className="min-w-4 size-4 text-workbench-accent-sky" />
         );
     }
   }
 
-  return <FormFieldTypeIcon type={type} className="w-4 h-4" />;
+  return <FormFieldTypeIcon type={type} className="size-4" />;
 }

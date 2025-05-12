@@ -520,10 +520,7 @@ function BaseLayout({
   return (
     <div className="h-screen flex flex-col">
       <ThemeProvider
-        attribute="class"
         defaultTheme={appearance}
-        enableSystem
-        disableTransitionOnChange
         storageKey={`theme-workbench-${docid}`}
       >
         <SidebarProvider>
@@ -533,7 +530,7 @@ function BaseLayout({
               <EditorSidebar />
               <div className="flex flex-col overflow-hidden w-full h-full">
                 {/* top */}
-                <header className="px-2 h-11 min-h-11 flex items-center border-b bg-workbench-panel desktop-drag-area">
+                <header className="px-2 h-11 min-h-11 flex items-center border-b bg-sidebar desktop-drag-area">
                   <div className="ms-2 flex items-center gap-4 flex-1">
                     <Breadcrumbs />
                     <SavingIndicator />

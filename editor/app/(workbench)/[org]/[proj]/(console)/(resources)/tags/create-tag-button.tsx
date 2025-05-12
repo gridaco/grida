@@ -11,7 +11,7 @@ export function CreateTagButton() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus className="mr-2 h-4 w-4" />
+        <Plus className="size-4" />
         Create Tag
       </Button>
       <TagFormDialog

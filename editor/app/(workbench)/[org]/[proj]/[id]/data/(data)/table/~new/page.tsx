@@ -10,7 +10,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Button } from "@/components/ui/button";
 import artwork from "../../../../../../../../../public/images/abstract-database-illustration.png";
@@ -29,7 +29,7 @@ export default function WelcomeNewPage() {
   return (
     <>
       <EmptyWelcome
-        art={<TableIcon className="w-10 h-10 text-muted-foreground" />}
+        art={<TableIcon className="size-10 text-muted-foreground" />}
         title={"Create your first table"}
         paragraph={"Let's get started by creating your first table."}
       />

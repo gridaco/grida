@@ -89,14 +89,14 @@ function OptionCard({
   return (
     <Card
       className={cn(
-        `relative cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`,
+        `p-0 relative cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`,
         className
       )}
       onClick={onSelect}
     >
       {selected && (
         <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 z-10">
-          <Check className="w-4 h-4" />
+          <Check className="size-4" />
         </div>
       )}
       {children}
@@ -249,7 +249,7 @@ export default function OrderPage() {
                   {pp.map((prop) => (
                     <OptionCard
                       key={prop.name}
-                      className="w-14 h-14 overflow-hidden rounded"
+                      className="size-14 overflow-hidden rounded-sm"
                     >
                       <Image
                         src={prop.image}

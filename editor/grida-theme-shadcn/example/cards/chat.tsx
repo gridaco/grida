@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Check, Plus, Send } from "lucide-react";
 
+import { cn } from "@/components/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +35,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/components/lib/utils";
 
 const users = [
   {
@@ -217,7 +217,7 @@ export function CardsChat() {
                       </p>
                     </div>
                     {selectedUsers.includes(user) ? (
-                      <Check className="ml-auto flex h-5 w-5 text-primary" />
+                      <Check className="ml-auto flex size-5 text-primary" />
                     ) : null}
                   </CommandItem>
                 ))}

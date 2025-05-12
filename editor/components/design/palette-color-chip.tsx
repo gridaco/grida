@@ -26,7 +26,7 @@ export function PaletteColorChip({
       data-selected={selected}
       onClick={onSelect}
       className={cn(
-        "w-6 h-6 border-2 rounded-full overflow-hidden cursor-pointer",
+        "size-6 border-2 rounded-full overflow-hidden cursor-pointer",
         "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background",
         className
       )}

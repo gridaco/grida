@@ -22,7 +22,7 @@ export function SidebarRoot({
       className={cn(
         "relative w-60 h-full shrink-0 overflow-y-scroll",
         // apply slightly dimmed background for main content
-        "bg-workbench-panel",
+        "bg-sidebar",
         side === "left" ? "border-e" : "border-s",
         className
       )}
@@ -41,7 +41,7 @@ export function SidebarHeader({
       className={cn(
         "sticky top-0 w-full px-2 py-2 border-b z-10",
         // apply slightly dimmed background for main content
-        "bg-workbench-panel backdrop-blur-md",
+        "bg-sidebar backdrop-blur-md",
         className
       )}
     >
@@ -140,7 +140,7 @@ export function SidebarMenuGridItem({
       className={cn(
         "aspect-square",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-secondary text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded-sm hover:bg-secondary text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex flex-col items-center justify-center",
         className
@@ -230,7 +230,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       className={cn(
         "flex items-center",
         "relative group/menu-item",
-        "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
+        "w-full px-2 py-1 rounded-sm text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "hover:bg-sidebar-accent hover:text-accent-foreground data-[hovered='true']:bg-sidebar-accent data-[hovered='true']:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
@@ -244,11 +244,11 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       onClick={onSelect}
     >
       {has_icon_slot && (
-        <div className="relative w-4 h-4 me-2">
+        <div className="relative size-4 me-2">
           {expandable && (
             <button
               type="button"
-              className="absolute z-10 w-4 h-4 me-2 opacity-0 group-hover/menu-item:opacity-100"
+              className="absolute z-10 size-4 me-2 opacity-0 group-hover/menu-item:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpandChange?.(!expanded);
@@ -261,7 +261,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
             {icon && (
               <div
                 data-expandable={expandable}
-                className="w-4 h-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover/menu-item:opacity-0"
+                className="size-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover/menu-item:opacity-0"
               >
                 {icon}
               </div>
@@ -318,7 +318,7 @@ export function SidebarSectionHeaderItem({
     <div
       className={cn(
         "relative group",
-        "w-full px-2 py-1 my-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 my-1 rounded-sm hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
         className
@@ -370,7 +370,7 @@ export function SidebarMenuItemActions({
     <div
       {...props}
       className={cn(
-        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-sidebar opacity-0 group-hover/menu-item:opacity-100 group-hover/menu-item:bg-sidebar-accent transition-opacity rounded",
+        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-sidebar opacity-0 group-hover/menu-item:opacity-100 group-hover/menu-item:bg-sidebar-accent transition-opacity rounded-sm",
         className
       )}
     >
@@ -393,7 +393,7 @@ export const SidebarMenuItemAction = React.forwardRef(
         {...props}
         variant="ghost"
         size="sm"
-        className={cn("w-5 h-5 p-0", props.className)}
+        className={cn("size-5 p-0", props.className)}
       >
         {children}
       </Button>

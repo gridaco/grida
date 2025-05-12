@@ -173,9 +173,9 @@ function AssetItem({
           e.stopPropagation();
           onRemoveClick?.();
         }}
-        className="absolute -top-2.5 -right-2.5 border shadow-sm rounded-full bg-background text-foreground flex items-center justify-center w-5 h-5"
+        className="absolute -top-2.5 -right-2.5 border shadow-sm rounded-full bg-background text-foreground flex items-center justify-center size-5"
       >
-        <Cross2Icon className="w-3 h-3" />
+        <Cross2Icon className="size-3" />
       </button>
       {type === "image" ? (
         // eslint-disable-next-line @next/next/no-img-element

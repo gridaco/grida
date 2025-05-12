@@ -103,7 +103,7 @@ export function XSBTextSearchInput({
             isExpanded && "pointer-events-none"
           )}
         >
-          <SearchIcon className="h-4 w-4" />
+          <SearchIcon className="size-4" />
         </div>
       )}
       {isExpanded && (
@@ -125,14 +125,14 @@ export function XSBTextSearchInput({
                       )}
                     >
                       <div className="relative">
-                        <SearchIcon className="h-4 w-4" />
+                        <SearchIcon className="size-4" />
                       </div>
                       <span className="flex-1 text-xs font-normal w-full text-start overflow-hidden text-ellipsis">
                         {column === undefined
                           ? "Select"
                           : attributes_label_text(column, localsearch_on)}
                       </span>
-                      <CaretDownIcon className="w-4 h-4 min-w-4" />
+                      <CaretDownIcon className="size-4 min-w-4" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -194,7 +194,7 @@ export function XSBTextSearchInput({
               <DropdownMenuSeparator />
               <article className="text-xs text-muted-foreground p-1">
                 <h6 className="py-1">
-                  <InfoCircledIcon className="inline-block h-4 w-4 me-1 align-bottom" />
+                  <InfoCircledIcon className="inline-block size-4 me-1 align-bottom" />
                   <strong>What is this?</strong>
                 </h6>
                 <p>

@@ -5,11 +5,11 @@
 .minimal-tiptap-editor .ProseMirror pre {
   @apply relative overflow-auto rounded border font-mono text-sm;
   @apply border-[var(--mt-pre-border)] bg-[var(--mt-pre-background)] text-[var(--mt-pre-color)];
-  @apply hyphens-none whitespace-pre text-left;
+  @apply text-left hyphens-none whitespace-pre;
 }
 
 .minimal-tiptap-editor .ProseMirror code {
-  @apply break-words leading-[1.7em];
+  @apply leading-[1.7em] break-words;
 }
 
 .minimal-tiptap-editor .ProseMirror pre code {

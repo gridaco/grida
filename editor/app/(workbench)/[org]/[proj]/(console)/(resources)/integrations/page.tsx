@@ -30,12 +30,12 @@ export default function IntegrationsPage() {
         </div>
         <div className="flex items-center space-x-2">
           <IntegrationsSearch />
-          <Button variant="outline" asChild>
-            <Link href="#">
-              <FileText className="mr-2 h-4 w-4" />
+          <Link href="#">
+            <Button variant="outline">
+              <FileText className="size-4" />
               View Documentation
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export default function IntegrationsPage() {
           <Link href={sitemap.links.contact} target="_blank">
             <Button>
               Request Integration
-              <ExternalLink className="ml-2 h-4 w-4" />
+              <ExternalLink className="ml-2 size-4" />
             </Button>
           </Link>
         </div>

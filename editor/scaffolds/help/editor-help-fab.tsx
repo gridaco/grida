@@ -94,7 +94,7 @@ export function HelpFab() {
           sideOffset={10}
           className="max-w-sm overflow-hidden"
         >
-          <div className="m-2 p-4 flex flex-col justify-center items-center text-center mb-4 gap-4 rounded">
+          <div className="m-2 p-4 flex flex-col justify-center items-center text-center mb-4 gap-4 rounded-sm">
             <AnimatedAvatar />
             <article className="prose prose-sm dark:prose-invert">
               <p>

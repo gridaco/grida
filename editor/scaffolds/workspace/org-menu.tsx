@@ -49,14 +49,12 @@ export function WorkspaceMenu({
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem>
                   <OrganizationAvatar
-                    className="inline w-7 h-7 me-2 border shadow-sm rounded"
+                    className="inline size-7 me-2 border shadow-sm rounded-sm"
                     avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />
                   {org.display_name}
-                  {iscurrent && (
-                    <CheckIcon className="inline w-4 h-4 ms-auto" />
-                  )}
+                  {iscurrent && <CheckIcon className="inline size-4 ms-auto" />}
                 </DropdownMenuItem>
               </Link>
             );

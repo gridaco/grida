@@ -29,53 +29,46 @@ interface ImageActionsProps {
   onCopyLink?: () => void;
 }
 
-interface ActionButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ActionButtonProps extends React.ComponentProps<"button"> {
   icon: React.ReactNode;
   tooltip: string;
 }
 
 export const ActionWrapper = React.memo(
-  React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-    ({ children, className, ...props }, ref) => (
-      <div
-        ref={ref}
-        className={cn(
-          "absolute right-3 top-3 flex flex-row rounded px-0.5 opacity-0 group-hover/node-image:opacity-100",
-          "border-[0.5px] bg-[var(--mt-bg-secondary)] [backdrop-filter:saturate(1.8)_blur(20px)]",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    )
+  ({ children, className, ...props }: React.ComponentProps<"div">) => (
+    <div
+      className={cn(
+        "absolute top-3 right-3 flex flex-row rounded px-0.5 opacity-0 group-hover/node-image:opacity-100",
+        "border-[0.5px] bg-[var(--mt-bg-secondary)] [backdrop-filter:saturate(1.8)_blur(20px)]",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
   )
 );
 
 ActionWrapper.displayName = "ActionWrapper";
 
 export const ActionButton = React.memo(
-  React.forwardRef<HTMLButtonElement, ActionButtonProps>(
-    ({ icon, tooltip, className, ...props }, ref) => (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            ref={ref}
-            variant="ghost"
-            className={cn(
-              "relative flex h-7 w-7 flex-row rounded-none p-0 text-muted-foreground hover:text-foreground",
-              "bg-transparent hover:bg-transparent",
-              className
-            )}
-            {...props}
-          >
-            {icon}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">{tooltip}</TooltipContent>
-      </Tooltip>
-    )
+  ({ icon, tooltip, className, ...props }: ActionButtonProps) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          className={cn(
+            "text-muted-foreground hover:text-foreground relative flex h-7 w-7 flex-row rounded-none p-0",
+            "bg-transparent hover:bg-transparent",
+            className
+          )}
+          {...props}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
   )
 );
 

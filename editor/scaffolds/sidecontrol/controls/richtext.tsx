@@ -1,5 +1,5 @@
 import { CMSRichText } from "@/components/formfield-cms";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import {
   Sheet,
   SheetHeader,

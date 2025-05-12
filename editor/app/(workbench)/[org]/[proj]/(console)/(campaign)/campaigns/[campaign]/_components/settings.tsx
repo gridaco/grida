@@ -169,7 +169,7 @@ function ComingSoonCard() {
       <CardContent>
         <div className="flex flex-col items-center justify-center py-12">
           <div className="rounded-full bg-muted p-4 mb-4">
-            <InfoIcon className="h-8 w-8 text-muted-foreground" />
+            <InfoIcon className="size-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-2">Feature in Development</h3>
           <p className="text-sm text-muted-foreground text-center max-w-sm">
@@ -350,7 +350,7 @@ function Body({
                                     variant={"outline"}
                                     className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
                                   >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    <CalendarIcon className="size-4" />
                                     {field.value
                                       ? format(field.value, "PPP")
                                       : "Select start date"}
@@ -390,7 +390,7 @@ function Body({
                                     variant={"outline"}
                                     className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
                                   >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    <CalendarIcon className="size-4" />
                                     {field.value
                                       ? format(field.value, "PPP")
                                       : "Select end date"}
@@ -478,7 +478,7 @@ function Body({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                  <InfoIcon className="size-4 text-yellow-600 dark:text-yellow-400" />
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p className="max-w-xs">
@@ -517,7 +517,7 @@ function Body({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <InfoIcon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                  <InfoIcon className="size-4 text-yellow-600 dark:text-yellow-400" />
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p className="max-w-xs">
@@ -629,7 +629,7 @@ function Body({
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
-                  <Spinner className="h-4 w-4" />
+                  <Spinner className="size-4" />
                   <span>Saving...</span>
                 </div>
               ) : (

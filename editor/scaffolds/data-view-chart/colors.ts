@@ -1,4 +1,4 @@
-import colors from "@/k/tailwindcolors";
+import colors from "@/theme/tailwindcolors";
 
 export type DataChartPalette =
   | "theme-charts-1" // also known as colorful
@@ -27,15 +27,21 @@ export type DataChartPalette =
   | "rose";
 
 type HexStr = `#${string}`;
+type OklchStr = `oklch(${string})`;
+type RgbStr = `rgb(${string})`;
+type RgbaStr = `rgba(${string})`;
+type HslStr = `hsl(${string})`;
+type HslaStr = `hsla(${string})`;
+type AnyColorStr = HexStr | OklchStr | RgbStr | RgbaStr | HslStr | HslaStr;
 
 export interface ChartPaletteConfig {
   label: string;
   colors: {
-    "1": HexStr;
-    "2": HexStr;
-    "3": HexStr;
-    "4": HexStr;
-    "5": HexStr;
+    "1": AnyColorStr;
+    "2": AnyColorStr;
+    "3": AnyColorStr;
+    "4": AnyColorStr;
+    "5": AnyColorStr;
   };
 }
 

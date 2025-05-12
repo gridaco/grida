@@ -81,15 +81,15 @@ function MediaAVContent({
 
   return (
     <span className="group">
-      <div className="relative inline-flex w-5 h-5 me-1 align-middle">
+      <div className="relative inline-flex size-5 me-1 align-middle">
         <div className="visible group-hover:invisible">
-          <FileTypeIcon type={type} className="w-4 h-4" />
+          <FileTypeIcon type={type} className="size-4" />
         </div>
-        <div className="absolute inset-0 rounded hidden group-hover:flex items-center">
+        <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
           <Button
             variant="default"
             size="icon"
-            className="w-5 h-5 p-0.5 rounded-sm"
+            className="size-5 p-0.5 rounded-xs"
             onClick={() => {
               openInPictureInPicture(
                 {
@@ -102,7 +102,7 @@ function MediaAVContent({
               );
             }}
           >
-            <PlayFilledIcon className="w-3 h-3" />
+            <PlayFilledIcon className="size-3" />
           </Button>
         </div>
       </div>

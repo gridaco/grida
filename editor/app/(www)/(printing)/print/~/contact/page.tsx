@@ -79,7 +79,7 @@ export default function ContactPage() {
 
         <div className="space-y-6">
           <Card>
-            <CardContent className="p-6">
+            <CardContent>
               <h2 className="text-xl font-semibold mb-4">Our Information</h2>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
@@ -99,10 +99,10 @@ export default function ContactPage() {
           </Card>
 
           <Card>
-            <CardContent className="p-0">
+            <CardContent>
               {/* Replace this with an actual map integration */}
               <div className="bg-muted h-[300px] flex items-center justify-center">
-                <MapPin className="w-12 h-12 text-primary" />
+                <MapPin className="size-12 text-primary" />
               </div>
             </CardContent>
           </Card>

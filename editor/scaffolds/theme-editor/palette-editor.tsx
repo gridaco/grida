@@ -55,7 +55,7 @@ export function ThemePalette({
                     onPresetChange?.(key);
                   }}
                   className={cn(
-                    "w-6 h-6 border-2 rounded-full",
+                    "size-6 border-2 rounded-full",
                     "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
                   )}
                   style={{
@@ -156,7 +156,7 @@ function ColorChip({
     <Popover>
       <PopoverTrigger id={id}>
         <div
-          className="w-6 h-6 border-2 rounded-full"
+          className="size-6 border-2 rounded-full"
           style={{
             backgroundColor: `hsl(${value.h}, ${value.s}%, ${value.l}%)`,
           }}

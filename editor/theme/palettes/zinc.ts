@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 const zinc = {
   light: {
     "--background": { h: 0, s: 0, l: 100 },
@@ -15,7 +18,6 @@ const zinc = {
     "--accent": { h: 240, s: 4.8, l: 95.9 },
     "--accent-foreground": { h: 240, s: 5.9, l: 10 },
     "--destructive": { h: 0, s: 84.2, l: 60.2 },
-    "--destructive-foreground": { h: 0, s: 0, l: 98 },
     "--border": { h: 240, s: 5.9, l: 90 },
     "--input": { h: 240, s: 5.9, l: 90 },
     "--ring": { h: 240, s: 5.9, l: 10 },
@@ -37,7 +39,6 @@ const zinc = {
     "--accent": { h: 240, s: 3.7, l: 15.9 },
     "--accent-foreground": { h: 0, s: 0, l: 98 },
     "--destructive": { h: 0, s: 62.8, l: 30.6 },
-    "--destructive-foreground": { h: 0, s: 0, l: 98 },
     "--border": { h: 240, s: 3.7, l: 15.9 },
     "--input": { h: 240, s: 3.7, l: 15.9 },
     "--ring": { h: 240, s: 4.9, l: 83.9 },

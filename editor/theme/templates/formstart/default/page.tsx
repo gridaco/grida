@@ -81,7 +81,7 @@ export default function _000({ data }: Props) {
             </div>
           </section>
           <section className="p-4">
-            <div className="p-4 rounded bg-background border">
+            <div className="p-4 rounded-sm bg-background border">
               <p className="py-4">
                 Welcome! To join the event, please register below.
               </p>
@@ -101,7 +101,7 @@ export default function _000({ data }: Props) {
           {/* <section className="p-4">
             <SectionHeader>Location</SectionHeader>
             <MapGL
-              className="rounded shadow-sm min-h-96"
+              className="rounded-sm shadow-sm min-h-96"
               initialViewState={{
                 longitude: -95.652901,
                 latitude: 35.645233,
@@ -131,8 +131,8 @@ function Footer() {
   return (
     <footer className="container max-w-4xl mx-auto border-t px-4 py-8 text-muted-foreground">
       <aside className="flex gap-2">
-        <TwitterLogoIcon className="w-4 h-4" />
-        <YoutubeIcon className="w-4 h-4" />
+        <TwitterLogoIcon className="size-4" />
+        <YoutubeIcon className="size-4" />
       </aside>
     </footer>
   );

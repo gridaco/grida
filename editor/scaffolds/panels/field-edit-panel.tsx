@@ -424,7 +424,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-card rounded p-10 border">
+            <div className="relative w-full min-h-40 bg-card rounded-sm p-10 border">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -465,7 +465,7 @@ export function FieldEditPanel({
                     </button>
                     <button type="reset">
                       <Badge className="h-full" variant="secondary">
-                        <ReloadIcon className="w-3 h-3" />
+                        <ReloadIcon className="size-3" />
                       </Badge>
                     </button>
                   </div>

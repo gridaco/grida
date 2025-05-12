@@ -8,7 +8,7 @@ import React from "react";
 export default function MediaPlayerDevPage() {
   return (
     <main className="w-screen h-screen p-10">
-      <Card className="h-48 aspect-video shadow-2xl">
+      <Card className="h-48 aspect-video shadow-2xl p-0">
         <PipPlayerContent
           mediaSrc={{
             // artist: "Artist",

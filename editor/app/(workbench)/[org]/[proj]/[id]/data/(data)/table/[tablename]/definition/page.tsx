@@ -66,7 +66,7 @@ export default function TableDefinitionPage(props: {
         <div className="px-2 pointer-events-auto">
           <Link href="./">
             <Button variant="outline">
-              <ArrowLeftIcon className="w-4 h-4 me-2" />
+              <ArrowLeftIcon />
               {def.name}
             </Button>
           </Link>

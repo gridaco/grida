@@ -237,7 +237,7 @@ function ImageCard({
                 className="pointer-events-auto"
               >
                 <Button variant="ghost">
-                  <DownloadIcon className="size-4 mr-2" />
+                  <DownloadIcon className="size-4" />
                   Download
                 </Button>
               </Link>

@@ -74,7 +74,7 @@ export function ReferrerRewardStep({
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Users className="h-6 w-6 text-primary" />
+          <Users className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Referrer Rewards</h3>
@@ -132,7 +132,7 @@ export function ReferrerRewardStep({
               size="sm"
               onClick={addMilestone}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="size-4" />
               Add Milestone
             </Button>
           </div>
@@ -154,7 +154,7 @@ export function ReferrerRewardStep({
                         size="sm"
                         onClick={() => removeMilestone(index)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="size-4" />
                       </Button>
                     )}
                   </div>

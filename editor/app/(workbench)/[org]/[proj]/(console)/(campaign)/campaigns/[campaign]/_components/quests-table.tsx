@@ -137,7 +137,7 @@ export function QuestsTable() {
   }
 
   return (
-    <Card>
+    <Card className="p-0">
       <CardContent className="p-0">
         <div className="flex items-center p-4 border-b">
           <div className="flex-1">
@@ -188,16 +188,16 @@ export function QuestsTable() {
                       onClick={() => toggleQuestExpand(quest.id)}
                     >
                       {expandedQuests.includes(quest.id) ? (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="size-4" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="size-4" />
                       )}
                       <span className="sr-only">Toggle details</span>
                     </Button>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8 rounded-full">
+                      <Avatar className="size-8 rounded-full">
                         <AvatarFallback>
                           {quest.customer?.name?.[0].toUpperCase()}
                         </AvatarFallback>
@@ -235,7 +235,7 @@ export function QuestsTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <Users className="size-4 text-muted-foreground" />
                       <span>
                         {quest.invitation_count} /{" "}
                         {max_invitations_per_referrer ?? "∞"}
@@ -256,7 +256,7 @@ export function QuestsTable() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="size-4" />
                           <span className="sr-only">Open menu</span>
                         </Button>
                       </DropdownMenuTrigger>
@@ -272,7 +272,7 @@ export function QuestsTable() {
                             open(link, "_blank");
                           }}
                         >
-                          <OpenInNewWindowIcon className="size-4 me-2" />
+                          <OpenInNewWindowIcon className="size-4" />
                           Open URL
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled>
@@ -327,19 +327,19 @@ export function QuestsTable() {
                                   <TableCell>
                                     {challenge.is_claimed ? (
                                       <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                        <CheckCircle2 className="size-4 text-green-500" />
                                         {/* <span>{challenge.steps[0].date}</span> */}
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-amber-500" />
+                                        <Clock className="size-4 text-amber-500" />
                                         <span>Pending</span>
                                       </div>
                                     )}
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-2">
-                                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                      <AlertCircle className="size-4 text-muted-foreground" />
                                       <span className="text-muted-foreground">
                                         Not Started
                                       </span>
@@ -379,7 +379,7 @@ export function QuestsTable() {
                                       variant="ghost"
                                       className="text-xs h-8"
                                     >
-                                      <Plus className="h-3 w-3 mr-1" />
+                                      <Plus className="size-3 mr-1" />
                                       Send New Invitation (
                                       {quest.maxInvites -
                                         quest.invitedCount}{" "}

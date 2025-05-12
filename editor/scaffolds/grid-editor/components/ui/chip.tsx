@@ -31,7 +31,7 @@ export function QueryChip({
         )}
       >
         {children}
-        <CaretDownIcon className="w-3 h-3 ms-2" />
+        <CaretDownIcon className="size-3 ms-2" />
       </Badge>
     </div>
   );

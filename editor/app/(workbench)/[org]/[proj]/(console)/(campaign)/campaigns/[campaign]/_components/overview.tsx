@@ -55,10 +55,10 @@ function generateChartConfig(data: AnalyzedData) {
     new Set(data.events.map((event) => event.name))
   );
   const colors = [
-    "hsl(var(--chart-1))",
-    "hsl(var(--chart-2))",
-    "hsl(var(--chart-3))",
-    "hsl(var(--chart-4))",
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
   ];
 
   const config: Record<string, any> = {};
@@ -94,7 +94,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <div className="rounded-full bg-muted p-4 mb-4">
-        <ActivityIcon className="h-8 w-8 text-muted-foreground" />
+        <ActivityIcon className="size-8 text-muted-foreground" />
       </div>
       <h3 className="text-lg font-medium mb-2">No activity yet</h3>
       <p className="text-sm text-muted-foreground text-center max-w-sm">
@@ -108,7 +108,7 @@ function EmptyState() {
 function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+      <Loader2 className="size-8 animate-spin text-muted-foreground mb-4" />
       <p className="text-sm text-muted-foreground">Loading activity data...</p>
     </div>
   );
@@ -176,7 +176,7 @@ export default function Overview() {
                   {event.name}
                 </CardTitle>
                 <div
-                  className="h-4 w-4 rounded-full"
+                  className="size-4 rounded-full"
                   style={{
                     backgroundColor: generateChartConfig(data.data)[event.name]
                       ?.color,

@@ -79,13 +79,12 @@ const MemberList = ({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem
+                    variant="destructive"
                     // owner cannot be removed
                     disabled={member.role === "owner"}
                     onClick={() => removeMember(member.id)}
                   >
-                    <span className="text-destructive">
-                      Remove from organization
-                    </span>
+                    Remove from organization
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

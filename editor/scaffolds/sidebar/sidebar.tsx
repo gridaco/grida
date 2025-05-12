@@ -103,25 +103,25 @@ export function EditorSidebar() {
         >
           <TabsList className="w-full max-w-full bg-sidebar-accent">
             <TabsTrigger value="project">
-              <ResourceTypeIcon type="project" className="w-4 h-4" />
+              <ResourceTypeIcon type="project" className="size-4" />
             </TabsTrigger>
             <TabsTrigger
               value="build"
               disabled={state.sidebar.mode_build.disabled}
             >
-              <HammerIcon className="w-4 h-4" />
+              <HammerIcon className="size-4" />
             </TabsTrigger>
             <TabsTrigger
               value="data"
               disabled={state.sidebar.mode_data.disabled}
             >
-              <DatabaseIcon className="w-4 h-4" />
+              <DatabaseIcon className="size-4" />
             </TabsTrigger>
             <TabsTrigger
               value="connect"
               disabled={state.sidebar.mode_connect.disabled}
             >
-              <PlugIcon className="w-4 h-4" />
+              <PlugIcon className="size-4" />
             </TabsTrigger>
           </TabsList>
         </Tabs>

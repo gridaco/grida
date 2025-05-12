@@ -318,7 +318,7 @@ export const FileUploaderItem = forwardRef<
       >
         <span className="sr-only">remove item {index}</span>
         <span className="hover:text-destructive duration-200 ease-in-out">
-          <Cross2Icon className="w-3 h-3" />
+          <Cross2Icon className="size-3" />
         </span>
       </button>
     </div>

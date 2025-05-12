@@ -74,7 +74,7 @@ export default function MessageAppFrame({
       >
         <form className="flex w-full items-center space-x-2 p-3">
           <Button className="rounded-full" size="icon" variant="ghost">
-            <PlusIcon className="h-5 w-5" />
+            <PlusIcon className="size-5" />
             <span className="sr-only">Add attachment</span>
           </Button>
           <div className="relative flex-1">

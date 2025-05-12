@@ -196,7 +196,7 @@ function DoctypeForms() {
             <SidebarMenuItem>
               {/* <Link href={`connect/integrations`}> */}
               <SidebarMenuButton disabled size="sm">
-                <CodeIcon className="w-4 h-4" />
+                <CodeIcon className="size-4" />
                 Integrations
                 <Badge variant="outline" className="ms-auto">
                   soon
@@ -424,7 +424,7 @@ function DoctypeSite() {
             <SidebarMenuItem>
               {/* <Link href={`connect/integrations`}> */}
               <SidebarMenuButton disabled size="sm">
-                <CodeIcon className="w-4 h-4" />
+                <CodeIcon className="size-4" />
                 Integrations
                 <Badge variant="outline" className="ms-auto">
                   soon
@@ -455,7 +455,7 @@ function DoctypeSite() {
             <SidebarMenuItem>
               {/* <Link href={`connect/integrations`}> */}
               <SidebarMenuButton disabled size="sm">
-                <SalesforceLogo className="w-4 h-4" />
+                <SalesforceLogo className="size-4" />
                 Salesforce
                 <Badge variant="outline" className="ms-auto">
                   soon

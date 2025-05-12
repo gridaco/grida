@@ -55,7 +55,7 @@ export function FormPageDeveloperErrorDialog({
     <Dialog>
       <DialogTrigger>
         <Button variant="destructive" size="icon">
-          <TriangleAlertIcon color="white" className="w-4 h-4" />
+          <TriangleAlertIcon color="white" className="size-4" />
         </Button>
       </DialogTrigger>
       <DialogContent>

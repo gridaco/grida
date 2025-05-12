@@ -193,7 +193,7 @@ export function Playground({
               </span>
             </button>
           </Link>
-          <SlashIcon className="h-6 w-6 opacity-20" />
+          <SlashIcon className="size-6 opacity-20" />
           <div className="ms-1">
             <Select
               disabled={busy}
@@ -230,7 +230,7 @@ export function Playground({
         <div className="flex-1 flex justify-center">
           {busy ? (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 border-2 border-t-[#333] rounded-full animate-spin" />
+              <div className="size-6 border-2 border-t-[#333] rounded-full animate-spin" />
               <span className="text-sm opacity-80">Generating...</span>
             </div>
           ) : (
@@ -258,14 +258,14 @@ export function Playground({
             disabled={!is_modified || busy}
             variant="secondary"
           >
-            <Link2Icon className="mr-2" />
+            <Link2Icon />
             Share
           </Button>
           <form action={`/playground/publish`} method="POST">
             <input type="hidden" name="src" value={__schema_txt || undefined} />
             <input type="hidden" name="gist" value={initial?.slug} />
             <Button disabled={busy}>
-              <RocketIcon className="mr-2" />
+              <RocketIcon />
               Publish
             </Button>
           </form>
@@ -274,7 +274,7 @@ export function Playground({
       <div className="flex-1 flex max-h-full overflow-hidden">
         <aside className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            <div className="relative flex-grow overflow-y-auto">
+            <div className="relative grow overflow-y-auto">
               {fileName === "variables.css" && (
                 <div className="absolute z-20 top-16 right-4 max-w-lg">
                   <ThemePalette
@@ -324,7 +324,7 @@ export function Playground({
                 }}
               />
             </div>
-            <Collapsible className="flex-shrink-0 overflow-hidden">
+            <Collapsible className="shrink-0 overflow-hidden">
               <CollapsibleTrigger className="w-full">
                 <header className="flex justify-between items-center border-y p-2">
                   <div>
@@ -353,7 +353,7 @@ export function Playground({
                             setLogs([]);
                           }}
                         >
-                          <BanIcon className="h-4 w-4" />
+                          <BanIcon className="size-4" />
                         </Button>
                       </div>
                       <div className="w-full h-full overflow-y-scroll">

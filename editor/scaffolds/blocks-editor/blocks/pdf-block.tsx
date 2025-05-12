@@ -79,7 +79,7 @@ export function PdfBlock({
             placeholder="Video URL"
           />
         </div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-video">
+        <div className="bg-neutral-200 rounded-sm overflow-hidden border border-black/20 aspect-video">
           <PDFViewer file={src ?? ""} />
         </div>
       </div>

@@ -50,7 +50,7 @@ function ActionsCell({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0">
+        <Button variant="ghost" className="size-8 p-0">
           <span className="sr-only">Open menu</span>
           <MoreHorizontal className="size-4" />
         </Button>
@@ -77,7 +77,7 @@ function ActionsCell({
             open(link, "_blank");
           }}
         >
-          <OpenInNewWindowIcon className="size-4 me-2" />
+          <OpenInNewWindowIcon className="size-4" />
           Open URL
         </DropdownMenuItem>
         <DropdownMenuItem disabled>View owner</DropdownMenuItem>
@@ -304,7 +304,7 @@ export function InvitationsTable() {
               exportDialog.openDialog();
             }}
           >
-            <DownloadIcon className="size-4 me-2" />
+            <DownloadIcon className="size-4" />
             Export CSV
           </Button>
         </div>

@@ -93,7 +93,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Gift className="h-6 w-6 text-primary" />
+          <Gift className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Set up your reward structure</h3>
@@ -163,7 +163,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+              <Users className="size-5" />
               Referrer Rewards
             </CardTitle>
           </CardHeader>
@@ -188,7 +188,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
                           size="sm"
                           onClick={() => removeMilestone(index)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="size-4" />
                         </Button>
                       )}
                     </div>
@@ -263,7 +263,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
                 className="w-full"
                 onClick={addMilestone}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="size-4" />
                 Add Milestone
               </Button>
             </div>
@@ -273,7 +273,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
-              <Gift className="h-5 w-5" />
+              <Gift className="size-5" />
               Invitee Reward
             </CardTitle>
           </CardHeader>

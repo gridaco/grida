@@ -52,12 +52,12 @@ export function XSBTableInfo({ table }: { table: GridaXSupabase.JSONSChema }) {
               <TableRow key={prop}>
                 <TableCell>
                   {meta.pk && (
-                    <KeyIcon className="me-1 inline align-middle w-4 h-4" />
+                    <KeyIcon className="me-1 inline align-middle size-4" />
                   )}
                   {meta.fk && (
                     <Tooltip>
                       <TooltipTrigger>
-                        <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                        <LinkIcon className="me-1 inline align-middle size-4" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <div className="max-w-40 overflow-scroll">
@@ -83,9 +83,9 @@ export function XSBTableInfo({ table }: { table: GridaXSupabase.JSONSChema }) {
         </TableBody>
       </Table>
       <Collapsible className="mt-4">
-        <CollapsibleTrigger>
+        <CollapsibleTrigger asChild>
           <Button variant="link" size="sm">
-            <CodeIcon className="me-2 align-middle" /> Raw JSON
+            <CodeIcon className="align-middle" /> Raw JSON
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>

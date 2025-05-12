@@ -143,9 +143,9 @@ export default function CodeTabs() {
       {/* Top bar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-neutral-700 border-b border-neutral-600">
         <div className="flex gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-red-400 border border-neutral-800" />
-          <div className="w-4 h-4 rounded-full bg-yellow-400 border border-neutral-800" />
-          <div className="w-4 h-4 rounded-full bg-green-400 border border-neutral-800" />
+          <div className="size-4 rounded-full bg-red-400 border border-neutral-800" />
+          <div className="size-4 rounded-full bg-yellow-400 border border-neutral-800" />
+          <div className="size-4 rounded-full bg-green-400 border border-neutral-800" />
         </div>
       </div>
 
@@ -178,7 +178,7 @@ export default function CodeTabs() {
                     : "text-neutral-500 bg-neutral-800 hover:bg-neutral-900"
                 }`}
               >
-                <CodeIcon className="w-4 h-4 mr-2" />
+                <CodeIcon className="size-4 mr-2" />
                 {tab.label}
               </button>
             ))}

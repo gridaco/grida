@@ -86,7 +86,7 @@ function PlayerAvatar({
       <TooltipTrigger asChild>
         <button
           data-selected={selected}
-          className="w-7 h-7 rounded-full bg-muted border-2 border-background focus:border-ring hover:border-ring hover:!z-10 transition data-[selected='true']:border-foreground data-[selected='true']:!z-10"
+          className="size-7 rounded-full bg-muted border-2 border-background focus:border-ring hover:border-ring hover:!z-10 transition data-[selected='true']:border-foreground data-[selected='true']:!z-10"
           style={{
             borderColor: type === "local" ? undefined : colors.ring,
             backgroundColor: type === "local" ? undefined : colors.fill,

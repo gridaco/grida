@@ -82,7 +82,7 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
         </BlockAction>
       </BlockHeader>
       <div>
-        <div className="rounded overflow-hidden border aspect-auto">
+        <div className="rounded-sm overflow-hidden border aspect-auto">
           <ThemedMonacoEditor
             height={400}
             defaultLanguage="html"

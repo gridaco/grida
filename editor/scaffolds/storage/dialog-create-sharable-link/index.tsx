@@ -6,7 +6,7 @@ import {
   DialogClose,
   DialogContent,
   DialogHeader,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { wellkown } from "@/utils/mimetype";
@@ -43,7 +43,7 @@ function ImageResourcePicker({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={value}
-              className="w-5 h-5 rounded-full object-contain"
+              className="size-5 rounded-full object-contain"
               alt=""
             />
           ) : (
@@ -229,7 +229,7 @@ export default function CreateViewerLinkDialog({
           <div>
             <DialogClose asChild>
               <Button variant="ghost" size="sm">
-                <Cross2Icon className="me-2" />
+                <Cross2Icon />
                 Cancel
               </Button>
             </DialogClose>

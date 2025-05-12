@@ -5,7 +5,7 @@ import { grida } from "@/grida";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { useEyeDropper } from "./utils/eyedropper";
 import {
   Tooltip,
@@ -55,7 +55,7 @@ export function ColorPicker({
               });
             }}
           >
-            <PipetteIcon className="w-4 h-4" />
+            <PipetteIcon className="size-4" />
           </Button>
           <div
             className={cn(
@@ -86,11 +86,11 @@ export function ColorPicker({
               <Tooltip key={option.id}>
                 <TooltipTrigger>
                   <div
-                    className="w-4 h-4"
+                    className="size-4"
                     onClick={() => onColorChange?.(option.color)}
                   >
                     <div
-                      className="w-5 h-5 rounded-sm border"
+                      className="size-5 rounded-xs border"
                       style={{
                         background: `rgba(${option.color.r}, ${option.color.g}, ${option.color.b}, ${option.color.a})`,
                       }}

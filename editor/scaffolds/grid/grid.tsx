@@ -275,7 +275,7 @@ export function DataGrid({
         <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
           <RDG
             className={cn(
-              "flex-grow select-none text-xs text-foreground/80",
+              "grow select-none text-xs text-foreground/80",
               className
             )}
             rowKeyGetter={rowKeyGetter}
@@ -361,11 +361,11 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: DGSystemColumnKey }) {
   switch (key) {
     case "__gf_display_id":
-      return <KeyIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />;
+      return <KeyIcon className="min-w-4 size-4 text-workbench-accent-sky" />;
     case "__gf_created_at":
-      return <CalendarIcon className="min-w-4 w-4 h-4" />;
+      return <CalendarIcon className="min-w-4 size-4" />;
     case "__gf_customer_id":
-      return <AvatarIcon className="min-w-4 w-4 h-4" />;
+      return <AvatarIcon className="min-w-4 size-4" />;
   }
 }
 
@@ -432,7 +432,7 @@ function DefaultPropertyCustomerCell({
           });
         }}
       >
-        <ArrowRightIcon className="w-3 h-3" />
+        <ArrowRightIcon className="size-3" />
       </FloatingIconButton>
     </CellRoot>
   );
@@ -446,7 +446,7 @@ function FloatingIconButton({
     <Button
       variant="outline"
       size="icon"
-      className="p-1 w-5 h-5"
+      className="p-1 size-5"
       onClick={onClick}
     >
       {children}
@@ -532,7 +532,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
           className="w-full h-full p-2 flex gap-2 items-center"
         >
           <div
-            className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
+            className="aspect-square min-w-4 rounded-sm bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
           <span>
@@ -595,7 +595,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         <CellRoot {...rootprops}>
           <FileTypeIcon
             type="richtext"
-            className="inline w-4 h-4 align-middle me-2"
+            className="inline size-4 align-middle me-2"
           />{" "}
           DOCUMENT
         </CellRoot>
@@ -656,7 +656,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
           {fk && (
             <ReferencedRowLookupPopover relation={fk} value={value}>
               <FloatingIconButton onClick={onFKClick}>
-                <ArrowRightIcon className="w-3 h-3" />
+                <ArrowRightIcon className="size-3" />
               </FloatingIconButton>
             </ReferencedRowLookupPopover>
           )}
@@ -689,15 +689,15 @@ function MediaCellContent({
           files: (f, i) => {
             return (
               <span key={i} className="group">
-                <div className="relative inline-flex w-5 h-5 me-1 align-middle">
+                <div className="relative inline-flex size-5 me-1 align-middle">
                   <div className="visible group-hover:invisible">
-                    <FileTypeIcon type={type} className="w-4 h-4" />
+                    <FileTypeIcon type={type} className="size-4" />
                   </div>
-                  <div className="absolute inset-0 rounded hidden group-hover:flex items-center">
+                  <div className="absolute inset-0 rounded-sm hidden group-hover:flex items-center">
                     <Button
                       variant="default"
                       size="icon"
-                      className="w-5 h-5 p-0.5 rounded-sm"
+                      className="size-5 p-0.5 rounded-xs"
                       onClick={() => {
                         openInPictureInPicture(
                           {
@@ -748,7 +748,7 @@ function FileCellContent({
               <span key={i}>
                 <FileTypeIcon
                   type={type}
-                  className="inline w-4 h-4 align-middle me-2"
+                  className="inline size-4 align-middle me-2"
                 />
                 <span>{f.name}</span>
               </span>
@@ -785,7 +785,7 @@ function ImageCellContent({
                 <img
                   src={f.srcset.thumbnail}
                   alt={f.name}
-                  className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                  className="h-full min-w-8 aspect-square rounded-sm overflow-hidden object-cover bg-neutral-500"
                   loading="lazy"
                 />
               </figure>

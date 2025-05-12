@@ -156,7 +156,7 @@ function Body() {
                           <Button
                             size="icon"
                             variant="outline"
-                            className="w-7 h-7"
+                            className="size-7"
                             onClick={onClearSelection}
                           >
                             <Cross2Icon />
@@ -184,13 +184,13 @@ function Body() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                      <div className="flex justify-center items-center divide-x *:px-2 *:first:pl-0 *:last:pr-0">
                         <Tabs defaultValue="default">
                           <TabsList>
                             <TabsTrigger value="default">
                               <ResourceTypeIcon
                                 type={"user"}
-                                className="inline align-middle w-4 min-w-4 h-4 me-2"
+                                className="inline align-middle w-4 min-size-4"
                               />
                               Customer
                             </TabsTrigger>

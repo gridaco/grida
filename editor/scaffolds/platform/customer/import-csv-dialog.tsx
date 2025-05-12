@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Progress } from "@/components/ui-editor/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, File } from "lucide-react";
 import { SimpleCSVTable } from "@/components/table/simple-csv-table";
@@ -156,7 +156,7 @@ export function ImportCSVDialog({
             </ScrollArea>
 
             <Alert>
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="size-4" />
               <AlertTitle>Review your data</AlertTitle>
               <AlertDescription>
                 Please review the data before importing. This action cannot be
@@ -311,8 +311,8 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
         className="hidden"
       />
 
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-        <File className="h-6 w-6 text-muted-foreground" />
+      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
+        <File className="size-6 text-muted-foreground" />
       </div>
 
       <div className="mt-4 flex flex-col items-center justify-center text-sm">
@@ -323,7 +323,7 @@ function FileUploader({ onFileSelected }: FileUploaderProps) {
       </div>
 
       <Button variant="outline" onClick={handleButtonClick} className="mt-4">
-        <Upload className="mr-2 h-4 w-4" />
+        <Upload className="size-4" />
         Select CSV File
       </Button>
     </div>

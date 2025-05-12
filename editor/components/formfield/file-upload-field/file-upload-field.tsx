@@ -184,7 +184,7 @@ function FilePreview({
 
     return (
       <div className="w-full flex justify-center gap-2 p-2 items-center">
-        <FileIcon className="w-8 h-8" />
+        <FileIcon className="size-8" />
         <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
           {file.name}
         </span>
@@ -196,12 +196,12 @@ function FilePreview({
     <div className="relativ h-20e">
       <Body />
       {(status === "uploading" || status === "pending") && (
-        <div className="absolute top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="absolute top-0 left-0 right-0 bottom-0 bg-black/50 flex items-center justify-center">
           <Spinner />
         </div>
       )}
       {status === "failed" && (
-        <div className="absolute top-0 left-0 right-0 bottom-0 bg-red-500 bg-opacity-50 flex items-center justify-center">
+        <div className="absolute top-0 left-0 right-0 bottom-0 bg-destructive/50 flex items-center justify-center">
           <ExclamationTriangleIcon className="text-destructive" />
         </div>
       )}

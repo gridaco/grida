@@ -57,7 +57,7 @@ import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { ShineBorder } from "@/www/ui/shine-border";
 import type {
   GDocument,
@@ -371,7 +371,7 @@ export function NavProjects({
       {allowNew && (
         <CreateNewProjectDialog org={orgname}>
           <SidebarGroupAction>
-            <PlusIcon className="w-4 h-4" />
+            <PlusIcon className="size-4" />
           </SidebarGroupAction>
         </CreateNewProjectDialog>
       )}
@@ -391,7 +391,7 @@ export function NavProjects({
                   <Link href={project.url}>
                     <ResourceTypeIcon
                       type="project"
-                      className="inline align-middle w-4 h-4"
+                      className="inline align-middle size-4"
                     />
                     <span>{project.name}</span>
                   </Link>
@@ -439,13 +439,13 @@ export function NavProjects({
                     </Link>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
+                      variant="destructive"
                       onSelect={() => {
                         deleteProjectDialog.openDialog({
                           id: project.id,
                           match: `DELETE ${project.name}`,
                         });
                       }}
-                      className="text-destructive"
                     >
                       <Trash2Icon className="size-3.5" />
                       <span>Delete Project</span>
@@ -468,7 +468,7 @@ export function NavProjects({
                           <Link href={page.url}>
                             <ResourceTypeIcon
                               type={page.doctype}
-                              className="inline align-middle w-4 h-4"
+                              className="inline align-middle size-4"
                             />
                             <span>{page.title}</span>
                           </Link>
@@ -507,7 +507,7 @@ function OrganizationSwitcher({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton className="w-fit px-1.5">
               <OrganizationAvatar
-                className="inline size-6 border shadow-sm rounded"
+                className="inline size-6 border shadow-sm rounded-sm"
                 avatar_url={organization.avatar_url}
                 alt={organization.display_name}
               />
@@ -530,7 +530,7 @@ function OrganizationSwitcher({
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem className="gap-2 p-2">
                   <OrganizationAvatar
-                    className="inline size-6 border shadow-sm rounded"
+                    className="inline size-6 border shadow-sm rounded-sm"
                     avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />

@@ -41,7 +41,6 @@ function Hero() {
       <div className="flex gap-4 mt-12">
         <Button
           variant="outline"
-          className="border border-gray-400 bg-white text-black font-mono dark:border-none"
           onClick={() => {
             navigator.clipboard.writeText("npx grida init");
             setCopied(true);
@@ -51,12 +50,7 @@ function Hero() {
           {copied ? "Copied to clipboard" : "npx grida init"}
         </Button>
         <a href="https://grida.co/docs/cli">
-          <Button
-            variant="default"
-            className="bg-black text-white font-mono dark:hover:bg-neutral-700"
-          >
-            Start Coding
-          </Button>
+          <Button variant="default">Start Coding</Button>
         </a>
       </div>
     </section>
@@ -173,16 +167,10 @@ function Demo3() {
           </h3>
           <div className="flex gap-4 mt-4 items-center justify-center">
             <a href="https://grida.co/docs/cli">
-              <Button
-                variant="default"
-                className="bg-black text-white font-mono dark:hover:bg-neutral-700"
-              >
-                Start Coding
-              </Button>
+              <Button variant="default">Start Coding</Button>
             </a>
             <Button
               variant="outline"
-              className="border border-gray-400 bg-white text-black font-mono dark:border-none"
               onClick={() => {
                 navigator.clipboard.writeText("npx grida init");
                 setCopied(true);
@@ -355,9 +343,9 @@ function TerminalAnimation() {
         {/* Terminal header */}
         <div className="flex items-center px-4 py-2 bg-gray-100 border-b-gray-200">
           <div className="flex space-x-2">
-            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-red-400"></div>
-            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
-            <div className="w-4 h-4 rounded-full border border-neutral-200 bg-green-400"></div>
+            <div className="size-4 rounded-full border border-neutral-200 bg-red-400"></div>
+            <div className="size-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
+            <div className="size-4 rounded-full border border-neutral-200 bg-green-400"></div>
           </div>
           <div className="mx-auto text-sm text-gray-500">
             ~/projects/my-react-app -- zsh
@@ -396,7 +384,7 @@ function TerminalAnimation() {
         variant="outline"
         className="mt-6 flex items-center gap-2 px-4 py-2 transition-all duration-300 border border-gray-200 rounded-full bg-white text-black"
       >
-        <RefreshCw className="w-4 h-4" />
+        <RefreshCw className="size-4" />
         <span>replay</span>
       </Button>
     </div>

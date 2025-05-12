@@ -577,7 +577,7 @@ function FloatingCursorTooltip() {
           transform: "translate(8px, calc(-100% - 8px))",
         }}
       >
-        <div className="bg-pink-500 text-white text-xs px-1 py-0.5 rounded shadow">
+        <div className="bg-pink-500 text-white text-xs px-1 py-0.5 rounded-sm shadow">
           {value}
         </div>
       </div>
@@ -1341,7 +1341,7 @@ function DistributeButton({
   return (
     <div className="absolute hidden group-hover:block bottom-1 right-1 z-50 pointer-events-auto">
       <button
-        className="p-1 bg-workbench-accent-sky text-white rounded pointer-events-auto"
+        className="p-1 bg-workbench-accent-sky text-white rounded-sm pointer-events-auto"
         onClick={(e) => {
           e.stopPropagation();
           onClick?.(axis);

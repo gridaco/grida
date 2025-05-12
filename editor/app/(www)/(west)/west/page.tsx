@@ -330,7 +330,7 @@ function FeatureCard({
           <p className="text-muted-foreground mb-4 text-sm">{description}</p>
         </div>
         {imageSrc && (
-          <div className="flex-shrink-0 w-[200px] h-[200px] lg:w-[300px] lg:h-[300px] relative hover:scale-105 duration-500 transition-all">
+          <div className="shrink-0 w-[200px] h-[200px] lg:w-[300px] lg:h-[300px] relative hover:scale-105 duration-500 transition-all">
             <Image
               src={imageSrc}
               alt={`${title} image`}
@@ -355,7 +355,7 @@ function StepCard({
 }) {
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm group">
-      <div className="mb-4 relative flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-300/10 text-xl font-bold transition-all duration-300 overflow-hidden">
+      <div className="mb-4 relative flex size-12 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-300/10 text-xl font-bold transition-all duration-300 overflow-hidden">
         <span className="group-hover:opacity-0 group-hover:scale-90 transition-all duration-300 ease-in-out">
           {number}
         </span>
@@ -392,11 +392,11 @@ function TestimonialCard({
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="flex mb-4 text-slate-600">
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
-        <Star className="h-5 w-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
+        <Star className="size-5 fill-current" />
       </div>
       <p className="mb-4 italic text-muted-foreground">&quot;{quote}&quot;</p>
       <div>
@@ -552,7 +552,7 @@ function InteractiveCardDemo() {
                                 className="border-primary-foreground"
                                 onClick={handleNext}
                               >
-                                Next <ArrowRight className="ml-2 h-4 w-4" />
+                                Next <ArrowRight className="ml-2 size-4" />
                               </Button>
                             </CardFooter>
                           </Card>
@@ -570,7 +570,7 @@ function InteractiveCardDemo() {
                           setTimeout(() => setActiveCard(index), 300);
                         }}
                         className={cn(
-                          "w-2 h-2 rounded-full transition-all",
+                          "size-2 rounded-full transition-all",
                           index === activeCard
                             ? "bg-black w-6"
                             : "bg-muted dark:bg-muted/10"
@@ -605,7 +605,7 @@ function HorizontalCard({
   imageSrc?: string;
 }) {
   return (
-    <div className="card flex-shrink-0 flex items-end gap-6">
+    <div className="card shrink-0 flex items-end gap-6">
       <div className="flex-1">
         <div className="text-3xl mb-2">{icon}</div>
         <h3 className="text-xl font-bold mb-2">{title}</h3>
@@ -688,7 +688,7 @@ function HorizontalScrollDemo() {
                 display: none;
               }
             `}</style>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center pl-20 py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center pl-20 py-20">
               <HorizontalCard
                 icon="📊"
                 title="Campaign Analytics"
@@ -696,7 +696,7 @@ function HorizontalScrollDemo() {
                 imageSrc="/www/.west/demo-1.png"
               />
             </div>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center py-20">
               <HorizontalCard
                 icon="💸"
                 title="Interactive Campaign Rewards"
@@ -704,7 +704,7 @@ function HorizontalScrollDemo() {
                 imageSrc="/www/.west/demo-2.png"
               />
             </div>
-            <div className="snap-start flex-shrink-0  flex items-center justify-center pr-20 py-20">
+            <div className="snap-start shrink-0  flex items-center justify-center pr-20 py-20">
               <HorizontalCard
                 icon="🗂️"
                 title="Powerful Customer management"
@@ -743,7 +743,7 @@ function WestCTA() {
             <Link href={sitemap.links.signin}>
               <Button className="flex-1 group" size="lg">
                 Get Started
-                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 size-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
             <Link href={sitemap.links.book30}>

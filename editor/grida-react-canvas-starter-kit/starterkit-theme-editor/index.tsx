@@ -42,7 +42,7 @@ import {
   SectionHeaderDescription,
   SectionHeaderTitle,
 } from "./components/section-header";
-import colors, { ColorPalette } from "@/k/tailwindcolors";
+import colors, { ColorPalette } from "@/theme/tailwindcolors";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import { ThemeEditorProvider, ThemeEditorState, useThemeEditor } from "./state";
@@ -353,7 +353,7 @@ function Typography() {
             Customize your theme typography
           </SectionHeaderDescription>
         </SectionHeader>
-        <div className="max-w-md border border-dashed rounded-sm p-4">
+        <div className="max-w-md border border-dashed rounded-xs p-4">
           <article className="prose dark:prose-invert">
             <h1>Prose Preview</h1>
             <p>This paragraph demonstrates TailwindCSS prose styling.</p>

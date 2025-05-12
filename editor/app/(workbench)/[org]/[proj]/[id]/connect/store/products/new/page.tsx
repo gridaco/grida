@@ -188,7 +188,7 @@ function Variants() {
         </CardFooter>
       </Card>
       <div className="w-full flex justify-center my-5">
-        <ArrowDownIcon className="w-5 h-5" />
+        <ArrowDownIcon className="size-5" />
       </div>
       <Card>
         <CardHeader>
@@ -348,7 +348,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
                       className="absolute top-0 right-2 bottom-0 flex items-center justify-center"
                       onClick={() => handleValueDelete(i)}
                     >
-                      <button className="w-4 h-4 ">
+                      <button className="size-4 ">
                         <TrashIcon />
                       </button>
                     </div>

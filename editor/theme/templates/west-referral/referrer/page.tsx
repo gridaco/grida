@@ -279,7 +279,7 @@ export default function ReferrerPageTemplate({
               )}
             </Standard.Section>
             <Standard.Section className="py-4">
-              <Card className="relative overflow-hidden rounded-xl border-0">
+              <Card className="relative overflow-hidden rounded-xl border-0 p-0">
                 <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
                 <div className="px-4 py-1.5 m-0.5 relative border border-background rounded-t-[10px] overflow-hidden flex items-center z-10">
                   {/* background */}
@@ -487,7 +487,7 @@ function StatusIndicator({
   // if (invitation.is_burned) {
   //   return (
   //     <Badge className="bg-white text-amber-600 hover:bg-white flex items-center gap-1 font-medium">
-  //       <Gift className="h-3 w-3" />
+  //       <Gift className="size-3" />
   //       미션 완료
   //     </Badge>
   //   );
@@ -496,7 +496,7 @@ function StatusIndicator({
   if (invitation.is_claimed) {
     return (
       <Badge className="bg-white text-green-600 hover:bg-white flex items-center gap-1 font-medium">
-        <Check className="h-3 w-3" />
+        <Check className="size-3" />
         {t.invitation_status_accepted}
       </Badge>
     );

@@ -4,25 +4,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
-import {
-  HexColorPicker,
-  HslStringColorPicker,
-  HsvStringColorPicker,
-  HsvaStringColorPicker,
-  RgbStringColorPicker,
-  RgbaStringColorPicker,
-} from "react-colorful";
 import parse from "color-parse";
-
-const picker = {
-  hex: HexColorPicker,
-  hsl: HslStringColorPicker,
-  hsv: HsvStringColorPicker,
-  hsva: HsvaStringColorPicker,
-  rgb: RgbStringColorPicker,
-  rgba: RgbaStringColorPicker,
-  noop: () => null,
-};
+import { pickers } from "@/components/color-picker";
 
 export function ColorPickerChip({
   id,
@@ -40,11 +23,11 @@ export function ColorPickerChip({
   const { space } = parse(value);
 
   const Picker =
-    space && space in picker
-      ? picker[space as keyof typeof picker]
-      : picker.noop;
+    space && space in pickers
+      ? pickers[space as keyof typeof pickers]
+      : pickers.noop;
 
-  const no_picker = Picker === picker.noop;
+  const no_picker = Picker === pickers.noop;
 
   return (
     <Popover>

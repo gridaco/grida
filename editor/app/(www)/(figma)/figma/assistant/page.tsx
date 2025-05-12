@@ -57,7 +57,7 @@ function Hero() {
             rel="noopener noreferrer"
             className="flex items-center text-white gap-2"
           >
-            <Github className="h-5 w-5" />
+            <Github className="size-5" />
             <span>600 Stars</span>
           </a>
 
@@ -108,7 +108,7 @@ function WaitlistCard() {
               {" "}
               <Button variant="ghost" className="h-auto text-base">
                 Book a Demo
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 size-4" />
               </Button>
             </a>
           </div>

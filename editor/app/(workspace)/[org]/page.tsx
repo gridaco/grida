@@ -75,14 +75,14 @@ export default function OrganizationDashboardPage(props: {
                   <CardHeader />
                   <div className="flex flex-col items-center justify-center gap-8">
                     <div className="flex flex-col gap-2 items-center">
-                      <BoxSelectIcon className="w-12 h-12 text-muted-foreground" />
+                      <BoxSelectIcon className="size-12 text-muted-foreground" />
                       <h2 className="text-lg text-muted-foreground">
                         No projects yet
                       </h2>
                     </div>
                     <CreateNewProjectDialog org={organization.name}>
                       <Button variant="outline">
-                        <PlusIcon className="inline w-4 h-4 me-2" />
+                        <PlusIcon />
                         Create your first project
                       </Button>
                     </CreateNewProjectDialog>
@@ -102,7 +102,7 @@ export default function OrganizationDashboardPage(props: {
                     <Link href={`/${organization.name}/${p.name}`}>
                       <h2 className="text-2xl font-bold">
                         {p.name}
-                        <OpenInNewWindowIcon className="inline align-middle ms-2 w-5 h-5" />
+                        <OpenInNewWindowIcon className="inline align-middle ms-2 size-5" />
                       </h2>
                     </Link>
                     <CreateNewDocumentButton

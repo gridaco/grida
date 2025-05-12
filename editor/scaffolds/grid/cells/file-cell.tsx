@@ -222,7 +222,7 @@ function FileItem({
   return (
     <div
       //
-      className="flex items-start hover:bg-secondary rounded"
+      className="flex items-start hover:bg-secondary rounded-sm"
     >
       {/* TODO: dnd & sort */}
       {/* <Button variant="ghost" size="icon" className="cursor-move">
@@ -362,7 +362,7 @@ function FileCard(props: {
             <span className="cursor-pointer hover:underline text-sm">
               <FileTypeIcon
                 type={type}
-                className="inline w-4 h-4 align-middle me-2"
+                className="inline size-4 align-middle me-2"
               />
               {f.name}
             </span>

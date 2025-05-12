@@ -3,7 +3,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { Select } from "@radix-ui/react-select";
 import { SelectContent, SelectItem } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils";
 import { TChange, TMixed } from "./utils/types";
@@ -39,7 +39,7 @@ export function FontSizeControl({
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>
-            <Button variant="ghost" size="xs" className="w-6 h-6 m-0.5 p-0">
+            <Button variant="ghost" size="xs" className="size-6 m-0.5 p-0">
               <CaretDownIcon />
             </Button>
           </SelectPrimitive.SelectTrigger>

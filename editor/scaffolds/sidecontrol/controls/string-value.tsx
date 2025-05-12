@@ -59,7 +59,7 @@ export function StringValueControl({
         <DropdownMenuTrigger disabled={disabled} asChild>
           <button
             disabled={disabled}
-            className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded-sm flex items-center justify-center z-10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <BoltIcon className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
@@ -72,7 +72,7 @@ export function StringValueControl({
           {schema && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+                <PropertyTypeIcon type="object" className="me-2 size-4" />
                 props
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
@@ -98,30 +98,30 @@ export function StringValueControl({
               );
             }}
           >
-            <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+            <PropertyTypeIcon type="object" className="me-2 size-4" />
             Page
           </PropertyAccessDropdownMenu> */}
           {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <TokensIcon className="me-2 w-4 h-4" />
+              <TokensIcon className="me-2 size-4" />
               Item (in list)
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="number" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="number" className="me-2 size-4" />
                   property.a
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="string" className="me-2 size-4" />
                   property.b
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="string" className="me-2 size-4" />
                   property.c
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <PropertyTypeIcon type="any" className="me-2 w-4 h-4" />
+                  <PropertyTypeIcon type="any" className="me-2 size-4" />
                   property.d
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -129,7 +129,7 @@ export function StringValueControl({
           </DropdownMenuSub> */}
           {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <CookieIcon className="me-2 w-4 h-4" />
+              <CookieIcon className="me-2 size-4" />
               Sample Data
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -264,7 +264,7 @@ function TemplateExpressionValue({
 }) {
   return (
     <div className="flex h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-      <div className="px-1 flex overflow-hidden space-x-1">
+      <div className="px-1 flex overflow-hidden gap-1">
         {value.templateSpans.map((span, i) => {
           switch (span.kind) {
             case "StringLiteral":

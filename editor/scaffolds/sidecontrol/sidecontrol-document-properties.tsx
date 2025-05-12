@@ -13,7 +13,7 @@ import {
   PropertySeparator,
   PropertyTextarea,
 } from "./ui";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { CubeIcon, GearIcon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserDataControl } from "./controls/x-userdata";
@@ -83,7 +83,7 @@ export function DocumentProperties({ className }: { className?: string }) {
               variant="ghost"
               size="xs"
               onClick={addProperty}
-              className="w-4 h-4 p-0"
+              className="size-4 p-0"
             >
               <PlusIcon />
             </Button>
@@ -173,7 +173,7 @@ function PropertyDefinitionBlock({
           <SidebarSectionHeaderActions className="gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="w-4 h-4 p-0">
+                <Button variant="ghost" size="xs" className="size-4 p-0">
                   <GearIcon />
                 </Button>
               </DropdownMenuTrigger>
@@ -194,7 +194,7 @@ function PropertyDefinitionBlock({
             <Button
               variant="ghost"
               size="xs"
-              className="w-4 h-4 p-0"
+              className="size-4 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove?.();

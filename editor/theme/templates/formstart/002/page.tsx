@@ -76,7 +76,7 @@ export default function _002() {
                     <div>
                       <ModeratorDrawer>
                         <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
+                          <Avatar className="size-8">
                             <AvatarImage
                               src="/templates/sample-faces/anthony-le-lmdHAyY57KQ-unsplash.jpg"
                               className="object-cover"
@@ -113,7 +113,7 @@ export default function _002() {
                           className="border-foreground bg-transparent rounded-none"
                         >
                           <span>Register Now</span>
-                          <ArrowRightIcon className="ms-2 w-4 h-4 text-orange-400" />
+                          <ArrowRightIcon className="ms-2 size-4 text-orange-400" />
                         </Button>
                       </Link>
                     </div>
@@ -200,7 +200,7 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
         <DrawerHeader className="text-start">
           <DrawerTitle>
             <span className="inline-flex align-middle me-2">
-              <Avatar className="w-8 h-8">
+              <Avatar className="size-8">
                 <AvatarImage
                   src="/templates/sample-faces/anthony-le-lmdHAyY57KQ-unsplash.jpg"
                   className="object-cover"
@@ -216,19 +216,19 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
         </DrawerHeader>
         <div className="p-4 flex flex-col gap-2 text-muted-foreground">
           <li className="flex items-center gap-2">
-            <PhoneIcon className="w-4 h-4" />
+            <PhoneIcon className="size-4" />
             <Link href={"tel:010-1234-5678"}>
               <span>010-1234-5678</span>
             </Link>
           </li>
           <li className="flex items-center gap-2">
-            <KakaoTalkLogo className="w-4 h-4" />
+            <KakaoTalkLogo className="size-4" />
             <Link href={"tel:010-1234-5678"}>
               <span>010-1234-5678</span>
             </Link>
           </li>
           <li className="flex items-center gap-2">
-            <GlobeIcon className="w-4 h-4" />
+            <GlobeIcon className="size-4" />
             <Link href={"https://acme.com"}>
               <span>www.acme.com</span>
             </Link>

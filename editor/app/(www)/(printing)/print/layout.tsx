@@ -69,7 +69,7 @@ function AppSidebar() {
             <SidebarMenuButton asChild>
               <div>
                 <Link href="/">
-                  <GridaLogo className="w-4 h-4" />
+                  <GridaLogo className="size-4" />
                 </Link>
                 <SlashIcon />
                 <Link href="/print">

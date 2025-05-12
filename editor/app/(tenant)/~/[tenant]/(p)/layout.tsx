@@ -1,4 +1,9 @@
 import type { Metadata } from "next";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Customer Portal",
@@ -9,5 +14,14 @@ export default function PortalLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <>{children}</>;
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider>
+          <Toaster position="bottom-center" />
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }

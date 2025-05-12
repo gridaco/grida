@@ -30,7 +30,7 @@ export function ContinueWithGoogleButton({
 
   return (
     <button
-      className="flex px-4 py-2 rounded items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow"
+      className="flex px-4 py-2 rounded-sm items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow"
       onClick={() => {
         client.auth
           .signInWithOAuth({
@@ -83,7 +83,7 @@ export function ContinueWithGoogleButton({
 function GoogleLogo() {
   return (
     <svg
-      className="w-5 h-5 fill-black dark:fill-white"
+      className="size-5 fill-black dark:fill-white"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 210 210"
     >

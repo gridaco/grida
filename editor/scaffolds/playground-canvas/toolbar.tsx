@@ -216,7 +216,7 @@ export function PlaygroundToolbar({
           {/* <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" className="px-3">
-                <OpenAILogo className="w-4 h-4" />
+                <OpenAILogo className="size-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -322,7 +322,7 @@ function ClipboardColor() {
         className={toggleVariants({ variant: "default", size: "default" })}
       >
         <div
-          className="border rounded-full w-5 h-5"
+          className="border rounded-full size-5"
           style={{
             background: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
           }}

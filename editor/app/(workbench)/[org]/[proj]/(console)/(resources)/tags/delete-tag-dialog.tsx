@@ -14,6 +14,7 @@ import {
 import type { Platform } from "@/lib/platform";
 import { useTags } from "@/scaffolds/workspace";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 interface DeleteTagDialogProps {
   tag: Platform.Tag.TagWithUsageCount;
@@ -63,12 +64,14 @@ export function DeleteTagDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
+          <AlertDialogAction asChild>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDelete}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -131,7 +131,7 @@ export function AuthPolicyList() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="size-4" />
                           <span className="sr-only">Open menu</span>
                         </Button>
                       </DropdownMenuTrigger>
@@ -143,8 +143,8 @@ export function AuthPolicyList() {
                           </DropdownMenuItem>
                         </Link>
                         <DropdownMenuItem
+                          variant="destructive"
                           onClick={() => handleDeleteClick(policy.id)}
-                          className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="size-4" />
                           Delete
@@ -171,11 +171,10 @@ export function AuthPolicyList() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground"
-            >
-              Delete
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -55,10 +55,10 @@ export function TypeSelect({
           className="w-full justify-between capitalize"
         >
           <div className="flex gap-2 items-center">
-            {value && <FormFieldTypeIcon type={value} className="w-4 h-4" />}
+            {value && <FormFieldTypeIcon type={value} className="size-4" />}
             {value ? value : "Select"}
           </div>
-          <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
@@ -79,12 +79,12 @@ export function TypeSelect({
                 >
                   <CheckIcon
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "size-4",
                       value === opt.value ? "opacity-100" : "opacity-0"
                     )}
                   />
                   <div className="flex items-center gap-2">
-                    <FormFieldTypeIcon type={opt.value} className="w-4 h-4" />
+                    <FormFieldTypeIcon type={opt.value} className="size-4" />
                     <span className="capitalize">
                       {opt.label ?? fieldlabels[opt.value]}
                     </span>

@@ -24,7 +24,6 @@ export const Palette = z.object({
   "--accent": HSL,
   "--accent-foreground": HSL,
   "--destructive": HSL,
-  "--destructive-foreground": HSL,
   "--border": HSL,
   "--input": HSL,
   "--ring": HSL,

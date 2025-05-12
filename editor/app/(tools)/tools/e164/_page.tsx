@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -106,11 +112,13 @@ export default function PhoneNumberTool() {
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Input Section */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Input</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Input</CardTitle>
+          </CardHeader>
 
-          <div className="space-y-4">
-            <div>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
               <Label htmlFor="country">Select Country Code</Label>
               <Select value={country} onValueChange={setCountry}>
                 <SelectTrigger>
@@ -126,7 +134,7 @@ export default function PhoneNumberTool() {
               </Select>
             </div>
 
-            <div>
+            <div className="grid gap-2">
               <Label htmlFor="phoneNumbers">
                 Enter phone numbers (one per line)
               </Label>
@@ -138,52 +146,56 @@ export default function PhoneNumberTool() {
                 className="min-h-[200px]"
               />
             </div>
+          </CardContent>
+          <CardFooter className="flex gap-2">
+            <Button onClick={processPhoneNumbers} className="flex-1">
+              Format Numbers
+            </Button>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={processPhoneNumbers} className="flex-1">
-                Format Numbers
+            <div className="relative flex-1">
+              <Button variant="outline" className="w-full">
+                <Upload className="size-4" />
+                Upload File
               </Button>
-
-              <div className="relative flex-1">
-                <Button variant="outline" className="w-full">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload File
-                </Button>
-                <input
-                  type="file"
-                  accept=".txt"
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-              </div>
+              <input
+                type="file"
+                accept=".txt"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
             </div>
-          </div>
+          </CardFooter>
         </Card>
 
         {/* Output Section */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Output</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Output</CardTitle>
+          </CardHeader>
 
-          <div className="space-y-4">
-            {error && <p className="text-sm text-red-500">{error}</p>}
+          <CardContent>
+            <div className="space-y-4">
+              {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <Textarea
-              value={outputText}
-              readOnly
-              placeholder="Formatted E.164 numbers will appear here..."
-              className="min-h-[200px]"
-            />
-
+              <Textarea
+                value={outputText}
+                readOnly
+                placeholder="Formatted E.164 numbers will appear here..."
+                className="min-h-[200px]"
+              />
+            </div>
+          </CardContent>
+          <CardFooter>
             <Button
               variant="outline"
               onClick={downloadResults}
               disabled={!outputText}
               className="w-full"
             >
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="size-4" />
               Download Results
             </Button>
-          </div>
+          </CardFooter>
         </Card>
       </div>
     </div>

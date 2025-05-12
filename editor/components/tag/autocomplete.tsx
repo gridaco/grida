@@ -240,7 +240,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={`lucide lucide-chevron-down h-4 w-4 shrink-0 opacity-50 ${isPopoverOpen ? "rotate-180" : "rotate-0"}`}
+                className={`lucide lucide-chevron-down size-4 shrink-0 opacity-50 ${isPopoverOpen ? "rotate-180" : "rotate-0"}`}
               >
                 <path d="m6 9 6 6 6-6"></path>
               </svg>
@@ -295,7 +295,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
                       role="option"
                       aria-selected={isSelected}
                       className={cn(
-                        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-accent",
+                        "relative flex cursor-pointer select-none items-center rounded-xs px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 hover:bg-accent",
                         isSelected && "bg-accent text-accent-foreground",
                         classStyleProps?.commandItem
                       )}

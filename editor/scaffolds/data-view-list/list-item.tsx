@@ -61,7 +61,7 @@ export function ListItem({
       }}
     >
       <div
-        className="group overflow-hidden hover:bg-secondary cursor-default rounded-sm"
+        className="group overflow-hidden hover:bg-secondary cursor-default rounded-xs"
         style={{
           height: ITEM_HEIGHT,
         }}
@@ -73,7 +73,7 @@ export function ListItem({
 
               return (
                 <TooltipContainer
-                  className="min-w-6 w-6 h-6 rounded-sm overflow-hidden"
+                  className="min-w-6 size-6 rounded-xs overflow-hidden"
                   label={field.name}
                 >
                   <MediaRenderer

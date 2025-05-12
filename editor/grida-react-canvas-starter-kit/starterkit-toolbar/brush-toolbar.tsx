@@ -8,7 +8,7 @@ import {
   SquareIcon,
   TransparencyGridIcon,
 } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { BitmapEditorBrush, BitmapEditorRuntimeBrush } from "@grida/bitmap";
 import {
   createGrainBrushTexture,
@@ -280,7 +280,7 @@ function BrushItem({
       {...props}
       data-selected={selected}
       className={cn(
-        "w-full rounded-sm hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent select-none",
+        "w-full rounded-xs hover:bg-accent px-4 py-2 data-[selected='true']:bg-accent select-none",
         className
       )}
     >
@@ -315,7 +315,7 @@ function EyedropButton() {
   return (
     <div
       onPointerDown={mod}
-      className="w-5 h-5 rounded border-2 border-primary/20"
+      className="size-5 rounded-sm border-2 border-primary/20"
     />
   );
 }
@@ -328,7 +328,7 @@ function BrushPreview({
   label: React.ReactNode;
 }) {
   return (
-    <div className="relative w-full h-full flex items-center justify-center rounded overflow-hidden">
+    <div className="relative w-full h-full flex items-center justify-center rounded-sm overflow-hidden">
       <TransparencyGridIcon className="absolute inset-0 w-full h-full opacity-20" />
       <div className="absolute top-2 left-2 z-10">
         <span className="text-muted-foreground text-xs">{label}</span>
@@ -359,10 +359,10 @@ const VerticalSlider = React.forwardRef<
     orientation="vertical"
     {...props}
   >
-    <SliderPrimitive.Track className="relative h-full w-2 grow overflow-hidden rounded bg-primary/10">
+    <SliderPrimitive.Track className="relative h-full w-2 grow overflow-hidden rounded-sm bg-primary/10">
       <SliderPrimitive.Range className="absolute w-full bg-transparent" />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-3 w-8 rounded border shadow bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+    <SliderPrimitive.Thumb className="block h-3 w-8 rounded-sm border shadow bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
   </SliderPrimitive.Root>
 ));
 VerticalSlider.displayName = SliderPrimitive.Root.displayName;

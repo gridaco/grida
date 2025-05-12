@@ -67,7 +67,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { ZoomControl } from "./controls/ext-zoom";
 import { SchemaProvider, useSchema } from "./schema";
 import { BoltIcon } from "lucide-react";
@@ -250,12 +250,12 @@ function SelectionMixedProperties({
                 disabled={locked.mixed}
                 pressed={locked.mixed ? true : locked.value}
                 onPressedChange={change.locked}
-                className="w-6 h-6 p-0.5 aspect-square"
+                className="size-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockClosedIcon className="w-3 h-3" />
+                  <LockClosedIcon className="size-3" />
                 ) : (
-                  <LockOpen1Icon className="w-3 h-3" />
+                  <LockOpen1Icon className="size-3" />
                 )}
               </Toggle>
               {/* <small className="ms-2 font-mono">{id}</small> */}
@@ -364,10 +364,12 @@ function SelectionMixedProperties({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Font</PropertyLineLabel>
-              <FontFamilyControl
-                value={fontFamily?.value}
-                onValueChange={change.fontFamily}
-              />
+              <div className="flex-1">
+                <FontFamilyControl
+                  value={fontFamily?.value}
+                  onValueChange={change.fontFamily}
+                />
+              </div>
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Weight</PropertyLineLabel>
@@ -769,12 +771,12 @@ function SelectedNodeProperties({
                 size="sm"
                 pressed={locked}
                 onPressedChange={actions.locked}
-                className="w-6 h-6 p-0.5 aspect-square"
+                className="size-6 p-0.5 aspect-square"
               >
                 {locked ? (
-                  <LockClosedIcon className="w-3 h-3" />
+                  <LockClosedIcon className="size-3" />
                 ) : (
-                  <LockOpen1Icon className="w-3 h-3" />
+                  <LockOpen1Icon className="size-3" />
                 )}
               </Toggle>
             </PropertyLine>
@@ -905,10 +907,12 @@ function SelectedNodeProperties({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Font</PropertyLineLabel>
-              <FontFamilyControl
-                value={fontFamily}
-                onValueChange={actions.fontFamily}
-              />
+              <div className="flex-1">
+                <FontFamilyControl
+                  value={fontFamily}
+                  onValueChange={actions.fontFamily}
+                />
+              </div>
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Weight</PropertyLineLabel>
@@ -1235,7 +1239,7 @@ function SelectionColors() {
                   select(ids);
                 }}
               >
-                <Crosshair2Icon className="w-3 h-3" />
+                <Crosshair2Icon className="size-3" />
               </Button>
             </div>
           </PropertyLine>
@@ -1284,7 +1288,7 @@ function ConfigurableProperty({
               onClick={() => {
                 setOpen(true);
               }}
-              className="w-3 h-3"
+              className="size-3"
             />
           </div>
         </TooltipContent>

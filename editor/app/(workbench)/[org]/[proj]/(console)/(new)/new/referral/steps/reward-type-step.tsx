@@ -45,7 +45,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Gift className="h-6 w-6 text-primary" />
+          <Gift className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">
@@ -83,7 +83,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="double-sided"
                   className="font-medium flex items-center gap-2"
                 >
-                  <Users className="h-4 w-4 text-primary" />
+                  <Users className="size-4 text-primary" />
                   Double-sided rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="referrer-only"
                   className="font-medium flex items-center gap-2"
                 >
-                  <User className="h-4 w-4 text-primary" />
+                  <User className="size-4 text-primary" />
                   Referrer-only rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -129,7 +129,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="invitee-only"
                   className="font-medium flex items-center gap-2"
                 >
-                  <User className="h-4 w-4 text-primary" />
+                  <User className="size-4 text-primary" />
                   Invitee-only rewards
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="virtual-currency"
                   className="font-medium flex items-center gap-2"
                 >
-                  <CreditCard className="h-4 w-4 text-primary" />
+                  <CreditCard className="size-4 text-primary" />
                   Virtual Currency
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -184,7 +184,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="draw-ticket"
                   className="font-medium flex items-center gap-2"
                 >
-                  <Ticket className="h-4 w-4 text-primary" />
+                  <Ticket className="size-4 text-primary" />
                   Draw Tickets
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -201,7 +201,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="discount"
                   className="font-medium flex items-center gap-2"
                 >
-                  <DollarSign className="h-4 w-4 text-primary" />
+                  <DollarSign className="size-4 text-primary" />
                   Discounts
                 </Label>
                 <p className="text-sm text-muted-foreground">
@@ -217,7 +217,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                   htmlFor="custom"
                   className="font-medium flex items-center gap-2"
                 >
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Sparkles className="size-4 text-primary" />
                   Custom Reward
                 </Label>
                 <p className="text-sm text-muted-foreground">

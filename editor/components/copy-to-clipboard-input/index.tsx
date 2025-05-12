@@ -20,12 +20,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
 
   return (
     <div className="relative">
-      <Input
-        id="npm-install-copy-text"
-        type="text"
-        defaultValue={value}
-        readOnly
-      />
+      <Input id="npm-install-copy-text" type="text" value={value} readOnly />
       <Button
         variant="outline"
         size="icon"
@@ -40,7 +35,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
             display: isCopied ? "none" : "inline-flex",
           }}
         >
-          <CopyIcon className="w-3 h-3" />
+          <CopyIcon className="size-3" />
         </span>
         <span
           className="inline-flex items-center justify-center"

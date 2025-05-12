@@ -13,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import {
   Select,
   SelectContent,
@@ -178,10 +178,6 @@ export function DataQueryPredicatesMenu({
                       size="icon"
                       variant="outline"
                       onClick={() => onRemove(i)}
-                      className={WorkbenchUI.buttonVariants({
-                        variant: "outline",
-                        size: "icon",
-                      })}
                     >
                       <Cross2Icon />
                     </Button>
@@ -197,7 +193,7 @@ export function DataQueryPredicatesMenu({
                 size="sm"
                 className="w-full flex justify-start"
               >
-                <PlusIcon className="w-4 h-4 me-2 align-middle" />
+                <PlusIcon className="size-4 me-2 align-middle" />
                 Add Filter
               </Button>
             </DataQueryPrediateAddMenu>
@@ -209,7 +205,7 @@ export function DataQueryPredicatesMenu({
                   className="w-full flex justify-start"
                   onClick={onClear}
                 >
-                  <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete
+                  <TrashIcon className="size-4 me-2 align-middle" /> Delete
                   filter
                 </Button>
               </PopoverClose>
@@ -253,9 +249,9 @@ export function DataQueryPrediateAddMenu({
               key={key}
               onSelect={() => onAdd({ column: key, op: "eq", value: null })}
             >
-              <div className="w-4 h-4 flex items-center justify-center gap-2">
-                {property.pk && <KeyIcon className="w-3 h-3" />}
-                {property.fk && <Link2Icon className="w-3 h-3" />}
+              <div className="size-4 flex items-center justify-center gap-2">
+                {property.pk && <KeyIcon className="size-3" />}
+                {property.fk && <Link2Icon className="size-3" />}
               </div>
               <span className="ms-2">{key}</span>
               <span className="ms-2 text-xs text-muted-foreground">
@@ -357,7 +353,7 @@ export function DataQueryPredicateChip({
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
         <div className="flex justify-between w-full">
           <div className="flex gap-2 items-center w-full overflow-hidden">
-            <span className="text-xs text-muted-foreground  overflow-hidden overflow-ellipsis">
+            <span className="text-xs text-muted-foreground  overflow-hidden text-ellipsis">
               {predicate.column}
             </span>
             <Select
@@ -367,7 +363,7 @@ export function DataQueryPredicateChip({
               <SelectPrimitive.Trigger>
                 <Badge
                   variant="outline"
-                  className="px-1 w-full overflow-ellipsis text-xs text-muted-foreground whitespace-nowrap"
+                  className="px-1 w-full text-ellipsis text-xs text-muted-foreground whitespace-nowrap"
                 >
                   <SelectValue>
                     {Predicate.K.operators[predicate.op].symbol}
@@ -414,9 +410,9 @@ export function DataQueryPredicateChip({
             variant="ghost"
             size="icon"
             onClick={onRemove}
-            className="w-6 h-6 min-w-6 min-h-6"
+            className="size-6 min-w-6 min-h-6"
           >
-            <TrashIcon className="w-3 h-3" />
+            <TrashIcon className="size-3" />
           </Button>
         </div>
         {requires_value && (

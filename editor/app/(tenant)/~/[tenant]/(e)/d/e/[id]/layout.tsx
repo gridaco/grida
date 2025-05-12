@@ -5,9 +5,11 @@ import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
-import palettes from "@/theme/palettes";
+import { Toaster } from "@/components/ui/sonner";
 import { CustomCSS } from "@/theme/customcss";
 import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";
+import { FingerprintProvider } from "@/components/fingerprint";
+import palettes from "@/theme/palettes";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 const lora = Lora({ subsets: ["latin"], display: "swap" });
@@ -136,14 +138,14 @@ export default async function Layout({
             `,
           }}
         />
+        <FingerprintProvider />
         <FormAgentGlobalWindowMessagingInterface>
           <ThemeProvider
-            attribute="class"
             defaultTheme={appearance}
-            enableSystem
+            forcedTheme={appearance}
             storageKey={`theme-form-agent-${id}`}
-            disableTransitionOnChange
           >
+            <Toaster position="bottom-center" />
             {children}
           </ThemeProvider>
         </FormAgentGlobalWindowMessagingInterface>

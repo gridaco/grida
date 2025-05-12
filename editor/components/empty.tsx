@@ -11,7 +11,7 @@ export default function EmptyWelcome({
 }) {
   return (
     <div className="w-full h-full p-10">
-      <div className="flex w-full h-full flex-col items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8 border border-dashed rounded">
+      <div className="flex w-full h-full flex-col items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8 border border-dashed rounded-sm">
         <div className="mx-auto max-w-md text-center">
           <div className="flex items-center justify-center">{art}</div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">

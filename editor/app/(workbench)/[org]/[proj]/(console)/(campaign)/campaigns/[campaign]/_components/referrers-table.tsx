@@ -51,7 +51,7 @@ function ActionsCell({ row }: CellContext<ReferrerWithCustomer, unknown>) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0">
+        <Button variant="ghost" className="size-8 p-0">
           <span className="sr-only">Open menu</span>
           <MoreHorizontal className="size-4" />
         </Button>
@@ -343,7 +343,7 @@ export function ReferrersTable() {
               exportDialog.openDialog();
             }}
           >
-            <DownloadIcon className="size-4 me-2" />
+            <DownloadIcon className="size-4" />
             Export CSV
           </Button>
           <Button onClick={importCustomersDialog.openDialog}>Import</Button>

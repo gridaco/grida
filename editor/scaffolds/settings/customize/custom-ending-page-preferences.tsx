@@ -21,7 +21,11 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { MixIcon } from "@radix-ui/react-icons";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui-editor/dialog";
 import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
@@ -260,7 +264,7 @@ function Preview({
           getComponent(template),
           {
             ...texts,
-          }
+          } as any
         )}
     </>
   );
@@ -300,7 +304,7 @@ function CustomizeTemplate({
   };
   return (
     <Dialog {...props}>
-      <DialogContent className="min-w-full h-screen p-0" hideCloseButton>
+      <DialogContent className="p-0" hideCloseButton fullScreen>
         <DialogTitle className="sr-only">Customize</DialogTitle>
         <TemplateEditor
           context={{

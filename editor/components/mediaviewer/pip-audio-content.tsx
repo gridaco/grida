@@ -33,23 +33,23 @@ export function ContentAudio({
       <div className="py-4 w-full flex flex-col items-center justify-center">
         <div className="px-4 flex w-full h-full">
           <PlayerArtwork>
-            <AudioLinesIcon className="w-5 h-5" />
+            <AudioLinesIcon className="size-5" />
           </PlayerArtwork>
           <div className="flex-1 w-full h-auto flex justify-center items-center">
             <PlayerPrevTrigger disabled>
-              <ChevronFirstIcon className="w-4 h-4" />
+              <ChevronFirstIcon className="size-4" />
             </PlayerPrevTrigger>
             <PlayerTrigger
               renderer={(playing) =>
                 playing ? (
-                  <PauseFilledIcon className="w-4 h-4" />
+                  <PauseFilledIcon className="size-4" />
                 ) : (
-                  <PlayFilledIcon className="w-4 h-4" />
+                  <PlayFilledIcon className="size-4" />
                 )
               }
             />
             <PlayerNextTrigger disabled>
-              <ChevronLastIcon className="w-4 h-4" />
+              <ChevronLastIcon className="size-4" />
             </PlayerNextTrigger>
           </div>
         </div>
@@ -63,7 +63,7 @@ export function ContentAudio({
             </span>
             {/* {media?.artist && (
               <>
-                <DotFilledIcon className="w-2 h-2" />
+                <DotFilledIcon className="size-2" />
                 <span className="text-sm">{media.artist}</span>
               </>
             )} */}
@@ -71,7 +71,7 @@ export function ContentAudio({
           <div className="flex items-center gap-2">
             <PlayerCurrentTime />
             {/* <PlayerTime>00:00</PlayerTime> */}
-            <SlashIcon className="w-2 h-2 text-muted-foreground" />
+            <SlashIcon className="size-2 text-muted-foreground" />
             {/* <PlayerTime>1:00</PlayerTime> */}
             <PlayerDuration />
           </div>

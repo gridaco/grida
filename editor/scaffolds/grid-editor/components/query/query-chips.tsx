@@ -1,6 +1,6 @@
 import { DataQueryOrderbyChip } from "./orderby";
 import { DataQueryPrediateAddMenu, DataQueryPredicateChip } from "./predicate";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -26,7 +26,7 @@ export function TableQueryChips(
       ))}
       <DataQueryPrediateAddMenu {...props}>
         <Button variant="ghost" size="xs" className="text-muted-foreground">
-          <PlusIcon className="w-3 h-3 me-2" />
+          <PlusIcon className="size-3 me-2" />
           Add filter
         </Button>
       </DataQueryPrediateAddMenu>

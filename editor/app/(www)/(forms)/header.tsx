@@ -9,7 +9,7 @@ export default function Header() {
       <div className="flex">
         <span className="flex items-center gap-2">
           <Link href="/">
-            <GridaLogo className="w-5 h-5" />
+            <GridaLogo className="size-5" />
           </Link>
           <Link href="/forms">
             <span className="text-lg font-bold">Grida Forms</span>

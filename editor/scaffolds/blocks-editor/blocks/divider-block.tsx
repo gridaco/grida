@@ -53,7 +53,7 @@ export function DividerBlock({ id }: EditorFlatFormBlock) {
         </BlockAction>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="bg-neutral-200 rounded-sm overflow-hidden border border-black/20 aspect-auto">
           <hr />
         </div>
       </div>

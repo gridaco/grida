@@ -112,12 +112,12 @@ export function ModeData() {
           <DropdownMenuGroup>
             <DropdownMenuLabel>CMS</DropdownMenuLabel>
             <DropdownMenuItem onSelect={newTableDialog.openDialog}>
-              <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+              <ResourceTypeIcon type="table" className="size-4 me-2" />
               New Empty Table
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                <ResourceTypeIcon type="table" className="size-4 me-2" />
                 Examples
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -130,7 +130,7 @@ export function ModeData() {
                     });
                   }}
                 >
-                  <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                  <ResourceTypeIcon type="table" className="size-4 me-2" />
                   Blog
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -142,7 +142,7 @@ export function ModeData() {
                     });
                   }}
                 >
-                  <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                  <ResourceTypeIcon type="table" className="size-4 me-2" />
                   CMS Starter
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
@@ -152,7 +152,7 @@ export function ModeData() {
             <DropdownMenuLabel>Supabase</DropdownMenuLabel>
             {state.supabase_project && (
               <DropdownMenuItem onSelect={newXSBTableDialog.openDialog}>
-                <SupabaseLogo className="w-4 h-4 me-2" />
+                <SupabaseLogo className="size-4 me-2" />
                 Connect Table
               </DropdownMenuItem>
             )}
@@ -164,7 +164,7 @@ export function ModeData() {
               })}
             >
               <DropdownMenuItem>
-                <SupabaseLogo className="w-4 h-4 me-2" />
+                <SupabaseLogo className="size-4 me-2" />
                 {state.supabase_project ? "Settings" : "Connect"}
               </DropdownMenuItem>
             </Link>
@@ -176,7 +176,7 @@ export function ModeData() {
 
   function EmptyState() {
     return (
-      <div className="py-4 border border-dashed rounded-sm flex flex-col gap-2 items-center justify-center w-full">
+      <div className="py-4 border border-dashed rounded-xs flex flex-col gap-2 items-center justify-center w-full">
         <span className="text-center">
           <h4 className="text-muted-foreground text-xs font-bold">No tables</h4>
           <p className="text-muted-foreground text-xs">
@@ -188,7 +188,7 @@ export function ModeData() {
           size="sm"
           onClick={() => newTableDialog.openDialog({})}
         >
-          <PlusIcon className="w-4 h-4 me-2" />
+          <PlusIcon className="size-4 me-2" />
           New Table
         </Button>
       </div>
@@ -288,7 +288,7 @@ export function ModeData() {
               {item.data.readonly && (
                 <Tooltip>
                   <TooltipTrigger>
-                    <EyeOpenIcon className="min-w-3 w-3 h-3 ms-1 inline text-muted-foreground" />
+                    <EyeOpenIcon className="min-w-3 size-3 ms-1 inline text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent>Readonly VIEW</TooltipContent>
                 </Tooltip>
@@ -306,6 +306,7 @@ export function ModeData() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    variant="destructive"
                     disabled={item.data.rules.delete_restricted}
                     onSelect={() => {
                       deleteTableDialog.openDialog({
@@ -404,7 +405,7 @@ function CreateNewSchemaTableDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex gap-2 items-center">
-            <ResourceTypeIcon type="table" className="w-5 h-5" />
+            <ResourceTypeIcon type="table" className="size-5" />
             Create New CMS Table
           </DialogTitle>
         </DialogHeader>
@@ -549,7 +550,7 @@ function ConnectNewSupabaseTableDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            <SupabaseLogo className="w-5 h-5 me-2 inline-flex" />
+            <SupabaseLogo className="size-5 me-2 inline-flex" />
             Connect Supabase Table
           </DialogTitle>
           <DialogDescription>

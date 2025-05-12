@@ -279,7 +279,7 @@ export function DataChartview() {
             </div>
           )}
         </div>
-        <aside className="flex-shrink-0 flex flex-col gap-4 w-60 max-w-xs pl-4 border-l">
+        <aside className="shrink-0 flex flex-col gap-4 w-60 max-w-xs pl-4 border-l">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
           <hr />
           <Label className="text-muted-foreground">Main Axis</Label>
@@ -365,16 +365,16 @@ function ChartTypeToggleGroup({
       }}
     >
       <ToggleGroupItem value="bar">
-        <ResourceTypeIcon type="chart-bar" className="w-4 h-4" />
+        <ResourceTypeIcon type="chart-bar" className="size-4" />
       </ToggleGroupItem>
       <ToggleGroupItem value="bar-vertical">
-        <ResourceTypeIcon type="chart-bar-vertical" className="w-4 h-4" />
+        <ResourceTypeIcon type="chart-bar-vertical" className="size-4" />
       </ToggleGroupItem>
       <ToggleGroupItem value="area">
-        <ResourceTypeIcon type="chart-line" className="w-4 h-4" />
+        <ResourceTypeIcon type="chart-line" className="size-4" />
       </ToggleGroupItem>
       <ToggleGroupItem value="pie">
-        <ResourceTypeIcon type="chart-pie" className="w-4 h-4" />
+        <ResourceTypeIcon type="chart-pie" className="size-4" />
       </ToggleGroupItem>
     </ToggleGroup>
   );
@@ -410,7 +410,7 @@ function PaletteToggleGroup({
               {Object.entries(colors).map(([k, color]) => (
                 <div
                   key={k}
-                  className="w-4 h-4 rounded-sm"
+                  className="size-4 rounded-xs"
                   style={{
                     backgroundColor: color,
                   }}
@@ -502,7 +502,7 @@ function MainAxisQueryControl({
               <DropdownMenuRadioItem key={name} value={name}>
                 <FormFieldTypeIcon
                   type={type}
-                  className="inline-block me-2 align-middle w-4 h-4"
+                  className="inline-block me-2 align-middle size-4"
                 />
                 {name}
               </DropdownMenuRadioItem>

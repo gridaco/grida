@@ -236,7 +236,7 @@ function TaskHandler({
                       >
                         <small className="text-muted-foreground">
                           {request.response.id}
-                          <OpenInNewWindowIcon className="inline w-3 h-3 ms-2 align-middle" />
+                          <OpenInNewWindowIcon className="inline size-3 ms-2 align-middle" />
                         </small>
                       </Link>
                     </>
@@ -292,7 +292,7 @@ function ErrorCodeLink({
   return (
     <Link href={href} target="_blank" prefetch={false}>
       {code}
-      <OpenInNewWindowIcon className="inline w-3 h-3 ms-2 align-middle" />
+      <OpenInNewWindowIcon className="inline size-3 ms-2 align-middle" />
     </Link>
   );
 }

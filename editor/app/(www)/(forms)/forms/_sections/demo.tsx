@@ -26,7 +26,7 @@ export default function Demo() {
           damping: 20,
         }}
       >
-        <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden">
+        <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden p-0">
           <Playground />
         </Card>
       </motion.div>

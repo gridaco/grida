@@ -53,10 +53,10 @@ const _column_avatar = {
 
     return (
       <CellRoot className="flex items-center justify-center">
-        <Avatar className="h-6 w-6 aspect-square">
+        <Avatar className="size-6 aspect-square">
           <AvatarImage src={val} alt="Avatar" />
           <AvatarFallback>
-            <AvatarIcon className="w-8 h-8 text-muted-foreground" />
+            <AvatarIcon className="size-8 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
       </CellRoot>
@@ -82,8 +82,8 @@ const _column_provider = {
       <CellRoot className="flex items-center">
         <div className="flex items-center gap-2">
           {val.map((p) => (
-            <div key={p} className="flex items-center gap-1 rounded-sm p-1">
-              <AuthProviderIcon type={p} className="w-4 h-4 text-foreground" />
+            <div key={p} className="flex items-center gap-1 rounded-xs p-1">
+              <AuthProviderIcon type={p} className="size-4 text-foreground" />
               <Highlight
                 text={p}
                 tokens={highlightTokens}
@@ -201,7 +201,7 @@ export function XSBAuthUsersGrid({
       highlightTokens={highlightTokens}
     >
       <DataGrid
-        className="flex-grow select-none text-xs text-foreground/80"
+        className="grow select-none text-xs text-foreground/80"
         columns={columns}
         rows={rows}
         renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
@@ -232,7 +232,7 @@ function HeaderCell({ column }: RenderHeaderCellProps<any>) {
     <CellRoot className="flex items-center gap-1.5">
       <UserPropertyIcon
         property={key as keyof XSBUserRow}
-        className="min-w-4 w-4 h-4"
+        className="min-w-4 size-4"
       />
       {name && <span className="font-normal">{name}</span>}
     </CellRoot>

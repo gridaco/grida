@@ -55,7 +55,7 @@ export function CornerRadiusControl({
               disabled={disabled}
               variant={mode === "each" ? "secondary" : "ghost"}
               size="icon"
-              className="w-8 h-8 min-w-8"
+              className="size-8 min-w-8"
             >
               <CornersIcon />
             </Button>
@@ -107,13 +107,13 @@ function CornerRadius4Control({
           type="number"
           value={topLeft}
           onChange={(e) => onChange(e, 0)}
-          icon={<CornerTopLeftIcon className="w-3 h-3" />}
+          icon={<CornerTopLeftIcon className="size-3" />}
         />
         <PropertyInput
           type="number"
           value={topRight}
           onChange={(e) => onChange(e, 1)}
-          icon={<CornerTopRightIcon className="w-3 h-3" />}
+          icon={<CornerTopRightIcon className="size-3" />}
         />
       </div>
       <div className="flex items-center gap-2">
@@ -121,13 +121,13 @@ function CornerRadius4Control({
           type="number"
           value={bottomLeft}
           onChange={(e) => onChange(e, 3)}
-          icon={<CornerBottomLeftIcon className="w-3 h-3" />}
+          icon={<CornerBottomLeftIcon className="size-3" />}
         />
         <PropertyInput
           type="number"
           value={bottomRight}
           onChange={(e) => onChange(e, 2)}
-          icon={<CornerBottomRightIcon className="w-3 h-3" />}
+          icon={<CornerBottomRightIcon className="size-3" />}
         />
       </div>
     </div>

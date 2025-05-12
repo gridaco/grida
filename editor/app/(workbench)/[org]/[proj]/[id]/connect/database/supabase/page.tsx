@@ -246,7 +246,7 @@ function ConnectSupabase() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>
-                <SupabaseLogo className="w-5 h-5 inline me-2 align-middle" />
+                <SupabaseLogo className="size-5 inline me-2 align-middle" />
                 Connect Supabase
               </span>
               {is_connected && (
@@ -259,7 +259,7 @@ function ConnectSupabase() {
                     target="_blank"
                   >
                     <Button variant="link">
-                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      <OpenInNewWindowIcon />
                       OpenAPI
                     </Button>
                   </Link>
@@ -268,7 +268,7 @@ function ConnectSupabase() {
                     target="_blank"
                   >
                     <Button variant="link">
-                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      <OpenInNewWindowIcon />
                       Dashboard
                     </Button>
                   </Link>
@@ -501,7 +501,7 @@ function ConnectServiceRoleKey({
     <Card>
       <CardHeader>
         <CardTitle>
-          <LockClosedIcon className="inline me-2 align-middle w-5 h-5" />
+          <LockClosedIcon className="inline me-2 align-middle size-5" />
           Service Role Key
         </CardTitle>
         <CardDescription>
@@ -633,7 +633,7 @@ function ConnectSchema({
       <Card>
         <CardHeader>
           <CardTitle>
-            <SupabaseLogo className="inline me-2 align-middle w-5 h-5" />
+            <SupabaseLogo className="inline me-2 align-middle size-5" />
             DB Schemas
           </CardTitle>
           <CardDescription>
@@ -659,14 +659,14 @@ function ConnectSchema({
               className="font-mono cursor-pointer"
               onClick={newCustomSchemaDialog.openDialog}
             >
-              <PlusCircledIcon className="me-2" />
+              <PlusCircledIcon />
               Add Custom Schema
             </Badge>
           </div>
           <Collapsible className="mt-4">
             <CollapsibleTrigger asChild>
               <Button variant="link" size="sm">
-                <CodeIcon className="me-2 align-middle" /> View Details
+                <CodeIcon /> View Details
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -899,7 +899,7 @@ function DBSchemaSelect({
             </SelectItem>
           ))}
           <SelectItem value={__add_custom}>
-            <PlusIcon className="me-2 inline align-middle w-4 h-4" />
+            <PlusIcon />
             Register custom schema
           </SelectItem>
         </SelectContent>
@@ -981,12 +981,12 @@ function NewCustomSchemaDialog({
           </DialogClose>
           {isvalid ? (
             <Button disabled={testing} onClick={onUseClick}>
-              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              {testing && <Spinner className="size-4 me-2 align-middle" />}
               Add this schema
             </Button>
           ) : (
             <Button disabled={testing || !custom} onClick={onTest}>
-              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              {testing && <Spinner className="size-4 me-2 align-middle" />}
               Test Connection
             </Button>
           )}

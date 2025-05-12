@@ -69,7 +69,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
       <div className="lg:hidden">
         {/* Free - Mobile  */}
         <div className="bg-background p-2 sticky top-0 z-10 pt-4">
-          <div className="bg-surface-100 rounded-lg border dark:border-white dark:border-opacity-25 py-2 px-4 flex justify-between items-center">
+          <div className="bg-surface-100 rounded-lg border dark:border-white/25 py-2 px-4 flex justify-between items-center">
             <label className="text-foreground-lighter">Change plan</label>
             <select
               id="change-plan"
@@ -96,46 +96,46 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingTableRowMobile
               category={pricing.ai}
               plan={"free"}
-              icon={<SparklesIcon className="w-4 h-4" />}
+              icon={<SparklesIcon className="size-4" />}
               sectionId="ai"
             />
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"free"}
-              icon={<Component1Icon className="w-4 h-4" />}
+              icon={<Component1Icon className="size-4" />}
               sectionId="highlight"
             />
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"free"}
-              icon={<CloudUploadIcon className="w-4 h-4" />}
+              icon={<CloudUploadIcon className="size-4" />}
               sectionId="storage"
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"free"}
-              icon={<PlugZapIcon className="w-4 h-4" />}
+              icon={<PlugZapIcon className="size-4" />}
               sectionId="integrations"
             />
             <PricingTableRowMobile
               category={pricing.commerce}
               plan={"free"}
-              icon={<ShoppingBagIcon className="w-4 h-4" />}
+              icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.ticketing}
               plan={"free"}
-              icon={<TicketIcon className="w-4 h-4" />}
+              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
               plan={"free"}
-              icon={<MessageCircleIcon className="w-4 h-4" />}
+              icon={<MessageCircleIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"free"}
-              icon={<MessageCircleQuestionIcon className="w-4 h-4" />}
+              icon={<MessageCircleQuestionIcon className="size-4" />}
             />
           </>
         )}
@@ -155,37 +155,37 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"pro"}
-              icon={<Component1Icon className="w-4 h-4" />}
+              icon={<Component1Icon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"pro"}
-              icon={<CloudUploadIcon className="w-4 h-4" />}
+              icon={<CloudUploadIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"pro"}
-              icon={<PlugZapIcon className="w-4 h-4" />}
+              icon={<PlugZapIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.commerce}
               plan={"pro"}
-              icon={<ShoppingBagIcon className="w-4 h-4" />}
+              icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.ticketing}
               plan={"pro"}
-              icon={<TicketIcon className="w-4 h-4" />}
+              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
               plan={"pro"}
-              icon={<MessageCircleIcon className="w-4 h-4" />}
+              icon={<MessageCircleIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"pro"}
-              icon={<MessageCircleQuestionIcon className="w-4 h-4" />}
+              icon={<MessageCircleQuestionIcon className="size-4" />}
             />
           </>
         )}
@@ -205,37 +205,37 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"team"}
-              icon={<Component1Icon className="w-4 h-4" />}
+              icon={<Component1Icon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"team"}
-              icon={<CloudUploadIcon className="w-4 h-4" />}
+              icon={<CloudUploadIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"team"}
-              icon={<PlugZapIcon className="w-4 h-4" />}
+              icon={<PlugZapIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.commerce}
               plan={"team"}
-              icon={<ShoppingBagIcon className="w-4 h-4" />}
+              icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.ticketing}
               plan={"team"}
-              icon={<TicketIcon className="w-4 h-4" />}
+              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
               plan={"team"}
-              icon={<MessageCircleIcon className="w-4 h-4" />}
+              icon={<MessageCircleIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"team"}
-              icon={<MessageCircleQuestionIcon className="w-4 h-4" />}
+              icon={<MessageCircleQuestionIcon className="size-4" />}
             />
           </>
         )}
@@ -255,37 +255,37 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"enterprise"}
-              icon={<Component1Icon className="w-4 h-4" />}
+              icon={<Component1Icon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"enterprise"}
-              icon={<CloudUploadIcon className="w-4 h-4" />}
+              icon={<CloudUploadIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"enterprise"}
-              icon={<PlugZapIcon className="w-4 h-4" />}
+              icon={<PlugZapIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.commerce}
               plan={"enterprise"}
-              icon={<ShoppingBagIcon className="w-4 h-4" />}
+              icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.ticketing}
               plan={"enterprise"}
-              icon={<TicketIcon className="w-4 h-4" />}
+              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
               plan={"enterprise"}
-              icon={<MessageCircleIcon className="w-4 h-4" />}
+              icon={<MessageCircleIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"enterprise"}
-              icon={<MessageCircleQuestionIcon className="w-4 h-4" />}
+              icon={<MessageCircleQuestionIcon className="size-4" />}
             />
           </>
         )}
@@ -338,45 +338,45 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               ))}
             </tr>
           </thead>
-          <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
+          <tbody className="border-default divide-border dark:divide-white/25 divide-y first:divide-y-0">
             <PricingTableRowDesktop
               category={pricing.ai}
-              icon={<SparklesIcon className="w-4 h-4" />}
+              icon={<SparklesIcon className="size-4" />}
               sectionId="ai"
             />
             <PricingTableRowDesktop
               category={pricing.highlight}
-              icon={<Component1Icon className="w-4 h-4" />}
+              icon={<Component1Icon className="size-4" />}
               sectionId="highlight"
             />
             <PricingTableRowDesktop
               category={pricing.storage}
-              icon={<CloudUploadIcon className="w-4 h-4" />}
+              icon={<CloudUploadIcon className="size-4" />}
               sectionId="storage"
             />
             <PricingTableRowDesktop
               category={pricing.integrations}
-              icon={<PlugZapIcon className="w-4 h-4" />}
+              icon={<PlugZapIcon className="size-4" />}
               sectionId="integrations"
             />
             <PricingTableRowDesktop
               category={pricing.commerce}
-              icon={<ShoppingBagIcon className="w-4 h-4" />}
+              icon={<ShoppingBagIcon className="size-4" />}
               sectionId="commerce"
             />
             <PricingTableRowDesktop
               category={pricing.ticketing}
-              icon={<TicketIcon className="w-4 h-4" />}
+              icon={<TicketIcon className="size-4" />}
               sectionId="ticketing"
             />
             <PricingTableRowDesktop
               category={pricing.support}
-              icon={<MessageCircleQuestionIcon className="w-4 h-4" />}
+              icon={<MessageCircleQuestionIcon className="size-4" />}
               sectionId="support"
             />
             <PricingTableRowDesktop
               category={pricing.channels}
-              icon={<MessageCircleIcon className="w-4 h-4" />}
+              icon={<MessageCircleIcon className="size-4" />}
               sectionId="channels"
             />
           </tbody>

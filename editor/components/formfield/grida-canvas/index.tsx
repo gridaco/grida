@@ -31,7 +31,11 @@ import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui-editor/dialog";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
@@ -96,7 +100,7 @@ export function GridaCanvasFormField() {
         </Card>
       </DialogTrigger>
       <DialogContent
-        className="max-w-screen-xl overflow-hidden select-none p-0"
+        className="!max-w-screen-xl overflow-hidden select-none p-0"
         style={{ height: "calc(100vh - 4rem)" }}
         hideCloseButton
       >

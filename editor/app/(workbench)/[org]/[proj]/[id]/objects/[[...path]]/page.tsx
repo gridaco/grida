@@ -111,14 +111,14 @@ function Tools() {
     <>
       <nav className="flex flex-wrap gap-4">
         <div className={__tools_card_classes} onClick={openFilePicker}>
-          <UploadIcon className="w-4 h-4" />
+          <UploadIcon className="size-4" />
           <span className="text-xs text-muted-foreground">Upload</span>
         </div>
         <div
           className={__tools_card_classes}
           onClick={createFolderDialog.openDialog}
         >
-          <FolderIcon className="w-4 h-4" />
+          <FolderIcon className="size-4" />
           <span className="text-xs text-muted-foreground">Create Folder</span>
         </div>
       </nav>
@@ -306,9 +306,9 @@ function Folder() {
                 onClick={() => storage.refresh()}
               >
                 {storage.loading ? (
-                  <Spinner className="h-4 w-4 me-2" />
+                  <Spinner className="size-4 me-2" />
                 ) : (
-                  <ReloadIcon className="h-4 w-4 me-2" />
+                  <ReloadIcon className="size-4 me-2" />
                 )}
                 Reload
               </Button>
@@ -318,7 +318,7 @@ function Folder() {
                 onClick={() => setView("grid")}
                 className={cn(view === "grid" && "bg-muted")}
               >
-                <GridIcon className="h-4 w-4" />
+                <GridIcon className="size-4" />
               </Button>
               <Button
                 variant="outline"
@@ -326,14 +326,14 @@ function Folder() {
                 onClick={() => setView("list")}
                 className={cn(view === "list" && "bg-muted")}
               >
-                <ListIcon className="h-4 w-4" />
+                <ListIcon className="size-4" />
               </Button>
             </div>
           </div>
           {storage.public && (
             <div className="py-4">
               <Alert>
-                <LockOpen1Icon className="w-4 h-4" />
+                <LockOpen1Icon className="size-4" />
                 <AlertTitle>Public Bucket</AlertTitle>
                 <AlertDescription>
                   This bucket is public and only meant for serving public files.{" "}
@@ -441,10 +441,10 @@ const EntityNodeItemComponent = ({
         >
           {view === "grid" ? (
             <div className="flex flex-col items-center">
-              <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded">
+              <div className="w-full h-full aspect-square flex items-center justify-center group-hover:bg-muted rounded-sm">
                 <MimeTypeIcon
                   type={node.type === "folder" ? "folder" : node.mimetype}
-                  className="w-6 h-6"
+                  className="size-6"
                 />
               </div>
               <span className="w-full mt-2 text-sm font-medium truncate">
@@ -456,7 +456,7 @@ const EntityNodeItemComponent = ({
               <span className="w-1/2 text-sm font-medium truncate">
                 <MimeTypeIcon
                   type={node.type === "folder" ? "folder" : node.mimetype}
-                  className="inline align-middle me-2 w-4 h-4"
+                  className="inline align-middle me-2 size-4"
                 />
                 {node.name}
               </span>
@@ -474,10 +474,10 @@ const EntityNodeItemComponent = ({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="absolute right-1 top-1 h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+                className="absolute right-1 top-1 size-8 p-0 opacity-0 group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DotsHorizontalIcon className="h-4 w-4" />
+                <DotsHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -589,7 +589,7 @@ function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            <FolderIcon className="w-5 h-5 inline me-2 align-middle" />
+            <FolderIcon className="size-5 inline me-2 align-middle" />
             Create folder
           </DialogTitle>
         </DialogHeader>
@@ -640,7 +640,7 @@ function FolderEmptyState() {
 
   return (
     <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
-      <UploadIcon className="w-8 h-8" />
+      <UploadIcon className="size-8" />
       <h6 className="text-lg text-muted-foreground">
         Drop files here to upload
       </h6>
@@ -652,7 +652,7 @@ function FolderEmptyState() {
 function FolderLoadingState() {
   return (
     <div className="w-full px-4 py-16 flex flex-col items-center justify-center gap-4 border border-dashed rounded-lg">
-      <Spinner className="w-8 h-8" />
+      <Spinner className="size-8" />
       <h6 className="text-xs text-muted-foreground">Loading...</h6>
     </div>
   );
@@ -736,10 +736,10 @@ function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
       className="w-full flex items-center gap-4 data-[status='completed']:text-muted-foreground"
     >
       <div>
-        {staus === "progress" && <Spinner className="w-5 h-5" />}
-        {staus === "completed" && <CheckCircledIcon className="w-5 h-5" />}
+        {staus === "progress" && <Spinner className="size-5" />}
+        {staus === "completed" && <CheckCircledIcon className="size-5" />}
         {staus === "failed" && (
-          <CrossCircledIcon className="w-5 h-5 text-destructive" />
+          <CrossCircledIcon className="size-5 text-destructive" />
         )}
       </div>
       <div className="flex-1 flex flex-col gap-1 overflow-hidden">
@@ -747,7 +747,7 @@ function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
         <div className="flex items-center gap-2 text-muted-foreground">
           <Badge
             variant="outline"
-            className="uppercase rounded text-[9px] px-1 py-0.5"
+            className="uppercase rounded-sm text-[9px] px-1 py-0.5"
           >
             {l_type}
           </Badge>
@@ -780,7 +780,7 @@ function ConfirmDeleteDialog({
         <DialogContent>
           <DialogHeader className="overflow-hidden">
             <DialogTitle className="truncate">
-              <ExclamationTriangleIcon className="inline align-middle me-2 w-4 h-4" />
+              <ExclamationTriangleIcon className="inline align-middle me-2 size-4" />
               Delete {data.name}
             </DialogTitle>
             <DialogDescription>This action cannot be undone.</DialogDescription>

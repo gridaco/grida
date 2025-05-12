@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { usePropsEditor } from "@/scaffolds/props-editor";
 import { CMSImageField, CMSRichText } from "@/components/formfield-cms";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { Spinner } from "@/components/spinner";
 import { useProject } from "@/scaffolds/workspace";
 import { useCampaign } from "../store";
@@ -204,7 +204,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Referrer
                         </Button>
                       </Link>
@@ -375,7 +375,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Invitation
                         </Button>
                       </Link>
@@ -419,7 +419,7 @@ function TemplateEditor({
                         target="_blank"
                       >
                         <Button size="xs" variant="outline">
-                          <OpenInNewWindowIcon className="me-2" />
+                          <OpenInNewWindowIcon />
                           Preview Invitation
                         </Button>
                       </Link>
@@ -508,7 +508,7 @@ function TemplateEditor({
                   </div>
                 </CardContent>
               </TabsContent>
-              <TabsContent value="theme" className="m-0 max-w-screen-md">
+              <TabsContent value="theme" className="m-0">
                 <CardHeader>
                   <CardTitle>Theme</CardTitle>
                 </CardHeader>

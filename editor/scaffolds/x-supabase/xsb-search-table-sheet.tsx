@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import {
   Sheet,
   SheetContent,
@@ -200,7 +200,7 @@ function XSBSearchTableDataGrid({
                         size="xs"
                         className="text-muted-foreground"
                       >
-                        <PlusIcon className="w-3 h-3 me-2" />
+                        <PlusIcon className="size-3" />
                         Add filter
                       </Button>
                     </DataQueryPrediateAddMenu>

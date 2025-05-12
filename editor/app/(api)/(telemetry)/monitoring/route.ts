@@ -17,7 +17,6 @@ export async function POST(req: Request) {
     const header = JSON.parse(piece);
 
     const dsn = new URL(header.dsn);
-    console.log("dsn", dsn.hostname, process.env.SENTRY_HOST);
     if (dsn.hostname !== process.env.SENTRY_HOST) {
       return Response.json(
         { error: `Invalid Sentry host: ${dsn.hostname}` },

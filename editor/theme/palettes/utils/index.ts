@@ -24,8 +24,15 @@ const indent = (str: string) =>
     .map((line) => `  ${line}`)
     .join("\n");
 
-const stringifyHSL = (value: any) => {
-  return `${value.h} ${value.s}% ${value.l}%`;
+const stringifyHSL = (value: { h: number; s: number; l: number } | string) => {
+  if (typeof value === "string") {
+    if (value.startsWith("hsl")) {
+      return value;
+    } else {
+      return `hsl(${value})`;
+    }
+  }
+  return `hsl(${value.h} ${value.s}% ${value.l}%)`;
 };
 
 const stringifyREM = (value: any) => value;

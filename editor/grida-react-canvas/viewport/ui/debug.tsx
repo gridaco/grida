@@ -9,7 +9,7 @@ export function DebugPointer({ position }: { position: [number, number] }) {
       }}
     >
       <div
-        className="rounded-full bg-red-500 w-2 h-2"
+        className="rounded-full bg-red-500 size-2"
         style={{
           transform: "translate(-50%, -50%)",
         }}

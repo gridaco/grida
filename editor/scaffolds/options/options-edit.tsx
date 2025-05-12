@@ -565,7 +565,7 @@ function OptionEditItem({
               <div className="relative">
                 <Button
                   onClick={clearSrc}
-                  className="absolute z-10 top-0 right-0 w-6 h-6 p-0 m-1"
+                  className="absolute z-10 top-0 right-0 size-6 p-0 m-1"
                   variant="ghost"
                   type="button"
                 >
@@ -576,7 +576,7 @@ function OptionEditItem({
                   <img
                     src={src}
                     alt=""
-                    className="w-full h-full object-contain rounded-sm overflow-hidden pointer-events-none select-none"
+                    className="w-full h-full object-contain rounded-xs overflow-hidden pointer-events-none select-none"
                   />
                 </div>
               </div>
@@ -704,7 +704,7 @@ function OptgroupEditItem({
                 "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
               }
             >
-              <FolderIcon className="me-2 w-4 h-4" />
+              <FolderIcon className="me-2 size-4" />
               Group
             </div>
           </label>
@@ -712,7 +712,7 @@ function OptgroupEditItem({
         <label className="flex-[2] relative">
           {!detailed && (
             <div className="absolute left-2 top-0 bottom-0 flex items-center justify-center">
-              <FolderIcon className="text-muted-foreground w-4 h-4" />
+              <FolderIcon className="text-muted-foreground size-4" />
             </div>
           )}
           <Input

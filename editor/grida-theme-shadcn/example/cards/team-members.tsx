@@ -37,7 +37,7 @@ export function CardsTeamMembers() {
       <CardContent className="grid gap-6">
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-4">
-            <Avatar className="h-8 w-8">
+            <Avatar className="size-8">
               <AvatarImage src="/avatars/01.png" alt="Image" />
               <AvatarFallback>OM</AvatarFallback>
             </Avatar>
@@ -90,7 +90,7 @@ export function CardsTeamMembers() {
         </div>
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-4">
-            <Avatar className="h-8 w-8">
+            <Avatar className="size-8">
               <AvatarImage src="/avatars/02.png" alt="Image" />
               <AvatarFallback>JL</AvatarFallback>
             </Avatar>
@@ -143,7 +143,7 @@ export function CardsTeamMembers() {
         </div>
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-4">
-            <Avatar className="h-8 w-8">
+            <Avatar className="size-8">
               <AvatarImage src="/avatars/03.png" alt="Image" />
               <AvatarFallback>IN</AvatarFallback>
             </Avatar>

@@ -50,7 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,7 +84,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <MessageCircleIcon className="inline me-2 w-5 h-5 align-middle" />
+                  <MessageCircleIcon className="inline me-2 size-5 align-middle" />
                   SMS Notifications
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
@@ -138,7 +138,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <EnvelopeClosedIcon className="inline me-2 w-5 h-5 align-middle" />
+                  <EnvelopeClosedIcon className="inline me-2 size-5 align-middle" />
                   Email Notifications
                 </>
               }
@@ -222,7 +222,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <WhatsAppLogo className="inline me-2 w-5 h-5 align-middle" />
+                  <WhatsAppLogo className="inline me-2 size-5 align-middle" />
                   WhatsApp
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
@@ -238,7 +238,7 @@ export default function ConnectChannels() {
             <PreferenceBoxHeader
               heading={
                 <>
-                  <KakaoTalkLogo className="inline me-2 w-5 h-5 align-middle" />
+                  <KakaoTalkLogo className="inline me-2 size-5 align-middle" />
                   Kakao Talk
                   <Badge variant="outline" className="ms-2 align-middle">
                     Enterprise
@@ -290,11 +290,11 @@ function TestSMS({ form_id }: { form_id: string }) {
     <Dialog>
       <DialogTrigger>
         <Badge variant={"outline"}>
-          <LightningBoltIcon className="w-3 h-3 inline align-middle me-2" />
+          <LightningBoltIcon className="size-3" />
           Test
         </Badge>
       </DialogTrigger>
-      <DialogContent className="max-w-screen-lg">
+      <DialogContent className="!max-w-screen-lg">
         <DialogHeader>
           <DialogTitle>Test SMS Notifications</DialogTitle>
           <DialogDescription>
@@ -375,7 +375,7 @@ function AboutSMSFees() {
     <Collapsible>
       <CollapsibleTrigger>
         <Badge variant={"outline"}>
-          <QuestionMarkCircledIcon className="w-3 h-3 inline align-middle me-2" />
+          <QuestionMarkCircledIcon />
           Learn more about SMS Fees
         </Badge>
       </CollapsibleTrigger>

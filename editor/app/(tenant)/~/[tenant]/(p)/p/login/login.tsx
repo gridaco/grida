@@ -130,7 +130,7 @@ export default function PortalLogin({
           <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center gap-2">
               <div className="flex flex-col items-center gap-2 font-medium">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md">
+                <div className="flex size-8 items-center justify-center rounded-md">
                   <UserCheck2Icon className="size-6" />
                 </div>
               </div>

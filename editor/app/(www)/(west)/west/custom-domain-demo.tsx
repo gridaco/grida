@@ -54,9 +54,9 @@ export default function CustomDomainDemo() {
               {/* Terminal header mimic */}
               <div className="flex items-center px-4 py-2 bg-gray-100 border-b border-gray-200">
                 <div className="flex space-x-2">
-                  <div className="w-4 h-4 rounded-full border border-neutral-200 bg-red-400"></div>
-                  <div className="w-4 h-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
-                  <div className="w-4 h-4 rounded-full border border-neutral-200 bg-green-400"></div>
+                  <div className="size-4 rounded-full border border-neutral-200 bg-red-400"></div>
+                  <div className="size-4 rounded-full border border-neutral-200 bg-yellow-400"></div>
+                  <div className="size-4 rounded-full border border-neutral-200 bg-green-400"></div>
                 </div>
                 <div className="mx-auto text-sm text-gray-500">
                   https://{brand || "example"}.co

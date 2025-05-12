@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
+import { Progress } from "@/components/ui-editor/progress";
 import { SearchInput } from "@/components/extension/search-input";
 import { useCustomers } from "./use-customer-feed";
 import { useProject } from "@/scaffolds/workspace";
@@ -228,7 +228,7 @@ export function ImportFromCustomersDialog({
                             size="icon"
                             onClick={() => handleSelectCustomer(customer.uid)}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="size-4" />
                           </Button>
                         </div>
                       ))}
@@ -238,7 +238,7 @@ export function ImportFromCustomersDialog({
 
               <div className="rounded-md border p-4 bg-muted/50">
                 <div className="flex items-start gap-2">
-                  <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <Info className="size-5 text-muted-foreground mt-0.5" />
                   <div>
                     <h4 className="font-medium">Import Information</h4>
                     <p className="text-sm text-muted-foreground">

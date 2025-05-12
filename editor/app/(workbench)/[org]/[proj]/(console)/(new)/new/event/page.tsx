@@ -150,7 +150,7 @@ function ThemeSelect({ className }: { className?: string }) {
           width={400}
           height={300}
           alt="thumb"
-          className="h-10 w-auto aspect-[4/3] rounded"
+          className="h-10 w-auto aspect-[4/3] rounded-sm"
         />
         <div>
           <span className="block text-xs">Theme</span>
@@ -177,7 +177,7 @@ function PropertyLine({
   return (
     <div
       className={cn(
-        "min-h-9 px-4 py-2 flex bg-muted w-full rounded text-sm text-muted-foreground",
+        "min-h-9 px-4 py-2 flex bg-muted w-full rounded-sm text-sm text-muted-foreground",
         className
       )}
       {...props}

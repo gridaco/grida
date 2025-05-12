@@ -46,7 +46,7 @@ function Contact() {
       <div className="grid w-auto max-w-2xl gap-6 grid-cols-1 md:grid-cols-2 mx-auto">
         <div className="md:col-span-2">
           <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="items-center justify-center">
+            <CardContent className="flex flex-col items-center justify-center">
               <AnimatedAvatar />
               <div className="h-6" />
               <p className="text-center">
@@ -71,18 +71,13 @@ function Contact() {
                 </Link>
                 .
               </p>
-            </CardHeader>
-            {/* <CardContent className="flex justify-center">
-              <Button asChild className="w-full">
-                <Link href="universe@grida.co">Send Email</Link>
-              </Button>
-            </CardContent> */}
+            </CardContent>
           </Card>
         </div>
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <SlackIcon className="w-8 h-8 mb-4" />
+            <SlackIcon className="size-8 mb-4" />
             <CardTitle>Join Slack</CardTitle>
             <CardDescription>Connect with our community</CardDescription>
           </CardHeader>
@@ -101,7 +96,7 @@ function Contact() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <Calendar className="w-8 h-8 mb-4" />
+            <Calendar className="size-8 mb-4" />
             <CardTitle>Book a Meeting</CardTitle>
             <CardDescription>Schedule time with our team</CardDescription>
           </CardHeader>

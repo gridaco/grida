@@ -76,7 +76,7 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <DollarSign className="h-6 w-6 text-primary" />
+          <DollarSign className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Set Conversion Value</h3>
@@ -101,8 +101,8 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <HelpCircle className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="size-6">
+                  <HelpCircle className="size-4" />
                   <span className="sr-only">More information</span>
                 </Button>
               </TooltipTrigger>
@@ -172,9 +172,9 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
             >
               <span className="font-medium">Industry Benchmarks</span>
               {isExamplesOpen ? (
-                <ChevronUp className="h-4 w-4 opacity-70" />
+                <ChevronUp className="size-4 opacity-70" />
               ) : (
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                <ChevronDown className="size-4 opacity-70" />
               )}
             </Button>
           </CollapsibleTrigger>

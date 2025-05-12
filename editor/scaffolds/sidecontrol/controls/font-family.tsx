@@ -37,10 +37,7 @@ function Item({ option, selected }: ItemRendererProps) {
   return (
     <>
       <CheckIcon
-        className={cn(
-          "mr-2 h-4 w-4 min-w-4",
-          selected ? "opacity-100" : "opacity-0"
-        )}
+        className={cn("size-4 min-w-4", selected ? "opacity-100" : "opacity-0")}
       />
       <GoogleFontsPreview fontFamily={option.value} className="h-3" />
     </>
@@ -65,7 +62,6 @@ export function FontFamilyControl({
       onValueChange={onValueChange}
       renderer={Item}
       options={list.map((i) => i.family)}
-      width={320}
       side="right"
       align="start"
       className={cn(

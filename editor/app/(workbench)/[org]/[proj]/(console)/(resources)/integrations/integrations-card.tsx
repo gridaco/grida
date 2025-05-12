@@ -67,7 +67,7 @@ export function IntegrationCard({
             variant="outline"
             className="bg-green-50 text-green-700 border-green-200"
           >
-            <CheckCircle2 className="mr-1 h-3 w-3" /> Connected
+            <CheckCircle2 className="mr-1 size-3" /> Connected
           </Badge>
         )}
       </CardHeader>
@@ -110,7 +110,7 @@ export function IntegrationCard({
               rel="noopener noreferrer"
             >
               View Documentation
-              <ExternalLink className="ml-1 h-3 w-3" />
+              <ExternalLink className="ml-1 size-3" />
             </Link>
           </Button>
         )}

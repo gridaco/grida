@@ -149,7 +149,7 @@ export function ToolsGroup({
   return (
     <>
       <ToggleGroupItem value={primary}>
-        <ToolIcon type={primary} className="w-4 h-4" />
+        <ToolIcon type={primary} className="size-4" />
       </ToggleGroupItem>
       {options.length > 1 && (
         <DropdownMenu modal>
@@ -167,7 +167,7 @@ export function ToolsGroup({
                 asChild
               >
                 <button className="w-full flex items-center gap-2">
-                  <ToolIcon type={option.value} className="w-4 h-4" />
+                  <ToolIcon type={option.value} className="size-4" />
                   <span>{option.label}</span>
                   {option.shortcut && (
                     <DropdownMenuShortcut>

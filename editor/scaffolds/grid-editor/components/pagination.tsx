@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui-editor/button";
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { IDataQueryPaginationConsumer } from "@/scaffolds/data-query";
@@ -21,10 +21,7 @@ export function GridQueryPaginationControl({
       <Button
         disabled={!hasPrev}
         variant="outline"
-        className={WorkbenchUI.buttonVariants({
-          variant: "outline",
-          size: "icon",
-        })}
+        size="icon"
         onClick={onPrev}
       >
         <ArrowLeftIcon className="w-3.5 h-3.5" />
@@ -49,10 +46,7 @@ export function GridQueryPaginationControl({
       <Button
         disabled={!hasNext}
         variant="outline"
-        className={WorkbenchUI.buttonVariants({
-          variant: "outline",
-          size: "icon",
-        })}
+        size="icon"
         onClick={onNext}
       >
         <ArrowRightIcon className="w-3.5 h-3.5" />

@@ -6,7 +6,7 @@ export function Spinner({ className }: { className?: string }) {
       <svg
         aria-hidden="true"
         className={cn(
-          "inline w-4 h-4 text-ring animate-spin fill-accent",
+          "inline size-4 text-ring animate-spin fill-accent",
           className
         )}
         viewBox="0 0 100 101"

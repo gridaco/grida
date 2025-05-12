@@ -265,7 +265,7 @@ export function GridEditor({
                           <Button
                             size="icon"
                             variant="outline"
-                            className="w-7 h-7"
+                            className="size-7"
                             onClick={onClearSelection}
                           >
                             <Cross2Icon />
@@ -296,7 +296,7 @@ export function GridEditor({
                     </div>
                   ) : (
                     <>
-                      <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                      <div className="flex justify-center items-center divide-x *:px-2 *:first:pl-0 *:last:pr-0">
                         <TableViews />
                         <TableQueryToggles />
                       </div>
@@ -536,7 +536,7 @@ function SelectionExport() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="default" size="sm">
-          <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+          <DownloadIcon className="size-4 align-middle inline-flex me-2" />
           Export
         </Button>
       </DropdownMenuTrigger>
@@ -565,7 +565,7 @@ function GridaFormsResponsesExportCSV() {
       prefetch={false}
     >
       <Button variant="outline" size="sm">
-        <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+        <DownloadIcon className="size-4 align-middle inline-flex me-2" />
         Export to CSV
       </Button>
     </Link>

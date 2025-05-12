@@ -119,7 +119,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <CheckCircle2 className="h-6 w-6 text-primary" />
+          <CheckCircle2 className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Ready to Launch</h3>
@@ -152,7 +152,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
 
         <div className="pt-4 border-t">
           <div className="flex items-start gap-4 mb-4">
-            <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <Clock className="size-5 text-muted-foreground mt-0.5" />
             <div>
               <h4 className="font-medium">Campaign Scheduling</h4>
               <p className="text-sm text-muted-foreground">
@@ -203,7 +203,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             }`}
                             disabled={schedulingType !== "scheduled"}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="size-4" />
                             {data.scheduling.scheduling_open_at ? (
                               format(
                                 new Date(data.scheduling.scheduling_open_at),
@@ -243,7 +243,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
                             }`}
                             disabled={schedulingType !== "scheduled"}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="size-4" />
                             {data.scheduling.scheduling_close_at ? (
                               format(
                                 new Date(data.scheduling.scheduling_close_at),

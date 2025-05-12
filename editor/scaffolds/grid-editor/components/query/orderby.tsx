@@ -137,12 +137,12 @@ export function DataQueryOrderByMenu({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="w-6 h-6"
+                    className="size-6"
                     onClick={() => {
                       onOrderbyRemove(col);
                     }}
                   >
-                    <TrashIcon className="w-3 h-3" />
+                    <TrashIcon className="size-3" />
                   </Button>
                 </div>
               );
@@ -152,8 +152,8 @@ export function DataQueryOrderByMenu({
         <section className="flex flex-col">
           <DataQueryAddOrderbyMenu asChild {...props}>
             <Button variant="ghost" size="sm" className="flex justify-start">
-              <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
-              to sort by
+              <PlusIcon className="size-4 me-2 align-middle" /> Pick a column to
+              sort by
             </Button>
           </DataQueryAddOrderbyMenu>
           {isset && (
@@ -164,7 +164,7 @@ export function DataQueryOrderByMenu({
                 className="flex justify-start"
                 onClick={onOrderbyClear}
               >
-                <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
+                <TrashIcon className="size-4 me-2 align-middle" /> Delete sort
               </Button>
             </PopoverClose>
           )}
@@ -227,7 +227,7 @@ export function DataQueryOrderbyChip(props: IDataQueryOrderbyConsumer) {
   return (
     <DataQueryOrderByMenu {...props}>
       <QueryChip active={isset}>
-        <SortIcon type={icon} className="w-3 h-3 me-1" />
+        <SortIcon type={icon} className="size-3 me-1" />
         {multiple ? <>{length} sorts</> : <>{first.column}</>}
       </QueryChip>
     </DataQueryOrderByMenu>

@@ -1,4 +1,3 @@
-/*
 import * as React from "react";
 import type { Editor } from "@tiptap/react";
 import type { toggleVariants } from "@/components/ui/toggle";
@@ -171,7 +170,7 @@ export const SectionThree: React.FC<SectionThreeProps> = ({
         <ToolbarButton
           tooltip="Text color"
           aria-label="Text color"
-          className="w-12"
+          className="gap-0"
           size={size}
           variant={variant}
         >
@@ -185,14 +184,14 @@ export const SectionThree: React.FC<SectionThreeProps> = ({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="size-5"
+            className="size-4"
             style={{ color: selectedColor }}
           >
             <path d="M4 20h16" />
             <path d="m6 16 6-12 6 12" />
             <path d="M8 12h8" />
           </svg>
-          <CaretDownIcon className="size-5" />
+          <CaretDownIcon className="size-4" />
         </ToolbarButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-full">
@@ -215,4 +214,3 @@ export const SectionThree: React.FC<SectionThreeProps> = ({
 SectionThree.displayName = "SectionThree";
 
 export default SectionThree;
-*/

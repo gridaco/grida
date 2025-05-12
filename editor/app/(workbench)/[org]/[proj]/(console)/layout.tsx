@@ -25,12 +25,7 @@ export default async function Layout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <div className="h-screen flex flex-col">
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
+          <ThemeProvider>
             <TooltipProvider>
               <div className="flex flex-1 overflow-y-auto">
                 <div className="h-full flex flex-1 w-full">

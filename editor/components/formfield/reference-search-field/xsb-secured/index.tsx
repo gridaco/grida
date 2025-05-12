@@ -53,7 +53,7 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
       )}
 
       <div className="relative group">
-        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground pointer-events-none" />
         <Input
           type="search"
           placeholder="Search for reference..."
@@ -67,7 +67,7 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
             type="button"
             variant="outline"
             size="icon"
-            className="w-6 h-6"
+            className="size-6"
             onClick={() => setOpen(true)}
           >
             <Link2Icon />

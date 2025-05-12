@@ -1,6 +1,6 @@
 "use clinet";
 import React, { useContext, useEffect, useMemo, useReducer } from "react";
-import type { ColorPalette } from "@/k/tailwindcolors";
+import type { ColorPalette } from "@/theme/tailwindcolors";
 import { produce } from "immer";
 
 interface SchemedColorToken {

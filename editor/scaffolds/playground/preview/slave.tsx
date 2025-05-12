@@ -101,7 +101,7 @@ export default function PlaygroundPreviewSlave() {
         {renderer ? (
           <>
             {invalid && (
-              <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
+              <div className="absolute top-2 right-2 bg-red-500 p-2 rounded-sm shadow">
                 <ExclamationTriangleIcon />
               </div>
             )}

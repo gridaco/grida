@@ -434,10 +434,10 @@ export default function HalftoneTool() {
             <span className="text-xs">Download</span>
             <div className="w-full flex gap-2">
               <Button variant="outline" onClick={exportPNG}>
-                <DownloadIcon className="size-4 mr-2" /> PNG
+                <DownloadIcon className="size-4" /> PNG
               </Button>
               <Button variant="outline" onClick={exportSVG}>
-                <DownloadIcon className="size-4 mr-2" /> SVG
+                <DownloadIcon className="size-4" /> SVG
               </Button>
             </div>
           </div>

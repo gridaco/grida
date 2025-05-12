@@ -38,7 +38,7 @@ export function InviteeRewardStep({
     <div className="space-y-6">
       <div className="flex items-start gap-4 mb-6">
         <div className="bg-primary/10 p-3 rounded-full">
-          <Gift className="h-6 w-6 text-primary" />
+          <Gift className="size-6 text-primary" />
         </div>
         <div>
           <h3 className="text-lg font-medium">Invitee Rewards</h3>

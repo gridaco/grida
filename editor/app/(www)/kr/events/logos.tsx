@@ -49,14 +49,14 @@ const logos = [
 ];
 export function Logos() {
   return (
-    <div className="flex flex-wrap gap-10 p-8 rounded justify-center items-center">
+    <div className="flex flex-wrap gap-10 p-8 rounded-sm justify-center items-center">
       {logos.map((src, i) => (
         <Image
           key={i}
           src={src}
           alt="adidas"
           height={40}
-          className="p-1 rounded grayscale dark:invert hover:grayscale-0 hover:dark:invert-0 hover:bg-white"
+          className="p-1 rounded-sm grayscale dark:invert hover:grayscale-0 hover:dark:invert-0 hover:bg-white"
         />
       ))}
     </div>

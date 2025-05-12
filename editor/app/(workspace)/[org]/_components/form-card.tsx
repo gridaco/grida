@@ -16,7 +16,7 @@ export function GridCard({
   doctype,
 }: GDocument & { thumbnail?: string }) {
   return (
-    <div className="group rounded border bg-background shadow-md h-full">
+    <div className="group rounded-sm border bg-background shadow-md h-full">
       {thumbnail ? (
         <Image
           className="object-cover w-full h-full"
@@ -29,7 +29,7 @@ export function GridCard({
         <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
           <ResourceTypeIcon
             type={doctype}
-            className="w-10 h-10 text-muted-foreground group-hover:text-foreground transition-colors"
+            className="size-10 text-muted-foreground group-hover:text-foreground transition-colors"
           />
         </div>
       )}
@@ -85,7 +85,7 @@ export function RowCard({
         />
       ) : (
         <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
-          <ResourceTypeIcon type={doctype} className="w-5 h-5" />
+          <ResourceTypeIcon type={doctype} className="size-5" />
         </div>
       )}
       <div className="flex-1 px-6 font-medium whitespace-nowrap">
@@ -146,7 +146,7 @@ function Badges({
       </Badge>
       {has_connection_supabase && (
         <Badge variant="outline" className="p-1">
-          <ResourceTypeIcon type="form-x-supabase" className="w-4 h-4" />
+          <ResourceTypeIcon type="form-x-supabase" className="size-4" />
         </Badge>
       )}
       {is_public && (
@@ -154,7 +154,7 @@ function Badges({
           variant="outline"
           className="text-xs text-muted-foreground font-normal font-mono px-1.5"
         >
-          <LockOpen1Icon className="me-1 w-3 h-3" />
+          <LockOpen1Icon className="me-1 size-3" />
           Public
         </Badge>
       )}

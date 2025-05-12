@@ -6,14 +6,14 @@ import { useEditor } from "@tiptap/react";
 import { Typography } from "@tiptap/extension-typography";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Underline } from "@tiptap/extension-underline";
-// import { TextStyle } from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 import {
   Link,
   Image,
   HorizontalRule,
   CodeBlockLowlight,
   Selection,
-  // Color,
+  Color,
   UnsetAllMarks,
   ResetMarksOnEnter,
   FileHandler,
@@ -74,38 +74,55 @@ const createExtensions = ({
     uploadFn: async (file: File) => {
       return uploader ? await uploader(file) : await fakeuploader(file);
     },
-    onImageRemoved({ id, src }: any) {
+    onToggle(editor, files, pos) {
+      editor.commands.insertContentAt(
+        pos,
+        files.map((image) => {
+          const blobUrl = URL.createObjectURL(image);
+          const id = randomId();
+
+          return {
+            type: "image",
+            attrs: {
+              id,
+              src: blobUrl,
+              alt: image.name,
+              title: image.name,
+              fileName: image.name,
+            },
+          };
+        })
+      );
+    },
+    onImageRemoved({ id, src }) {
       console.log("Image removed", { id, src });
     },
-    onValidationError(errors: any[]) {
+    onValidationError(errors) {
       errors.forEach((error) => {
-        // toast.error("Image validation error");
         toast.error("Image validation error", {
           position: "bottom-right",
           description: error.reason,
         });
       });
     },
-    onActionSuccess({ action }: { action: string }) {
+    onActionSuccess({ action }) {
       const mapping = {
         copyImage: "Copy Image",
         copyLink: "Copy Link",
         download: "Download",
       };
-      // toast.success(mapping[action as keyof typeof mapping]);
-      toast.success(mapping[action as keyof typeof mapping], {
+      toast.success(mapping[action], {
         position: "bottom-right",
         description: "Image action success",
       });
     },
-    onActionError(error: any, { action }: { action: string }) {
+    onActionError(error, { action }) {
       const mapping = {
         copyImage: "Copy Image",
         copyLink: "Copy Link",
         download: "Download",
       };
-      // toast.error(`Failed to ${mapping[action as keyof typeof mapping]}`);
-      toast.error(`Failed to ${mapping[action as keyof typeof mapping]}`, {
+      toast.error(`Failed to ${mapping[action]}`, {
         position: "bottom-right",
         description: error.message,
       });
@@ -135,7 +152,6 @@ const createExtensions = ({
     },
     onValidationError: (errors) => {
       errors.forEach((error) => {
-        // toast.error("Image validation error");
         toast.error("Image validation error", {
           position: "bottom-right",
           description: error.reason,
@@ -143,8 +159,8 @@ const createExtensions = ({
       });
     },
   }),
-  // Color,
-  // TextStyle,
+  Color,
+  TextStyle,
   Selection,
   Typography,
   UnsetAllMarks,
@@ -197,7 +213,7 @@ export const useMinimalTiptapEditor = ({
         autocomplete: "off",
         autocorrect: "off",
         autocapitalize: "off",
-        class: cn("focus:outline-none", editorClassName),
+        class: cn("focus:outline-hidden", editorClassName),
       },
     },
     onUpdate: ({ editor }) => handleUpdate(editor),

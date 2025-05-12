@@ -79,7 +79,7 @@ const BentoCardContent = ({
       )}
     >
       {Icon && (
-        <Icon className="h-8 w-8 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
+        <Icon className="size-8 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
       )}
       <h3 className="text-lg font-semibold text-neutral-700 dark:text-neutral-300">
         {name}
@@ -108,7 +108,7 @@ const BentoCardCTA = ({
       <Button variant="ghost" asChild size="sm" className="pointer-events-auto">
         <a href={href}>
           {label}
-          <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
+          <ArrowRightIcon className="ms-2 size-4 rtl:rotate-180" />
         </a>
       </Button>
     </div>

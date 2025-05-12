@@ -296,7 +296,7 @@ export default function CanvasPlayground({
                                 <header className="h-11 min-h-11 flex items-center px-4 border-b">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger className="me-2">
-                                      <GridaLogo className="inline-block w-4 h-4" />
+                                      <GridaLogo className="inline-block size-4" />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent
                                       align="start"
@@ -462,10 +462,10 @@ export default function CanvasPlayground({
                                           ? "default"
                                           : "outline"
                                       }
-                                      className="w-8 h-8 rounded-full p-0"
+                                      className="size-8 rounded-full p-0"
                                       onClick={libraryDialog.openDialog}
                                     >
-                                      <PlusIcon className="w-4 h-4" />
+                                      <PlusIcon className="size-4" />
                                     </Button>
                                   </div>
                                 </>
@@ -783,7 +783,7 @@ function LibraryContent() {
                     >
                       {/* <BlockTypeIcon
                   type={block_type}
-                  className="p-2 w-8 h-8 rounded"
+                  className="p-2 size-8 rounded-sm"
                 /> */}
                       <ButtonIcon />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">

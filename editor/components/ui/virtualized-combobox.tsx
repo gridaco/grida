@@ -46,10 +46,7 @@ function DefaultRenderer({
   return (
     <>
       <CheckIcon
-        className={cn(
-          "mr-2 h-4 w-4 min-w-4",
-          selected ? "opacity-100" : "opacity-0"
-        )}
+        className={cn("size-4 min-w-4", selected ? "opacity-100" : "opacity-0")}
       />
       {option.label}
     </>
@@ -169,7 +166,6 @@ export function VirtualizedCombobox({
   onValueChange,
   options,
   placeholder = "Select",
-  width = "400px",
   height = "400px",
   side,
   sideOffset,
@@ -187,20 +183,16 @@ export function VirtualizedCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("justify-between", className)}
-          style={{
-            width: width,
-          }}
+          className={cn("w-full justify-between", className)}
         >
           <span className="text-ellipsis overflow-hidden">
             {value ? options.find((option) => option === value) : placeholder}
           </span>
-          <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <CaretSortIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
         className="p-0"
-        style={{ width: width }}
         side={side}
         sideOffset={sideOffset}
         align={align}

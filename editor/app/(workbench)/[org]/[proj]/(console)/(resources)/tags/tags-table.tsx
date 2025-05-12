@@ -63,7 +63,7 @@ function TagsTableSkeleton() {
                 <div className="h-6 w-16 bg-muted animate-pulse rounded-md" />
               </TableCell>
               <TableCell>
-                <div className="h-8 w-8 bg-muted animate-pulse rounded-md" />
+                <div className="size-8 bg-muted animate-pulse rounded-md" />
               </TableCell>
             </TableRow>
           ))}
@@ -119,7 +119,7 @@ export function TagsTable() {
                     </Badge>
                     {/* <div className="flex items-center gap-2">
                       <div
-                        className="w-4 h-4 rounded-full"
+                        className="size-4 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
                       <span className="font-medium">{tag.name}</span>
@@ -138,7 +138,7 @@ export function TagsTable() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="size-4" />
                           <span className="sr-only">Open menu</span>
                         </Button>
                       </DropdownMenuTrigger>
@@ -148,8 +148,8 @@ export function TagsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          variant="destructive"
                           onClick={() => setDeletingTag(tag)}
-                          className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="size-4" />
                           Delete

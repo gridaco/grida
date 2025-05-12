@@ -1,6 +1,6 @@
 "use client";
 
-import { Google } from "@/components/logos";
+import { Icons } from "./icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
 
 export function CardsCreateAccount() {
   return (
@@ -26,11 +25,11 @@ export function CardsCreateAccount() {
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-2 gap-6">
           <Button variant="outline">
-            <GitHubLogoIcon />
+            <Icons.gitHub />
             GitHub
           </Button>
           <Button variant="outline">
-            <Google />
+            <Icons.google />
             Google
           </Button>
         </div>
