@@ -20,3 +20,12 @@ We support macOS, Windows, and Linux distributions.
 # Building locally
 
 See the [CONTRIBUTING.md](CONTRIBUTING.md) file for instructions on how to build and run the project locally.
+
+**Quick Start**
+
+Note: the `/desktop` directory has its own `pnpm-workspace.yaml` file, so you need to run `pnpm install` in the `/desktop` directory.
+
+```bash
+pnpm install
+pnpm dev
+```
