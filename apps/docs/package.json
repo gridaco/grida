@@ -35,7 +35,8 @@
     "@docusaurus/tsconfig": "3.7.0",
     "@docusaurus/types": "3.7.0",
     "fs-extra": "^10.0.0",
-    "marked": "^4.0.10"
+    "marked": "^4.0.10",
+    "typescript": "^5"
   },
   "browserslist": {
     "production": [
@@ -50,7 +51,6 @@
     ]
   },
   "engines": {
-    "node": ">=22.0.0",
-    "pnpm": ">=10.0.0"
+    "node": ">=18.0"
   }
 }

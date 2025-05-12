@@ -25,6 +25,9 @@
       "axios": "1.6.7",
       "prosemirror-model": "1.23.0",
       "prosemirror-view": "1.36.0"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
   }
 }
