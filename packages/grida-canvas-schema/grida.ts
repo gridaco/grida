@@ -4,7 +4,10 @@ import type cg from "@grida/cg";
 import type cmath from "@grida/cmath";
 import * as CSS from "csstype";
 
-export interface CSSProperties extends CSS.Properties<string | number> {
+/**
+ * CSSProperties definition from `@types/react`
+ */
+interface CSSProperties extends CSS.Properties<string | number> {
   /**
    * The index signature was removed to enable closed typing for style
    * using CSSType. You're able to use type assertion or module augmentation
