@@ -7,7 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/components/lib/utils";
@@ -44,7 +44,7 @@ export function TemplateControl({
       </Button>
       <ProgramDataContextHost>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-screen-xl p-0">
+          <DialogContent className="!max-w-screen-xl p-0">
             <DialogHeader className="p-4">
               <DialogTitle>Browse Templates</DialogTitle>
             </DialogHeader>

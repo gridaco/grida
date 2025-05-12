@@ -50,7 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -294,7 +294,7 @@ function TestSMS({ form_id }: { form_id: string }) {
           Test
         </Badge>
       </DialogTrigger>
-      <DialogContent className="max-w-screen-lg">
+      <DialogContent className="!max-w-screen-lg">
         <DialogHeader>
           <DialogTitle>Test SMS Notifications</DialogTitle>
           <DialogDescription>

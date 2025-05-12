@@ -166,7 +166,6 @@ export function VirtualizedCombobox({
   onValueChange,
   options,
   placeholder = "Select",
-  width = "400px",
   height = "400px",
   side,
   sideOffset,
@@ -184,10 +183,7 @@ export function VirtualizedCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("justify-between", className)}
-          style={{
-            width: width,
-          }}
+          className={cn("w-full justify-between", className)}
         >
           <span className="text-ellipsis overflow-hidden">
             {value ? options.find((option) => option === value) : placeholder}
@@ -197,7 +193,6 @@ export function VirtualizedCombobox({
       </PopoverTrigger>
       <PopoverContent
         className="p-0"
-        style={{ width: width }}
         side={side}
         sideOffset={sideOffset}
         align={align}

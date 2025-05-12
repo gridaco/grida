@@ -7,7 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { ThemeEditor } from "@/grida-react-canvas-starter-kit/starterkit-theme-editor";
 import { CardsDemo } from "@/grida-theme-shadcn/example/cards";
 

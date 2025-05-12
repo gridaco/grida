@@ -508,7 +508,7 @@ function TemplateEditor({
                   </div>
                 </CardContent>
               </TabsContent>
-              <TabsContent value="theme" className="m-0 max-w-screen-md">
+              <TabsContent value="theme" className="m-0">
                 <CardHeader>
                   <CardTitle>Theme</CardTitle>
                 </CardHeader>

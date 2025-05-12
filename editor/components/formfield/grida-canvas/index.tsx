@@ -100,7 +100,7 @@ export function GridaCanvasFormField() {
         </Card>
       </DialogTrigger>
       <DialogContent
-        className="max-w-screen-xl overflow-hidden select-none p-0"
+        className="!max-w-screen-xl overflow-hidden select-none p-0"
         style={{ height: "calc(100vh - 4rem)" }}
         hideCloseButton
       >

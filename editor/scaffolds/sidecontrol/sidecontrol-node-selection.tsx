@@ -364,10 +364,12 @@ function SelectionMixedProperties({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Font</PropertyLineLabel>
-              <FontFamilyControl
-                value={fontFamily?.value}
-                onValueChange={change.fontFamily}
-              />
+              <div className="flex-1">
+                <FontFamilyControl
+                  value={fontFamily?.value}
+                  onValueChange={change.fontFamily}
+                />
+              </div>
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Weight</PropertyLineLabel>
@@ -905,10 +907,12 @@ function SelectedNodeProperties({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Font</PropertyLineLabel>
-              <FontFamilyControl
-                value={fontFamily}
-                onValueChange={actions.fontFamily}
-              />
+              <div className="flex-1">
+                <FontFamilyControl
+                  value={fontFamily}
+                  onValueChange={actions.fontFamily}
+                />
+              </div>
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Weight</PropertyLineLabel>

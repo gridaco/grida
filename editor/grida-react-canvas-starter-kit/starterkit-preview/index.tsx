@@ -124,7 +124,8 @@ export function PreviewProvider({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           hideCloseButton
-          className="max-w-screen h-screen flex flex-col p-0 gap-0 !rounded-none"
+          fullScreen
+          className="flex flex-col p-0 gap-0"
         >
           <DialogTitle className="sr-only">Preivew</DialogTitle>
           {mode === "framed" && (

@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useReducer, useState } from "react";
+import React, { useMemo } from "react";
 import { PanelPropertyField } from "@/components/panels/side-panel";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { MixIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { EditValueExpression } from "./v-edit";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
-import { TProperties, TProperty, TSchema } from "@/lib/spock";
-import { useEditorState, useFormFields } from "@/scaffolds/editor";
+import { TProperties, TSchema } from "@/lib/spock";
+import { useFormFields } from "@/scaffolds/editor";
 import { FormExpression } from "@/lib/forms/expression";
 import { toast } from "sonner";
 import { tokens } from "@grida/tokens";
@@ -91,19 +89,6 @@ export function FieldValueExpression({
             )}
           </Button>
         </PropertyAccessDropdownMenu>
-        {/* <Dialog>
-            <DialogTrigger>
-              <div>
-                <Button variant="outline" type="button">
-                  <MixIcon className="me-2" />
-                  <>Set Value Expression</>
-                </Button>
-              </div>
-            </DialogTrigger>
-            <DialogContent className="min-w-full h-screen p-0">
-              <EditValueExpression />
-            </DialogContent>
-          </Dialog> */}
       </PanelPropertyField>
       {expression && (
         <PanelPropertyField label="Expression">

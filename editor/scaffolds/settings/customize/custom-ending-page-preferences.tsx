@@ -304,7 +304,7 @@ function CustomizeTemplate({
   };
   return (
     <Dialog {...props}>
-      <DialogContent className="min-w-full h-screen p-0" hideCloseButton>
+      <DialogContent className="p-0" hideCloseButton fullScreen>
         <DialogTitle className="sr-only">Customize</DialogTitle>
         <TemplateEditor
           context={{

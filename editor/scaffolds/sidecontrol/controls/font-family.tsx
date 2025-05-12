@@ -62,7 +62,6 @@ export function FontFamilyControl({
       onValueChange={onValueChange}
       renderer={Item}
       options={list.map((i) => i.family)}
-      width={320}
       side="right"
       align="start"
       className={cn(

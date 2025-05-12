@@ -277,19 +277,31 @@ function FontFamilyControl() {
       onValueChange={(value) => onFontChange(value as any)}
       className="w-full"
     >
-      <ToggleGroupItem value={"inter"} className="h-full w-1/3">
+      <ToggleGroupItem
+        variant="outline"
+        value={"inter"}
+        className="h-full w-1/3"
+      >
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag className="text-2xl" fontClassName={fonts.inter.className} />
           <span className="text-xs">Default</span>
         </div>
       </ToggleGroupItem>
-      <ToggleGroupItem value={"lora"} className="h-full w-1/3">
+      <ToggleGroupItem
+        variant="outline"
+        value={"lora"}
+        className="h-full w-1/3"
+      >
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag className="text-2xl" fontClassName={fonts.lora.className} />
           <span className="text-xs">Serif</span>
         </div>
       </ToggleGroupItem>
-      <ToggleGroupItem value={"inconsolata"} className="h-full w-1/3">
+      <ToggleGroupItem
+        variant="outline"
+        value={"inconsolata"}
+        className="h-full w-1/3"
+      >
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag
             className="text-2xl"
