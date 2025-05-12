@@ -6,7 +6,7 @@ import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";
 import { MapGL } from "@/components/mapgl";
 import { TwitterLogoIcon } from "@radix-ui/react-icons";
 import { YoutubeIcon } from "lucide-react";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 interface Props {
   data: {

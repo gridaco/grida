@@ -54,7 +54,7 @@ import {
   FloatingBarContent,
   FloatingBarTitle,
 } from "./ui/floating-bar";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 

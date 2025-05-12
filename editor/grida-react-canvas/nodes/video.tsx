@@ -1,6 +1,6 @@
 import React from "react";
 import queryattributes from "./utils/attributes";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { css } from "@/grida/css";
 
 export const VideoWidget = ({

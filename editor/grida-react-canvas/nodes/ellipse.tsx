@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { svg } from "@/grida/svg";
 import queryattributes from "./utils/attributes";
 

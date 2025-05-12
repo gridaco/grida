@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 type Schema = {
   properties: grida.program.schema.Properties;

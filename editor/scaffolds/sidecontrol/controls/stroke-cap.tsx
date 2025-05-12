@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import type cg from "@grida/cg";
 import { PropertyEnum } from "../ui";
 import { TMixed } from "./utils/types";
 
@@ -6,23 +6,23 @@ export function StrokeCapControl({
   value,
   onValueChange,
 }: {
-  value?: TMixed<grida.program.cg.StrokeCap>;
-  onValueChange?: (value: grida.program.cg.StrokeCap) => void;
+  value?: TMixed<cg.StrokeCap>;
+  onValueChange?: (value: cg.StrokeCap) => void;
 }) {
   return (
     <PropertyEnum
       enum={[
         {
           label: "None",
-          value: "butt" satisfies grida.program.cg.StrokeCap,
+          value: "butt" satisfies cg.StrokeCap,
         },
         {
           label: "Round",
-          value: "round" satisfies grida.program.cg.StrokeCap,
+          value: "round" satisfies cg.StrokeCap,
         },
         {
           label: "Square",
-          value: "square" satisfies grida.program.cg.StrokeCap,
+          value: "square" satisfies cg.StrokeCap,
         },
       ]}
       value={value}

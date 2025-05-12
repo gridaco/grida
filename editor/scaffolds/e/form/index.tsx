@@ -21,7 +21,7 @@ import type {
 } from "@/app/(api)/(public)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
 import { StandaloneDocumentEditor } from "@/grida-react-canvas/provider";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { FormAgentGeo } from "@/lib/formstate/core/geo";
 
 export function Agent({

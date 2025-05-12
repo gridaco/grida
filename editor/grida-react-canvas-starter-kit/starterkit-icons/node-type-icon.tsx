@@ -1,4 +1,4 @@
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import {
   FrameIcon,
   BoxIcon,

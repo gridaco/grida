@@ -9,7 +9,7 @@ import { history } from "./history";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import equal from "deep-equal";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import nid from "./tools/id";
 
 export default function reducer<S extends IDocumentEditorState>(

@@ -1,5 +1,5 @@
 import React from "react";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 
 export const RichTextWidget = ({

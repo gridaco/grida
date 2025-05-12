@@ -6,7 +6,7 @@ import {
 } from "@/grida-react-canvas/provider";
 import { useEffect, useRef } from "react";
 import { useSingleSelection } from "../surface-hooks";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { css } from "@/grida/css";
 import { cmath } from "@grida/cmath";
 

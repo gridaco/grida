@@ -13,7 +13,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
 import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { self_clearSelection, self_selectNode } from "./methods";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 

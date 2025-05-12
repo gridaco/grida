@@ -14,7 +14,7 @@ import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import { useGoogleFontsList } from "../../grida-fonts/react/hooks";
 
 export function DevtoolsPanel() {

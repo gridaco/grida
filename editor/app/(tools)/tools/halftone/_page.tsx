@@ -14,8 +14,8 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
-import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
+import type cg from "@grida/cg";
 import { DownloadIcon } from "lucide-react";
 
 const DEFAULT_GRID = 8;
@@ -219,7 +219,7 @@ export default function HalftoneTool() {
   const [gamma, setGamma] = useState<number>(1);
   const [jitter, setJitter] = useState<number>(0);
   const [opacity, setOpacity] = useState<number>(1);
-  const [color, setColor] = useState<grida.program.cg.RGBA8888>({
+  const [color, setColor] = useState<cg.RGBA8888>({
     r: 0,
     g: 0,
     b: 0,

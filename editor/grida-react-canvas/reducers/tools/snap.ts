@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
 import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";

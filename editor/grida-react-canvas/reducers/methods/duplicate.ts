@@ -5,7 +5,7 @@ import { self_insertSubDocument } from "./insert";
 import { self_selectNode } from "./selection";
 import assert from "assert";
 import nid from "../tools/id";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { domapi } from "@/grida-react-canvas/domapi";
 import { cmath } from "@grida/cmath";
 

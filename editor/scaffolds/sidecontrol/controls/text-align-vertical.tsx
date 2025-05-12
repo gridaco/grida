@@ -3,11 +3,11 @@ import {
   TextAlignMiddleIcon,
   TextAlignBottomIcon,
 } from "@radix-ui/react-icons";
-import type { grida } from "@/grida";
+import type cg from "@grida/cg";
 import type { TMixed } from "./utils/types";
 import { PropertyEnumToggle } from "../ui";
 
-type TextAlignVertical = grida.program.cg.TextAlignVertical;
+type TextAlignVertical = cg.TextAlignVertical;
 
 export function TextAlignVerticalControl({
   value,

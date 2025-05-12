@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 type Padding = grida.program.nodes.i.IPadding["padding"];
 

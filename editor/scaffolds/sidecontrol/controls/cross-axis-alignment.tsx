@@ -7,7 +7,7 @@ import {
   AlignCenterVerticallyIcon,
   AlignBottomIcon,
 } from "@radix-ui/react-icons";
-import type { grida } from "@/grida";
+import type cg from "@grida/cg";
 import type { TMixed } from "./utils/types";
 import { PropertyEnumToggle } from "../ui";
 
@@ -29,7 +29,7 @@ const icons = {
   vertical: iconsbyaxis.horizontal,
 };
 
-type CrossAxisAlignment = grida.program.cg.CrossAxisAlignment;
+type CrossAxisAlignment = cg.CrossAxisAlignment;
 
 export function CrossAxisAlignmentControl({
   value,
@@ -37,7 +37,7 @@ export function CrossAxisAlignmentControl({
   onValueChange,
 }: {
   value?: TMixed<CrossAxisAlignment>;
-  direction?: grida.program.cg.Axis;
+  direction?: cg.Axis;
   onValueChange?: (value: CrossAxisAlignment) => void;
 }) {
   return (

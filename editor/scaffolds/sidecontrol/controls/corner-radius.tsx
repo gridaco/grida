@@ -6,7 +6,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import type grida from "@grida/schema";
+import cg from "@grida/cg";
 import {
   CornerTopLeftIcon,
   CornerTopRightIcon,
@@ -66,13 +67,13 @@ export function CornerRadiusControl({
         <CornerRadius4Control
           value={
             Array.isArray(value)
-              ? (value as grida.program.cg.CornerRadius4)
+              ? (value as cg.CornerRadius4)
               : value
                 ? [value, value, value, value]
                 : [0, 0, 0, 0]
           }
           onValueChange={(v) => {
-            if (grida.program.cg.cornerRadius4Identical(v)) {
+            if (cg.cornerRadius4Identical(v)) {
               onValueChange?.(v[0]);
               return;
             }
@@ -88,8 +89,8 @@ function CornerRadius4Control({
   value,
   onValueChange,
 }: {
-  value: grida.program.cg.CornerRadius4;
-  onValueChange?: (value: grida.program.cg.CornerRadius4) => void;
+  value: cg.CornerRadius4;
+  onValueChange?: (value: cg.CornerRadius4) => void;
 }) {
   const [topLeft, topRight, bottomRight, bottomLeft] = value;
 
@@ -97,7 +98,7 @@ function CornerRadius4Control({
     const newValue = [...value];
     const n = parseInt(e.target.value) || 0;
     newValue[index] = n;
-    onValueChange?.(newValue as grida.program.cg.CornerRadius4);
+    onValueChange?.(newValue as cg.CornerRadius4);
   };
 
   return (

@@ -4661,3 +4661,5 @@ export namespace cmath.ui {
 //   // fromPointToVector
 //   // sideToPoint
 // }
+
+export default cmath;

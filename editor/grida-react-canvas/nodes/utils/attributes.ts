@@ -1,4 +1,4 @@
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 
 /**
  * safely maps the attributes that are required to be passed to the html element

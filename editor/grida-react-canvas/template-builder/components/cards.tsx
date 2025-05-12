@@ -6,7 +6,7 @@ import { SlashIcon } from "@radix-ui/react-icons";
 import { withTemplateDefinition } from "@/grida-react-canvas/template-builder/with-template";
 import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import { Media } from "./media";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 const card_properties_definition = {
   badge: { type: "string" },

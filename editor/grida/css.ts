@@ -1,5 +1,6 @@
 import { cmath } from "@grida/cmath";
-import type { grida } from "./index";
+import type grida from "@grida/schema";
+import type cg from "@grida/cg";
 import colors from "color-name";
 
 export namespace css {
@@ -9,13 +10,13 @@ export namespace css {
    */
   export const namedcolors = colors;
 
-  export function toRGBAString(rgba: grida.program.cg.RGBA8888): string {
+  export function toRGBAString(rgba: cg.RGBA8888): string {
     return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
   }
 
   /**
    *
-   * {@link grida.program.cg.TextAlignVertical} to CSS `align-content` mapping
+   * {@link cg.TextAlignVertical} to CSS `align-content` mapping
    *
    * - `top`:`start`
    * - `center`:`center`
@@ -24,7 +25,7 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
    */
   const text_align_vertical_to_css_align_content: Record<
-    grida.program.cg.TextAlignVertical,
+    cg.TextAlignVertical,
     React.CSSProperties["alignContent"]
   > = {
     top: "start",
@@ -41,7 +42,7 @@ export namespace css {
       Partial<grida.program.nodes.i.IZIndex> &
       Partial<grida.program.nodes.i.IPositioning> &
       Partial<grida.program.nodes.i.ICSSDimension> &
-      Partial<grida.program.nodes.i.IFill<grida.program.cg.Paint>> &
+      Partial<grida.program.nodes.i.IFill<cg.Paint>> &
       Partial<grida.program.nodes.i.IBoxShadow> &
       Partial<grida.program.nodes.i.ICSSBorder> &
       Partial<grida.program.nodes.i.IMouseCursor> &
@@ -252,13 +253,13 @@ export namespace css {
     };
   }
 
-  function boxShadowToCSS(boxShadow: grida.program.cg.BoxShadow): string {
+  function boxShadowToCSS(boxShadow: cg.BoxShadow): string {
     const { color, offset = [0, 0], blur = 0, spread = 0 } = boxShadow;
 
     return `${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
   }
 
-  export function toFillString(paint: grida.program.cg.Paint): string {
+  export function toFillString(paint: cg.Paint): string {
     switch (paint.type) {
       case "solid":
         return toRGBAString(paint.color);
@@ -291,9 +292,7 @@ export namespace css {
     }
   }
 
-  export function axisToFlexDirection(
-    axis: grida.program.cg.Axis
-  ): "row" | "column" {
+  export function axisToFlexDirection(axis: cg.Axis): "row" | "column" {
     switch (axis) {
       case "horizontal":
         return "row";
@@ -312,7 +311,7 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient
    */
   export function toLinearGradientString(
-    paint: Omit<grida.program.cg.LinearGradientPaint, "id">
+    paint: Omit<cg.LinearGradientPaint, "id">
   ): string {
     const { stops, transform } = paint;
 
@@ -338,7 +337,7 @@ export namespace css {
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient
    */
   export function toRadialGradientString(
-    paint: Omit<grida.program.cg.RadialGradientPaint, "id">
+    paint: Omit<cg.RadialGradientPaint, "id">
   ): string {
     const { stops } = paint;
 

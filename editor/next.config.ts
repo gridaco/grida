@@ -5,7 +5,9 @@ import createMDX from "@next/mdx";
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
-const USE_TELEMETRY = process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
+const USE_TELEMETRY =
+  process.env.NODE_ENV === "production" &&
+  process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
 
 const withMDX = createMDX({
   // Add markdown plugins here, as desired
@@ -207,9 +209,11 @@ const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
       silent: !process.env.CI, // Only print logs for uploading source maps in CI
       widenClientFileUpload: false,
       sourcemaps: {
-        disable:
-          process.env.NODE_ENV === "development" ||
-          process.env.VERCEL_ENV === "preview",
+        disable: true,
+        // [causes build time out error - enable once fixed]
+        // disable:
+        //   process.env.NODE_ENV === "development" ||
+        //   process.env.VERCEL_ENV === "preview",
       },
 
       // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.

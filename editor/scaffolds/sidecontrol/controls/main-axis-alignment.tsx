@@ -1,8 +1,8 @@
-import type { grida } from "@/grida";
-import type { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
+import type { TMixed } from "./utils/types";
+import type cg from "@grida/cg";
 
-type MainAxisAlignment = grida.program.cg.MainAxisAlignment;
+type MainAxisAlignment = cg.MainAxisAlignment;
 
 export function MainAxisAlignmentControl({
   value,

@@ -8,7 +8,7 @@ import {
   ScreenRoot,
   TextAlign,
 } from "@/theme/templates/kit/components";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { tokens } from "@grida/tokens";

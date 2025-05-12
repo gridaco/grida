@@ -1,5 +1,5 @@
 import { tokens } from "@grida/tokens";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { PropertyEnum } from "../ui";
 
 export function PropertyAccessExpressionControl({

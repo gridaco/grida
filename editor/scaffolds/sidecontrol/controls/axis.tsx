@@ -1,30 +1,28 @@
 "use client";
 
 import { ViewHorizontalIcon, ViewVerticalIcon } from "@radix-ui/react-icons";
-import type { grida } from "@/grida";
 import { TMixed } from "./utils/types";
 import { PropertyEnumToggle } from "../ui";
-
-type Axis = grida.program.cg.Axis;
+import type cg from "@grida/cg";
 
 export function AxisControl({
   value,
   onValueChange,
 }: {
-  value?: TMixed<Axis>;
-  onValueChange?: (value: Axis) => void;
+  value?: TMixed<cg.Axis>;
+  onValueChange?: (value: cg.Axis) => void;
 }) {
   return (
-    <PropertyEnumToggle<Axis>
+    <PropertyEnumToggle<cg.Axis>
       enum={[
         {
           label: "Horizontal",
-          value: "horizontal" satisfies Axis,
+          value: "horizontal" satisfies cg.Axis,
           icon: <ViewVerticalIcon />,
         },
         {
           label: "Vertical",
-          value: "vertical" satisfies Axis,
+          value: "vertical" satisfies cg.Axis,
           icon: <ViewHorizontalIcon />,
         },
       ]}

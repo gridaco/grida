@@ -1,7 +1,6 @@
 import React from "react";
 import HexValueInput from "./utils/hex";
 import { RgbaColorPicker } from "react-colorful";
-import { grida } from "@/grida";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PipetteIcon } from "lucide-react";
@@ -13,11 +12,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cmath } from "@grida/cmath";
+import type cg from "@grida/cg";
 import "./color-picker.css";
 
 interface IDColor {
   id: string;
-  color: grida.program.cg.RGBA8888;
+  color: cg.RGBA8888;
 }
 
 export function ColorPicker({
@@ -25,8 +25,8 @@ export function ColorPicker({
   onColorChange,
   options,
 }: {
-  color: grida.program.cg.RGBA8888;
-  onColorChange?: (color: grida.program.cg.RGBA8888) => void;
+  color: cg.RGBA8888;
+  onColorChange?: (color: cg.RGBA8888) => void;
   options?: IDColor[];
 }) {
   const { isSupported, open } = useEyeDropper();

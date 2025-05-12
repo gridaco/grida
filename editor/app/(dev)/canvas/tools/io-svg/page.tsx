@@ -12,7 +12,7 @@ import {
   ViewportRoot,
 } from "@/grida-react-canvas";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
 import { Button } from "@/components/ui/button";

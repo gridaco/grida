@@ -31,7 +31,7 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import _messages from "./messages.json";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 
 type Messages = typeof _messages;
 

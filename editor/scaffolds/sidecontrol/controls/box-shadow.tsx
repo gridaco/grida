@@ -6,7 +6,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import cg from "@grida/cg";
 import * as tw from "./k/tailwindcss";
 import { cn } from "@/components/lib/utils";
 import { PaintChip } from "./utils/paint-chip";
@@ -19,7 +19,7 @@ import { PropertyLine, PropertyLineLabel, PropertyNumber } from "../ui";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { RGBAColorControl } from "./color";
 
-type BoxShadow = grida.program.cg.BoxShadow;
+type BoxShadow = cg.BoxShadow;
 
 const default_box_shadow: BoxShadow = {
   color: { r: 0, g: 0, b: 0, a: 0.25 },
@@ -73,7 +73,7 @@ export function BoxShadowControl({
             )}
             onClick={onAdd}
           >
-            <PaintChip paint={grida.program.cg.paints.transparent} />
+            <PaintChip paint={cg.paints.transparent} />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>

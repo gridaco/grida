@@ -11,14 +11,15 @@ import type {
   BlendMode,
 } from "@figma/rest-api-spec";
 import { cmath } from "@grida/cmath";
-import { grida } from "editor/grida";
+import type cg from "@grida/cg";
+import type grida from "@grida/schema";
 
 export namespace iofigma {
   export namespace restful {
     export namespace map {
       export const strokeCapMap: Record<
         NonNullable<LineNode["strokeCap"]>,
-        grida.program.cg.StrokeCap | undefined
+        cg.StrokeCap | undefined
       > = {
         NONE: "butt",
         ROUND: "round",
@@ -39,7 +40,7 @@ export namespace iofigma {
 
       export const textAlignMap: Record<
         NonNullable<TypeStyle["textAlignHorizontal"]>,
-        grida.program.cg.TextAlign | undefined
+        cg.TextAlign | undefined
       > = {
         CENTER: "center",
         RIGHT: "right",
@@ -49,7 +50,7 @@ export namespace iofigma {
 
       export const textAlignVerticalMap: Record<
         NonNullable<TypeStyle["textAlignVertical"]>,
-        grida.program.cg.TextAlignVertical
+        cg.TextAlignVertical
       > = {
         CENTER: "center",
         TOP: "top",
@@ -58,17 +59,14 @@ export namespace iofigma {
 
       export const textDecorationMap: Record<
         NonNullable<TypeStyle["textDecoration"]>,
-        grida.program.cg.TextDecoration | undefined
+        cg.TextDecoration | undefined
       > = {
         NONE: "none",
         STRIKETHROUGH: undefined,
         UNDERLINE: "underline",
       };
 
-      export const windingRuleMap: Record<
-        Path["windingRule"],
-        grida.program.cg.FillRule
-      > = {
+      export const windingRuleMap: Record<Path["windingRule"], cg.FillRule> = {
         EVENODD: "evenodd",
         NONZERO: "nonzero",
       };
@@ -100,10 +98,7 @@ export namespace iofigma {
     }
 
     export namespace factory {
-      function paint(
-        paint: Paint,
-        id: () => string
-      ): grida.program.cg.Paint | undefined {
+      function paint(paint: Paint, id: () => string): cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
             return {
@@ -501,8 +496,7 @@ export namespace iofigma {
               fontSize: node.style.fontSize ?? 0,
               fontFamily: node.style.fontFamily,
               fontWeight:
-                (node.style.fontWeight as grida.program.cg.NFontWeight) ??
-                (400 as const),
+                (node.style.fontWeight as cg.NFontWeight) ?? (400 as const),
             };
           }
           case "RECTANGLE": {

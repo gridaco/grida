@@ -1,0 +1,11 @@
+{
+  "name": "@grida/schema",
+  "description": "Grida Canvas Document Model",
+  "devDependencies": {
+    "@grida/cg": "workspace:*",
+    "@grida/cmath": "workspace:*",
+    "@grida/tokens": "workspace:*",
+    "@grida/vn": "workspace:*",
+    "csstype": "3.1.0"
+  }
+}

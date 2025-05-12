@@ -1,5 +1,5 @@
 import React from "react";
-import type { grida } from "@/grida";
+import type grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 import { svg } from "@/grida/svg";
 

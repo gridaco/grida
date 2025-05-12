@@ -1,7 +1,8 @@
 import type { Action, EditorAction } from "./action";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
+import type cg from "@grida/cg";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
 import type { BitmapLayerEditor, BitmapEditorBrush } from "@grida/bitmap";
 
@@ -177,8 +178,8 @@ export interface IDocumentEditorClipboardState {
    * @deprecated - not ready
    */
   next_font_family?: string;
-  next_paint_color?: grida.program.cg.RGBA8888;
-  user_clipboard_color?: grida.program.cg.RGBA8888;
+  next_paint_color?: cg.RGBA8888;
+  user_clipboard_color?: cg.RGBA8888;
   brush: CurrentBrush;
 }
 

@@ -1,7 +1,7 @@
 import { Slider } from "./utils/slider";
 import { WorkbenchUI } from "@/components/workbench";
 import { PropertyNumber } from "../ui";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type { TChange, TMixed } from "./utils/types";
 
 export function OpacityControl({

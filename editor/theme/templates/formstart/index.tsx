@@ -10,7 +10,7 @@ import FormStartPage005_RES from "@/theme/templates/formstart/005/messages.json"
 import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { StandaloneSceneContent } from "@/grida-react-canvas";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";

@@ -10,7 +10,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { TChange } from "@/grida-react-canvas/action";
 import { cn } from "@/components/lib/utils";
 import { TMixed } from "../controls/utils/types";

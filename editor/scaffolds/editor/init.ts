@@ -36,7 +36,7 @@ import {
   initDocumentEditorState,
 } from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { DataFormat } from "../data-format";
 // import * as samples from "@/theme/templates/formcollection/samples";
 

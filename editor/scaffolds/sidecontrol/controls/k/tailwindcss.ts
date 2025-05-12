@@ -1,6 +1,6 @@
-import type { grida } from "@/grida";
+import type cg from "@grida/cg";
 
-type BoxShadow = grida.program.cg.BoxShadow;
+type BoxShadow = cg.BoxShadow;
 
 export const boxshadow: Record<
   string,

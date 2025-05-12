@@ -18,7 +18,7 @@ import {
   SurfaceRaycastTargeting,
 } from "./state";
 import type { tokens } from "@grida/tokens";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
@@ -36,6 +36,7 @@ import iosvg from "@grida/io-svg";
 import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida/utils/supports";
+import type cg from "@grida/cg";
 import nid from "./reducers/tools/id";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
@@ -404,7 +405,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       node_id: string,
       fill:
         | grida.program.nodes.i.props.SolidPaintToken
-        | grida.program.cg.PaintWithoutID
+        | cg.PaintWithoutID
         | null
     ) => {
       requestAnimationFrame(() => {
@@ -423,7 +424,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       node_id: string,
       stroke:
         | grida.program.nodes.i.props.SolidPaintToken
-        | grida.program.cg.PaintWithoutID
+        | cg.PaintWithoutID
         | null
     ) => {
       requestAnimationFrame(() => {
@@ -451,7 +452,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeStrokeCap = useCallback(
-    (node_id: string, strokeCap: grida.program.cg.StrokeCap) => {
+    (node_id: string, strokeCap: cg.StrokeCap) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/stroke-cap",
@@ -464,7 +465,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFit = useCallback(
-    (node_id: string, fit: grida.program.cg.BoxFit) => {
+    (node_id: string, fit: cg.BoxFit) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fit",
@@ -507,7 +508,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeTextNodeFontWeight = useCallback(
-    (node_id: string, fontWeight: grida.program.cg.NFontWeight) => {
+    (node_id: string, fontWeight: cg.NFontWeight) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fontWeight",
@@ -533,7 +534,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeTextNodeTextAlign = useCallback(
-    (node_id: string, textAlign: grida.program.cg.TextAlign) => {
+    (node_id: string, textAlign: cg.TextAlign) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/textAlign",
@@ -546,10 +547,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeTextNodeTextAlignVertical = useCallback(
-    (
-      node_id: string,
-      textAlignVertical: grida.program.cg.TextAlignVertical
-    ) => {
+    (node_id: string, textAlignVertical: cg.TextAlignVertical) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/textAlignVertical",
@@ -636,7 +634,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeBoxShadow = useCallback(
-    (node_id: string, boxShadow?: grida.program.cg.BoxShadow) => {
+    (node_id: string, boxShadow?: cg.BoxShadow) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/box-shadow",
@@ -665,7 +663,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeFlexContainerNodeDirection = useCallback(
-    (node_id: string, direction: grida.program.cg.Axis) => {
+    (node_id: string, direction: cg.Axis) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/direction",
@@ -678,10 +676,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeFlexContainerNodeMainAxisAlignment = useCallback(
-    (
-      node_id: string,
-      mainAxisAlignment: grida.program.cg.MainAxisAlignment
-    ) => {
+    (node_id: string, mainAxisAlignment: cg.MainAxisAlignment) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/mainAxisAlignment",
@@ -694,10 +689,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeFlexContainerNodeCrossAxisAlignment = useCallback(
-    (
-      node_id: string,
-      crossAxisAlignment: grida.program.cg.CrossAxisAlignment
-    ) => {
+    (node_id: string, crossAxisAlignment: cg.CrossAxisAlignment) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/crossAxisAlignment",
@@ -727,7 +719,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   //
 
   const changeNodeMouseCursor = useCallback(
-    (node_id: string, cursor: grida.program.cg.SystemMouseCursor) => {
+    (node_id: string, cursor: cg.SystemMouseCursor) => {
       dispatch({
         type: "node/change/mouse-cursor",
         node_id,
@@ -902,21 +894,20 @@ export function useNodeAction(node_id: string | undefined) {
       fill: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken
-          | grida.program.cg.PaintWithoutID
+          | cg.PaintWithoutID
           | null
       ) => nodeActions.changeNodeFill(node_id, value),
       stroke: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken
-          | grida.program.cg.PaintWithoutID
+          | cg.PaintWithoutID
           | null
       ) => nodeActions.changeNodeStroke(node_id, value),
       strokeWidth: (change: TChange<number>) =>
         nodeActions.changeNodeStrokeWidth(node_id, change),
-      strokeCap: (value: grida.program.cg.StrokeCap) =>
+      strokeCap: (value: cg.StrokeCap) =>
         nodeActions.changeNodeStrokeCap(node_id, value),
-      fit: (value: grida.program.cg.BoxFit) =>
-        nodeActions.changeNodeFit(node_id, value),
+      fit: (value: cg.BoxFit) => nodeActions.changeNodeFit(node_id, value),
       // stylable
       opacity: (change: TChange<number>) =>
         nodeActions.changeNodeOpacity(node_id, change),
@@ -930,13 +921,13 @@ export function useNodeAction(node_id: string | undefined) {
       // text style
       fontFamily: (value: string) =>
         nodeActions.changeTextNodeFontFamily(node_id, value),
-      fontWeight: (value: grida.program.cg.NFontWeight) =>
+      fontWeight: (value: cg.NFontWeight) =>
         nodeActions.changeTextNodeFontWeight(node_id, value),
       fontSize: (change: TChange<number>) =>
         nodeActions.changeTextNodeFontSize(node_id, change),
-      textAlign: (value: grida.program.cg.TextAlign) =>
+      textAlign: (value: cg.TextAlign) =>
         nodeActions.changeTextNodeTextAlign(node_id, value),
-      textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
+      textAlignVertical: (value: cg.TextAlignVertical) =>
         nodeActions.changeTextNodeTextAlignVertical(node_id, value),
       lineHeight: (
         change: TChange<grida.program.nodes.TextNode["lineHeight"]>
@@ -955,19 +946,19 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
-      boxShadow: (value?: grida.program.cg.BoxShadow) =>
+      boxShadow: (value?: cg.BoxShadow) =>
         nodeActions.changeNodeBoxShadow(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
         nodeActions.changeContainerNodeLayout(node_id, value),
-      direction: (value: grida.program.cg.Axis) =>
+      direction: (value: cg.Axis) =>
         nodeActions.changeFlexContainerNodeDirection(node_id, value),
       // flexWrap: (value?: string) =>
       //   changeNodeStyle(node_id, "flexWrap", value),
-      mainAxisAlignment: (value: grida.program.cg.MainAxisAlignment) =>
+      mainAxisAlignment: (value: cg.MainAxisAlignment) =>
         nodeActions.changeFlexContainerNodeMainAxisAlignment(node_id, value),
-      crossAxisAlignment: (value: grida.program.cg.CrossAxisAlignment) =>
+      crossAxisAlignment: (value: cg.CrossAxisAlignment) =>
         nodeActions.changeFlexContainerNodeCrossAxisAlignment(node_id, value),
       gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
         nodeActions.changeFlexContainerNodeGap(node_id, value),
@@ -975,7 +966,7 @@ export function useNodeAction(node_id: string | undefined) {
       // css style
       aspectRatio: (value?: number) =>
         nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
-      cursor: (value: grida.program.cg.SystemMouseCursor) =>
+      cursor: (value: cg.SystemMouseCursor) =>
         nodeActions.changeNodeMouseCursor(node_id, value),
     };
   }, [node_id, nodeActions]);
@@ -990,8 +981,8 @@ const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
     case "fill":
     case "stroke":
       // support gradient (as the id should be ignored)
-      const { id: __, ..._a } = (a ?? {}) as grida.program.cg.AnyPaint;
-      const { id: _, ..._b } = (b ?? {}) as grida.program.cg.AnyPaint;
+      const { id: __, ..._a } = (a ?? {}) as cg.AnyPaint;
+      const { id: _, ..._b } = (b ?? {}) as cg.AnyPaint;
       return deepEqual(_a, _b);
   }
   return deepEqual(a, b);
@@ -1111,7 +1102,7 @@ export function useSelection() {
   );
 
   const fontWeight = useCallback(
-    (value: grida.program.cg.NFontWeight) => {
+    (value: cg.NFontWeight) => {
       mixedProperties.fontWeight?.ids.forEach((id) => {
         __actions.changeTextNodeFontWeight(id, value);
       });
@@ -1147,7 +1138,7 @@ export function useSelection() {
   );
 
   const textAlign = useCallback(
-    (value: grida.program.cg.TextAlign) => {
+    (value: cg.TextAlign) => {
       mixedProperties.textAlign?.ids.forEach((id) => {
         __actions.changeTextNodeTextAlign(id, value);
       });
@@ -1156,7 +1147,7 @@ export function useSelection() {
   );
 
   const textAlignVertical = useCallback(
-    (value: grida.program.cg.TextAlignVertical) => {
+    (value: cg.TextAlignVertical) => {
       mixedProperties.textAlignVertical?.ids.forEach((id) => {
         __actions.changeTextNodeTextAlignVertical(id, value);
       });
@@ -1165,7 +1156,7 @@ export function useSelection() {
   );
 
   const fit = useCallback(
-    (value: grida.program.cg.BoxFit) => {
+    (value: cg.BoxFit) => {
       mixedProperties.fit?.ids.forEach((id) => {
         __actions.changeNodeFit(id, value);
       });
@@ -1177,7 +1168,7 @@ export function useSelection() {
     (
       value:
         | grida.program.nodes.i.props.SolidPaintToken
-        | grida.program.cg.PaintWithoutID
+        | cg.PaintWithoutID
         | null
     ) => {
       mixedProperties.fill?.ids.forEach((id) => {
@@ -1191,7 +1182,7 @@ export function useSelection() {
     (
       value:
         | grida.program.nodes.i.props.SolidPaintToken
-        | grida.program.cg.PaintWithoutID
+        | cg.PaintWithoutID
         | null
     ) => {
       mixedProperties.stroke?.ids.forEach((id) => {
@@ -1211,7 +1202,7 @@ export function useSelection() {
   );
 
   const strokeCap = useCallback(
-    (value: grida.program.cg.StrokeCap) => {
+    (value: cg.StrokeCap) => {
       mixedProperties.strokeCap?.ids.forEach((id) => {
         __actions.changeNodeStrokeCap(id, value);
       });
@@ -1229,7 +1220,7 @@ export function useSelection() {
   );
 
   const direction = useCallback(
-    (value: grida.program.cg.Axis) => {
+    (value: cg.Axis) => {
       mixedProperties.direction?.ids.forEach((id) => {
         __actions.changeFlexContainerNodeDirection(id, value);
       });
@@ -1238,7 +1229,7 @@ export function useSelection() {
   );
 
   const mainAxisAlignment = useCallback(
-    (value: grida.program.cg.MainAxisAlignment) => {
+    (value: cg.MainAxisAlignment) => {
       mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
         __actions.changeFlexContainerNodeMainAxisAlignment(id, value);
       });
@@ -1247,7 +1238,7 @@ export function useSelection() {
   );
 
   const crossAxisAlignment = useCallback(
-    (value: grida.program.cg.CrossAxisAlignment) => {
+    (value: cg.CrossAxisAlignment) => {
       mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
         __actions.changeFlexContainerNodeCrossAxisAlignment(id, value);
       });
@@ -1265,7 +1256,7 @@ export function useSelection() {
   );
 
   const cursor = useCallback(
-    (value: grida.program.cg.SystemMouseCursor) => {
+    (value: cg.SystemMouseCursor) => {
       mixedProperties.cursor?.ids.forEach((id) => {
         __actions.changeNodeMouseCursor(id, value);
       });
@@ -1394,7 +1385,7 @@ export function useSelectionPaints() {
       index: number,
       value:
         | grida.program.nodes.i.props.SolidPaintToken
-        | grida.program.cg.PaintWithoutID
+        | cg.PaintWithoutID
         | null
         | null
     ) => {
@@ -1551,7 +1542,7 @@ export function useDocument() {
   const clipboardColor = state.user_clipboard_color;
 
   const setClipboardColor = useCallback(
-    (color: grida.program.cg.RGBA8888) => {
+    (color: cg.RGBA8888) => {
       dispatch({
         type: "clip/color",
         color,
@@ -3517,6 +3508,99 @@ export function useComputedNode(
   return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
+namespace internal {
+  /**
+   * @deprecated
+   * @returns
+   * This model does not work. it's a proof of concept. - will be removed
+   */
+  export function __createApiProxyNode_experimental(
+    node: grida.program.nodes.Node,
+    context: {
+      dispatcher: DocumentDispatcher;
+    }
+  ): grida.program.nodes.Node {
+    const p = new Proxy(
+      { ...node },
+      {
+        get(target, prop, receiver) {
+          return Reflect.get(target, prop, receiver);
+        },
+        set(target, prop, value, receiver) {
+          switch (prop as keyof grida.program.nodes.UnknwonNode) {
+            case "width":
+              context.dispatcher({
+                type: "node/change/size",
+                axis: "width",
+                node_id: node.id,
+                value: value,
+              });
+              return true;
+            case "height":
+              context.dispatcher({
+                type: "node/change/size",
+                axis: "height",
+                node_id: node.id,
+                value: value,
+              });
+              return true;
+            case "top":
+            case "right":
+            case "bottom":
+            case "left":
+              context.dispatcher({
+                type: "node/change/positioning",
+                node_id: node.id,
+                positioning: {
+                  position: "absolute",
+                  [prop]: value,
+                },
+              });
+              return true;
+            case "opacity": {
+              context.dispatcher({
+                type: "node/change/opacity",
+                node_id: node.id,
+                opacity: value,
+              });
+              return true;
+            }
+            case "rotation": {
+              context.dispatcher({
+                type: "node/change/rotation",
+                node_id: node.id,
+                rotation: value,
+              });
+              return true;
+            }
+            case "fill": {
+              context.dispatcher({
+                type: "node/change/fill",
+                node_id: node.id,
+                fill: value,
+              });
+              return true;
+            }
+            case "cornerRadius": {
+              context.dispatcher({
+                type: "node/change/cornerRadius",
+                node_id: node.id,
+                cornerRadius: value,
+              });
+              return true;
+            }
+            default:
+              console.error(`Unsupported property: ${prop.toString()}`);
+          }
+
+          return false;
+        },
+      }
+    );
+    return p;
+  }
+}
+
 export function useTemplateDefinition(template_id: string) {
   const {
     state: { templates },
@@ -3536,12 +3620,9 @@ export function useEditorApi() {
     useCallback(
       (id: grida.program.api.NodeID) => {
         const nodedata = document.state.document.nodes[id];
-        return grida.program.api.internal.__createApiProxyNode_experimental(
-          nodedata,
-          {
-            dispatcher,
-          }
-        );
+        return internal.__createApiProxyNode_experimental(nodedata, {
+          dispatcher,
+        });
       },
       [document.state.document.nodes]
     );

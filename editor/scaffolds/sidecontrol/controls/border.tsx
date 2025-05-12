@@ -5,7 +5,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
 import { RGBAChip } from "./utils/paint-chip";
 import { RGBAColorControl } from "./color";

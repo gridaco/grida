@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 import type { IDocumentEditorState } from "./state";
 import assert from "assert";
 

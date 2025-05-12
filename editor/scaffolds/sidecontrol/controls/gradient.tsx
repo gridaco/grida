@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
+import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
@@ -13,13 +14,9 @@ export function GradientControl({
   value,
   onValueChange,
 }: {
-  value:
-    | grida.program.cg.LinearGradientPaint
-    | grida.program.cg.RadialGradientPaint;
+  value: cg.LinearGradientPaint | cg.RadialGradientPaint;
   onValueChange?: (
-    value:
-      | grida.program.cg.LinearGradientPaint
-      | grida.program.cg.RadialGradientPaint
+    value: cg.LinearGradientPaint | cg.RadialGradientPaint
   ) => void;
 }) {
   const { stops } = value;
@@ -78,8 +75,8 @@ function GradientStopsSlider({
   stops,
   onValueChange,
 }: {
-  stops: grida.program.cg.GradientStop[];
-  onValueChange?: (value: grida.program.cg.GradientStop[]) => void;
+  stops: cg.GradientStop[];
+  onValueChange?: (value: cg.GradientStop[]) => void;
 }) {
   const step = 0.01;
   const threshold = step * 20;
@@ -155,8 +152,8 @@ function GradientStop({
   canRemove,
   onRemove,
 }: {
-  value: grida.program.cg.GradientStop;
-  onValueChange?: (value: grida.program.cg.GradientStop) => void;
+  value: cg.GradientStop;
+  onValueChange?: (value: cg.GradientStop) => void;
   canRemove?: boolean;
   onRemove?: () => void;
 }) {

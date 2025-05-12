@@ -23,7 +23,7 @@ import type { DataQueryAction } from "../data-query";
 import type { CanvasAction } from "@/grida-react-canvas";
 import type { DataFormat } from "../data-format";
 import type { Platform } from "@/lib/platform";
-import { grida } from "@/grida";
+import grida from "@grida/schema";
 
 export type EditorAction =
   //
