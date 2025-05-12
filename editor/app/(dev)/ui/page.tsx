@@ -1,6 +1,8 @@
 "use client";
 import { Spinner } from "@/components/spinner";
 import { TagInput } from "@/components/tag";
+import { Progress } from "@/components/ui/progress";
+import { Progress as EditorProgress } from "@/components/ui-editor/progress";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { useState } from "react";
@@ -8,10 +10,12 @@ import { useState } from "react";
 export default function AllComponentsPage() {
   return (
     <TooltipProvider>
-      <main className="max-w-screen-lg mx-auto">
+      <main className="container max-w-screen-lg mx-auto">
         <div className="h-10" />
         <div className="space-y-10">
           <__Spinner />
+          <hr />
+          <__Progress />
           <hr />
           <__Tags />
           <hr />
@@ -20,6 +24,16 @@ export default function AllComponentsPage() {
         <div className="h-10" />
       </main>
     </TooltipProvider>
+  );
+}
+
+function __Progress() {
+  return (
+    <div className="grid gap-4">
+      <label>Progress</label>
+      <Progress value={50} />
+      <EditorProgress indeterminate />
+    </div>
   );
 }
 

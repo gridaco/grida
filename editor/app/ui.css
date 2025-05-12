@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
-@config "../tailwind.config.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -112,7 +111,38 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
 
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* #region custom */
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+@utility container-2xl {
+  max-width: 1400px;
+}
+
+@theme inline {
+  /* Workbench accent colors */
+  --color-workbench-accent-sky: oklch(68.5% 0.169 237.323);
+  --color-workbench-accent-violet: oklch(60.6% 0.25 292.717);
+  --color-workbench-accent-orange: oklch(70.5% 0.213 47.604);
+  --color-workbench-accent-red: oklch(63.7% 0.237 25.331);
+}
+
+/* animations */
+@theme inline {
   /* #region https://github.com/shadcn-ui/ui/issues/700#issuecomment-2830152736 */
   --animate-progress: progress 1s infinite ease-in-out;
 
@@ -166,26 +196,6 @@
     }
   }
   /* #endregion */
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-/* #region custom */
-
-@utility container {
-  margin-inline: auto;
-  padding-inline: 2rem;
-}
-
-@utility container-2xl {
-  max-width: 1400px;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
