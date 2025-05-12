@@ -209,9 +209,11 @@ const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
       silent: !process.env.CI, // Only print logs for uploading source maps in CI
       widenClientFileUpload: false,
       sourcemaps: {
-        disable:
-          process.env.NODE_ENV === "development" ||
-          process.env.VERCEL_ENV === "preview",
+        disable: true,
+        // [causes build time out error - enable once fixed]
+        // disable:
+        //   process.env.NODE_ENV === "development" ||
+        //   process.env.VERCEL_ENV === "preview",
       },
 
       // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
