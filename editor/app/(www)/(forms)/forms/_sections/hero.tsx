@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { FormPageBackground } from "@/scaffolds/e/form/background";
 import Link from "next/link";
 
 export default function Hero() {
@@ -22,11 +21,6 @@ export default function Hero() {
           </Link>
         </div>
       </div>
-      <FormPageBackground
-        type="background"
-        element="iframe"
-        src="https://bg.grida.co/embed/dots"
-      />
     </section>
   );
 }

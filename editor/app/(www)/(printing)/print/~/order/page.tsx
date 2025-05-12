@@ -89,7 +89,7 @@ function OptionCard({
   return (
     <Card
       className={cn(
-        `relative cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`,
+        `p-0 relative cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : ""}`,
         className
       )}
       onClick={onSelect}

@@ -137,7 +137,7 @@ export function QuestsTable() {
   }
 
   return (
-    <Card>
+    <Card className="p-0">
       <CardContent className="p-0">
         <div className="flex items-center p-4 border-b">
           <div className="flex-1">

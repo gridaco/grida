@@ -41,7 +41,6 @@ function Hero() {
       <div className="flex gap-4 mt-12">
         <Button
           variant="outline"
-          className="border border-gray-400 bg-white text-black font-mono dark:border-none"
           onClick={() => {
             navigator.clipboard.writeText("npx grida init");
             setCopied(true);
@@ -51,12 +50,7 @@ function Hero() {
           {copied ? "Copied to clipboard" : "npx grida init"}
         </Button>
         <a href="https://grida.co/docs/cli">
-          <Button
-            variant="default"
-            className="bg-black text-white font-mono dark:hover:bg-neutral-700"
-          >
-            Start Coding
-          </Button>
+          <Button variant="default">Start Coding</Button>
         </a>
       </div>
     </section>
@@ -173,16 +167,10 @@ function Demo3() {
           </h3>
           <div className="flex gap-4 mt-4 items-center justify-center">
             <a href="https://grida.co/docs/cli">
-              <Button
-                variant="default"
-                className="bg-black text-white font-mono dark:hover:bg-neutral-700"
-              >
-                Start Coding
-              </Button>
+              <Button variant="default">Start Coding</Button>
             </a>
             <Button
               variant="outline"
-              className="border border-gray-400 bg-white text-black font-mono dark:border-none"
               onClick={() => {
                 navigator.clipboard.writeText("npx grida init");
                 setCopied(true);

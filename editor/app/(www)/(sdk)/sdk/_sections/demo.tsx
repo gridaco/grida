@@ -31,7 +31,7 @@ export default function SectionMainDemo() {
     >
       <Card
         data-locked={isLocked}
-        className="group/demo-card mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative"
+        className="group/demo-card mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative p-0"
       >
         <ShineBorder
           shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}

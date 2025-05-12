@@ -112,7 +112,7 @@ export function AuthPolicyForm({ policyId }: AuthPolicyFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <Card>
-        <CardContent className="space-y-4 pt-4">
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Policy Name</Label>

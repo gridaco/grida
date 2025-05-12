@@ -36,7 +36,7 @@ const menus = [
   },
 ];
 
-export default function HalftoneToolPage() {
+export default function ToolsPage() {
   return (
     <main>
       <Header />

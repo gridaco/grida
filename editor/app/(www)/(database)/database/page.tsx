@@ -7,7 +7,6 @@ import { ArrowRight } from "lucide-react";
 import { Section } from "@/www/ui/section";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/lib/utils";
-import { FormPageBackground } from "@/scaffolds/e/form/background";
 import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Image from "next/image";
@@ -24,11 +23,6 @@ export default function A() {
         <SectionMainDemo />
       </Section>
       <div className="h-96" />
-      <FormPageBackground
-        type="background"
-        element="iframe"
-        src="https://bg.grida.co/embed/dots"
-      />
       <FooterWithCTA />
     </main>
   );
@@ -129,9 +123,9 @@ function SectionMainDemo() {
       transition={{ duration: 1.0, ease: "easeOut" }}
     >
       <div>
-        <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative">
+        <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-square md:aspect-video overflow-hidden relative p-0">
           <motion.div
-            key={data.src} // key 변경 시 새로운 애니메이션 실행
+            key={data.src}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
