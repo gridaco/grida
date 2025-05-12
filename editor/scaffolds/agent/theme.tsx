@@ -8,7 +8,7 @@ import { FormPageBackground } from "../e/form/background";
 import { cn } from "@/components/lib/utils";
 import { useTheme } from "next-themes";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
-import type { NextFont } from "@next/font/dist/types";
+import type { NextFont } from "next/dist/compiled/@next/font/dist/types";
 import type {
   Appearance,
   FontFamily,

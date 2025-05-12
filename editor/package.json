@@ -212,7 +212,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@figma/rest-api-spec": "^0.21.0",
-    "@next/font": "^14.2.4",
     "@supabase/storage-js": "^2.7.3",
     "@tailwindcss/postcss": "^4.1.6",
     "@tailwindcss/typography": "^0.5.16",
