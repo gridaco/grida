@@ -163,8 +163,15 @@ const FlagComponent = ({ country, countryName }: RPNInput.FlagProps) => {
   const Flag = flags[country];
 
   return (
-    <span className="flex h-4 w-6 overflow-hidden rounded-xs bg-foreground/20 [&_svg]:size-full">
-      {Flag && <Flag title={countryName} />}
+    <span className="flex h-4 w-6 overflow-hidden rounded-sm bg-foreground/20 [&_svg]:size-full">
+      {Flag && (
+        <Flag
+          title={countryName}
+          // https://github.com/omeralpi/shadcn-phone-input/issues/75#issue-3056082305
+          // @ts-expect-error not-typed
+          style={{ width: "auto" }}
+        />
+      )}
     </span>
   );
 };

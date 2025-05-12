@@ -6,6 +6,7 @@ import { Progress as EditorProgress } from "@/components/ui-editor/progress";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { useState } from "react";
+import { PhoneInput } from "@/components/extension/phone-input";
 
 export default function AllComponentsPage() {
   return (
@@ -18,6 +19,8 @@ export default function AllComponentsPage() {
           <__Progress />
           <hr />
           <__Tags />
+          <hr />
+          <__PhoneInput />
           <hr />
           <__RichTextEditor />
         </div>
@@ -71,6 +74,15 @@ function __Tags() {
         activeTagIndex={null}
         setActiveTagIndex={() => {}}
       />
+    </div>
+  );
+}
+
+function __PhoneInput() {
+  return (
+    <div className="grid gap-4">
+      <label>Phone Input</label>
+      <PhoneInput />
     </div>
   );
 }
