@@ -23,7 +23,7 @@ const formatActions: InsertElement[] = [
   {
     value: "codeBlock",
     label: "Code block",
-    icon: <CodeIcon className="size-5" />,
+    icon: <CodeIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleCodeBlock().run(),
     isActive: (editor) => editor.isActive("codeBlock"),
     canExecute: (editor) =>
@@ -33,7 +33,7 @@ const formatActions: InsertElement[] = [
   {
     value: "blockquote",
     label: "Blockquote",
-    icon: <QuoteIcon className="size-5" />,
+    icon: <QuoteIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleBlockquote().run(),
     isActive: (editor) => editor.isActive("blockquote"),
     canExecute: (editor) =>
@@ -43,7 +43,7 @@ const formatActions: InsertElement[] = [
   {
     value: "horizontalRule",
     label: "Divider",
-    icon: <DividerHorizontalIcon className="size-5" />,
+    icon: <DividerHorizontalIcon className="size-4" />,
     action: (editor) => editor.chain().focus().setHorizontalRule().run(),
     isActive: () => false,
     canExecute: (editor) =>
@@ -76,8 +76,8 @@ export const SectionFive: React.FC<SectionFiveProps> = ({
         mainActionCount={mainActionCount}
         dropdownIcon={
           <>
-            <PlusIcon className="size-5" />
-            <CaretDownIcon className="size-5" />
+            <PlusIcon className="size-4" />
+            <CaretDownIcon className="size-4" />
           </>
         }
         dropdownTooltip="Insert elements"

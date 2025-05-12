@@ -30,7 +30,7 @@ const formatActions: TextStyle[] = [
   {
     value: "bold",
     label: "Bold",
-    icon: <FontBoldIcon className="size-5" />,
+    icon: <FontBoldIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleBold().run(),
     isActive: (editor) => editor.isActive("bold"),
     canExecute: (editor) =>
@@ -41,7 +41,7 @@ const formatActions: TextStyle[] = [
   {
     value: "italic",
     label: "Italic",
-    icon: <FontItalicIcon className="size-5" />,
+    icon: <FontItalicIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleItalic().run(),
     isActive: (editor) => editor.isActive("italic"),
     canExecute: (editor) =>
@@ -52,7 +52,7 @@ const formatActions: TextStyle[] = [
   {
     value: "underline",
     label: "Underline",
-    icon: <UnderlineIcon className="size-5" />,
+    icon: <UnderlineIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleUnderline().run(),
     isActive: (editor) => editor.isActive("underline"),
     canExecute: (editor) =>
@@ -63,7 +63,7 @@ const formatActions: TextStyle[] = [
   {
     value: "strikethrough",
     label: "Strikethrough",
-    icon: <StrikethroughIcon className="size-5" />,
+    icon: <StrikethroughIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleStrike().run(),
     isActive: (editor) => editor.isActive("strike"),
     canExecute: (editor) =>
@@ -74,7 +74,7 @@ const formatActions: TextStyle[] = [
   {
     value: "code",
     label: "Code",
-    icon: <CodeIcon className="size-5" />,
+    icon: <CodeIcon className="size-4" />,
     action: (editor) => editor.chain().focus().toggleCode().run(),
     isActive: (editor) => editor.isActive("code"),
     canExecute: (editor) =>
@@ -85,7 +85,7 @@ const formatActions: TextStyle[] = [
   {
     value: "clearFormatting",
     label: "Clear formatting",
-    icon: <TextNoneIcon className="size-5" />,
+    icon: <TextNoneIcon className="size-4" />,
     action: (editor) => editor.chain().focus().unsetAllMarks().run(),
     isActive: () => false,
     canExecute: (editor) =>
@@ -114,7 +114,7 @@ export const SectionTwo: React.FC<SectionTwoProps> = ({
       actions={formatActions}
       activeActions={activeActions}
       mainActionCount={mainActionCount}
-      dropdownIcon={<DotsHorizontalIcon className="size-5" />}
+      dropdownIcon={<DotsHorizontalIcon className="size-4" />}
       dropdownTooltip="More formatting"
       dropdownClassName="w-8"
       size={size}

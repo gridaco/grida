@@ -35,7 +35,7 @@ const formatActions: ListItem[] = [
   {
     value: "bulletList",
     label: "Bullet list",
-    icon: <ListBulletIcon className="size-5" />,
+    icon: <ListBulletIcon className="size-4" />,
     isActive: (editor) => editor.isActive("bulletList"),
     action: (editor) => editor.chain().focus().toggleBulletList().run(),
     canExecute: (editor) =>
@@ -65,8 +65,8 @@ export const SectionFour: React.FC<SectionFourProps> = ({
       mainActionCount={mainActionCount}
       dropdownIcon={
         <>
-          <ListBulletIcon className="size-5" />
-          <CaretDownIcon className="size-5" />
+          <ListBulletIcon className="size-4" />
+          <CaretDownIcon className="size-4" />
         </>
       }
       dropdownTooltip="Lists"
