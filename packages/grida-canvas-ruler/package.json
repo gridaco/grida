@@ -1,10 +1,12 @@
 {
   "name": "@grida/ruler",
+  "version": "0.0.0-canary.0",
   "description": "Zero-Dependency Canvas Ruler Component for Infinite Canvas",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",
+  "private": false,
   "keywords": [
     "grida",
     "canvas",
@@ -16,6 +18,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
