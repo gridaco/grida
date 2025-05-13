@@ -49,10 +49,10 @@ import {
 import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
-import "core-js/features/map/group-by";
-import { tokens } from "@grida/tokens";
+import type { tokens } from "@grida/tokens";
 import { useValue } from "@/lib/spock";
 import { GridaCanvasFormField } from "./grida-canvas";
+import "core-js/features/map/group-by";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px

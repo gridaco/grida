@@ -1,6 +1,6 @@
 import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
-import { tokens } from "@grida/tokens";
+import { access } from "@grida/tokens";
 
 export function useData() {
   const dataContext = useContext(DataContext);
@@ -10,7 +10,7 @@ export function useData() {
   return dataContext.data;
 }
 
-export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
+export const useValue = <T = any>(key?: access.KeyPath<T>): any => {
   const data = useData();
   const scopedVariableContext = useContext(ScopedVariableContext);
 
@@ -21,7 +21,7 @@ export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
   if (!key) {
     return data;
   }
-  return tokens.Access.access(data, key as any, {
+  return access.access(data, key as any, {
     scopedIdentifiers: variablePaths,
   });
 };
@@ -39,7 +39,7 @@ export const useSelectValue = <T>({
     : {};
 
   return useMemo(() => {
-    const selected = tokens.Access.select(data, keys as any, {
+    const selected = access.select(data, keys as any, {
       scopedIdentifiers: variablePaths,
     });
     // console.log(selected, data, keys, variablePaths);

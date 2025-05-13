@@ -11,7 +11,7 @@ import {
 import type grida from "@grida/schema";
 import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import { useCTAContext } from "../../kit/contexts/cta.context";
-import { tokens } from "@grida/tokens";
+import { factory } from "@grida/tokens";
 
 const userprops = {
   title: { type: "string" },
@@ -72,7 +72,7 @@ _003.definition = {
       locked: false,
       type: "text",
       name: "Title",
-      text: tokens.factory.createPropertyAccessExpression(["props", "title"]),
+      text: factory.createPropertyAccessExpression(["props", "title"]),
       fontWeight: 700,
       fontSize: 60,
       textAlign: "center",
@@ -92,10 +92,7 @@ _003.definition = {
       locked: false,
       type: "text",
       name: "Subtitle",
-      text: tokens.factory.createPropertyAccessExpression([
-        "props",
-        "subtitle",
-      ]),
+      text: factory.createPropertyAccessExpression(["props", "subtitle"]),
       fontWeight: 400,
       fontSize: 18,
       textAlign: "center",
@@ -115,10 +112,7 @@ _003.definition = {
       locked: false,
       type: "image",
       name: "Background",
-      src: tokens.factory.createPropertyAccessExpression([
-        "props",
-        "background",
-      ]),
+      src: factory.createPropertyAccessExpression(["props", "background"]),
       opacity: 1,
       zIndex: 0,
       rotation: 0,

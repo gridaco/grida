@@ -5,14 +5,14 @@ import {
   useValue,
 } from "@/program-context/data-context";
 import { TemplateValueProperties } from "../template-builder/with-template";
-import { tokens } from "@grida/tokens";
+import { type tokens, factory, render } from "@grida/tokens";
 
 function extractAccessIdentifiersDependencyArrayFromProps<
   P extends Record<string, any>,
 >(props?: TemplateValueProperties<P, tokens.StringValueExpression>) {
   return Object.entries(props || {})
     .map(([key, value]) => {
-      return tokens.factory.getStringValueExpressionAccessIdentifiersDependencyArray(
+      return factory.getStringValueExpressionAccessIdentifiersDependencyArray(
         value
       );
     })
@@ -50,7 +50,7 @@ export function useComputed<P extends Record<string, any>>(
   const computed = useMemo(() => {
     return Object.entries(props || {}).reduce(
       (acc: Record<string, any>, [key, value]) => {
-        acc[key] = tokens.render.any(value, data, recursive);
+        acc[key] = render.any(value, data, recursive);
         return acc;
       },
       {} as P

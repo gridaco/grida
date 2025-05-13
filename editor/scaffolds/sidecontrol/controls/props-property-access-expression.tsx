@@ -1,4 +1,4 @@
-import { tokens } from "@grida/tokens";
+import { factory, tokens } from "@grida/tokens";
 import grida from "@grida/schema";
 import { PropertyEnum } from "../ui";
 
@@ -32,11 +32,11 @@ export function PropertyAccessExpressionControl({
 
   const uivalue = value
     ? // TODO: remove props. token
-      tokens.factory.strfy.stringValueExpression(value)
+      factory.strfy.stringValueExpression(value)
     : undefined;
 
   const _onValueChange = (key: string) => {
-    const exp = tokens.factory.createPropertyAccessExpression(["props", key]);
+    const exp = factory.createPropertyAccessExpression(["props", key]);
     onValueChange?.(exp);
   };
 

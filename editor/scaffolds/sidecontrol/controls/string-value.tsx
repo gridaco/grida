@@ -94,7 +94,7 @@ export function StringValueControl({
             // schema={schema}
             onSelect={(path) => {
               onValueChange?.(
-                tokens.factory.createPropertyAccessExpression(path)
+                factory.createPropertyAccessExpression(path)
               );
             }}
           >

@@ -1,6 +1,6 @@
 import { FormFieldDefinition } from "@/types";
 import { TProperty } from "@/lib/spock";
-import { tokens } from "@grida/tokens";
+import type { tokens } from "@grida/tokens";
 
 export namespace FormExpression {
   export function create_field_property_json_ref(

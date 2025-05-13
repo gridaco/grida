@@ -28,7 +28,7 @@ import { FileIO } from "@/lib/file";
 import type grida from "@grida/schema";
 import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
-import { tokens } from "@grida/tokens";
+import { factory } from "@grida/tokens";
 
 type Messages = typeof _messages;
 
@@ -86,7 +86,7 @@ function Consumer() {
 
 function Media() {
   const props = useComputed({
-    media: tokens.factory.createPropertyAccessExpression(["props", "media"]),
+    media: factory.createPropertyAccessExpression(["props", "media"]),
   });
 
   // TODO: fixme - wrong type
@@ -294,7 +294,7 @@ _005.definition = {
       textAlign: "left",
       textAlignVertical: "top",
       textDecoration: "none",
-      text: tokens.factory.createPropertyAccessExpression(["props", "title"]),
+      text: factory.createPropertyAccessExpression(["props", "title"]),
       zIndex: 0,
     },
     "005.body": {
@@ -309,7 +309,7 @@ _005.definition = {
       style: {},
       width: "auto",
       height: "auto",
-      html: tokens.factory.createPropertyAccessExpression(["props", "body"]),
+      html: factory.createPropertyAccessExpression(["props", "body"]),
       zIndex: 0,
     },
     // "005.media": {
