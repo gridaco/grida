@@ -3,10 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "build/**"]
-    },
-    "editor#build": {
-      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "build/**"],
       "env": [
         "REDIS_URL",
         "UPSTASH_REDIS_REST_URL",
@@ -28,8 +25,7 @@
         "SENTRY_AUTH_TOKEN",
         "SENTRY_HOST",
         "SENTRY_PROJECT_ID"
-      ],
-      "outputs": [".next/**", "!.next/cache/**"]
+      ]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
