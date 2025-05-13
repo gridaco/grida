@@ -1,6 +1,6 @@
 {
   "name": "@grida/ruler",
-  "description": "Ruler component for Infinite Canvas",
+  "description": "Zero-Dependency Canvas Ruler Component for Infinite Canvas",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
@@ -10,13 +10,26 @@
     "canvas",
     "ruler",
     "design",
-    "editor"
+    "editor",
+    "react"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    }
+  },
   "scripts": {
-    "build": "tsup index.ts --format cjs,esm --dts"
+    "build": "tsup index.ts react.tsx --format cjs,esm --dts"
   },
   "devDependencies": {
     "@types/react": "^19",

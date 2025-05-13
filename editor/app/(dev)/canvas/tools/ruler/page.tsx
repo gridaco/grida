@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AxisRuler, type Tick } from "@grida/ruler";
+import { AxisRuler, type Tick } from "@grida/ruler/react";
 import { useGesture } from "@use-gesture/react";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { cmath } from "@grida/cmath";

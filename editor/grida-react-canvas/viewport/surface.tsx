@@ -45,7 +45,7 @@ import {
 } from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
-import { AxisRuler, Tick } from "@grida/ruler";
+import { AxisRuler, Tick } from "@grida/ruler/react";
 import { PixelGrid } from "@grida/pixel-grid";
 import { Rule } from "./ui/rule";
 import type { BitmapEditorBrush } from "@grida/bitmap";
