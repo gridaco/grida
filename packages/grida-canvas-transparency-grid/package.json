@@ -1,9 +1,6 @@
 {
   "name": "@grida/transparency-grid",
   "description": "Transparency Grid component for Infinite Canvas",
-  "scripts": {
-    "build": "tsup index.ts react.tsx --format cjs,esm --dts"
-  },
   "version": "0.0.0-canary.0",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
@@ -20,6 +17,10 @@
     "editor",
     "react"
   ],
+  "scripts": {
+    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
+    "build": "tsup index.ts react.tsx --format cjs,esm --dts"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

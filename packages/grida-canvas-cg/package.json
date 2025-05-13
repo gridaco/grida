@@ -1,14 +1,28 @@
 {
   "name": "@grida/cg",
-  "license": "MIT",
+  "description": "Grida Canvas Core Graphics",
+  "version": "0.0.0-canary.0",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
-  "description": "Grida Canvas Core Graphics",
+  "license": "MIT",
+  "author": "softmarshmallow",
   "private": false,
+  "keywords": [
+    "grida",
+    "canvas",
+    "cg",
+    "core",
+    "graphics",
+    "dts"
+  ],
+  "scripts": {
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts --format cjs,esm --dts"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsup index.ts --format cjs,esm --dts"
-  }
+  "files": [
+    "dist"
+  ]
 }
