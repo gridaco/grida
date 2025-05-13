@@ -5,7 +5,7 @@ import { useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
-import { TransparencyGrid } from "@grida/transparency-grid";
+import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
 
 type CustomComponent = React.ComponentType<any>;
