@@ -12,7 +12,9 @@
   "packageManager": "pnpm@10.10.0",
   "resolutions": {},
   "devDependencies": {
+    "@changesets/cli": "^2.29.4",
     "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
     "turbo": "^2.5.3",
     "typescript": "^5"
   },
