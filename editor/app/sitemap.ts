@@ -93,7 +93,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
-      url: "https://grida.co/package",
+      url: "https://grida.co/packages",
       changeFrequency: "monthly",
       priority: 0.5,
     },

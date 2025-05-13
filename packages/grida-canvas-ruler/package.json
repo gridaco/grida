@@ -2,7 +2,7 @@
   "name": "@grida/ruler",
   "description": "Zero-Dependency Canvas Ruler Component for Infinite Canvas",
   "version": "0.0.0-canary.0",
-  "homepage": "https://grida.co/package/@grida/ruler",
+  "homepage": "https://grida.co/packages/@grida/ruler",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",

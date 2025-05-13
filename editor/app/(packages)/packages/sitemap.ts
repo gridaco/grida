@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://grida.co/package";
+  const baseUrl = "https://grida.co/packages";
 
   return [
     {

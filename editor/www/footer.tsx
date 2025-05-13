@@ -5,7 +5,8 @@ import {
   FooterBottom,
   FooterContent,
 } from "@/www/ui/footer";
-import { GitHubLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
+import { XLogoIcon } from "@/components/logos/x";
 
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
@@ -37,8 +38,8 @@ export default function Footer() {
                     href={sitemap.links.x}
                     className="text-muted-foreground"
                   >
-                    <span className="sr-only">Twitter</span>
-                    <TwitterLogoIcon className="size-5" />
+                    <span className="sr-only">X (Twitter)</span>
+                    <XLogoIcon className="size-5" />
                   </Link>
                   <Link
                     href={sitemap.links.slack}
@@ -89,6 +90,12 @@ export default function Footer() {
                   className="text-xs md:text-sm text-muted-foreground"
                 >
                   AI Models
+                </Link>
+                <Link
+                  href={sitemap.links.packages}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  Packages
                 </Link>
                 <Link
                   href={sitemap.links.thebundle}
