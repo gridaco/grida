@@ -146,7 +146,7 @@ export default function Footer() {
                   href={sitemap.links.x}
                   className="text-xs md:text-sm text-muted-foreground"
                 >
-                  Twitter
+                  X
                 </Link>
                 <Link
                   href={sitemap.links.github}
