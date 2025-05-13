@@ -15,8 +15,8 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "tsup src/index.ts src/locales.ts --format cjs,esm --dts --watch",
-    "build": "tsup src/index.ts src/locales.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
     "test": "jest"
   },
   "main": "./dist/index.js",
@@ -30,6 +30,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.js"
     },
     "./k": {
       "types": "./dist/locales.d.ts",
