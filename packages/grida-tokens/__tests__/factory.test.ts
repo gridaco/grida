@@ -1,9 +1,9 @@
-import { tokens } from "../tokens";
+import { factory } from "../src";
 
 const token_test_property_access_expression =
-  tokens.factory.createPropertyAccessExpression(["props", "a"]);
+  factory.createPropertyAccessExpression(["props", "a"]);
 
-const toekn_test_template_expression = tokens.factory.createTemplateExpression([
+const toekn_test_template_expression = factory.createTemplateExpression([
   { kind: "StringLiteral", text: "Hi " },
   { kind: "Identifier", name: "name" },
 ]);
@@ -11,7 +11,7 @@ const toekn_test_template_expression = tokens.factory.createTemplateExpression([
 describe("getStringValueExpressionAccessIdentifiersDependencyArray", () => {
   it("should return property access expression", () => {
     const deps =
-      tokens.factory.getStringValueExpressionAccessIdentifiersDependencyArray(
+      factory.getStringValueExpressionAccessIdentifiersDependencyArray(
         token_test_property_access_expression
       );
     expect(deps).toEqual([["props", "a"]]);
@@ -19,7 +19,7 @@ describe("getStringValueExpressionAccessIdentifiersDependencyArray", () => {
 
   it("should return template expression", () => {
     const deps =
-      tokens.factory.getStringValueExpressionAccessIdentifiersDependencyArray(
+      factory.getStringValueExpressionAccessIdentifiersDependencyArray(
         toekn_test_template_expression
       );
     expect(deps).toEqual([["name"]]);

@@ -1,4 +1,4 @@
-import { tokens } from "../tokens";
+import { type tokens, render } from "../src";
 
 describe("tokens.render.any", () => {
   const context = {
@@ -23,7 +23,7 @@ describe("tokens.render.any", () => {
       expression: ["user", "name"],
     };
 
-    const result = tokens.render.any(propertyAccessExpression, context, false);
+    const result = render.any(propertyAccessExpression, context, false);
     expect(result).toBe("John Doe");
   });
 
@@ -42,16 +42,14 @@ describe("tokens.render.any", () => {
       ],
     };
 
-    const result = tokens.render.any(templateExpression, context, false);
+    const result = render.any(templateExpression, context, false);
     expect(result).toBe("Hello, John Doe! Welcome to New York.");
   });
 
   it("should handle a primitive value", () => {
-    expect(tokens.render.any("Hello, World!", context, false)).toBe(
-      "Hello, World!"
-    );
-    expect(tokens.render.any(42, context, false)).toBe(42);
-    expect(tokens.render.any(true, context, false)).toBe(true);
+    expect(render.any("Hello, World!", context, false)).toBe("Hello, World!");
+    expect(render.any(42, context, false)).toBe(42);
+    expect(render.any(true, context, false)).toBe(true);
   });
 
   it("should handle recursive rendering for arrays", () => {
@@ -64,7 +62,7 @@ describe("tokens.render.any", () => {
       },
     ];
 
-    const result = tokens.render.any(arrayValue, context, true);
+    const result = render.any(arrayValue, context, true);
     expect(result).toEqual(["John Doe", "is from", "New York"]);
   });
 
@@ -77,7 +75,7 @@ describe("tokens.render.any", () => {
       },
     };
 
-    const result = tokens.render.any(objectValue, context, true);
+    const result = render.any(objectValue, context, true);
     expect(result).toEqual({
       name: "John Doe",
       city: "New York",
@@ -105,7 +103,7 @@ describe("tokens.render.any", () => {
       },
     };
 
-    const result = tokens.render.any(nestedObject, context, true);
+    const result = render.any(nestedObject, context, true);
     expect(result).toEqual({
       userInfo: {
         name: "John Doe",
@@ -120,18 +118,18 @@ describe("tokens.render.any", () => {
 
   it("should return the value as is if not a recognized token type and recursive is false", () => {
     const unknownValue = { random: "data" };
-    const result = tokens.render.any(unknownValue, context, false);
+    const result = render.any(unknownValue, context, false);
     expect(result).toEqual(unknownValue);
   });
 
   it("should handle unknown token types gracefully", () => {
     const unknownToken = { kind: "UnknownToken" } as any;
-    const result = tokens.render.any(unknownToken, context, false);
+    const result = render.any(unknownToken, context, false);
     expect(result).toEqual(unknownToken);
   });
 
   it("should handle null and undefined gracefully", () => {
-    expect(tokens.render.any(null, context, false)).toBe(null);
-    expect(tokens.render.any(undefined, context, false)).toBe(undefined);
+    expect(render.any(null, context, false)).toBe(null);
+    expect(render.any(undefined, context, false)).toBe(undefined);
   });
 });
