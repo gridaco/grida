@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import * as React from "react";
+import { useRef, useEffect } from "react";
 import { PixelGridCanvas, PixelGridOptions } from "./pixel-grid";
 
 export interface PixelGridProps extends PixelGridOptions {

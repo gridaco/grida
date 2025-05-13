@@ -1,8 +1,56 @@
 {
   "name": "@grida/pixel-grid",
+  "version": "0.0.0-canary.0",
   "description": "Pixel Grid component for Infinite Canvas",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "private": false,
+  "keywords": [
+    "grida",
+    "canvas",
+    "pixel",
+    "grid",
+    "design",
+    "editor",
+    "react"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup index.ts react.tsx --format cjs,esm --dts"
+  },
   "devDependencies": {
     "@types/react": "^19",
     "react": "19.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   }
 }
