@@ -7,7 +7,8 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "test": "pnpm -r --filter 'packages/*' run test"
+    "test": "turbo run test",
+    "publish-packages": "turbo run build lint test && changeset version && changeset publish"
   },
   "packageManager": "pnpm@10.10.0",
   "resolutions": {},

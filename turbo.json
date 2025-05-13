@@ -1,9 +1,12 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
+    "test": {
+      "dependsOn": ["^test"]
+    },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "build/**"],
+      "outputs": [".next/**", "!.next/cache/**", "build/**", "dist/**"],
       "env": [
         "REDIS_URL",
         "UPSTASH_REDIS_REST_URL",

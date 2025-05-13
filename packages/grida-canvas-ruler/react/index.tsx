@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
-import { Axis, RulerCanvas, RulerOptions } from "./ruler";
+import * as React from "react";
+import { useRef, useEffect } from "react";
+import { Axis, RulerCanvas, RulerOptions } from "../ruler";
 
 export type RulerProps = Partial<
   Pick<

@@ -1,6 +1,14 @@
 {
   "name": "@grida/cg",
+  "license": "MIT",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
   "description": "Grida Canvas Core Graphics",
-  "dependencies": {},
-  "devDependencies": {}
+  "private": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup index.ts --format cjs,esm --dts"
+  }
 }
