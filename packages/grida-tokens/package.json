@@ -1,7 +1,7 @@
 {
   "name": "@grida/tokens",
   "description": "Grida AST logic model",
-  "version": "0.0.0-canary.0",
+  "version": "0.0.0",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
