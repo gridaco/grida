@@ -1,14 +1,46 @@
 {
   "name": "@grida/tokens",
+  "description": "Grida AST logic model",
   "version": "0.0.0",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "private": false,
+  "keywords": [
+    "grida",
+    "design",
+    "tokens",
+    "ast",
+    "typescript"
+  ],
   "scripts": {
+    "dev": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts src/utils.ts src/locales.ts --format cjs,esm --dts",
     "test": "jest"
   },
-  "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.2",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.5"
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.js"
+    },
+    "./k": {
+      "types": "./dist/locales.d.ts",
+      "import": "./dist/locales.mjs",
+      "require": "./dist/locales.js"
+    }
   },
   "jest": {
     "preset": "ts-jest"

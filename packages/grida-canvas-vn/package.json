@@ -1,6 +1,7 @@
 {
   "name": "@grida/vn",
   "description": "Vector Network Spec",
+  "private": true,
   "scripts": {
     "test": "jest"
   },

@@ -1,4 +1,4 @@
-import { tokens } from "@grida/tokens";
+import { tokens, access } from "@grida/tokens";
 import { useFormAgentState } from "@/lib/formstate";
 import assert from "assert";
 import { useMemo } from "react";
@@ -60,7 +60,7 @@ function resolveJsonRefPath(ref: tokens.JSONRef): string[] {
   return path.split("/");
 }
 
-function access(
+function _access(
   data: any,
   exp?: tokens.TValueExpression | undefined | null
 ): tokens.Primitive | undefined | null {
@@ -71,14 +71,14 @@ function access(
   }
   if (tokens.is.jsonRef(exp)) {
     const path = resolveJsonRefPath(exp);
-    const value = tokens.Access.access(data, path);
+    const value = access.access(data, path);
     return value;
   }
   if (tokens.is.inferredShorthandBinaryExpression(exp)) {
     const [l, o, r] = exp;
 
-    const left: any = access(data, l);
-    const right: any = access(data, r);
+    const left: any = _access(data, l);
+    const right: any = _access(data, r);
     return op(left, o!, right);
   }
 
@@ -98,6 +98,6 @@ export function useValue<O>(
 ): O | undefined {
   const [state] = useFormAgentState();
   return useMemo(() => {
-    return access(state, exp) as O;
+    return _access(state, exp) as O;
   }, [exp, state]);
 }

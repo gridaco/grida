@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { TransparencyGrid } from "@grida/transparency-grid";
+import { PixelGrid } from "@grida/pixel-grid/react";
 import { useGesture } from "@use-gesture/react";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 
-export default function TransparencyGridDemoPage() {
+export default function PixelGridDemoPage() {
   useDisableSwipeBack();
 
   const ref = React.useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export default function TransparencyGridDemoPage() {
           </span>
         </div>
       </div>
-      <TransparencyGrid
+      <PixelGrid
         width={typeof window === "undefined" ? 0 : window.innerWidth}
         height={typeof window === "undefined" ? 0 : window.innerHeight}
         transform={[

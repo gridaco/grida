@@ -6,7 +6,7 @@ import React, {
   FC,
   useMemo,
 } from "react";
-import { tokens } from "@grida/tokens";
+import { type access } from "@grida/tokens";
 
 interface RootDataContextProps {
   rootData: Record<string, any>;
@@ -128,7 +128,7 @@ export const ScopedVariableContext = createContext<
 >(undefined);
 
 interface ScopedVariableContextProps {
-  variablePaths: Record<string, tokens.Access.KeyPath<any>>;
+  variablePaths: Record<string, access.KeyPath<any>>;
 }
 
 /**
@@ -137,7 +137,7 @@ interface ScopedVariableContextProps {
  */
 export const ScopedVariableBoundary: FC<{
   identifier: string;
-  expression: tokens.Access.KeyPath<any>;
+  expression: access.KeyPath<any>;
   children: ReactNode;
 }> = ({ identifier, expression, children }) => {
   const parentScopedContext = useContext(ScopedVariableContext);

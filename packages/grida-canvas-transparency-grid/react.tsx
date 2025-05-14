@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import * as React from "react";
+import { useRef, useEffect } from "react";
 import { TransparencyGridCanvas } from "./transparency-grid";
 import type { TransparencyGridOptions } from "./types";
 

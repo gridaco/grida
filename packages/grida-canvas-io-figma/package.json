@@ -1,6 +1,7 @@
 {
   "name": "@grida/io-figma",
   "description": "Figma I/O for Grida Canvas",
+  "private": true,
   "dependencies": {
     "@grida/cmath": "workspace:*"
   },

@@ -1,7 +1,7 @@
-import { tokens } from "../tokens";
+import { access } from "../src";
 
 describe("resolvePath", () => {
-  const context: tokens.Access.ScopedIdentifiersContext = {
+  const context: access.ScopedIdentifiersContext = {
     scopedIdentifiers: {
       identifier: ["b", "c"],
       nested: ["identifier", "d"],
@@ -11,43 +11,43 @@ describe("resolvePath", () => {
 
   it("should resolve a path without context", () => {
     const path = ["a", "b", "c"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["a", "b", "c"]);
   });
 
   it("should resolve a path with single level context", () => {
     const path = ["identifier", "d"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["b", "c", "d"]);
   });
 
   it("should resolve a path with nested context", () => {
     const path = ["nested"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["b", "c", "d"]);
   });
 
   it("should resolve a path with deep nested context", () => {
     const path = ["deep"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["b", "c", "d", "e"]);
   });
 
   it("should handle mixed context and direct path", () => {
     const path = ["deep", "f"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["b", "c", "d", "e", "f"]);
   });
 
   it("should return the original path if no context matches", () => {
     const path = ["x", "y", "z"];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual(["x", "y", "z"]);
   });
 
   it("should handle empty path", () => {
     const path: string[] = [];
-    const resolvedPath = tokens.Access.resolvePath(path, context);
+    const resolvedPath = access.resolvePath(path, context);
     expect(resolvedPath).toEqual([]);
   });
 });
@@ -68,7 +68,7 @@ describe("access", () => {
     g: "value",
   };
 
-  const context: tokens.Access.ScopedIdentifiersContext = {
+  const context: access.ScopedIdentifiersContext = {
     scopedIdentifiers: {
       identifier: ["b", "c"],
       nested: ["identifier", "d"],
@@ -78,44 +78,44 @@ describe("access", () => {
   };
 
   it("should access a value without context", () => {
-    const path: tokens.Access.KeyPath<typeof obj> = ["b", "c", "d"];
-    const result = tokens.Access.access(obj, path);
+    const path: access.KeyPath<typeof obj> = ["b", "c", "d"];
+    const result = access.access(obj, path);
     expect(result).toBe("hello");
   });
 
   it("should access a value with single level context", () => {
     const path = ["identifier", "d"] as any;
-    const result = tokens.Access.access(obj, path, context);
+    const result = access.access(obj, path, context);
     expect(result).toBe("hello");
   });
 
   it("should access a value with nested context", () => {
     const path = ["nested"] as any;
-    const result = tokens.Access.access(obj, path, context);
+    const result = access.access(obj, path, context);
     expect(result).toBe("hello");
   });
 
   it("should access a value with deep nested context", () => {
     const path = ["deep", "z"] as any;
-    const result = tokens.Access.access(obj, path, context);
+    const result = access.access(obj, path, context);
     expect(result).toBe("z");
   });
 
   it("should return undefined for a path with no match", () => {
     const path = ["x", "y", "z"] as any;
-    const result = tokens.Access.access(obj, path);
+    const result = access.access(obj, path);
     expect(result).toBeUndefined();
   });
 
   it("should return undefined for an empty path", () => {
-    const path: tokens.Access.KeyPath<typeof obj> = [] as any;
-    const result = tokens.Access.access(obj, path);
+    const path: access.KeyPath<typeof obj> = [] as any;
+    const result = access.access(obj, path);
     expect(result).toBeUndefined();
   });
 
   it("should access a value without context and with a direct path", () => {
-    const path: tokens.Access.KeyPath<typeof obj> = ["g"];
-    const result = tokens.Access.access(obj, path);
+    const path: access.KeyPath<typeof obj> = ["g"];
+    const result = access.access(obj, path);
     expect(result).toBe("value");
   });
 });
@@ -136,7 +136,7 @@ describe("select", () => {
     g: "value",
   };
 
-  const context: tokens.Access.ScopedIdentifiersContext = {
+  const context: access.ScopedIdentifiersContext = {
     scopedIdentifiers: {
       identifier: ["b", "c"],
       nested: ["identifier", "d"],
@@ -146,8 +146,8 @@ describe("select", () => {
   };
 
   it("should select object value without context", () => {
-    const paths: tokens.Access.KeyPath<typeof obj>[] = [["b", "c"]];
-    const result = tokens.Access.select(obj, paths);
+    const paths: access.KeyPath<typeof obj>[] = [["b", "c"]];
+    const result = access.select(obj, paths);
     expect(result).toEqual({
       b: {
         c: {
@@ -163,54 +163,50 @@ describe("select", () => {
   });
 
   it("should select values without context", () => {
-    const paths: tokens.Access.KeyPath<typeof obj>[] = [["b", "c", "d"]];
-    const result = tokens.Access.select(obj, paths);
+    const paths: access.KeyPath<typeof obj>[] = [["b", "c", "d"]];
+    const result = access.select(obj, paths);
     expect(result).toEqual({ b: { c: { d: "hello" } } });
   });
 
   it("should select values with single level context", () => {
     const paths = [["identifier", "d"]] as any;
-    const result = tokens.Access.select(obj, paths, context);
+    const result = access.select(obj, paths, context);
     expect(result).toEqual({ identifier: { d: "hello" } });
   });
 
   it("should select values with nested context", () => {
     const paths = [["nested"]] as any;
-    const result = tokens.Access.select(obj, paths, context);
+    const result = access.select(obj, paths, context);
     expect(result).toEqual({ nested: "hello" });
   });
 
   it("should select values with deep nested context", () => {
     const paths = [["deep", "z"]] as any;
-    const result = tokens.Access.select(obj, paths, context);
+    const result = access.select(obj, paths, context);
     expect(result).toEqual({ deep: { z: "z" } });
   });
 
   it("should handle mixed context and direct path", () => {
     const paths = [["deep", "z"]] as any;
-    const result = tokens.Access.select(obj, paths, context);
+    const result = access.select(obj, paths, context);
     expect(result).toEqual({ deep: { z: "z" } });
   });
 
   it("should return an empty object for paths with no match", () => {
     const paths = [["x", "y", "z"]] as any;
-    const result = tokens.Access.select(obj, paths);
+    const result = access.select(obj, paths);
     expect(result).toEqual({});
   });
 
   it("should handle an empty paths array", () => {
-    const paths: tokens.Access.KeyPath<typeof obj>[] = [];
-    const result = tokens.Access.select(obj, paths);
+    const paths: access.KeyPath<typeof obj>[] = [];
+    const result = access.select(obj, paths);
     expect(result).toEqual({});
   });
 
   it("should select multiple values correctly", () => {
-    const paths: tokens.Access.KeyPath<typeof obj>[] = [
-      ["a"],
-      ["b", "c", "d"],
-      ["g"],
-    ];
-    const result = tokens.Access.select(obj, paths);
+    const paths: access.KeyPath<typeof obj>[] = [["a"], ["b", "c", "d"], ["g"]];
+    const result = access.select(obj, paths);
     expect(result).toEqual({
       a: 1,
       b: {
@@ -224,7 +220,7 @@ describe("select", () => {
 
   it("should select values using nested context and direct paths", () => {
     const paths = [["nested"], ["a"], ["deep", "z"]] as any;
-    const result = tokens.Access.select(obj, paths, context);
+    const result = access.select(obj, paths, context);
     expect(result).toEqual({
       nested: "hello",
       a: 1,

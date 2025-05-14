@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import * as React from "react";
+import { useRef, useEffect } from "react";
 import { Axis, RulerCanvas, RulerOptions } from "./ruler";
 
 export type RulerProps = Partial<
@@ -59,3 +60,5 @@ export const AxisRuler: React.FC<RulerProps> = (props) => {
     />
   );
 };
+
+export type { Axis, Tick, RulerOptions, Range } from "./ruler";

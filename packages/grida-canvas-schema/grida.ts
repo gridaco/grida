@@ -1,4 +1,5 @@
 import type { tokens } from "@grida/tokens";
+import type { TokenizableExcept } from "@grida/tokens/utils";
 import type vn from "@grida/vn";
 import type cg from "@grida/cg";
 import type cmath from "@grida/cmath";
@@ -1048,10 +1049,7 @@ export namespace grida.program.nodes {
        */
       export type PropsTextValue = tokens.StringValueExpression;
 
-      export type SolidPaintToken = tokens.utils.TokenizableExcept<
-        cg.SolidPaint,
-        "type"
-      >;
+      export type SolidPaintToken = TokenizableExcept<cg.SolidPaint, "type">;
 
       export type PropsPaintValue = cg.Paint | SolidPaintToken;
     }

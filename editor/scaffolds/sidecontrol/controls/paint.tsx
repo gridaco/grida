@@ -22,7 +22,7 @@ import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
 import { Button } from "@/components/ui-editor/button";
 import { useSchema } from "../schema";
-import { tokens } from "@grida/tokens";
+import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
 
 export function PaintControl({
@@ -300,7 +300,7 @@ function TokenizedPaintControl({
         <PaintInputContainer>
           <PaintChip paint={computed.value as any as ComputedPaint} />
           <span className="text-xs text-muted-foreground ms-2">
-            {tokens.factory.strfy.stringValueExpression(
+            {factory.strfy.stringValueExpression(
               identifier as tokens.PropertyAccessExpression
             )}
           </span>
@@ -349,10 +349,7 @@ function ContextVariableColors({
           size="xs"
           className="flex items-center justify-start gap-1 px-1 py-0.5 w-full"
           onClick={() => {
-            const exp = tokens.factory.createPropertyAccessExpression([
-              "props",
-              key,
-            ]);
+            const exp = factory.createPropertyAccessExpression(["props", key]);
             onSelect?.(exp);
           }}
         >

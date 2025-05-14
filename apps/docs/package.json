@@ -1,5 +1,5 @@
 {
-  "name": "docs-site",
+  "name": "docs",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -21,7 +21,6 @@
     "@docusaurus/core": "^3.7.0",
     "@docusaurus/plugin-client-redirects": "^3.7.0",
     "@docusaurus/plugin-google-gtag": "^3.7.0",
-    "@docusaurus/plugin-ideal-image": "^3.7.0",
     "@docusaurus/plugin-sitemap": "^3.7.0",
     "@docusaurus/preset-classic": "^3.7.0",
     "@mdx-js/react": "^3.0.0",
@@ -35,7 +34,8 @@
     "@docusaurus/tsconfig": "3.7.0",
     "@docusaurus/types": "3.7.0",
     "fs-extra": "^10.0.0",
-    "marked": "^4.0.10"
+    "marked": "^4.0.10",
+    "typescript": "^5"
   },
   "browserslist": {
     "production": [
@@ -50,7 +50,6 @@
     ]
   },
   "engines": {
-    "node": ">=22.0.0",
-    "pnpm": ">=10.0.0"
+    "node": ">=18.0"
   }
 }

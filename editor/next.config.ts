@@ -196,10 +196,6 @@ const nextConfig: NextConfig = {
       // #endregion
     },
   },
-  webpack: (config) => {
-    config.resolve.alias.handlebars = "handlebars/dist/handlebars.js";
-    return config;
-  },
 };
 
 const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
@@ -229,7 +225,7 @@ const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
       // See the following for more information:
       // https://docs.sentry.io/product/crons/
       // https://vercel.com/docs/cron-jobs
-      automaticVercelMonitors: true,
+      automaticVercelMonitors: false,
     } satisfies SentryBuildOptions)
   : null;
 

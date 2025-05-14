@@ -604,7 +604,6 @@ export namespace iosvg {
         case "stop":
         case "symbol":
         case "use":
-        case "image":
         case "clipPath":
         case "mask":
         // ignored, non supported
