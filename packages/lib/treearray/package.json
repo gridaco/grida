@@ -1,29 +1,29 @@
 {
-    "name": "treearray",
-    "version": "0.0.0",
-    "description": "simple package for sorting tree data as in array form of data",
-    "author": "Grida.co",
-    "license": "MIT",
-    "private": false,
-    "scripts": {
-        "test": "jest",
-        "prepack": "yarn test && tsc"
-    },
-    "devDependencies": {
-        "@types/jest": "^27.0.1",
-        "jest": "^27.1.0",
-        "ts-jest": "^27.0.5",
-        "typescript": "^4.3.5"
-    },
-    "publishConfig": {
-        "access": "public"
-    },
-    "files": [
-        "dist/index.js",
-        "dist/index.d.ts",
-        "dist/**/*.js",
-        "dist/**/*.d.ts",
-        "LICENSE",
-        "README.md"
-    ]
+  "name": "treearray",
+  "version": "0.0.0",
+  "description": "simple package for sorting tree data as in array form of data",
+  "author": "Grida.co",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "prepack": "yarn test && tsc"
+  },
+  "devDependencies": {
+    "@types/jest": "^27.0.1",
+    "jest": "^27.1.0",
+    "ts-jest": "^27.0.5",
+    "typescript": "^4.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "LICENSE",
+    "README.md"
+  ]
 }
