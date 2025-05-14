@@ -1,6 +1,7 @@
 {
   "name": "@grida/schema",
   "description": "Grida Canvas Document Model",
+  "private": true,
   "devDependencies": {
     "@grida/cg": "workspace:*",
     "@grida/cmath": "workspace:*",

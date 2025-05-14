@@ -1,4 +1,5 @@
 {
   "name": "@grida/tailwindcss",
-  "description": "TailwindCSS Integration for Grida Canvas"
+  "description": "TailwindCSS Integration for Grida Canvas",
+  "private": true
 }
