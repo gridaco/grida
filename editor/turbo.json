@@ -1,0 +1,46 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "BIRD_API_KEY",
+        "BIRD_SMS_CHANNEL_ID",
+        "BIRD_WORKSPACE_ID",
+        "EDGE_CONFIG",
+        "ENABLE_EXPERIMENTAL_COREPACK",
+        "INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY",
+        "INTEGRATIONS_TEST_TOSSPAYMENTS_SECRET_KEY",
+        "IPINFO_ACCESS_TOKEN",
+        "OPENAI_API_KEY",
+        "POSTGRES_DATABASE",
+        "POSTGRES_HOST",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_PRISMA_URL",
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "POSTGRES_USER",
+        "REDIS_URL",
+        "REPLICATE_API_TOKEN",
+        "RESEND_API_KEY",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_HOST",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_PROJECT_ID",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_JWT_SECRET",
+        "SUPABASE_SERVICE_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_URL",
+        "UPSTASH_REDIS_REST_TOKEN",
+        "UPSTASH_REDIS_REST_URL",
+        "VERCEL_AUTH_BEARER_TOKEN",
+        "VERCEL_TEAM_ID",
+        "VERCEL_URL"
+      ]
+    }
+  }
+}

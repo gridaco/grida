@@ -6,29 +6,7 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "build/**", "dist/**"],
-      "env": [
-        "REDIS_URL",
-        "UPSTASH_REDIS_REST_URL",
-        "UPSTASH_REDIS_REST_TOKEN",
-        "SUPABASE_SERVICE_KEY",
-        "OPENAI_API_KEY",
-        "INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY",
-        "INTEGRATIONS_TEST_TOSSPAYMENTS_SECRET_KEY",
-        "RESEND_API_KEY",
-        "BIRD_API_KEY",
-        "BIRD_WORKSPACE_ID",
-        "BIRD_SMS_CHANNEL_ID",
-        "IPINFO_ACCESS_TOKEN",
-        "EDGE_CONFIG",
-        "REPLICATE_API_TOKEN",
-        "ENABLE_EXPERIMENTAL_COREPACK",
-        "SENTRY_ORG",
-        "SENTRY_PROJECT",
-        "SENTRY_AUTH_TOKEN",
-        "SENTRY_HOST",
-        "SENTRY_PROJECT_ID"
-      ]
+      "outputs": [".next/**", "!.next/cache/**", "build/**", "dist/**"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
