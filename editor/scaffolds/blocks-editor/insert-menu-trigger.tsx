@@ -20,6 +20,7 @@ export function InsertMenuTrigger({ className }: { className?: string }) {
 
   return (
     <Button
+      aria-label="insert form block"
       role="combobox"
       variant={insertmenu.open ? "default" : "outline"}
       size="icon"

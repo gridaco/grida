@@ -31,7 +31,7 @@ import { Metadata } from "next";
 import { SavingIndicator } from "@/scaffolds/workbench/saving-indicator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Inter } from "next/font/google";
 import { cn } from "@/components/lib/utils";
 import React from "react";

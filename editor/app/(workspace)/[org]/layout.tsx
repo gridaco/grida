@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
 import { notFound, redirect } from "next/navigation";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
 import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import Header from "./header";
