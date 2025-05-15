@@ -4,7 +4,7 @@ import React, { useCallback, useMemo } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "@/scaffolds/editor";
 import { SidebarMenuGrid, SidebarMenuGridItem } from "@/components/sidebar";
-import { fieldlabels, supported_field_types } from "@/k/supported_field_types";
+import { supported_field_types, annotations } from "@/k/supported_field_types";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
   HoverCard,
@@ -74,7 +74,7 @@ export function ModeInsertBlocks() {
   const fieldFuse = useMemo(() => {
     const fieldData = supported_field_types.map((field_type) => ({
       type: field_type,
-      label: fieldlabels[field_type],
+      label: annotations[field_type].label,
     }));
     return new Fuse(fieldData, { keys: ["label"] });
   }, []);
@@ -169,7 +169,7 @@ export function ModeInsertBlocks() {
                         className="p-2 size-8 rounded-sm"
                       />
                       <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
-                        {fieldlabels[field_type]}
+                        {annotations[field_type].label}
                       </div>
                     </SidebarMenuGridItem>
                   </HoverCardTrigger>
@@ -186,7 +186,7 @@ export function ModeInsertBlocks() {
                             className="inline align-middle me-2 size-8 p-2 border rounded-sm shadow-sm"
                           />
                           <span className="font-bold">
-                            {fieldlabels[field_type]}
+                            {annotations[field_type].label}
                           </span>
                         </div>
                         <Button
@@ -203,7 +203,7 @@ export function ModeInsertBlocks() {
                         <FormField
                           type={field_type}
                           name={"example"}
-                          label={fieldlabels[field_type] + " Example"}
+                          label={annotations[field_type].label + " Example"}
                           placeholder="Example"
                           helpText="This is an example field"
                           options={[

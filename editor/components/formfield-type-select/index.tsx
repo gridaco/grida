@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
-import { supported_field_types, fieldlabels } from "@/k/supported_field_types";
+import { supported_field_types, annotations } from "@/k/supported_field_types";
 import type { FormInputType } from "@/types";
 import { CheckIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 
@@ -30,7 +30,7 @@ type FormFieldTypeSelectOptionItem = {
 const all_supported_field_type_items: FormFieldTypeSelectOptionItem[] =
   supported_field_types.map((t) => ({
     value: t,
-    label: fieldlabels[t],
+    label: annotations[t].label,
     disabled: false,
   }));
 
@@ -61,7 +61,7 @@ export function TypeSelect({
           <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+      <PopoverContent className="w-(--radix-popover-trigger-width) max-h-(--radix-popover-content-available-height) p-0">
         <Command>
           <CommandInput placeholder="Search" />
           <CommandEmpty>No input found.</CommandEmpty>
@@ -72,6 +72,7 @@ export function TypeSelect({
                   key={opt.value}
                   value={opt.value}
                   disabled={opt.disabled}
+                  keywords={annotations[opt.value].keywords}
                   onSelect={(currentValue) => {
                     onValueChange(currentValue as FormInputType);
                     setOpen(false);
@@ -86,7 +87,7 @@ export function TypeSelect({
                   <div className="flex items-center gap-2">
                     <FormFieldTypeIcon type={opt.value} className="size-4" />
                     <span className="capitalize">
-                      {opt.label ?? fieldlabels[opt.value]}
+                      {opt.label ?? annotations[opt.value].label}
                     </span>
                   </div>
                 </CommandItem>
