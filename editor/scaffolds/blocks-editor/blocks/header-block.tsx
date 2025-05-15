@@ -93,7 +93,7 @@ export function HeaderBlock({
           />
           <MinimalTiptapHeadlessEditor
             output="html"
-            className="bg-background w-full outline-none border-none mt-4"
+            className="bg-background shadow-none w-full outline-none border-none mt-4"
             placeholder="Description"
             value={description_html ?? ""}
             onChange={(value) => onEditDescription((value as string) ?? "")}

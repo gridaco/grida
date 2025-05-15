@@ -38,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { PopoverContentProps } from "@radix-ui/react-popover";
 
 export function InsertCommandDialogTrigger({
   className,
@@ -79,41 +80,22 @@ export function InsertCommandDialogTrigger({
  * use with <PopoverTrigger>
  * @returns
  */
-export function InsertCommandPopoverTrigger({
-  className,
-}: {
-  className?: string;
-}) {
-  return (
-    <InsertCommandPopover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label="insert form block"
-          role="combobox"
-          variant={"outline"}
-          size="icon"
-          className={cn("rounded-full", className)}
-          onPointerDown={(e) => {
-            // this shall not trigger focused block to lose focus
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <PlusIcon />
-        </Button>
-      </PopoverTrigger>
-    </InsertCommandPopover>
-  );
-}
-
 export function InsertCommandPopover({
   index,
   children,
   onOpenChange,
+  align = "start",
+  side = "left",
+  sideOffset,
+  alignOffset,
 }: {
   index?: number;
   children: React.ReactElement<typeof PopoverTrigger>;
   onOpenChange?: (open: boolean) => void;
+  side?: PopoverContentProps["side"];
+  sideOffset?: PopoverContentProps["sideOffset"];
+  align?: PopoverContentProps["align"];
+  alignOffset?: PopoverContentProps["alignOffset"];
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -146,14 +128,16 @@ export function InsertCommandPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side="bottom">
+        <TooltipContent side="left">
           <p>Insert block</p>
         </TooltipContent>
       </Tooltip>
       <PopoverContent
         className="w-[300px] p-0"
-        align="start"
-        side="right"
+        align={align}
+        side={side}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
         collisionPadding={16}
       >
         <Command className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]_svg]:size-4">

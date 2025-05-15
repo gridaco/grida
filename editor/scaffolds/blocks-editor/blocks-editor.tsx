@@ -21,8 +21,7 @@ import { toast } from "sonner";
 import {
   InsertCommandDialogTrigger,
   InsertCommandPopover,
-  InsertCommandPopoverTrigger,
-} from "./insert-trigger";
+} from "./insert-menu";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { cn } from "@/components/lib/utils";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -254,15 +253,15 @@ function BlocksEditor() {
                   <div key={block.id}>
                     <Block {...block} />
                     {index < state.blocks.length - 1 && (
-                      <BlockMiddleSlot index={index} />
+                      <BlockMiddleSlot index={index + 1} />
                     )}
                   </div>
                 );
               })}
             </FormSectionStyle>
           </SortableContext>
-          <div className="mt-10 w-full flex items-center justify-center">
-            <InsertCommandPopoverTrigger />
+          <div className="mt-4 mb-80 w-full">
+            <BlockLastSlot />
           </div>
         </BlocksCanvas>
       </div>
@@ -270,7 +269,7 @@ function BlocksEditor() {
   );
 }
 
-function BlockMiddleSlot({ index }: { index: number }) {
+function BlockMiddleSlot({ index }: { index?: number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -279,7 +278,11 @@ function BlockMiddleSlot({ index }: { index: number }) {
       className="group relative"
     >
       <div className="absolute left-0 top-4 -translate-y-1/2 -translate-x-full opacity-0 group-hover:opacity-100 group-data-[state=expanded]:opacity-100 transition-opacity">
-        <InsertCommandPopover index={index + 1} onOpenChange={setExpanded}>
+        <InsertCommandPopover
+          index={index}
+          onOpenChange={setExpanded}
+          side="left"
+        >
           <PopoverTrigger asChild>
             <button className="size-8 bg-primary/10 rounded-[100%_100%_6px] rotate-[-45deg] transition-colors hover:bg-primary/20 flex items-center justify-center">
               <PlusIcon className="size-4 -rotate-45 text-primary" />
@@ -289,6 +292,40 @@ function BlockMiddleSlot({ index }: { index: number }) {
       </div>
       <div className="w-full h-8 -mx-4">
         <span className="sr-only">Insert block here</span>
+      </div>
+      <div
+        aria-label="slot"
+        data-state={expanded ? "expanded" : undefined}
+        className="h-0 m-0 opacity-0 rounded-2xl bg-primary/10 outline group-data-[state=expanded]:opacity-100 group-data-[state=expanded]:mb-4 group-data-[state=expanded]:h-16 transition-[height] duration-200 ease-in-out"
+      />
+    </div>
+  );
+}
+
+function BlockLastSlot() {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      data-state={expanded ? "expanded" : undefined}
+      className="h-16 group relative"
+    >
+      <div className="w-full opacity-100 group-data-[state=expanded]:h-0 group-data-[state=expanded]:opacity-0">
+        <div className="">
+          <InsertCommandPopover
+            onOpenChange={setExpanded}
+            side="left"
+            sideOffset={16}
+            align="center"
+          >
+            <PopoverTrigger asChild>
+              <button className="w-full h-full flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-auto size-8 bg-primary/10 rounded-full transition-colors hover:bg-primary/20 flex items-center justify-center">
+                  <PlusIcon className="size-4 text-primary" />
+                </div>
+              </button>
+            </PopoverTrigger>
+          </InsertCommandPopover>
+        </div>
       </div>
       <div
         aria-label="slot"

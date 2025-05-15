@@ -92,13 +92,16 @@ export default function blockReducer(
               });
             }
 
-            const new_blocks = blockstreeflat(
-              draft.blocks.concat({
-                ...__shared,
-              })
-            );
+            // Insert the new section at the specified index
+            draft.blocks.splice(insert_index, 0, {
+              ...__shared,
+            });
 
-            draft.blocks = new_blocks;
+            // Recalculate local_index for all blocks
+            draft.blocks = draft.blocks.map((block, index) => ({
+              ...block,
+              local_index: index,
+            }));
           });
         }
         case "field": {
