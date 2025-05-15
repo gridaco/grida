@@ -114,7 +114,7 @@ export function NameInput({
       </PopoverTrigger>
       <PopoverContent
         sideOffset={-40}
-        className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
+        className="w-(--radix-popover-trigger-width) max-h-(--radix-popover-content-available-height) p-0"
       >
         <Command>
           <CommandInput

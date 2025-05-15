@@ -269,14 +269,14 @@ const row2 = wwwprint.categories.slice(wwwprint.categories.length / 2);
 function MarqueeHero() {
   return (
     <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
-      <Marquee pauseOnHover className="[--duration:20s]">
+      <Marquee pauseOnHover className="[--duration:30s]">
         {row1.map((item) => (
           <Link key={item.name} href={sitemap.print.links.templates}>
             <MarqueeCard {...item} />
           </Link>
         ))}
       </Marquee>
-      <Marquee pauseOnHover reverse className="[--duration:20s]">
+      <Marquee pauseOnHover reverse className="[--duration:40s]">
         {row2.map((item) => (
           <Link key={item.name} href={sitemap.print.links.templates}>
             <MarqueeCard {...item} />
