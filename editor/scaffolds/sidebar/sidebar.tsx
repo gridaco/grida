@@ -7,7 +7,6 @@ import {
   SidebarContent,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { ModeInsertBlocks } from "./sidebar-mode-insert";
 import { ModeDesign } from "./sidebar-mode-design";
 import { ModeData } from "./sidebar-mode-data";
 import { ModeConnect } from "./sidebar-mode-connect";
@@ -18,7 +17,6 @@ import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
 import { DarwinSidebarHeaderDragArea } from "../desktop";
 import Link from "next/link";
 import { ModeDesignForm } from "./sidebar-mode-design-form";
@@ -39,30 +37,6 @@ export function EditorSidebar() {
       mode: mode as any,
     });
   };
-
-  const onInsertMenuOpenChange = (open: boolean) => {
-    dispatch({
-      type: "editor/panels/insert-menu",
-      open: open,
-    });
-  };
-
-  if (insertmenu.open) {
-    return (
-      <Dialog.Root open={insertmenu.open} onOpenChange={onInsertMenuOpenChange}>
-        <Dialog.Content>
-          <Dialog.Title className="sr-only">Insert Block</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            Select a block to insert into the canvas
-          </Dialog.Description>
-          <Sidebar>
-            <DarwinSidebarHeaderDragArea />
-            <ModeInsertBlocks />
-          </Sidebar>
-        </Dialog.Content>
-      </Dialog.Root>
-    );
-  }
 
   return (
     <Sidebar>

@@ -5,7 +5,6 @@ import type {
   GlobalSavingAction,
   EditorSidebarModeAction,
   DataGridReorderColumnAction,
-  OpenInsertMenuPanelAction,
   OpenCustomerDetailsPanelAction,
   OpenFieldEditPanelAction,
   OpenRecordEditPanelAction,
@@ -180,12 +179,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return produce(state, (draft) => {
         draft.customer_editor.open = open ?? true;
         draft.customer_editor.id = customer_id;
-      });
-    }
-    case "editor/panels/insert-menu": {
-      const { open } = <OpenInsertMenuPanelAction>action;
-      return produce(state, (draft) => {
-        draft.insertmenu.open = open ?? true;
       });
     }
     // #endregion editor/panels

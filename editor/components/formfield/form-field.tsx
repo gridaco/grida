@@ -650,7 +650,7 @@ function MonoFormField({
         <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           <HelpText />
-          <Card>
+          <Card className="p-0">
             <fieldset className="not-prose">
               <ul>
                 {options?.map((option) => (

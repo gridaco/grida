@@ -18,7 +18,10 @@ import {
 } from "@dnd-kit/sortable";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { InsertMenuTrigger } from "./insert-menu-trigger";
+import {
+  InsertCommandDialogTrigger,
+  InsertCommandPopoverTrigger,
+} from "./insert-trigger";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { cn } from "@/components/lib/utils";
 
@@ -231,7 +234,7 @@ function BlocksEditor() {
     <div onPointerDown={blur}>
       <div className="fixed z-10">
         <div className="absolute left-4 top-4">
-          <InsertMenuTrigger />
+          <InsertCommandDialogTrigger />
         </div>
       </div>
       <div className="py-20 container mx-auto max-w-screen-sm">
@@ -253,7 +256,7 @@ function BlocksEditor() {
             </FormSectionStyle>
           </SortableContext>
           <div className="mt-10 w-full flex items-center justify-center">
-            <InsertMenuTrigger />
+            <InsertCommandPopoverTrigger />
           </div>
         </BlocksCanvas>
       </div>
