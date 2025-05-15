@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
@@ -20,10 +20,13 @@ import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   InsertCommandDialogTrigger,
+  InsertCommandPopover,
   InsertCommandPopoverTrigger,
 } from "./insert-trigger";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { cn } from "@/components/lib/utils";
+import { PlusIcon } from "@radix-ui/react-icons";
+import { PopoverTrigger } from "@radix-ui/react-popover";
 
 export default function BlocksEditorRoot() {
   return (
@@ -245,11 +248,17 @@ function BlocksEditor() {
             items={state.blocks.map((b) => b.id)}
             strategy={verticalListSortingStrategy}
           >
-            <FormSectionStyle className="flex flex-col gap-4 ">
-              {state.blocks.map((block) => {
+            <FormSectionStyle className="flex flex-col">
+              {state.blocks.map((block, index) => {
                 return (
                   <div key={block.id}>
                     <Block {...block} />
+                    {index < state.blocks.length - 1 && (
+                      <BlockMiddleSlot
+                        index={index}
+                        of={state.blocks[index + 1].id}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -260,6 +269,35 @@ function BlocksEditor() {
           </div>
         </BlocksCanvas>
       </div>
+    </div>
+  );
+}
+
+function BlockMiddleSlot({ index, of }: { index: number; of: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      data-state={expanded ? "expanded" : undefined}
+      className="group relative"
+    >
+      <div className="absolute left-0 top-4 -translate-y-1/2 -translate-x-full opacity-0 group-hover:opacity-100 group-data-[state=expanded]:opacity-100 transition-opacity">
+        <InsertCommandPopover onOpenChange={setExpanded}>
+          <PopoverTrigger asChild>
+            <button className="size-8 bg-primary/10 rounded-[100%_100%_6px] rotate-[-45deg] transition-colors hover:bg-primary/20 flex items-center justify-center">
+              <PlusIcon className="size-4 -rotate-45 text-primary" />
+            </button>
+          </PopoverTrigger>
+        </InsertCommandPopover>
+      </div>
+      <div className="w-full h-8 -mx-4">
+        <span className="sr-only">Insert block here</span>
+      </div>
+      <div
+        aria-label="slot"
+        data-state={expanded ? "expanded" : undefined}
+        className="h-0 m-0 opacity-0 rounded-2xl bg-primary/10 outline group-data-[state=expanded]:opacity-100 group-data-[state=expanded]:mb-4 group-data-[state=expanded]:h-16 transition-[height] duration-200 ease-in-out"
+      />
     </div>
   );
 }
