@@ -98,6 +98,7 @@ export type FormsBlockCreateNewPendingBlockAction =
   | {
       type: "blocks/new";
       block: FormBlockType;
+      index?: number;
     }
   | {
       type: "blocks/new";
@@ -105,6 +106,7 @@ export type FormsBlockCreateNewPendingBlockAction =
       init: {
         type: FormInputType;
       };
+      index?: number;
     };
 
 export interface FormsBlockResolvePendingBlockAction {

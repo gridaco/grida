@@ -28,23 +28,25 @@ export default function useInsertFormBlockMenu() {
   const [state, dispatch] = useEditorState();
 
   const addBlock = useCallback(
-    (block: FormBlockType) => {
+    (block: FormBlockType, index?: number) => {
       dispatch({
         type: "blocks/new",
         block: block,
+        index: index,
       });
     },
     [dispatch]
   );
 
   const addFieldBlock = useCallback(
-    (type: FormInputType) => {
+    (type: FormInputType, index?: number) => {
       dispatch({
         type: "blocks/new",
         block: "field",
         init: {
           type: type,
         },
+        index: index,
       });
     },
     [dispatch]

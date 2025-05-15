@@ -254,10 +254,7 @@ function BlocksEditor() {
                   <div key={block.id}>
                     <Block {...block} />
                     {index < state.blocks.length - 1 && (
-                      <BlockMiddleSlot
-                        index={index}
-                        of={state.blocks[index + 1].id}
-                      />
+                      <BlockMiddleSlot index={index} />
                     )}
                   </div>
                 );
@@ -273,7 +270,7 @@ function BlocksEditor() {
   );
 }
 
-function BlockMiddleSlot({ index, of }: { index: number; of: string }) {
+function BlockMiddleSlot({ index }: { index: number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -282,7 +279,7 @@ function BlockMiddleSlot({ index, of }: { index: number; of: string }) {
       className="group relative"
     >
       <div className="absolute left-0 top-4 -translate-y-1/2 -translate-x-full opacity-0 group-hover:opacity-100 group-data-[state=expanded]:opacity-100 transition-opacity">
-        <InsertCommandPopover onOpenChange={setExpanded}>
+        <InsertCommandPopover index={index + 1} onOpenChange={setExpanded}>
           <PopoverTrigger asChild>
             <button className="size-8 bg-primary/10 rounded-[100%_100%_6px] rotate-[-45deg] transition-colors hover:bg-primary/20 flex items-center justify-center">
               <PlusIcon className="size-4 -rotate-45 text-primary" />

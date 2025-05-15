@@ -107,9 +107,11 @@ export function InsertCommandPopoverTrigger({
 }
 
 export function InsertCommandPopover({
+  index,
   children,
   onOpenChange,
 }: {
+  index?: number;
   children: React.ReactElement<typeof PopoverTrigger>;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -133,9 +135,9 @@ export function InsertCommandPopover({
     value: FormBlockType | FormInputType
   ) => {
     if (type === "block") {
-      addBlock(value as FormBlockType);
+      addBlock(value as FormBlockType, index);
     } else {
-      addFieldBlock(value as FormInputType);
+      addFieldBlock(value as FormInputType, index);
     }
     setOpen(false);
   };
