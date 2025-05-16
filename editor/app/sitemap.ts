@@ -35,6 +35,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: "https://grida.co/forms/ai",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/forms/supabase",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: "https://grida.co/database",
       changeFrequency: "monthly",
       priority: 0.5,

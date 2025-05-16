@@ -24,6 +24,7 @@ export namespace sitemap {
     privacy: "/privacy",
     toc: "/terms",
     forms: "/forms",
+    forms_ai: "/forms/ai",
     canvas: "/canvas",
     west: "/west",
     cookies: "/cookies-policy",
