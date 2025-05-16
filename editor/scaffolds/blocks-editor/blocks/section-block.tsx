@@ -16,11 +16,11 @@ import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockAction,
   BlockHeader,
+  FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
-import { cn } from "@/components/lib/utils";
 
 export function SectionBlock({ id }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
@@ -33,17 +33,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
   const index = sections.findIndex((section) => section.id === id);
 
   return (
-    <div
-      data-focused={focused}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        setFocus();
-      }}
-      className={cn(
-        "p-4 rounded-md border-primary border-2 bg-background shadow-md",
-        'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
-      )}
-    >
+    <FlatBlockBase focused={focused} onPointerDown={setFocus}>
       <BlockHeader>
         <span className="flex flex-row gap-2 items-center">
           <SectionIcon />
@@ -61,7 +51,10 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => deleteBlock(id)}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => deleteBlock(id)}
+              >
                 <TrashIcon className="size-3.5" />
                 Delete Section
               </DropdownMenuItem>
@@ -69,6 +62,6 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
           </DropdownMenu>
         </BlockAction>
       </BlockHeader>
-    </div>
+    </FlatBlockBase>
   );
 }

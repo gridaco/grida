@@ -88,7 +88,7 @@ export function Block(props: EditorFlatFormBlock) {
         data-folder={props.type === "section"}
         ref={setNodeRef}
         style={style}
-        className="group relative data-[folder='true']:mt-16 data-[folder='true']:mb-4"
+        className="group relative data-[folder='true']:mt-16"
       >
         <div
           style={{

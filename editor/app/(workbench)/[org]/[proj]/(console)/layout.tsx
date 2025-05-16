@@ -1,6 +1,6 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Inter } from "next/font/google";
 import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
 import { Metadata } from "next";

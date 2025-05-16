@@ -6,7 +6,7 @@ import {
   Option,
   PaymentFieldData,
 } from "@/types";
-import { Select as HtmlSelect } from "../vanilla/select";
+import { Select as HtmlSelect } from "@/components/vanilla/select";
 import {
   Select,
   SelectContent,
@@ -23,16 +23,19 @@ import { cn } from "@/components/lib/utils";
 import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
-import { Switch } from "../ui/switch";
-import { Slider } from "../ui/slider"; // TODO: this causes hydration error
-import { Toggle } from "../ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
-import { Textarea } from "../ui/textarea";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader } from "../ui/card";
-import { Label } from "../ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider"; // TODO: this causes hydration error
+import { Toggle } from "@/components/ui/toggle";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui-forms/toggle-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   FileUploadField,
   getMaxUploadSize,
@@ -650,7 +653,7 @@ function MonoFormField({
         <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           <HelpText />
-          <Card>
+          <Card className="p-0">
             <fieldset className="not-prose">
               <ul>
                 {options?.map((option) => (

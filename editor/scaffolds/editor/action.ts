@@ -41,7 +41,6 @@ export type EditorAction =
   | OpenFieldEditPanelAction
   | OpenRecordEditPanelAction
   | OpenCustomerDetailsPanelAction
-  | OpenInsertMenuPanelAction
   //
   | FeedCustomerAction
   //
@@ -99,6 +98,7 @@ export type FormsBlockCreateNewPendingBlockAction =
   | {
       type: "blocks/new";
       block: FormBlockType;
+      index?: number;
     }
   | {
       type: "blocks/new";
@@ -106,6 +106,7 @@ export type FormsBlockCreateNewPendingBlockAction =
       init: {
         type: FormInputType;
       };
+      index?: number;
     };
 
 export interface FormsBlockResolvePendingBlockAction {
@@ -205,12 +206,6 @@ export interface OpenFieldEditPanelAction {
 export interface OpenCustomerDetailsPanelAction {
   type: "editor/panels/customer-details";
   customer_id?: string;
-  // true by default
-  open?: boolean;
-}
-
-export interface OpenInsertMenuPanelAction {
-  type: "editor/panels/insert-menu";
   // true by default
   open?: boolean;
 }

@@ -74,7 +74,10 @@ export function HeaderBlock({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => deleteBlock(id)}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => deleteBlock(id)}
+              >
                 <TrashIcon className="size-3.5" />
                 Delete Block
               </DropdownMenuItem>
@@ -93,7 +96,7 @@ export function HeaderBlock({
           />
           <MinimalTiptapHeadlessEditor
             output="html"
-            className="bg-background w-full outline-none border-none mt-4"
+            className="bg-background shadow-none w-full outline-none border-none mt-4"
             placeholder="Description"
             value={description_html ?? ""}
             onChange={(value) => onEditDescription((value as string) ?? "")}

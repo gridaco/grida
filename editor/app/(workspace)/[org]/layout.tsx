@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
 import { notFound, redirect } from "next/navigation";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
+import { EditorCommandK } from "@/scaffolds/globals/editor-cmdk";
 import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import Header from "./header";
@@ -44,6 +45,7 @@ export default async function Layout({
     <SidebarProvider>
       <Workspace organization={organization}>
         <EditorHelpFab />
+        <EditorCommandK />
         <WorkspaceSidebar />
         <div className="h-full flex flex-1 w-full">
           <div className="flex flex-col overflow-hidden w-full h-full">

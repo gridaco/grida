@@ -243,7 +243,7 @@ export function FieldBlock({
           </DropdownMenu>
         </BlockAction>
       </BlockHeader>
-      <div className={cn("w-full bg-background rounded-sm px-4 py-10")}>
+      <div className={cn("w-full bg-background rounded-sm px-2 py-4")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
@@ -330,7 +330,10 @@ export function FormFieldBlockMenuItems({
           Edit Field Definition
         </DropdownMenuItem>
       )}
-      <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
+      <DropdownMenuItem
+        variant="destructive"
+        onClick={() => deleteBlock(block_id)}
+      >
         <TrashIcon className="size-3.5" />
         Delete Block
       </DropdownMenuItem>

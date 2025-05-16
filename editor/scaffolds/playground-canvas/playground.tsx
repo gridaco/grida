@@ -71,7 +71,7 @@ import { ImportFromFigmaDialog } from "@/scaffolds/playground-canvas/modals/impo
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "@/scaffolds/playground-canvas/modals/import-from-grida-file";
 import { v4 } from "uuid";
-import { HelpFab } from "@/scaffolds/help/editor-help-fab";
+import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
 import Link from "next/link";

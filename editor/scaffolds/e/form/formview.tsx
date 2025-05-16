@@ -318,8 +318,8 @@ function Footer({
       )}
     >
       <FormPrev>{translation.back}</FormPrev>
-      <FormNext className="w-full md:w-auto">{translation.next}</FormNext>
-      <FormSubmit className="w-full md:w-auto">{translation.submit}</FormSubmit>
+      <FormNext className="flex-1 md:w-auto">{translation.next}</FormNext>
+      <FormSubmit className="flex-1 md:w-auto">{translation.submit}</FormSubmit>
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
         className={cn(

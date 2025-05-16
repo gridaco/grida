@@ -229,7 +229,7 @@ export function FieldEditPanel({
         optgroups: init?.optgroups || [],
       },
     ]);
-  }, []);
+  }, [init]);
 
   const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
     init?.autocomplete || []

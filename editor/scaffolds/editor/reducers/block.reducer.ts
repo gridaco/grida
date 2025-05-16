@@ -32,7 +32,7 @@ export default function blockReducer(
   switch (action.type) {
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
-      const { block } = <FormsBlockCreateNewPendingBlockAction>action;
+      const { block, index } = <FormsBlockCreateNewPendingBlockAction>action;
 
       const old_index = state.blocks.length;
       const focus_block_index = state.blocks.findIndex(
@@ -40,6 +40,9 @@ export default function blockReducer(
       );
       const focus_index =
         focus_block_index >= 0 ? focus_block_index + 1 : old_index;
+
+      // Use provided index if available, otherwise use focus_index
+      const insert_index = index !== undefined ? index : focus_index;
 
       // Get the parent section of the focus block
       const focus_block = state.blocks[focus_block_index];
@@ -66,7 +69,7 @@ export default function blockReducer(
         form_page_id: state.document_id,
         parent_id: block === "section" ? null : parent_id,
         type: block,
-        local_index: old_index,
+        local_index: insert_index,
         data: {},
       };
 
@@ -89,13 +92,16 @@ export default function blockReducer(
               });
             }
 
-            const new_blocks = blockstreeflat(
-              draft.blocks.concat({
-                ...__shared,
-              })
-            );
+            // Insert the new section at the specified index
+            draft.blocks.splice(insert_index, 0, {
+              ...__shared,
+            });
 
-            draft.blocks = new_blocks;
+            // Recalculate local_index for all blocks
+            draft.blocks = draft.blocks.map((block, index) => ({
+              ...block,
+              local_index: index,
+            }));
           });
         }
         case "field": {
@@ -132,7 +138,7 @@ export default function blockReducer(
             });
 
             // move ==
-            draft.blocks = arrayMove(draft.blocks, old_index, focus_index).map(
+            draft.blocks = arrayMove(draft.blocks, old_index, insert_index).map(
               (block, index) => ({
                 ...block,
                 local_index: index,
@@ -164,7 +170,7 @@ export default function blockReducer(
             draft.focus_block_id = id;
 
             // move ==
-            draft.blocks = arrayMove(draft.blocks, old_index, focus_index).map(
+            draft.blocks = arrayMove(draft.blocks, old_index, insert_index).map(
               (block, index) => ({
                 ...block,
                 local_index: index,
