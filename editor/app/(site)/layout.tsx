@@ -25,12 +25,12 @@ export default function RootLayout({
           <Toaster position="bottom-center" />
           {children}
         </ThemeProvider>
+        {process.env.NEXT_PUBLIC_GAID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
+        )}
+        <Analytics />
+        <SpeedInsights />
       </body>
-      {process.env.NEXT_PUBLIC_GAID && (
-        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
-      )}
-      <Analytics />
-      <SpeedInsights />
     </html>
   );
 }
