@@ -148,7 +148,7 @@ export function Playground({
 
   const onShareClick = async () => {
     setBusy(true);
-    fetch("/playground/share", {
+    fetch("/playground/forms/share", {
       method: "POST",
       body: JSON.stringify({
         src: __schema_txt,
@@ -261,7 +261,7 @@ export function Playground({
             <Link2Icon />
             Share
           </Button>
-          <form action={`/playground/publish`} method="POST">
+          <form action={`/playground/forms/publish`} method="POST">
             <input type="hidden" name="src" value={__schema_txt || undefined} />
             <input type="hidden" name="gist" value={initial?.slug} />
             <Button disabled={busy}>
