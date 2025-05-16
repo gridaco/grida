@@ -11,9 +11,9 @@ import Hero from "./_sections/hero";
 import Demo from "./_sections/demo";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Header from "../header";
-import Footer from "@/www/footer";
 import { FAQ } from "./_sections/faq";
+import Header from "@/www/header";
+import Footer from "@/www/footer";
 import { type Metadata } from "next";
 
 export const metadata: Metadata = {
