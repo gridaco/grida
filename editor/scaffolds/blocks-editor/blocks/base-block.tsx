@@ -84,16 +84,22 @@ export function FlatBlockBase({
       data-invalid={invalid}
       data-focused={focused}
       className={cn(
-        "group/block rounded-md flex flex-col gap-4 w-full p-4 bg-background transition-all",
-        "shadow-[0_0_0_1px_theme('colors.border')]",
-        "hover:shadow-[0_0_0_2px_theme('colors.border')]",
-        'data-[focused="true"]:shadow-[0_0_0_2px_theme("colors.ring")]'
+        "group/block relative flex flex-col gap-4 w-full p-4 bg-background"
       )}
       onPointerDown={(e) => {
         e.stopPropagation();
         onPointerDown?.(e);
       }}
     >
+      <div
+        role="border"
+        className={cn(
+          "pointer-events-none absolute inset-0 z-0 rounded-md transition-all",
+          "opacity-25 shadow-[0_0_0_1px_var(--color-primary)]",
+          "group-hover/block:opacity-50 group-hover/block:shadow-[0_0_0_2px_var(--color-primary)]",
+          'group-data-[focused="true"]/block:opacity-100 group-data-[focused="true"]/block:shadow-[0_0_0_2px_var(--color-primary)]'
+        )}
+      />
       {children}
     </div>
   );
