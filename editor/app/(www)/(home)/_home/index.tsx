@@ -286,11 +286,11 @@ function SectionB() {
           }
           foreground={
             <div className="relative top-3 left-3 md:top-6 md:left-6 text-xl md:text-3xl  font-semibold text-white/90">
-              The Bundle
+              Library
             </div>
           }
-          title={"The Bundle"}
-          excerpt={"3D Illustrations and more"}
+          title={"Library"}
+          excerpt={"Free, Open Graphics Resources"}
         />
       </motion.div>
     </section>
