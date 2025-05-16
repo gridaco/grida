@@ -330,7 +330,10 @@ export function FormFieldBlockMenuItems({
           Edit Field Definition
         </DropdownMenuItem>
       )}
-      <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
+      <DropdownMenuItem
+        variant="destructive"
+        onClick={() => deleteBlock(block_id)}
+      >
         <TrashIcon className="size-3.5" />
         Delete Block
       </DropdownMenuItem>

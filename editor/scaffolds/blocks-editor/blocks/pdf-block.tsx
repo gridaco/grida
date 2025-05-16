@@ -55,7 +55,10 @@ export function PdfBlock({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => deleteBlock(id)}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => deleteBlock(id)}
+              >
                 <TrashIcon className="size-3.5" />
                 Delete Block
               </DropdownMenuItem>
