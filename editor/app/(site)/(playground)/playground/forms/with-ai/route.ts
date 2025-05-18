@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     .select("slug")
     .single();
 
-  return NextResponse.redirect(origin + `/playground/${data?.slug}`, {
+  return NextResponse.redirect(origin + `/playground/forms/${data?.slug}`, {
     status: 303,
   });
 }

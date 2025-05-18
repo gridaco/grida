@@ -1,18 +1,11 @@
-import Link from "next/link";
-// import {
-//   Select,
-//   SelectTrigger,
-//   SelectValue,
-//   SelectContent,
-//   SelectItem,
-// } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import Header from "../../header";
-import Footer from "@/www/footer";
-import Image from "next/image";
 import { fetchTemplates } from "./actions";
 import { formlink } from "@/lib/forms/url";
 import { Env } from "@/env";
+import Header from "@/www/header";
+import Footer from "@/www/footer";
+import Image from "next/image";
+import Link from "next/link";
 
 export default async function TemplatesPage() {
   const data = await fetchTemplates();
@@ -32,30 +25,6 @@ export default async function TemplatesPage() {
                   kickstart your next project.
                 </p>
               </div>
-              {/* <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Select>
-                  <SelectTrigger className="h-10 w-full sm:w-auto">
-                    <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="contact">Contact</SelectItem>
-                    <SelectItem value="registration">Registration</SelectItem>
-                    <SelectItem value="feedback">Feedback</SelectItem>
-                    <SelectItem value="application">Application</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select>
-                  <SelectTrigger className="h-10 w-full sm:w-auto">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="popular">Most Popular</SelectItem>
-                    <SelectItem value="rating">Highest Rated</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div> */}
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-16">
               {data.map((item, i) => (

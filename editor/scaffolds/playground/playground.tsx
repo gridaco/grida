@@ -143,12 +143,12 @@ export function Playground({
 
   useEffect(() => {
     // update the url
-    onRouteChange?.(`/playground?example=${exampleId}`);
+    onRouteChange?.(`/playground/forms?example=${exampleId}`);
   }, [exampleId, onRouteChange]);
 
   const onShareClick = async () => {
     setBusy(true);
-    fetch("/playground/share", {
+    fetch("/playground/forms/share", {
       method: "POST",
       body: JSON.stringify({
         src: __schema_txt,
@@ -160,7 +160,7 @@ export function Playground({
       .then((req) => req.json())
       .then(({ slug }) => {
         // update the route
-        router.push(`/playground/${slug}`);
+        router.push(`/playground/forms/${slug}`);
       })
       .catch((err) => {
         console.error(err);
@@ -217,7 +217,7 @@ export function Playground({
               onClick={() => {
                 // copy to clipboard
                 navigator.clipboard.writeText(
-                  `${Env.web.HOST}/playground/${initial.slug}`
+                  `${Env.web.HOST}/playground/forms/${initial.slug}`
                 );
                 toast.success("Copied");
               }}
@@ -261,7 +261,7 @@ export function Playground({
             <Link2Icon />
             Share
           </Button>
-          <form action={`/playground/publish`} method="POST">
+          <form action={`/playground/forms/publish`} method="POST">
             <input type="hidden" name="src" value={__schema_txt || undefined} />
             <input type="hidden" name="gist" value={initial?.slug} />
             <Button disabled={busy}>
@@ -457,7 +457,7 @@ function transform(formstate: FormAgentState) {
 }
 
 const schema = {
-  uri: "https://forms.grida.co/schema/form.schema.json",
+  uri: "https://grida.co/schema/form.schema.json",
   fileMatch: ["*"], // Associate with all JSON files
 };
 

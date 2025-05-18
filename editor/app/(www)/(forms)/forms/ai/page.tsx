@@ -1,9 +1,9 @@
 import { Metadata } from "next";
 import Prompt from "./prompt";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { FormPageBackground } from "@/scaffolds/e/form/background";
-import Header from "../../header";
+import Header from "@/www/header";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "AI Forms Builder | Grida Forms",
@@ -39,7 +39,7 @@ export default function AIHome() {
         <Prompt autoFocus />
       </div>
       <div className="mt-10 z-10">
-        <Link href="/playground">
+        <Link href="/playground/forms">
           <Button variant="link">Jump to playground</Button>
         </Link>
       </div>

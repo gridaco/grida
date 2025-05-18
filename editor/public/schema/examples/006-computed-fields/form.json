@@ -1,5 +1,5 @@
 {
-  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "$schema": "https://grida.co/schema/form.schema.json",
   "title": "Computed Fields Demo",
   "name": "computed property (output) fields",
   "description": "Use Computed property to reference / compute value from other fields",

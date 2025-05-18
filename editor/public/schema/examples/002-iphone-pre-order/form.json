@@ -1,5 +1,5 @@
 {
-  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "$schema": "https://grida.co/schema/form.schema.json",
   "title": "iPhone 15 - Pre-order",
   "name": "iphone-15-pre-order",
   "fields": [

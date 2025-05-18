@@ -43,7 +43,7 @@ export default function Prompt({ autoFocus }: { autoFocus?: boolean }) {
         }}
         className="space-y-4"
         method="POST"
-        action="/playground/with-ai"
+        action="/playground/forms/with-ai"
       >
         <div className="space-y-1">
           <Textarea

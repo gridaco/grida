@@ -35,7 +35,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: "https://grida.co/forms/ai",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/forms/supabase",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: "https://grida.co/database",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/database/supabase",
       changeFrequency: "monthly",
       priority: 0.5,
     },
@@ -46,11 +61,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: "https://grida.co/sdk",
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
-      url: "https://grida.co/playground",
       changeFrequency: "monthly",
       priority: 0.5,
     },
@@ -68,6 +78,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // playground
     {
       url: "https://grida.co/playground",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/playground/forms",
       changeFrequency: "monthly",
       priority: 0.5,
     },

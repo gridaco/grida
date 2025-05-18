@@ -51,7 +51,13 @@ export default function Demo() {
             <Prompt />
           </div>
           <div className="mt-10 z-10">
-            <Link href="/playground">
+            <Link href="/forms/ai">
+              <Button variant="link">
+                Build with AI
+                <ArrowRightIcon className="ms-2" />
+              </Button>
+            </Link>
+            <Link href="/playground/forms">
               <Button variant="link">
                 Jump to playground
                 <ArrowRightIcon className="ms-2" />
