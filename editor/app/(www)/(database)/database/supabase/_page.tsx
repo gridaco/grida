@@ -40,8 +40,12 @@ function Hero() {
       >
         <div className="flex flex-col items-start text-left">
           <h1 className="text-4xl max-w-4xl md:text-5xl lg:text-6xl font-bold pb-8">
-            Your <SupabaseLogo className="inline-block size-10" /> Supabase
-            Database, Supacharged
+            Your{" "}
+            <SupabaseLogo
+              className="inline-block size-10"
+              aria-label="Supabase"
+            />{" "}
+            Supabase Database, Supacharged
           </h1>
           <p className="max-w-2xl text-sm md:text-base text-muted-foreground">
             Transform your Supabase database into a powerful visual interface.

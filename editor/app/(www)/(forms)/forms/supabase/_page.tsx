@@ -101,7 +101,7 @@ function SectionMainDemo() {
   useEffect(() => {
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % tabs.length);
-    }, 3000); // 3초마다 변경
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
