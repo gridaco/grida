@@ -5,24 +5,19 @@ import * as templates from "./templates.ts";
 
 const QUEUE_NAME = "grida_hosted_evt_new_organization_jobs";
 
-// Initialize Supabase client
-const client = createClient<Database>(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_KEY") ?? ""
-);
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_KEY = Deno.env.get("SUPABASE_KEY") ?? "";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 
-const pgmq_client = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_KEY") ?? "",
-  {
-    db: {
-      schema: "pgmq_public",
-    },
-  }
-);
+const client = createClient<Database>(SUPABASE_URL, SUPABASE_KEY);
 
-// Initialize Resend
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const pgmq_client = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: {
+    schema: "pgmq_public",
+  },
+});
+
+const resend = new Resend(RESEND_API_KEY);
 
 interface QueueMessage {
   msg_id: string;
@@ -157,7 +152,6 @@ class EmailWorker {
 
           // Get and format the template
           const template = templates.organization_onboarding_welcome_email({
-            organization_name: org.name,
             owner_name: owner.name,
           });
 
