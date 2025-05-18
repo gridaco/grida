@@ -1,5 +1,5 @@
 {
-  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "$schema": "https://grida.co/schema/form.schema.json",
   "title": "Data Transform",
   "name": "Data Transform",
   "description": "merge fields to construct a json data",

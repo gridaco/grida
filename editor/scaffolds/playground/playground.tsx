@@ -457,7 +457,7 @@ function transform(formstate: FormAgentState) {
 }
 
 const schema = {
-  uri: "https://forms.grida.co/schema/form.schema.json",
+  uri: "https://grida.co/schema/form.schema.json",
   fileMatch: ["*"], // Associate with all JSON files
 };
 
