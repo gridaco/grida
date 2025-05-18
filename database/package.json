@@ -1,0 +1,7 @@
+{
+  "name": "@app/database",
+  "private": true,
+  "dependencies": {
+    "type-fest": "^4.41.0"
+  }
+}

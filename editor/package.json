@@ -14,6 +14,7 @@
   },
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
+    "@app/database": "workspace:*",
     "@ai-sdk/openai": "^1.3.20",
     "@ai-sdk/replicate": "^0.2.7",
     "@blocknote/core": "^0.29.1",

@@ -1,4 +1,4 @@
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 import { createBrowserClient as _createBrowserClient } from "@supabase/ssr";
 
 const __create_browser_client = <
