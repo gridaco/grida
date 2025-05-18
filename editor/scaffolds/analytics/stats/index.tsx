@@ -1,6 +1,6 @@
 "use client";
 
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   createBrowserFormsClient,

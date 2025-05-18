@@ -22,7 +22,7 @@ import assert from "assert";
 import type { Data } from "@/lib/data";
 import { useCustomerFeed } from "@/scaffolds/platform/customer/use-customer-feed";
 import { useTableSubscription } from "@/lib/supabase/realtime";
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 
 type RealtimeTableChangeData = {
   id: string;

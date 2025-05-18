@@ -15,7 +15,7 @@ import type { XSupabaseStorageSchema } from "@/types";
 import type { TemplateVariables } from "@/lib/templating";
 import type { StorageError } from "@supabase/storage-js";
 import assert from "assert";
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 import "core-js/features/map/group-by";
 import { unique } from "@/utils/unique";
 
