@@ -57,7 +57,7 @@ export default function Demo() {
                 <ArrowRightIcon className="ms-2" />
               </Button>
             </Link>
-            <Link href="/playground">
+            <Link href="/playground/forms">
               <Button variant="link">
                 Jump to playground
                 <ArrowRightIcon className="ms-2" />

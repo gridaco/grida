@@ -143,7 +143,7 @@ export function Playground({
 
   useEffect(() => {
     // update the url
-    onRouteChange?.(`/playground?example=${exampleId}`);
+    onRouteChange?.(`/playground/forms?example=${exampleId}`);
   }, [exampleId, onRouteChange]);
 
   const onShareClick = async () => {
@@ -160,7 +160,7 @@ export function Playground({
       .then((req) => req.json())
       .then(({ slug }) => {
         // update the route
-        router.push(`/playground/${slug}`);
+        router.push(`/playground/forms/${slug}`);
       })
       .catch((err) => {
         console.error(err);
@@ -217,7 +217,7 @@ export function Playground({
               onClick={() => {
                 // copy to clipboard
                 navigator.clipboard.writeText(
-                  `${Env.web.HOST}/playground/${initial.slug}`
+                  `${Env.web.HOST}/playground/forms/${initial.slug}`
                 );
                 toast.success("Copied");
               }}

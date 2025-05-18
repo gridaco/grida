@@ -1,7 +1,8 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Grida Playground",
+  title: "Grida Forms Playground",
+  description: "A playground for generating form schemas",
 };
 
 export default function Layout({

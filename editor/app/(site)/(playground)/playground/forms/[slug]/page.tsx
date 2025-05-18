@@ -23,7 +23,7 @@ export default async function SharedPlaygroundPage({
     .single();
 
   if (!_gist) {
-    return redirect("/playground");
+    return redirect("/playground/forms");
   }
 
   const { data, prompt } = _gist;

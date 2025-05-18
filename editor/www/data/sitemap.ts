@@ -32,6 +32,7 @@ export namespace sitemap {
     cta: "/dashboard/new?plan=free",
     thebundle: "/bundle",
     playground: "/playground",
+    playground_forms: "/playground/forms",
     figma_ci: "/figma/ci",
     figma_assistant: "/figma/assistant",
     figma_vscode: "/figma/vscode",

@@ -65,11 +65,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
-      url: "https://grida.co/playground",
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
       url: "https://grida.co/figma/ci",
       changeFrequency: "monthly",
       priority: 0.5,
@@ -83,6 +78,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // playground
     {
       url: "https://grida.co/playground",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/playground/forms",
       changeFrequency: "monthly",
       priority: 0.5,
     },

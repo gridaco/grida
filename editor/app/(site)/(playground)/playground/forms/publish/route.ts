@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (!auth?.user) {
     // redirect back to playground, atm, user need to click the publish button again.
     return NextResponse.redirect(
-      Env.web.HOST + `/sign-in?next=/playground/${data.slug}`,
+      Env.web.HOST + `/sign-in?next=/playground/forms/${data.slug}`,
       {
         status: 302,
       }

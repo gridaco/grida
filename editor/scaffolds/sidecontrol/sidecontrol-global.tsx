@@ -601,7 +601,11 @@ function CustomCSS() {
             Customize Page CSS (only available through built-in pages).
             <br />
             You can Use{" "}
-            <Link className="underline" href="/playground" target="_blank">
+            <Link
+              className="underline"
+              href="/playground/forms"
+              target="_blank"
+            >
               Playground
               <OpenInNewWindowIcon className="size-4 inline align-middle ms-1" />
             </Link>{" "}

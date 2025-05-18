@@ -39,7 +39,7 @@ export default function AIHome() {
         <Prompt autoFocus />
       </div>
       <div className="mt-10 z-10">
-        <Link href="/playground">
+        <Link href="/playground/forms">
           <Button variant="link">Jump to playground</Button>
         </Link>
       </div>
