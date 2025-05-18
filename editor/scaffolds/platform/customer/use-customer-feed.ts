@@ -4,7 +4,7 @@ import { Data } from "@/lib/data";
 import { Platform } from "@/lib/platform";
 import type { PostgrestError } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 
 export async function insertCustomer(
   client: SupabaseClient<Database, "public">,

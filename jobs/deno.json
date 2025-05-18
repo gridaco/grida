@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read src/main.ts",
+    "start": "deno run --allow-net --allow-env --allow-read src/main.ts"
+  },
+  "imports": {
+    "supabase": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "resend": "https://esm.sh/resend@2.0.0",
+    "dotenv": "https://esm.sh/dotenv@3.3.0",
+    "std/": "https://deno.land/std@0.208.0/"
+  }
+}

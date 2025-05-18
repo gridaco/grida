@@ -256,6 +256,12 @@ importers:
         specifier: ^5
         version: 5.8.3
 
+  database:
+    dependencies:
+      type-fest:
+        specifier: ^4.41.0
+        version: 4.41.0
+
   editor:
     dependencies:
       '@ai-sdk/openai':
@@ -264,6 +270,9 @@ importers:
       '@ai-sdk/replicate':
         specifier: ^0.2.7
         version: 0.2.8(zod@3.24.4)
+      '@app/database':
+        specifier: workspace:*
+        version: link:../database
       '@blocknote/core':
         specifier: ^0.29.1
         version: 0.29.1(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)

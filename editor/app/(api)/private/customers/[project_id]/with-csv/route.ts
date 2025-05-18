@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { Platform } from "@/lib/platform";
 import assert from "assert";
 import { qboolean } from "@/utils/qs";
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 
 type PGCustomerInsert =
   Database["public"]["Views"]["customer_with_tags"]["Row"];

@@ -1,6 +1,6 @@
 import { FormRenderTree } from "@/lib/forms";
 import { type JSONForm } from "@/types";
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";

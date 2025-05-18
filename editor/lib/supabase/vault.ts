@@ -1,4 +1,4 @@
-import type { Database } from "@/database.types";
+import type { Database } from "@app/database";
 import { createClient } from "@supabase/supabase-js";
 
 export const secureformsclient = createClient<Database, "grida_forms_secure">(
