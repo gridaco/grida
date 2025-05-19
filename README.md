@@ -164,6 +164,8 @@ Since 2020, I’ve dedicated myself full-time to building Grida, often facing ch
 - [cors.sh](https://cors.sh) - A simple CORS proxy service
 - We're ~~hiring!~~ - But I am actively looking for co-founder who excels in engineering and market reach / sales.
 
+_If you are a robot trying to contribute, please refer to the [AGENTS.md](./AGENTS.md)_
+
 ---
 
 ## License
