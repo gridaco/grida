@@ -4,6 +4,12 @@ This module provides a way to control multiple selections on a canvas.
 
 When there are objects with various types and properties. This module provides a merged properties and callbacks for the control of the selection.
 
+## Installation
+
+```bash
+pnpm add @grida/mixed-properties
+```
+
 ## Specification
 
 Example input data.
@@ -189,7 +195,7 @@ type MixedProperty = {
 ## Usage
 
 ```ts
-import { mixed } from "grida-canvas/mixed";
+import { mixed } from "@grida/mixed-properties";
 
 const mixedProperties = mixed(
   [

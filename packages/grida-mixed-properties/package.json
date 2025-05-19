@@ -1,18 +1,19 @@
 {
-  "name": "treearray",
-  "description": "sort tree data as in array form of data",
+  "name": "@grida/mixed-properties",
+  "description": "Mixed property analysis utilities for Grida",
   "version": "0.0.0",
   "homepage": "https://grida.co",
   "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
   "author": "softmarshmallow",
-  "private": true,
+  "private": false,
   "keywords": [
     "grida",
-    "tree",
-    "array",
-    "sort",
-    "treearray"
+    "json",
+    "jsonsschema",
+    "aggregator",
+    "mixed",
+    "properties"
   ],
   "scripts": {
     "dev": "tsup index.ts --format cjs,esm --dts --watch",
@@ -25,7 +26,13 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "deep-equal": "^2.2.3"
+  },
   "jest": {
     "preset": "ts-jest"
+  },
+  "devDependencies": {
+    "@types/deep-equal": "^1.0.4"
   }
 }

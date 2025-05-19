@@ -180,8 +180,70 @@ const _realword_page_data = [
 const _ta_realworld = new TreeArray(_realword_page_data, "page-root");
 
 test("tree array test with realworld example", () => {
-  //
   const arr = _ta_realworld.asTreeArray();
 
-  expect(arr).toStrictEqual([]);
+  expect(arr).toStrictEqual([
+    {
+      id: "T44S2eNSCZmz23xeMVrtW",
+      type: "boring-document",
+      name: "k",
+      sort: 0,
+      document: "QuM1FzumAUMTUaCXpDZ0-",
+      parent: "page-root",
+      depth: 0,
+    },
+    {
+      id: "ULtPuVuLdb6pS3hUh8Ej7",
+      type: "boring-document",
+      name: "2",
+      sort: 0,
+      document: "JhvKo6odE_xKOgJ8DTGKB",
+      parent: "page-root",
+      depth: 0,
+    },
+    {
+      id: "qphgGrEGcE-gWdkwTIPne",
+      type: "boring-document",
+      name: "1",
+      sort: 0,
+      document: "1e2VIu_nZTXLIXdXBXLbC",
+      parent: "page-root",
+      depth: 0,
+    },
+    {
+      id: "gU497Iss-Vi7I_aD4TMdD",
+      type: "boring-document",
+      name: "1",
+      sort: 1,
+      document: "hj_R2ce8LIi_ZgBulQYp-",
+      parent: "qphgGrEGcE-gWdkwTIPne",
+      depth: 1,
+    },
+    {
+      id: "FF5748KwNmc3RskBRNDUF",
+      type: "boring-document",
+      name: "1",
+      sort: 1,
+      document: "TJp8oOJWahzV9ujJ6q9HF",
+      parent: "gU497Iss-Vi7I_aD4TMdD",
+      depth: 2,
+    },
+    {
+      id: "built-in/getting-started",
+      type: "boring-document",
+      name: "Getting started",
+      sort: 0,
+      parent: "page-root",
+      depth: 0,
+    },
+    {
+      id: "28vC7gacEoan26I-hMYLd",
+      type: "boring-document",
+      name: "Screen : Newest World Vibes",
+      sort: 1,
+      document: "lRe4CNKITjKnE6tJF3V3g",
+      parent: "built-in/getting-started",
+      depth: 1,
+    },
+  ]);
 });

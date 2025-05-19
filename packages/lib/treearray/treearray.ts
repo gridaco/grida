@@ -8,7 +8,8 @@ type IDeepTreeItemLike = {
 };
 
 export class TreeArray<
-  T extends TreeNodeWithUnevenSortDataArrayItem = TreeNodeWithUnevenSortDataArrayItem
+  T extends
+    TreeNodeWithUnevenSortDataArrayItem = TreeNodeWithUnevenSortDataArrayItem,
 > {
   constructor(
     readonly seed: TreeNodeWithUnevenSortDataArrayItem[],
@@ -139,11 +140,11 @@ export class TreeArray<
     const deepflat = (arr: IDeepTreeItemLike[]) => {
       const flat = [];
       for (const item of arr) {
-        const children = deepflat(item.children);
-        const _nochild_item = delete item.children && item;
-        flat.push(_nochild_item);
-        if (children.length > 0) {
-          flat.push(children);
+        const { children, ...nodeWithoutChildren } = item;
+        const childrenFlat = deepflat(children);
+        flat.push(nodeWithoutChildren);
+        if (childrenFlat.length > 0) {
+          flat.push(...childrenFlat);
         }
       }
       return flat;

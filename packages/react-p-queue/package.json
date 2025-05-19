@@ -1,0 +1,51 @@
+{
+  "name": "react-p-queue",
+  "description": "A React library for handling promise-based queue management with support for batch processing, throttling, and concurrency control using `p-queue`",
+  "version": "0.0.0",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "private": false,
+  "keywords": [
+    "grida",
+    "react",
+    "p-queue",
+    "queue",
+    "batch",
+    "throttle",
+    "concurrency"
+  ],
+  "scripts": {
+    "dev": "tsup index.tsx --format cjs,esm --dts --watch",
+    "build": "tsup index.tsx --format cjs,esm --dts",
+    "test": "jest"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "react": "19.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "p-queue": "^7.4.1"
+  },
+  "jest": {
+    "preset": "ts-jest"
+  }
+}
