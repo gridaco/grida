@@ -1,4 +1,4 @@
-import mixed from "./index";
+import mixed from "../index";
 
 describe("mixed function", () => {
   it("should compute mixed properties correctly for given objects", () => {

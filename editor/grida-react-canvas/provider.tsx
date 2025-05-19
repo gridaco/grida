@@ -30,7 +30,7 @@ import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
-import mixed, { PropertyCompareFn } from "@/grida/mixed";
+import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
 import iosvg from "@grida/io-svg";
 import { toast } from "sonner";

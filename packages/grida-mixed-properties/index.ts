@@ -89,7 +89,7 @@ export default function mixed<T extends Record<string, any>, S>(
     idKey,
     ignoredKey: ignoredKeys = [],
     mixed: mixedIndicator,
-    compare = deepEqual,
+    compare = (_key: any, a: any, b: any) => deepEqual(a, b),
   }: MixedOptions<T, S>
 ): MixedProperties<T, S> {
   if (!objects.length) return {} as MixedProperties<T, S>;
