@@ -36,7 +36,7 @@
 
 <br/>
 
-- [x] Connecy your Supabase Project (Table, Views, Storage, Auth)
+- [x] Connect your Supabase Project (Table, Views, Storage, Auth)
 - [x] Readonly Views
 - [x] Storage Connected Rich Text Editor
 - [x] CMS Ready
@@ -73,7 +73,7 @@
 - [x] Simulator
 - [x] Headless Usage - API-only usage
 - [x] 12 Supported Languages
-- [ ] Client SDK - BYO (Bring your own) Compoennt
+- [ ] Client SDK - BYO (Bring your own) Component
 - [ ] Localization
 - [ ] Custom Auth Gate
 - [ ] Accept Payments
