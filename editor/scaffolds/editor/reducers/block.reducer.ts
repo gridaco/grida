@@ -367,7 +367,12 @@ export default function blockReducer(
             if (section) {
               // BLOCK THIS ACTION
               // revert the move
-              draft.blocks = arrayMove(draft.blocks, newIndex, oldIndex);
+              draft.blocks = arrayMove(draft.blocks, newIndex, oldIndex).map(
+                (block, index) => ({
+                  ...block,
+                  local_index: index,
+                })
+              );
               return;
             }
           }
