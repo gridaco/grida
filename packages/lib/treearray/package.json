@@ -1,20 +1,29 @@
 {
   "name": "treearray",
-  "version": "0.0.0",
   "description": "sort tree data as in array form of data",
-  "author": "Grida.co",
+  "version": "0.0.0",
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
   "license": "MIT",
-  "private": false,
+  "author": "softmarshmallow",
+  "private": true,
+  "keywords": [
+    "grida",
+    "tree",
+    "array",
+    "sort",
+    "treearray"
+  ],
   "scripts": {
+    "dev": "tsup index.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts --format cjs,esm --dts",
     "test": "jest"
   },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "files": [
-    "dist/index.js",
-    "dist/index.d.ts",
-    "dist/**/*.js",
-    "dist/**/*.d.ts",
-    "LICENSE",
-    "README.md"
+    "dist"
   ],
   "jest": {
     "preset": "ts-jest"
