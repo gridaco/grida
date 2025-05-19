@@ -182,6 +182,7 @@
     "react-map-gl": "^7.1.7",
     "react-medium-image-zoom": "^5.2.11",
     "react-pdf": "^9.2.1",
+    "react-p-queue": "workspace:*",
     "react-phone-number-input": "^3.4.12",
     "react-player": "^2.14.1",
     "react-resizable-panels": "^3.0.1",

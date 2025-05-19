@@ -1,4 +1,4 @@
-import BatchQueue from "./batch"; // Adjust the import path as necessary
+import BatchQueue from "../batch";
 
 interface Task {
   id: string;
