@@ -4,6 +4,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import "../globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -21,13 +22,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <Toaster position="bottom-center" />
+          {children}
+        </ThemeProvider>
+        {process.env.NEXT_PUBLIC_GAID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
+        )}
+        <Analytics />
+        <SpeedInsights />
       </body>
-      {process.env.NEXT_PUBLIC_GAID && (
-        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
-      )}
-      <Analytics />
-      <SpeedInsights />
     </html>
   );
 }
