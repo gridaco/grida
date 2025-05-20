@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { CardsDemo } from "@/grida-theme-shadcn/example/cards";
+import { CardsDemo } from "@/theme/shadcn/example/cards";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import palettes from "@/theme/palettes";
 import {

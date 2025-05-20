@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui-editor/dialog";
 import { ThemeEditor } from "@/grida-react-canvas-starter-kit/starterkit-theme-editor";
-import { CardsDemo } from "@/grida-theme-shadcn/example/cards";
+import { CardsDemo } from "@/theme/shadcn/example/cards";
 
 export default function ThemeToolPage() {
   const [open, setOpen] = useState(false);

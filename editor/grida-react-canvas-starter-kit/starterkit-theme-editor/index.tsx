@@ -28,12 +28,9 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import {
-  SchemedColorToken,
-  defaultThemeColors,
-} from "@/grida-theme-shadcn/colors";
+import { SchemedColorToken, defaultThemeColors } from "@/theme/shadcn/colors";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { CardsDemo } from "@/grida-theme-shadcn/example/cards";
+import { CardsDemo } from "@/theme/shadcn/example/cards";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
