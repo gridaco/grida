@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { TriangleAlertIcon } from "lucide-react";
+import { TriangleAlertIcon, CodeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ErrorViewProps = {
@@ -77,6 +77,28 @@ export function FormPageDeveloperErrorDialog({
               </>
             )}
           </DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function DevtoolsDialog({ data }: { data: unknown }) {
+  return (
+    <Dialog>
+      <DialogTrigger>
+        <Button variant="outline" size="icon">
+          <CodeIcon className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[80vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle>Devtools</DialogTitle>
+          <div className="h-full">
+            <pre className="p-4 bg-muted rounded-md overflow-auto">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          </div>
         </DialogHeader>
       </DialogContent>
     </Dialog>

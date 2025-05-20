@@ -21,9 +21,9 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { arrayMove } from "@dnd-kit/sortable";
-import { blockstreeflat } from "@/grida-forms/lib/tree";
 import { draftid } from "@/utils/id";
 import type { FormBlockType, FormInputType } from "@/grida-forms-hosted/types";
+import { depth1, flat, type FlatItem } from "@/lib/flat2tree";
 
 export default function blockReducer(
   state: EditorState,
@@ -41,23 +41,27 @@ export default function blockReducer(
       const focus_index =
         focus_block_index >= 0 ? focus_block_index + 1 : old_index;
 
-      // Use provided index if available, otherwise use focus_index
-      const insert_index = index !== undefined ? index : focus_index;
+      const section_blocks = state.blocks.filter(
+        (block) => block.type === "section" && block.parent_id === null
+      );
 
       // Get the parent section of the focus block
       const focus_block = state.blocks[focus_block_index];
-      let parent_id = focus_block?.parent_id ?? null;
 
-      if (block === "section") {
-        parent_id = null; // Sections are always at root level
-      } else {
-        if (!parent_id) {
+      const can_have_parent = block !== "section";
+
+      const parent_id: string | null = can_have_parent
+        ? (focus_block?.parent_id ??
           // Find the last parent section if no focus block or parent_id is null
-          const parent_section = state.blocks
-            .filter((block) => block.type === "section")
-            .sort((a, b) => b.local_index - a.local_index)[0];
-          parent_id = parent_section?.id ?? null;
-        }
+          section_blocks.sort((a, b) => b.local_index - a.local_index)[0]?.id ??
+          null)
+        : null;
+
+      // Use provided index if available, otherwise use focus_index
+      let insert_index: number = index !== undefined ? index : focus_index;
+      // if there were no section on root, the existing blocks should be nested under the new section.
+      if (block === "section" && section_blocks.length === 0) {
+        insert_index = 0;
       }
 
       const id = draftid();
@@ -75,42 +79,14 @@ export default function blockReducer(
 
       let init: EditorFlatFormBlock = init_block(__shared, block);
 
-      switch (block) {
-        case "section": {
-          return produce(state, (draft) => {
-            const id = __shared.id;
-
-            // section can be placed on root only.
-            // if there were no section on root, the existing blocks should be nested under the new section.
-            const section_blocks = draft.blocks.filter(
-              (block) => block.type === "section" && block.parent_id === null
-            );
-
-            if (section_blocks.length === 0) {
-              draft.blocks.forEach((block) => {
-                block.parent_id = id;
-              });
+      return produce(state, (draft) => {
+        switch (block) {
+          case "field": {
+            let init: { type: FormInputType } | null = null;
+            if ("init" in action) {
+              init = action.init;
             }
 
-            // Insert the new section at the specified index
-            draft.blocks.splice(insert_index, 0, {
-              ...__shared,
-            });
-
-            // Recalculate local_index for all blocks
-            draft.blocks = draft.blocks.map((block, index) => ({
-              ...block,
-              local_index: index,
-            }));
-          });
-        }
-        case "field": {
-          let init: { type: FormInputType } | null = null;
-          if ("init" in action) {
-            init = action.init;
-          }
-
-          return produce(state, (draft) => {
             const {
               form: { available_field_ids },
             } = state;
@@ -132,57 +108,42 @@ export default function blockReducer(
               }
             }
 
-            draft.blocks.push({
-              ...__shared,
-              form_field_id: field_id,
-            });
-
-            // move ==
-            draft.blocks = arrayMove(draft.blocks, old_index, insert_index).map(
-              (block, index) => ({
-                ...block,
-                local_index: index,
-              })
-            );
-            // ========
-
-            // update focus block id
-            draft.focus_block_id = id;
-
             if (!field_id) {
               // if no available field, but field block provided, open a field editor panel
               draft.field_editor.id = undefined;
               draft.field_editor.open = true;
               //
             }
-          });
-        }
-        case "html":
-        case "image":
-        case "video":
-        case "pdf":
-        case "divider":
-        case "header": {
-          return produce(state, (draft) => {
+
+            draft.blocks.push({
+              ...__shared,
+              form_field_id: field_id,
+            });
+
+            break;
+          }
+          case "section":
+          case "html":
+          case "image":
+          case "video":
+          case "pdf":
+          case "divider":
+          case "header": {
             draft.blocks.push(init);
-
-            // update focus block id
-            draft.focus_block_id = id;
-
-            // move ==
-            draft.blocks = arrayMove(draft.blocks, old_index, insert_index).map(
-              (block, index) => ({
-                ...block,
-                local_index: index,
-              })
-            );
-            // ========
-          });
+            break;
+          }
+          default: {
+            throw new Error("Unsupported block type : " + block);
+          }
         }
-        default: {
-          throw new Error("Unsupported block type : " + block);
-        }
-      }
+
+        // move ==
+        self_sort(draft, [old_index, insert_index]);
+        // ========
+
+        // update focus block id
+        draft.focus_block_id = id;
+      });
     }
     case "blocks/field/new": {
       const { block_id } = <FormsBlockCreateFielFromBlockdAction>action;
@@ -226,9 +187,33 @@ export default function blockReducer(
         });
       });
     }
+    case "blocks/sort": {
+      const { block_id, over_id } = <FormsBlockSortBlockAction>action;
+      return produce(state, (draft) => {
+        if (over_id === "root") {
+          const blockIndex = draft.blocks.findIndex(
+            (block) => block.id === block_id
+          );
+          if (blockIndex > -1) {
+            // DO NOT ALLOW THIS ACTION. this is not hanlded yet. (item exiting section)
+            // Assign to root if moved above the first section
+            // draft.blocks[blockIndex].parent_id = null;
+          }
+          return;
+        }
+
+        const oldIndex = draft.blocks.findIndex(
+          (block) => block.id === block_id
+        );
+        const newIndex = draft.blocks.findIndex(
+          (block) => block.id === over_id
+        );
+
+        self_sort(draft, [oldIndex, newIndex]);
+      });
+    }
     case "blocks/delete": {
       const { block_id } = <FormsBlockDeleteBlockAction>action;
-      console.log("delete block", block_id);
       return produce(state, (draft) => {
         // remove the field id from available_field_ids
         draft.blocks = draft.blocks.filter((block) => block.id !== block_id);
@@ -241,6 +226,8 @@ export default function blockReducer(
         if (field_id) {
           draft.form.available_field_ids.push(field_id);
         }
+
+        self_sort(draft);
       });
     }
     case "blocks/hidden": {
@@ -316,65 +303,6 @@ export default function blockReducer(
         }
       });
     }
-    case "blocks/sort": {
-      const { block_id, over_id } = <FormsBlockSortBlockAction>action;
-      return produce(state, (draft) => {
-        if (over_id === "root") {
-          const blockIndex = draft.blocks.findIndex(
-            (block) => block.id === block_id
-          );
-          if (blockIndex > -1) {
-            // DO NOT ALLOW THIS ACTION. this is not hanlded yet. (item exiting section)
-            // Assign to root if moved above the first section
-            // draft.blocks[blockIndex].parent_id = null;
-          }
-          return;
-        }
-
-        const oldIndex = draft.blocks.findIndex(
-          (block) => block.id === block_id
-        );
-        const newIndex = draft.blocks.findIndex(
-          (block) => block.id === over_id
-        );
-
-        // Ensure arrayMove returns a new array with objects that can be mutated
-        let movedBlocks = arrayMove(draft.blocks, oldIndex, newIndex);
-
-        // Re-assign draft.blocks to ensure the objects are treated as new if necessary
-        draft.blocks = movedBlocks.map((block, index) => ({
-          ...block,
-          local_index: index,
-        }));
-
-        // Update parent_id based on the new position
-        const movedBlock = draft.blocks.find((block) => block.id === block_id);
-        if (movedBlock) {
-          // Find the nearest section/group above the moved block
-          let newParentId: string | null = null;
-          for (let i = newIndex - 1; i >= 0; i--) {
-            if (["section", "group"].includes(draft.blocks[i].type)) {
-              newParentId = draft.blocks[i].id;
-              break;
-            }
-          }
-
-          if (!newParentId) {
-            // DO NOT ALLOW PARENT ID TO BE NULL IF THERE IS A SECTION PRESENT.
-            const section = draft.blocks.find(
-              (block) => block.type === "section"
-            );
-            if (section) {
-              // BLOCK THIS ACTION
-              // revert the move
-              draft.blocks = arrayMove(draft.blocks, newIndex, oldIndex);
-              return;
-            }
-          }
-          movedBlock.parent_id = newParentId;
-        }
-      });
-    }
     case "blocks/focus": {
       const { block_id } = <FormsBlockFocusBlockAction>action;
       return produce(state, (draft) => {
@@ -388,6 +316,35 @@ export default function blockReducer(
     }
   }
   return state;
+}
+
+function self_sort(draft: Draft<EditorState>, t?: [number, number]) {
+  let blocks = draft.blocks;
+  if (t) {
+    // Ensure arrayMove returns a new array with objects that can be mutated
+    blocks = arrayMove(draft.blocks, t[0], t[1]);
+  }
+
+  const tree = depth1(
+    blocks.reduce((acc, block) => {
+      acc.push({
+        id: block.id,
+        isFolder: block.type === "section" || block.type === "group",
+      });
+      return acc;
+    }, [] as FlatItem[])
+  );
+
+  const sorted = flat(tree).map(({ id, parent_id }, index) => {
+    const prev = blocks.find((b) => b.id === id)!;
+    return {
+      ...prev,
+      local_index: index,
+      parent_id: parent_id ?? null,
+    } satisfies EditorFlatFormBlock;
+  });
+
+  draft.blocks = sorted;
 }
 
 function init_block(

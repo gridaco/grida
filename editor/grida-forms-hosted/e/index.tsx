@@ -2,7 +2,10 @@
 
 import React, { memo, useMemo } from "react";
 import { notFound, redirect } from "next/navigation";
-import { FormPageDeveloperErrorDialog } from "@/grida-forms-hosted/e/error";
+import {
+  DevtoolsDialog,
+  FormPageDeveloperErrorDialog,
+} from "@/grida-forms-hosted/e/dev";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFingerprint } from "@/components/fingerprint";
 import { formlink } from "@/host/url";
@@ -32,11 +35,13 @@ export function Agent({
   params,
   translation,
   geo,
+  debug,
 }: {
   form_id: string;
   params: { [key: string]: string };
   translation: FormViewTranslation;
   geo?: FormAgentGeo;
+  debug?: boolean;
 }) {
   const { session } = useRequestFormSession(form_id);
   const { result: fingerprint } = useFingerprint();
@@ -80,6 +85,7 @@ export function Agent({
       data={data}
       error={error}
       translation={translation}
+      debug={debug}
     />
   );
 }
@@ -91,6 +97,7 @@ function Ready({
   data,
   error,
   translation,
+  debug,
 }: {
   form_id: string;
   session: string;
@@ -98,6 +105,7 @@ function Ready({
   data: FormAgentPrefetchData;
   error?: FormClientFetchResponseError | null;
   translation: FormViewTranslation;
+  debug?: boolean;
 }) {
   const { background } = data;
 
@@ -133,6 +141,11 @@ function Ready({
       {error && (
         <div className="fixed top-4 right-4 z-[9999]">
           <FormPageDeveloperErrorDialog {...error} />
+        </div>
+      )}
+      {debug && (
+        <div className="fixed top-4 left-4 z-[9999]">
+          <DevtoolsDialog data={data} />
         </div>
       )}
     </>

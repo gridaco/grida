@@ -49,7 +49,7 @@ export function useRequestFormSession(form_id: string) {
   };
 }
 
-export function makeurl_forminit({
+function makeurl_forminit({
   form_id,
   session_id,
   fingerprint,

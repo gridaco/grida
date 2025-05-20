@@ -22,7 +22,11 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
-import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
@@ -58,22 +62,20 @@ export function ImageBlock({
           </span>
         </div>
         <div className="flex gap-2">
-          <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-              <button
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 onClick={() => {
                   setPickerOpen(true);
                 }}
+                variant="ghost"
+                size="icon"
               >
                 <ImageIcon />
-              </button>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content>
-                <p className="text-xs opacity-50">Media Picker</p>
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Media Picker</TooltipContent>
+          </Tooltip>
           <BlockAction>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
