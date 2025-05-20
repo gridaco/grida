@@ -108,7 +108,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
-import { io } from "@/grida-io-model";
+import { io } from "@grida/io";
 import { canvas_examples } from "../playground/k";
 import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
 import { DarwinSidebarHeaderDragArea } from "../desktop";

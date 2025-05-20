@@ -315,6 +315,9 @@ importers:
       '@grida/cmath':
         specifier: workspace:*
         version: link:../packages/grida-cmath
+      '@grida/io':
+        specifier: workspace:*
+        version: link:../packages/grida-canvas-io
       '@grida/io-figma':
         specifier: workspace:*
         version: link:../packages/grida-canvas-io-figma
@@ -630,15 +633,9 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.0.0)
-      fast-png:
-        specifier: ^6.2.0
-        version: 6.3.0
       fast-xml-parser:
         specifier: ^4.4.0
         version: 4.5.3
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
       figma-api:
         specifier: 2.0.1-beta
         version: 2.0.1-beta
@@ -993,6 +990,25 @@ importers:
         version: link:../grida-cmath
 
   packages/grida-canvas-cg: {}
+
+  packages/grida-canvas-io:
+    dependencies:
+      '@grida/cmath':
+        specifier: workspace:*
+        version: link:../grida-cmath
+      fast-png:
+        specifier: ^6.3.0
+        version: 6.3.0
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
+    devDependencies:
+      '@grida/cg':
+        specifier: workspace:*
+        version: link:../grida-canvas-cg
+      '@grida/schema':
+        specifier: workspace:*
+        version: link:../grida-canvas-schema
 
   packages/grida-canvas-io-figma:
     dependencies:
