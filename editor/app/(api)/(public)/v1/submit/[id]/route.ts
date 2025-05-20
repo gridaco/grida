@@ -24,7 +24,7 @@ import {
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
 import { OnSubmitProcessors, OnSubmit } from "./hooks";
-import { Features } from "@/lib/features/scheduling";
+import { Features } from "@/grida-forms/features/scheduling";
 import { IpInfo, ipinfo } from "@/clients/ipinfo";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,

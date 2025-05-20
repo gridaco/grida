@@ -13,7 +13,7 @@ import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
 import { cn } from "@/components/lib/utils";
-import { request_toss_payments_checkout_session } from "@/lib/agent/integrations/payments/tosspayments/api";
+import { request_toss_payments_checkout_session } from "@/grida-forms/integrations/payments/tosspayments/api";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 import {
   TossPaymentsCheckout,

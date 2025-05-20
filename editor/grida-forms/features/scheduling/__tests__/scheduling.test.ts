@@ -1,4 +1,4 @@
-import { Features } from "./";
+import { Features } from "..";
 
 type TimestampTZ = string | Date;
 

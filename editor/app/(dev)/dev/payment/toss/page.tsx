@@ -1,5 +1,5 @@
 import { TossPaymentsCheckout } from "@/components/tosspayments/checkout";
-import { request_toss_payments_checkout_session } from "@/lib/agent/integrations/payments/tosspayments/api";
+import { request_toss_payments_checkout_session } from "@/grida-forms/integrations/payments/tosspayments/api";
 
 export default async function TossPaymentsDevPage() {
   // const session = await request_toss_payments_checkout_session({
