@@ -23,6 +23,7 @@ import {
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
+  MoveBlockMenuItems,
 } from "./base-block";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
@@ -330,6 +331,7 @@ export function FormFieldBlockMenuItems({
           Edit Field Definition
         </DropdownMenuItem>
       )}
+      <MoveBlockMenuItems id={block_id} />
       <DropdownMenuItem
         variant="destructive"
         onClick={() => deleteBlock(block_id)}
