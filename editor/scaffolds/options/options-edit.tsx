@@ -30,7 +30,7 @@ import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Button } from "@/components/ui/button";
 import { AdminMediaPicker } from "../mediapicker";
-import type { Optgroup, Option } from "@/types";
+import type { Optgroup, Option } from "@/grida-forms-hosted/types";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,

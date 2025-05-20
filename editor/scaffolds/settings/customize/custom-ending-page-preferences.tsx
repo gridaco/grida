@@ -31,10 +31,10 @@ import { useTranslation } from "react-i18next";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type {
+  FormsPageLanguage,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
-  FormsPageLanguage,
-} from "@/types";
+} from "@/grida-forms-hosted/types";
 import {
   render,
   getPropTypes,

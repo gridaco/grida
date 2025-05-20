@@ -8,7 +8,7 @@ import assert from "assert";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import type { NextRequest } from "next/server";
 import { geolocation, ipAddress } from "@vercel/functions";
-import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { parseGFKeys } from "@/grida-forms/lib/gfkeys";
 import { haccept } from "@/utils/h";
 
 export interface SessionMeta {

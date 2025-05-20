@@ -18,7 +18,7 @@ import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { Badge } from "@/components/ui/badge";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { PaletteIcon } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";

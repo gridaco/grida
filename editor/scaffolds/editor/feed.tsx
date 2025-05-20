@@ -5,7 +5,11 @@ import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
-import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
+import type { GridaXSupabase } from "@/types";
+import type {
+  FormResponse,
+  FormResponseField,
+} from "@/grida-forms-hosted/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";

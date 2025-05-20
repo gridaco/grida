@@ -5,7 +5,7 @@ import type { DGColumn, DGResponseRow } from "../grid";
 import { useMemo } from "react";
 import { analyze } from "../data-card/analyze";
 import { DataCard } from "../data-card/card";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 
 export function DataGalleryView({
   className,

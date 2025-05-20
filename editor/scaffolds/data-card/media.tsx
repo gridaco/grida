@@ -5,7 +5,7 @@ import type {
   DataGridFileRef,
   DGResponseRow,
 } from "../grid";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { useFileRefs } from "../grid/providers";
 import { FileRefsStateRenderer } from "../grid/cells";
 import { Skeleton } from "@/components/ui/skeleton";

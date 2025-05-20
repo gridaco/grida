@@ -15,15 +15,15 @@ import {
   SidePanel,
 } from "@/components/panels/side-panel";
 import FormFieldPreview from "@/components/formfield";
-import {
-  type FormFieldAutocompleteType,
-  type FormFieldDataSchema,
-  type FormInputType,
-  type FormFieldInit,
-  type PaymentFieldData,
-  type FormFieldStorageSchema,
-  type FormFieldReferenceSchema,
-} from "@/types";
+import type {
+  FormInputType,
+  FormFieldInit,
+  FormFieldDataSchema,
+  FormFieldAutocompleteType,
+  PaymentFieldData,
+  FormFieldStorageSchema,
+  FormFieldReferenceSchema,
+} from "@/grida-forms-hosted/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
@@ -55,13 +55,13 @@ import { Switch } from "@/components/ui/switch";
 import { FormFieldUpsert } from "@/types/private/api";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
-import { DummyFormAgentStateProvider } from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/grida-forms/formstate";
 import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";

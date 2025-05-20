@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, useReducer, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import {
   Label as ChartLabel,
@@ -20,13 +21,13 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useCallback, useMemo, useReducer, useState } from "react";
 import produce from "immer";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
 import { useDatagridTable, useDatagridTableSpace } from "../editor";
 import assert from "assert";
-import { FormInputType, GridaXSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import {
   Select,
   SelectContent,

@@ -10,7 +10,7 @@ import React, {
 import { FixedSizeList as List, ListChildComponentProps } from "react-window";
 import { ITEM_SIZE, ListItem } from "./list-item";
 import { useTableDefinition } from "../data-query";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import type { DGResponseRow } from "../grid";
 import assert from "assert";
 import { cn } from "@/components/lib/utils";

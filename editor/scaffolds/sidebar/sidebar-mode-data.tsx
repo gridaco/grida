@@ -53,7 +53,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { useRouter } from "next/navigation";
 import { renderMenuGroup } from "./render";
 import Link from "next/link";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TypeSelect } from "@/components/formfield-type-select";
@@ -63,7 +63,7 @@ import {
   DeleteConfirmationSnippet,
 } from "@/components/dialogs/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { FormInputType } from "@/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,

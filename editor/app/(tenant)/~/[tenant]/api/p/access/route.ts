@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Authentication } from "@/lib/auth";
 import { service_role } from "@/lib/supabase/server";
 import parsePhoneNumber from "libphonenumber-js";
-import { resolve_next } from "@/lib/forms/url";
+import { resolve_next } from "@/host/url";
 import { headers } from "next/headers";
 import {
   haccept,

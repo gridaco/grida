@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

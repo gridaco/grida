@@ -48,13 +48,13 @@ import {
 } from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
-import { DarwinSidebarHeaderDragArea } from "../desktop";
+import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { Badge } from "@/components/ui/badge";
 import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui-editor/button";

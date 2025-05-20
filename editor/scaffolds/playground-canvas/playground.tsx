@@ -109,9 +109,9 @@ import { cn } from "@/components/lib/utils";
 import { SlackIcon } from "lucide-react";
 import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@grida/io";
-import { canvas_examples } from "../playground/k";
+import { canvas_examples } from "./examples";
 import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
-import { DarwinSidebarHeaderDragArea } from "../desktop";
+import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import {
   PreviewButton,

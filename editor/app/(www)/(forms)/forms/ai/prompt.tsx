@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { forms_ai_shortcuts } from "@/scaffolds/playground/k";
+import { forms_ai_shortcuts } from "@/scaffolds/playground-forms/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 import { useMemo, useRef, useState } from "react";
 

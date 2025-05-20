@@ -32,7 +32,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {

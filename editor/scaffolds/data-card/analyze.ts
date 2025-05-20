@@ -1,4 +1,7 @@
-import { FormFieldDefinition, FormInputType } from "@/types";
+import type {
+  FormFieldDefinition,
+  FormInputType,
+} from "@/grida-forms-hosted/types";
 import type { Data } from "@/lib/data";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
 import { PGSupportedColumnType } from "@/lib/pg-meta/@types/pg";

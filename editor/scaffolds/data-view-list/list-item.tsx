@@ -8,7 +8,7 @@ import { Data } from "@/lib/data";
 import type { DGResponseRow } from "../grid";
 import { LineContent } from "../data-card/line";
 import { cn } from "@/components/lib/utils";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { MediaRenderer } from "../data-card/media";
 
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;

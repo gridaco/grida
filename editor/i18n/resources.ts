@@ -1,6 +1,6 @@
 import { TemplateVariables } from "@/lib/templating";
 import type { ObjectPath } from "@/lib/templating/@types";
-import type { FormsPageLanguage } from "@/types";
+import type { FormsPageLanguage } from "@/grida-forms-hosted/types";
 
 type T = ObjectPath<
   TemplateVariables.FormResponseContext & {

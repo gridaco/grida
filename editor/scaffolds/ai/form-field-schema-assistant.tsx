@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FormFieldInit } from "@/types";
+import type { FormFieldInit } from "@/grida-forms-hosted/types";
 import { LightningBoltIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { draftid } from "@/utils/id";
 import { Textarea } from "@/components/ui/textarea";

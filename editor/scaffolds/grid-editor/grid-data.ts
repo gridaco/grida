@@ -1,11 +1,11 @@
+import { GridaXSupabase } from "@/types";
 import {
   type FormFieldDefinition,
   type FormResponse,
   type FormResponseField,
   type FormResponseSession,
-  GridaXSupabase,
   isReferenceSchema,
-} from "@/types";
+} from "@/grida-forms-hosted/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
   DGColumn,

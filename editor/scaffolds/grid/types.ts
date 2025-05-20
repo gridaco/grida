@@ -1,10 +1,9 @@
 import type { Data } from "@/lib/data";
-import type { Platform } from "@/lib/platform";
+import type { GridaXSupabase } from "@/types";
 import type {
   FormFieldStorageSchema,
   FormInputType,
-  GridaXSupabase,
-} from "@/types";
+} from "@/grida-forms-hosted/types";
 
 export interface DataGridCellSelectionCursor {
   pk: string | -1;

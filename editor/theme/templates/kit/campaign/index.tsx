@@ -1,8 +1,8 @@
 "use client";
 
-import { Features } from "@/lib/features/scheduling";
+import { Features } from "@/grida-forms-hosted/features/scheduling";
 import React, { createContext, useContext, useMemo } from "react";
-import type { CampaignMeta } from "@/types";
+import type { CampaignMeta } from "@/grida-forms-hosted/types";
 
 interface State {
   campaign: CampaignMeta;

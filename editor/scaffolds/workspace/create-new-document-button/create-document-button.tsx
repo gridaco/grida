@@ -17,7 +17,7 @@ import Link from "next/link";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import {
   Dialog,
   DialogTitle,

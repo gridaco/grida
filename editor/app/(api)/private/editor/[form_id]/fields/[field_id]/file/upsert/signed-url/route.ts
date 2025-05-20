@@ -1,5 +1,5 @@
 import { createFormsClient } from "@/lib/supabase/server";
-import type { FormFieldStorageSchema } from "@/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import type {
   FormsApiResponse,
   SignedUploadUrlData,
@@ -56,7 +56,7 @@ export async function PUT(
 
   const fs = new FieldStorageService(
     field.id,
-    field.storage as FormFieldStorageSchema,
+    field.storage as unknown as FormFieldStorageSchema,
     form.supabase_connection
   );
   const { data, error } = await fs.createSignedUpsertUrlFromPath(path);

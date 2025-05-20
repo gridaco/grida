@@ -2,7 +2,7 @@ import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { service_role } from "@/lib/supabase/server";
 import { parseStorageUrlOptions } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { FormFieldStorageSchema } from "@/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";

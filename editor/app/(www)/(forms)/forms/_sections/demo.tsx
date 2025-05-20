@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import Playground from "@/scaffolds/playground";
+import Playground from "@/scaffolds/playground-forms";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import { ArrowRightIcon } from "@radix-ui/react-icons";

@@ -1,4 +1,4 @@
-import type { FormInputType } from "@/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 import type { Data } from "../data";

@@ -6,7 +6,7 @@ import { cn } from "@/components/lib/utils";
 import React from "react";
 
 const PlaygroundPreviewSlave = dynamic(
-  () => import("@/scaffolds/playground/preview/slave"),
+  () => import("@/scaffolds/playground-forms/preview/slave"),
   {
     ssr: false,
   }

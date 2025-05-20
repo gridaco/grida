@@ -1,7 +1,7 @@
 "use client";
 import { use } from "react";
 
-import Playground from "@/scaffolds/playground";
+import Playground from "@/scaffolds/playground-forms";
 import { useRouter } from "next/navigation";
 
 export const maxDuration = 60;

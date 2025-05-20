@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
-import { FormMethod } from "@/types";
+import type { FormMethod } from "@/grida-forms-hosted/types";
 import { Spinner } from "@/components/spinner";
 import { useEditorState } from "../editor";
 

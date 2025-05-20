@@ -19,7 +19,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { FormView } from "@/scaffolds/e/form";
+import { FormView } from "@/grida-forms-hosted/e";
 import {
   ScreenMobileFrame,
   ScreenScrollable,
@@ -33,7 +33,10 @@ import Link from "next/link";
 import * as Standard from "@/theme/templates/west-referral/standard";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { template } from "@/utils/template";
-import { useFormSession, useRequestFormSession } from "@/scaffolds/e/form/load";
+import {
+  useFormSession,
+  useRequestFormSession,
+} from "@/grida-forms-hosted/e/load";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const dictionary = {

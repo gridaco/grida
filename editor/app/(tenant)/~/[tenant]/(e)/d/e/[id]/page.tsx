@@ -1,4 +1,4 @@
-import { Agent } from "@/scaffolds/e/form";
+import { Agent } from "@/grida-forms-hosted/e";
 import { headers } from "next/headers";
 import { geolocation } from "@vercel/functions";
 import { ssr_page_init_i18n } from "@/i18n/ssr";

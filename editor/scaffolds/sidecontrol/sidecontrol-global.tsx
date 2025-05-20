@@ -21,12 +21,11 @@ import {
 import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
-import {
-  Appearance,
-  FontFamily,
-  FormStyleSheetV1Schema,
+import { Appearance, FontFamily } from "@/types";
+import type {
   FormsPageLanguage,
-} from "@/types";
+  FormStyleSheetV1Schema,
+} from "@/grida-forms-hosted/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { sections } from "@/theme/section";

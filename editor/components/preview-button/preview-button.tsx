@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/components/lib/utils";
-import { editorlink, formlink } from "@/lib/forms/url";
+import { editorlink, formlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
 

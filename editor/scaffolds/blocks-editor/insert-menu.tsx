@@ -29,9 +29,9 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { blocklabels } from "@/k/supported_block_types";
 import { annotations } from "@/k/supported_field_types";
 import useInsertFormBlockMenu from "./use-insert-form-block";
-import { DummyFormAgentStateProvider } from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/grida-forms/formstate";
 import FormField from "@/components/formfield/form-field";
-import type { FormBlockType, FormInputType } from "@/types";
+import type { FormBlockType, FormInputType } from "@/grida-forms-hosted/types";
 import {
   Popover,
   PopoverContent,

@@ -3,7 +3,11 @@
 import React from "react";
 import { useEditorState, useFormFields } from "../editor";
 import { EditorFlatFormBlock } from "../editor/state";
-import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
+import type {
+  FormFieldDefinition,
+  FormBlockType,
+  FormInputType,
+} from "@/grida-forms-hosted/types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";

@@ -10,7 +10,7 @@ import {
 } from "@radix-ui/react-icons";
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
-import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { notFound } from "next/navigation";

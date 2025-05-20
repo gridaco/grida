@@ -9,7 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { DesktopDragArea } from "@/host/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop";
 import { usePathname } from "next/navigation";
 
 export default function Header() {

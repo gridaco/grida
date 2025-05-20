@@ -1,6 +1,6 @@
 import { createFormsClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Playground from "@/scaffolds/playground";
+import Playground from "@/scaffolds/playground-forms";
 
 export const maxDuration = 60;
 

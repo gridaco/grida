@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Prompt from "./prompt";
 import { Button } from "@/components/ui/button";
-import { FormPageBackground } from "@/scaffolds/e/form/background";
+import { PageBackground } from "@/theme/bg/background";
 import Header from "@/www/header";
 import Link from "next/link";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function AIHome() {
   return (
     <main className="flex flex-col w-full min-h-screen items-center justify-center">
-      <FormPageBackground
+      <PageBackground
         type="background"
         element="iframe"
         src="https://bg.grida.co/embed/dots"

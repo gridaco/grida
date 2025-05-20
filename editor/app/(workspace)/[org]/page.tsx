@@ -11,7 +11,7 @@ import {
 } from "@radix-ui/react-icons";
 import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
-import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
 import { BoxSelectIcon } from "lucide-react";
 import { CreateNewProjectDialog } from "@/scaffolds/workspace/new-project-dialog";
 import {

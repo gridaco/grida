@@ -1,16 +1,16 @@
+import type { Appearance, FontFamily, GridaXSupabase } from "@/types";
 import type {
-  Appearance,
-  FontFamily,
-  FormBlockType,
   FormFieldDefinition,
   FormInputType,
-  FormPageBackgroundSchema,
+} from "@/grida-forms-hosted/types";
+import type {
   FormResponse,
-  FormResponseWithFields,
-  FormStyleSheetV1Schema,
+  FormBlockType,
   FormsPageLanguage,
-  GridaXSupabase,
-} from "@/types";
+  FormResponseWithFields,
+  FormPageBackgroundSchema,
+  FormStyleSheetV1Schema,
+} from "@/grida-forms-hosted/types";
 import type {
   EditorFlatFormBlock,
   EditorState,

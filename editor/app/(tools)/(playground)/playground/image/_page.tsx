@@ -66,7 +66,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   useContinueWithAuth,
   AuthProvider,
-} from "@/scaffolds/auth/use-continue-with-auth";
+} from "@/host/auth/use-continue-with-auth";
 
 export default function ImagePlayground() {
   const [state, dispatch] = useReducer(

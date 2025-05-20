@@ -1,4 +1,4 @@
-import { formlink } from "@/lib/forms/url";
+import { formlink } from "@/host/url";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(

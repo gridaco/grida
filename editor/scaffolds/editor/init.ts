@@ -1,4 +1,4 @@
-import { editorbasepath } from "@/lib/forms/url";
+import { editorbasepath } from "@/host/url";
 import type {
   BaseDocumentEditorInit,
   BaseDocumentEditorState,
@@ -18,14 +18,13 @@ import type {
   BucketDocumentEditorInit,
   SchemaMayVaryDocument,
 } from "./state";
-import { blockstreeflat } from "@/lib/forms/tree";
+import { blockstreeflat } from "@/grida-forms/lib/tree";
 import { EditorSymbols } from "./symbols";
-import {
+import { GridaXSupabase, SchemaMayVaryDocumentServerObject } from "@/types";
+import type {
   FormFieldDefinition,
   FormStartPageSchema,
-  GridaXSupabase,
-  SchemaMayVaryDocumentServerObject,
-} from "@/types";
+} from "@/grida-forms-hosted/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";

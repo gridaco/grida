@@ -3,7 +3,7 @@ import {
   useData,
   useSelectValue,
   useValue,
-} from "@/program-context/data-context";
+} from "@/grida-react-program-context/data-context";
 import { TemplateValueProperties } from "../template-builder/with-template";
 import { type tokens, factory, render } from "@grida/tokens";
 

@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { supported_field_types, annotations } from "@/k/supported_field_types";
-import type { FormInputType } from "@/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import { CheckIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 
 type FormFieldTypeSelectOptionItem = {

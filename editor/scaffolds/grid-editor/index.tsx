@@ -35,7 +35,7 @@ import {
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import type { DGColumn, DGResponseRow, DGSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
@@ -80,7 +80,7 @@ import {
 } from "../data-query";
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { TableQueryChips } from "./components/query/query-chips";
 import { DeleteSelectionButton } from "./components/delete";
 
