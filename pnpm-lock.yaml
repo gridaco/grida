@@ -315,6 +315,9 @@ importers:
       '@grida/cmath':
         specifier: workspace:*
         version: link:../packages/grida-cmath
+      '@grida/fonts':
+        specifier: workspace:*
+        version: link:../packages/grida-fonts
       '@grida/io':
         specifier: workspace:*
         version: link:../packages/grida-canvas-io
@@ -1144,6 +1147,8 @@ importers:
         version: 7.2.0
 
   packages/grida-cmath: {}
+
+  packages/grida-fonts: {}
 
   packages/grida-mixed-properties:
     dependencies:

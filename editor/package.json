@@ -32,6 +32,7 @@
     "@grida/bitmap": "workspace:*",
     "@grida/cg": "workspace:*",
     "@grida/cmath": "workspace:*",
+    "@grida/fonts": "workspace:*",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
     "@grida/io-svg": "workspace:*",

@@ -48,7 +48,7 @@ import {
 } from "@/grida-react-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
+import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";

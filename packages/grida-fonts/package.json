@@ -1,0 +1,30 @@
+{
+  "name": "@grida/fonts",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsup index.ts google.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts google.ts --format cjs,esm --dts"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./google": {
+      "types": "./dist/google.d.ts",
+      "import": "./dist/google.mjs",
+      "require": "./dist/google.js"
+    }
+  },
+  "jest": {
+    "preset": "ts-jest"
+  }
+}
