@@ -215,7 +215,7 @@ export default function blockReducer(
       });
     }
     case "blocks/move/up": {
-      const { block_id } = action as any;
+      const { block_id } = <FormsBlockMoveUpAction>action;
       return produce(state, (draft) => {
         const index = draft.blocks.findIndex((b) => b.id === block_id);
         if (index > 0) {
@@ -224,7 +224,7 @@ export default function blockReducer(
       });
     }
     case "blocks/move/down": {
-      const { block_id } = action as any;
+      const { block_id } = <FormsBlockMoveDownAction>action;
       return produce(state, (draft) => {
         const index = draft.blocks.findIndex((b) => b.id === block_id);
         if (index !== -1 && index < draft.blocks.length - 1) {
