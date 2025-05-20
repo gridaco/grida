@@ -19,7 +19,7 @@ import type {
   EndingPageTemplateID,
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type {
   GDocEditorRouteParams,
   FormDocumentEditorInit,
@@ -40,7 +40,7 @@ import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { xsb_table_conn_init } from "@/scaffolds/editor/init";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { Win32LinuxWindowSafeArea } from "@/scaffolds/desktop";
+import { Win32LinuxWindowSafeArea } from "@/host/desktop";
 
 const inter = Inter({ subsets: ["latin"] });
 

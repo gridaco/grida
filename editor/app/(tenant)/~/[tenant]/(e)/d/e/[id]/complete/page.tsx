@@ -7,7 +7,7 @@ import { fmt_local_index } from "@/utils/fmt";
 import type {
   FormDocument,
   EndingPageI18nOverrides,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type { FormLinkURLParams } from "@/host/url";
 import { FormValue } from "@/services/form";
 

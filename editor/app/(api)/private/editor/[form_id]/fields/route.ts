@@ -9,7 +9,7 @@ import type {
   FormFieldDataSchema,
   PaymentFieldData,
   FormInputType,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { UpsertDto } from "@/types/supabase-ext";
 
 type Params = { form_id: string };

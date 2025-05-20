@@ -20,8 +20,8 @@ import type {
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
   AttributeDefinition,
-} from "@/grida-forms/hosted/types";
-import type { FormMethod, FormsPageLanguage } from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
+import type { FormMethod, FormsPageLanguage } from "@/grida-forms-hosted/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
 import type { IDocumentEditorState } from "@/grida-react-canvas/state";

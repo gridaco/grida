@@ -25,7 +25,7 @@ import { Appearance, FontFamily } from "@/types";
 import type {
   FormsPageLanguage,
   FormStyleSheetV1Schema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { sections } from "@/theme/section";

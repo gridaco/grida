@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
 import { service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { RawdataProcessing } from "@/lib/forms/rawdata";
+import { RawdataProcessing } from "@/grida-forms/lib/rawdata";
 
 type Params = { id: string };
 

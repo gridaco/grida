@@ -9,7 +9,7 @@ import {
   PropertyTextInput,
 } from "@/components/panels/side-panel";
 import { GridaXSupabase } from "@/types";
-import type { FormFieldStorageSchema } from "@/grida-forms/hosted/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import {
   Select,
   SelectContent,

@@ -4,7 +4,7 @@ import type {
   IFormField,
   FormMethod,
   FormResponseUnknownFieldHandlingStrategyType,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type { InventoryLevelCommit } from "../inventory";
 import type { GridaXSupabase } from "../x-supabase";
 import * as ERR from "@/k/error";

@@ -1,7 +1,7 @@
 import React from "react";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import { GridaLogo } from "@/components/grida-logo";
-import { ContinueWithGoogleButton } from "@/scaffolds/auth/continue-with-google-button";
+import { ContinueWithGoogleButton } from "@/host/auth/continue-with-google-button";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";

@@ -1,6 +1,6 @@
 import { service_role } from "@/lib/supabase/server";
 import type { CanvasDocumentSnapshotSchema, GDocumentType } from "@/types";
-import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms/hosted/types";
+import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms-hosted/types";
 import assert from "assert";
 import {
   bucket_validation_messages,

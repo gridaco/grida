@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 import { TProperties, TSchema } from "@/lib/spock";
 import { useFormFields } from "@/scaffolds/editor";
-import { FormExpression } from "@/lib/forms/expression";
+import { FormExpression } from "@/grida-forms/lib/expression";
 import { toast } from "sonner";
 import { tokens } from "@grida/tokens";
 

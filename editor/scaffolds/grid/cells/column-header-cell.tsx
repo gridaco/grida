@@ -9,7 +9,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FormInputType } from "@/grida-forms/hosted/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import {
   AvatarIcon,
   ChevronDownIcon,

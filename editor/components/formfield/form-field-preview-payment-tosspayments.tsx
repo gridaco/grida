@@ -7,7 +7,7 @@ import {
   TossPaymentsPayButton,
   TossPaymentsPayButtonContainerFooter,
 } from "../tosspayments/checkout";
-import { request_toss_payments_checkout_session } from "@/grida-forms/integrations/payments/tosspayments/api";
+import { request_toss_payments_checkout_session } from "@/grida-forms-hosted/integrations/payments/tosspayments/api";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 
 export function TossPaymentsPaymentFormFieldPreview({

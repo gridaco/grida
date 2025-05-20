@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { canvas_examples } from "@/scaffolds/playground/k";
+import { canvas_examples } from "@/scaffolds/playground-canvas/examples";
 import { notFound } from "next/navigation";
 import Editor from "../../editor";
 

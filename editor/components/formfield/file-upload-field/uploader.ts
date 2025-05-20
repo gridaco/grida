@@ -8,7 +8,7 @@ import type {
   FileResolveStrategy,
   FileResolveStrategyRequestUrl,
   FileUploadStrategy,
-} from "@/lib/forms";
+} from "@/grida-forms/lib";
 import type {
   CreateSessionSignedUploadUrlRequest,
   FormsApiResponse,

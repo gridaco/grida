@@ -1,5 +1,5 @@
 import { FieldSupports } from "@/k/supported_field_types";
-import type { FormInputType } from "@/grida-forms/hosted/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 
 export namespace XSupabaseFieldConnectionPolicyCheck {
   export function required_object_path_policy_for({

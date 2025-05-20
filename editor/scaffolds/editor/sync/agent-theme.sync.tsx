@@ -6,7 +6,7 @@ import { usePrevious } from "@uidotdev/usehooks";
 import {
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { useEditorState } from "@/scaffolds/editor/use-editor";
 import equal from "deep-equal";
 

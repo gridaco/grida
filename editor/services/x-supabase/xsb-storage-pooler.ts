@@ -1,6 +1,6 @@
 import { FieldSupports } from "@/k/supported_field_types";
 import type { XSupabaseStorageSchema } from "@/types";
-import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import type { XSupabase } from ".";
 import assert from "assert";
 

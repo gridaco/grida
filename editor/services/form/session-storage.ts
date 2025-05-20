@@ -5,7 +5,7 @@ import {
   GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
 } from "@/k/env";
-import { UniqueFileNameGenerator } from "@/lib/forms/storage";
+import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Env } from "@/env";
 

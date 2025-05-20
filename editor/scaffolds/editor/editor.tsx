@@ -19,7 +19,7 @@ import {
 } from "./state";
 import { initialEditorState } from "./init";
 import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
-import { FormFieldDefinition } from "@/grida-forms/hosted/types";
+import { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { RowEditPanel } from "../panels/row-edit-panel";

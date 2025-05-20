@@ -31,7 +31,7 @@ import type {
   FormResponse,
   FormResponseField,
   AttributeDefinition,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";

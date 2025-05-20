@@ -2,7 +2,7 @@ import type { Appearance, FontFamily, GridaXSupabase } from "@/types";
 import type {
   FormFieldDefinition,
   FormInputType,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type {
   FormResponse,
   FormBlockType,
@@ -10,7 +10,7 @@ import type {
   FormResponseWithFields,
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type {
   EditorFlatFormBlock,
   EditorState,

@@ -1,4 +1,4 @@
-import type { FormInputType } from "@/grida-forms/hosted/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import {
   EnvelopeClosedIcon,
   TextIcon,

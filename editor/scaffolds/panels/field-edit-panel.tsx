@@ -23,7 +23,7 @@ import type {
   PaymentFieldData,
   FormFieldStorageSchema,
   FormFieldReferenceSchema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
@@ -61,7 +61,7 @@ import Link from "next/link";
 import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
-import { DummyFormAgentStateProvider } from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/grida-forms/formstate";
 import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";

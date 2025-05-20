@@ -1,7 +1,7 @@
 import { Env } from "@/env";
 import { editorlink } from "@/host/url";
 import { createFormsClient, service_role } from "@/lib/supabase/server";
-import { JSONFrom2DB } from "@/services/new/json2db";
+import { JSONFrom2DB } from "@/grida-forms-hosted/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";
 import { customAlphabet } from "nanoid";

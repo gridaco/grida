@@ -19,7 +19,7 @@ import type {
   FormFieldDefinition,
   FormResponse,
   FormResponseField,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { fmt_local_index } from "@/utils/fmt";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,12 @@ import { AvatarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
 import { Toggle } from "@/components/ui/toggle";
-import { FormView } from "@/scaffolds/e/form";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFormSession, useRequestFormSession } from "../e/form/load";
+import { FormView } from "@/grida-forms-hosted/e";
+import {
+  useFormSession,
+  useRequestFormSession,
+} from "@/grida-forms-hosted/e/load";
 import { toast } from "sonner";
 
 type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;

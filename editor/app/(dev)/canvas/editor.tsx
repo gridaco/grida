@@ -1,7 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import React from "react";
-import { DesktopDragArea } from "@/host/desktop-drag-area";
+import { DesktopDragArea } from "@/host/desktop";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 const PlaygroundCanvas = dynamic(

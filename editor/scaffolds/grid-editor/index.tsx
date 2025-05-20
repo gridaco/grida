@@ -80,7 +80,7 @@ import {
 } from "../data-query";
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
-import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
+import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { TableQueryChips } from "./components/query/query-chips";
 import { DeleteSelectionButton } from "./components/delete";
 

@@ -3,7 +3,7 @@ import type { GridaXSupabase } from "@/types";
 import type {
   FormFieldStorageSchema,
   FormInputType,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 
 export interface DataGridCellSelectionCursor {
   pk: string | -1;

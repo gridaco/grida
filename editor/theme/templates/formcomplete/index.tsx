@@ -1,7 +1,7 @@
 import { TemplateVariables } from "@/lib/templating";
 import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/receipt01";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
-import type { EndingPageI18nOverrides } from "@/grida-forms/hosted/types";
+import type { EndingPageI18nOverrides } from "@/grida-forms-hosted/types";
 
 export function EndingPageWithContext({
   template_id,

@@ -3,7 +3,7 @@ import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import { createFormsClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { FieldStorageService } from "@/services/form/storage";
-import type { FormFieldStorageSchema } from "@/grida-forms/hosted/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import assert from "assert";
 
 type Params = {

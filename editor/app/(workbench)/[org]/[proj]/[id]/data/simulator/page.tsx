@@ -37,7 +37,7 @@ import {
   SimulationPlan,
   Simulator,
   SimulatorSubmission,
-} from "@/lib/simulator";
+} from "@/grida-forms-hosted/simulator";
 import { useEditorState } from "@/scaffolds/editor";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";

@@ -18,7 +18,7 @@ import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
-import { FormBlockTree } from "@/lib/forms/types";
+import { FormBlockTree } from "@/grida-forms/lib/types";
 import { service_role } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
@@ -32,22 +32,22 @@ import {
 } from "@/services/form/validate-max-access";
 import i18next from "i18next";
 import { notFound } from "next/navigation";
-import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
+import { FormRenderTree, type ClientRenderBlock } from "@/grida-forms/lib";
 import type {
   FormDocument,
   FormMethod,
   FormsPageLanguage,
   FormStartPageSchema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import type {
   FormFieldDefinition,
   Option,
   CampaignMeta,
-} from "@/grida-forms/hosted/types";
-import { Features } from "@/grida-forms/features/scheduling";
+} from "@/grida-forms-hosted/types";
+import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { requesterurl, resolverurl } from "@/services/form/session-storage";
-import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
-import { RawdataProcessing } from "@/lib/forms/rawdata";
+import { type GFKeys, parseGFKeys } from "@/grida-forms/lib/gfkeys";
+import { RawdataProcessing } from "@/grida-forms/lib/rawdata";
 
 type Params = { id: string };
 

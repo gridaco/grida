@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms/hosted/types";
+import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms-hosted/types";
 import { Button } from "@/components/ui/button";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";

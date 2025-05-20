@@ -9,7 +9,7 @@ import type { GridaXSupabase } from "@/types";
 import type {
   FormResponse,
   FormResponseField,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";

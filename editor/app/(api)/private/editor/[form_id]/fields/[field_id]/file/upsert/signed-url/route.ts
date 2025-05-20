@@ -1,5 +1,5 @@
 import { createFormsClient } from "@/lib/supabase/server";
-import type { FormFieldStorageSchema } from "@/grida-forms/hosted/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import type {
   FormsApiResponse,
   SignedUploadUrlData,

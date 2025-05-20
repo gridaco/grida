@@ -2,12 +2,12 @@ import { notFound } from "next/navigation";
 import { service_role } from "@/lib/supabase/server";
 import { type Metadata, type Viewport } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
-import type { FormDocument } from "@/grida-forms/hosted/types";
+import type { FormDocument } from "@/grida-forms-hosted/types";
 import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { CustomCSS } from "@/theme/customcss";
-import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";
+import { FormAgentGlobalWindowMessagingInterface } from "@/grida-forms-hosted/e/interface";
 import { FingerprintProvider } from "@/components/fingerprint";
 import palettes from "@/theme/palettes";
 

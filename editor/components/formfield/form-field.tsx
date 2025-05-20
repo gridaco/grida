@@ -5,7 +5,7 @@ import type {
   Option,
   FormFieldDataSchema,
   PaymentFieldData,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { Select as HtmlSelect } from "@/components/vanilla/select";
 import {
   Select,
@@ -43,7 +43,10 @@ import {
   makeUploader,
 } from "./file-upload-field";
 import { GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD } from "@/k/env";
-import type { FileResolveStrategy, FileUploadStrategy } from "@/lib/forms";
+import type {
+  FileResolveStrategy,
+  FileUploadStrategy,
+} from "@/grida-forms/lib";
 import assert from "assert";
 import {
   ReferenceSearch,

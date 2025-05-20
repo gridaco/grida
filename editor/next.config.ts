@@ -196,6 +196,12 @@ const nextConfig: NextConfig = {
       // #endregion
     },
   },
+  webpack: (config) => {
+    // #region handlebars https://github.com/handlebars-lang/handlebars.js/issues/1174#issuecomment-229918935
+    config.resolve.alias.handlebars = "handlebars/dist/handlebars.min.js";
+    // #endregion
+    return config;
+  },
 };
 
 const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY

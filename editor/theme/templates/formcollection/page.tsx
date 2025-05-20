@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import {
@@ -15,8 +15,8 @@ import * as samples from "./samples";
 import {
   ProgramDataContextHost,
   DataProvider,
-} from "@/program-context/data-context";
-import ArrayMap from "@/program-context/data-context/array";
+} from "@/grida-react-program-context/data-context";
+import ArrayMap from "@/grida-react-program-context/data-context/array";
 import { useDocument } from "@/grida-react-canvas/provider";
 import assert from "assert";
 

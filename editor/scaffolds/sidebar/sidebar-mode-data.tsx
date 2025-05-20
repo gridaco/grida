@@ -63,7 +63,7 @@ import {
   DeleteConfirmationSnippet,
 } from "@/components/dialogs/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import type { FormInputType } from "@/grida-forms/hosted/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,

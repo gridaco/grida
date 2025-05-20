@@ -5,7 +5,7 @@ import {
   type FormResponseField,
   type FormResponseSession,
   isReferenceSchema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
   DGColumn,

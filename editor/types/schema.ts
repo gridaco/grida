@@ -5,7 +5,7 @@ import type {
   FormBlock,
   FormsPageLanguage,
   FormFieldAutocompleteType,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { toArrayOf, MaybeArray } from "./utility";
 import type { tokens } from "@grida/tokens";
 

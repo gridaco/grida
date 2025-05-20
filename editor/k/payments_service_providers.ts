@@ -1,4 +1,4 @@
-import type { PaymentsServiceProviders } from "@/grida-forms/hosted/types";
+import type { PaymentsServiceProviders } from "@/grida-forms-hosted/types";
 
 export const payments_service_providers: ReadonlyArray<PaymentsServiceProviders> =
   ["stripe", "tosspayments"];

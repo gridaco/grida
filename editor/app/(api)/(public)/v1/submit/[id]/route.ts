@@ -24,13 +24,13 @@ import {
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
 import { OnSubmitProcessors, OnSubmit } from "./hooks";
-import { Features } from "@/grida-forms/features/scheduling";
+import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { IpInfo, ipinfo } from "@/clients/ipinfo";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,
   Geo,
 } from "@/types";
-import type { FormFieldStorageSchema } from "@/grida-forms/hosted/types";
+import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import { PGXXError } from "@/k/errcode";
 import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
@@ -38,13 +38,13 @@ import { FormSubmitErrorCode } from "@/types/private/api";
 import { SessionMeta, meta } from "./meta";
 import { sbconn_insert, sbconn_update } from "./sbconn";
 import { FieldSupports } from "@/k/supported_field_types";
-import { UniqueFileNameGenerator } from "@/lib/forms/storage";
+import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
-import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { parseGFKeys } from "@/grida-forms/lib/gfkeys";
 import {
   SessionStagedFileStorage,
   parse_tmp_storage_object_path,

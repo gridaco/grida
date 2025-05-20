@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
 import _messages from "./messages.json";
-import { Features } from "@/grida-forms/features/scheduling";
+import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/components/lib/utils";
 import { DataProvider, useData } from "../../kit/contexts/data.context";

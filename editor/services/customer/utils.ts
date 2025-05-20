@@ -2,7 +2,7 @@ import type {
   IFormField,
   FormResponse,
   FormResponseField,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { unique } from "@/utils/unique";
 
 export function process_response_provisional_info(

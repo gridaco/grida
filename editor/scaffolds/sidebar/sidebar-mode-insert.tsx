@@ -15,9 +15,9 @@ import FormField from "@/components/formfield/form-field";
 import { Button } from "@/components/ui/button";
 import { blocklabels } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
-import type { FormBlockType, FormInputType } from "@/grida-forms/hosted/types";
+import type { FormBlockType, FormInputType } from "@/grida-forms-hosted/types";
 import { SearchInput } from "@/components/extension/search-input";
-import { DummyFormAgentStateProvider } from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/grida-forms/formstate";
 import {
   SidebarContent,
   SidebarGroup,

@@ -1,4 +1,4 @@
-import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { parseGFKeys } from "@/grida-forms/lib/gfkeys";
 import { service_role } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 

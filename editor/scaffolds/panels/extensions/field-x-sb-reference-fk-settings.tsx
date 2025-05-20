@@ -8,7 +8,7 @@ import {
   PanelPropertySectionTitle,
 } from "@/components/panels/side-panel";
 import { GridaXSupabase } from "@/types";
-import type { FormFieldReferenceSchema } from "@/grida-forms/hosted/types";
+import type { FormFieldReferenceSchema } from "@/grida-forms-hosted/types";
 import {
   Select,
   SelectContent,

@@ -27,7 +27,7 @@ import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
 import { useDatagridTable, useDatagridTableSpace } from "../editor";
 import assert from "assert";
 import { GridaXSupabase } from "@/types";
-import type { FormInputType } from "@/grida-forms/hosted/types";
+import type { FormInputType } from "@/grida-forms-hosted/types";
 import {
   Select,
   SelectContent,

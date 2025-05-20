@@ -2,9 +2,9 @@
 
 import React, { useEffect } from "react";
 import palettes from "@/theme/palettes";
-import useVariablesCSS from "../playground/use-variables-css";
+import useVariablesCSS from "@/theme/hooks/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
-import { FormPageBackground } from "../e/form/background";
+import { PageBackground } from "@/theme/bg/background";
 import { cn } from "@/components/lib/utils";
 import { useTheme } from "next-themes";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
@@ -49,7 +49,7 @@ function BackgroundProvider({
   return (
     <>
       {background && (
-        <FormPageBackground {...(background as TemplatePageBackgroundSchema)} />
+        <PageBackground {...(background as TemplatePageBackgroundSchema)} />
       )}
     </>
   );

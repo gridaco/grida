@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { UniqueFileNameGenerator } from "@/lib/forms/storage";
+import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { service_role } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
@@ -16,7 +16,7 @@ import type { SchemaTableConnectionXSupabaseMainTableJoint } from "@/types";
 import type {
   FormFieldDefinition,
   FormFieldStorageSchema,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import assert from "assert";
 

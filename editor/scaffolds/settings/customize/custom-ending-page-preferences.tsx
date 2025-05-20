@@ -34,7 +34,7 @@ import type {
   FormsPageLanguage,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
-} from "@/grida-forms/hosted/types";
+} from "@/grida-forms-hosted/types";
 import {
   render,
   getPropTypes,

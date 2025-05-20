@@ -1,4 +1,4 @@
-import type { FormBlockType } from "@/grida-forms/hosted/types";
+import type { FormBlockType } from "@/grida-forms-hosted/types";
 
 export const blocklabels: Record<FormBlockType, string> = {
   section: "Section",
