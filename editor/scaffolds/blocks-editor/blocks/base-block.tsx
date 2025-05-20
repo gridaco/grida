@@ -5,10 +5,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from "@radix-ui/react-icons";
+import { ArrowUpIcon, ArrowDownIcon } from "@radix-ui/react-icons";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export function useDeleteBlock() {
@@ -152,11 +149,14 @@ export function MoveBlockMenuItems({ id }: { id: string }) {
   return (
     <>
       <DropdownMenuItem disabled={disabledUp} onClick={() => move(id, "up")}>
-        <ChevronUpIcon className="size-3.5" />
+        <ArrowUpIcon className="size-3.5" />
         Move Up
       </DropdownMenuItem>
-      <DropdownMenuItem disabled={disabledDown} onClick={() => move(id, "down")}>
-        <ChevronDownIcon className="size-3.5" />
+      <DropdownMenuItem
+        disabled={disabledDown}
+        onClick={() => move(id, "down")}
+      >
+        <ArrowDownIcon className="size-3.5" />
         Move Down
       </DropdownMenuItem>
     </>
