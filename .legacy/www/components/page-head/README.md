@@ -1,1 +1,0 @@
-# Page html meta head injecting component for SEO
