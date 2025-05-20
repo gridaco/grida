@@ -83,6 +83,7 @@ grida.co and \[tenant\].grida.site domains are connected.
     - `(workbench)` contains the workbench, the main editor page.
     - `(workspace)` similar to `(workbench)`, but contains the dashboard, not the actual editor.
     - `(www)` contains the landing page, seo-purpose static pages. when to add new webpages, this is the root directory.
+    - `sitemap.ts` contains the sitemap.xml generator. this contains the sitemap for the public pages, usually under `(www)` directory.
   - `/www` contains the landing page specific components.
   - `/components` contains the generally reusable components.
   - `/components/ui` contains the shadcn ui components.
