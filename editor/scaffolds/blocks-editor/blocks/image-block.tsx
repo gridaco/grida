@@ -20,6 +20,7 @@ import {
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
+  MoveBlockMenuItems,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import {
@@ -84,6 +85,7 @@ export function ImageBlock({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
+                <MoveBlockMenuItems id={id} />
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => deleteBlock(id)}

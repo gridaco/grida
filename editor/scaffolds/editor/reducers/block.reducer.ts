@@ -10,6 +10,8 @@ import type {
   FormsBlockCreateNewPendingBlockAction,
   FormsBlockDeleteBlockAction,
   FormsBlockFocusBlockAction,
+  FormsBlockMoveUpAction,
+  FormsBlockMoveDownAction,
   FormsBlockHtmlBlockBodyAction,
   FormsBlockImageBlockSrcAction,
   FormsBlockResolvePendingBlockAction,
@@ -210,6 +212,24 @@ export default function blockReducer(
         );
 
         self_sort(draft, [oldIndex, newIndex]);
+      });
+    }
+    case "blocks/move/up": {
+      const { block_id } = action as any;
+      return produce(state, (draft) => {
+        const index = draft.blocks.findIndex((b) => b.id === block_id);
+        if (index > 0) {
+          self_sort(draft, [index, index - 1]);
+        }
+      });
+    }
+    case "blocks/move/down": {
+      const { block_id } = action as any;
+      return produce(state, (draft) => {
+        const index = draft.blocks.findIndex((b) => b.id === block_id);
+        if (index !== -1 && index < draft.blocks.length - 1) {
+          self_sort(draft, [index, index + 1]);
+        }
       });
     }
     case "blocks/delete": {

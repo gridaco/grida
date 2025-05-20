@@ -5,6 +5,11 @@ import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@radix-ui/react-icons";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export function useDeleteBlock() {
   const [state, dispatch] = useEditorState();
@@ -120,5 +125,40 @@ export function BlockAction({
     >
       {children}
     </div>
+  );
+}
+
+export function useMoveBlock() {
+  const [, dispatch] = useEditorState();
+  return useCallback(
+    (block_id: string, direction: "up" | "down") => {
+      dispatch({
+        type: direction === "up" ? "blocks/move/up" : "blocks/move/down",
+        block_id,
+      });
+    },
+    [dispatch]
+  );
+}
+
+export function MoveBlockMenuItems({ id }: { id: string }) {
+  const [state] = useEditorState();
+  const move = useMoveBlock();
+
+  const index = state.blocks.findIndex((b) => b.id === id);
+  const disabledUp = index <= 0;
+  const disabledDown = index === state.blocks.length - 1;
+
+  return (
+    <>
+      <DropdownMenuItem disabled={disabledUp} onClick={() => move(id, "up")}>
+        <ChevronUpIcon className="size-3.5" />
+        Move Up
+      </DropdownMenuItem>
+      <DropdownMenuItem disabled={disabledDown} onClick={() => move(id, "down")}>
+        <ChevronDownIcon className="size-3.5" />
+        Move Down
+      </DropdownMenuItem>
+    </>
   );
 }

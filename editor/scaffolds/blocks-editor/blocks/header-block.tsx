@@ -20,6 +20,7 @@ import {
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
+  MoveBlockMenuItems,
 } from "./base-block";
 import { Button } from "@/components/ui/button";
 import { MinimalTiptapHeadlessEditor } from "@/kits/minimal-tiptap";
@@ -74,6 +75,7 @@ export function HeaderBlock({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <MoveBlockMenuItems id={id} />
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => deleteBlock(id)}

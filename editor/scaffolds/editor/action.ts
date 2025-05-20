@@ -92,7 +92,9 @@ export type FormsBlockAction =
   | FormsBlockBlockTitleAction
   | FormsBlockBlockDescriptionAction
   | FormsBlockFocusBlockAction
-  | FormsBlockBlurBlockAction;
+  | FormsBlockBlurBlockAction
+  | FormsBlockMoveUpAction
+  | FormsBlockMoveDownAction;
 
 export type FormsBlockCreateNewPendingBlockAction =
   | {
@@ -180,6 +182,16 @@ export interface FormsBlockFocusBlockAction {
 
 export interface FormsBlockBlurBlockAction {
   type: "blocks/blur";
+}
+
+export interface FormsBlockMoveUpAction {
+  type: "blocks/move/up";
+  block_id: string;
+}
+
+export interface FormsBlockMoveDownAction {
+  type: "blocks/move/down";
+  block_id: string;
 }
 
 // #endregion block
