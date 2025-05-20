@@ -7,7 +7,7 @@ import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
 import { useUserCustomTemplates } from "../renderer";
-import { css } from "@/grida/css";
+import { css } from "@/grida-canvas-utils/css";
 import type cg from "@grida/cg";
 
 class RendererNotFound extends Error {

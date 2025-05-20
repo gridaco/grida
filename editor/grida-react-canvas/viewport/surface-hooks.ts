@@ -9,7 +9,7 @@ import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
 import { NodeWithMeta } from "../provider";
 import "core-js/features/object/group-by";
-import { is_direct_component_consumer } from "@/grida/utils/supports";
+import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 export interface SurfaceNodeObject {
   id: string;
   boundingRect: cmath.Rectangle;

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/components/lib/utils";
 import { ColorPicker } from "./color-picker";
-import { css } from "@/grida/css";
+import { css } from "@/grida-canvas-utils/css";
 import HexValueInput from "./utils/hex";
 
 type RGBA = { r: number; g: number; b: number; a: number };

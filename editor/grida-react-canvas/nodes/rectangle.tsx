@@ -1,5 +1,5 @@
 import grida from "@grida/schema";
-import { svg } from "@/grida/svg";
+import { svg } from "@/grida-canvas-utils/svg";
 import queryattributes from "./utils/attributes";
 
 export function RectangleWidget({

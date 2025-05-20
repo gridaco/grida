@@ -6,7 +6,7 @@ import {
 import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
-import { svg } from "@/grida/svg";
+import { svg } from "@/grida-canvas-utils/svg";
 import { vector2ToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import assert from "assert";
 
