@@ -1,1 +1,0 @@
-- 2021/11/4 - Fix iOS Video autoplay issue

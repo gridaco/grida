@@ -1,2 +1,0 @@
-// dummy
-export const a = "";

@@ -1,9 +1,6 @@
 packages:
   - "editor"
   - "database"
-  - "apps/backgrounds"
-  - "apps/docs"
-  - "apps/blog"
-  - "apps/viewer"
+  - "apps/*"
   - "packages/*"
   - "packages/lib/*"
