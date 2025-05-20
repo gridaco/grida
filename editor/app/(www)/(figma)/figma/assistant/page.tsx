@@ -5,6 +5,12 @@ import { Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Figma Assistant | Grida",
+  description: "AI powered design assistant for Figma by Grida.",
+};
 
 export default function AssistantPage() {
   return (

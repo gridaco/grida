@@ -29,6 +29,13 @@ import {
 import Image from "next/image";
 import Footer from "@/www/footer";
 import { wwwprint } from "./data";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Grida Print | Fast Online Printing",
+  description:
+    "High-quality printing with express shipping, instant samples, and more.",
+};
 
 const features = [
   {
@@ -41,7 +48,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.print/features/01.png"
-          alt=""
+          alt="7-Day A-Z Guarantee"
           width={800}
           height={400}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -58,7 +65,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.print/features/02.png"
-          alt=""
+          alt="3-Day Express Shipping"
           width={800}
           height={400}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -75,7 +82,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.print/features/03.png"
-          alt=""
+          alt="Instant Sample Orders"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -92,7 +99,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.print/features/04.png"
-          alt=""
+          alt="Free Design Canvas"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -109,7 +116,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.print/features/05.png"
-          alt=""
+          alt="Personalized 1:1 Management"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -438,7 +445,7 @@ function SectionCustomOrder() {
           <div className="absolute inset-0 bg-background">
             <Image
               src="/www/common/custom-card-bg-01.png"
-              alt=""
+              alt="Contact us background"
               width={1200}
               height={520}
               className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110"

@@ -12,6 +12,7 @@ import FooterWithCTA from "@/www/footer-with-cta";
 import Header from "@/www/header";
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import {
   Card,
@@ -25,6 +26,11 @@ import { cn } from "@/components/lib/utils";
 import CustomDomainDemo from "./custom-domain-demo";
 import { AnalysisIcon } from "@/www/icons";
 import Hello from "./hello";
+
+export const metadata: Metadata = {
+  title: "Grida West",
+  description: "Next-generation hosting and integrations with Grida West.",
+};
 
 export default function WestPage() {
   return (

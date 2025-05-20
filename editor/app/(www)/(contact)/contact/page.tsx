@@ -4,6 +4,7 @@ import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +18,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import { SlackIcon } from "lucide-react";
 import { EnvelopeClosedIcon } from "@radix-ui/react-icons";
+
+export const metadata: Metadata = {
+  title: "Contact Grida | Get in Touch",
+  description: "Have questions? Reach out via Slack or email. We're here to help!",
+};
 
 export default function ContactPage() {
   return (

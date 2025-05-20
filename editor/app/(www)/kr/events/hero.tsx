@@ -90,7 +90,7 @@ const ImageGrid = () => {
             <div key={index} className=" h-96 w-72 overflow-hidden rounded-lg">
               <Image
                 src={src}
-                alt=""
+                alt="Event photo"
                 className="h-full w-full object-cover object-center"
                 width={320}
                 height={520}

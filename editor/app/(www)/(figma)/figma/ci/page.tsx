@@ -10,6 +10,12 @@ import { ArrowDown, Github, Redo2Icon, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckIcon } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Figma CI | Automate Your Design Workflow",
+  description: "Continuous integration for Figma projects powered by Grida.",
+};
 
 export default function CiPage() {
   return (
