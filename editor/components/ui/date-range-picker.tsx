@@ -2,7 +2,6 @@
 // https://github.com/johnpolacek/date-range-picker-for-shadcn
 //
 
-/* eslint-disable max-lines */
 "use client";
 
 import React, { type FC, useState, useEffect, useRef, type JSX } from "react";

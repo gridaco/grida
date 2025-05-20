@@ -214,11 +214,11 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/eslintrc": "^3",
     "@figma/rest-api-spec": "^0.21.0",
     "@playwright/test": "^1.52.0",
     "@supabase/storage-js": "^2.7.3",
-    "@tailwindcss/postcss": "^4.1.6",
+    "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^5.14.1",
     "@testing-library/react": "^11.2.7",
