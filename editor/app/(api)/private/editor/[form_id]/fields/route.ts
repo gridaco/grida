@@ -86,7 +86,7 @@ export async function POST(
   // console.log("upserted", upserted, init);
 
   if (error) {
-    // console.error("ERR: while upserting field", error, upserted);
+    console.info("ERR: while upserting field", error, upserted);
     return NextResponse.json(
       {
         message: `Failed to ${operation} field`,
