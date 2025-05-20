@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchTemplates } from "./actions";
-import { formlink } from "@/lib/forms/url";
+import { formlink } from "@/host/url";
 import { Env } from "@/env";
 import Header from "@/www/header";
 import Footer from "@/www/footer";

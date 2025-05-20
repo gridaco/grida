@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 
 export function FieldBlock({

@@ -1,5 +1,5 @@
 import { Env } from "@/env";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { createFormsClient, service_role } from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";

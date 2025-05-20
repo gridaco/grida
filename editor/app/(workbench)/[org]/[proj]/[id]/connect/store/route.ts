@@ -1,4 +1,4 @@
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { type NextRequest, NextResponse } from "next/server";
 import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 import { notFound } from "next/navigation";

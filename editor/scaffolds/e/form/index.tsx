@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFingerprint } from "@/components/fingerprint";
-import { formlink } from "@/lib/forms/url";
+import { formlink } from "@/host/url";
 import { GridaFormsFormView, type FormViewTranslation } from "./formview";
 import type { FormPageBackgroundSchema } from "@/grida-forms/hosted/types";
 import { FormPageBackground } from "./background";

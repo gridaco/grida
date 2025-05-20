@@ -5,7 +5,7 @@ import { Spinner } from "@/components/spinner";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useEditorState } from "@/scaffolds/editor";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 
 export default function DataIndexPage() {
   const [state] = useEditorState();

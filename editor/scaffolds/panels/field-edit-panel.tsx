@@ -55,7 +55,7 @@ import { Switch } from "@/components/ui/switch";
 import { FormFieldUpsert } from "@/types/private/api";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { NameInput } from "./name-input";

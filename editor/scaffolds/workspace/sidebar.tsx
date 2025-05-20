@@ -48,7 +48,7 @@ import {
 } from "@radix-ui/react-icons";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { CreateNewDocumentButton } from "./create-new-document-button";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { createBrowserClient } from "@/lib/supabase/client";

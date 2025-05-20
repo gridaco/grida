@@ -1,4 +1,4 @@
-import { editorbasepath } from "@/lib/forms/url";
+import { editorbasepath } from "@/host/url";
 import type {
   BaseDocumentEditorInit,
   BaseDocumentEditorState,

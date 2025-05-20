@@ -1,4 +1,4 @@
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { createClient } from "@/lib/supabase/server";
 import {
   SchemaDocumentSetupAssistantService,

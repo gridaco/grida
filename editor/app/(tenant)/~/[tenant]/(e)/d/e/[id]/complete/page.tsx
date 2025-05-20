@@ -8,7 +8,7 @@ import type {
   FormDocument,
   EndingPageI18nOverrides,
 } from "@/grida-forms/hosted/types";
-import type { FormLinkURLParams } from "@/lib/forms/url";
+import type { FormLinkURLParams } from "@/host/url";
 import { FormValue } from "@/services/form";
 
 type Params = { id: string };

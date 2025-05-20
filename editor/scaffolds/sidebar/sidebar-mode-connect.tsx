@@ -25,7 +25,7 @@ import {
   SidebarMenuItem,
   SidebarMenu,
 } from "@/components/ui/sidebar";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
 import { SalesforceLogo } from "@/components/logos/salesforce";
 

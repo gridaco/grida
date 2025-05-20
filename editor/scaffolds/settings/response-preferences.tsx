@@ -24,7 +24,7 @@ import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useEditorState } from "../editor";
 
 export function RestrictNumberOfResponseByCustomer() {

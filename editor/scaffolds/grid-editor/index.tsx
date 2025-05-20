@@ -35,7 +35,7 @@ import {
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import type { DGColumn, DGResponseRow, DGSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";

@@ -24,7 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { editorlink } from "@/lib/forms/url";
+import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
 import { ArchiveIcon, InfoCircledIcon } from "@radix-ui/react-icons";

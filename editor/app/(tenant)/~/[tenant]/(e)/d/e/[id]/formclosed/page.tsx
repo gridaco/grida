@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
-import type { FormLinkURLParams } from "@/lib/forms/url";
+import type { FormLinkURLParams } from "@/host/url";
 
 type Params = { id: string };
 
