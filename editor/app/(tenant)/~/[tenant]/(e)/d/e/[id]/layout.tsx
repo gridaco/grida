@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { service_role } from "@/lib/supabase/server";
 import { type Metadata, type Viewport } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
-import { FormDocument } from "@/types";
+import type { FormDocument } from "@/grida-forms/hosted/types";
 import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { Toaster } from "@/components/ui/sonner";

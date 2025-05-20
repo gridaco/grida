@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import * as CardPrimitives from "@/components/ui/card";
 import type { DGResponseRow } from "../grid";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 import { cn } from "@/components/lib/utils";
 import { Data } from "@/lib/data";
 import {

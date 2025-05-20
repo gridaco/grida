@@ -28,9 +28,9 @@ import { Features } from "@/grida-forms/features/scheduling";
 import { IpInfo, ipinfo } from "@/clients/ipinfo";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,
-  FormFieldStorageSchema,
   Geo,
 } from "@/types";
+import type { FormFieldStorageSchema } from "@/grida-forms/hosted/types";
 import { PGXXError } from "@/k/errcode";
 import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";

@@ -1,6 +1,6 @@
 import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import type { FormBlockTree, FormBlockTreeFolderBlock } from "./types";
-import { FormBlockType } from "@/types";
+import type { FormBlockType } from "@/grida-forms/hosted/types";
 
 const folder_types = ["section", "group"];
 

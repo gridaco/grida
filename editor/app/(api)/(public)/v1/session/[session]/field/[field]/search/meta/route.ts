@@ -1,6 +1,7 @@
 import { service_role } from "@/lib/supabase/server";
 import { GridaXSupabaseService } from "@/services/x-supabase";
-import { type FormFieldReferenceSchema, GridaXSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
+import type { FormFieldReferenceSchema } from "@/grida-forms/hosted/types";
 import { NextRequest, NextResponse } from "next/server";
 import { notFound } from "next/navigation";
 import assert from "assert";

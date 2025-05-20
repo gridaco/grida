@@ -7,9 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import type { FormFieldUpsert } from "@/types/private/api";
 import type {
   FormFieldDataSchema,
-  FormInputType,
   PaymentFieldData,
-} from "@/types";
+  FormInputType,
+} from "@/grida-forms/hosted/types";
 import { UpsertDto } from "@/types/supabase-ext";
 
 type Params = { form_id: string };

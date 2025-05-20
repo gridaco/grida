@@ -25,7 +25,7 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
-import { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 import Link from "next/link";
 import FormFieldPreview from "@/components/formfield";
 import {

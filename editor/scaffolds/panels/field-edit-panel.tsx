@@ -15,15 +15,15 @@ import {
   SidePanel,
 } from "@/components/panels/side-panel";
 import FormFieldPreview from "@/components/formfield";
-import {
-  type FormFieldAutocompleteType,
-  type FormFieldDataSchema,
-  type FormInputType,
-  type FormFieldInit,
-  type PaymentFieldData,
-  type FormFieldStorageSchema,
-  type FormFieldReferenceSchema,
-} from "@/types";
+import type {
+  FormInputType,
+  FormFieldInit,
+  FormFieldDataSchema,
+  FormFieldAutocompleteType,
+  PaymentFieldData,
+  FormFieldStorageSchema,
+  FormFieldReferenceSchema,
+} from "@/grida-forms/hosted/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,

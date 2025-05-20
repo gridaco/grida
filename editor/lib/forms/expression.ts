@@ -1,4 +1,4 @@
-import { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 import { TProperty } from "@/lib/spock";
 import type { tokens } from "@grida/tokens";
 

@@ -3,7 +3,10 @@
 import React, { useEffect, useMemo } from "react";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { usePrevious } from "@uidotdev/usehooks";
-import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
+import {
+  FormPageBackgroundSchema,
+  FormStyleSheetV1Schema,
+} from "@/grida-forms/hosted/types";
 import { useEditorState } from "@/scaffolds/editor/use-editor";
 import equal from "deep-equal";
 

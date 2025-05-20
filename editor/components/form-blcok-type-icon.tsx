@@ -8,7 +8,7 @@ import {
   SectionIcon,
   VideoIcon,
 } from "@radix-ui/react-icons";
-import type { FormBlockType } from "@/types";
+import type { FormBlockType } from "@/grida-forms/hosted/types";
 
 export function BlockTypeIcon({
   type,

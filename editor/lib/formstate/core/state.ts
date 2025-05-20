@@ -1,6 +1,6 @@
 import { FormBlockTree } from "@/lib/forms/types";
 import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 import type { FormAgentGeo } from "./geo";
 
 export type VirtualFileValueProxy = {

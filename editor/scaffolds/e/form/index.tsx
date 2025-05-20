@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFingerprint } from "@/components/fingerprint";
 import { formlink } from "@/lib/forms/url";
 import { GridaFormsFormView, type FormViewTranslation } from "./formview";
-import type { FormPageBackgroundSchema } from "@/types";
+import type { FormPageBackgroundSchema } from "@/grida-forms/hosted/types";
 import { FormPageBackground } from "./background";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRequestFormSession, useFormSession } from "./load";

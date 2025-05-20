@@ -1,12 +1,12 @@
 import type {
+  FormBlock,
   FormBlockType,
   FormFieldDataSchema,
   FormInputType,
   FormFieldDefinition,
-  FormBlock,
   Option,
   FormsPageLanguage,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
@@ -202,7 +202,7 @@ export class FormRenderTree {
         ?.map((block: FormBlock) => {
           const is_field = block.type === "field";
           const field = is_field
-            ? _m_fields.find((f: any) => f.id === block.form_field_id) ?? null
+            ? (_m_fields.find((f: any) => f.id === block.form_field_id) ?? null)
             : null;
 
           const shared: Partial<BaseRenderBlock> = {

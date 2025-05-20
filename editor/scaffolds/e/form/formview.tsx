@@ -10,7 +10,10 @@ import React, {
 import FormField from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import { FormBlockTree } from "@/lib/forms/types";
-import { FormFieldDefinition, PaymentFieldData } from "@/types";
+import type {
+  FormFieldDefinition,
+  PaymentFieldData,
+} from "@/grida-forms/hosted/types";
 import dynamic from "next/dynamic";
 import { cn } from "@/components/lib/utils";
 import { request_toss_payments_checkout_session } from "@/grida-forms/integrations/payments/tosspayments/api";

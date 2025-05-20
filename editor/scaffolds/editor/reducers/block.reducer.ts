@@ -23,7 +23,7 @@ import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { draftid } from "@/utils/id";
-import type { FormBlockType, FormInputType } from "@/types";
+import type { FormBlockType, FormInputType } from "@/grida-forms/hosted/types";
 
 export default function blockReducer(
   state: EditorState,

@@ -1,4 +1,4 @@
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 
 export namespace RawdataProcessing {
   export function idkeytonamekey(

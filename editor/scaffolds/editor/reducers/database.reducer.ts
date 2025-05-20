@@ -26,12 +26,12 @@ import type {
   TVirtualRowData,
   TXSupabaseDataTablespace,
 } from "../state";
-import {
-  AttributeDefinition,
+import { GridaXSupabase } from "@/types";
+import type {
   FormResponse,
   FormResponseField,
-  GridaXSupabase,
-} from "@/types";
+  AttributeDefinition,
+} from "@/grida-forms/hosted/types";
 import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";

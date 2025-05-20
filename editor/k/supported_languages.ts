@@ -1,4 +1,4 @@
-import { FormsPageLanguage } from "@/types";
+import type { FormsPageLanguage } from "@/grida-forms/hosted/types";
 import resources from "@/i18n";
 
 export const supported_form_page_languages: FormsPageLanguage[] = Object.keys(

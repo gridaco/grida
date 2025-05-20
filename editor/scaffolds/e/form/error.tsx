@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { FormFieldDefinition } from "@/types";
+import type { FormFieldDefinition } from "@/grida-forms/hosted/types";
 import {
   Dialog,
   DialogContent,

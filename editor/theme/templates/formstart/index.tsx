@@ -8,7 +8,7 @@ import FormStartPage004 from "@/theme/templates/formstart/004/page";
 import FormStartPage005 from "@/theme/templates/formstart/005/page";
 import FormStartPage005_RES from "@/theme/templates/formstart/005/messages.json";
 import FormStartPage006 from "@/theme/templates/formstart/006/page";
-import { CampaignMeta } from "@/types";
+import type { CampaignMeta } from "@/grida-forms/hosted/types";
 import React, { useMemo } from "react";
 import grida from "@grida/schema";
 import { StandaloneSceneContent } from "@/grida-react-canvas";

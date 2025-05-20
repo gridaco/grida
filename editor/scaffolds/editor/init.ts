@@ -20,12 +20,11 @@ import type {
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { EditorSymbols } from "./symbols";
-import {
+import { GridaXSupabase, SchemaMayVaryDocumentServerObject } from "@/types";
+import type {
   FormFieldDefinition,
   FormStartPageSchema,
-  GridaXSupabase,
-  SchemaMayVaryDocumentServerObject,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";

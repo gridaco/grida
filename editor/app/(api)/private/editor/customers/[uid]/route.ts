@@ -1,6 +1,6 @@
 import type { Platform } from "@/lib/platform";
 import { createClient, createFormsClient } from "@/lib/supabase/server";
-import { Form, FormResponse } from "@/types";
+import type { Form, FormResponse } from "@/grida-forms/hosted/types";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 

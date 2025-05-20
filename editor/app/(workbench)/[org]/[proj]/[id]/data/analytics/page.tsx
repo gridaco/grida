@@ -10,7 +10,7 @@ import { useMemo } from "react";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import type { Analytics } from "@/lib/analytics";
 import type { GridaSchemaTableVirtualRow } from "@/scaffolds/editor/state";
-import type { FormResponseSession } from "@/types";
+import type { FormResponseSession } from "@/grida-forms/hosted/types";
 
 function useAnalyticsEventStreams(
   response_stream: GridaSchemaTableVirtualRow[],

@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
-import { EndingPageI18nOverrides, FormDocument } from "@/types";
+import type {
+  FormDocument,
+  EndingPageI18nOverrides,
+} from "@/grida-forms/hosted/types";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 import { FormValue } from "@/services/form";
 

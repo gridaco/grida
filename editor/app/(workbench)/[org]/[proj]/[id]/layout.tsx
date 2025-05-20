@@ -11,15 +11,15 @@ import {
 import { EditorSidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { GridaXSupabaseService } from "@/services/x-supabase";
+import type { CanvasDocumentSnapshotSchema } from "@/types";
 import type {
-  CanvasDocumentSnapshotSchema,
-  EndingPageTemplateID,
   Form,
-  FormBlock,
   FormFieldDefinition,
+  FormBlock,
+  EndingPageTemplateID,
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import type {
   GDocEditorRouteParams,
   FormDocumentEditorInit,

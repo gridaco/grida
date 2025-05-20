@@ -1,4 +1,7 @@
-import { FormFieldAutocompleteType, FormInputType } from "@/types";
+import type {
+  FormFieldAutocompleteType,
+  FormInputType,
+} from "@/grida-forms/hosted/types";
 
 type FieldTypeAnnotation = {
   label: string;

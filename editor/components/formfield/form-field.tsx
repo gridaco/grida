@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import {
-  FormFieldDataSchema,
+import type {
   FormInputType,
   Optgroup,
   Option,
+  FormFieldDataSchema,
   PaymentFieldData,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import { Select as HtmlSelect } from "@/components/vanilla/select";
 import {
   Select,

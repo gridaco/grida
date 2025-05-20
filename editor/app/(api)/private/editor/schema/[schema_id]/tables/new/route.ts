@@ -1,5 +1,5 @@
 import { createFormsClient } from "@/lib/supabase/server";
-import { FormInputType } from "@/types";
+import type { FormInputType } from "@/grida-forms/hosted/types";
 import {
   CreateNewSchemaTableRequest,
   CreateNewSchemaTableResponse,

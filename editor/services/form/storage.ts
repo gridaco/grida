@@ -12,11 +12,11 @@ import {
   XSupabase,
   createXSupabaseClient,
 } from "@/services/x-supabase";
-import {
-  SchemaTableConnectionXSupabaseMainTableJoint,
+import type { SchemaTableConnectionXSupabaseMainTableJoint } from "@/types";
+import type {
   FormFieldDefinition,
   FormFieldStorageSchema,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import assert from "assert";
 

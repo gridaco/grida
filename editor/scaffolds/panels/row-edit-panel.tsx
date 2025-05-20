@@ -15,12 +15,11 @@ import {
   PropertyTextInput,
   SidePanel,
 } from "@/components/panels/side-panel";
-import {
+import type {
   FormFieldDefinition,
   FormResponse,
-  FormFieldInit,
   FormResponseField,
-} from "@/types";
+} from "@/grida-forms/hosted/types";
 import { fmt_local_index } from "@/utils/fmt";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button } from "@/components/ui/button";

@@ -14,8 +14,8 @@ import {
   ArrowRightIcon,
   PlayIcon,
 } from "@radix-ui/react-icons";
-import { KeyIcon, LinkIcon } from "lucide-react";
-import type { FormInputType } from "@/types";
+import { KeyIcon } from "lucide-react";
+import type { FormInputType } from "@/grida-forms/hosted/types";
 import {
   CellRoot,
   ColumnHeaderCell,

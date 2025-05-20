@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
 import { createBrowserFormsClient } from "@/lib/supabase/client";
-import { FormDocument } from "@/types";
+import type { FormDocument } from "@/grida-forms/hosted/types";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { type FakeLocationPlan, FormDataFaker, CustomerFaker } from "./faker";
 import { Platform } from "../platform";

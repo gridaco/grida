@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { Option } from "@/types";
+import type { Option } from "@/grida-forms/hosted/types";
 import {
   Table,
   TableBody,

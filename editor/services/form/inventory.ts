@@ -1,8 +1,8 @@
 import { service_role } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "../commerce";
-import assert from "assert";
-import { Option } from "@/types";
+import type { Option } from "@/grida-forms/hosted/types";
 import { FORM_OPTION_UNAVAILABLE, FORM_SOLD_OUT } from "@/k/error";
+import assert from "assert";
 
 export type FormFieldOptionsInventoryMap = { [sku: string]: number };
 

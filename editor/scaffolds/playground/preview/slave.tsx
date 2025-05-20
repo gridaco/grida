@@ -8,7 +8,7 @@ import resources from "@/i18n";
 import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
-import { FormsPageLanguage } from "@/types";
+import type { FormsPageLanguage } from "@/grida-forms/hosted/types";
 import { useTheme } from "next-themes";
 import type { PlaygroundWindowMessageAction } from "@/lib/forms/messages";
 import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";

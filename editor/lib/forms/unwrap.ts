@@ -1,4 +1,5 @@
-import type { FormInputType, JSONValue } from "@/types";
+import type { JSONValue } from "@/types";
+import type { FormInputType } from "@/grida-forms/hosted/types";
 
 export function unwrapFeildValue(
   value: any,

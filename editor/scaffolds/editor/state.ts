@@ -1,26 +1,27 @@
 import type {
   Appearance,
-  AttributeDefinition,
   CanvasDocumentSnapshotSchema,
-  EndingPageI18nOverrides,
-  EndingPageTemplateID,
   FontFamily,
-  FormBlock,
-  FormBlockType,
-  FormFieldDefinition,
-  FormFieldInit,
-  FormMethod,
-  FormPageBackgroundSchema,
-  FormResponse,
-  FormResponseField,
-  FormResponseSession,
-  FormResponseUnknownFieldHandlingStrategyType,
-  FormStartPageSchema,
-  FormStyleSheetV1Schema,
-  FormsPageLanguage,
   GDocumentType,
   GridaXSupabase,
 } from "@/types";
+import type {
+  FormFieldDefinition,
+  FormFieldInit,
+  FormBlock,
+  FormResponse,
+  FormBlockType,
+  FormResponseField,
+  FormStartPageSchema,
+  FormResponseSession,
+  FormResponseUnknownFieldHandlingStrategyType,
+  EndingPageI18nOverrides,
+  EndingPageTemplateID,
+  FormPageBackgroundSchema,
+  FormStyleSheetV1Schema,
+  AttributeDefinition,
+} from "@/grida-forms/hosted/types";
+import type { FormMethod, FormsPageLanguage } from "@/grida-forms/hosted/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
 import type { IDocumentEditorState } from "@/grida-react-canvas/state";
