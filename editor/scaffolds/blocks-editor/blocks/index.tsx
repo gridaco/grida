@@ -76,20 +76,20 @@ export function Block(props: EditorFlatFormBlock) {
 
   return (
     <>
-      {/* debug display */}
-      {/* <div className="text-xs border p-1">
-        <div className="flex flex-col gap-3">
-          <span>id: {props.id}</span>
-          <span>parent: {props.parent_id}</span>
-          <span>index: {props.local_index}</span>
-        </div>
-      </div> */}
       <div
         data-folder={props.type === "section"}
         ref={setNodeRef}
         style={style}
         className="group relative data-[folder='true']:mt-16"
       >
+        {/* debug display */}
+        {/* <div className="border p-1">
+          <div className="flex flex-col gap-1 text-xs font-mono text-muted-foreground">
+            <span>id: {props.id}</span>
+            <span>parent: {props.parent_id}</span>
+            <span>index: {props.local_index}</span>
+          </div>
+        </div> */}
         <div
           style={{
             display: props.type === "section" ? "none" : "block",
