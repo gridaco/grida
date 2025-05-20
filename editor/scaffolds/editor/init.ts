@@ -714,11 +714,8 @@ function formdocumentpagesinit({
         {
           defaultOpen: true,
           type: "folder",
-          id: "campaign",
-          label: "Campaign",
-          link: {
-            href: `/${basepath}/${document_id}/form`,
-          },
+          id: "form",
+          label: "Form",
           icon: "folder",
           children: [
             // TODO: not ready
@@ -747,6 +744,15 @@ function formdocumentpagesinit({
               label: "Ending",
               link: {
                 href: `/${basepath}/${document_id}/form/end`,
+              },
+              icon: "file",
+            },
+            {
+              type: "item",
+              id: "form/settings",
+              label: "Settings",
+              link: {
+                href: `/${basepath}/${document_id}/form`,
               },
               icon: "file",
             },
