@@ -51,7 +51,7 @@ import {
   LockClosedIcon,
   LockOpen1Icon,
 } from "@radix-ui/react-icons";
-import { supports } from "@/grida/utils/supports";
+import { supports } from "@/grida-canvas-utils/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";

@@ -1,0 +1,15 @@
+{
+  "name": "@grida/io",
+  "description": "IO model for Grida Canvas",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@grida/cmath": "workspace:*",
+    "fast-png": "^6.3.0",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@grida/cg": "workspace:*",
+    "@grida/schema": "workspace:*"
+  }
+}

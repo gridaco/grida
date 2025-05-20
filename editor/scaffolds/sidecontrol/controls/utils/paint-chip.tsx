@@ -1,4 +1,4 @@
-import { css } from "@/grida/css";
+import { css } from "@/grida-canvas-utils/css";
 import type cg from "@grida/cg";
 import { TransparencyGridIcon } from "@radix-ui/react-icons";
 

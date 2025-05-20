@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useFilePicker } from "use-file-picker";
 import { Card } from "@/components/ui/card";
-import { io } from "@/grida-io-model";
+import { io } from "@grida/io";
 
 export function ImportFromGridaFileJsonDialog({
   onImport,

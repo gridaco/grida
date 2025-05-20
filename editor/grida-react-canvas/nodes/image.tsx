@@ -1,7 +1,7 @@
 import React from "react";
 import queryattributes from "./utils/attributes";
 import grida from "@grida/schema";
-import { css } from "@/grida/css";
+import { css } from "@/grida-canvas-utils/css";
 
 export const ImageWidget = ({
   src,

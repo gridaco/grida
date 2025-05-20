@@ -8,7 +8,7 @@ import { SideControlDoctypeSite } from "./sidecontrol-doctype-site";
 import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
-import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
+import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
 import { SideControlDoctypeCanvas } from "./sidecontrol-doctype-canvas";
 
 export function SideControl() {

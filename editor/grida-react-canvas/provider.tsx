@@ -35,7 +35,7 @@ import deepEqual from "deep-equal";
 import iosvg from "@grida/io-svg";
 import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
-import { is_direct_component_consumer } from "@/grida/utils/supports";
+import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type cg from "@grida/cg";
 import nid from "./reducers/tools/id";
 

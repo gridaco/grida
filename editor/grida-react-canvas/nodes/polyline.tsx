@@ -1,7 +1,7 @@
 import React from "react";
 import queryattributes from "./utils/attributes";
 import grida from "@grida/schema";
-import { svg } from "@/grida/svg";
+import { svg } from "@/grida-canvas-utils/svg";
 import type cg from "@grida/cg";
 
 /**

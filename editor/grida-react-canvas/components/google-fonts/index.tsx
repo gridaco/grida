@@ -1,10 +1,19 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/components/lib/utils";
-import * as Fonts from "@/grida-fonts";
+import * as google from "@grida/fonts/google";
+
+export function useGoogleFontsList() {
+  const [fonts, setFonts] = useState<any[]>([]);
+  useEffect(() => {
+    google.fetchGoogleFontsV2().then(setFonts);
+  }, []);
+
+  return fonts;
+}
 
 const GoogleFontsManagerProviderContext = React.createContext<{
-  fonts: Fonts.google.GoogleFontsFontInfo[];
+  fonts: google.GoogleFontsFontInfo[];
 }>({ fonts: [] });
 
 export function GoogleFontsManager({
@@ -12,7 +21,7 @@ export function GoogleFontsManager({
   children,
   stylesheets,
 }: React.PropsWithChildren<{
-  fonts: Fonts.google.GoogleFontsFontInfo[];
+  fonts: google.GoogleFontsFontInfo[];
   stylesheets?: boolean;
 }>) {
   return (
@@ -31,7 +40,7 @@ export function GoogleFontsStylesheets() {
 
   useEffect(() => {
     fonts.forEach((font) => {
-      const fontId = `gfm-${Fonts.google.fontFamilyToId(font.family)}`;
+      const fontId = `gfm-${google.fontFamilyToId(font.family)}`;
 
       // Only inject if not already in the document or in the injectedFonts Set
       if (
@@ -61,7 +70,7 @@ export function GoogleFontsStylesheets() {
 }
 
 function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
-  const id = `gfm-${Fonts.google.fontFamilyToId(fontFamily)}`;
+  const id = `gfm-${google.fontFamilyToId(fontFamily)}`;
   const existing = document.getElementById(id);
   if (existing) return existing as HTMLLinkElement;
 
@@ -70,7 +79,7 @@ function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
   link.id = id;
   link.setAttribute("data-gfm", "true");
   link.setAttribute("data-font-family", fontFamily);
-  link.href = Fonts.google.csslink({ fontFamily });
+  link.href = google.csslink({ fontFamily });
   link.rel = "stylesheet";
   document.head.appendChild(link);
 
@@ -90,7 +99,7 @@ export function GoogleFontsPreview({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       data-font-family={fontFamily}
-      src={Fonts.google.svglink(id)}
+      src={google.svglink(id)}
       alt={fontFamily}
       className={cn("dark:invert", className)}
     />

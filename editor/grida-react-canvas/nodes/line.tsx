@@ -1,7 +1,7 @@
 import React from "react";
 import type grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
-import { svg } from "@/grida/svg";
+import { svg } from "@/grida-canvas-utils/svg";
 
 export function SVGLineWidget({
   width,
