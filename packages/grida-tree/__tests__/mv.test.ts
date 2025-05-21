@@ -53,3 +53,47 @@ describe("mv", () => {
     expect(tree.a).toEqual(["c", "b"]);
   });
 });
+
+describe("mv:advanced", () => {
+  let tree: TreeMap;
+
+  beforeEach(() => {
+    tree = {
+      root: ["a", "b", "c"],
+      a: ["d", "e"],
+      b: [],
+      c: ["f"],
+      d: [],
+      e: [],
+      f: [],
+    };
+  });
+
+  test("complex chained moves with indices and bulk sources", () => {
+    // move 'd' under 'b' at index 0
+    mv(tree, "d", "b", 0);
+    // move 'e' under 'root' at index 1
+    mv(tree, "e", "root", 1);
+    // move multiple ['f','a'] under 'b' (append)
+    mv(tree, ["f", "a"], "b");
+    expect(tree).toEqual({
+      root: ["e", "b", "c"],
+      a: [],
+      b: ["d", "f", "a"],
+      c: [],
+      d: [],
+      e: [],
+      f: [],
+    });
+  });
+
+  test("reordering within same parent using index", () => {
+    // initial children of 'a' are ['d','e']
+    // move 'e' within 'a' to index 0
+    mv(tree, "e", "a", 0);
+    expect(tree.a).toEqual(["e", "d"]);
+    // then move 'd' to index -1 (append) under 'a'
+    mv(tree, "d", "a", -1);
+    expect(tree.a).toEqual(["e", "d"]);
+  });
+});
