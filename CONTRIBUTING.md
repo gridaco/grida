@@ -5,8 +5,13 @@
 First, clone the repo with git submodules (optional. using Github Desktop will automatically clone the submodules for you)
 
 ```bash
+# clone the repo
 git clone --recurse-submodules https://github.com/gridaco/grida
 cd grida
+
+# setup node & package manager
+nvm use
+corepack enable pnpm
 ```
 
 Then, install the dependencies and run the development server:
