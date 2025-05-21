@@ -16,15 +16,15 @@
     "clsx": "^2.1.1",
     "motion": "^12.11.0",
     "next": "15.3.2",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
     "shadergradient": "^1.2.14",
     "tailwind-merge": "^3.2.0",
     "three": "^0.170.0",
     "three-globe": "^2.42.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.6",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

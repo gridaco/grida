@@ -1,11 +1,11 @@
 import {
-  AccountTreeIcon,
-  ApiIcon,
-  DashBoardCustomizeIcon,
-  SmartToyIcon,
-  AnalysisIcon,
-  VisualStudioIcon,
-} from "@/www/icons";
+  CodeIcon,
+  BotIcon,
+  FrameIcon,
+  PaletteIcon,
+  UsersIcon,
+  ChartLineIcon,
+} from "lucide-react";
 
 export default function Features() {
   return (
@@ -16,42 +16,42 @@ export default function Features() {
       <div className="mt-20">
         <div className="columns-2 lg:columns-3 2xl:columns-3 grid-rows-2 space-y-20">
           <FeatureCard
-            icon={<SmartToyIcon size={24} />}
+            icon={<BotIcon className="size-6" />}
             title={"Smart Customer Identity"}
             excerpt={
               "Optimize user experience with customizable Smart Customer Identity in your forms."
             }
           />
           <FeatureCard
-            icon={<AccountTreeIcon size={24} />}
+            icon={<UsersIcon className="size-6" />}
             title={"Connect Customer Identity"}
             excerpt={
               "Align your forms with your customers' identity, fostering a personalized and trustworthy interaction."
             }
           />
           <FeatureCard
-            icon={<VisualStudioIcon size={24} />}
+            icon={<FrameIcon className="size-6" />}
             title={"Visual Editor"}
             excerpt={
               "Visual Editor allows users to intuitively customize visuals, ensuring their forms match their unique style."
             }
           />
           <FeatureCard
-            icon={<AnalysisIcon size={24} />}
+            icon={<ChartLineIcon className="size-6" />}
             title={"Advanced Analytics"}
             excerpt={
               "Advanced Analytics provides detailed insights to optimize your form strategy."
             }
           />
           <FeatureCard
-            icon={<DashBoardCustomizeIcon size={24} />}
+            icon={<PaletteIcon className="size-6" />}
             title={"Custom branding & form"}
             excerpt={
               "Customize your form pages with branding elements to align seamlessly with your brand identity."
             }
           />
           <FeatureCard
-            icon={<ApiIcon size={24} />}
+            icon={<CodeIcon className="size-6" />}
             title={"API access"}
             excerpt={
               "API access allows for streamlined integration and enhanced form functionality."

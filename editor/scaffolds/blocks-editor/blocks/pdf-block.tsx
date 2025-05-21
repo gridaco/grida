@@ -19,6 +19,7 @@ import {
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
+  MoveBlockMenuItems,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { PDFViewer } from "@/components/pdf-viewer";
@@ -55,6 +56,7 @@ export function PdfBlock({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <MoveBlockMenuItems id={id} />
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => deleteBlock(id)}

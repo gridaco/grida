@@ -15,6 +15,7 @@ import {
   FlatBlockBase,
   useBlockFocus,
   useDeleteBlock,
+  MoveBlockMenuItems,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <MoveBlockMenuItems id={id} />
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => deleteBlock(id)}

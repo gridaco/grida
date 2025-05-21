@@ -44,7 +44,7 @@ const FlipPage: React.FC<FlipPageProps> = React.forwardRef(
   ({ onLinkClick, pageNumber, width, height, ...props }, ref) => {
     return (
       <div
-        className="shadow-lg rounded overflow-hidden"
+        className="shadow-lg rounded-sm overflow-hidden"
         ref={ref as React.RefObject<HTMLDivElement>}
       >
         <Page
@@ -364,7 +364,7 @@ function NavigationPageNumberControl({
         <input
           type="text"
           autoComplete="off"
-          className="w-7 rounded border text-center"
+          className="w-7 rounded-sm border text-center"
           value={txt}
           onChange={(e) => setTxt(e.target.value)}
           onKeyDown={(e) => {

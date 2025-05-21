@@ -1,24 +1,38 @@
-## Running Locally
+# Contributing to Grida
 
 ---
 
-First, clone the repo with git submodules
+First, clone the repo with git submodules (optional. using Github Desktop will automatically clone the submodules for you)
 
-```
+```bash
+# clone the repo
 git clone --recurse-submodules https://github.com/gridaco/grida
 cd grida
+
+# setup node & package manager
+nvm use
+corepack enable pnpm
 ```
-
-**Tip**
-
-If you are not familiar with git submodules, you can simply use the Github Desktop app to clone the repo and it will automatically clone the submodules for you.
 
 Then, install the dependencies and run the development server:
 
 ```bash
+# (1) install dependencies
 pnpm install
-cd /path/to/package
+
+# run all (not recommended)
+pnpm turbo dev
+
+# run specific app
+pnpm turbo dev --filter=editor
+
+# or simply..
+cd editor
 pnpm dev
+
+# -----
+# building
+pnpm turbo build
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -54,27 +68,11 @@ supabase gen types typescript --local \
   --schema grida_west \
   --schema grida_west_referral \
   > database/database-generated.types.ts
-```
 
-or (if you are a tier 1 contributor)
-
-```bash
+# or with --project-id for hosted db
 supabase gen types typescript \
   --project-id $PROJECT_REF \
-  --schema public \
-  --schema grida_library \
-  --schema grida_www \
-  --schema grida_g11n \
-  --schema grida_x_supabase \
-  --schema grida_sites \
-  --schema grida_canvas \
-  --schema grida_commerce \
-  --schema grida_forms_secure \
-  --schema grida_forms \
-  --schema grida_storage \
-  --schema grida_west \
-  --schema grida_west_referral \
-  > database/database-generated.types.ts
+  ...
 ```
 
 ## Support
@@ -82,3 +80,7 @@ supabase gen types typescript \
 If you have any problem running the project locally or for any further information, please contact us via Slack.
 
 - [joining our slack channel](https://grida.co/join-slack)
+
+**See Also**
+
+- [AGENTS.md](./AGENTS.md) has a comprehensive list of the project structure and the purpose of each directory and file.

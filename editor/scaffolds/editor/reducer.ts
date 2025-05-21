@@ -103,6 +103,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/image/src":
     case "blocks/video/src":
     case "blocks/sort":
+    case "blocks/move/up":
+    case "blocks/move/down":
     case "blocks/focus":
     case "blocks/blur":
       return blockReducer(state, action);
