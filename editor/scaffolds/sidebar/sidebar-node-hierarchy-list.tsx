@@ -265,7 +265,7 @@ export function NodeHierarchyList() {
     return children.filter(
       (id) => (document.nodes[id] as grida.program.nodes.UnknwonNode).expanded
     );
-  }, [id]);
+  }, [children]);
 
   const tree = useTree<grida.program.nodes.Node>({
     rootItemId: "<scene-root>",
@@ -322,7 +322,7 @@ export function NodeHierarchyList() {
 
   useEffect(() => {
     tree.rebuildTree();
-  }, [id]);
+  }, [children]);
 
   return (
     <Tree tree={tree} indent={6} className="gap-y-1">
