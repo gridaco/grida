@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/components/lib/utils";
 import CustomDomainDemo from "./custom-domain-demo";
-import { AnalysisIcon } from "@/www/icons";
+import { ChartLineIcon } from "lucide-react";
 import Hello from "./hello";
 
 export default function WestPage() {
@@ -183,7 +183,7 @@ function FeaturesSection() {
               imageSrc="/www/.west/reward-simulation.png"
             />
             <FeatureCard
-              icon={<AnalysisIcon />}
+              icon={<ChartLineIcon />}
               title="Real-time Analytics"
               description="Analyze referral and participation data instantly with visual graphs and metrics."
               imageSrc="/www/.west/real-time-analytics.png"
