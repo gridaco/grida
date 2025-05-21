@@ -19,7 +19,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.home/3/react-components.png"
-          alt=""
+          alt="React Components"
           width={800}
           height={400}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -35,7 +35,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.home/3/modular-sdk.png"
-          alt=""
+          alt="Modular SDK"
           width={800}
           height={400}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -52,7 +52,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.home/3/optimized.png"
-          alt=""
+          alt="Optimized"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -68,7 +68,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.home/3/widgets-templates.png"
-          alt=""
+          alt="Widgets & Templates"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"
@@ -85,7 +85,7 @@ const features = [
       <div className="absolute inset-0">
         <Image
           src="/www/.home/3/scripting-interface.png"
-          alt=""
+          alt="Scripting Interface"
           width={500}
           height={500}
           className="w-full h-full object-cover object-right-bottom transition-transform duration-300 ease-in-out group-hover:scale-110 dark:invert"

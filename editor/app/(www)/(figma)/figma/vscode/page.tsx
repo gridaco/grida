@@ -5,6 +5,12 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import CodeTabs from "./demo";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "VSCode × Grida",
+  description: "Work with your Figma designs directly in VSCode using Grida.",
+};
 
 export default function AssistantPage() {
   return (
