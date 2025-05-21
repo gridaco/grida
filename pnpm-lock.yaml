@@ -348,6 +348,9 @@ importers:
       '@grida/transparency-grid':
         specifier: workspace:*
         version: link:../packages/grida-canvas-transparency-grid
+      '@grida/tree':
+        specifier: workspace:*
+        version: link:../packages/grida-tree
       '@grida/vn':
         specifier: workspace:*
         version: link:../packages/grida-canvas-vn
@@ -1164,6 +1167,8 @@ importers:
         version: 1.0.4
 
   packages/grida-tokens: {}
+
+  packages/grida-tree: {}
 
   packages/lib/treearray: {}
 

@@ -1,3 +1,6 @@
 {
-  "compilerOptions": {}
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "strict": true
+  }
 }

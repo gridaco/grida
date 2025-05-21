@@ -41,6 +41,7 @@
     "@grida/ruler": "workspace:*",
     "@grida/schema": "workspace:*",
     "@grida/tokens": "workspace:*",
+    "@grida/tree": "workspace:*",
     "@grida/transparency-grid": "workspace:*",
     "@grida/vn": "workspace:*",
     "@headless-tree/core": "^1.0.1",

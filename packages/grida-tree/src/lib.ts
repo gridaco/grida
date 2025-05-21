@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * const nodes: Record<string,Node> = {
+ * const nodes: Record<string, { children: string[] }> = {
  *   a: { children: ["b","c"] },
  *   b: { children: [] },
  *   c: { children: [] }
@@ -18,8 +18,12 @@
  * mv(nodes, "c", "b", 0);
  * // now nodes.b.children === ["c"]
  * ```
+ *
+ * @remark
+ * - This function is not recursive. It only moves direct children of the target node.
+ * - This function does not check for cycles.
  */
-export function mv<T extends { children: string[] }>(
+export function mv<T extends Partial<{ children: string[] }>>(
   nodes: Record<string, T>,
   sources: string | string[],
   target: string,
@@ -33,6 +37,10 @@ export function mv<T extends { children: string[] }>(
     throw new Error(`mv: cannot move to '${target}': No such node`);
   }
 
+  if (!nodes[target].children) {
+    throw new Error(`mv: cannot move to '${target}': No children`);
+  }
+
   for (const src of srcs) {
     if (!(src in nodes)) {
       throw new Error(`mv: cannot move '${src}': No such node`);
@@ -40,9 +48,11 @@ export function mv<T extends { children: string[] }>(
 
     // detach from old parent (if any)
     for (const node of Object.values(nodes)) {
-      const i = node.children.indexOf(src);
+      const list = node.children;
+      if (!list) continue;
+      const i = list.indexOf(src);
       if (i !== -1) {
-        node.children.splice(i, 1);
+        list.splice(i, 1);
         break;
       }
     }

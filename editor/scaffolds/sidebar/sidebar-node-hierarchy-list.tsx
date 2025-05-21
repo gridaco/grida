@@ -77,38 +77,6 @@ export function ScenesGroup() {
   );
 }
 
-export function ScenesList() {
-  const { scenes: scenesmap, scene_id, loadScene } = useDocument();
-
-  const scenes = useMemo(() => {
-    return Object.values(scenesmap).sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0)
-    );
-  }, [scenesmap]);
-
-  return (
-    <SidebarMenu>
-      {scenes.map((scene) => {
-        const isActive = scene.id === scene_id;
-        return (
-          <SceneItemContextMenuWrapper scene_id={scene.id} key={scene.id}>
-            <SidebarMenuItem key={scene.id}>
-              <SidebarMenuButton
-                isActive={isActive}
-                size="sm"
-                onClick={() => loadScene(scene.id)}
-              >
-                <FileIcon />
-                {scene.name}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SceneItemContextMenuWrapper>
-        );
-      })}
-    </SidebarMenu>
-  );
-}
-
 function SceneItemContextMenuWrapper({
   scene_id,
   children,
@@ -151,6 +119,38 @@ function SceneItemContextMenuWrapper({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+function ScenesList() {
+  const { scenes: scenesmap, scene_id, loadScene } = useDocument();
+
+  const scenes = useMemo(() => {
+    return Object.values(scenesmap).sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    );
+  }, [scenesmap]);
+
+  return (
+    <SidebarMenu>
+      {scenes.map((scene) => {
+        const isActive = scene.id === scene_id;
+        return (
+          <SceneItemContextMenuWrapper scene_id={scene.id} key={scene.id}>
+            <SidebarMenuItem key={scene.id}>
+              <SidebarMenuButton
+                isActive={isActive}
+                size="sm"
+                onClick={() => loadScene(scene.id)}
+              >
+                <FileIcon />
+                {scene.name}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SceneItemContextMenuWrapper>
+        );
+      })}
+    </SidebarMenu>
   );
 }
 
@@ -244,7 +244,6 @@ export function NodeHierarchyGroup() {
       <SidebarGroupLabel>Layers</SidebarGroupLabel>
       <SidebarGroupContent>
         <NodeHierarchyList />
-        {/* <NodeHierarchyListV1 /> */}
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -253,6 +252,7 @@ export function NodeHierarchyGroup() {
 export function NodeHierarchyList() {
   const {
     state: { document },
+    mv,
     select,
     hoverNode,
     toggleNodeLocked,
@@ -267,8 +267,9 @@ export function NodeHierarchyList() {
     );
   }, [children]);
 
+  // root item id must be "<root>"
   const tree = useTree<grida.program.nodes.Node>({
-    rootItemId: "<scene-root>",
+    rootItemId: "<root>",
     canReorder: true,
     initialState: {
       expandedItems: expandedItems,
@@ -281,7 +282,7 @@ export function NodeHierarchyList() {
       select(items as string[]);
     },
     getItemName: (item) => {
-      if (item.getId() === "<scene-root>") {
+      if (item.getId() === "<root>") {
         return name;
       }
       return item.getItemData().name;
@@ -293,15 +294,17 @@ export function NodeHierarchyList() {
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());
       const target_id = target.item.getId();
-      const index = "insertionIndex" in target ? target.insertionIndex : 0;
-      console.log("drop", ids, target_id, index);
+      const index =
+        "insertionIndex" in target ? target.insertionIndex : undefined;
+      mv(ids, target_id, index);
+      tree.rebuildTree();
     },
     dataLoader: {
       getItem(itemId) {
         return document.nodes[itemId];
       },
       getChildren: (itemId) => {
-        if (itemId === "<scene-root>") {
+        if (itemId === "<root>") {
           return children;
         }
         const node = document.nodes[itemId];

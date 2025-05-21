@@ -1,60 +1,47 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
 import type grida from "@grida/schema";
+import { mv } from "@grida/tree";
 import { document } from "@/grida-react-canvas/document-query";
 import assert from "assert";
 
 export function self_moveNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
-  node_id: string,
-  target_id: string,
+  source_id: string,
+  target_id: "<root>" | string,
   order?: number
 ): boolean {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
-  const parent_id = document.getParentId(draft.document_ctx, node_id);
+  const source_parent_id = document.getParentId(draft.document_ctx, source_id);
+  const source_is_root =
+    scene.children.includes(source_id) || source_parent_id === null;
 
-  // do not allow move on the root node
-  if (scene.children.includes(node_id) || parent_id === null) {
+  // do not allow move of the root node with constraints
+  if (scene.constraints.children === "single" && source_is_root) {
     return false;
   }
 
+  // make a virtual tree, including the root, treating as a node.
+  const itree: Record<string, grida.program.nodes.i.IChildrenReference> = {
+    "<root>": scene,
+    ...draft.document.nodes,
+  };
+
   // validate target is a container
-  const target = draft.document.nodes[target_id];
+  const target = itree[target_id];
   if (!("children" in target)) {
     return false;
   }
 
-  // validate the current parent is not the target
-
-  if (parent_id === target_id) {
+  // validate target is not a descendant of the node (otherwise it will create a cycle)
+  if (
+    document.getAncestors(draft.document_ctx, target_id).includes(source_id)
+  ) {
     return false;
   }
 
-  // validate target is not a descendant of the node
-  if (document.getAncestors(draft.document_ctx, target_id).includes(node_id)) {
-    return false;
-  }
-
-  // how move works.
-  // 1. unlink the node from the parent
-  // 2. link the node to the target
-  // 3. reset the document hierarchy context
-
-  // [1]
-  const parent = draft.document.nodes[
-    parent_id
-  ] as grida.program.nodes.i.IChildrenReference;
-  parent.children.splice(parent.children.indexOf(node_id), 1);
-
-  // [2]
-  const target_node = draft.document.nodes[
-    target_id
-  ] as grida.program.nodes.i.IChildrenReference;
-  const index = order === undefined ? target_node.children.length : order;
-  target_node.children.splice(index, 0, node_id);
-
-  // [3]
+  mv(itree, source_id, target_id, order);
   const context = document.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 
