@@ -42,8 +42,8 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
-  | EditorOrderAction
-  | EditorPathAction
+  | EditorHierarchyOrderAction
+  | EditorVectorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorA11yArrowAction
@@ -220,14 +220,27 @@ export interface EditorDeleteAction {
   target: NodeID | "selection";
 }
 
-export interface EditorOrderAction {
+export type EditorHierarchyAction =
+  | EditorHierarchyOrderAction
+  | EditorHierarchyMoveAction;
+
+export interface EditorHierarchyOrderAction {
   type: "order";
   target: NodeID | "selection";
   order: "front" | "back" | number;
 }
 
+export interface EditorHierarchyMoveAction {
+  type: "mv";
+  source: NodeID[];
+  target: {
+    id: NodeID;
+    index: number;
+  };
+}
+
 // #region [path]
-export type EditorPathAction =
+export type EditorVectorPathAction =
   | EditorDeleteVertexAction
   | EditorSelectVertexAction
   | EditorHoverVertexAction;

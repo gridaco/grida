@@ -44,7 +44,7 @@ export function ModeDesignForm() {
       )}
 
       <SidebarGroup>
-        <SidebarGroupLabel>Layers</SidebarGroupLabel>
+        <SidebarGroupLabel>Blocks</SidebarGroupLabel>
         <SidebarGroupContent>
           <FormBlockHierarchyList />
         </SidebarGroupContent>

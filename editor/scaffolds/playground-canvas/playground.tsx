@@ -337,7 +337,7 @@ export default function CanvasPlayground({
                                       <DropdownMenuSeparator />
                                       <DropdownMenuSub>
                                         <DropdownMenuSubTrigger className="text-xs">
-                                          <OpenInNewWindowIcon className="size-3.5" />
+                                          <OpenInNewWindowIcon className="size-3.5 me-2" />
                                           Tools
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent>
@@ -381,7 +381,7 @@ export default function CanvasPlayground({
                                       </DropdownMenuSub>
                                       <DropdownMenuSub>
                                         <DropdownMenuSubTrigger className="text-xs">
-                                          <MixIcon className="size-3.5" />
+                                          <MixIcon className="size-3.5 me-2" />
                                           Examples
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent>

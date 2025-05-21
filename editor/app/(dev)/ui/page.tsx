@@ -1,11 +1,12 @@
 "use client";
+import React, { useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { TagInput } from "@/components/tag";
 import { Progress } from "@/components/ui/progress";
 import { Progress as EditorProgress } from "@/components/ui-editor/progress";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { useState } from "react";
+import OriginComp569 from "./comp/comp-569";
 import { PhoneInput } from "@/components/extension/phone-input";
 
 export default function AllComponentsPage() {
@@ -23,6 +24,8 @@ export default function AllComponentsPage() {
           <__PhoneInput />
           <hr />
           <__RichTextEditor />
+          <hr />
+          <OriginComp569 />
         </div>
         <div className="h-10" />
       </main>
