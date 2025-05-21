@@ -1,24 +1,29 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import {
-  createOnDropHandler,
-  dragAndDropFeature,
-  hotkeysCoreFeature,
-  keyboardDragAndDropFeature,
-  selectionFeature,
-  syncDataLoaderFeature,
-} from "@headless-tree/core";
-import { AssistiveTreeDescription, useTree } from "@headless-tree/react";
-import { FolderIcon, FolderOpenIcon } from "lucide-react";
-
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { useDocument } from "@/grida-react-canvas";
 import {
   Tree,
   TreeDragLine,
   TreeItem,
   TreeItemLabel,
 } from "@/components/ui-editor/tree";
-import { useDocument } from "@/grida-react-canvas";
+import {
+  createOnDropHandler,
+  dragAndDropFeature,
+  hotkeysCoreFeature,
+  keyboardDragAndDropFeature,
+  selectionFeature,
+  renamingFeature,
+  syncDataLoaderFeature,
+} from "@headless-tree/core";
+import { AssistiveTreeDescription, useTree } from "@headless-tree/react";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -28,12 +33,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  SidebarMenuItem as Item,
-  SidebarMenuItemAction,
-  SidebarMenuItemActions,
-  SidebarMenuItemLabel,
-} from "@/components/sidebar";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -55,10 +54,9 @@ import {
   useNodeAction,
   useTransform,
 } from "@/grida-react-canvas/provider";
-import { document as dq } from "@/grida-react-canvas/document-query";
 import { NodeTypeIcon } from "@/grida-react-canvas-starter-kit/starterkit-icons/node-type-icon";
-import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
+import grida from "@grida/schema";
 
 export function ScenesGroup() {
   const { createScene } = useDocument();
@@ -159,8 +157,10 @@ function SceneItemContextMenuWrapper({
 function NodeHierarchyItemContextMenuWrapper({
   node_id,
   children,
+  onStartRenaming,
 }: React.PropsWithChildren<{
   node_id: string;
+  onStartRenaming?: () => void;
 }>) {
   const { copy, deleteNode } = useDocument();
   const { fit } = useTransform();
@@ -179,9 +179,9 @@ function NodeHierarchyItemContextMenuWrapper({
           Copy
         </ContextMenuItem>
         <ContextMenuItem
+          disabled={!onStartRenaming}
           onSelect={() => {
-            const n = prompt("Rename");
-            if (n) change.name(n);
+            onStartRenaming?.();
           }}
           className="text-xs"
         >
@@ -250,88 +250,14 @@ export function NodeHierarchyGroup() {
   );
 }
 
-export function NodeHierarchyListV1() {
-  const {
-    state: { document, document_ctx },
-    select,
-    hoverNode,
-    toggleNodeLocked,
-    toggleNodeActive,
-  } = useDocument();
-  const { children, selection, hovered_node_id } = useCurrentScene();
-
-  const list = useMemo(() => {
-    // TODO: need nested nodes for templates
-    return children.map((top) => dq.hierarchy(top, document_ctx)).flat();
-  }, [children, document_ctx]);
-
-  // const ids = Object.keys(document.nodes);
-
-  return (
-    <>
-      {list.map(({ id, depth }) => {
-        const n = document.nodes[id];
-        if (!n) return null;
-        const selected = selection.includes(id);
-        const hovered = hovered_node_id === id;
-        return (
-          <NodeHierarchyItemContextMenuWrapper key={id} node_id={id}>
-            <Item
-              muted
-              hovered={hovered}
-              level={depth}
-              selected={selected}
-              onPointerDown={(e) => {
-                if (e.metaKey || e.ctrlKey) {
-                  select("selection", [id]);
-                } else {
-                  select([id]);
-                }
-              }}
-              icon={<NodeTypeIcon node={n} className="w-3.5 h-3.5" />}
-              onPointerEnter={() => {
-                hoverNode(id, "enter");
-              }}
-              onPointerLeave={() => {
-                hoverNode(id, "leave");
-              }}
-            >
-              <SidebarMenuItemLabel className="font-normal text-xs">
-                {n.name}
-              </SidebarMenuItemLabel>
-              <SidebarMenuItemActions>
-                <SidebarMenuItemAction
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleNodeLocked(id);
-                  }}
-                >
-                  {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
-                </SidebarMenuItemAction>
-                <SidebarMenuItemAction
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleNodeActive(id);
-                  }}
-                >
-                  {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
-                </SidebarMenuItemAction>
-              </SidebarMenuItemActions>
-            </Item>
-          </NodeHierarchyItemContextMenuWrapper>
-        );
-      })}
-    </>
-  );
-}
-
 export function NodeHierarchyList() {
   const {
-    state: { document, document_ctx },
+    state: { document },
     select,
     hoverNode,
     toggleNodeLocked,
     toggleNodeActive,
+    changeNodeName,
   } = useDocument();
   const { id, name, children, selection, hovered_node_id } = useCurrentScene();
 
@@ -342,7 +268,8 @@ export function NodeHierarchyList() {
   }, [id]);
 
   const tree = useTree<grida.program.nodes.Node>({
-    rootItemId: "<root>",
+    rootItemId: "<scene-root>",
+    canReorder: true,
     initialState: {
       expandedItems: expandedItems,
       selectedItems: selection,
@@ -354,7 +281,7 @@ export function NodeHierarchyList() {
       select(items as string[]);
     },
     getItemName: (item) => {
-      if (item.getId() === "<root>") {
+      if (item.getId() === "<scene-root>") {
         return name;
       }
       return item.getItemData().name;
@@ -363,13 +290,18 @@ export function NodeHierarchyList() {
       const node = item.getItemData();
       return "children" in node;
     },
-    canReorder: false,
+    onDrop(items, target) {
+      const ids = items.map((item) => item.getId());
+      const target_id = target.item.getId();
+      const index = "insertionIndex" in target ? target.insertionIndex : 0;
+      console.log("drop", ids, target_id, index);
+    },
     dataLoader: {
       getItem(itemId) {
         return document.nodes[itemId];
       },
       getChildren: (itemId) => {
-        if (itemId === "<root>") {
+        if (itemId === "<scene-root>") {
           return children;
         }
         const node = document.nodes[itemId];
@@ -384,6 +316,7 @@ export function NodeHierarchyList() {
       hotkeysCoreFeature,
       dragAndDropFeature,
       keyboardDragAndDropFeature,
+      renamingFeature,
     ],
   });
 
@@ -398,13 +331,24 @@ export function NodeHierarchyList() {
         const node = item.getItemData();
         if (!node) return null;
 
-        const hovered = hovered_node_id === node.id;
+        const isRenaming = item.isRenaming();
+        const isHovered = hovered_node_id === node.id;
 
         return (
-          <NodeHierarchyItemContextMenuWrapper key={node.id} node_id={node.id}>
+          <NodeHierarchyItemContextMenuWrapper
+            key={node.id}
+            node_id={node.id}
+            onStartRenaming={() => {
+              // prevent from input blurring caused by the context menu closing
+              setTimeout(() => {
+                item.startRenaming();
+              }, 100);
+            }}
+          >
             <TreeItem
               item={item}
               className="group/item w-full h-[25px] max-h-[25px]"
+              data-is-renaming={isRenaming}
               onPointerEnter={() => {
                 hoverNode(node.id, "enter");
               }}
@@ -415,18 +359,38 @@ export function NodeHierarchyList() {
               <TreeItemLabel
                 className={cn(
                   "h-full px-1 py-1 bg-transparent",
-                  hovered && "bg-accent"
+                  isHovered && "bg-accent"
                 )}
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <NodeTypeIcon node={node} className="size-3 shrink-0" />
-                  <span className="text-start font-normal text-[11px] truncate min-w-0">
-                    {node.name}
-                  </span>
+                  {isRenaming ? (
+                    <>
+                      <NameInput
+                        onBlur={item.getRenameInputProps().onBlur}
+                        initialValue={node.name}
+                        onValueCommit={(name) => {
+                          changeNodeName(node.id, name);
+                        }}
+                        className="px-1 py-0.5 font-normal text-[11px]"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className="px-1 py-0.5 text-start font-normal text-[11px] truncate min-w-0 w-full"
+                        onDoubleClick={() => {
+                          item.startRenaming();
+                        }}
+                      >
+                        {node.name}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div
                   aria-label="actions"
-                  className="items-center gap-2 px-2 group-hover/item:flex hidden shrink-0"
+                  className="items-center gap-2 px-2 hidden shrink-0 group-hover/item:flex group-data-[is-renaming=true]/item:hidden"
                 >
                   <button
                     onClick={(e) => {
@@ -460,5 +424,82 @@ export function NodeHierarchyList() {
       })}
       <TreeDragLine />
     </Tree>
+  );
+}
+
+function NameInput({
+  initialValue,
+  onValueChange,
+  onValueCommit,
+  className,
+  ...props
+}: Omit<React.ComponentProps<"input">, "ref" | "value"> & {
+  initialValue: string;
+  onValueChange?: (name: string) => void;
+  onValueCommit?: (name: string) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(initialValue);
+
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      props.onChange?.(e);
+      setValue(e.target.value);
+      onValueChange?.(e.target.value);
+    },
+    [onValueChange, props.onChange]
+  );
+
+  const onBlur = useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      props.onBlur?.(e);
+      onValueCommit?.(value);
+    },
+    [onValueCommit, value, props.onBlur]
+  );
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      props.onKeyDown?.(e);
+
+      if (e.defaultPrevented) return;
+
+      if (e.key === "Escape") {
+        ref.current?.blur();
+      }
+      if (e.key === "Enter") {
+        onValueCommit?.(value);
+        ref.current?.blur();
+      }
+    },
+    [onValueCommit, value, props.onKeyDown]
+  );
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (ref.current) {
+        ref.current.focus();
+        ref.current.select();
+      }
+    }, 100);
+  }, [ref.current]);
+
+  return (
+    <input
+      {...props}
+      ref={ref}
+      type="text"
+      value={value}
+      className={cn("w-full", className)}
+      onChange={onChange}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+      onClick={(e) => {
+        props.onClick?.(e);
+        if (e.defaultPrevented) return;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    />
   );
 }
