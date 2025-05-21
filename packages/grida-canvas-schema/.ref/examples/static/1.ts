@@ -1,4 +1,4 @@
-import { grida } from "../../../index";
+import grida from "../../../index";
 import { cmath } from "@grida/cmath";
 
 const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -14,7 +14,6 @@ const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" x
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
-  root_id: "playground",
   nodes: {
     playground: {
       id: "playground",
@@ -315,6 +314,6 @@ export default {
       style: {},
     },
   },
-  textures: {},
+  bitmaps: {},
   properties: {},
 } satisfies grida.program.document.IDocumentDefinition;
