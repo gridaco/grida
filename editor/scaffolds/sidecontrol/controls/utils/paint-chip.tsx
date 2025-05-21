@@ -1,21 +1,39 @@
 import { css } from "@/grida-canvas-utils/css";
-import type cg from "@grida/cg";
 import { TransparencyGridIcon } from "@radix-ui/react-icons";
+import type cg from "@grida/cg";
+import { cn } from "@/components/lib/utils";
 
-export function PaintChip({ paint }: { paint: cg.Paint }) {
+export function PaintChip({
+  paint,
+  className,
+}: {
+  paint: cg.Paint;
+  className?: string;
+}) {
   switch (paint.type) {
     case "solid":
-      return <RGBAChip rgba={paint.color} />;
+      return <RGBAChip rgba={paint.color} className={className} />;
     case "linear_gradient":
-      return <LinearGradientPaintChip paint={paint} />;
+      return <LinearGradientPaintChip paint={paint} className={className} />;
     case "radial_gradient":
-      return <RadialGradientPaintChip paint={paint} />;
+      return <RadialGradientPaintChip paint={paint} className={className} />;
   }
 }
 
-export function RGBAChip({ rgba }: { rgba: cg.RGBA8888 }) {
+export function RGBAChip({
+  rgba,
+  className,
+}: {
+  rgba: cg.RGBA8888;
+  className?: string;
+}) {
   return (
-    <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+    >
       <div
         className="absolute w-full h-full"
         style={{
@@ -29,11 +47,18 @@ export function RGBAChip({ rgba }: { rgba: cg.RGBA8888 }) {
 
 export function LinearGradientPaintChip({
   paint,
+  className,
 }: {
   paint: cg.LinearGradientPaint;
+  className?: string;
 }) {
   return (
-    <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+    >
       <div
         className="absolute w-full h-full"
         style={{
@@ -47,11 +72,18 @@ export function LinearGradientPaintChip({
 
 export function RadialGradientPaintChip({
   paint,
+  className,
 }: {
   paint: cg.RadialGradientPaint;
+  className?: string;
 }) {
   return (
-    <div className="relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden">
+    <div
+      className={cn(
+        "relative size-5 min-w-5 rounded-xs border border-gray-300 overflow-hidden",
+        className
+      )}
+    >
       <div
         className="absolute w-full h-full"
         style={{
