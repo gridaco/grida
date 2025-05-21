@@ -32,6 +32,7 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
+  sitemap.items.pdf_flip_book,
   sitemap.items.forms,
   sitemap.items.database,
   // sitemap.items.west,

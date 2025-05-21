@@ -36,6 +36,7 @@ export namespace sitemap {
     figma_ci: "/figma/ci",
     figma_assistant: "/figma/assistant",
     figma_vscode: "/figma/vscode",
+    pdf_flip_book: "/feature/pdf-flip-book",
     book15: "https://cal.com/universe-from-grida/15min",
     book30: "https://cal.com/universe-from-grida/30min",
     studio: "https://grida.studio",
@@ -94,6 +95,11 @@ export namespace sitemap {
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
+    } satisfies Item,
+    pdf_flip_book: {
+      title: "PDF Flip Book",
+      href: links.pdf_flip_book,
+      description: "Turn PDFs into interactive flipbooks",
     } satisfies Item,
     library: {
       icon: "folder",
