@@ -1,6 +1,23 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  createOnDropHandler,
+  dragAndDropFeature,
+  hotkeysCoreFeature,
+  keyboardDragAndDropFeature,
+  selectionFeature,
+  syncDataLoaderFeature,
+} from "@headless-tree/core";
+import { AssistiveTreeDescription, useTree } from "@headless-tree/react";
+import { FolderIcon, FolderOpenIcon } from "lucide-react";
+
+import {
+  Tree,
+  TreeDragLine,
+  TreeItem,
+  TreeItemLabel,
+} from "@/components/ui-editor/tree";
 import { useDocument } from "@/grida-react-canvas";
 import {
   SidebarGroup,
@@ -40,6 +57,8 @@ import {
 } from "@/grida-react-canvas/provider";
 import { document as dq } from "@/grida-react-canvas/document-query";
 import { NodeTypeIcon } from "@/grida-react-canvas-starter-kit/starterkit-icons/node-type-icon";
+import grida from "@grida/schema";
+import { cn } from "@/components/lib/utils";
 
 export function ScenesGroup() {
   const { createScene } = useDocument();
@@ -225,12 +244,13 @@ export function NodeHierarchyGroup() {
       <SidebarGroupLabel>Layers</SidebarGroupLabel>
       <SidebarGroupContent>
         <NodeHierarchyList />
+        {/* <NodeHierarchyListV1 /> */}
       </SidebarGroupContent>
     </SidebarGroup>
   );
 }
 
-export function NodeHierarchyList() {
+export function NodeHierarchyListV1() {
   const {
     state: { document, document_ctx },
     select,
@@ -302,5 +322,143 @@ export function NodeHierarchyList() {
         );
       })}
     </>
+  );
+}
+
+export function NodeHierarchyList() {
+  const {
+    state: { document, document_ctx },
+    select,
+    hoverNode,
+    toggleNodeLocked,
+    toggleNodeActive,
+  } = useDocument();
+  const { id, name, children, selection, hovered_node_id } = useCurrentScene();
+
+  const expandedItems = useMemo(() => {
+    return children.filter(
+      (id) => (document.nodes[id] as grida.program.nodes.UnknwonNode).expanded
+    );
+  }, [id]);
+
+  const tree = useTree<grida.program.nodes.Node>({
+    rootItemId: "<root>",
+    initialState: {
+      expandedItems: expandedItems,
+      selectedItems: selection,
+    },
+    state: {
+      selectedItems: selection,
+    },
+    setSelectedItems: (items) => {
+      select(items as string[]);
+    },
+    getItemName: (item) => {
+      if (item.getId() === "<root>") {
+        return name;
+      }
+      return item.getItemData().name;
+    },
+    isItemFolder: (item) => {
+      const node = item.getItemData();
+      return "children" in node;
+    },
+    canReorder: false,
+    dataLoader: {
+      getItem(itemId) {
+        return document.nodes[itemId];
+      },
+      getChildren: (itemId) => {
+        if (itemId === "<root>") {
+          return children;
+        }
+        const node = document.nodes[itemId];
+        return (
+          (node as grida.program.nodes.i.IChildrenReference)?.children || []
+        );
+      },
+    },
+    features: [
+      syncDataLoaderFeature,
+      selectionFeature,
+      hotkeysCoreFeature,
+      dragAndDropFeature,
+      keyboardDragAndDropFeature,
+    ],
+  });
+
+  useEffect(() => {
+    tree.rebuildTree();
+  }, [id]);
+
+  return (
+    <Tree tree={tree} indent={6} className="gap-y-1">
+      <AssistiveTreeDescription tree={tree} />
+      {tree.getItems().map((item) => {
+        const node = item.getItemData();
+        if (!node) return null;
+
+        const hovered = hovered_node_id === node.id;
+
+        return (
+          <NodeHierarchyItemContextMenuWrapper key={node.id} node_id={node.id}>
+            <TreeItem
+              item={item}
+              className="group/item w-full h-[25px] max-h-[25px]"
+              onPointerEnter={() => {
+                hoverNode(node.id, "enter");
+              }}
+              onPointerLeave={() => {
+                hoverNode(node.id, "leave");
+              }}
+            >
+              <TreeItemLabel
+                className={cn(
+                  "h-full px-1 py-1 bg-transparent",
+                  hovered && "bg-accent"
+                )}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <NodeTypeIcon node={node} className="size-3 shrink-0" />
+                  <span className="text-start font-normal text-[11px] truncate min-w-0">
+                    {node.name}
+                  </span>
+                </div>
+                <div
+                  aria-label="actions"
+                  className="items-center gap-2 px-2 group-hover/item:flex hidden shrink-0"
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleNodeLocked(node.id);
+                    }}
+                  >
+                    {node.locked ? (
+                      <LockClosedIcon className="size-3" />
+                    ) : (
+                      <LockOpen1Icon className="size-3" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleNodeActive(node.id);
+                    }}
+                  >
+                    {node.active ? (
+                      <EyeOpenIcon className="size-3" />
+                    ) : (
+                      <EyeClosedIcon className="size-3" />
+                    )}
+                  </button>
+                </div>
+              </TreeItemLabel>
+            </TreeItem>
+          </NodeHierarchyItemContextMenuWrapper>
+        );
+      })}
+      <TreeDragLine />
+    </Tree>
   );
 }

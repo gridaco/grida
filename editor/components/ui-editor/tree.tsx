@@ -3,8 +3,7 @@
 import * as React from "react";
 import { ItemInstance } from "@headless-tree/core";
 import { Slot } from "@radix-ui/react-slot";
-import { ChevronDownIcon } from "lucide-react";
-
+import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils/index";
 
 interface TreeContextValue<T = any> {
@@ -56,8 +55,7 @@ function Tree({ indent = 20, tree, className, ...props }: TreeProps) {
   );
 }
 
-interface TreeItemProps<T = any>
-  extends React.HTMLAttributes<HTMLButtonElement> {
+interface TreeItemProps<T = any> extends React.HTMLAttributes<HTMLDivElement> {
   item: ItemInstance<T>;
   indent?: number;
   asChild?: boolean;
@@ -84,7 +82,7 @@ function TreeItem<T = any>({
     "--tree-padding": `${item.getItemMeta().level * indent}px`,
   } as React.CSSProperties;
 
-  const Comp = asChild ? Slot : "button";
+  const Comp = asChild ? Slot : "div";
 
   return (
     <TreeContext.Provider value={{ indent, currentItem: item }}>
@@ -158,7 +156,7 @@ function TreeItemLabel<T = any>({
       {...props}
     >
       {item.isFolder() && (
-        <ChevronDownIcon className="text-muted-foreground size-4 in-aria-[expanded=false]:-rotate-90" />
+        <ChevronDownIcon className="text-muted-foreground size-3 in-aria-[expanded=false]:-rotate-90" />
       )}
       {children ||
         (typeof item.getItemName === "function" ? item.getItemName() : null)}

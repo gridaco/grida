@@ -36,9 +36,9 @@ export function NodeTypeIcon({
       if (node.layout === "flex") {
         switch (node.direction) {
           case "horizontal":
-            return <ViewVerticalIcon />;
+            return <ViewVerticalIcon className={className} />;
           case "vertical":
-            return <ViewHorizontalIcon />;
+            return <ViewHorizontalIcon className={className} />;
         }
       }
       return <FrameIcon className={className} />;
