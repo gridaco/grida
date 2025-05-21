@@ -1,62 +1,58 @@
 /**
- * TreeMap: adjacency-list representation of an ordered tree. (Ordered Adjacency List Tree)
+ * Move one or more nodes under a target node (mutates the input map in-place).
+ * @param nodes – Record mapping node IDs to objects that each have a `children: string[]` array.
+ * @param sources – Single node ID or array of node IDs to move.
+ * @param target – Target parent node ID to move into.
+ * @param index – Desired insertion index in the target’s children array; -1 (default) appends at end.
+ * @returns The same `nodes` map, now mutated.
+ * @mutates nodes – the input map’s `children` arrays are modified directly.
  *
- * Maps each node ID to an ordered array of its child node IDs, preserving insertion order.
  * @example
- * ```json
- * {
- *   "a": ["b", "c"],
- *   "b": [],
- *   "c": []
- * }
+ * ```ts
+ * const nodes: Record<string,Node> = {
+ *   a: { children: ["b","c"] },
+ *   b: { children: [] },
+ *   c: { children: [] }
+ * };
+ *
+ * mv(nodes, "c", "b", 0);
+ * // now nodes.b.children === ["c"]
  * ```
  */
-export type TreeMap = Record<string, string[]>;
-
-/**
- * Move one or more nodes under a target node (mutates the input tree in-place).
- * @param tree - The context of the tree.
- * @param sources - Single node id or array of node ids to move.
- * @param target - Target node id to move into.
- * @param index - desired insertion index in the target's children array; -1 (default) appends at end
- * @returns true if successful.
- * @mutates tree - the input tree is modified directly
- */
-export function mv(
-  tree: TreeMap,
+export function mv<T extends { children: string[] }>(
+  nodes: Record<string, T>,
   sources: string | string[],
   target: string,
   index = -1
-): boolean {
-  const nodes = Array.isArray(sources) ? sources : [sources];
+): Record<string, T> {
+  const srcs = Array.isArray(sources) ? sources : [sources];
   const pos_specified = index >= 0;
   let pos = index;
 
-  if (!(target in tree)) {
+  if (!(target in nodes)) {
     throw new Error(`mv: cannot move to '${target}': No such node`);
   }
 
-  for (const src of nodes) {
-    if (!(src in tree)) {
+  for (const src of srcs) {
+    if (!(src in nodes)) {
       throw new Error(`mv: cannot move '${src}': No such node`);
     }
 
     // detach from old parent (if any)
-    for (const id of Object.keys(tree)) {
-      const child_index = tree[id].indexOf(src);
-      if (child_index !== -1) {
-        tree[id].splice(child_index, 1);
+    for (const node of Object.values(nodes)) {
+      const i = node.children.indexOf(src);
+      if (i !== -1) {
+        node.children.splice(i, 1);
         break;
       }
     }
 
-    const children = tree[target];
+    const kids = nodes[target].children;
     // determine insertion position
-    const insert_at =
-      !pos_specified || pos > children.length ? children.length : pos;
-    children.splice(insert_at, 0, src);
-    if (pos_specified) pos++; // keep relative order for the next
+    const insert_at = !pos_specified || pos > kids.length ? kids.length : pos;
+    kids.splice(insert_at, 0, src);
+    if (pos_specified) pos++;
   }
 
-  return true;
+  return nodes;
 }
