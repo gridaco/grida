@@ -42,7 +42,7 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
-  | EditorHierarchyOrderAction
+  | EditorHierarchyAction
   | EditorVectorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
@@ -233,10 +233,8 @@ export interface EditorHierarchyOrderAction {
 export interface EditorHierarchyMoveAction {
   type: "mv";
   source: NodeID[];
-  target: {
-    id: NodeID;
-    index: number;
-  };
+  target: NodeID;
+  index?: number;
 }
 
 // #region [path]

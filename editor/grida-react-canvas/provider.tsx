@@ -1686,6 +1686,18 @@ export function useDocument() {
     [dispatch]
   );
 
+  const mv = useCallback(
+    (source: string[], target: string, index?: number) => {
+      dispatch({
+        type: "mv",
+        source,
+        target,
+        index,
+      });
+    },
+    [dispatch]
+  );
+
   const distributeEvenly = useCallback(
     (target: "selection" | string[] = "selection", axis: "x" | "y") => {
       dispatch({
@@ -1976,6 +1988,7 @@ export function useDocument() {
       a11yarrow,
       align,
       order,
+      mv,
       distributeEvenly,
       autoLayout,
       contain,
@@ -2034,6 +2047,7 @@ export function useDocument() {
     a11yarrow,
     align,
     order,
+    mv,
     distributeEvenly,
     autoLayout,
     contain,

@@ -1,8 +1,7 @@
-import { grida } from "../../../index";
+import grida from "../../../index";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
-  root_id: "playground",
   nodes: {
     playground: {
       id: "playground",
@@ -93,6 +92,6 @@ export default {
       style: {},
     },
   },
-  textures: {},
+  bitmaps: {},
   properties: {},
 } satisfies grida.program.document.IDocumentDefinition;

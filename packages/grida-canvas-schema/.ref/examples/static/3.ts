@@ -1,12 +1,13 @@
-import { grida } from "../../../index";
+import grida from "../../../index";
+import cg from "@grida/cg";
 
-function randcolor(): grida.program.cg.RGBA8888 {
+function randcolor(): cg.RGBA8888 {
   return {
     r: Math.floor(Math.random() * 256),
     g: Math.floor(Math.random() * 256),
     b: Math.floor(Math.random() * 256),
     a: 1,
-  } satisfies grida.program.cg.RGBA8888;
+  } satisfies cg.RGBA8888;
 }
 
 function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
@@ -40,7 +41,6 @@ const rects = _1000_rects();
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
-  root_id: "playground",
   nodes: {
     playground: {
       id: "playground",
@@ -80,6 +80,6 @@ export default {
       return acc;
     }, {}),
   },
-  textures: {},
+  bitmaps: {},
   properties: {},
 } satisfies grida.program.document.IDocumentDefinition;

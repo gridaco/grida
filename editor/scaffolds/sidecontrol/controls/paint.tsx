@@ -142,7 +142,7 @@ function ComputedPaintControl({
           {value.type === "solid" && (
             <PaintInputContainer>
               <PopoverTrigger>
-                <PaintChip paint={value} />
+                <PaintChip paint={value} className="rounded-sm" />
               </PopoverTrigger>
               <HexValueInput
                 className="border-none outline-none w-full h-full ps-2 text-xs"

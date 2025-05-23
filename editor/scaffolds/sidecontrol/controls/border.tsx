@@ -52,15 +52,19 @@ export function BorderControl({
               })
             )}
           >
-            <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
+            <RGBAChip
+              rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }}
+              className="rounded-sm"
+            />
             {value?.borderStyle === "solid" && <>Solid</>}
             {value?.borderStyle === "dashed" && <>Dashed</>}
-            <button
+            <span
+              role="button"
               onClick={onRemove}
-              className="px-1 py-1 me-0.5 text-muted-foreground"
+              className="px-1 py-1 ms-auto me-0.5 text-muted-foreground"
             >
               <Cross2Icon className="w-3.5 h-3.5" />
-            </button>
+            </span>
           </div>
         ) : (
           <div

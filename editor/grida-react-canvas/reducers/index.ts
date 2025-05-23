@@ -11,6 +11,7 @@ import documentReducer from "./document.reducer";
 import equal from "deep-equal";
 import grida from "@grida/schema";
 import nid from "./tools/id";
+import { v4 } from "uuid";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -61,7 +62,7 @@ export default function reducer<S extends IDocumentEditorState>(
       const { scene } = action;
       const new_scene = grida.program.document.init_scene(
         scene ?? {
-          id: nid(), // TODO: use other than nid
+          id: v4(),
           name: `Scene ${Object.keys(state.document.scenes).length + 1}`,
           order: Object.keys(state.document.scenes).length,
         }

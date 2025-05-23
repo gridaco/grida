@@ -325,6 +325,15 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
       break;
     }
+    case "mv": {
+      const { source, target, index } = action;
+      return produce(state, (draft) => {
+        for (const node_id of source) {
+          self_moveNode(draft, node_id, target, index);
+        }
+      });
+      break;
+    }
     case "nudge": {
       const { target, axis, delta } = action;
       const target_node_ids =

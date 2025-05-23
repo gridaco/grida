@@ -12,7 +12,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
+import { NodeHierarchyList } from "@/grida-react-canvas-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,

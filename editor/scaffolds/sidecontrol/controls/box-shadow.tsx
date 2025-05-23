@@ -48,7 +48,10 @@ export function BoxShadowControl({
       {value ? (
         <PopoverTrigger className="w-full">
           <InputContainer>
-            <PaintChip paint={{ type: "solid", color: value.color }} />
+            <PaintChip
+              paint={{ type: "solid", color: value.color }}
+              className="rounded-sm"
+            />
             <span className="ms-2 text-start text-xs flex-1">Shadow</span>
             <button
               onClick={(e) => {
@@ -73,7 +76,7 @@ export function BoxShadowControl({
             )}
             onClick={onAdd}
           >
-            <PaintChip paint={cg.paints.transparent} />
+            <PaintChip paint={cg.paints.transparent} className="rounded-sm" />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>

@@ -12,10 +12,27 @@ declare type ArgFreeEventType =
 interface PluginAPI {
   readonly apiVersion: "1.0.0";
   readonly command: string;
-  readonly editorType: "figma" | "figjam" | "dev";
+  readonly editorType: "figma" | "figjam" | "dev" | "slides";
+  readonly mode:
+    | "default"
+    | "textreview"
+    | "inspect"
+    | "codegen"
+    | "linkpreview"
+    | "auth";
+  readonly pluginId?: string;
+  readonly widgetId?: string;
   readonly fileKey: string | undefined;
   skipInvisibleInstanceChildren: boolean;
+  readonly timer?: TimerAPI;
+  readonly viewport: ViewportAPI;
+  readonly currentUser: User | null;
+  readonly activeUsers: ActiveUser[];
+  readonly textreview?: TextReviewAPI;
+  readonly codegen: CodegenAPI;
+  readonly vscode?: VSCodeAPI;
   readonly devResources?: DevResourcesAPI;
+  readonly payments?: PaymentsAPI;
   closePlugin(message?: string): void;
   notify(message: string, options?: NotificationOptions): NotificationHandler;
   commitUndo(): void;
@@ -37,6 +54,7 @@ interface PluginAPI {
   getStyleById(id: string): BaseStyle | null;
   readonly variables: VariablesAPI;
   readonly teamLibrary: TeamLibraryAPI;
+  readonly annotations: AnnotationsAPI;
   readonly root: DocumentNode;
   currentPage: PageNode;
   setCurrentPageAsync(page: PageNode): Promise<void>;
@@ -46,6 +64,10 @@ interface PluginAPI {
   on(
     type: "documentchange",
     callback: (event: DocumentChangeEvent) => void
+  ): void;
+  on(
+    type: "slidesviewchange",
+    callback: (event: SlidesViewChangeEvent) => void
   ): void;
   on(
     type: "textreview",
@@ -62,6 +84,10 @@ interface PluginAPI {
     callback: (event: DocumentChangeEvent) => void
   ): void;
   once(
+    type: "slidesviewchange",
+    callback: (event: SlidesViewChangeEvent) => void
+  ): void;
+  once(
     type: "textreview",
     callback: (
       event: TextReviewEvent
@@ -74,6 +100,10 @@ interface PluginAPI {
   off(
     type: "documentchange",
     callback: (event: DocumentChangeEvent) => void
+  ): void;
+  off(
+    type: "slidesviewchange",
+    callback: (event: SlidesViewChangeEvent) => void
   ): void;
   off(
     type: "textreview",
@@ -94,7 +124,10 @@ interface PluginAPI {
   createComponent(): ComponentNode;
   createComponentFromNode(node: SceneNode): ComponentNode;
   createPage(): PageNode;
+  createPageDivider(dividerName?: string): PageNode;
   createSlice(): SliceNode;
+  createSlide(row?: number, col?: number): SlideNode;
+  createSlideRow(row?: number): SlideRowNode;
   createSticky(): StickyNode;
   createConnector(): ConnectorNode;
   createShapeWithText(): ShapeWithTextNode;
@@ -215,6 +248,8 @@ interface PluginAPI {
     node: FrameNode | ComponentNode | ComponentSetNode | SectionNode | null
   ): Promise<void>;
   loadAllPagesAsync(): Promise<void>;
+  getSlideGrid(): Array<Array<SlideNode>>;
+  setSlideGrid(slideGrid: Array<Array<SlideNode>>): void;
 }
 interface VersionHistoryResult {
   id: string;
@@ -270,6 +305,16 @@ interface LibraryVariable {
   key: string;
   resolvedType: VariableResolvedDataType;
 }
+interface AnnotationsAPI {
+  getAnnotationCategoriesAsync(): Promise<AnnotationCategory[]>;
+  getAnnotationCategoryByIdAsync(
+    id: string
+  ): Promise<AnnotationCategory | null>;
+  addAnnotationCategoryAsync(categoryInput: {
+    label: string;
+    color: AnnotationCategoryColor;
+  }): Promise<AnnotationCategory>;
+}
 interface TeamLibraryAPI {
   getAvailableLibraryVariableCollectionsAsync(): Promise<
     LibraryVariableCollection[]
@@ -278,7 +323,19 @@ interface TeamLibraryAPI {
     libraryCollectionKey: string
   ): Promise<LibraryVariable[]>;
 }
-
+declare type PaymentStatus = {
+  type: "UNPAID" | "PAID" | "NOT_SUPPORTED";
+};
+interface PaymentsAPI {
+  readonly status: PaymentStatus;
+  setPaymentStatusInDevelopment(status: PaymentStatus): void;
+  getUserFirstRanSecondsAgo(): number;
+  initiateCheckoutAsync(options?: {
+    interstitial?: "PAID_FEATURE" | "TRIAL_ENDED" | "SKIP";
+  }): Promise<void>;
+  requestCheckout(): void;
+  getPluginPaymentTokenAsync(): Promise<string>;
+}
 interface ClientStorageAPI {
   getAsync(key: string): Promise<any | undefined>;
   setAsync(key: string, value: any): Promise<void>;
@@ -341,6 +398,7 @@ interface UtilAPI {
     color: string | RGB | RGBA,
     overrides?: Partial<SolidPaint>
   ): SolidPaint;
+  normalizeMarkdown(markdown: string): string;
 }
 interface ColorPalette {
   [key: string]: string;
@@ -356,9 +414,74 @@ declare type CodegenEvent = {
   node: SceneNode;
   language: string;
 };
-
-interface CodegenAPI {}
-interface DevResource {}
+declare type CodegenPreferences = {
+  readonly unit: "PIXEL" | "SCALED";
+  readonly scaleFactor?: number;
+  readonly customSettings: Record<string, string>;
+};
+declare type CodegenPreferencesEvent = {
+  propertyName: string;
+};
+declare type CodegenResult = {
+  title: string;
+  code: string;
+  language:
+    | "TYPESCRIPT"
+    | "CPP"
+    | "RUBY"
+    | "CSS"
+    | "JAVASCRIPT"
+    | "HTML"
+    | "JSON"
+    | "GRAPHQL"
+    | "PYTHON"
+    | "GO"
+    | "SQL"
+    | "SWIFT"
+    | "KOTLIN"
+    | "RUST"
+    | "BASH"
+    | "PLAINTEXT";
+};
+interface CodegenAPI {
+  on(
+    type: "generate",
+    callback: (
+      event: CodegenEvent
+    ) => Promise<CodegenResult[]> | CodegenResult[]
+  ): void;
+  on(
+    type: "preferenceschange",
+    callback: (event: CodegenPreferencesEvent) => Promise<void>
+  ): void;
+  once(
+    type: "generate",
+    callback: (
+      event: CodegenEvent
+    ) => Promise<CodegenResult[]> | CodegenResult[]
+  ): void;
+  once(
+    type: "preferenceschange",
+    callback: (event: CodegenPreferencesEvent) => Promise<void>
+  ): void;
+  off(
+    type: "generate",
+    callback: (
+      event: CodegenEvent
+    ) => Promise<CodegenResult[]> | CodegenResult[]
+  ): void;
+  off(
+    type: "preferenceschange",
+    callback: (event: CodegenPreferencesEvent) => Promise<void>
+  ): void;
+  readonly preferences: CodegenPreferences;
+  refresh: () => void;
+}
+interface DevResource {
+  readonly name: string;
+  readonly url: string;
+  readonly inheritedNodeId?: string;
+}
 interface DevResourceWithNodeId extends DevResource {
   nodeId: string;
 }
@@ -384,6 +507,7 @@ declare type DevResourceOpenEvent = {
 declare type AuthResult = {
   type: "AUTH_SUCCESS";
 } | null;
+interface VSCodeAPI {}
 interface DevResourcesAPI {
   on(
     type: "linkpreview",
@@ -418,6 +542,27 @@ interface DevResourcesAPI {
     callback: (event: AuthEvent) => Promise<AuthResult> | AuthResult
   ): void;
   off(type: "open", callback: (event: DevResourceOpenEvent) => void): void;
+}
+interface TimerAPI {
+  readonly remaining: number;
+  readonly total: number;
+  readonly state: "STOPPED" | "PAUSED" | "RUNNING";
+  pause: () => void;
+  resume: () => void;
+  start: (seconds: number) => void;
+  stop: () => void;
+}
+interface ViewportAPI {
+  center: Vector;
+  zoom: number;
+  scrollAndZoomIntoView(nodes: ReadonlyArray<BaseNode>): void;
+  readonly bounds: Rect;
+  slidesView: "grid" | "single-slide";
+}
+interface TextReviewAPI {
+  requestToBeEnabledAsync(): Promise<void>;
+  requestToBeDisabledAsync(): Promise<void>;
+  readonly isEnabled: boolean;
 }
 interface ParameterValues {
   [key: string]: any;
@@ -461,6 +606,9 @@ interface OpenDevResourcesEvent {
   };
 }
 declare type RunEvent = RunParametersEvent | OpenDevResourcesEvent;
+interface SlidesViewChangeEvent {
+  view: "GRID" | "SINGLE_SLIDE";
+}
 interface DropEvent {
   node: BaseNode | SceneNode;
   x: number;
@@ -729,6 +877,30 @@ declare type TextCase =
   | "SMALL_CAPS"
   | "SMALL_CAPS_FORCED";
 declare type TextDecoration = "NONE" | "UNDERLINE" | "STRIKETHROUGH";
+declare type TextDecorationStyle = "SOLID" | "WAVY" | "DOTTED";
+declare type TextDecorationOffset =
+  | {
+      readonly value: number;
+      readonly unit: "PIXELS" | "PERCENT";
+    }
+  | {
+      readonly unit: "AUTO";
+    };
+declare type TextDecorationThickness =
+  | {
+      readonly value: number;
+      readonly unit: "PIXELS" | "PERCENT";
+    }
+  | {
+      readonly unit: "AUTO";
+    };
+declare type TextDecorationColor =
+  | {
+      readonly value: SolidPaint;
+    }
+  | {
+      readonly value: "AUTO";
+    };
 declare type OpenTypeFeature =
   | "PCAP"
   | "C2PC"
@@ -989,7 +1161,7 @@ interface InnerShadowEffect {
     [field in VariableBindableEffectField]?: VariableAlias;
   };
 }
-interface BlurEffect {
+interface BlurEffectBase {
   readonly type: "LAYER_BLUR" | "BACKGROUND_BLUR";
   readonly radius: number;
   readonly visible: boolean;
@@ -997,7 +1169,49 @@ interface BlurEffect {
     ["radius"]?: VariableAlias;
   };
 }
-declare type Effect = DropShadowEffect | InnerShadowEffect | BlurEffect;
+interface BlurEffectNormal extends BlurEffectBase {
+  readonly blurType: "NORMAL";
+}
+interface BlurEffectProgressive extends BlurEffectBase {
+  readonly blurType: "PROGRESSIVE";
+  readonly startRadius: number;
+  readonly startOffset: Vector;
+  readonly endOffset: Vector;
+}
+declare type BlurEffect = BlurEffectNormal | BlurEffectProgressive;
+interface NoiseEffectBase {
+  readonly type: "NOISE";
+  readonly blendMode: BlendMode;
+  readonly noiseSize: number;
+  readonly density: number;
+}
+interface NoiseEffectMonotone extends NoiseEffectBase {
+  readonly noiseType: "MONOTONE";
+}
+interface NoiseEffectDuotone extends NoiseEffectBase {
+  readonly noiseType: "DUOTONE";
+  readonly secondaryColor: RGBA;
+}
+interface NoiseEffectMultitone extends NoiseEffectBase {
+  readonly noiseType: "MULTITONE";
+  readonly opacity: number;
+}
+declare type NoiseEffect =
+  | NoiseEffectMonotone
+  | NoiseEffectDuotone
+  | NoiseEffectMultitone;
+interface TextureEffect {
+  readonly type: "TEXTURE";
+  readonly noiseSize: number;
+  readonly radius: number;
+  readonly clipToShape: boolean;
+}
+declare type Effect =
+  | DropShadowEffect
+  | InnerShadowEffect
+  | BlurEffect
+  | NoiseEffect
+  | TextureEffect;
 declare type ConstraintType = "MIN" | "CENTER" | "MAX" | "STRETCH" | "SCALE";
 interface Constraints {
   readonly horizontal: ConstraintType;
@@ -1065,7 +1279,23 @@ interface VideoPaint {
   readonly opacity?: number;
   readonly blendMode?: BlendMode;
 }
-declare type Paint = SolidPaint | GradientPaint | ImagePaint | VideoPaint;
+interface PatternPaint {
+  readonly type: "PATTERN";
+  readonly sourceNodeId: string;
+  readonly tileType:
+    | "RECTANGULAR"
+    | "HORIZONTAL_HEXAGONAL"
+    | "VERTICAL_HEXAGONAL";
+  readonly scalingFactor: number;
+  readonly spacing: Vector;
+  readonly horizontalAlignment: "START" | "CENTER" | "END";
+}
+declare type Paint =
+  | SolidPaint
+  | GradientPaint
+  | ImagePaint
+  | VideoPaint
+  | PatternPaint;
 interface Guide {
   readonly axis: "X" | "Y";
   readonly offset: number;
@@ -1220,6 +1450,11 @@ interface StyledTextSegment {
   fontName: FontName;
   fontWeight: number;
   textDecoration: TextDecoration;
+  textDecorationStyle: TextDecorationStyle | null;
+  textDecorationOffset: TextDecorationOffset | null;
+  textDecorationThickness: TextDecorationThickness | null;
+  textDecorationColor: TextDecorationColor | null;
+  textDecorationSkipInk: boolean | null;
   textCase: TextCase;
   lineHeight: LineHeight;
   letterSpacing: LetterSpacing;
@@ -1227,16 +1462,16 @@ interface StyledTextSegment {
   textStyleId: string;
   fillStyleId: string;
   listOptions: TextListOptions;
+  listSpacing: number;
   indentation: number;
+  paragraphIndent: number;
+  paragraphSpacing: number;
   hyperlink: HyperlinkTarget | null;
   openTypeFeatures: {
     readonly [feature in OpenTypeFeature]: boolean;
   };
   boundVariables?: {
-    [field in Exclude<
-      VariableBindableTextField,
-      "paragraphSpacing" | "paragraphIndent"
-    >]?: VariableAlias;
+    [field in VariableBindableTextField]?: VariableAlias;
   };
   textStyleOverrides: TextStyleOverrideType[];
 }
@@ -1489,6 +1724,7 @@ interface BaseNodeMixin extends PluginDataMixin, DevResourcesMixin {
   getCSSAsync(): Promise<{
     [key: string]: string;
   }>;
+  getTopLevelFrame(): FrameNode | undefined;
 }
 interface PluginDataMixin {
   getPluginData(key: string): string;
@@ -1612,6 +1848,7 @@ declare type VariableBindableLayoutGridField =
   | "gutterSize";
 declare type VariableBindableGridStyleField = "layoutGrids";
 declare type VariableBindableComponentPropertyField = "value";
+declare type VariableBindableComponentPropertyDefinitionField = "defaultValue";
 interface StickableMixin {
   stuckTo: SceneNode | null;
 }
@@ -1659,6 +1896,11 @@ interface LayoutMixin
   resize(width: number, height: number): void;
   resizeWithoutConstraints(width: number, height: number): void;
   rescale(scale: number): void;
+}
+interface AspectRatioLockMixin {
+  readonly targetAspectRatio: Vector | null;
+  lockAspectRatio(): void;
+  unlockAspectRatio(): void;
 }
 interface BlendMixin extends MinimalBlendMixin {
   isMask: boolean;
@@ -1783,6 +2025,7 @@ interface DocumentationLink {
 }
 interface PublishableMixin {
   description: string;
+  descriptionMarkdown: string;
   documentationLinks: ReadonlyArray<DocumentationLink>;
   readonly remote: boolean;
   readonly key: string;
@@ -1811,6 +2054,7 @@ interface BaseFrameMixin
     ExportMixin,
     IndividualStrokesMixin,
     AutoLayoutMixin,
+    AspectRatioLockMixin,
     AnnotationsMixin,
     DevStatusMixin {
   readonly detachedInfo: DetachedInfo | null;
@@ -1836,7 +2080,9 @@ interface MinimalBlendMixin {
 }
 interface Annotation {
   readonly label?: string;
+  readonly labelMarkdown?: string;
   readonly properties?: ReadonlyArray<AnnotationProperty>;
+  readonly categoryId?: string;
 }
 interface AnnotationProperty {
   readonly type: AnnotationPropertyType;
@@ -1881,6 +2127,7 @@ interface Measurement {
     side: MeasurementSide;
   };
   offset: MeasurementOffset;
+  freeText: string;
 }
 declare type MeasurementSide = "TOP" | "RIGHT" | "BOTTOM" | "LEFT";
 declare type MeasurementOffset =
@@ -1906,12 +2153,14 @@ interface MeasurementsMixin {
     },
     options?: {
       offset?: MeasurementOffset;
+      freeText?: string;
     }
   ): Measurement;
   editMeasurement(
     id: string,
     newValue: {
-      offset: MeasurementOffset;
+      offset?: MeasurementOffset;
+      freeText?: string;
     }
   ): Measurement;
   deleteMeasurement(id: string): void;
@@ -1926,26 +2175,21 @@ interface ComponentPropertiesMixin {
   addComponentProperty(
     propertyName: string,
     type: ComponentPropertyType,
-    defaultValue: string | boolean,
+    defaultValue: string | boolean | VariableAlias,
     options?: ComponentPropertyOptions
   ): string;
   editComponentProperty(
     propertyName: string,
     newValue: {
       name?: string;
-      defaultValue?: string | boolean;
+      defaultValue?: string | boolean | VariableAlias;
       preferredValues?: InstanceSwapPreferredValue[];
     }
   ): string;
   deleteComponentProperty(propertyName: string): void;
 }
-interface NonResizableTextMixin {
+interface BaseNonResizableTextMixin {
   readonly hasMissingFont: boolean;
-  paragraphIndent: number;
-  paragraphSpacing: number;
-  listSpacing: number;
-  hangingPunctuation: boolean;
-  hangingList: boolean;
   fontSize: number | PluginAPI["mixed"];
   fontName: FontName | PluginAPI["mixed"];
   readonly fontWeight: number | PluginAPI["mixed"];
@@ -1955,10 +2199,7 @@ interface NonResizableTextMixin {
         readonly [feature in OpenTypeFeature]: boolean;
       }
     | PluginAPI["mixed"];
-  textDecoration: TextDecoration | PluginAPI["mixed"];
   letterSpacing: LetterSpacing | PluginAPI["mixed"];
-  lineHeight: LineHeight | PluginAPI["mixed"];
-  leadingTrim: LeadingTrim | PluginAPI["mixed"];
   hyperlink: HyperlinkTarget | null | PluginAPI["mixed"];
   characters: string;
   insertCharacters(
@@ -1983,25 +2224,11 @@ interface NonResizableTextMixin {
         readonly [feature in OpenTypeFeature]: boolean;
       }
     | PluginAPI["mixed"];
-  getRangeTextDecoration(
-    start: number,
-    end: number
-  ): TextDecoration | PluginAPI["mixed"];
-  setRangeTextDecoration(
-    start: number,
-    end: number,
-    value: TextDecoration
-  ): void;
   getRangeLetterSpacing(
     start: number,
     end: number
   ): LetterSpacing | PluginAPI["mixed"];
   setRangeLetterSpacing(start: number, end: number, value: LetterSpacing): void;
-  getRangeLineHeight(
-    start: number,
-    end: number
-  ): LineHeight | PluginAPI["mixed"];
-  setRangeLineHeight(start: number, end: number, value: LineHeight): void;
   getRangeHyperlink(
     start: number,
     end: number
@@ -2027,28 +2254,15 @@ interface NonResizableTextMixin {
     styleId: string
   ): Promise<void>;
   setRangeFillStyleId(start: number, end: number, value: string): void;
-  getRangeListOptions(
-    start: number,
-    end: number
-  ): TextListOptions | PluginAPI["mixed"];
-  setRangeListOptions(start: number, end: number, value: TextListOptions): void;
-  getRangeIndentation(start: number, end: number): number | PluginAPI["mixed"];
-  setRangeIndentation(start: number, end: number, value: number): void;
   getRangeBoundVariable(
     start: number,
     end: number,
-    field: Exclude<
-      VariableBindableTextField,
-      "paragraphSpacing" | "paragraphIndent"
-    >
-  ): number | PluginAPI["mixed"];
+    field: VariableBindableTextField
+  ): VariableAlias | null | PluginAPI["mixed"];
   setRangeBoundVariable(
     start: number,
     end: number,
-    field: Exclude<
-      VariableBindableTextField,
-      "paragraphSpacing" | "paragraphIndent"
-    >,
+    field: VariableBindableTextField,
     variable: Variable | null
   ): void;
   getStyledTextSegments<
@@ -2067,6 +2281,100 @@ interface NonResizableTextMixin {
     >
   >;
 }
+interface NonResizableTextMixin extends BaseNonResizableTextMixin {
+  paragraphIndent: number;
+  paragraphSpacing: number;
+  listSpacing: number;
+  hangingPunctuation: boolean;
+  hangingList: boolean;
+  textDecoration: TextDecoration | PluginAPI["mixed"];
+  textDecorationStyle: TextDecorationStyle | PluginAPI["mixed"] | null;
+  textDecorationOffset: TextDecorationOffset | PluginAPI["mixed"] | null;
+  textDecorationThickness: TextDecorationThickness | PluginAPI["mixed"] | null;
+  textDecorationColor: TextDecorationColor | PluginAPI["mixed"] | null;
+  textDecorationSkipInk: boolean | PluginAPI["mixed"] | null;
+  lineHeight: LineHeight | PluginAPI["mixed"];
+  leadingTrim: LeadingTrim | PluginAPI["mixed"];
+  getRangeTextDecoration(
+    start: number,
+    end: number
+  ): TextDecoration | PluginAPI["mixed"];
+  setRangeTextDecoration(
+    start: number,
+    end: number,
+    value: TextDecoration
+  ): void;
+  getRangeTextDecorationStyle(
+    start: number,
+    end: number
+  ): TextDecorationStyle | PluginAPI["mixed"] | null;
+  setRangeTextDecorationStyle(
+    start: number,
+    end: number,
+    value: TextDecorationStyle
+  ): void;
+  getRangeTextDecorationOffset(
+    start: number,
+    end: number
+  ): TextDecorationOffset | PluginAPI["mixed"] | null;
+  setRangeTextDecorationOffset(
+    start: number,
+    end: number,
+    value: TextDecorationOffset
+  ): void;
+  getRangeTextDecorationThickness(
+    start: number,
+    end: number
+  ): TextDecorationThickness | PluginAPI["mixed"] | null;
+  setRangeTextDecorationThickness(
+    start: number,
+    end: number,
+    value: TextDecorationThickness
+  ): void;
+  getRangeTextDecorationColor(
+    start: number,
+    end: number
+  ): TextDecorationColor | PluginAPI["mixed"] | null;
+  setRangeTextDecorationColor(
+    start: number,
+    end: number,
+    value: TextDecorationColor
+  ): void;
+  getRangeTextDecorationSkipInk(
+    start: number,
+    end: number
+  ): boolean | PluginAPI["mixed"] | null;
+  setRangeTextDecorationSkipInk(
+    start: number,
+    end: number,
+    value: boolean
+  ): void;
+  getRangeLineHeight(
+    start: number,
+    end: number
+  ): LineHeight | PluginAPI["mixed"];
+  setRangeLineHeight(start: number, end: number, value: LineHeight): void;
+  getRangeListOptions(
+    start: number,
+    end: number
+  ): TextListOptions | PluginAPI["mixed"];
+  setRangeListOptions(start: number, end: number, value: TextListOptions): void;
+  getRangeListSpacing(start: number, end: number): number | PluginAPI["mixed"];
+  setRangeListSpacing(start: number, end: number, value: number): void;
+  getRangeIndentation(start: number, end: number): number | PluginAPI["mixed"];
+  setRangeIndentation(start: number, end: number, value: number): void;
+  getRangeParagraphIndent(
+    start: number,
+    end: number
+  ): number | PluginAPI["mixed"];
+  setRangeParagraphIndent(start: number, end: number, value: number): void;
+  getRangeParagraphSpacing(
+    start: number,
+    end: number
+  ): number | PluginAPI["mixed"];
+  setRangeParagraphSpacing(start: number, end: number, value: number): void;
+}
+interface NonResizableTextPathMixin extends BaseNonResizableTextMixin {}
 interface TextSublayerNode extends NonResizableTextMixin, MinimalFillsMixin {}
 interface DocumentNode extends BaseNodeMixin {
   readonly type: "DOCUMENT";
@@ -2133,10 +2441,12 @@ interface PageNode
     | ComponentNode
     | InstanceNode
     | null;
+  isPageDivider: boolean;
   loadAsync(): Promise<void>;
   on(type: "nodechange", callback: (event: NodeChangeEvent) => void): void;
   once(type: "nodechange", callback: (event: NodeChangeEvent) => void): void;
   off(type: "nodechange", callback: (event: NodeChangeEvent) => void): void;
+  focusedSlide?: SlideNode | null;
 }
 interface FrameNode extends DefaultFrameMixin {
   readonly type: "FRAME";
@@ -2151,9 +2461,24 @@ interface GroupNode
     DeprecatedBackgroundMixin,
     BlendMixin,
     LayoutMixin,
-    ExportMixin {
+    ExportMixin,
+    AspectRatioLockMixin {
   readonly type: "GROUP";
   clone(): GroupNode;
+}
+interface TransformGroupNode
+  extends BaseNodeMixin,
+    SceneNodeMixin,
+    ReactionMixin,
+    ChildrenMixin,
+    ContainerMixin,
+    DeprecatedBackgroundMixin,
+    BlendMixin,
+    LayoutMixin,
+    ExportMixin,
+    AspectRatioLockMixin {
+  readonly type: "TRANSFORM_GROUP";
+  clone(): TransformGroupNode;
 }
 interface SliceNode
   extends BaseNodeMixin,
@@ -2169,7 +2494,8 @@ interface RectangleNode
     CornerMixin,
     RectangleCornerMixin,
     IndividualStrokesMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "RECTANGLE";
   clone(): RectangleNode;
 }
@@ -2184,7 +2510,8 @@ interface EllipseNode
   extends DefaultShapeMixin,
     ConstraintMixin,
     CornerMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "ELLIPSE";
   clone(): EllipseNode;
   arcData: ArcData;
@@ -2193,7 +2520,8 @@ interface PolygonNode
   extends DefaultShapeMixin,
     ConstraintMixin,
     CornerMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "POLYGON";
   clone(): PolygonNode;
   pointCount: number;
@@ -2202,7 +2530,8 @@ interface StarNode
   extends DefaultShapeMixin,
     ConstraintMixin,
     CornerMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "STAR";
   clone(): StarNode;
   pointCount: number;
@@ -2213,7 +2542,8 @@ interface VectorNode
     ConstraintMixin,
     CornerMixin,
     VectorLikeMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "VECTOR";
   clone(): VectorNode;
 }
@@ -2221,7 +2551,8 @@ interface TextNode
   extends DefaultShapeMixin,
     ConstraintMixin,
     NonResizableTextMixin,
-    AnnotationsMixin {
+    AnnotationsMixin,
+    AspectRatioLockMixin {
   readonly type: "TEXT";
   clone(): TextNode;
   textAlignHorizontal: "LEFT" | "CENTER" | "RIGHT" | "JUSTIFIED";
@@ -2232,6 +2563,23 @@ interface TextNode
   autoRename: boolean;
   textStyleId: string | PluginAPI["mixed"];
   setTextStyleIdAsync(styleId: string): Promise<void>;
+}
+interface TextPathNode
+  extends DefaultShapeMixin,
+    ConstraintMixin,
+    NonResizableTextPathMixin,
+    AnnotationsMixin,
+    AspectRatioLockMixin {
+  readonly type: "TEXT_PATH";
+  clone(): TextPathNode;
+  textAlignHorizontal: "LEFT" | "CENTER" | "RIGHT" | "JUSTIFIED";
+  textAlignVertical: "TOP" | "CENTER" | "BOTTOM";
+  autoRename: boolean;
+  textStyleId: string | PluginAPI["mixed"];
+  setTextStyleIdAsync(styleId: string): Promise<void>;
+  readonly vectorPaths: VectorPaths;
+  readonly vectorNetwork: VectorNetwork;
+  readonly handleMirroring: HandleMirroring | PluginAPI["mixed"];
 }
 declare type ComponentPropertyType =
   | "BOOLEAN"
@@ -2251,6 +2599,9 @@ declare type ComponentPropertyDefinitions = {
     defaultValue: string | boolean;
     preferredValues?: InstanceSwapPreferredValue[];
     variantOptions?: string[];
+    readonly boundVariables?: {
+      [field in VariableBindableComponentPropertyField]?: VariableAlias;
+    };
   };
 };
 interface ComponentSetNode
@@ -2311,7 +2662,8 @@ interface BooleanOperationNode
   extends DefaultShapeMixin,
     ChildrenMixin,
     CornerMixin,
-    ContainerMixin {
+    ContainerMixin,
+    AspectRatioLockMixin {
   readonly type: "BOOLEAN_OPERATION";
   clone(): BooleanOperationNode;
   booleanOperation: "UNION" | "INTERSECT" | "SUBTRACT" | "EXCLUDE";
@@ -2327,9 +2679,14 @@ interface StickyNode
   isWideWidth: boolean;
   clone(): StickyNode;
 }
-interface StampNode extends DefaultShapeMixin, ConstraintMixin, StickableMixin {
+interface StampNode
+  extends DefaultShapeMixin,
+    ConstraintMixin,
+    StickableMixin,
+    AspectRatioLockMixin {
   readonly type: "STAMP";
   clone(): StampNode;
+  getAuthorAsync(): Promise<BaseUser | null>;
 }
 interface TableNode
   extends OpaqueNodeMixin,
@@ -2364,11 +2721,15 @@ interface HighlightNode
     ConstraintMixin,
     CornerMixin,
     VectorLikeMixin,
-    StickableMixin {
+    StickableMixin,
+    AspectRatioLockMixin {
   readonly type: "HIGHLIGHT";
   clone(): HighlightNode;
 }
-interface WashiTapeNode extends DefaultShapeMixin, StickableMixin {
+interface WashiTapeNode
+  extends DefaultShapeMixin,
+    StickableMixin,
+    AspectRatioLockMixin {
   readonly type: "WASHI_TAPE";
   clone(): WashiTapeNode;
 }
@@ -2450,7 +2811,7 @@ interface ConnectorNode
   readonly text: TextSublayerNode;
   readonly textBackground: LabelSublayerNode;
   readonly cornerRadius?: number;
-  connectorLineType: "ELBOWED" | "STRAIGHT";
+  connectorLineType: "ELBOWED" | "STRAIGHT" | "CURVED";
   connectorStart: ConnectorEndpoint;
   connectorEnd: ConnectorEndpoint;
   connectorStartStrokeCap: ConnectorStrokeCap;
@@ -2542,6 +2903,24 @@ interface VariableCollection extends PluginDataMixin {
   addMode(name: string): string;
   renameMode(modeId: string, newName: string): void;
 }
+declare type AnnotationCategoryColor =
+  | "yellow"
+  | "orange"
+  | "red"
+  | "pink"
+  | "violet"
+  | "blue"
+  | "teal"
+  | "green";
+interface AnnotationCategory {
+  readonly id: string;
+  readonly label: string;
+  readonly color: AnnotationCategoryColor;
+  readonly isPreset: boolean;
+  remove(): void;
+  setColor(color: AnnotationCategoryColor): void;
+  setLabel(label: string): void;
+}
 interface WidgetNode extends OpaqueNodeMixin, StickableMixin {
   readonly type: "WIDGET";
   readonly widgetId: string;
@@ -2607,11 +2986,75 @@ interface SectionNode
   extends ChildrenMixin,
     MinimalFillsMixin,
     OpaqueNodeMixin,
-    DevStatusMixin {
+    DevStatusMixin,
+    AspectRatioLockMixin {
   readonly type: "SECTION";
   sectionContentsHidden: boolean;
   clone(): SectionNode;
   resizeWithoutConstraints(width: number, height: number): void;
+}
+interface SlideNode extends BaseFrameMixin {
+  readonly type: "SLIDE";
+  clone(): SlideNode;
+  getSlideTransition(): SlideTransition;
+  setSlideTransition(transition: SlideTransition): void;
+  isSkippedSlide: boolean;
+}
+interface SlideRowNode extends OpaqueNodeMixin, ChildrenMixin {
+  readonly type: "SLIDE_ROW";
+  clone(): SlideRowNode;
+}
+interface SlideGridNode extends OpaqueNodeMixin, ChildrenMixin {
+  readonly type: "SLIDE_GRID";
+}
+interface InteractiveSlideElementNode extends OpaqueNodeMixin {
+  readonly type: "INTERACTIVE_SLIDE_ELEMENT";
+  readonly interactiveSlideElementType:
+    | "POLL"
+    | "EMBED"
+    | "FACEPILE"
+    | "ALIGNMENT"
+    | "YOUTUBE";
+}
+interface SlideTransition {
+  readonly style:
+    | "NONE"
+    | "DISSOLVE"
+    | "SLIDE_FROM_LEFT"
+    | "SLIDE_FROM_RIGHT"
+    | "SLIDE_FROM_BOTTOM"
+    | "SLIDE_FROM_TOP"
+    | "PUSH_FROM_LEFT"
+    | "PUSH_FROM_RIGHT"
+    | "PUSH_FROM_BOTTOM"
+    | "PUSH_FROM_TOP"
+    | "MOVE_FROM_LEFT"
+    | "MOVE_FROM_RIGHT"
+    | "MOVE_FROM_TOP"
+    | "MOVE_FROM_BOTTOM"
+    | "SLIDE_OUT_TO_LEFT"
+    | "SLIDE_OUT_TO_RIGHT"
+    | "SLIDE_OUT_TO_TOP"
+    | "SLIDE_OUT_TO_BOTTOM"
+    | "MOVE_OUT_TO_LEFT"
+    | "MOVE_OUT_TO_RIGHT"
+    | "MOVE_OUT_TO_TOP"
+    | "MOVE_OUT_TO_BOTTOM"
+    | "SMART_ANIMATE";
+  readonly duration: number;
+  readonly curve:
+    | "EASE_IN"
+    | "EASE_OUT"
+    | "EASE_IN_AND_OUT"
+    | "LINEAR"
+    | "GENTLE"
+    | "QUICK"
+    | "BOUNCY"
+    | "SLOW";
+  readonly timing: {
+    readonly type: "ON_CLICK" | "AFTER_DELAY";
+    readonly delay?: number;
+  };
 }
 declare type BaseNode = DocumentNode | PageNode | SceneNode;
 declare type SceneNode =
@@ -2629,6 +3072,8 @@ declare type SceneNode =
   | PolygonNode
   | RectangleNode
   | TextNode
+  | TextPathNode
+  | TransformGroupNode
   | StickyNode
   | ConnectorNode
   | ShapeWithTextNode
@@ -2641,7 +3086,11 @@ declare type SceneNode =
   | SectionNode
   | HighlightNode
   | WashiTapeNode
-  | TableNode;
+  | TableNode
+  | SlideNode
+  | SlideRowNode
+  | SlideGridNode
+  | InteractiveSlideElementNode;
 declare type NodeType = BaseNode["type"];
 declare type StyleType = "PAINT" | "TEXT" | "EFFECT" | "GRID";
 declare type InheritedStyleField =
@@ -2719,7 +3168,20 @@ interface Image {
 interface Video {
   readonly hash: string;
 }
-
+interface BaseUser {
+  readonly id: string | null;
+  readonly name: string;
+  readonly photoUrl: string | null;
+}
+interface User extends BaseUser {
+  readonly color: string;
+  readonly sessionId: number;
+}
+interface ActiveUser extends User {
+  readonly position: Vector | null;
+  readonly viewport: Rect;
+  readonly selection: string[];
+}
 interface FindAllCriteria<T extends NodeType[]> {
   types?: T;
   pluginData?: {
