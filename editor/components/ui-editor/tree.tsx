@@ -90,7 +90,7 @@ function TreeItem<T = any>({
         data-slot="tree-item"
         style={mergedStyle}
         className={cn(
-          "z-10 ps-(--tree-padding) outline-hidden select-none not-last:pb-0.5 focus:z-20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+          "group/item z-10 ps-(--tree-padding) outline-hidden select-none not-last:pb-0.5 focus:z-20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
           className
         )}
         data-focus={
@@ -101,6 +101,11 @@ function TreeItem<T = any>({
         data-folder={
           typeof item.isFolder === "function"
             ? item.isFolder() || false
+            : undefined
+        }
+        data-renaming={
+          typeof item.isRenaming === "function"
+            ? item.isRenaming() || false
             : undefined
         }
         data-selected={
