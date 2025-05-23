@@ -136,7 +136,7 @@ const config: Config = {
           customCss: require.resolve("./src/css/custom.css"),
         },
         gtag: {
-          trackingID: "G-C4615L9YZK", // same as grida.co
+          trackingID: "G-T0S919XJ07",
           anonymizeIP: true,
         },
       },
