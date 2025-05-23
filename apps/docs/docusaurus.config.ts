@@ -130,7 +130,7 @@ const config: Config = {
           routeBasePath: "/",
           path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
+          editUrl: "https://github.com/gridaco/grida/tree/main/docs",
         },
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
