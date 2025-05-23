@@ -16,13 +16,11 @@ import {
 } from "@/components/ui-editor/tree";
 import {
   dragAndDropFeature,
-  hotkeysCoreFeature,
-  keyboardDragAndDropFeature,
   selectionFeature,
   renamingFeature,
   syncDataLoaderFeature,
 } from "@headless-tree/core";
-import { AssistiveTreeDescription, useTree } from "@headless-tree/react";
+import { useTree } from "@headless-tree/react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -136,16 +134,17 @@ export function ScenesList() {
     features: [
       syncDataLoaderFeature,
       selectionFeature,
-      hotkeysCoreFeature,
       dragAndDropFeature,
-      keyboardDragAndDropFeature,
       renamingFeature,
     ],
   });
 
+  useEffect(() => {
+    tree.rebuildTree();
+  }, [scenes]);
+
   return (
     <Tree tree={tree} indent={0}>
-      <AssistiveTreeDescription tree={tree} />
       {tree.getItems().map((item) => {
         const scene = item.getItemData();
         if (!scene) return null;
@@ -162,7 +161,7 @@ export function ScenesList() {
           >
             <TreeItem
               item={item}
-              className="group/item w-full py-1"
+              className="group/item w-full py-0.5"
               data-is-renaming={isRenaming}
             >
               <TreeItemLabel
@@ -289,7 +288,7 @@ export function NodeHierarchyList() {
     return children.filter(
       (id) => (document.nodes[id] as grida.program.nodes.UnknwonNode).expanded
     );
-  }, [children]);
+  }, [id, children]);
 
   // root item id must be "<root>"
   const tree = useTree<grida.program.nodes.Node>({
@@ -321,7 +320,6 @@ export function NodeHierarchyList() {
       const index =
         "insertionIndex" in target ? target.insertionIndex : undefined;
       mv(ids, target_id, index);
-      tree.rebuildTree();
     },
     indent: 6,
     dataLoader: {
@@ -341,20 +339,17 @@ export function NodeHierarchyList() {
     features: [
       syncDataLoaderFeature,
       selectionFeature,
-      hotkeysCoreFeature,
       dragAndDropFeature,
-      keyboardDragAndDropFeature,
       renamingFeature,
     ],
   });
 
   useEffect(() => {
     tree.rebuildTree();
-  }, [children]);
+  }, [document]);
 
   return (
     <Tree tree={tree} indent={6}>
-      <AssistiveTreeDescription tree={tree} />
       {tree.getItems().map((item) => {
         const node = item.getItemData();
         if (!node) return null;
@@ -396,15 +391,17 @@ export function NodeHierarchyList() {
                   }}
                 >
                   <NodeTypeIcon node={node} className="size-3 shrink-0" />
-                  <NameInput
-                    isRenaming={isRenaming}
-                    initialValue={node.name}
-                    onValueCommit={(name) => {
-                      changeNodeName(node.id, name);
-                      tree.abortRenaming();
-                    }}
-                    className="px-1 py-0.5 font-normal text-[11px]"
-                  />
+                  <div className="min-w-0 flex-1">
+                    <NameInput
+                      isRenaming={isRenaming}
+                      initialValue={node.name}
+                      onValueCommit={(name) => {
+                        changeNodeName(node.id, name);
+                        tree.abortRenaming();
+                      }}
+                      className="px-1 py-0.5 font-normal text-[11px]"
+                    />
+                  </div>
                 </div>
                 <div
                   aria-label="actions"
@@ -556,7 +553,7 @@ function NameInput({
   }, [ref.current, isRenaming]);
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full min-w-0">
       {isRenaming ? (
         <input
           type="text"
@@ -577,10 +574,8 @@ function NameInput({
           }}
         />
       ) : (
-        <div
-          className={cn("flex w-full min-w-0 items-center truncate", className)}
-        >
-          {value}
+        <div className={cn("flex w-full min-w-0 items-center", className)}>
+          <span className="truncate">{value}</span>
         </div>
       )}
     </div>

@@ -33,7 +33,7 @@ export function RGBAColorControl({
         )}
       >
         <PopoverTrigger>
-          <RGBAChip rgba={value} />
+          <RGBAChip rgba={value} className="rounded-sm" />
         </PopoverTrigger>
 
         {/* <span className="ms-2">#{css.rgbaToHex(value)}</span> */}
