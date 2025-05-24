@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type cg from "@grida/cg";
+import type { editor } from "@/grida-canvas";
 import nid from "./reducers/tools/id";
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
@@ -3630,9 +3631,9 @@ export function useEditorApi() {
   const document = useDocument();
   const dispatcher = __useDispatch();
 
-  const getNodeById: grida.program.api.IStandaloneEditorApi["getNodeById"] =
+  const getNodeById: editor.api.IStandaloneEditorApi["getNodeById"] =
     useCallback(
-      (id: grida.program.api.NodeID) => {
+      (id: editor.api.NodeID) => {
         const nodedata = document.state.document.nodes[id];
         return internal.__createApiProxyNode_experimental(nodedata, {
           dispatcher,
@@ -3667,7 +3668,7 @@ export function useEditorApi() {
     [dispatcher]
   );
 
-  const editor: grida.program.api.IStandaloneEditorApi = useMemo(() => {
+  const editor: editor.api.IStandaloneEditorApi = useMemo(() => {
     return {
       selection: document.selection,
       getNodeById,
