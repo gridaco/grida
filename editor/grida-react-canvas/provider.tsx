@@ -5,18 +5,10 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
 } from "react";
-import {
-  type DocumentDispatcher,
-  type IDocumentEditorState,
-  type IDocumentEditorInit,
-  initDocumentEditorState,
-  ToolMode,
-  SurfaceRaycastTargeting,
-} from "./state";
+import { editor } from "@/grida-canvas";
 import type { tokens } from "@grida/tokens";
 import grida from "@grida/schema";
 import { useComputed } from "./nodes/use-computed";
@@ -25,11 +17,14 @@ import {
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
 import assert from "assert";
-import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
-import { domapi } from "./domapi";
+import { domapi } from "../grida-canvas/backends/dom";
 import { cmath } from "@grida/cmath";
-import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
+import type {
+  Action,
+  TCanvasEventTargetDragGestureState,
+  TChange,
+} from "../grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
 import iosvg from "@grida/io-svg";
@@ -37,13 +32,14 @@ import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type cg from "@grida/cg";
-import type { editor } from "@/grida-canvas";
 import nid from "./reducers/tools/id";
+
+type DocumentDispatcher = (action: Action) => void;
 
 const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
 const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
 
-const DocumentContext = createContext<IDocumentEditorState | null>(null);
+const DocumentContext = createContext<editor.state.IEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
 const DocumentDispatcherContext = createContext<DocumentDispatcher>(__noop);
@@ -57,7 +53,7 @@ export function StandaloneDocumentEditor({
 }: React.PropsWithChildren<{
   editable: boolean;
   debug?: boolean;
-  initial: Omit<IDocumentEditorInit, "editable" | "debug">;
+  initial: Omit<editor.state.IEditorInit, "editable" | "debug">;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
@@ -74,7 +70,7 @@ export function StandaloneDocumentEditor({
   );
 
   const state = useMemo(
-    () => initDocumentEditorState({ ...initial, editable, debug }),
+    () => editor.state.init({ ...initial, editable, debug }),
     [initial, editable, debug]
   );
 
@@ -1338,7 +1334,7 @@ export function useSelectionPaints() {
     () => [
       ...selection,
       ...selection
-        .map((s) => document.getChildren(state.document_ctx, s, true))
+        .map((s) => editor.dq.getChildren(state.document_ctx, s, true))
         .flat(),
     ],
     [selection, state.document_ctx]
@@ -1401,12 +1397,12 @@ export function useSelectionPaints() {
 
 export function useDocument(): editor.api.IDocumentEditorActions &
   editor.api.INodeChangeActions & {
-    state: IDocumentEditorState;
-    selection: IDocumentEditorState["selection"];
-    transform: IDocumentEditorState["transform"];
-    scenes: IDocumentEditorState["document"]["scenes"];
-    scene_id: IDocumentEditorState["scene_id"];
-    clipboardColor: IDocumentEditorState["user_clipboard_color"];
+    state: editor.state.IEditorState;
+    selection: editor.state.IEditorState["selection"];
+    transform: editor.state.IEditorState["transform"];
+    scenes: editor.state.IEditorState["document"]["scenes"];
+    scene_id: editor.state.IEditorState["scene_id"];
+    clipboardColor: editor.state.IEditorState["user_clipboard_color"];
   } {
   const [state, dispatch] = __useInternal();
 
@@ -1588,7 +1584,7 @@ export function useDocument(): editor.api.IDocumentEditorActions &
   const getNodeById: editor.api.IDocumentEditorActions["getNodeById"] =
     useCallback(
       (node_id: string): grida.program.nodes.Node => {
-        return document.__getNodeById(state, node_id);
+        return editor.dq.__getNodeById(state, node_id);
       },
       [state.document.nodes]
     );
@@ -1596,7 +1592,7 @@ export function useDocument(): editor.api.IDocumentEditorActions &
   const getNodeDepth: editor.api.IDocumentEditorActions["getNodeDepth"] =
     useCallback(
       (node_id: string) => {
-        return document.getDepth(state.document_ctx, node_id);
+        return editor.dq.getDepth(state.document_ctx, node_id);
       },
       [state.document_ctx]
     );
@@ -1604,7 +1600,7 @@ export function useDocument(): editor.api.IDocumentEditorActions &
   const getNodeAbsoluteRotation: editor.api.IDocumentEditorActions["getNodeAbsoluteRotation"] =
     useCallback(
       (node_id: string) => {
-        const parent_ids = document.getAncestors(state.document_ctx, node_id);
+        const parent_ids = editor.dq.getAncestors(state.document_ctx, node_id);
 
         let rotation = 0;
         // Calculate the absolute rotation
@@ -1816,7 +1812,7 @@ export function useDocument(): editor.api.IDocumentEditorActions &
 
   const configureSurfaceRaycastTargeting: editor.api.IDocumentEditorActions["configureSurfaceRaycastTargeting"] =
     useCallback(
-      (config: Partial<SurfaceRaycastTargeting>) => {
+      (config: Partial<editor.state.HitTestingConfig>) => {
         dispatch({
           type: "config/surface/raycast-targeting",
           config,
@@ -2135,11 +2131,11 @@ export function useDocument(): editor.api.IDocumentEditorActions &
 }
 
 type UseScene = grida.program.document.Scene & {
-  selection: IDocumentEditorState["selection"];
-  transform: IDocumentEditorState["transform"];
-  hovered_node_id: IDocumentEditorState["hovered_node_id"];
-  hovered_vertex_idx: IDocumentEditorState["hovered_vertex_idx"];
-  document_ctx: IDocumentEditorState["document_ctx"];
+  selection: editor.state.IEditorState["selection"];
+  transform: editor.state.IEditorState["transform"];
+  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
+  hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
+  document_ctx: editor.state.IEditorState["document_ctx"];
   setBackgroundColor: (
     backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
   ) => void;
@@ -2296,7 +2292,7 @@ export function useTransform() {
         animate: false,
       }
     ) => {
-      const ids = document.querySelector(
+      const ids = editor.dq.querySelector(
         scene.document_ctx,
         scene.selection,
         selector
@@ -2466,7 +2462,7 @@ export function useEventTarget() {
     debug,
     pixelgrid,
     ruler,
-    features,
+    flags: features,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -2498,7 +2494,7 @@ export function useEventTarget() {
   );
 
   const setTool = useCallback(
-    (tool: ToolMode) => {
+    (tool: editor.state.ToolMode) => {
       dispatch({
         type: "surface/tool",
         tool: tool,
@@ -3551,7 +3547,7 @@ export function useNode(node_id: string): NodeWithMeta {
  */
 export function useTopNode(node_id: string) {
   const { state } = useDocument();
-  const top_id = document.getTopId(state.document_ctx, node_id)!;
+  const top_id = editor.dq.getTopId(state.document_ctx, node_id)!;
   return useNode(top_id);
 }
 

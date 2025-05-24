@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import type { IDocumentEditorInit } from "@/grida-react-canvas";
+import { editor } from "@/grida-canvas";
 import Editor from "../../../editor";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 
-const document: IDocumentEditorInit = {
+const document: editor.state.IEditorInit = {
   editable: true,
   debug: false,
   document: {

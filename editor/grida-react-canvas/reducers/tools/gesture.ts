@@ -1,13 +1,9 @@
-import type {
-  GestureCurve,
-  IDocumentEditorState,
-} from "@/grida-react-canvas/state";
 import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
-import { document } from "@/grida-react-canvas/document-query";
+import { editor } from "@/grida-canvas";
 
 export function getInitialCurveGesture(
-  state: IDocumentEditorState,
+  state: editor.state.IEditorState,
   target: {
     node_id: string;
     segment: number;
@@ -18,10 +14,10 @@ export function getInitialCurveGesture(
      */
     invert: boolean;
   }
-): GestureCurve {
+): editor.gesture.GestureCurve {
   const { node_id, segment: segment_idx, control, invert } = target;
 
-  const node = document.__getNodeById(
+  const node = editor.dq.__getNodeById(
     state,
     node_id
   ) as grida.program.nodes.PathNode;

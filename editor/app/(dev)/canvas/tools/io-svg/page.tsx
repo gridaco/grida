@@ -5,7 +5,6 @@ import { GridaLogo } from "@/components/grida-logo";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import {
   EditorSurface,
-  initDocumentEditorState,
   StandaloneSceneContent,
   StandaloneDocumentEditor,
   standaloneDocumentReducer,
@@ -17,8 +16,9 @@ import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
 import { Button } from "@/components/ui/button";
 import { useHotkeys } from "react-hotkeys-hook";
-import Link from "next/link";
+import { editor } from "@/grida-canvas";
 import iosvg from "@grida/io-svg";
+import Link from "next/link";
 
 export default function IOSVGPage() {
   const [raw, setRaw] = useState<string>();
@@ -32,7 +32,7 @@ export default function IOSVGPage() {
 
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState({
+    editor.state.init({
       editable: true,
       debug: true,
       document: {
@@ -96,7 +96,7 @@ export default function IOSVGPage() {
 
           dispatch({
             type: "__internal/reset",
-            state: initDocumentEditorState({
+            state: editor.state.init({
               editable: true,
               document: doc,
             }),

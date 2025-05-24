@@ -1,10 +1,10 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
+import type { editor } from "@/grida-canvas";
 import { getRayTarget } from "../tools/target";
 
-export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
-  draft: Draft<S>
-) {
+export function self_updateSurfaceHoverState<
+  S extends editor.state.IEditorState,
+>(draft: Draft<S>) {
   if (
     // do not change the hovered node if the content edit mode is on
     draft.content_edit_mode ||
@@ -18,8 +18,8 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
     return draft;
   }
 
-  const target = getRayTarget(draft.surface_raycast_detected_node_ids, {
-    config: draft.surface_raycast_targeting,
+  const target = getRayTarget(draft.hits, {
+    config: draft.pointer_hit_testing_config,
     context: draft,
   });
 

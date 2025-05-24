@@ -1,10 +1,9 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
-import { document } from "../../document-query";
 import grida from "@grida/schema";
+import { editor } from "@/grida-canvas";
 import assert from "assert";
 
-export function self_insertSubDocument<S extends IDocumentEditorState>(
+export function self_insertSubDocument<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
   sub: grida.program.document.IPackedSceneDocument
@@ -12,8 +11,8 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
 
-  const sub_state = new document.DocumentState(sub);
-  const sub_ctx = document.Context.from(sub);
+  const sub_state = new editor.dq.DocumentState(sub);
+  const sub_ctx = editor.dq.Context.from(sub);
   const sub_fonts = sub_state.fonts();
 
   if (parent_id) {
@@ -66,7 +65,7 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   ).map((family) => ({ family }));
 
   // Update the hierarchy with parent-child relationships
-  const context = new document.Context(draft.document_ctx);
+  const context = new editor.dq.Context(draft.document_ctx);
   sub.scene.children.forEach((c) => {
     context.blindlymove(c, parent_id);
   });
@@ -77,7 +76,7 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   return sub.scene.children;
 }
 
-export function self_try_insert_node<S extends IDocumentEditorState>(
+export function self_try_insert_node<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
   node: grida.program.nodes.Node // TODO: NodePrototype
@@ -120,11 +119,11 @@ export function self_try_insert_node<S extends IDocumentEditorState>(
   }
 
   // Update the document's font registry
-  const s = new document.DocumentState(draft.document);
+  const s = new editor.dq.DocumentState(draft.document);
   draft.googlefonts = s.fonts().map((family) => ({ family }));
 
   // Update the runtime context with parent-child relationships
-  const context = new document.Context(draft.document_ctx);
+  const context = new editor.dq.Context(draft.document_ctx);
   context.insert(node_id, parent_id);
   draft.document_ctx = context.snapshot();
 

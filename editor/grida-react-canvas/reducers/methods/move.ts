@@ -1,11 +1,10 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
 import type grida from "@grida/schema";
+import { editor } from "@/grida-canvas";
 import { mv } from "@grida/tree";
-import { document } from "@/grida-react-canvas/document-query";
 import assert from "assert";
 
-export function self_moveNode<S extends IDocumentEditorState>(
+export function self_moveNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   source_id: string,
   target_id: "<root>" | string,
@@ -13,7 +12,7 @@ export function self_moveNode<S extends IDocumentEditorState>(
 ): boolean {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
-  const source_parent_id = document.getParentId(draft.document_ctx, source_id);
+  const source_parent_id = editor.dq.getParentId(draft.document_ctx, source_id);
   const source_is_root =
     scene.children.includes(source_id) || source_parent_id === null;
 
@@ -36,13 +35,13 @@ export function self_moveNode<S extends IDocumentEditorState>(
 
   // validate target is not a descendant of the node (otherwise it will create a cycle)
   if (
-    document.getAncestors(draft.document_ctx, target_id).includes(source_id)
+    editor.dq.getAncestors(draft.document_ctx, target_id).includes(source_id)
   ) {
     return false;
   }
 
   mv(itree, source_id, target_id, order);
-  const context = document.Context.from(draft.document);
+  const context = editor.dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 
   return true;

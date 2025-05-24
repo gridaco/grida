@@ -1,4 +1,4 @@
-import type { SchemaAction } from "../action";
+import type { SchemaAction } from "../../grida-canvas/action";
 import type grida from "@grida/schema";
 import produce from "immer";
 

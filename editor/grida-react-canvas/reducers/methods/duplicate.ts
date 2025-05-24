@@ -1,15 +1,14 @@
 import type { Draft } from "immer";
-import type { ActiveDuplication, IDocumentEditorState } from "../../state";
-import { document } from "../../document-query";
+import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
 import { self_selectNode } from "./selection";
 import assert from "assert";
 import nid from "../tools/id";
 import grida from "@grida/schema";
-import { domapi } from "@/grida-react-canvas/domapi";
+import { domapi } from "@/grida-canvas/backends/dom";
 import { cmath } from "@grida/cmath";
 
-export function self_duplicateNode<S extends IDocumentEditorState>(
+export function self_duplicateNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   _targets: Set<grida.program.nodes.NodeID>
 ) {
@@ -40,7 +39,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
         nid
       );
 
-    const parent_id = document.getParentId(draft.document_ctx, origin_id);
+    const parent_id = editor.dq.getParentId(draft.document_ctx, origin_id);
 
     // insert the sub document
     const clone_id = self_insertSubDocument(draft, parent_id, sub)[0];
@@ -72,7 +71,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
 }
 
 function get_repeating_translation_delta(
-  prev: ActiveDuplication | null,
+  prev: editor.state.ActiveDuplication | null,
   targets: grida.program.nodes.NodeID[],
   cdom: domapi.CanvasDOM
 ): cmath.Vector2 | null {

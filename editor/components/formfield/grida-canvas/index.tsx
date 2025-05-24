@@ -19,7 +19,6 @@ import {
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
-  initDocumentEditorState,
 } from "@/grida-react-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
@@ -41,13 +40,14 @@ import Toolbar, {
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 import { Card } from "@/components/ui/card";
 import { PenToolIcon } from "lucide-react";
+import { editor } from "@/grida-canvas";
 
 export function GridaCanvasFormField() {
   useDisableSwipeBack();
   const fonts = useGoogleFontsList();
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState({
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},
@@ -73,7 +73,7 @@ export function GridaCanvasFormField() {
         dispatch({
           type: "__internal/reset",
           key: "template",
-          state: initDocumentEditorState({
+          state: editor.state.init({
             editable: true,
             document: file.document,
           }),

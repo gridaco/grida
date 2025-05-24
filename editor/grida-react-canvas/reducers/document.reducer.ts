@@ -9,14 +9,11 @@ import type {
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
-} from "../action";
-import {
-  DEFAULT_SNAP_NUDGE_THRESHOLD,
-  type IDocumentEditorState,
-} from "../state";
+} from "../../grida-canvas/action";
+import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import assert from "assert";
-import { document } from "../document-query";
+// import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
@@ -29,7 +26,7 @@ import {
 } from "./methods";
 import { cmath } from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import { domapi } from "../domapi";
+import { domapi } from "../../grida-canvas/backends/dom";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import vn from "@grida/vn";
@@ -52,7 +49,7 @@ const PLACEMENT_ANCHORS_PADDING = 40;
  */
 const PLACEMENT_VIEWPORT_INSET = 40;
 
-export default function documentReducer<S extends IDocumentEditorState>(
+export default function documentReducer<S extends editor.state.IEditorState>(
   state: S,
   action: DocumentAction
 ): S {
@@ -69,7 +66,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const ids = Array.from(
           new Set(
             selectors.flatMap((selector) =>
-              document.querySelector(document_ctx, selection, selector)
+              editor.dq.querySelector(document_ctx, selection, selector)
             )
           )
         );
@@ -148,7 +145,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           selection
             .filter((node_id) => !ids.includes(node_id))
             .filter((node_id) => {
-              const node = document.__getNodeById(draft, node_id);
+              const node = editor.dq.__getNodeById(draft, node_id);
               return node.type === "container";
             });
 
@@ -355,7 +352,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const node = document.__getNodeById(draft, node_id);
+          const node = editor.dq.__getNodeById(draft, node_id);
 
           draft.document.nodes[node_id] = nodeTransformReducer(node, {
             type: "resize",
@@ -376,7 +373,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         target === "selection" ? state.selection : [target];
 
       const nodes = target_node_ids.map((node_id) =>
-        document.__getNodeById(state, node_id)
+        editor.dq.__getNodeById(state, node_id)
       );
 
       const in_flow_node_ids = nodes
@@ -430,10 +427,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // if a single node is selected, align it with its container. (if not root)
         // TODO: Knwon issue: this does not work accurately if the node overflows the container
         const node_id = target_node_ids[0];
-        const top_id = document.getTopId(state.document_ctx, node_id);
+        const top_id = editor.dq.getTopId(state.document_ctx, node_id);
         if (node_id !== top_id) {
           // get container (parent)
-          const parent_node_id = document.getParentId(
+          const parent_node_id = editor.dq.getParentId(
             state.document_ctx,
             node_id
           );
@@ -461,7 +458,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of bounding_node_ids) {
-          const node = document.__getNodeById(state, node_id);
+          const node = editor.dq.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -500,7 +497,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
-          const node = document.__getNodeById(state, node_id);
+          const node = editor.dq.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -522,7 +519,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // omit root node
         target_node_ids.filter((id) => !scene.children.includes(id)),
         (node_id) => {
-          return document.getParentId(state.document_ctx, node_id)!;
+          return editor.dq.getParentId(state.document_ctx, node_id)!;
         }
       );
 
@@ -591,7 +588,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
           // [reset children position]
           children.forEach((child_id) => {
-            const child = document.__getNodeById(draft, child_id);
+            const child = editor.dq.__getNodeById(draft, child_id);
             (draft.document.nodes[
               child_id
             ] as grida.program.nodes.i.IPositioning) = {
@@ -621,7 +618,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // omit root node
         target_node_ids.filter((id) => !scene.children.includes(id)),
         (node_id) => {
-          return document.getParentId(state.document_ctx, node_id)!;
+          return editor.dq.getParentId(state.document_ctx, node_id)!;
         }
       );
 
@@ -672,7 +669,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
           // [adjust children position]
           g.forEach((id) => {
-            const child = document.__getNodeById(draft, id);
+            const child = editor.dq.__getNodeById(draft, id);
             if ("left" in child && typeof child.left === "number")
               child.left -= union.x;
             if ("top" in child && typeof child.top === "number")
@@ -694,7 +691,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const {
           target: { node_id, vertex },
         } = action;
-        const node = document.__getNodeById(draft, node_id);
+        const node = editor.dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
           case "delete-vertex": {
@@ -767,7 +764,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
       return produce(state, (draft) => {
-        const root_template_instance = document.__getNodeById(
+        const root_template_instance = editor.dq.__getNodeById(
           draft,
           // FIXME: update api interface
           scene.children[0]
@@ -832,7 +829,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
-        const node = document.__getNodeById(draft, node_id);
+        const node = editor.dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
 
@@ -848,7 +845,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/locked": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = document.__getNodeById(draft, node_id);
+        const node = editor.dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.locked = !node.locked;
       });
@@ -856,7 +853,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/active": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = document.__getNodeById(draft, node_id);
+        const node = editor.dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.active = !node.active;
       });
@@ -864,7 +861,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/bold": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBoldAction>action;
-        const node = document.__getNodeById(draft, node_id);
+        const node = editor.dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
@@ -885,7 +882,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const template_instance_node = document.__getNodeById(
+        const template_instance_node = editor.dq.__getNodeById(
           draft,
           template_instance_node_id
         );
@@ -947,18 +944,18 @@ const a11y_direction_to_vector = {
 } as const;
 
 function self_order(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   node_id: string,
   order: "back" | "front" | "backward" | "forward" | number
 ) {
   assert(draft.scene_id, "scene_id is required for order");
   const scene = draft.document.scenes[draft.scene_id];
 
-  const parent_id = document.getParentId(draft.document_ctx, node_id);
+  const parent_id = editor.dq.getParentId(draft.document_ctx, node_id);
   // if (!parent_id) return; // root node case
   let ichildren: grida.program.nodes.i.IChildrenReference;
   if (parent_id) {
-    ichildren = document.__getNodeById(
+    ichildren = editor.dq.__getNodeById(
       draft,
       parent_id
     ) as grida.program.nodes.i.IChildrenReference;
@@ -1010,7 +1007,7 @@ function self_order(
 }
 
 function self_nudge(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   targets: string[],
   dx: number,
   dy: number
@@ -1033,13 +1030,13 @@ function self_nudge(
       origin_rects,
       { objects: snap_target_node_rects },
       [dx, dy],
-      DEFAULT_SNAP_NUDGE_THRESHOLD
+      editor.config.DEFAULT_SNAP_NUDGE_THRESHOLD
     );
     draft.surface_snapping = snapping;
   }
 
   for (const node_id of targets) {
-    const node = document.__getNodeById(draft, node_id);
+    const node = editor.dq.__getNodeById(draft, node_id);
 
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "translate",

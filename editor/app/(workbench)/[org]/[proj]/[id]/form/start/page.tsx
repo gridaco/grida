@@ -57,7 +57,7 @@ import {
   useRootTemplateInstanceNode,
 } from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { CanvasAction } from "@/grida-react-canvas";
+import type { Action as CanvasAction } from "@/grida-canvas";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";

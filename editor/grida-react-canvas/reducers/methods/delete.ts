@@ -1,14 +1,13 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
 import type grida from "@grida/schema";
-import { document } from "@/grida-react-canvas/document-query";
+import { editor } from "@/grida-canvas";
 import { rm } from "@grida/tree";
 import assert from "assert";
 
 /**
  * @returns if the node is handled (removed or deactivated)
  */
-export function self_try_remove_node<S extends IDocumentEditorState>(
+export function self_try_remove_node<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   node_id: string
 ): boolean {
@@ -45,7 +44,7 @@ export function self_try_remove_node<S extends IDocumentEditorState>(
   delete nodes["<root>"];
 
   // rebuild context
-  const context = document.Context.from(draft.document);
+  const context = editor.dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 
   //

@@ -12,16 +12,9 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   //
-} from "../action";
-import {
-  __global_editors,
-  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
-  IDocumentEditorClipboardState,
-  type GestureDraw,
-  type IDocumentEditorState,
-} from "../state";
+} from "../../grida-canvas/action";
+import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
-import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
@@ -33,19 +26,19 @@ import {
   self_update_gesture_transform,
 } from "./methods";
 import { cmath } from "@grida/cmath";
-import { domapi } from "../domapi";
+import { domapi } from "../../grida-canvas/backends/dom";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import vn from "@grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
-import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
+import cg from "@grida/cg";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
-export default function eventTargetReducer<S extends IDocumentEditorState>(
+export default function eventTargetReducer<S extends editor.state.IEditorState>(
   state: S,
   action: EventTargetAction
 ): S {
@@ -102,7 +95,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             typeof a_point === "number" &&
             tarnslate_with_axis_lock === "on"
           ) {
-            const node = document.__getNodeById(
+            const node = editor.dq.__getNodeById(
               state,
               node_id
             ) as grida.program.nodes.PathNode;
@@ -139,14 +132,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        draft.hits = node_ids_from_point;
         self_updateSurfaceHoverState(draft);
       });
     }
     case "event-target/event/on-click": {
       const { node_ids_from_point } = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
-        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        draft.hits = node_ids_from_point;
         switch (draft.tool.type) {
           case "cursor":
           case "hand":
@@ -217,8 +210,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         if (state.gesture.type !== "idle") return; // ignore when gesture is active
 
-        const { document_ctx, selection, surface_raycast_detected_node_ids } =
-          state;
+        const {
+          document_ctx,
+          selection,
+          hits: surface_raycast_detected_node_ids,
+        } = state;
         // #region [nested selection]
         // - focus on the next descendant (next deep) hit node (if any) relative to the selection
 
@@ -240,7 +236,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           surface_raycast_detected_node_ids,
           {
             context: state,
-            config: state.surface_raycast_targeting,
+            config: state.pointer_hit_testing_config,
           },
           true
         );
@@ -258,7 +254,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        draft.hits = node_ids_from_point;
 
         switch (draft.tool.type) {
           case "cursor": {
@@ -291,7 +287,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { node_id, path_cursor_position, a_point, next_ta } =
                 draft.content_edit_mode;
 
-              const node = document.__getNodeById(
+              const node = editor.dq.__getNodeById(
                 draft,
                 node_id
               ) as grida.program.nodes.PathNode;
@@ -589,7 +585,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             assert(selected_vertices.length === 1);
             const vertex = selected_vertices[0];
 
-            const node = document.__getNodeById(
+            const node = editor.dq.__getNodeById(
               state,
               node_id
             ) as grida.program.nodes.PathNode;
@@ -754,7 +750,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 scene.children.map((id) => cdom.getNodeBoundingRect(id)!),
                 m,
                 threshold(
-                  DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
+                  editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
                   draft.transform
                 )
               );
@@ -798,9 +794,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               const mode = draft.gesture.mode;
 
-              const { origin, points, node_id } = state.gesture as GestureDraw;
+              const { origin, points, node_id } =
+                state.gesture as editor.gesture.GestureDraw;
 
-              const node = document.__getNodeById(
+              const node = editor.dq.__getNodeById(
                 draft,
                 node_id
               ) as grida.program.nodes.PathNode;
@@ -848,7 +845,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { node_id, segment, initial, control, invert } =
                 draft.gesture;
 
-              const node = document.__getNodeById(
+              const node = editor.dq.__getNodeById(
                 draft,
                 node_id
               ) as grida.program.nodes.PathNode;
@@ -908,7 +905,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               assert(draft.content_edit_mode?.type === "path");
               const { content_edit_mode } = draft;
               const { node_id } = content_edit_mode;
-              const node = document.__getNodeById(
+              const node = editor.dq.__getNodeById(
                 draft,
                 node_id
               ) as grida.program.nodes.PathNode;
@@ -964,7 +961,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { node_id } = draft.gesture;
               const [dx, dy] = delta;
               const d = -Math.round(dx);
-              const node = document.__getNodeById(draft, node_id);
+              const node = editor.dq.__getNodeById(draft, node_id);
 
               if (!("cornerRadius" in node)) {
                 return;
@@ -1026,7 +1023,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
                   // Apply transform to the actual nodes.
                   transformed.forEach((obj) => {
-                    const node = document.__getNodeById(
+                    const node = editor.dq.__getNodeById(
                       draft,
                       obj.id
                     ) as grida.program.nodes.i.IPositioning;
@@ -1042,7 +1039,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                     1
                   );
 
-                  const container = document.__getNodeById(draft, layout.group);
+                  const container = editor.dq.__getNodeById(
+                    draft,
+                    layout.group
+                  );
                   draft.document.nodes[layout.group] = nodeReducer(container, {
                     type: "node/change/gap",
                     gap: gap,
@@ -1067,7 +1067,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { selection, node_ids_from_point, shiftKey } = action;
       if (state.gesture.type === "translate") break;
       return produce(state, (draft) => {
-        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        draft.hits = node_ids_from_point;
         const { hovered_node_id } = self_updateSurfaceHoverState(draft);
         if (shiftKey) {
           if (hovered_node_id) {
@@ -1092,7 +1092,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 }
 
 function self_prepare_bitmap_node(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   node_id: string | null
 ): Draft<grida.program.nodes.BitmapNode> {
   if (!node_id) {
@@ -1139,7 +1139,7 @@ function self_prepare_bitmap_node(
 
     self_try_insert_node(draft, parent, bitmap);
 
-    const node = document.__getNodeById(
+    const node = editor.dq.__getNodeById(
       draft,
       new_node_id
     ) as grida.program.nodes.BitmapNode;
@@ -1148,7 +1148,7 @@ function self_prepare_bitmap_node(
 
     return node;
   } else {
-    return document.__getNodeById(
+    return editor.dq.__getNodeById(
       draft,
       node_id
     ) as grida.program.nodes.BitmapNode;
@@ -1156,7 +1156,7 @@ function self_prepare_bitmap_node(
 }
 
 function self_brush(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   {
     is_gesture,
   }: {
@@ -1174,7 +1174,7 @@ function self_brush(
   if (draft.gesture && draft.gesture.type == "brush") {
     color = draft.gesture.color;
   } else {
-    color = get_next_brush_pain_color(draft);
+    color = get_next_brush_pain_color(draft, draft.user_clipboard_color);
   }
 
   const blendmode =
@@ -1189,8 +1189,11 @@ function self_brush(
 
   // set up the editor from global.
   let bme: BitmapLayerEditor;
-  if (__global_editors.bitmap && __global_editors.bitmap.id === node.imageRef) {
-    bme = __global_editors.bitmap;
+  if (
+    editor.__global_editors.bitmap &&
+    editor.__global_editors.bitmap.id === node.imageRef
+  ) {
+    bme = editor.__global_editors.bitmap;
   } else {
     bme = new BitmapLayerEditor(
       node.imageRef,
@@ -1203,7 +1206,7 @@ function self_brush(
       image.data,
       image.version
     );
-    __global_editors.bitmap = bme;
+    editor.__global_editors.bitmap = bme;
   }
   bme.open();
 
@@ -1256,9 +1259,12 @@ function self_brush(
   return bme;
 }
 
-function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
-  const color = get_next_brush_pain_color(draft);
-  const bme = __global_editors.bitmap!;
+function self_floodfill(
+  draft: Draft<editor.state.IEditorState>,
+  imageRef: string
+) {
+  const color = get_next_brush_pain_color(draft, draft.user_clipboard_color);
+  const bme = editor.__global_editors.bitmap!;
   bme.floodfill(draft.pointer.position, color);
   draft.document.bitmaps[imageRef] = {
     data: bme.data,
@@ -1269,15 +1275,16 @@ function self_floodfill(draft: Draft<IDocumentEditorState>, imageRef: string) {
 }
 
 function get_next_brush_pain_color(
-  state: IDocumentEditorClipboardState
+  state: editor.state.IEditorFeatureBrushState,
+  fallback?: cg.RGBA8888
 ): cmath.Vector4 {
   return cmath.color.rgba_to_unit8_chunk(
-    state.next_paint_color ?? state.user_clipboard_color ?? black
+    state.brush_color ?? fallback ?? black
   );
 }
 
 function self_start_gesture_scale_draw_new_node(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   {
     new_node_id,
     new_node_rect,
@@ -1288,7 +1295,7 @@ function self_start_gesture_scale_draw_new_node(
 ) {
   draft.gesture = {
     type: "scale",
-    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
+    initial_snapshot: editor.state.snapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
@@ -1298,7 +1305,7 @@ function self_start_gesture_scale_draw_new_node(
   };
 }
 
-function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
+function self_start_gesture_translate(draft: Draft<editor.state.IEditorState>) {
   const selection = draft.selection;
   if (selection.length === 0) return;
 
@@ -1314,7 +1321,7 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
     initial_clone_ids: selection.map(() => nid()),
     initial_selection: selection,
     initial_rects: rects,
-    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
+    initial_snapshot: editor.state.snapshot(draft),
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
     last: cmath.vector2.zero,
@@ -1322,10 +1329,10 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   };
 }
 
-function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
+function self_maybe_end_gesture(draft: Draft<editor.state.IEditorState>) {
   switch (draft.gesture.type) {
     case "brush": {
-      __global_editors.bitmap?.close();
+      editor.__global_editors.bitmap?.close();
       break;
     }
     case "translate": {
@@ -1359,16 +1366,18 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
  *
  * @returns the parent node id or `null` if no desired target
  */
-function __get_insertion_target(state: IDocumentEditorState): string | null {
+function __get_insertion_target(
+  state: editor.state.IEditorState
+): string | null {
   assert(state.scene_id, "scene_id is not set");
   const scene = state.document.scenes[state.scene_id];
   if (scene.constraints.children === "single") {
     return scene.children[0];
   }
 
-  const hits = state.surface_raycast_detected_node_ids.slice();
+  const hits = state.hits.slice();
   for (const hit of hits) {
-    const node = document.__getNodeById(state, hit);
+    const node = editor.dq.__getNodeById(state, hit);
     if (node.type === "container") return hit;
   }
   return null;

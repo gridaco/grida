@@ -31,7 +31,8 @@ import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";
 import { FormAgentThemeSyncProvider } from "./sync";
-import { CanvasAction, StandaloneDocumentEditor } from "@/grida-react-canvas";
+import { StandaloneDocumentEditor } from "@/grida-react-canvas";
+import { type Action as CanvasAction } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "./action";
 import { ErrorInvalidSchema } from "@/components/error";
 

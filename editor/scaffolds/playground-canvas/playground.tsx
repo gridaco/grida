@@ -23,9 +23,7 @@ import {
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
-  initDocumentEditorState,
   useDocument,
-  type IDocumentEditorInit,
 } from "@/grida-react-canvas";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
@@ -120,6 +118,7 @@ import {
 import { sitemap } from "@/www/data/sitemap";
 import iosvg from "@grida/io-svg";
 import iofigma from "@grida/io-figma";
+import { editor } from "@/grida-canvas";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -130,7 +129,7 @@ const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
 export type CanvasPlaygroundProps = {
   src?: string;
-  document?: IDocumentEditorInit;
+  document?: editor.state.IEditorInit;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -172,7 +171,7 @@ export default function CanvasPlayground({
   const fonts = useGoogleFontsList();
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState(document)
+    editor.state.init(document)
   );
 
   useHotkeys("meta+\\, ctrl+\\", () => {
@@ -206,7 +205,7 @@ export default function CanvasPlayground({
         dispatch({
           type: "__internal/reset",
           key: src,
-          state: initDocumentEditorState({
+          state: editor.state.init({
             editable: true,
             document: file.document,
           }),
@@ -243,7 +242,7 @@ export default function CanvasPlayground({
             onImport={(file) => {
               dispatch({
                 type: "__internal/reset",
-                state: initDocumentEditorState({
+                state: editor.state.init({
                   editable: true,
                   document: file.document,
                 }),

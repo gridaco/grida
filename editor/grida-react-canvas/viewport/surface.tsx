@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DropzoneIndication,
-  GestureState,
-  type Guide,
-  useEventTarget,
-} from "@/grida-react-canvas";
+import { useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
@@ -60,6 +55,7 @@ import {
 import grida from "@grida/schema";
 import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
+import type { editor } from "@/grida-canvas";
 
 const DRAG_THRESHOLD = 2;
 
@@ -425,7 +421,7 @@ export function EditorSurface() {
   );
 }
 
-function DropzoneOverlay(props: DropzoneIndication) {
+function DropzoneOverlay(props: editor.state.DropzoneIndication) {
   const { transform } = useTransform();
   switch (props.type) {
     case "node":
@@ -627,7 +623,7 @@ function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   );
 }
 
-function get_cursor_tooltip_value(gesture: GestureState) {
+function get_cursor_tooltip_value(gesture: editor.gesture.GestureState) {
   switch (gesture.type) {
     case "gap":
       return cmath.ui.formatNumber(gesture.gap, 1);
@@ -1495,7 +1491,11 @@ function RulerGuideOverlay() {
   //
 }
 
-function Guide({ axis, offset, idx }: Guide & { idx: number }) {
+function Guide({
+  axis,
+  offset,
+  idx,
+}: grida.program.document.Guide2D & { idx: number }) {
   const { transform } = useTransform();
   const { startGuideGesture, deleteGuide } = useEventTarget();
   const o = offsetToSurfaceSpace(offset, axis, transform);

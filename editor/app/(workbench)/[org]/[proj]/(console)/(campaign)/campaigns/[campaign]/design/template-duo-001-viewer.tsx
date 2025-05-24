@@ -1,12 +1,10 @@
 import React, { useEffect, useReducer } from "react";
-import type { IDocumentEditorInit } from "@/grida-react-canvas";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 import ShareDialog from "@/theme/templates/west-referral/referrer/share";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
 import {
-  initDocumentEditorState,
   StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
@@ -28,8 +26,9 @@ import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import { useTransform } from "@/grida-react-canvas/provider";
 import MessageAppFrame from "@/components/frames/message-app-frame";
+import { editor } from "@/grida-canvas";
 
-const document: IDocumentEditorInit = {
+const document: editor.state.IEditorInit = {
   editable: true,
   debug: false,
   document: {
@@ -218,7 +217,7 @@ export function CampaignTemplateDuo001Viewer({
 }) {
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState(document)
+    editor.state.init(document)
   );
 
   return (

@@ -1,8 +1,4 @@
-import type {
-  IDocumentEditorState,
-  SurfaceRaycastTargeting,
-} from "@/grida-react-canvas/state";
-import { document } from "../../document-query";
+import { editor } from "@/grida-canvas";
 
 export function getRayTarget(
   hits: string[],
@@ -10,8 +6,8 @@ export function getRayTarget(
     config,
     context,
   }: {
-    config: SurfaceRaycastTargeting;
-    context: IDocumentEditorState;
+    config: editor.state.HitTestingConfig;
+    context: editor.state.IEditorState;
   },
   nested_first: boolean = false
 ): string | null {
@@ -24,7 +20,7 @@ export function getRayTarget(
   const filtered = hits
     .filter((node_id) => {
       const node = nodes[node_id];
-      const top_id = document.getTopId(context.document_ctx, node_id);
+      const top_id = editor.dq.getTopId(context.document_ctx, node_id);
       const maybeichildren = ichildren(node);
       if (
         maybeichildren &&
@@ -48,8 +44,8 @@ export function getRayTarget(
     })
     .sort((a, b) => {
       return (
-        document.getDepth(context.document_ctx, a) -
-        document.getDepth(context.document_ctx, b)
+        editor.dq.getDepth(context.document_ctx, a) -
+        editor.dq.getDepth(context.document_ctx, b)
       );
     });
 
@@ -60,7 +56,9 @@ export function getRayTarget(
     case "auto": {
       const selection_sibling_ids = new Set(
         selection
-          .map((node_id) => document.getSiblings(context.document_ctx, node_id))
+          .map((node_id) =>
+            editor.dq.getSiblings(context.document_ctx, node_id)
+          )
           .flat()
       );
 
@@ -73,7 +71,7 @@ export function getRayTarget(
           return -1;
         }
 
-        const a_parent = document.getParentId(context.document_ctx, node_id);
+        const a_parent = editor.dq.getParentId(context.document_ctx, node_id);
         if (a_parent && selection.includes(a_parent)) {
           return nested_first ? -3 : 0;
         }
@@ -97,7 +95,7 @@ export function getRayTarget(
 }
 
 export function getMarqueeSelection(
-  state: IDocumentEditorState,
+  state: editor.state.IEditorState,
   hits: string[]
 ): string[] {
   const { document_ctx } = state;
@@ -107,15 +105,15 @@ export function getMarqueeSelection(
   // 2. shall not be a locked node
   // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
-    const root_id = document.getTopId(document_ctx, hit_id)!;
-    const hit = document.__getNodeById(state, hit_id);
+    const root_id = editor.dq.getTopId(document_ctx, hit_id)!;
+    const hit = editor.dq.__getNodeById(state, hit_id);
 
     // (1) shall not be a root node (if configured)
     const maybeichildren = ichildren(hit);
     if (
       maybeichildren &&
       maybeichildren.length > 0 &&
-      state.surface_raycast_targeting.ignores_root_with_children &&
+      state.pointer_hit_testing_config.ignores_root_with_children &&
       hit_id === root_id
     )
       return false;
@@ -126,7 +124,7 @@ export function getMarqueeSelection(
     if (hit.locked) return false;
 
     // (3). the parent of this node shall also be hit by the marquee (unless it's the root node)
-    const parent_id = document.getParentId(document_ctx, hit_id)!;
+    const parent_id = editor.dq.getParentId(document_ctx, hit_id)!;
 
     // root node
     if (parent_id === null) {
@@ -136,7 +134,7 @@ export function getMarqueeSelection(
       if (!hits.includes(parent_id)) return false;
     }
 
-    const parent = document.__getNodeById(state, parent_id!);
+    const parent = editor.dq.__getNodeById(state, parent_id!);
     if (!parent) return false;
     if (parent.locked) return false;
 

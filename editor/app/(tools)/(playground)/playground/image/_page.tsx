@@ -43,7 +43,6 @@ import {
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
-  initDocumentEditorState,
   useDocument,
 } from "@/grida-react-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
@@ -67,11 +66,12 @@ import {
   useContinueWithAuth,
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
+import { editor } from "@/grida-canvas";
 
 export default function ImagePlayground() {
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState({
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},

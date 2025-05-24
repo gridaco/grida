@@ -1,23 +1,15 @@
 import { produce, type Draft } from "immer";
 
-import type { SurfaceAction } from "../action";
-import {
-  DEFAULT_GAP_ALIGNMENT_TOLERANCE,
-  Guide,
-  type ToolModeType,
-  type IDocumentEditorState,
-  type LayoutSnapshot,
-} from "../state";
-import { document } from "../document-query";
+import type { SurfaceAction } from "../../grida-canvas/action";
+import { editor } from "@/grida-canvas";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
 import { cmath } from "@grida/cmath";
-import { domapi } from "../domapi";
+import { domapi } from "../../grida-canvas/backends/dom";
 import grida from "@grida/schema";
 import { self_clearSelection, self_selectNode } from "./methods";
-import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
-export default function surfaceReducer<S extends IDocumentEditorState>(
+export default function surfaceReducer<S extends editor.state.IEditorState>(
   state: S,
   action: SurfaceAction
 ): S {
@@ -47,7 +39,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];
-      const node = document.__getNodeById(state, node_id);
+      const node = editor.dq.__getNodeById(state, node_id);
 
       return produce(state, (draft) => {
         switch (node.type) {
@@ -85,7 +77,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //   //
           // }
           case "bitmap": {
-            const node = document.__getNodeById(
+            const node = editor.dq.__getNodeById(
               draft,
               node_id
             ) as grida.program.nodes.BitmapNode;
@@ -115,20 +107,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { tool } = action;
 
       if (
-        state.features.__unstable_brush_tool !== "on" &&
+        state.flags.__unstable_brush_tool !== "on" &&
         (tool.type === "brush" || tool.type === "eraser")
       ) {
         console.warn("unstable brush tool is not enabled");
         return state;
       }
 
-      const path_edit_mode_valid_tool_modes: ToolModeType[] = [
+      const path_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
         "cursor",
         "hand",
         "path",
       ];
-      const text_edit_mode_valid_tool_modes: ToolModeType[] = ["cursor"];
-      const bitmap_edit_mode_valid_tool_modes: ToolModeType[] = [
+      const text_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
+        "cursor",
+      ];
+      const bitmap_edit_mode_valid_tool_modes: editor.state.ToolModeType[] = [
         "brush",
         "eraser",
         "flood-fill",
@@ -226,7 +220,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               const next = {
                 axis,
                 offset: -cmath.quantize(t[axi] * (1 / s[axi]), 1),
-              } satisfies Guide;
+              } satisfies grida.program.document.Guide2D;
               const idx = scene.guides.push(next) - 1;
 
               // new
@@ -320,7 +314,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             const { content_edit_mode } = draft;
             assert(content_edit_mode && content_edit_mode.type === "path");
             const { node_id } = content_edit_mode;
-            const node = document.__getNodeById(
+            const node = editor.dq.__getNodeById(
               draft,
               node_id
             ) as grida.program.nodes.PathNode;
@@ -347,11 +341,14 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             const { selection, node_id } = gesture;
 
             // assure the selection shares the same parent
-            const parent_id = document.getParentId(state.document_ctx, node_id);
+            const parent_id = editor.dq.getParentId(
+              state.document_ctx,
+              node_id
+            );
             if (
               !selection.every(
                 (it) =>
-                  document.getParentId(state.document_ctx, it) === parent_id
+                  editor.dq.getParentId(state.document_ctx, it) === parent_id
               )
             ) {
               return;
@@ -393,14 +390,14 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
             if (Array.isArray(selection)) {
               // assure the selection shares the same parent
-              const parent_id = document.getParentId(
+              const parent_id = editor.dq.getParentId(
                 state.document_ctx,
                 selection[0]
               );
               if (
                 !selection.every(
                   (it) =>
-                    document.getParentId(state.document_ctx, it) === parent_id
+                    editor.dq.getParentId(state.document_ctx, it) === parent_id
                 )
               ) {
                 return;
@@ -412,7 +409,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               const [gap] = cmath.rect.getUniformGap(
                 layout.objects,
                 axis,
-                DEFAULT_GAP_ALIGNMENT_TOLERANCE
+                editor.config.DEFAULT_GAP_ALIGNMENT_TOLERANCE
               );
 
               assert(gap !== undefined, "gap is not uniform");
@@ -438,7 +435,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               };
             } else {
               // assert the selection to be a flex container
-              const node = document.__getNodeById(state, selection);
+              const node = editor.dq.__getNodeById(state, selection);
               assert(
                 node.type === "container" && node.layout === "flex",
                 "the selection is not a flex container"
@@ -446,7 +443,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               // (we only support main axis gap for now) - ignoring the input axis.
               const { direction, mainAxisGap } = node;
 
-              const children = document.getChildren(
+              const children = editor.dq.getChildren(
                 state.document_ctx,
                 selection
               );
@@ -479,29 +476,31 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 }
 
 function createLayoutSnapshot(
-  state: IDocumentEditorState,
+  state: editor.state.IEditorState,
   group: string | null,
   items: string[]
-): LayoutSnapshot {
+): editor.gesture.LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
   let reldelta: cmath.Vector2 = [0, 0];
   let parent: grida.program.nodes.Node | null = null;
   if (group) {
-    parent = document.__getNodeById(state, group);
+    parent = editor.dq.__getNodeById(state, group);
     const parent_rect = cdom.getNodeBoundingRect(group)!;
     reldelta = [-parent_rect.x, -parent_rect.y];
   }
 
-  const objects: LayoutSnapshot["objects"] = items.map((node_id) => {
-    const abs_rect = cdom.getNodeBoundingRect(node_id)!;
-    const rel_rect = cmath.rect.translate(abs_rect, reldelta);
+  const objects: editor.gesture.LayoutSnapshot["objects"] = items.map(
+    (node_id) => {
+      const abs_rect = cdom.getNodeBoundingRect(node_id)!;
+      const rel_rect = cmath.rect.translate(abs_rect, reldelta);
 
-    return {
-      ...rel_rect,
-      id: node_id,
-    };
-  });
+      return {
+        ...rel_rect,
+        id: node_id,
+      };
+    }
+  );
 
   const is_group_flex_container =
     parent && parent.type === "container" && parent.layout === "flex";
@@ -522,7 +521,7 @@ function createLayoutSnapshot(
 }
 
 function self_start_gesture_scale(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   {
     selection,
     direction,
@@ -538,7 +537,7 @@ function self_start_gesture_scale(
 
   draft.gesture = {
     type: "scale",
-    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
+    initial_snapshot: editor.state.snapshot(draft),
     initial_rects: rects,
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
@@ -549,7 +548,7 @@ function self_start_gesture_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = document.__getNodeById(draft, node_id);
+    const node = editor.dq.__getNodeById(draft, node_id);
     const rect = rects[i++];
 
     // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
@@ -591,7 +590,7 @@ function self_start_gesture_scale(
 }
 
 function self_start_gesture_rotate(
-  draft: Draft<IDocumentEditorState>,
+  draft: Draft<editor.state.IEditorState>,
   {
     selection,
     offset,
@@ -602,7 +601,7 @@ function self_start_gesture_rotate(
     offset: cmath.Vector2;
   }
 ) {
-  const { rotation } = document.__getNodeById(
+  const { rotation } = editor.dq.__getNodeById(
     draft,
     selection
   ) as grida.program.nodes.i.IRotation;

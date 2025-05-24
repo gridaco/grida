@@ -7,7 +7,7 @@ import { cn } from "@/components/lib/utils";
 import { cmath } from "@grida/cmath";
 import { useTransform } from "@/grida-react-canvas/provider";
 import { useLayoutEffect, useState } from "react";
-import { domapi } from "@/grida-react-canvas/domapi";
+import { domapi } from "@/grida-canvas/backends/dom";
 import { useDocument } from "@/grida-react-canvas/provider";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";

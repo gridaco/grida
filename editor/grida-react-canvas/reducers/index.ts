@@ -1,19 +1,18 @@
-import { DEFAULT_SCENE_STATE, type IDocumentEditorState } from "../state";
-import type { Action, EditorAction } from "../action";
+import type { Action, EditorAction } from "../../grida-canvas/action";
 import { produce, type Draft } from "immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
 } from "./methods";
-import { history } from "./history";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import equal from "deep-equal";
 import grida from "@grida/schema";
+import { editor } from "@/grida-canvas";
 import nid from "./tools/id";
 import { v4 } from "uuid";
 
-export default function reducer<S extends IDocumentEditorState>(
+export default function reducer<S extends editor.state.IEditorState>(
   state: S,
   action: Action
 ): S {
@@ -55,7 +54,7 @@ export default function reducer<S extends IDocumentEditorState>(
         // 1. change the scene_id
         draft.scene_id = scene;
         // 2. clear scene-specific state
-        Object.assign(draft, DEFAULT_SCENE_STATE);
+        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
     case "scenes/new": {
@@ -81,7 +80,7 @@ export default function reducer<S extends IDocumentEditorState>(
         // 1. change the scene_id
         draft.scene_id = new_scene.id;
         // 2. clear scene-specific state
-        Object.assign(draft, DEFAULT_SCENE_STATE);
+        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
     case "scenes/delete": {
@@ -97,7 +96,7 @@ export default function reducer<S extends IDocumentEditorState>(
           draft.document.entry_scene_id = draft.scene_id;
         }
         // 2. clear scene-specific state
-        Object.assign(draft, DEFAULT_SCENE_STATE);
+        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
     case "scenes/duplicate": {
@@ -121,7 +120,7 @@ export default function reducer<S extends IDocumentEditorState>(
         // 1. change the scene_id
         draft.scene_id = next.id;
         // 2. clear scene-specific state
-        Object.assign(draft, DEFAULT_SCENE_STATE);
+        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
       });
     }
     case "scenes/change/name": {
@@ -159,9 +158,12 @@ export default function reducer<S extends IDocumentEditorState>(
           const nextPresent = draft.history.past.pop();
           if (nextPresent) {
             draft.history.future.unshift(
-              history.entry(nextPresent.actionType, history.snapshot(state))
+              editor.history.entry(
+                nextPresent.actionType,
+                editor.history.snapshot(state)
+              )
             );
-            history.apply(draft, nextPresent.state);
+            editor.history.apply(draft, nextPresent.state);
           }
         });
       }
@@ -173,16 +175,19 @@ export default function reducer<S extends IDocumentEditorState>(
           const nextPresent = draft.history.future.shift();
           if (nextPresent) {
             draft.history.past.push(
-              history.entry(nextPresent.actionType, history.snapshot(state))
+              editor.history.entry(
+                nextPresent.actionType,
+                editor.history.snapshot(state)
+              )
             );
-            history.apply(draft, nextPresent.state);
+            editor.history.apply(draft, nextPresent.state);
           }
         });
       }
     case "clip/color": {
       return produce(state, (draft: Draft<S>) => {
         draft.user_clipboard_color = action.color;
-        draft.next_paint_color = action.color;
+        draft.brush_color = action.color;
       });
     }
     default:
@@ -190,7 +195,7 @@ export default function reducer<S extends IDocumentEditorState>(
   }
 }
 
-function historyExtension<S extends IDocumentEditorState>(
+function historyExtension<S extends editor.state.IEditorState>(
   prev: S,
   action: EditorAction,
   next: S
@@ -201,8 +206,8 @@ function historyExtension<S extends IDocumentEditorState>(
   const hasChanged = !equal(prev.document, next.document);
   if (!hasChanged) return next;
   return produce(next, (draft) => {
-    const entry = history.entry(action.type, prev);
-    const mergableEntry = history.getMergableEntry(prev.history.past);
+    const entry = editor.history.entry(action.type, prev);
+    const mergableEntry = editor.history.getMergableEntry(prev.history.past);
 
     if (mergableEntry) {
       draft.history.past[draft.history.past.length - 1] = {
@@ -221,7 +226,7 @@ function historyExtension<S extends IDocumentEditorState>(
   });
 }
 
-function _reducer<S extends IDocumentEditorState>(
+function _reducer<S extends editor.state.IEditorState>(
   state: S,
   action: EditorAction
 ): S {
@@ -230,12 +235,12 @@ function _reducer<S extends IDocumentEditorState>(
       const { config } = action;
       return produce(state, (draft: Draft<S>) => {
         if (config.target)
-          draft.surface_raycast_targeting.target = config.target;
+          draft.pointer_hit_testing_config.target = config.target;
         if (config.ignores_locked)
-          draft.surface_raycast_targeting.ignores_locked =
+          draft.pointer_hit_testing_config.ignores_locked =
             config.ignores_locked;
         if (config.ignores_root_with_children)
-          draft.surface_raycast_targeting.ignores_root_with_children =
+          draft.pointer_hit_testing_config.ignores_root_with_children =
             config.ignores_root_with_children;
         self_updateSurfaceHoverState(draft);
       });
