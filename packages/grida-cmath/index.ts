@@ -512,6 +512,28 @@ export namespace cmath {
   }
 }
 
+export namespace cmath.delta {
+  /**
+   * Projects a scalar delta along the given axis through a 2D affine transform.
+   *
+   * @param offset - The delta along the 'x' or 'y' axis.
+   * @param axis - The axis ('x' or 'y') of the delta.
+   * @param transform - The 2×3 affine transform matrix.
+   * @returns The transformed scalar offset in surface space.
+   */
+  export function transform(
+    offset: number,
+    axis: cmath.Axis,
+    transform: cmath.Transform
+  ) {
+    const i = axis === "x" ? 0 : 1;
+    const row = transform[i];
+    // row[0]*x + row[1]*y + row[2],
+    // but x=offset when i=0, y=offset when i=1
+    return row[i] * offset + row[2];
+  }
+}
+
 /**
  * Vector2 computations.
  */
@@ -4627,6 +4649,25 @@ export namespace cmath.ui {
     x2: number;
     y2: number;
   };
+
+  export function transformPoint(
+    point: cmath.ui.Point,
+    transform: cmath.Transform
+  ): cmath.ui.Point {
+    return {
+      ...point,
+      ...cmath.vector2.transform([point.x, point.y], transform),
+    };
+  }
+
+  export function transformLine(
+    line: cmath.ui.Line,
+    transform: cmath.Transform
+  ): cmath.ui.Line {
+    const [x1p, y1p] = cmath.vector2.transform([line.x1, line.y1], transform);
+    const [x2p, y2p] = cmath.vector2.transform([line.x2, line.y2], transform);
+    return { ...line, x1: x1p, y1: y1p, x2: x2p, y2: y2p };
+  }
 
   /**
    * Ensures that (x1, y1) <= (x2, y2) in a canonical way.
