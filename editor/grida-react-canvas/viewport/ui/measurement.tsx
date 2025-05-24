@@ -10,7 +10,7 @@ import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-canvas/backends/dom";
 import { useDocument } from "@/grida-react-canvas/provider";
 import { measure, Measurement } from "@grida/cmath/_measurement";
-import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+// import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 
 function useMeasurement() {
   const { transform, state, selection } = useDocument();
@@ -79,9 +79,9 @@ export function MeasurementGuide() {
   const label_sb = cmath.ui.formatNumber(_sb, 1);
   const label_sl = cmath.ui.formatNumber(_sl, 1);
 
-  const box = rectToSurfaceSpace(_box, transform);
-  const a = rectToSurfaceSpace(_a, transform);
-  const b = rectToSurfaceSpace(_b, transform);
+  const box = cmath.rect.transform(_box, transform);
+  const a = cmath.rect.transform(_a, transform);
+  const b = cmath.rect.transform(_b, transform);
 
   const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(box, "top", st);
   const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(box, "right", sr);

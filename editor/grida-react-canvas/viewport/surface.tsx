@@ -36,11 +36,6 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import {
-  vector2ToSurfaceSpace,
-  rectToSurfaceSpace,
-  offsetToSurfaceSpace,
-} from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
@@ -357,8 +352,8 @@ export function EditorSurface() {
               className="absolute top-0 left-0 w-0 h-0"
             >
               <MarqueeArea
-                a={vector2ToSurfaceSpace(marquee.a, transform)}
-                b={vector2ToSurfaceSpace(marquee.b, transform)}
+                a={cmath.vector2.transform(marquee.a, transform)}
+                b={cmath.vector2.transform(marquee.b, transform)}
               />
             </div>
           )}
@@ -427,7 +422,7 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
     case "node":
       return <NodeOverlay node_id={props.node_id} readonly />;
     case "rect":
-      const r = rectToSurfaceSpace(props.rect, transform);
+      const r = cmath.rect.transform(props.rect, transform);
       return (
         <LayerOverlay
           transform={{
@@ -562,7 +557,7 @@ export function EditorSurfaceClipboardSyncProvider({
 
 function FloatingCursorTooltip() {
   const { gesture, pointer, transform } = useEventTarget();
-  const pos = vector2ToSurfaceSpace(pointer.position, transform);
+  const pos = cmath.vector2.transform(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
   if (value) {
     return (
@@ -587,7 +582,7 @@ function FloatingCursorTooltip() {
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   const { transform, scaleX, scaleY } = useTransform();
   const { pointer } = useEventTarget();
-  const pos = vector2ToSurfaceSpace(
+  const pos = cmath.vector2.transform(
     // quantize position to canvas space 1.
     cmath.vector2.quantize(pointer.position, 1),
     // pointer.position,
@@ -1056,13 +1051,13 @@ function Edge({
   const get_pos = (p: grida.program.document.EdgePoint) => {
     switch (p.type) {
       case "position":
-        return vector2ToSurfaceSpace([p.x, p.y], transform);
+        return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
           const n = getNodeById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
-          return vector2ToSurfaceSpace([cx, cy], transform);
+          return cmath.vector2.transform([cx, cy], transform);
         } catch (e) {}
     }
   };
@@ -1147,7 +1142,7 @@ function GapOverlay({
 
   // rects in surface space
   const rects = useMemo(
-    () => _rects.map((r) => rectToSurfaceSpace(r, transform)),
+    () => _rects.map((r) => cmath.rect.transform(r, transform)),
     [_rects, transform]
   );
 
@@ -1498,7 +1493,7 @@ function Guide({
 }: grida.program.document.Guide2D & { idx: number }) {
   const { transform } = useTransform();
   const { startGuideGesture, deleteGuide } = useEventTarget();
-  const o = offsetToSurfaceSpace(offset, axis, transform);
+  const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
 

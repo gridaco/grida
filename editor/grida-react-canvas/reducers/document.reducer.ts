@@ -33,7 +33,6 @@ import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import "core-js/features/object/group-by";
-import { surfaceRectToCanvasSpace } from "../utils/transform";
 
 /**
  * the padding applied to the anchors (siblings) for dynamic next placement
@@ -250,20 +249,23 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // if the insertion parent is null (root), use viewport rect (canvas space)
       // otherwise, use the parent's bounding rect (canvas space) (TODO:)
       const _viewport_rect = domapi.get_viewport_rect();
-      const viewport_rect = surfaceRectToCanvasSpace(
-        // apply the inset before convering to canvas space
-        cmath.rect.inset(
-          {
-            x: 0,
-            y: 0,
-            width: _viewport_rect.width,
-            height: _viewport_rect.height,
-          },
-          PLACEMENT_VIEWPORT_INSET
-        ),
 
-        state.transform
+      // apply the inset before convering to canvas space
+      const _inset_rect = cmath.rect.inset(
+        {
+          x: 0,
+          y: 0,
+          width: _viewport_rect.width,
+          height: _viewport_rect.height,
+        },
+        PLACEMENT_VIEWPORT_INSET
       );
+
+      const viewport_rect = cmath.rect.transform(
+        _inset_rect,
+        cmath.transform.invert(state.transform)
+      );
+
       const cdom = new domapi.CanvasDOM(state.transform);
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
       assert(state.scene_id, "scene_id is required for insertion");

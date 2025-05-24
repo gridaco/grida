@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDocument, useNode } from "@/grida-react-canvas";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
-import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+// import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import { cmath } from "@grida/cmath";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
@@ -177,7 +177,7 @@ function computeSurfaceSelectionGroup({
   // Collect bounding rectangles for all node elements
   const objects: SurfaceNodeObject[] = items.map((id) => {
     const br = cdom.getNodeBoundingRect(id)!;
-    const bsr = rectToSurfaceSpace(br, transform);
+    const bsr = cmath.rect.transform(br, transform);
     return {
       id: id,
       boundingRect: {
@@ -197,7 +197,7 @@ function computeSurfaceSelectionGroup({
 
   const boundingRect = cmath.rect.union(objects.map((it) => it.boundingRect));
 
-  const surfaceBoundingRect = rectToSurfaceSpace(boundingRect, transform);
+  const surfaceBoundingRect = cmath.rect.transform(boundingRect, transform);
 
   const distribution = analyzeDistribution(
     objects.map((it) => it.boundingRect)
@@ -315,7 +315,7 @@ export function useSingleSelection(
 
     // Collect bounding rectangle
     const br = cdom.getNodeBoundingRect(node_id)!;
-    const bsr = rectToSurfaceSpace(br, transform);
+    const bsr = cmath.rect.transform(br, transform);
     const object: SurfaceNodeObject = {
       id: node_id,
       boundingRect: {
@@ -332,7 +332,7 @@ export function useSingleSelection(
       },
     };
 
-    const boundingSurfaceRect = rectToSurfaceSpace(
+    const boundingSurfaceRect = cmath.rect.transform(
       object.boundingRect,
       transform
     );

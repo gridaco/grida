@@ -7,7 +7,6 @@ import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
-import { vector2ToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import assert from "assert";
 
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
@@ -42,7 +41,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
         {vertices.map(({ p }, i) => (
           <VertexPoint
             key={i}
-            point={vector2ToSurfaceSpace(
+            point={cmath.vector2.transform(
               cmath.vector2.add(offset, p),
               transform
             )}
@@ -76,11 +75,11 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
         <>
           {/* next segment */}
           <Extension
-            a={vector2ToSurfaceSpace(
+            a={cmath.vector2.transform(
               cmath.vector2.add(offset, vertices[a_point].p),
               transform
             )}
-            b={vector2ToSurfaceSpace(path_cursor_position, transform)}
+            b={cmath.vector2.transform(path_cursor_position, transform)}
             ta={next_ta ? next_ta : undefined}
           />
         </>
@@ -104,11 +103,11 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
                 <CurveControlExtension
                   segment={i}
                   control="ta"
-                  a={vector2ToSurfaceSpace(
+                  a={cmath.vector2.transform(
                     cmath.vector2.add(a, offset),
                     transform
                   )}
-                  b={vector2ToSurfaceSpace(
+                  b={cmath.vector2.transform(
                     cmath.vector2.add(a, offset, ta),
                     transform
                   )}
@@ -118,11 +117,11 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
                 <CurveControlExtension
                   segment={i}
                   control="tb"
-                  a={vector2ToSurfaceSpace(
+                  a={cmath.vector2.transform(
                     cmath.vector2.add(b, offset),
                     transform
                   )}
-                  b={vector2ToSurfaceSpace(
+                  b={cmath.vector2.transform(
                     cmath.vector2.add(b, offset, tb),
                     transform
                   )}
@@ -131,11 +130,11 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
               {/* preview the next ta - cannot be edited */}
               {a_point_is_last && (
                 <Extension
-                  a={vector2ToSurfaceSpace(
+                  a={cmath.vector2.transform(
                     cmath.vector2.add(b, offset),
                     transform
                   )}
-                  b={vector2ToSurfaceSpace(
+                  b={cmath.vector2.transform(
                     cmath.vector2.add(b, offset, cmath.vector2.invert(tb)),
                     transform
                   )}

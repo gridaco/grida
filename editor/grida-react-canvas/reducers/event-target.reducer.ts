@@ -31,7 +31,6 @@ import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import vn from "@grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
-import { vector2ToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 import { snapGuideTranslation, threshold } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
 import cg from "@grida/cg";
@@ -75,9 +74,10 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
 
       const surface_space_pointer_position: cmath.Vector2 = [x, y];
       const canvas_transform = state.transform;
-      const canvas_space_pointer_position = toCanvasSpace(
+
+      const canvas_space_pointer_position = cmath.vector2.transform(
         surface_space_pointer_position,
-        canvas_transform
+        cmath.transform.invert(canvas_transform)
       );
 
       return produce(state, (draft) => {
@@ -151,7 +151,7 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
               2,
               draft.transform,
               // map the cursor position back to surface space
-              vector2ToSurfaceSpace(draft.pointer.position, draft.transform)
+              cmath.vector2.transform(draft.pointer.position, draft.transform)
             );
             break;
           case "insert":
