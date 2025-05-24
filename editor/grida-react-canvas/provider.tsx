@@ -24,7 +24,7 @@ import type {
   Action,
   TCanvasEventTargetDragGestureState,
   TChange,
-} from "../grida-canvas/action";
+} from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
 import iosvg from "@grida/io-svg";
@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type cg from "@grida/cg";
-import nid from "./reducers/tools/id";
+import nid from "@/grida-canvas/reducers/tools/id";
 
 type DocumentDispatcher = (action: Action) => void;
 

@@ -18,8 +18,8 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
 } from "@/grida-react-canvas";
+import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";

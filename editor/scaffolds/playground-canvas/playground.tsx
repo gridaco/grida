@@ -22,9 +22,9 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
   useDocument,
 } from "@/grida-react-canvas";
+import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";

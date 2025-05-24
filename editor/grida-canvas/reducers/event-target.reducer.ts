@@ -12,7 +12,7 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   //
-} from "../../grida-canvas/action";
+} from "../action";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import nodeReducer from "./node.reducer";
@@ -26,7 +26,7 @@ import {
   self_update_gesture_transform,
 } from "./methods";
 import { cmath } from "@grida/cmath";
-import { domapi } from "../../grida-canvas/backends/dom";
+import { domapi } from "../backends/dom";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import vn from "@grida/vn";

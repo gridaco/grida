@@ -39,7 +39,7 @@ import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
-import builderReducer from "@/grida-react-canvas/reducers";
+import builderReducer from "@/grida-canvas/reducers";
 import assert from "assert";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";

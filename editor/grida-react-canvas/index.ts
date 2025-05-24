@@ -9,4 +9,3 @@ export {
 } from "./provider";
 export { StandaloneSceneContent } from "./renderer";
 export * from "./viewport";
-export { default as standaloneDocumentReducer } from "./reducers";

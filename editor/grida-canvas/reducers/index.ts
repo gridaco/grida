@@ -1,4 +1,4 @@
-import type { Action, EditorAction } from "../../grida-canvas/action";
+import type { Action, EditorAction } from "../action";
 import { produce, type Draft } from "immer";
 import {
   self_update_gesture_transform,

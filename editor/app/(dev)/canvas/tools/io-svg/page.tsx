@@ -7,9 +7,9 @@ import {
   EditorSurface,
   StandaloneSceneContent,
   StandaloneDocumentEditor,
-  standaloneDocumentReducer,
   ViewportRoot,
 } from "@/grida-react-canvas";
+import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import grida from "@grida/schema";
 import { v4 } from "uuid";

@@ -2,18 +2,16 @@ import { produce, type Draft } from "immer";
 
 import type {
   DocumentAction,
-  //
   EditorSelectAction,
   NodeChangeAction,
   NodeToggleBasePropertyAction,
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
-} from "../../grida-canvas/action";
+} from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import assert from "assert";
-// import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
@@ -26,7 +24,7 @@ import {
 } from "./methods";
 import { cmath } from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import { domapi } from "../../grida-canvas/backends/dom";
+import { domapi } from "../backends/dom";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import vn from "@grida/vn";
