@@ -2955,6 +2955,53 @@ export namespace cmath.transform {
     // Apply scaling to the existing transform
     return multiply(scaledTransform, transform);
   }
+
+  /**
+   * Computes the inverse of a 2D affine transform matrix.
+   *
+   * The inverse transform will undo the original transform, such that:
+   * `invert(T) * T * point = point`
+   *
+   * @param transform - The 2D transform matrix to invert:
+   *   ```
+   *   [
+   *     [a, b, tx],
+   *     [c, d, ty]
+   *   ]
+   *   ```
+   * @returns The inverse transform matrix, or throws an error if the transform is not invertible.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [2, 0, 10], // Scale by 2 and translate by 10
+   *   [0, 2, 20], // Scale by 2 and translate by 20
+   * ];
+   * const inverse = cmath.transform.invert(transform);
+   * // inverse = [
+   * //   [0.5, 0, -5], // Scale by 0.5 and translate by -5
+   * //   [0, 0.5, -10], // Scale by 0.5 and translate by -10
+   * // ]
+   *
+   * @remarks
+   * - The transform must be invertible (determinant must be non-zero).
+   * - For a transform matrix [[a,b,tx],[c,d,ty]], the determinant is (a*d - b*c).
+   * - If the determinant is zero, the transform is not invertible and an error is thrown.
+   */
+  export function invert(transform: Transform): Transform {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const det = a * d - b * c;
+
+    if (det === 0) {
+      throw new Error("Transform is not invertible (determinant is zero)");
+    }
+
+    const invDet = 1 / det;
+    return [
+      [d * invDet, -b * invDet, (b * ty - d * tx) * invDet],
+      [-c * invDet, a * invDet, (c * tx - a * ty) * invDet],
+    ];
+  }
+
   /**
    * Extracts the scaling factors from a 2D transformation matrix.
    *
