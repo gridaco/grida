@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { domapi } from "../domapi";
+import { domapi } from "../../grida-canvas/backends/dom";
 import { ViewportSurfaceContext } from "./context";
 import { cn } from "@/components/lib/utils";
 

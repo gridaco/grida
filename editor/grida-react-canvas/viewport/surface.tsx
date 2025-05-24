@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DropzoneIndication,
-  GestureState,
-  type Guide,
-  useEventTarget,
-} from "@/grida-react-canvas";
+import { useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
@@ -41,11 +36,6 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import {
-  vector2ToSurfaceSpace,
-  rectToSurfaceSpace,
-  offsetToSurfaceSpace,
-} from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import { ObjectsDistributionAnalysis } from "./ui/distribution";
 import { AxisRuler, Tick } from "@grida/ruler/react";
@@ -60,6 +50,7 @@ import {
 import grida from "@grida/schema";
 import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
+import type { editor } from "@/grida-canvas";
 
 const DRAG_THRESHOLD = 2;
 
@@ -361,8 +352,8 @@ export function EditorSurface() {
               className="absolute top-0 left-0 w-0 h-0"
             >
               <MarqueeArea
-                a={vector2ToSurfaceSpace(marquee.a, transform)}
-                b={vector2ToSurfaceSpace(marquee.b, transform)}
+                a={cmath.vector2.transform(marquee.a, transform)}
+                b={cmath.vector2.transform(marquee.b, transform)}
               />
             </div>
           )}
@@ -425,13 +416,13 @@ export function EditorSurface() {
   );
 }
 
-function DropzoneOverlay(props: DropzoneIndication) {
+function DropzoneOverlay(props: editor.state.DropzoneIndication) {
   const { transform } = useTransform();
   switch (props.type) {
     case "node":
       return <NodeOverlay node_id={props.node_id} readonly />;
     case "rect":
-      const r = rectToSurfaceSpace(props.rect, transform);
+      const r = cmath.rect.transform(props.rect, transform);
       return (
         <LayerOverlay
           transform={{
@@ -566,7 +557,7 @@ export function EditorSurfaceClipboardSyncProvider({
 
 function FloatingCursorTooltip() {
   const { gesture, pointer, transform } = useEventTarget();
-  const pos = vector2ToSurfaceSpace(pointer.position, transform);
+  const pos = cmath.vector2.transform(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
   if (value) {
     return (
@@ -591,7 +582,7 @@ function FloatingCursorTooltip() {
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   const { transform, scaleX, scaleY } = useTransform();
   const { pointer } = useEventTarget();
-  const pos = vector2ToSurfaceSpace(
+  const pos = cmath.vector2.transform(
     // quantize position to canvas space 1.
     cmath.vector2.quantize(pointer.position, 1),
     // pointer.position,
@@ -627,7 +618,7 @@ function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   );
 }
 
-function get_cursor_tooltip_value(gesture: GestureState) {
+function get_cursor_tooltip_value(gesture: editor.gesture.GestureState) {
   switch (gesture.type) {
     case "gap":
       return cmath.ui.formatNumber(gesture.gap, 1);
@@ -1060,13 +1051,13 @@ function Edge({
   const get_pos = (p: grida.program.document.EdgePoint) => {
     switch (p.type) {
       case "position":
-        return vector2ToSurfaceSpace([p.x, p.y], transform);
+        return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
           const n = getNodeById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
-          return vector2ToSurfaceSpace([cx, cy], transform);
+          return cmath.vector2.transform([cx, cy], transform);
         } catch (e) {}
     }
   };
@@ -1151,7 +1142,7 @@ function GapOverlay({
 
   // rects in surface space
   const rects = useMemo(
-    () => _rects.map((r) => rectToSurfaceSpace(r, transform)),
+    () => _rects.map((r) => cmath.rect.transform(r, transform)),
     [_rects, transform]
   );
 
@@ -1495,10 +1486,14 @@ function RulerGuideOverlay() {
   //
 }
 
-function Guide({ axis, offset, idx }: Guide & { idx: number }) {
+function Guide({
+  axis,
+  offset,
+  idx,
+}: grida.program.document.Guide2D & { idx: number }) {
   const { transform } = useTransform();
   const { startGuideGesture, deleteGuide } = useEventTarget();
-  const o = offsetToSurfaceSpace(offset, axis, transform);
+  const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
 

@@ -1,15 +1,16 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDocument, useNode } from "@/grida-react-canvas";
 import { analyzeDistribution } from "./ui/distribution";
-import { domapi } from "@/grida-react-canvas/domapi";
-import { document } from "@/grida-react-canvas/document-query";
-import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { domapi } from "@/grida-canvas/backends/dom";
+// import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import { cmath } from "@grida/cmath";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
 import { NodeWithMeta } from "../provider";
-import "core-js/features/object/group-by";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
+import { editor } from "@/grida-canvas";
+import "core-js/features/object/group-by";
+
 export interface SurfaceNodeObject {
   id: string;
   boundingRect: cmath.Rectangle;
@@ -176,7 +177,7 @@ function computeSurfaceSelectionGroup({
   // Collect bounding rectangles for all node elements
   const objects: SurfaceNodeObject[] = items.map((id) => {
     const br = cdom.getNodeBoundingRect(id)!;
-    const bsr = rectToSurfaceSpace(br, transform);
+    const bsr = cmath.rect.transform(br, transform);
     return {
       id: id,
       boundingRect: {
@@ -196,7 +197,7 @@ function computeSurfaceSelectionGroup({
 
   const boundingRect = cmath.rect.union(objects.map((it) => it.boundingRect));
 
-  const surfaceBoundingRect = rectToSurfaceSpace(boundingRect, transform);
+  const surfaceBoundingRect = cmath.rect.transform(boundingRect, transform);
 
   const distribution = analyzeDistribution(
     objects.map((it) => it.boundingRect)
@@ -255,7 +256,7 @@ export function useSelectionGroups(
       .filter((n) => n && n.active);
     return Object.groupBy(
       activenodes,
-      (it) => document.getParentId(state.document_ctx, it.id) ?? ""
+      (it) => editor.dq.getParentId(state.document_ctx, it.id) ?? ""
     );
   }, [state.document.nodes, state.document_ctx, __node_ids]);
 
@@ -314,7 +315,7 @@ export function useSingleSelection(
 
     // Collect bounding rectangle
     const br = cdom.getNodeBoundingRect(node_id)!;
-    const bsr = rectToSurfaceSpace(br, transform);
+    const bsr = cmath.rect.transform(br, transform);
     const object: SurfaceNodeObject = {
       id: node_id,
       boundingRect: {
@@ -331,7 +332,7 @@ export function useSingleSelection(
       },
     };
 
-    const boundingSurfaceRect = rectToSurfaceSpace(
+    const boundingSurfaceRect = cmath.rect.transform(
       object.boundingRect,
       transform
     );
@@ -366,7 +367,7 @@ export function useSingleSelection(
       const container = node as grida.program.nodes.ContainerNode;
       const { direction, mainAxisGap, crossAxisGap } = container;
       const axis = direction === "horizontal" ? "x" : "y";
-      const children = document.getChildren(state.document_ctx, node_id);
+      const children = editor.dq.getChildren(state.document_ctx, node_id);
       const children_rects = children
         .map((id) => cdom.getNodeBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);

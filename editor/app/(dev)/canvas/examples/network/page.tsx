@@ -1,9 +1,9 @@
-import { IDocumentEditorInit } from "@/grida-react-canvas";
 import Editor from "../../editor";
 import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
+import { editor } from "@/grida-canvas";
 
-const document: IDocumentEditorInit = {
+const document: editor.state.IEditorInit = {
   editable: true,
   debug: false,
   document: {

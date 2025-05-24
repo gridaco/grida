@@ -39,13 +39,10 @@ import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
-import builderReducer from "@/grida-react-canvas/reducers";
+import builderReducer from "@/grida-canvas/reducers";
 import assert from "assert";
 import grida from "@grida/schema";
-import {
-  IDocumentEditorState,
-  initDocumentEditorState,
-} from "@/grida-react-canvas/state";
+import { editor } from "@/grida-canvas";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -119,7 +116,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         document.state = builderReducer(
           document.state,
           _action
-        ) as IDocumentEditorState & { template_id: string };
+        ) as editor.state.IEditorState & { template_id: string };
       });
     }
 
@@ -379,7 +376,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           __schema_valid: true,
           state: {
             template_id: template_id,
-            ...initDocumentEditorState({
+            ...editor.state.init({
               editable: true,
               debug: false,
               document: {

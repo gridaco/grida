@@ -1,8 +1,7 @@
 import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
-import { document } from "@/grida-react-canvas/document-query";
 import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
-import { Guide } from "@/grida-react-canvas/state";
+import { editor } from "@/grida-canvas";
 
 const q = 1;
 
@@ -51,7 +50,7 @@ export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: {
     objects?: cmath.Rectangle[];
-    guides?: Guide[];
+    guides?: grida.program.document.Guide2D[];
   },
   movement: cmath.ext.movement.Movement,
   threshold: number
@@ -110,9 +109,9 @@ export function getSnapTargets(
     new Set(
       selection
         .map((node_id) =>
-          document
+          editor.dq
             .getSiblings(document_ctx, node_id)
-            .concat(document.getParentId(document_ctx, node_id) ?? [])
+            .concat(editor.dq.getParentId(document_ctx, node_id) ?? [])
         )
         .flat()
     )

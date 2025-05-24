@@ -30,7 +30,7 @@ export function EditorSurfaceContextMenu({
   const can_toggle_active = has_selection;
   const can_toggle_locked = has_selection;
   // TODO: valid ids (not locked, not active, not root)
-  const can_select_layer = state.surface_raycast_detected_node_ids.length >= 2;
+  const can_select_layer = state.hits.length >= 2;
 
   const handlePaste = async (e: Event) => {
     try {

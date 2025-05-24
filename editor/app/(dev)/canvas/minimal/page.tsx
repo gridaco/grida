@@ -15,9 +15,9 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
-  initDocumentEditorState,
 } from "@/grida-react-canvas";
+import { editor } from "@/grida-canvas";
+import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -42,7 +42,7 @@ export default function MinimalCanvasDemo() {
   const fonts = useGoogleFontsList();
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
-    initDocumentEditorState({
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},

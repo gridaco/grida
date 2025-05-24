@@ -1,11 +1,6 @@
 import React, { useMemo } from "react";
 import { Crosshair } from "./crosshair";
 import { useEventTarget } from "@/grida-react-canvas/provider";
-import {
-  lineToSurfaceSpace,
-  offsetToSurfaceSpace,
-  vector2ToSurfaceSpace,
-} from "@/grida-react-canvas/utils/transform";
 import { Rule } from "./rule";
 import { cmath } from "@grida/cmath";
 import { guide } from "@grida/cmath/_snap";
@@ -24,11 +19,11 @@ function useSnapGuide(): guide.SnapGuide | undefined {
       const { lines, points, rules: rays } = guide.plot(surface_snapping);
       // finally, map the vectors to the surface space
       return {
-        lines: lines.map((l) => lineToSurfaceSpace(l, transform)),
-        points: points.map((p) => vector2ToSurfaceSpace(p, transform)),
+        lines: lines.map((l) => cmath.ui.transformLine(l, transform)),
+        points: points.map((p) => cmath.vector2.transform(p, transform)),
         rules: rays.map((r) => {
           const axis = r[0];
-          return [axis, offsetToSurfaceSpace(r[1], axis, transform)];
+          return [axis, cmath.delta.transform(r[1], axis, transform)];
         }),
       } satisfies guide.SnapGuide;
     }

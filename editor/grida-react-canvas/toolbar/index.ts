@@ -1,4 +1,4 @@
-import type { ToolMode } from "../state";
+import type { editor } from "@/grida-canvas";
 
 export type ToolbarToolType =
   | "cursor"
@@ -15,7 +15,9 @@ export type ToolbarToolType =
   | "flood-fill"
   | "path";
 
-export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
+export function toolmode_to_toolbar_value(
+  cm: editor.state.ToolMode
+): ToolbarToolType {
   switch (cm.type) {
     case "cursor":
     case "zoom":
@@ -37,7 +39,9 @@ export function toolmode_to_toolbar_value(cm: ToolMode): ToolbarToolType {
   }
 }
 
-export function toolbar_value_to_cursormode(tt: ToolbarToolType): ToolMode {
+export function toolbar_value_to_cursormode(
+  tt: ToolbarToolType
+): editor.state.ToolMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };

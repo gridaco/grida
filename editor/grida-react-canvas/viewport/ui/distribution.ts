@@ -1,4 +1,4 @@
-import { DEFAULT_GAP_ALIGNMENT_TOLERANCE } from "@/grida-react-canvas/state";
+import { editor } from "@/grida-canvas";
 import { cmath } from "@grida/cmath";
 
 export interface AxisAlignedObjectsDistribution {
@@ -36,12 +36,12 @@ export function analyzeDistribution(
       const [gap, gaps] = cmath.rect.getUniformGap(
         rects,
         "x",
-        DEFAULT_GAP_ALIGNMENT_TOLERANCE
+        editor.config.DEFAULT_GAP_ALIGNMENT_TOLERANCE
       );
       x = {
         gap,
         gaps,
-        tolerance: DEFAULT_GAP_ALIGNMENT_TOLERANCE,
+        tolerance: editor.config.DEFAULT_GAP_ALIGNMENT_TOLERANCE,
       };
     }
 
@@ -49,12 +49,12 @@ export function analyzeDistribution(
       const [gap, gaps] = cmath.rect.getUniformGap(
         rects,
         "y",
-        DEFAULT_GAP_ALIGNMENT_TOLERANCE
+        editor.config.DEFAULT_GAP_ALIGNMENT_TOLERANCE
       );
       y = {
         gap,
         gaps: gaps,
-        tolerance: DEFAULT_GAP_ALIGNMENT_TOLERANCE,
+        tolerance: editor.config.DEFAULT_GAP_ALIGNMENT_TOLERANCE,
       };
     }
 

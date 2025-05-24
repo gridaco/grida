@@ -22,13 +22,13 @@ import {
 } from "@radix-ui/react-icons";
 import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
-import { document } from "@/grida-react-canvas/document-query";
 import { useCurrentScene } from "@/grida-react-canvas/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
+import { editor } from "@/grida-canvas";
 
 const min = { width: 100, height: 100 };
 
@@ -57,7 +57,7 @@ export function PreviewProvider({
 
   const getPreviewNode = (node_id?: string) => {
     function tryGetTopPreviewNode(node_id: string) {
-      const topid = document.getTopId(state.document_ctx, node_id);
+      const topid = editor.dq.getTopId(state.document_ctx, node_id);
       if (!topid) return null;
       const top = state.document.nodes[topid];
       if (!top) return null;

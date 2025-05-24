@@ -1,22 +1,9 @@
 import type { tokens } from "@grida/tokens";
+import type { editor } from "@/grida-canvas";
+import type { cmath } from "@grida/cmath";
+import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
-import type {
-  ToolMode,
-  GestureCornerRadius,
-  GestureCurve,
-  GestureGap,
-  GestureRotate,
-  GestureScale,
-  GestureSort,
-  GestureGuide,
-  // GestureTranslate1DArrange,
-  GestureTranslateVertex,
-  IDocumentEditorState,
-  SurfaceRaycastTargeting,
-} from "./state";
-import { cmath } from "@grida/cmath";
-import { BitmapEditorBrush } from "@grida/bitmap";
 
 export type Action =
   | InternalAction
@@ -115,7 +102,7 @@ interface ISelection {
 export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
-  state: IDocumentEditorState;
+  state: editor.state.IEditorState;
 }
 
 export interface LoadSceneAction {
@@ -336,7 +323,7 @@ export type EditorConfigAction =
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
-  config: Partial<SurfaceRaycastTargeting>;
+  config: Partial<editor.state.HitTestingConfig>;
 }
 
 export interface EditorConfigure_Measurement {
@@ -541,20 +528,30 @@ export type EditorSurface_ExitContentEditMode = {
 
 export type EditorSurface_CursorMode = {
   type: "surface/tool";
-  tool: ToolMode;
+  tool: editor.state.ToolMode;
 };
 
 export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
-    | Pick<GestureGuide, "type" | "axis" | "idx">
-    | Pick<GestureScale, "type" | "direction" | "selection">
-    | Pick<GestureRotate, "type" | "selection">
-    | (Pick<GestureSort, "type" | "node_id"> & { selection: string[] })
-    | (Pick<GestureGap, "type" | "axis"> & { selection: string | string[] })
-    | Pick<GestureCornerRadius, "type" | "node_id">
-    | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
-    | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;
+    | Pick<editor.gesture.GestureGuide, "type" | "axis" | "idx">
+    | Pick<editor.gesture.GestureScale, "type" | "direction" | "selection">
+    | Pick<editor.gesture.GestureRotate, "type" | "selection">
+    | (Pick<editor.gesture.GestureSort, "type" | "node_id"> & {
+        selection: string[];
+      })
+    | (Pick<editor.gesture.GestureGap, "type" | "axis"> & {
+        selection: string | string[];
+      })
+    | Pick<editor.gesture.GestureCornerRadius, "type" | "node_id">
+    | Pick<
+        editor.gesture.GestureCurve,
+        "type" | "control" | "node_id" | "segment"
+      >
+    | Pick<
+        editor.gesture.GestureTranslateVertex,
+        "type" | "node_id" | "vertex"
+      >;
 };
 
 // #endregion surface action
