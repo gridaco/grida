@@ -196,7 +196,7 @@ function NodeHierarchyItemContextMenuWrapper({
   node_id: string;
   onStartRenaming?: () => void;
 }>) {
-  const { copy, deleteNode } = useDocument();
+  const { copy, deleteNode, order } = useDocument();
   const { fit } = useTransform();
   const change = useNodeAction(node_id)!;
 
@@ -225,14 +225,14 @@ function NodeHierarchyItemContextMenuWrapper({
         {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
         {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
         <ContextMenuItem
-          onSelect={() => change.order("front")}
+          onSelect={() => order(node_id, "front")}
           className="text-xs"
         >
           Bring to front
           <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
-          onSelect={() => change.order("back")}
+          onSelect={() => order(node_id, "back")}
           className="text-xs"
         >
           Send to back
