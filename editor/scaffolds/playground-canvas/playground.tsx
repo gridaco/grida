@@ -95,7 +95,7 @@ import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
+import { datatransfer } from "@/grida-canvas/data-transfer";
 import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
