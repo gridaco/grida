@@ -13,7 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui-editor/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateBlockNote } from "@blocknote/react";
 import { useDatabaseTableId } from "@/scaffolds/editor";
@@ -108,11 +108,11 @@ export function RichTextEditCell({
 
   return (
     <Dialog defaultOpen>
-      <DialogContent className="min-w-full h-full max-w-lg flex flex-col">
+      <DialogContent className="flex flex-col" fullScreen>
         <DialogHeader>
           <DialogTitle>Edit Content</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1" onClick={() => editor.focus()}>
+        <ScrollArea className="flex-1 min-h-0" onClick={() => editor.focus()}>
           <div className="prose dark:prose-invert mx-auto w-full">
             <RichTextContent
               onKeyDown={(e) => {
