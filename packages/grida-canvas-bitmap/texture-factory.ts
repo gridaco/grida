@@ -1,4 +1,4 @@
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 /**
  * Dynamically creates a spray texture.
  *

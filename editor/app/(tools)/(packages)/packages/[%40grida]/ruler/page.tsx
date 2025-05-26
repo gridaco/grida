@@ -4,7 +4,7 @@ import React from "react";
 import { AxisRuler, type Tick } from "@grida/ruler/react";
 import { useGesture } from "@use-gesture/react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 const rects = [
   { x: 100, y: 100, width: 100, height: 100 },

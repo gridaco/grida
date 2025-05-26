@@ -1,5 +1,5 @@
 import assert from "assert";
-import { cmath } from ".";
+import cmath from "./index";
 
 interface IDistance {
   distance: number;

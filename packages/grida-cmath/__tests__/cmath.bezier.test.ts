@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 /**
  * Converts the output of cmath.bezier.a2c to an SVG path string.

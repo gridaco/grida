@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 describe("cmath.align", () => {
   describe("scalar", () => {

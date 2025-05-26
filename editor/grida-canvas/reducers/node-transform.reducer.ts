@@ -1,7 +1,7 @@
 import { produce } from "immer";
 import grida from "@grida/schema";
 import assert from "assert";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 type NodeTransformAction =
   | {

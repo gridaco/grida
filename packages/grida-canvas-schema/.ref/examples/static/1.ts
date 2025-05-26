@@ -1,5 +1,5 @@
 import grida from "../../../index";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" xmlns="http://www.w3.org/2000/svg">
 <mask id="mask0_198_311" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="311" height="311">

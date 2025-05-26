@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 function expectTransformsClose(a: cmath.Transform, b: cmath.Transform) {
   for (let i = 0; i < 2; i++) {

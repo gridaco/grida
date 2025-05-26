@@ -20,7 +20,7 @@ import {
 } from "@/grida-react-program-context/data-context/context";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "../grida-canvas/backends/dom";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import type {
   Action,
   TCanvasEventTargetDragGestureState,

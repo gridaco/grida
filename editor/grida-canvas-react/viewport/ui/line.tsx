@@ -1,4 +1,4 @@
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { MeterLabel } from "./meter";
 
 export function Line({ x1, y1, x2, y2, label }: cmath.ui.Line) {

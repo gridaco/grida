@@ -1,5 +1,5 @@
 import grida from "@grida/schema";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
 export function getInitialCurveGesture(

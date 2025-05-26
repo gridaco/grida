@@ -1,5 +1,5 @@
 import { cn } from "@/components/lib/utils";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import React, { useMemo } from "react";
 
 export function NetworkArrow({

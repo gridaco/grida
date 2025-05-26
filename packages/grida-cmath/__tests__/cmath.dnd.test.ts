@@ -1,5 +1,5 @@
 import { dnd } from "../_dnd";
-import { cmath } from "../index";
+import cmath from "..";
 
 describe("dnd.test", () => {
   test("finds the closest rectangle (center points)", () => {

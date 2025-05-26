@@ -1,5 +1,5 @@
 import { editor } from "@/grida-canvas";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 export interface AxisAlignedObjectsDistribution {
   /**

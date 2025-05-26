@@ -4,7 +4,7 @@ import {
 } from "@grida/cmath/_measurement";
 import { MeterLabel } from "./meter";
 import { cn } from "@/components/lib/utils";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { useCurrentEditor, useTransform } from "@/grida-canvas-react/provider";
 import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-canvas/backends/dom";

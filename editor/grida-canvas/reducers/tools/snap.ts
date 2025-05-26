@@ -1,5 +1,5 @@
 import grida from "@grida/schema";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { editor } from "@/grida-canvas";
 

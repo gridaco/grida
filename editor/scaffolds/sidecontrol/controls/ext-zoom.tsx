@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WorkbenchUI } from "@/components/workbench";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { Input } from "@/components/ui/input";
 import { useEventTarget, useTransform } from "@/grida-canvas-react/provider";
 import { cn } from "@/components/lib/utils";

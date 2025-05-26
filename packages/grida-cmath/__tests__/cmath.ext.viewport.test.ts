@@ -1,4 +1,4 @@
-import { cmath } from "../index"; // Adjust import path as needed
+import cmath from "..";
 
 describe("cmath.ext.viewport", () => {
   const { transformToFit } = cmath.ext.viewport;

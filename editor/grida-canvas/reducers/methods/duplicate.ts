@@ -6,7 +6,7 @@ import assert from "assert";
 import nid from "../tools/id";
 import grida from "@grida/schema";
 import { domapi } from "@/grida-canvas/backends/dom";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 export function self_duplicateNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,

@@ -1,5 +1,5 @@
 import type grida from "@grida/schema";
-import type { cmath } from "@grida/cmath";
+import type cmath from "@grida/cmath";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
 

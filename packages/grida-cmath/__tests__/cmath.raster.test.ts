@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 describe("cmath.raster", () => {
   it("bresenhamLine should return a single point if start == end", () => {

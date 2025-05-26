@@ -22,7 +22,7 @@ import {
   self_insertSubDocument,
   self_selectNode,
 } from "./methods";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
 import { domapi } from "../backends/dom";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";

@@ -1,4 +1,4 @@
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 
 type Vector2 = [number, number];

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
 import { toast } from "sonner";

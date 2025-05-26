@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useMemo } from "react";
 import { useCurrentEditor, useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
 import { useEditorState } from "./use-editor";
