@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useReducer } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ChatBoxFooter,
   ChatBox,
@@ -44,7 +44,6 @@ import {
   EditorSurface,
   useDocument,
 } from "@/grida-react-canvas";
-import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
@@ -67,10 +66,10 @@ import {
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
 import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-react-canvas";
 
 export default function ImagePlayground() {
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
+  const instance = useEditor(
     editor.state.init({
       editable: true,
       document: {
@@ -94,7 +93,7 @@ export default function ImagePlayground() {
   return (
     <main className="w-screen h-screen overflow-hidden select-none">
       <AuthProvider>
-        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <StandaloneDocumentEditor editor={instance}>
           <CanvasConsumer />
         </StandaloneDocumentEditor>
       </AuthProvider>

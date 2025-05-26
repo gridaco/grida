@@ -4,11 +4,12 @@ import React, { ReactNode, useMemo } from "react";
 import type { TemplateComponent } from "../template-builder/with-template";
 import grida from "@grida/schema";
 import { ReactNodeRenderers } from ".";
-import { useComputedNode, useDocument, useNode } from "../provider";
+import { useComputedNode, useCurrentEditor, useNode } from "../provider";
 import assert from "assert";
 import { useUserCustomTemplates } from "../renderer";
 import { css } from "@/grida-canvas-utils/css";
 import type cg from "@grida/cg";
+import { useEditorState } from "../use-editor";
 
 class RendererNotFound extends Error {
   constructor(message: string) {
@@ -48,12 +49,15 @@ export function NodeElement<P extends Record<string, any>>({
   override,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const user_registered_renderers = useUserCustomTemplates();
-  const { state: document, selection } = useDocument();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    editable: state.editable,
+    bitmaps: state.document.bitmaps,
+    content_edit_mode: state.content_edit_mode,
+  }));
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
-  const selected = selection.includes(node_id);
-  const hovered = node_id === document.hovered_node_id;
 
   const { component_id, template_id, children } = node;
 
@@ -113,7 +117,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   const renderprops = {
     context: {
-      bitmaps: document.document.bitmaps,
+      bitmaps: state.bitmaps,
     },
     ...node,
     text: computed.text,
@@ -172,8 +176,6 @@ export function NodeElement<P extends Record<string, any>>({
             ["data-grida-node-id"]: node_id,
             ["data-grida-node-locked"]: node.locked!,
             ["data-grida-node-type"]: node.type,
-            ["data-dev-editor-selected"]: selected,
-            ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
             ...css.toReactCSSProperties(
@@ -184,11 +186,11 @@ export function NodeElement<P extends Record<string, any>>({
               }
             ),
             // hard override user-select
-            userSelect: document.editable ? "none" : undefined,
+            userSelect: state.editable ? "none" : undefined,
             // hide this node when in surface edit mode
             visibility:
-              document.content_edit_mode?.type === "text" &&
-              document.content_edit_mode.node_id === node_id
+              state.content_edit_mode?.type === "text" &&
+              state.content_edit_mode.node_id === node_id
                 ? "hidden"
                 : undefined,
             ...override?.style,
@@ -227,9 +229,8 @@ function HrefWrapper({
   href?: string;
   target?: string;
 }>) {
-  const {
-    state: { editable },
-  } = useDocument();
+  const editor = useCurrentEditor();
+  const editable = useEditorState(editor, (state) => state.editable);
 
   // only render a tag on viewer mode
   if (!editable && href) {

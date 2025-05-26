@@ -75,6 +75,9 @@ export namespace editor.config {
    */
   export const DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR = 5;
 
+  export const DEFAULT_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
+  export const DEFAULT_CANVAS_TRANSFORM_SCALE_MAX = 256;
+
   /**
    * snap threshold applyed when nudge (fake gesture) is applied
    */
@@ -578,7 +581,7 @@ export namespace editor.state {
     surface_snapping: undefined,
   };
 
-  export interface IEditorInit
+  export interface IEditorStateInit
     extends Pick<editor.config.IEditorConfig, "editable" | "debug">,
       Partial<Pick<editor.config.IEditorConfig, "flags">>,
       grida.program.document.IDocumentTemplatesRepository {
@@ -598,7 +601,7 @@ export namespace editor.state {
   export function init({
     debug,
     ...init
-  }: Omit<IEditorInit, "debug"> & {
+  }: Omit<IEditorStateInit, "debug"> & {
     debug?: boolean;
   }): editor.state.IEditorState {
     const doc: grida.program.document.Document = {
@@ -1480,10 +1483,9 @@ export namespace editor.dq {
    * @param node_id
    * @returns
    */
-  export function __getNodeById<S extends editor.state.IEditorState>(
-    state: S,
-    node_id: string
-  ): S["document"]["nodes"][string] {
+  export function __getNodeById<
+    S extends Pick<editor.state.IEditorState, "document" | "templates">,
+  >(state: S, node_id: string): S["document"]["nodes"][string] {
     ///
     /// NOTE: once migrated, this function SHALL NOT lookup the templates table.
     ///

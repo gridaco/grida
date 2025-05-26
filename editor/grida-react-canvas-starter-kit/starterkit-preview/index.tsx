@@ -44,7 +44,7 @@ const Context = React.createContext<{
 export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
-  const { state } = useDocument();
+  const { document, document_ctx } = useDocument();
   const scene = useCurrentScene();
   const [mode, setMode] = useState<"framed" | "fullscreen">("framed");
   const [open, setOpen] = useState(false);
@@ -57,9 +57,9 @@ export function PreviewProvider({
 
   const getPreviewNode = (node_id?: string) => {
     function tryGetTopPreviewNode(node_id: string) {
-      const topid = editor.dq.getTopId(state.document_ctx, node_id);
+      const topid = editor.dq.getTopId(document_ctx, node_id);
       if (!topid) return null;
-      const top = state.document.nodes[topid];
+      const top = document.nodes[topid];
       if (!top) return null;
       if (
         !(

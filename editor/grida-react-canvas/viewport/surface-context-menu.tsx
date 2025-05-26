@@ -18,7 +18,7 @@ export function EditorSurfaceContextMenu({
   children,
   className,
 }: React.PropsWithChildren<{ className?: string }>) {
-  const { selection, state, paste, order, autoLayout, contain, deleteNode } =
+  const { selection, paste, order, autoLayout, contain, deleteNode } =
     useDocument();
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useSelection();
@@ -27,10 +27,10 @@ export function EditorSurfaceContextMenu({
   const can_copy = has_selection;
   const can_send_to_back = has_selection;
   const can_bring_to_front = has_selection;
-  const can_toggle_active = has_selection;
-  const can_toggle_locked = has_selection;
+  // const can_toggle_active = has_selection;
+  // const can_toggle_locked = has_selection;
   // TODO: valid ids (not locked, not active, not root)
-  const can_select_layer = state.hits.length >= 2;
+  // const can_select_layer = state.hits.length >= 2;
 
   const handlePaste = async (e: Event) => {
     try {

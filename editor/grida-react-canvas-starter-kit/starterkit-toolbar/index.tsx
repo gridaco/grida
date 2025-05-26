@@ -24,9 +24,9 @@ import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
-} from "@/grida-react-canvas/toolbar";
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useEventTarget } from "@/grida-react-canvas/provider";
+import { useEditorFlags, useTool } from "@/grida-react-canvas/provider";
 import { cn } from "@/components/lib/utils";
 
 export function ToolbarPosition({
@@ -48,7 +48,8 @@ export function ToolbarPosition({
 }
 
 export default function Toolbar() {
-  const { setTool, tool, features } = useEventTarget();
+  const { setTool, tool } = useTool();
+  const { flags } = useEditorFlags();
   const value = toolmode_to_toolbar_value(tool);
 
   const tools = useMemo(() => {
@@ -61,13 +62,13 @@ export default function Toolbar() {
       { value: "path", label: "Path tool", shortcut: "P" },
     ];
 
-    if (features.__unstable_brush_tool === "on") {
+    if (flags.__unstable_brush_tool === "on") {
       stable.push({ value: "brush", label: "Brush tool", shortcut: "B" });
       stable.push({ value: "eraser", label: "Eraser tool", shortcut: "E" });
     }
 
     return stable;
-  }, [features.__unstable_brush_tool]);
+  }, [flags.__unstable_brush_tool]);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">

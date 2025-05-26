@@ -1,3 +1,4 @@
+export { useEditor, useEditorState } from "./use-editor";
 export {
   StandaloneDocumentEditor,
   useDocument,

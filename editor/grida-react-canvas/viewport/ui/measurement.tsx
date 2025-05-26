@@ -5,16 +5,21 @@ import {
 import { MeterLabel } from "./meter";
 import { cn } from "@/components/lib/utils";
 import { cmath } from "@grida/cmath";
-import { useTransform } from "@/grida-react-canvas/provider";
+import { useCurrentEditor, useTransform } from "@/grida-react-canvas/provider";
 import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-canvas/backends/dom";
-import { useDocument } from "@/grida-react-canvas/provider";
 import { measure, Measurement } from "@grida/cmath/_measurement";
-// import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { useEditorState } from "@/grida-react-canvas";
 
 function useMeasurement() {
-  const { transform, state, selection } = useDocument();
-  const { surface_measurement_target } = state;
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
+  const selection = useEditorState(editor, (state) => state.selection);
+  const document = useEditorState(editor, (state) => state.document);
+  const surface_measurement_target = useEditorState(
+    editor,
+    (state) => state.surface_measurement_target
+  );
 
   const [measurement, setMeasurement] = useState<Measurement>();
 
@@ -52,7 +57,7 @@ function useMeasurement() {
     } catch (e) {
       console.error("useMeasurement", e);
     }
-  }, [state.document, selection, surface_measurement_target, transform]);
+  }, [document, selection, surface_measurement_target, transform]);
 
   return measurement;
 }

@@ -112,13 +112,15 @@ function Ready({
   const pages = useMemo(() => {
     const { start_page, lang, campaign } = data;
     return {
-      start: start_page ? (
-        <FormStartPage
-          start_page={start_page}
-          campaign={campaign}
-          lang={lang}
-        />
-      ) : undefined,
+      start: start_page
+        ? null
+        : // FIXME: fix useEditor
+          // <FormStartPage
+          //   start_page={start_page}
+          //   campaign={campaign}
+          //   lang={lang}
+          // />
+          undefined,
       main: (
         <FormPage
           form_id={form_id}
@@ -152,55 +154,56 @@ function Ready({
   );
 }
 
-function FormStartPage({
-  start_page,
-  campaign,
-  lang,
-}: {
-  start_page: NonNullable<FormAgentPrefetchData["start_page"]>;
-  campaign: FormAgentPrefetchData["campaign"];
-  lang: FormAgentPrefetchData["lang"];
-}) {
-  const { next } = useAgentFlow();
+// FIXME: fix useEditor
+// function FormStartPage({
+//   start_page,
+//   campaign,
+//   lang,
+// }: {
+//   start_page: NonNullable<FormAgentPrefetchData["start_page"]>;
+//   campaign: FormAgentPrefetchData["campaign"];
+//   lang: FormAgentPrefetchData["lang"];
+// }) {
+//   const { next } = useAgentFlow();
 
-  return (
-    <StandaloneDocumentEditor
-      editable={false}
-      initial={{
-        document: start_page,
-        templates: {
-          [(
-            start_page.nodes["page"] as grida.program.nodes.TemplateInstanceNode
-          ).template_id]: FormStartPageRenderer.getTemplate(
-            (
-              start_page.nodes[
-                "page"
-              ] as grida.program.nodes.TemplateInstanceNode
-            ).template_id
-          ),
-        },
-      }}
-    >
-      <CTAProvider value={{ onClick: next }}>
-        <ScreenWindowRoot>
-          {/* TODO: use a unified renderer */}
-          <FormStartPageRenderer.TemplateRenderer
-            name={
-              (
-                start_page.nodes[
-                  "page"
-                ] as grida.program.nodes.TemplateInstanceNode
-              ).template_id
-            }
-            // TODO: handle more data - agent errors states
-            meta={campaign}
-            lang={lang}
-          />
-        </ScreenWindowRoot>
-      </CTAProvider>
-    </StandaloneDocumentEditor>
-  );
-}
+//   return (
+//     <StandaloneDocumentEditor
+//       editable={false}
+//       initial={{
+//         document: start_page,
+//         templates: {
+//           [(
+//             start_page.nodes["page"] as grida.program.nodes.TemplateInstanceNode
+//           ).template_id]: FormStartPageRenderer.getTemplate(
+//             (
+//               start_page.nodes[
+//                 "page"
+//               ] as grida.program.nodes.TemplateInstanceNode
+//             ).template_id
+//           ),
+//         },
+//       }}
+//     >
+//       <CTAProvider value={{ onClick: next }}>
+//         <ScreenWindowRoot>
+//           {/* TODO: use a unified renderer */}
+//           <FormStartPageRenderer.TemplateRenderer
+//             name={
+//               (
+//                 start_page.nodes[
+//                   "page"
+//                 ] as grida.program.nodes.TemplateInstanceNode
+//               ).template_id
+//             }
+//             // TODO: handle more data - agent errors states
+//             meta={campaign}
+//             lang={lang}
+//           />
+//         </ScreenWindowRoot>
+//       </CTAProvider>
+//     </StandaloneDocumentEditor>
+//   );
+// }
 
 function FormPage({
   form_id,

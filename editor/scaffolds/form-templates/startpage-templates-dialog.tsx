@@ -103,7 +103,8 @@ export function BrowseStartPageTemplatesDialog({
                   onValueCommit?.(template.name);
                 }}
               >
-                <StandaloneDocumentEditor
+                {/* FIXME: fix useEditor */}
+                {/* <StandaloneDocumentEditor
                   editable={false}
                   initial={{
                     templates: {
@@ -138,7 +139,7 @@ export function BrowseStartPageTemplatesDialog({
                     meta={campaign}
                     lang={lang}
                   />
-                </StandaloneDocumentEditor>
+                </StandaloneDocumentEditor> */}
               </SandboxWrapper>
             </motion.div>
           )}

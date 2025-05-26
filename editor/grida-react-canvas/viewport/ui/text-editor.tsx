@@ -1,7 +1,7 @@
 import {
-  useEventTarget,
   useNode,
   useNodeAction,
+  useTool,
   useTransform,
 } from "@/grida-react-canvas/provider";
 import { useEffect, useRef } from "react";
@@ -14,9 +14,9 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
   const { transform } = useTransform();
+  const { tryExitContentEditMode } = useTool();
   const data = useSingleSelection(node_id);
   const node = useNode(node_id!);
-  const { tryExitContentEditMode } = useEventTarget();
 
   useEffect(() => {
     // select all text

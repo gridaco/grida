@@ -274,7 +274,7 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const {
-    state: { document },
+    document,
     mv,
     select,
     hoverNode,
@@ -282,6 +282,7 @@ export function NodeHierarchyList() {
     toggleNodeActive,
     changeNodeName,
   } = useDocument();
+
   const { id, name, children, selection, hovered_node_id } = useCurrentScene();
 
   const expandedItems = useMemo(() => {

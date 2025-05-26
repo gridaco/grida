@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useReducer } from "react";
+import React from "react";
 import {
   Align,
   Selection,
@@ -17,7 +17,6 @@ import {
   EditorSurface,
 } from "@/grida-react-canvas";
 import { editor } from "@/grida-canvas";
-import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,11 +36,11 @@ import {
   SidebarHeader,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useEditor } from "@/grida-react-canvas";
 
 export default function MinimalCanvasDemo() {
   const fonts = useGoogleFontsList();
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
+  const instance = useEditor(
     editor.state.init({
       editable: true,
       document: {
@@ -66,11 +65,7 @@ export default function MinimalCanvasDemo() {
     <TooltipProvider>
       <SidebarProvider>
         <main className="w-screen h-screen overflow-hidden select-none">
-          <StandaloneDocumentEditor
-            editable
-            initial={state}
-            dispatch={dispatch}
-          >
+          <StandaloneDocumentEditor editor={instance}>
             <Hotkyes />
             <Sidebar side="left" variant="floating">
               <SidebarContent>

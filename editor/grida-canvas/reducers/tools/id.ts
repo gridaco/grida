@@ -8,7 +8,7 @@ let i = 0;
  */
 export default function nid() {
   if (process.env.NODE_ENV === "development") {
-    return (i++).toString();
+    return "dev-" + i++;
   }
   return v4();
 }

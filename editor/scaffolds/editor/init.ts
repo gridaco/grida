@@ -6,7 +6,6 @@ import type {
   EditorInit,
   FormDocumentEditorInit,
   EditorState,
-  SiteDocumentEditorInit,
   IDataGridState,
   GDocTableID,
   GDocTable,

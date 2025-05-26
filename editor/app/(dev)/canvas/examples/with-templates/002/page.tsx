@@ -6,7 +6,7 @@ import Editor from "../../../editor";
 import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 
-const document: editor.state.IEditorInit = {
+const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {

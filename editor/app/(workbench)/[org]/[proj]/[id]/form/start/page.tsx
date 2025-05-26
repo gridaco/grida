@@ -101,9 +101,13 @@ function Exists() {
     );
   }
 
-  return <Ready />;
+  return null;
+  // FIXME: fix useEditor
+  // return <Ready />;
 }
 
+/*
+// FIXME: fix useEditor
 function Ready() {
   const [
     {
@@ -111,18 +115,14 @@ function Ready() {
     },
     dispatch,
   ] = useEditorState();
-
   const state = startpage!.state!;
-
   useSyncFormAgentStartPage();
-
   const startPageDocumentDispatch = useCallback(
     (action: CanvasAction) => {
       dispatch(composeEditorDocumentAction("form/startpage", action));
     },
     [dispatch]
   );
-
   return (
     <StandaloneDocumentEditor
       key={state.template_id}
@@ -145,6 +145,7 @@ function Ready() {
     </StandaloneDocumentEditor>
   );
 }
+ */
 
 function SetupStartPage() {
   const [state, dispatch] = useEditorState();
@@ -208,8 +209,6 @@ function StartPageEditor({ template_id }: { template_id: string }) {
     form: { campaign },
     theme: { lang },
   } = rootstate;
-
-  const { state } = useDocument();
 
   return (
     <>

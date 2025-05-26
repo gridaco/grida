@@ -1,13 +1,14 @@
 import React, { useMemo } from "react";
-import { Crosshair } from "./crosshair";
-import { useEventTarget } from "@/grida-react-canvas/provider";
-import { Rule } from "./rule";
+import { useEventTarget, useTransform } from "@/grida-react-canvas/provider";
 import { cmath } from "@grida/cmath";
 import { guide } from "@grida/cmath/_snap";
+import { Crosshair } from "./crosshair";
+import { Rule } from "./rule";
 import { Line } from "./line";
 
 function useSnapGuide(): guide.SnapGuide | undefined {
-  const { gesture, transform, surface_snapping } = useEventTarget();
+  const { transform } = useTransform();
+  const { gesture, surface_snapping } = useEventTarget();
 
   return useMemo(() => {
     if (

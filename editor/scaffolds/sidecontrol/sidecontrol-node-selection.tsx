@@ -59,6 +59,7 @@ import grida from "@grida/schema";
 import assert from "assert";
 import {
   useCurrentScene,
+  useEditorFlags,
   useNodeAction,
   useSelection,
   useSelectionPaints,
@@ -112,9 +113,9 @@ export function Selection({
   empty?: React.ReactNode;
   config?: ControlsConfig;
 }) {
-  const { state: document } = useDocument();
+  const { selection } = useDocument();
 
-  const selection_length = document.selection.length;
+  const selection_length = selection.length;
 
   return (
     <div>
@@ -657,11 +658,9 @@ function SelectedNodeProperties({
 }: {
   config?: ControlsConfig;
 }) {
-  const { state } = useDocument();
+  const { selection, document } = useDocument();
+  const { debug } = useEditorFlags();
   const scene = useCurrentScene();
-
-  // - color - variables
-  const { selection, debug, document } = state;
 
   assert(selection.length === 1);
   const node_id = selection[0];
@@ -725,7 +724,7 @@ function SelectedNodeProperties({
     userdata,
   } = node;
 
-  const document_properties = state.document.properties;
+  const document_properties = document.properties;
   const properties = node.properties;
   const root_properties = root.properties;
 

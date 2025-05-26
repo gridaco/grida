@@ -11,12 +11,13 @@ import React, {
 import { editor } from "@/grida-canvas";
 import type { tokens } from "@grida/tokens";
 import grida from "@grida/schema";
+import iosvg from "@grida/io-svg";
+import type cg from "@grida/cg";
 import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
-import assert from "assert";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "../grida-canvas/backends/dom";
 import { cmath } from "@grida/cmath";
@@ -27,53 +28,33 @@ import type {
 } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
-import iosvg from "@grida/io-svg";
 import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
-import type cg from "@grida/cg";
 import nid from "@/grida-canvas/reducers/tools/id";
+import { Editor } from "@/grida-canvas/editor";
+import { useEditorState } from "./use-editor";
+import assert from "assert";
 
-type DocumentDispatcher = (action: Action) => void;
+type Dispatcher = (action: Action) => void;
 
-const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
-const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
+const EditorContext = createContext<Editor | null>(null);
 
-const DocumentContext = createContext<editor.state.IEditorState | null>(null);
+function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
+  const editor = useCurrentEditor();
+  const fonts = useEditorState(editor, (state) => state.googlefonts);
 
-const __noop: DocumentDispatcher = () => void 0;
-const DocumentDispatcherContext = createContext<DocumentDispatcher>(__noop);
+  return (
+    <GoogleFontsManager stylesheets fonts={fonts}>
+      {children}
+    </GoogleFontsManager>
+  );
+}
 
 export function StandaloneDocumentEditor({
-  initial,
-  editable,
-  dispatch,
+  editor,
   children,
-  debug = false,
-}: React.PropsWithChildren<{
-  editable: boolean;
-  debug?: boolean;
-  initial: Omit<editor.state.IEditorInit, "editable" | "debug">;
-  dispatch?: DocumentDispatcher;
-}>) {
-  useEffect(() => {
-    if (editable && !dispatch) {
-      console.error(
-        "DocumentEditor: dispatch is required when readonly is false"
-      );
-    }
-  }, [editable, dispatch]);
-
-  const __dispatch = useMemo(
-    () => (editable ? (dispatch ?? __noop) : __noop),
-    [editable]
-  );
-
-  const state = useMemo(
-    () => editor.state.init({ ...initial, editable, debug }),
-    [initial, editable, debug]
-  );
-
+}: React.PropsWithChildren<{ editor: Editor }>) {
   // TODO:
   // const rootnode = initial.document.nodes[initial.document.root_id];
   // assert(rootnode, "root node is not found");
@@ -100,713 +81,423 @@ export function StandaloneDocumentEditor({
   //   }
   // }, [rootnode]);
 
-  const props = Object.entries(state.document.properties ?? {}).reduce(
-    (acc, [key, value]) => {
-      acc[key] = value.default;
-      return acc;
-    },
-    {} as Record<string, tokens.StringValueExpression>
-  );
+  //   const props = Object.entries(state.document.properties ?? {}).reduce(
+  //     (acc, [key, value]) => {
+  //       acc[key] = value.default;
+  //       return acc;
+  //     },
+  //     {} as Record<string, tokens.StringValueExpression>
+  //   );
 
   return (
-    <DocumentContext.Provider value={state}>
-      <DocumentDispatcherContext.Provider value={__dispatch}>
-        <ProgramDataContextHost>
-          <DataProvider data={{ props: props }}>
-            <EditorGoogleFontsManager>
-              {/*  */}
-              {children}
-            </EditorGoogleFontsManager>
-          </DataProvider>
-        </ProgramDataContextHost>
-      </DocumentDispatcherContext.Provider>
-    </DocumentContext.Provider>
+    <EditorContext.Provider value={editor}>
+      <ProgramDataContextHost>
+        {/* <DataProvider data={{ props: props }}> */}
+        <DataProvider>
+          <EditorGoogleFontsManager>{children}</EditorGoogleFontsManager>
+        </DataProvider>
+      </ProgramDataContextHost>
+    </EditorContext.Provider>
   );
 }
 
-function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
-  const { state } = useDocument();
-
-  const fonts = state.googlefonts;
-
-  return (
-    <GoogleFontsManager stylesheets fonts={fonts}>
-      {children}
-    </GoogleFontsManager>
-  );
-}
-
-function __useDispatch() {
-  return useContext(DocumentDispatcherContext);
-}
-
-function __useInternal() {
-  const state = useContext(DocumentContext);
-  if (!state) {
+export function useCurrentEditor() {
+  const editor = useContext(EditorContext);
+  if (!editor) {
     throw new Error(
-      "useDocument must be used within a StandaloneDocumentEditor"
+      "useCurrentEditor must be used within an EditorContextV2.Provider"
     );
   }
-
-  const dispatch = __useDispatch();
-
-  return useMemo(() => [state, dispatch] as const, [state, dispatch]);
+  return editor;
 }
 
-function __useNodeActions(
-  dispatch: DocumentDispatcher
-): editor.api.INodeChangeActions {
-  const toggleNodeActive: editor.api.INodeChangeActions["toggleNodeActive"] =
-    useCallback(
-      (node_id: string) => {
+function __useNodeActions(dispatch: Dispatcher): editor.api.INodeChangeActions {
+  const actions = {
+    toggleNodeActive: (node_id: string) =>
+      dispatch({
+        type: "node/toggle/active",
+        node_id: node_id,
+      }),
+    toggleNodeLocked: (node_id: string) =>
+      dispatch({
+        type: "node/toggle/locked",
+        node_id: node_id,
+      }),
+    toggleNodeBold: (node_id: string) =>
+      dispatch({
+        type: "node/toggle/bold",
+        node_id: node_id,
+      }),
+    changeNodeProps: (
+      node_id: string,
+      key: string,
+      value?: tokens.StringValueExpression
+    ) =>
+      dispatch({
+        type: "node/change/props",
+        node_id: node_id,
+        props: {
+          [key]: value,
+        },
+      }),
+    changeNodeComponent: (node_id: string, component_id: string) =>
+      dispatch({
+        type: "node/change/component",
+        node_id: node_id,
+        component_id: component_id,
+      }),
+    changeNodeText: (node_id: string, text?: tokens.StringValueExpression) =>
+      dispatch({
+        type: "node/change/text",
+        node_id: node_id,
+        text,
+      }),
+    changeNodeName: (node_id: string, name: string) =>
+      dispatch({
+        type: "node/change/name",
+        node_id: node_id,
+        name: name,
+      }),
+    changeNodeUserData: (node_id: string, userdata: unknown) =>
+      dispatch({
+        type: "node/change/userdata",
+        node_id: node_id,
+        userdata: userdata as any,
+      }),
+    changeNodeActive: (node_id: string, active: boolean) =>
+      dispatch({
+        type: "node/change/active",
+        node_id: node_id,
+        active: active,
+      }),
+    changeNodeLocked: (node_id: string, locked: boolean) =>
+      dispatch({
+        type: "node/change/locked",
+        node_id: node_id,
+        locked: locked,
+      }),
+    changeNodePositioning: (
+      node_id: string,
+      positioning: grida.program.nodes.i.IPositioning
+    ) =>
+      dispatch({
+        type: "node/change/positioning",
+        node_id: node_id,
+        positioning,
+      }),
+    changeNodePositioningMode: (
+      node_id: string,
+      position: grida.program.nodes.i.IPositioning["position"]
+    ) =>
+      dispatch({
+        type: "node/change/positioning-mode",
+        node_id: node_id,
+        position,
+      }),
+    changeNodeSrc: (node_id: string, src?: tokens.StringValueExpression) =>
+      dispatch({
+        type: "node/change/src",
+        node_id: node_id,
+        src,
+      }),
+    changeNodeHref: (
+      node_id: string,
+      href?: grida.program.nodes.i.IHrefable["href"]
+    ) =>
+      dispatch({
+        type: "node/change/href",
+        node_id: node_id,
+        href,
+      }),
+    changeNodeTarget: (
+      node_id: string,
+      target?: grida.program.nodes.i.IHrefable["target"]
+    ) =>
+      dispatch({
+        type: "node/change/target",
+        node_id: node_id,
+        target,
+      }),
+    changeNodeOpacity: (node_id: string, opacity: TChange<number>) =>
+      requestAnimationFrame(() => {
         dispatch({
-          type: "node/toggle/active",
+          type: "node/change/opacity",
           node_id: node_id,
+          opacity,
         });
-      },
-      [dispatch]
-    );
-
-  const toggleNodeLocked: editor.api.INodeChangeActions["toggleNodeLocked"] =
-    useCallback(
-      (node_id: string) => {
+      }),
+    changeNodeRotation: (node_id: string, rotation: TChange<number>) =>
+      requestAnimationFrame(() => {
         dispatch({
-          type: "node/toggle/locked",
+          type: "node/change/rotation",
           node_id: node_id,
+          rotation,
         });
-      },
-      [dispatch]
-    );
-
-  const toggleNodeBold: editor.api.INodeChangeActions["toggleNodeBold"] =
-    useCallback(
-      (node_id: string) => {
+      }),
+    changeNodeSize: (
+      node_id: string,
+      axis: "width" | "height",
+      value: grida.program.css.LengthPercentage | "auto"
+    ) =>
+      requestAnimationFrame(() => {
         dispatch({
-          type: "node/toggle/bold",
+          type: "node/change/size",
           node_id: node_id,
+          axis,
+          value: value,
         });
-      },
-      [dispatch]
-    );
-
-  const changeNodeProps: editor.api.INodeChangeActions["changeNodeProps"] =
-    useCallback(
-      (node_id: string, key: string, value?: tokens.StringValueExpression) => {
+      }),
+    changeNodeFill: (
+      node_id: string,
+      fill:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | cg.PaintWithoutID
+        | null
+    ) =>
+      requestAnimationFrame(() => {
         dispatch({
-          type: "node/change/props",
+          type: "node/change/fill",
           node_id: node_id,
-          props: {
+          fill,
+        });
+      }),
+    changeNodeStroke: (
+      node_id: string,
+      stroke:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | cg.PaintWithoutID
+        | null
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke",
+          node_id: node_id,
+          stroke,
+        });
+      }),
+    changeNodeStrokeWidth: (node_id: string, strokeWidth: TChange<number>) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-width",
+          node_id: node_id,
+          strokeWidth,
+        });
+      }),
+    changeNodeStrokeCap: (node_id: string, strokeCap: cg.StrokeCap) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-cap",
+          node_id: node_id,
+          strokeCap,
+        });
+      }),
+    changeNodeFit: (node_id: string, fit: cg.BoxFit) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fit",
+          node_id: node_id,
+          fit,
+        });
+      }),
+    changeNodeCornerRadius: (
+      node_id: string,
+      cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/cornerRadius",
+          node_id: node_id,
+          cornerRadius,
+        });
+      }),
+    // text style
+    changeTextNodeFontFamily: (
+      node_id: string,
+      fontFamily: string | undefined
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontFamily",
+          node_id: node_id,
+          fontFamily,
+        });
+      }),
+    changeTextNodeFontWeight: (node_id: string, fontWeight: cg.NFontWeight) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontWeight",
+          node_id: node_id,
+          fontWeight,
+        });
+      }),
+    changeTextNodeFontSize: (node_id: string, fontSize: TChange<number>) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontSize",
+          node_id: node_id,
+          fontSize,
+        });
+      }),
+    changeTextNodeTextAlign: (node_id: string, textAlign: cg.TextAlign) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/textAlign",
+          node_id: node_id,
+          textAlign,
+        });
+      }),
+    changeTextNodeTextAlignVertical: (
+      node_id: string,
+      textAlignVertical: cg.TextAlignVertical
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/textAlignVertical",
+          node_id: node_id,
+          textAlignVertical,
+        });
+      }),
+    changeTextNodeLineHeight: (
+      node_id: string,
+      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/lineHeight",
+          node_id: node_id,
+          lineHeight,
+        });
+      }),
+    changeTextNodeLetterSpacing: (
+      node_id: string,
+      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/letterSpacing",
+          node_id: node_id,
+          letterSpacing,
+        });
+      }),
+    changeTextNodeMaxlength: (node_id: string, maxlength: number | undefined) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/maxlength",
+          node_id: node_id,
+          maxlength,
+        });
+      }),
+    //
+    changeNodeBorder: (
+      node_id: string,
+      border: grida.program.css.Border | undefined
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/border",
+          node_id: node_id,
+          border: border,
+        });
+      }),
+    //
+    changeContainerNodePadding: (
+      node_id: string,
+      padding: grida.program.nodes.i.IPadding["padding"]
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/padding",
+          node_id: node_id,
+          padding,
+        });
+      }),
+    changeNodeBoxShadow: (node_id: string, boxShadow?: cg.BoxShadow) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/box-shadow",
+          node_id: node_id,
+          boxShadow,
+        });
+      }),
+    changeContainerNodeLayout: (
+      node_id: string,
+      layout: grida.program.nodes.i.IFlexContainer["layout"]
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/layout",
+          node_id: node_id,
+          layout,
+        });
+      }),
+    changeFlexContainerNodeDirection: (node_id: string, direction: cg.Axis) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/direction",
+          node_id: node_id,
+          direction,
+        });
+      }),
+    changeFlexContainerNodeMainAxisAlignment: (
+      node_id: string,
+      mainAxisAlignment: cg.MainAxisAlignment
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/mainAxisAlignment",
+          node_id: node_id,
+          mainAxisAlignment,
+        });
+      }),
+    changeFlexContainerNodeCrossAxisAlignment: (
+      node_id: string,
+      crossAxisAlignment: cg.CrossAxisAlignment
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/crossAxisAlignment",
+          node_id: node_id,
+          crossAxisAlignment,
+        });
+      }),
+    changeFlexContainerNodeGap: (
+      node_id: string,
+      gap: number | { mainAxisGap: number; crossAxisGap: number }
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/gap",
+          node_id: node_id,
+          gap,
+        });
+      }),
+    //
+    changeNodeMouseCursor: (node_id: string, cursor: cg.SystemMouseCursor) =>
+      dispatch({
+        type: "node/change/mouse-cursor",
+        node_id,
+        cursor,
+      }),
+    changeNodeStyle: (
+      node_id: string,
+      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
+      value: any
+    ) =>
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/style",
+          node_id: node_id,
+          style: {
             [key]: value,
           },
         });
-      },
-      [dispatch]
-    );
+      }),
+  } satisfies editor.api.INodeChangeActions;
 
-  const changeNodeComponent: editor.api.INodeChangeActions["changeNodeComponent"] =
-    useCallback(
-      (node_id: string, component_id: string) => {
-        dispatch({
-          type: "node/change/component",
-          node_id: node_id,
-          component_id: component_id,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeText: editor.api.INodeChangeActions["changeNodeText"] =
-    useCallback(
-      (node_id: string, text?: tokens.StringValueExpression) => {
-        dispatch({
-          type: "node/change/text",
-          node_id: node_id,
-          text,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeName: editor.api.INodeChangeActions["changeNodeName"] =
-    useCallback(
-      (node_id: string, name: string) => {
-        dispatch({
-          type: "node/change/name",
-          node_id: node_id,
-          name: name,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeUserData: editor.api.INodeChangeActions["changeNodeUserData"] =
-    useCallback(
-      (node_id: string, userdata: unknown) => {
-        dispatch({
-          type: "node/change/userdata",
-          node_id: node_id,
-          userdata: userdata as any,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeActive: editor.api.INodeChangeActions["changeNodeActive"] =
-    useCallback(
-      (node_id: string, active: boolean) => {
-        dispatch({
-          type: "node/change/active",
-          node_id: node_id,
-          active: active,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeLocked: editor.api.INodeChangeActions["changeNodeLocked"] =
-    useCallback(
-      (node_id: string, locked: boolean) => {
-        dispatch({
-          type: "node/change/locked",
-          node_id: node_id,
-          locked: locked,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodePositioning: editor.api.INodeChangeActions["changeNodePositioning"] =
-    useCallback(
-      (node_id: string, positioning: grida.program.nodes.i.IPositioning) => {
-        dispatch({
-          type: "node/change/positioning",
-          node_id: node_id,
-          positioning,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodePositioningMode: editor.api.INodeChangeActions["changeNodePositioningMode"] =
-    useCallback(
-      (
-        node_id: string,
-        position: grida.program.nodes.i.IPositioning["position"]
-      ) => {
-        dispatch({
-          type: "node/change/positioning-mode",
-          node_id: node_id,
-          position,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeSrc: editor.api.INodeChangeActions["changeNodeSrc"] =
-    useCallback(
-      (node_id: string, src?: tokens.StringValueExpression) => {
-        dispatch({
-          type: "node/change/src",
-          node_id: node_id,
-          src,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeHref: editor.api.INodeChangeActions["changeNodeHref"] =
-    useCallback(
-      (node_id: string, href?: grida.program.nodes.i.IHrefable["href"]) => {
-        dispatch({
-          type: "node/change/href",
-          node_id: node_id,
-          href,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeTarget: editor.api.INodeChangeActions["changeNodeTarget"] =
-    useCallback(
-      (node_id: string, target?: grida.program.nodes.i.IHrefable["target"]) => {
-        dispatch({
-          type: "node/change/target",
-          node_id: node_id,
-          target,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeOpacity: editor.api.INodeChangeActions["changeNodeOpacity"] =
-    useCallback(
-      (node_id: string, opacity: TChange<number>) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/opacity",
-            node_id: node_id,
-            opacity,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeRotation: editor.api.INodeChangeActions["changeNodeRotation"] =
-    useCallback(
-      (node_id: string, rotation: TChange<number>) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/rotation",
-            node_id: node_id,
-            rotation,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeSize: editor.api.INodeChangeActions["changeNodeSize"] =
-    useCallback(
-      (
-        node_id: string,
-        axis: "width" | "height",
-        value: grida.program.css.LengthPercentage | "auto"
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/size",
-            node_id: node_id,
-            axis,
-            value: value,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeFill: editor.api.INodeChangeActions["changeNodeFill"] =
-    useCallback(
-      (
-        node_id: string,
-        fill:
-          | grida.program.nodes.i.props.SolidPaintToken
-          | cg.PaintWithoutID
-          | null
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/fill",
-            node_id: node_id,
-            fill,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeStroke: editor.api.INodeChangeActions["changeNodeStroke"] =
-    useCallback(
-      (
-        node_id: string,
-        stroke:
-          | grida.program.nodes.i.props.SolidPaintToken
-          | cg.PaintWithoutID
-          | null
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/stroke",
-            node_id: node_id,
-            stroke,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeStrokeWidth: editor.api.INodeChangeActions["changeNodeStrokeWidth"] =
-    useCallback(
-      (node_id: string, strokeWidth: TChange<number>) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/stroke-width",
-            node_id: node_id,
-            strokeWidth,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeStrokeCap: editor.api.INodeChangeActions["changeNodeStrokeCap"] =
-    useCallback(
-      (node_id: string, strokeCap: cg.StrokeCap) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/stroke-cap",
-            node_id: node_id,
-            strokeCap,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeFit: editor.api.INodeChangeActions["changeNodeFit"] =
-    useCallback(
-      (node_id: string, fit: cg.BoxFit) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/fit",
-            node_id: node_id,
-            fit,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeCornerRadius: editor.api.INodeChangeActions["changeNodeCornerRadius"] =
-    useCallback(
-      (
-        node_id: string,
-        cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/cornerRadius",
-            node_id: node_id,
-            cornerRadius,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  // text style
-  const changeTextNodeFontFamily: editor.api.INodeChangeActions["changeTextNodeFontFamily"] =
-    useCallback(
-      (node_id: string, fontFamily: string | undefined) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/fontFamily",
-            node_id: node_id,
-            fontFamily,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeFontWeight: editor.api.INodeChangeActions["changeTextNodeFontWeight"] =
-    useCallback(
-      (node_id: string, fontWeight: cg.NFontWeight) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/fontWeight",
-            node_id: node_id,
-            fontWeight,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeFontSize: editor.api.INodeChangeActions["changeTextNodeFontSize"] =
-    useCallback(
-      (node_id: string, fontSize: TChange<number>) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/fontSize",
-            node_id: node_id,
-            fontSize,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeTextAlign: editor.api.INodeChangeActions["changeTextNodeTextAlign"] =
-    useCallback(
-      (node_id: string, textAlign: cg.TextAlign) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/textAlign",
-            node_id: node_id,
-            textAlign,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeTextAlignVertical: editor.api.INodeChangeActions["changeTextNodeTextAlignVertical"] =
-    useCallback(
-      (node_id: string, textAlignVertical: cg.TextAlignVertical) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/textAlignVertical",
-            node_id: node_id,
-            textAlignVertical,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeLineHeight: editor.api.INodeChangeActions["changeTextNodeLineHeight"] =
-    useCallback(
-      (
-        node_id: string,
-        lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/lineHeight",
-            node_id: node_id,
-            lineHeight,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeLetterSpacing: editor.api.INodeChangeActions["changeTextNodeLetterSpacing"] =
-    useCallback(
-      (
-        node_id: string,
-        letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/letterSpacing",
-            node_id: node_id,
-            letterSpacing,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeTextNodeMaxlength: editor.api.INodeChangeActions["changeTextNodeMaxlength"] =
-    useCallback(
-      (node_id: string, maxlength: number | undefined) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/maxlength",
-            node_id: node_id,
-            maxlength,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  //
-  const changeNodeBorder: editor.api.INodeChangeActions["changeNodeBorder"] =
-    useCallback(
-      (node_id: string, border: grida.program.css.Border | undefined) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/border",
-            node_id: node_id,
-            border: border,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  //
-
-  const changeContainerNodePadding: editor.api.INodeChangeActions["changeContainerNodePadding"] =
-    useCallback(
-      (node_id: string, padding: grida.program.nodes.i.IPadding["padding"]) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/padding",
-            node_id: node_id,
-            padding,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeBoxShadow: editor.api.INodeChangeActions["changeNodeBoxShadow"] =
-    useCallback(
-      (node_id: string, boxShadow?: cg.BoxShadow) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/box-shadow",
-            node_id: node_id,
-            boxShadow,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeContainerNodeLayout: editor.api.INodeChangeActions["changeContainerNodeLayout"] =
-    useCallback(
-      (
-        node_id: string,
-        layout: grida.program.nodes.i.IFlexContainer["layout"]
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/layout",
-            node_id: node_id,
-            layout,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeFlexContainerNodeDirection: editor.api.INodeChangeActions["changeFlexContainerNodeDirection"] =
-    useCallback(
-      (node_id: string, direction: cg.Axis) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/direction",
-            node_id: node_id,
-            direction,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeFlexContainerNodeMainAxisAlignment: editor.api.INodeChangeActions["changeFlexContainerNodeMainAxisAlignment"] =
-    useCallback(
-      (node_id: string, mainAxisAlignment: cg.MainAxisAlignment) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/mainAxisAlignment",
-            node_id: node_id,
-            mainAxisAlignment,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeFlexContainerNodeCrossAxisAlignment: editor.api.INodeChangeActions["changeFlexContainerNodeCrossAxisAlignment"] =
-    useCallback(
-      (node_id: string, crossAxisAlignment: cg.CrossAxisAlignment) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/crossAxisAlignment",
-            node_id: node_id,
-            crossAxisAlignment,
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  const changeFlexContainerNodeGap: editor.api.INodeChangeActions["changeFlexContainerNodeGap"] =
-    useCallback(
-      (
-        node_id: string,
-        gap: number | { mainAxisGap: number; crossAxisGap: number }
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/gap",
-            node_id: node_id,
-            gap,
-          });
-        });
-      },
-      [dispatch]
-    );
-  //
-
-  const changeNodeMouseCursor: editor.api.INodeChangeActions["changeNodeMouseCursor"] =
-    useCallback(
-      (node_id: string, cursor: cg.SystemMouseCursor) => {
-        dispatch({
-          type: "node/change/mouse-cursor",
-          node_id,
-          cursor,
-        });
-      },
-      [dispatch]
-    );
-
-  const changeNodeStyle: editor.api.INodeChangeActions["changeNodeStyle"] =
-    useCallback(
-      (
-        node_id: string,
-        key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-        value: any
-      ) => {
-        requestAnimationFrame(() => {
-          dispatch({
-            type: "node/change/style",
-            node_id: node_id,
-            style: {
-              [key]: value,
-            },
-          });
-        });
-      },
-      [dispatch]
-    );
-
-  return useMemo(
-    () => ({
-      toggleNodeActive,
-      toggleNodeLocked,
-      toggleNodeBold,
-      changeNodeActive,
-      changeNodeLocked,
-      changeNodeName,
-      changeNodeUserData,
-      changeNodeSize,
-      changeNodeBorder,
-      changeNodeProps,
-      changeNodeComponent,
-      changeNodeText,
-      changeNodeStyle,
-      changeNodeMouseCursor,
-      changeNodeSrc,
-      changeNodeHref,
-      changeNodeTarget,
-      changeNodePositioning,
-      changeNodePositioningMode,
-      changeNodeCornerRadius,
-      changeNodeFill,
-      changeNodeStroke,
-      changeNodeStrokeWidth,
-      changeNodeStrokeCap,
-      changeNodeFit,
-      changeNodeOpacity,
-      changeNodeRotation,
-      changeTextNodeFontFamily,
-      changeTextNodeFontWeight,
-      changeTextNodeFontSize,
-      changeTextNodeTextAlign,
-      changeTextNodeTextAlignVertical,
-      changeTextNodeLineHeight,
-      changeTextNodeLetterSpacing,
-      changeTextNodeMaxlength,
-      changeContainerNodePadding,
-      changeNodeBoxShadow,
-      changeContainerNodeLayout,
-      changeFlexContainerNodeDirection,
-      changeFlexContainerNodeMainAxisAlignment,
-      changeFlexContainerNodeCrossAxisAlignment,
-      changeFlexContainerNodeGap,
-    }),
-    [dispatch]
-  );
+  return useMemo(() => actions, [dispatch]);
 }
 
-function __useGestureNudgeState(dispatch: DocumentDispatcher) {
+function __useGestureNudgeState(dispatch: Dispatcher) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const __gesture_nudge_debounced = useCallback(
@@ -837,7 +528,11 @@ function __useGestureNudgeState(dispatch: DocumentDispatcher) {
 }
 
 export function useNodeAction(node_id: string | undefined) {
-  const dispatch = __useDispatch();
+  const instance = useCurrentEditor();
+  const dispatch = React.useCallback(
+    (action: Action) => instance.dispatch(action),
+    [instance]
+  );
   const nodeActions = __useNodeActions(dispatch);
 
   return useMemo(() => {
@@ -977,7 +672,15 @@ const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
 };
 
 export function useSelection() {
-  const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    selection: state.selection,
+    document: state.document,
+  }));
+  const dispatch = React.useCallback(
+    (action: Action) => instance.dispatch(action),
+    [instance]
+  );
   const __actions = __useNodeActions(dispatch);
   const selection = state.selection;
 
@@ -1325,7 +1028,16 @@ export function useSelection() {
 }
 
 export function useSelectionPaints() {
-  const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    selection: state.selection,
+    document: state.document,
+    document_ctx: state.document_ctx,
+  }));
+  const dispatch = React.useCallback(
+    (action: Action) => instance.dispatch(action),
+    [instance]
+  );
   const __actions = __useNodeActions(dispatch);
   const selection = state.selection;
 
@@ -1395,22 +1107,56 @@ export function useSelectionPaints() {
   }, [selection, paints, ids, setPaint]);
 }
 
+export function useEditorFlags() {
+  const instance = useCurrentEditor();
+  const flags = useEditorState(instance, (state) => state.flags);
+  const debug = useEditorState(instance, (state) => state.debug);
+
+  return useMemo(() => {
+    return {
+      flags,
+      debug,
+    };
+  }, [flags, debug]);
+}
+
 export function useDocument(): editor.api.IDocumentEditorActions &
   editor.api.INodeChangeActions & {
-    state: editor.state.IEditorState;
     selection: editor.state.IEditorState["selection"];
-    transform: editor.state.IEditorState["transform"];
+    document: editor.state.IEditorState["document"];
+    document_ctx: editor.state.IEditorState["document_ctx"];
     scenes: editor.state.IEditorState["document"]["scenes"];
     scene_id: editor.state.IEditorState["scene_id"];
+    hovered_node_id: editor.state.IEditorState["hovered_node_id"];
+    templates: editor.state.IEditorState["templates"];
     clipboardColor: editor.state.IEditorState["user_clipboard_color"];
   } {
-  const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    selection: state.selection,
+    document: state.document,
+    document_ctx: state.document_ctx,
+    scenes: state.document.scenes,
+    scene_id: state.scene_id,
+    hovered_node_id: state.hovered_node_id,
+    templates: state.templates,
+    user_clipboard_color: state.user_clipboard_color,
+  }));
+
+  const dispatch = React.useCallback(
+    (action: Action) => instance.dispatch(action),
+    [instance]
+  );
 
   const {
     selection,
-    transform,
+    document,
+    document_ctx,
     scene_id,
-    document: { scenes },
+    scenes,
+    hovered_node_id,
+    templates,
+    user_clipboard_color,
   } = state;
 
   const nodeActions = __useNodeActions(dispatch);
@@ -2002,12 +1748,15 @@ export function useDocument(): editor.api.IDocumentEditorActions &
 
   return useMemo(() => {
     return {
-      state,
       selection,
-      transform,
-      //
-      scenes,
+      document,
+      document_ctx,
       scene_id,
+      scenes,
+      hovered_node_id,
+      templates,
+      user_clipboard_color,
+      //
       loadScene,
       createScene,
       deleteScene,
@@ -2066,9 +1815,14 @@ export function useDocument(): editor.api.IDocumentEditorActions &
       schemaDeleteProperty,
     };
   }, [
-    state,
     selection,
-    transform,
+    document,
+    document_ctx,
+    scene_id,
+    scenes,
+    hovered_node_id,
+    templates,
+    user_clipboard_color,
     //
     scenes,
     scene_id,
@@ -2132,7 +1886,6 @@ export function useDocument(): editor.api.IDocumentEditorActions &
 
 type UseScene = grida.program.document.Scene & {
   selection: editor.state.IEditorState["selection"];
-  transform: editor.state.IEditorState["transform"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
   hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
   document_ctx: editor.state.IEditorState["document_ctx"];
@@ -2142,15 +1895,23 @@ type UseScene = grida.program.document.Scene & {
 };
 
 export function useScene(scene_id: string): UseScene {
-  const [state, dispatch] = __useInternal();
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => {
+    return {
+      selection: state.selection,
+      hovered_node_id: state.hovered_node_id,
+      hovered_vertex_idx: state.hovered_vertex_idx,
+      document_ctx: state.document_ctx,
+      ...state.document.scenes[scene_id],
+    } satisfies Omit<UseScene, "setBackgroundColor">;
+  });
 
-  const {
-    selection,
-    transform,
-    hovered_node_id,
-    hovered_vertex_idx,
-    document_ctx,
-  } = state;
+  const dispatch = React.useCallback(
+    (action: Action) => {
+      editor.dispatch(action);
+    },
+    [editor]
+  );
 
   const setBackgroundColor = useCallback(
     (
@@ -2166,21 +1927,18 @@ export function useScene(scene_id: string): UseScene {
     [dispatch, scene_id]
   );
 
-  const scene = state.document.scenes[scene_id];
   return {
-    selection,
-    transform,
-    hovered_node_id,
-    hovered_vertex_idx,
-    document_ctx,
-    ...scene,
+    ...state,
     setBackgroundColor,
   };
 }
 
 export function useCurrentScene(): UseScene {
-  const [state] = __useInternal();
-  return useScene(state.scene_id!);
+  const editor = useCurrentEditor();
+  const scene_id = useEditorState(editor, (state) => {
+    return state.scene_id!;
+  });
+  return useScene(scene_id);
 }
 
 function animateTransformTo(
@@ -2221,10 +1979,15 @@ function animateTransformTo(
 }
 
 export function useTransform() {
-  const [_, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
   const scene = useCurrentScene();
-
-  const { transform } = scene;
+  const transform = useEditorState(instance, (state) => state.transform);
+  const dispatch = useCallback(
+    (action: Action) => {
+      instance.dispatch(action);
+    },
+    [instance]
+  );
 
   const scale = useCallback(
     (
@@ -2247,14 +2010,14 @@ export function useTransform() {
 
       const sx = cmath.clamp(
         fx,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
       );
 
       const sy = cmath.clamp(
         fy,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
       );
 
       const [tx, ty] = cmath.transform.getTranslate(transform);
@@ -2298,7 +2061,7 @@ export function useTransform() {
         selector
       );
 
-      const cdom = new domapi.CanvasDOM(scene.transform);
+      const cdom = new domapi.CanvasDOM(transform);
 
       const rects = ids
         .map((id) => cdom.getNodeBoundingRect(id))
@@ -2313,14 +2076,14 @@ export function useTransform() {
       const _view = domapi.get_viewport_rect();
       const view = { x: 0, y: 0, width: _view.width, height: _view.height };
 
-      const transform = cmath.ext.viewport.transformToFit(
+      const next_transform = cmath.ext.viewport.transformToFit(
         view,
         area,
         options.margin
       );
 
       if (options.animate) {
-        animateTransformTo(scene.transform, transform, (t) => {
+        animateTransformTo(transform, next_transform, (t) => {
           dispatch({
             type: "transform",
             transform: t,
@@ -2329,17 +2092,11 @@ export function useTransform() {
       } else {
         dispatch({
           type: "transform",
-          transform: transform,
+          transform: next_transform,
         });
       }
     },
-    [
-      dispatch,
-      scene.document_ctx,
-      scene.transform,
-      scene.selection,
-      scene.children,
-    ]
+    [dispatch, transform, scene.document_ctx, scene.selection, scene.children]
   );
 
   const zoomIn = useCallback(() => {
@@ -2348,7 +2105,7 @@ export function useTransform() {
 
     scale(nextscale);
     //
-  }, [dispatch, scale, transform]);
+  }, [scale, transform]);
 
   const zoomOut = useCallback(() => {
     const prevscale = transform[0][0];
@@ -2356,7 +2113,7 @@ export function useTransform() {
 
     scale(nextscale);
     //
-  }, [dispatch, scale, transform]);
+  }, [scale, transform]);
 
   const setTransform = useCallback(
     (transform: cmath.Transform) => {
@@ -2369,7 +2126,6 @@ export function useTransform() {
   );
 
   return useMemo(() => {
-    const transform = scene.transform;
     const scaleX = transform[0][0];
     const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
@@ -2405,9 +2161,8 @@ function throttle<T extends (...args: any[]) => void>(
 }
 
 export function useEventTargetCSSCursor() {
-  const [state] = __useInternal();
-
-  const { tool } = state;
+  const editor = useCurrentEditor();
+  const tool = useEditorState(editor, (state) => state.tool);
 
   return useMemo(() => {
     switch (tool.type) {
@@ -2440,57 +2195,33 @@ export function useEventTargetCSSCursor() {
   }, [tool]);
 }
 
-export function useEventTarget() {
-  const [state, dispatch] = __useInternal();
-  const scene = useCurrentScene();
+export function usePointer() {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.pointer);
+}
 
-  const { guides, edges } = scene;
+interface UseTool {
+  tool: editor.state.IEditorState["tool"];
+  content_edit_mode: editor.state.IEditorState["content_edit_mode"];
+  setTool: (tool: editor.state.ToolMode) => void;
+  tryExitContentEditMode: () => void;
+  tryToggleContentEditMode: () => void;
+  tryEnterContentEditMode: () => void;
+}
 
-  const {
-    pointer,
-    transform,
-    surface_snapping,
-    gesture,
-    dragging,
-    hovered_node_id,
-    dropzone,
-    selection,
-    content_edit_mode,
-    tool,
-    brush,
-    marquee,
-    debug,
-    pixelgrid,
-    ruler,
-    flags: features,
-  } = state;
-
-  const is_node_transforming = gesture.type !== "idle";
-  const is_node_translating =
-    gesture.type === "translate" ||
-    gesture.type === "sort" ||
-    gesture.type === "nudge" ||
-    gesture.type === "gap";
-  const is_node_scaling = gesture.type === "scale";
-
-  const setRulerState = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "surface/ruler",
-        state,
-      });
-    },
-    [dispatch]
+export function useTool(): UseTool {
+  const editor = useCurrentEditor();
+  const tool = useEditorState(editor, (state) => state.tool);
+  const content_edit_mode = useEditorState(
+    editor,
+    (state) => state.content_edit_mode
   );
 
-  const setPixelGridState = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "surface/pixel-grid",
-        state,
-      });
+  const dispatch = useCallback(
+    (action: Action) => {
+      editor.dispatch(action);
     },
-    [dispatch]
+    [editor]
   );
 
   const setTool = useCallback(
@@ -2501,6 +2232,61 @@ export function useEventTarget() {
       });
     },
     [dispatch]
+  );
+
+  /**
+   * Try to enter content edit mode - only works when the selected node is a text or vector node
+   *
+   * when triggered on such invalid context, it should be a no-op
+   */
+  const tryEnterContentEditMode = useCallback(() => {
+    dispatch({
+      type: "surface/content-edit-mode/try-enter",
+    });
+  }, [dispatch]);
+
+  const tryExitContentEditMode = useCallback(() => {
+    dispatch({
+      type: "surface/content-edit-mode/try-exit",
+    });
+  }, [dispatch]);
+
+  const tryToggleContentEditMode = useCallback(() => {
+    if (content_edit_mode) {
+      tryExitContentEditMode();
+    } else {
+      tryEnterContentEditMode();
+    }
+  }, [content_edit_mode]);
+
+  return useMemo(() => {
+    return {
+      tool,
+      setTool,
+      content_edit_mode,
+      tryEnterContentEditMode,
+      tryExitContentEditMode,
+      tryToggleContentEditMode,
+    };
+  }, [
+    tool,
+    setTool,
+    content_edit_mode,
+    tryEnterContentEditMode,
+    tryExitContentEditMode,
+    tryToggleContentEditMode,
+  ]);
+}
+
+export function useBrush() {
+  const editor = useCurrentEditor();
+  const brush = useEditorState(editor, (state) => state.brush);
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      editor.dispatch(action);
+    },
+    [editor]
   );
 
   const changeBrush = useCallback(
@@ -2528,6 +2314,146 @@ export function useEventTarget() {
       dispatch({
         type: "surface/brush/opacity",
         opacity,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(() => {
+    return {
+      brush,
+      changeBrush,
+      changeBrushSize,
+      changeBrushOpacity,
+    };
+  }, [brush, changeBrush, changeBrushSize, changeBrushOpacity]);
+}
+
+interface UseEventTarget {
+  transform: editor.state.IEditorState["transform"];
+  gesture: editor.state.IEditorState["gesture"];
+  dragging: editor.state.IEditorState["dragging"];
+  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
+  dropzone: editor.state.IEditorState["dropzone"];
+  surface_snapping: editor.state.IEditorState["surface_snapping"];
+  is_node_transforming: boolean;
+  is_node_translating: boolean;
+  is_node_scaling: boolean;
+
+  selection: editor.state.IEditorState["selection"];
+  marquee: editor.state.IEditorState["marquee"];
+  edges: grida.program.document.Edge2D[];
+  guides: grida.program.document.Guide2D[];
+  pixelgrid: editor.state.IEditorState["pixelgrid"];
+  ruler: editor.state.IEditorState["ruler"];
+
+  // Actions/callbacks (write)
+  zoom: (delta: number, origin: cmath.Vector2) => void;
+  pan: (delta: [number, number]) => void;
+  //
+  setPixelGridState: (state: "on" | "off") => void;
+  setRulerState: (state: "on" | "off") => void;
+  deleteGuide: (idx: number) => void;
+
+  startGuideGesture: (axis: cmath.Axis, idx: number | -1) => void;
+  startScaleGesture: (
+    selection: string | string[],
+    direction: cmath.CardinalDirection
+  ) => void;
+  startSortGesture: (selection: string | string[], node_id: string) => void;
+  startGapGesture: (selection: string | string[], axis: "x" | "y") => void;
+  startCornerRadiusGesture: (selection: string) => void;
+  startRotateGesture: (selection: string) => void;
+
+  pointerDown: (event: PointerEvent) => void;
+  pointerUp: (event: PointerEvent) => void;
+  pointerMove: (event: PointerEvent) => void;
+
+  click: (event: MouseEvent) => void;
+  doubleClick: (event: MouseEvent) => void;
+
+  dragStart: (event: PointerEvent) => void;
+  dragEnd: (event: PointerEvent) => void;
+  drag: (event: TCanvasEventTargetDragGestureState) => void;
+
+  multipleSelectionOverlayClick: (
+    selection: string[],
+    event: MouseEvent
+  ) => void;
+}
+
+export function useEventTarget(): UseEventTarget {
+  // const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    transform: state.transform,
+    surface_snapping: state.surface_snapping,
+    gesture: state.gesture,
+    dragging: state.dragging,
+    hovered_node_id: state.hovered_node_id,
+    dropzone: state.dropzone,
+    selection: state.selection,
+    content_edit_mode: state.content_edit_mode,
+    tool: state.tool,
+    brush: state.brush,
+    marquee: state.marquee,
+    debug: state.debug,
+    pixelgrid: state.pixelgrid,
+    ruler: state.ruler,
+    flags: state.flags,
+  }));
+  const scene = useCurrentScene();
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      instance.dispatch(action);
+    },
+    [instance]
+  );
+
+  const { guides, edges } = scene;
+
+  const {
+    transform,
+    surface_snapping,
+    gesture,
+    dragging,
+    hovered_node_id,
+    dropzone,
+    selection,
+    content_edit_mode,
+    tool,
+    brush,
+    marquee,
+    debug,
+    pixelgrid,
+    ruler,
+    flags,
+  } = state;
+
+  const is_node_transforming = gesture.type !== "idle";
+  const is_node_translating =
+    gesture.type === "translate" ||
+    gesture.type === "sort" ||
+    gesture.type === "nudge" ||
+    gesture.type === "gap";
+  const is_node_scaling = gesture.type === "scale";
+
+  const setRulerState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/ruler",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const setPixelGridState = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "surface/pixel-grid",
+        state,
       });
     },
     [dispatch]
@@ -2576,8 +2502,8 @@ export function useEventTarget() {
 
       const newscale = cmath.clamp(
         scale,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
       );
       const [tx, ty] = cmath.transform.getTranslate(transform);
 
@@ -2597,7 +2523,7 @@ export function useEventTarget() {
         transform: next,
       });
     },
-    [transform, dispatch]
+    [dispatch, transform]
   );
 
   const pan = useCallback(
@@ -2674,31 +2600,6 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-
-  /**
-   * Try to enter content edit mode - only works when the selected node is a text or vector node
-   *
-   * when triggered on such invalid context, it should be a no-op
-   */
-  const tryEnterContentEditMode = useCallback(() => {
-    dispatch({
-      type: "surface/content-edit-mode/try-enter",
-    });
-  }, [dispatch]);
-
-  const tryExitContentEditMode = useCallback(() => {
-    dispatch({
-      type: "surface/content-edit-mode/try-exit",
-    });
-  }, [dispatch]);
-
-  const tryToggleContentEditMode = useCallback(() => {
-    if (content_edit_mode) {
-      tryExitContentEditMode();
-    } else {
-      tryEnterContentEditMode();
-    }
-  }, [dispatch, content_edit_mode]);
 
   const dragStart = useCallback(
     (event: PointerEvent) => {
@@ -2866,21 +2767,16 @@ export function useEventTarget() {
       zoom,
       pan,
       //
-      pointer,
       transform,
       debug,
-      features,
+      flags,
       gesture,
       dragging,
       surface_snapping,
       //
       marquee,
       tool,
-      setTool,
       brush,
-      changeBrush,
-      changeBrushSize,
-      changeBrushOpacity,
       //
       ruler,
       setRulerState,
@@ -2914,10 +2810,6 @@ export function useEventTarget() {
       click,
       doubleClick,
       //
-      tryEnterContentEditMode,
-      tryExitContentEditMode,
-      tryToggleContentEditMode,
-      //
       dragStart,
       dragEnd,
       drag,
@@ -2929,21 +2821,16 @@ export function useEventTarget() {
     zoom,
     pan,
     //
-    pointer,
     transform,
     debug,
-    features,
+    flags,
     gesture,
     dragging,
     surface_snapping,
     //
     marquee,
     tool,
-    setTool,
     brush,
-    changeBrush,
-    changeBrushSize,
-    changeBrushOpacity,
     //
     ruler,
     setRulerState,
@@ -2978,10 +2865,6 @@ export function useEventTarget() {
     click,
     doubleClick,
     //
-    tryEnterContentEditMode,
-    tryExitContentEditMode,
-    tryToggleContentEditMode,
-    //
     dragStart,
     dragEnd,
     drag,
@@ -2992,7 +2875,17 @@ export function useEventTarget() {
 }
 
 export function useDataTransferEventTarget() {
-  const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    transform: state.transform,
+  }));
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      instance.dispatch(action);
+    },
+    [instance]
+  );
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) => {
@@ -3256,7 +3149,11 @@ export function useDataTransferEventTarget() {
 }
 
 export function useClipboardSync() {
-  const { state } = useDocument();
+  // const { state } = useDocument();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    user_clipboard: state.user_clipboard,
+  }));
 
   useEffect(() => {
     try {
@@ -3283,7 +3180,18 @@ export function useClipboardSync() {
 }
 
 export function useSurfacePathEditor() {
-  const [state, dispatch] = __useInternal();
+  // const [state, dispatch] = __useInternal();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    content_edit_mode: state.content_edit_mode,
+    document: state.document,
+    hovered_vertex_idx: state.hovered_vertex_idx,
+    tool: state.tool,
+  }));
+  const dispatch = React.useCallback(
+    (action: Action) => instance.dispatch(action),
+    [instance]
+  );
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
   const { hovered_vertex_idx: hovered_point, tool } = state;
@@ -3410,9 +3318,7 @@ export function useSurfacePathEditor() {
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode(root_id: string) {
-  const { state, changeNodeProps } = useDocument();
-
-  const { document, templates } = state;
+  const { document, templates, changeNodeProps } = useDocument();
 
   const rootnode = document.nodes[root_id];
 
@@ -3421,7 +3327,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
 
   const rootProperties = rootnode.properties || {};
   const rootProps = rootnode.props || {};
-  const rootDefault = state.templates![rootnode.template_id].default || {};
+  const rootDefault = templates![rootnode.template_id].default || {};
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
@@ -3466,7 +3372,12 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
 
 export function useNode(node_id: string): NodeWithMeta {
   assert(node_id, "node_id is required");
-  const { state } = useDocument();
+  // const { state } = useDocument();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    document: state.document,
+    templates: state.templates,
+  }));
 
   const {
     document: { nodes },
@@ -3546,7 +3457,11 @@ export function useNode(node_id: string): NodeWithMeta {
  * @param node_id self or child node id
  */
 export function useTopNode(node_id: string) {
-  const { state } = useDocument();
+  // const { state } = useDocument();
+  const instance = useCurrentEditor();
+  const state = useEditorState(instance, (state) => ({
+    document_ctx: state.document_ctx,
+  }));
   const top_id = editor.dq.getTopId(state.document_ctx, node_id)!;
   return useNode(top_id);
 }
@@ -3582,7 +3497,7 @@ namespace internal {
   export function __createApiProxyNode_experimental(
     node: grida.program.nodes.Node,
     context: {
-      dispatcher: DocumentDispatcher;
+      dispatcher: Dispatcher;
     }
   ): grida.program.nodes.Node {
     const p = new Proxy(
@@ -3667,9 +3582,11 @@ namespace internal {
 }
 
 export function useTemplateDefinition(template_id: string) {
-  const {
-    state: { templates },
-  } = useDocument();
+  // const {
+  //   state: { templates },
+  // } = useDocument();
+  const instance = useCurrentEditor();
+  const templates = useEditorState(instance, (state) => state.templates);
 
   return templates![template_id];
 }
@@ -3677,19 +3594,21 @@ export function useTemplateDefinition(template_id: string) {
 const __not_implemented = (...args: any): any => {
   throw new Error("not implemented");
 };
+
 export function useEditorApi() {
+  const instance = useCurrentEditor();
   const document = useDocument();
-  const dispatcher = __useDispatch();
+  const dispatcher = instance.dispatch;
 
   const getNodeById: editor.api.IStandaloneEditorApi["getNodeById"] =
     useCallback(
       (id: editor.NodeID) => {
-        const nodedata = document.state.document.nodes[id];
+        const nodedata = document.document.nodes[id];
         return internal.__createApiProxyNode_experimental(nodedata, {
           dispatcher,
         });
       },
-      [document.state.document.nodes]
+      [document.document.nodes]
     );
 
   const createRectangle = useCallback(

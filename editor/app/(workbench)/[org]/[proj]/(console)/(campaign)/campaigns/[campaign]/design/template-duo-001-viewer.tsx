@@ -27,8 +27,9 @@ import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
 import { useTransform } from "@/grida-react-canvas/provider";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-react-canvas";
 
-const document: editor.state.IEditorInit = {
+const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {
@@ -215,16 +216,13 @@ export function CampaignTemplateDuo001Viewer({
   locale: "en" | "ko";
   onDoubleClick?: () => void;
 }) {
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    editor.state.init(document)
-  );
+  const instance = useEditor(editor.state.init(document));
 
   return (
     <CampaignViewerContextAndPropsContext.Provider
       value={{ ...props, campaign: campaign, locale }}
     >
-      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+      <StandaloneDocumentEditor editor={instance}>
         <EditorUXServer focus={focus} />
         <UserCustomTemplatesProvider
           templates={{

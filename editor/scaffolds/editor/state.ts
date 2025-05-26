@@ -437,6 +437,10 @@ export interface BaseDocumentEditorState
   doctype: GDocumentType;
   documents: {
     ["site"]?: SchemaMayVaryDocument<editor.state.IEditorState>;
+    /**
+     * loaded once, won't change after initial loading. the runtime states are managed via the editor. - this will be removed.
+     * @deprecated
+     */
     ["canvas"]?: SchemaMayVaryDocument<editor.state.IEditorState>;
     ["form/startpage"]?:
       | SchemaMayVaryDocument<

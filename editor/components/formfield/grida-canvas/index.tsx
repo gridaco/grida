@@ -19,7 +19,6 @@ import {
   ViewportRoot,
   EditorSurface,
 } from "@/grida-react-canvas";
-import standaloneDocumentReducer from "@/grida-canvas/reducers";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
 import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
@@ -41,12 +40,12 @@ import Toolbar, {
 import { Card } from "@/components/ui/card";
 import { PenToolIcon } from "lucide-react";
 import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-react-canvas";
 
 export function GridaCanvasFormField() {
   useDisableSwipeBack();
   const fonts = useGoogleFontsList();
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
+  const instance = useEditor(
     editor.state.init({
       editable: true,
       document: {
@@ -66,11 +65,12 @@ export function GridaCanvasFormField() {
       },
     })
   );
+  //
 
   useEffect(() => {
     fetch("/examples/canvas/sketch-teimplate-01.grida").then((res) => {
       res.json().then((file) => {
-        dispatch({
+        instance.dispatch({
           type: "__internal/reset",
           key: "template",
           state: editor.state.init({
@@ -104,7 +104,7 @@ export function GridaCanvasFormField() {
         style={{ height: "calc(100vh - 4rem)" }}
         hideCloseButton
       >
-        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <StandaloneDocumentEditor editor={instance}>
           <Hotkyes />
           <div className="flex w-full h-full">
             <EditorSurfaceClipboardSyncProvider>

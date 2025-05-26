@@ -16,9 +16,12 @@ import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
 import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
 import type grida from "@grida/schema";
+import { useCurrentEditor } from "../provider";
+import { useEditorState } from "../use-editor";
 
 export function DevtoolsPanel() {
-  const { state: _state } = useDocument();
+  const editor = useCurrentEditor();
+  const _state = useEditorState(editor, (state) => state);
   const fonts = useGoogleFontsList();
   const expandable = useDialogState();
 

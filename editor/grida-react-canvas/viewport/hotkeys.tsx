@@ -1,8 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import {
+  useBrush,
   useDocument,
   useEventTarget,
   useSelection,
+  useTool,
   useTransform,
 } from "../provider";
 import { toast } from "sonner";
@@ -322,18 +324,16 @@ function useSingleDoublePressHotkey(
 }
 
 export function useEditorHotKeys() {
+  const { ruler, setRulerState, pixelgrid, setPixelGridState } =
+    useEventTarget();
+  const { changeBrushSize } = useBrush();
   const {
-    content_edit_mode,
     tool,
     setTool,
-    ruler,
-    setRulerState,
-    changeBrushSize,
-    pixelgrid,
-    setPixelGridState,
+    content_edit_mode,
     tryExitContentEditMode,
     tryToggleContentEditMode,
-  } = useEventTarget();
+  } = useTool();
   const { scale, fit, zoomIn, zoomOut } = useTransform();
   const {
     select,

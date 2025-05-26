@@ -4,11 +4,15 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
+  useBrush,
   useClipboardSync,
+  useCurrentEditor,
   useCurrentScene,
   useDocument,
   useEventTargetCSSCursor,
   useNode,
+  usePointer,
+  useTool,
   useTransform,
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
@@ -48,9 +52,10 @@ import {
   FloatingBarTitle,
 } from "./ui/floating-bar";
 import grida from "@grida/schema";
-import { useEdgeScrolling } from "./hooks/use-edge-scrolling";
+import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
+import { useEditorState } from "../use-editor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -129,13 +134,11 @@ function SurfaceGroup({
 }
 
 export function EditorSurface() {
-  useEdgeScrolling({ enabled: true });
   const isWindowResizing = useIsWindowResizing();
   const { transform } = useTransform();
   const {
     zoom,
     pan,
-    pointer,
     ruler,
     pixelgrid,
     edges,
@@ -143,22 +146,20 @@ export function EditorSurface() {
     hovered_node_id,
     dropzone,
     selection,
-    tool,
-    brush,
     is_node_transforming,
     is_node_translating,
-    content_edit_mode,
     pointerMove,
     pointerDown,
     pointerUp,
     click,
     doubleClick,
-    setTool,
     drag,
     dragStart,
     dragEnd,
-    tryToggleContentEditMode,
   } = useEventTarget();
+  const { brush } = useBrush();
+  const { tool, setTool, content_edit_mode, tryToggleContentEditMode } =
+    useTool();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
@@ -312,6 +313,7 @@ export function EditorSurface() {
 
   return (
     <SurfaceSelectionGroupProvider value={selectiondata}>
+      <EdgeScrollingEffect />
       <div
         id="event-target"
         ref={eventTargetRef}
@@ -438,10 +440,10 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
 }
 
 function RootFramesBarOverlay() {
-  const { state } = useDocument();
+  const { selection, document, hovered_node_id } = useDocument();
   const scene = useCurrentScene();
   const rootframes = useMemo(() => {
-    const children = scene.children.map((id) => state.document.nodes[id]);
+    const children = scene.children.map((id) => document.nodes[id]);
     return children.filter(
       (n) =>
         n.type === "container" ||
@@ -449,7 +451,7 @@ function RootFramesBarOverlay() {
         n.type === "component" ||
         n.type === "instance"
     );
-  }, [scene.children, state.document.nodes]);
+  }, [scene.children, document.nodes]);
 
   if (scene.constraints.children === "single") {
     const rootframe = rootframes[0];
@@ -476,9 +478,9 @@ function RootFramesBarOverlay() {
           node={node}
           node_id={node.id}
           state={
-            state.selection.includes(node.id)
+            selection.includes(node.id)
               ? "active"
-              : state.hovered_node_id === node.id
+              : hovered_node_id === node.id
                 ? "hover"
                 : "idle"
           }
@@ -556,7 +558,9 @@ export function EditorSurfaceClipboardSyncProvider({
 }
 
 function FloatingCursorTooltip() {
-  const { gesture, pointer, transform } = useEventTarget();
+  const { gesture } = useEventTarget();
+  const { transform } = useTransform();
+  const pointer = usePointer();
   const pos = cmath.vector2.transform(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
   if (value) {
@@ -581,7 +585,7 @@ function FloatingCursorTooltip() {
 
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   const { transform, scaleX, scaleY } = useTransform();
-  const { pointer } = useEventTarget();
+  const pointer = usePointer();
   const pos = cmath.vector2.transform(
     // quantize position to canvas space 1.
     cmath.vector2.quantize(pointer.position, 1),
@@ -726,7 +730,8 @@ function SelectionGroupOverlay({
 }: SurfaceSelectionGroup & {
   readonly?: boolean;
 }) {
-  const { multipleSelectionOverlayClick, tool } = useEventTarget();
+  const { tool } = useTool();
+  const { multipleSelectionOverlayClick } = useEventTarget();
 
   const { distributeEvenly } = useDocument();
 
@@ -1348,7 +1353,10 @@ function DistributeButton({
 }
 
 function PixelGridOverlay() {
-  const { transform, scaleX } = useTransform();
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
+  const scaleX = transform[0][0];
+
   const viewport = useViewport();
   return (
     <div role="pixel-grid" className="fixed inset-0 pointer-events-none">

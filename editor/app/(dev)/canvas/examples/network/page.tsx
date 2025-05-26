@@ -3,7 +3,7 @@ import grida from "@grida/schema";
 import { cmath } from "@grida/cmath";
 import { editor } from "@/grida-canvas";
 
-const document: editor.state.IEditorInit = {
+const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {

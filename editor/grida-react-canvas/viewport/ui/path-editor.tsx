@@ -1,7 +1,9 @@
 import React from "react";
 import {
-  useEventTarget,
+  useEditorFlags,
   useSurfacePathEditor,
+  useTool,
+  useTransform,
 } from "@/grida-react-canvas/provider";
 import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
@@ -10,7 +12,9 @@ import { svg } from "@/grida-canvas-utils/svg";
 import assert from "assert";
 
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
-  const { debug, tool, transform } = useEventTarget();
+  const { debug } = useEditorFlags();
+  const { tool } = useTool();
+  const { transform } = useTransform();
   const {
     node_id,
     offset,

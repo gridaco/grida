@@ -2,10 +2,9 @@
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/components/lib/utils";
-import { useDocument, useEventTarget } from "@/grida-react-canvas/provider";
+import { useBrush, useDocument } from "@/grida-react-canvas/provider";
 import {
   DotsHorizontalIcon,
-  SquareIcon,
   TransparencyGridIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui-editor/button";
@@ -47,14 +46,12 @@ export function useSliderState() {
 }
 
 export default function BrushToolbar() {
-  const { tool, brush, changeBrush, changeBrushSize, changeBrushOpacity } =
-    useEventTarget();
+  const { brush, changeBrush, changeBrushSize, changeBrushOpacity } =
+    useBrush();
 
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
   const [detailOpen, setDetailOpen] = useState(false);
-
-  if (!(tool.type === "brush" || tool.type === "eraser")) return null;
 
   const { size, opacity } = brush;
 

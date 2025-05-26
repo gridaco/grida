@@ -23,9 +23,7 @@ import assert from "assert";
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
-  const {
-    state: { document, templates },
-  } = useDocument();
+  const { document } = useDocument();
 
   // FIXME: UNKNOWN
   const root = document.nodes["root"];

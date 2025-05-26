@@ -1,14 +1,14 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useDocument, useNode } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-react-canvas";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
-// import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import { cmath } from "@grida/cmath";
-import type { ObjectsDistributionAnalysis } from "./ui/distribution";
-import grida from "@grida/schema";
-import { NodeWithMeta } from "../provider";
+import { NodeWithMeta, useTransform } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { editor } from "@/grida-canvas";
+import type { ObjectsDistributionAnalysis } from "./ui/distribution";
+import grida from "@grida/schema";
+
 import "core-js/features/object/group-by";
 
 export interface SurfaceNodeObject {
@@ -243,7 +243,8 @@ function computeSurfaceSelectionGroup({
 export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
-  const { transform, state } = useDocument();
+  const { document, document_ctx } = useDocument();
+  const { transform } = useTransform();
 
   // Use stable node IDs to avoid unnecessary re-renders
   const __node_ids = useStableNodeIds(node_ids);
@@ -252,13 +253,13 @@ export function useSelectionGroups(
 
   const grouped = useMemo(() => {
     const activenodes = __node_ids
-      .map((id) => state.document.nodes[id])
+      .map((id) => document.nodes[id])
       .filter((n) => n && n.active);
     return Object.groupBy(
       activenodes,
-      (it) => editor.dq.getParentId(state.document_ctx, it.id) ?? ""
+      (it) => editor.dq.getParentId(document_ctx, it.id) ?? ""
     );
-  }, [state.document.nodes, state.document_ctx, __node_ids]);
+  }, [document.nodes, document_ctx, __node_ids]);
 
   useLayoutEffect(() => {
     const groupkeys = Object.keys(grouped);
@@ -294,8 +295,9 @@ export function useSingleSelection(
     enabled: boolean;
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
-  const { transform, getNodeAbsoluteRotation, state } = useDocument();
-  const node = state.document.nodes[node_id];
+  const { document, document_ctx, getNodeAbsoluteRotation } = useDocument();
+  const { transform } = useTransform();
+  const node = document.nodes[node_id];
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
     undefined
@@ -367,7 +369,7 @@ export function useSingleSelection(
       const container = node as grida.program.nodes.ContainerNode;
       const { direction, mainAxisGap, crossAxisGap } = container;
       const axis = direction === "horizontal" ? "x" : "y";
-      const children = editor.dq.getChildren(state.document_ctx, node_id);
+      const children = editor.dq.getChildren(document_ctx, node_id);
       const children_rects = children
         .map((id) => cdom.getNodeBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);

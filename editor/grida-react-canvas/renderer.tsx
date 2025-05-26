@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useContext, useLayoutEffect, useMemo, useRef } from "react";
-import { useCurrentScene, useTransform } from "./provider";
+import { useCurrentEditor, useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
 import { cmath } from "@grida/cmath";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
+import { useEditorState } from "./use-editor";
 
 type CustomComponent = React.ComponentType<any>;
 
@@ -97,7 +98,12 @@ export function StandaloneSceneBackground({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  const { backgroundColor, transform } = useCurrentScene();
+  const instance = useCurrentEditor();
+  const slice = useEditorState(instance, (state) => ({
+    backgroundColor: state.document.scenes[state.scene_id!].backgroundColor,
+    transform: state.transform,
+  }));
+  const { backgroundColor, transform } = slice;
 
   const [cssBackgroundColor, opacity] = useMemo(() => {
     if (!backgroundColor) return [undefined, 1] as const;

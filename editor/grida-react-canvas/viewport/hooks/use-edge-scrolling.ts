@@ -1,15 +1,33 @@
 "use client";
 
 import { useEffect } from "react";
-import { useEventTarget, useTransform } from "../../provider";
+import {
+  useEventTarget,
+  usePointer,
+  useTool,
+  useTransform,
+} from "../../provider";
 import { useViewport } from "../context";
 import { cmath } from "@grida/cmath";
 
 const EDGE_SCROLLING_THRESHOLD = 16;
 
-export function useEdgeScrolling({ enabled = true }: { enabled?: boolean }) {
-  const { pointer, dragging, tool } = useEventTarget();
+type EdgeScrollingProps = {
+  enabled?: boolean;
+};
+
+export function EdgeScrollingEffect(
+  props: EdgeScrollingProps = { enabled: true }
+) {
+  useEdgeScrolling(props);
+  return null;
+}
+
+export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
+  const { dragging } = useEventTarget();
+  const { tool } = useTool();
   const { transform, setTransform } = useTransform();
+  const pointer = usePointer();
   const viewport = useViewport();
 
   useEffect(() => {
