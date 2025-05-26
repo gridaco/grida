@@ -16,6 +16,7 @@ import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 import FooterWithCTA from "@/www/footer-with-cta";
 import { Section, SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
+import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 
 const pixelify = Pixelify_Sans({ subsets: ["latin"] });
 
@@ -58,6 +59,8 @@ export default function HomePage() {
 }
 
 function SectionMainDemo() {
+  useDisableSwipeBack();
+
   const [isLocked, setIsLocked] = useState(true);
 
   const unlockDemo = () => {

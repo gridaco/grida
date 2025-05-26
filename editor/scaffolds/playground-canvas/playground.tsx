@@ -118,6 +118,7 @@ import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
 import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
+import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -170,6 +171,8 @@ export default function CanvasPlayground({
   const fonts = useGoogleFontsList();
 
   const instance = useEditor(editor.state.init(document));
+
+  useDisableSwipeBack();
 
   useHotkeys("meta+\\, ctrl+\\", () => {
     setUI((ui) => ({
