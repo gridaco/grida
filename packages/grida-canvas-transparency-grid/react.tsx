@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRef, useEffect } from "react";
 import { TransparencyGridCanvas } from "./transparency-grid";
 import type { TransparencyGridOptions } from "./types";
 
@@ -13,10 +12,10 @@ export interface TransparencyProps extends TransparencyGridOptions {
 }
 
 export const TransparencyGrid: React.FC<TransparencyProps> = (props) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gridRef = useRef<TransparencyGridCanvas | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const gridRef = React.useRef<TransparencyGridCanvas | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!canvasRef.current) return;
     if (
       !gridRef.current ||
@@ -38,7 +37,17 @@ export const TransparencyGrid: React.FC<TransparencyProps> = (props) => {
     requestAnimationFrame(() => {
       gridRef.current!.draw();
     });
-  }, [props.backend, props.width, props.height, props.transform]);
+  }, [
+    props.backend,
+    props.width,
+    props.height,
+    props.transform[0][0],
+    props.transform[0][1],
+    props.transform[0][2],
+    props.transform[1][0],
+    props.transform[1][1],
+    props.transform[1][2],
+  ]);
 
   return (
     <canvas
