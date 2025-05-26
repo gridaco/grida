@@ -1695,6 +1695,22 @@ export namespace editor.dq {
   }
 }
 
+export namespace editor.a11y {
+  export const a11y_direction_to_order = {
+    "a11y/up": "backward",
+    "a11y/right": "forward",
+    "a11y/down": "forward",
+    "a11y/left": "backward",
+  } as const;
+
+  export const a11y_direction_to_vector = {
+    "a11y/up": [0, -1],
+    "a11y/right": [1, 0],
+    "a11y/down": [0, 1],
+    "a11y/left": [-1, 0],
+  } as const;
+}
+
 export namespace editor.api {
   export type NudgeUXConfig = {
     /**

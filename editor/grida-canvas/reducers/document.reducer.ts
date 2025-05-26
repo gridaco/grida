@@ -317,7 +317,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          self_order(draft, node_id, order);
+          __self_order(draft, node_id, order);
         }
       });
       break;
@@ -340,7 +340,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       if (target_node_ids.length === 0) return state;
       return produce(state, (draft) => {
-        self_nudge(draft, target_node_ids, dx, dy);
+        __self_nudge(draft, target_node_ids, dx, dy);
       });
     }
     case "nudge-resize": {
@@ -398,13 +398,19 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of in_flow_node_ids) {
-          self_order(draft, node_id, a11y_direction_to_order[direction]);
+          __self_order(
+            draft,
+            node_id,
+            editor.a11y.a11y_direction_to_order[direction]
+          );
         }
 
         if (out_flow_node_ids.length > 0) {
-          const nudge_dx = nudge_mod * a11y_direction_to_vector[direction][0];
-          const nudge_dy = nudge_mod * a11y_direction_to_vector[direction][1];
-          self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy);
+          const nudge_dx =
+            nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0];
+          const nudge_dy =
+            nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1];
+          __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy);
         }
       });
       //
@@ -929,21 +935,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
   return state;
 }
 
-const a11y_direction_to_order = {
-  "a11y/up": "backward",
-  "a11y/right": "forward",
-  "a11y/down": "forward",
-  "a11y/left": "backward",
-} as const;
-
-const a11y_direction_to_vector = {
-  "a11y/up": [0, -1],
-  "a11y/right": [1, 0],
-  "a11y/down": [0, 1],
-  "a11y/left": [-1, 0],
-} as const;
-
-function self_order(
+function __self_order(
   draft: Draft<editor.state.IEditorState>,
   node_id: string,
   order: "back" | "front" | "backward" | "forward" | number
@@ -1006,7 +998,7 @@ function self_order(
   // draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered; // TODO: remove me verified not required
 }
 
-function self_nudge(
+function __self_nudge(
   draft: Draft<editor.state.IEditorState>,
   targets: string[],
   dx: number,

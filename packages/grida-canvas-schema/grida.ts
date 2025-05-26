@@ -293,7 +293,7 @@ export namespace grida.program.document {
 
   export interface Guide2D {
     readonly axis: cmath.Axis;
-    readonly offset: number;
+    offset: number;
   }
 
   export interface I2DGuides {
