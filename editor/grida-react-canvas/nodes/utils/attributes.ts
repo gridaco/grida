@@ -13,7 +13,5 @@ export default function queryattributes<
     "data-grida-node-id": props["data-grida-node-id"],
     "data-grida-node-locked": props["data-grida-node-locked"],
     "data-grida-node-type": props["data-grida-node-type"],
-    "data-dev-editor-hovered": props["data-dev-editor-hovered"],
-    "data-dev-editor-selected": props["data-dev-editor-selected"],
   } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes;
 }

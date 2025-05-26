@@ -13,14 +13,6 @@ export const ImageWidget = ({
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.ImageNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
 
-  const img_element_props_without_data_attributes = {
-    ...props,
-    "data-grida-node-id": undefined,
-    "data-grida-node-type": undefined,
-    "data-dev-editor-hovered": undefined,
-    "data-dev-editor-selected": undefined,
-  };
-
   return (
     <div
       style={{ ...divStyles, overflow: "hidden" }}

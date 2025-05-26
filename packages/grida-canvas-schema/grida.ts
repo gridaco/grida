@@ -568,26 +568,6 @@ export namespace grida.program.document {
     [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
     [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
     ["data-grida-node-type"]: nodes.Node["type"];
-    // #region dev properties
-
-    /**
-     * Dev property - editor-selected
-     *
-     * if this node is a selected node withing current editor context, when editable
-     *
-     * this is not required to be set, but once configured to set, it is safe to build apon this attribute
-     */
-    ["data-dev-editor-selected"]?: boolean | undefined;
-
-    /**
-     * Dev property - editor-hovered
-     *
-     * if this node is a hovered node withing current editor context, when editable
-     *
-     * this is not required to be set, but once configured to set, it is safe to build apon this attribute
-     */
-    ["data-dev-editor-hovered"]?: boolean | undefined;
-    // #endregion dev properties
   }
 
   /**
