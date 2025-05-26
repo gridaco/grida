@@ -1,10 +1,17 @@
 "use client";
 
-import React from "react";
-import { useDocument } from "@/grida-canvas-react";
+import React, { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { CaretDownIcon, CaretUpIcon } from "@radix-ui/react-icons";
+import {
+  CaretDownIcon,
+  CaretUpIcon,
+  CircleBackslashIcon,
+  DiscIcon,
+  PlayIcon,
+  StopIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,8 +23,7 @@ import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
 import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
-import { useCurrentEditor } from "../provider";
-import { useEditorState } from "../use-editor";
+import { useCurrentEditor, useEditorState, useRecorder } from "../use-editor";
 
 export function DevtoolsPanel() {
   const editor = useCurrentEditor();
@@ -67,6 +73,13 @@ export function DevtoolsPanel() {
                 className="text-xs uppercase"
               >
                 Document
+              </TabsTrigger>
+              <TabsTrigger
+                onClick={onTabClick}
+                value="recorder"
+                className="text-xs uppercase"
+              >
+                Recorder
               </TabsTrigger>
             </TabsList>
           </div>
@@ -129,6 +142,9 @@ export function DevtoolsPanel() {
               </TabsContent>
             </Tabs>
           </TabsContent>
+          <TabsContent value="recorder" className="h-full">
+            <RecorderPanel />
+          </TabsContent>
         </CollapsibleContent>
       </Tabs>
     </Collapsible>
@@ -168,6 +184,60 @@ function JSONContent({ value }: { value: unknown }) {
           readOnly: true,
         }}
       />
+    </div>
+  );
+}
+
+function RecorderPanel() {
+  const recorder = useRecorder();
+
+  return (
+    <div className="p-10 flex flex-row gap-2">
+      <Button
+        title="Start Recording"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.start}
+        disabled={recorder.status !== "idle"}
+      >
+        <DiscIcon />
+      </Button>
+      <Button
+        title="Stop Recording"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.stop}
+        disabled={recorder.status !== "recording"}
+      >
+        <StopIcon />
+      </Button>
+      <Button
+        title="Replay"
+        variant="ghost"
+        size="icon"
+        onClick={() => recorder.replay()}
+        disabled={recorder.status !== "idle"}
+      >
+        <PlayIcon />
+      </Button>
+      <Button
+        title="Flush"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.flush}
+        disabled={recorder.status !== "idle"}
+      >
+        <TrashIcon />
+      </Button>
+      <Button
+        title="Flush"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.exit}
+        disabled={recorder.status !== "playing"}
+      >
+        <CircleBackslashIcon />
+      </Button>
     </div>
   );
 }

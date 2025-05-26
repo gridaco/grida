@@ -27,7 +27,10 @@ import {
   UserCustomTemplatesProvider,
   type UserCustomTemplatesProps,
   useDocument,
+  useEditorState,
+  useCurrentEditor,
 } from "@/grida-canvas-react";
+import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
@@ -117,7 +120,6 @@ import iosvg from "@grida/io-svg";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
-import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 
 type UIConfig = {
@@ -156,7 +158,6 @@ export default function CanvasPlayground({
   templates,
   src,
 }: CanvasPlaygroundProps) {
-  const [pref, setPref] = useState<Preferences>({ debug: false });
   const [ui, setUI] = useState<UIConfig>({
     sidebar: "visible",
     toolbar: "visible",
@@ -171,6 +172,7 @@ export default function CanvasPlayground({
   const fonts = useGoogleFontsList();
 
   const instance = useEditor(editor.state.init(document));
+  const debug = useEditorState(instance, (state) => state.debug);
 
   useDisableSwipeBack();
 
@@ -179,6 +181,13 @@ export default function CanvasPlayground({
       ...ui,
       sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
     }));
+  });
+
+  useHotkeys("ctrl+`", () => {
+    const debug = instance.toggleDebug();
+    toast("Debug mode " + (debug ? "enabled" : "disabled"), {
+      position: "bottom-left",
+    });
   });
 
   useHotkeys("meta+shift+\\, ctrl+shift+\\", () => {
@@ -227,41 +236,26 @@ export default function CanvasPlayground({
     saveAs(blob, `${v4()}.grida`);
   };
 
-  // const should_show_artboards_list =
-  //   state.tool.type === "insert" &&
-  //   state.tool.node === "container" &&
-  //   state.document.scenes[state.scene_id!].constraints.children === "multiple";
-
-  // FIXME:
-  const should_show_artboards_list = false;
-
   return (
     <SidebarProvider className="w-full h-full">
       <TooltipProvider>
         <main className="w-full h-full select-none">
-          <SettingsDialog
-            {...settingsDialog.props}
-            preferences={pref}
-            onPreferencesChange={setPref}
-          />
           <ImportFromGridaFileJsonDialog
             key={importFromJson.refreshkey}
             {...importFromJson.props}
             onImport={(file) => {
-              instance.dispatch({
-                type: "__internal/reset",
-                state: editor.state.init({
+              instance.reset(
+                editor.state.init({
                   editable: true,
                   document: file.document,
-                }),
-              });
+                })
+              );
             }}
           />
           <ImportFromFigmaDialog
             {...importFromFigmaDialog.props}
             onImport={(res) => {
-              instance.dispatch({
-                type: "insert",
+              instance.insert({
                 document: iofigma.restful.factory.document(
                   res.document as any,
                   res.images,
@@ -273,13 +267,8 @@ export default function CanvasPlayground({
             }}
           />
           <ErrorBoundary>
-            <StandaloneDocumentEditor
-              editor={instance}
-              // editable
-              // debug={pref.debug}
-              // initial={state}
-              // dispatch={dispatch}
-            >
+            <StandaloneDocumentEditor editor={instance}>
+              <SettingsDialog {...settingsDialog.props} />
               <UserCustomTemplatesProvider templates={templates}>
                 <FontFamilyListProvider fonts={fonts}>
                   <PreviewProvider>
@@ -490,7 +479,7 @@ export default function CanvasPlayground({
                                   </>
                                 )}
                               </ViewportRoot>
-                              {pref.debug && <DevtoolsPanel />}
+                              {debug && <DevtoolsPanel />}
                             </StandaloneSceneBackground>
                           </EditorSurfaceContextMenu>
                         </EditorSurfaceDropzone>
@@ -592,16 +581,8 @@ function Hotkyes() {
   return <></>;
 }
 
-type Preferences = {
-  debug: boolean;
-};
-
-function SettingsDialog(
-  props: React.ComponentProps<typeof Dialog> & {
-    preferences: Preferences;
-    onPreferencesChange: (preferences: Preferences) => void;
-  }
-) {
+function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+  const editor = useCurrentEditor();
   const [aiSettings, setAiSettings] = useLocalStorage<string | undefined>(
     CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
     undefined
@@ -625,12 +606,9 @@ function SettingsDialog(
               <Label className="flex items-center justify-between">
                 Debug Mode
                 <Switch
-                  checked={props.preferences.debug}
+                  checked={editor.debug}
                   onCheckedChange={(v) => {
-                    props.onPreferencesChange({
-                      ...props.preferences,
-                      debug: v,
-                    });
+                    editor.debug = v;
                   }}
                 />
               </Label>

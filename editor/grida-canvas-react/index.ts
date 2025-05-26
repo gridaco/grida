@@ -1,4 +1,9 @@
-export { useEditor, useEditorState } from "./use-editor";
+export {
+  useEditor,
+  useEditorState,
+  useCurrentEditor,
+  useRecorder,
+} from "./use-editor";
 export {
   StandaloneDocumentEditor,
   useDocument,
