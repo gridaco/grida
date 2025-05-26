@@ -8,7 +8,7 @@ import type {
 import { editor } from "@/grida-canvas";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { domapi } from "../backends/dom";
 import grida from "@grida/schema";
 import { self_clearSelection, self_selectNode } from "./methods";

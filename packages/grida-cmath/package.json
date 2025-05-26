@@ -1,9 +1,71 @@
 {
   "name": "@grida/cmath",
+  "description": "unopinionated canvas math",
+  "keywords": [
+    "canvas",
+    "math",
+    "geometry",
+    "vector",
+    "rectangle",
+    "circle",
+    "ellipse",
+    "polygon",
+    "path",
+    "svg",
+    "bezier",
+    "blob",
+    "dnd",
+    "layout",
+    "measurement",
+    "snap"
+  ],
   "version": "0.0.0",
-  "private": true,
+  "homepage": "https://grida.co",
+  "repository": "https://github.com/gridaco/grida",
+  "license": "MIT",
+  "author": "softmarshmallow",
   "scripts": {
+    "dev": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts --watch",
+    "build": "tsup index.ts _blob.ts _dnd.ts _layout.ts _measurement.ts _snap.ts --format cjs,esm --dts",
     "test": "jest"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./_blob": {
+      "types": "./dist/_blob.d.ts",
+      "import": "./dist/_blob.mjs",
+      "require": "./dist/_blob.js"
+    },
+    "./_dnd": {
+      "types": "./dist/_dnd.d.ts",
+      "import": "./dist/_dnd.mjs",
+      "require": "./dist/_dnd.js"
+    },
+    "./_layout": {
+      "types": "./dist/_layout.d.ts",
+      "import": "./dist/_layout.mjs",
+      "require": "./dist/_layout.js"
+    },
+    "./_measurement": {
+      "types": "./dist/_measurement.d.ts",
+      "import": "./dist/_measurement.mjs",
+      "require": "./dist/_measurement.js"
+    },
+    "./_snap": {
+      "types": "./dist/_snap.d.ts",
+      "import": "./dist/_snap.mjs",
+      "require": "./dist/_snap.js"
+    }
   },
   "jest": {
     "preset": "ts-jest"

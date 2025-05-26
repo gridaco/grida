@@ -2,7 +2,7 @@ import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
 import { self_try_remove_node } from "./delete";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../backends/dom";
 import {

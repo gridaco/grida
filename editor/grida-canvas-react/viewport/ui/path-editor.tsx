@@ -5,7 +5,7 @@ import {
   useTool,
   useTransform,
 } from "@/grida-canvas-react/provider";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";

@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDocument } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransform } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { editor } from "@/grida-canvas";
@@ -254,7 +254,7 @@ export function useSelectionGroups(
   const grouped = useMemo(() => {
     const activenodes = __node_ids
       .map((id) => document.nodes[id])
-      .filter((n) => n && n.active);
+      .filter((n) => n?.active);
     return Object.groupBy(
       activenodes,
       (it) => editor.dq.getParentId(document_ctx, it.id) ?? ""

@@ -25,7 +25,7 @@ import {
   self_updateSurfaceHoverState,
   self_update_gesture_transform,
 } from "./methods";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import { domapi } from "../backends/dom";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";

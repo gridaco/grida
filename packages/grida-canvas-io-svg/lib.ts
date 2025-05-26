@@ -5,7 +5,7 @@ import * as svgo from "svgo/dist/svgo.browser.js";
 import type { Config, Output } from "svgo";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import vn from "@grida/vn";
 import colors from "color-name";
 

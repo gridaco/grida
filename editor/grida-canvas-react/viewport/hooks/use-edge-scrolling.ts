@@ -8,7 +8,7 @@ import {
   useTransform,
 } from "../../provider";
 import { useViewport } from "../context";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 const EDGE_SCROLLING_THRESHOLD = 16;
 

@@ -1,4 +1,4 @@
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 /**
  * Represents an elliptical brush kernel.

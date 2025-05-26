@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 import "./color-picker.css";
 

@@ -1,4 +1,4 @@
-import { cmath } from ".";
+import cmath from "./index";
 
 export namespace dnd {
   export function test(t: cmath.Rectangle, objects: cmath.Rectangle[]) {

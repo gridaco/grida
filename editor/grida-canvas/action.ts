@@ -1,6 +1,6 @@
 import type { tokens } from "@grida/tokens";
 import type { editor } from "@/grida-canvas";
-import type { cmath } from "@grida/cmath";
+import type cmath from "@grida/cmath";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type grida from "@grida/schema";
 import type cg from "@grida/cg";

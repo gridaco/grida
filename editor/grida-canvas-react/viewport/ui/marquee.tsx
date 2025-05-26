@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo } from "react";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 /**
  * A marquee is a area where it takes two points, where it uses the min point as min and max point as max.

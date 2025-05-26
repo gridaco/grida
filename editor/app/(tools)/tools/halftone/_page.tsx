@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ColorPicker } from "@/scaffolds/sidecontrol/controls/color-picker";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 import { DownloadIcon } from "lucide-react";
 

@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 describe("cmath.quantize", () => {
   it("should quantize to the nearest multiple of the step", () => {

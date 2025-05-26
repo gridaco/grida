@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 import { useSingleSelection } from "../surface-hooks";
 import grida from "@grida/schema";
 import { css } from "@/grida-canvas-utils/css";
-import { cmath } from "@grida/cmath";
+import cmath from "@grida/cmath";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);

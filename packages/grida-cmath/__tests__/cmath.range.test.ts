@@ -1,6 +1,4 @@
-// tests/range.test.ts
-
-import { cmath } from "..";
+import cmath from "..";
 
 describe("cmath.range", () => {
   describe("groupRangesByUniformGap", () => {

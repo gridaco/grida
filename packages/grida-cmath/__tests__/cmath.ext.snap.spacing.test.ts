@@ -1,4 +1,4 @@
-import { cmath } from "..";
+import cmath from "..";
 
 describe("spacing.plotDistributionGeometry", () => {
   it("should return empty loops if no valid gaps exist", () => {
