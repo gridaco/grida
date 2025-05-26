@@ -70,6 +70,10 @@ export function useRecorder() {
     recorder.exit();
   }, [recorder]);
 
+  const dumps = React.useCallback(() => {
+    return recorder.dumps();
+  }, [recorder]);
+
   const status = useSyncExternalStore(
     recorder.subscribeStatusChange.bind(recorder),
     recorder.getStatus.bind(recorder)
@@ -82,5 +86,6 @@ export function useRecorder() {
     replay,
     status,
     exit,
+    dumps,
   };
 }

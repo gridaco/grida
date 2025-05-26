@@ -8,6 +8,7 @@ import {
   CaretUpIcon,
   CircleBackslashIcon,
   DiscIcon,
+  DownloadIcon,
   PlayIcon,
   StopIcon,
   TrashIcon,
@@ -24,6 +25,7 @@ import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console
 import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
 import { useCurrentEditor, useEditorState, useRecorder } from "../use-editor";
+import { saveAs } from "file-saver";
 
 export function DevtoolsPanel() {
   const editor = useCurrentEditor();
@@ -237,6 +239,18 @@ function RecorderPanel() {
         disabled={recorder.status !== "playing"}
       >
         <CircleBackslashIcon />
+      </Button>
+      <Button
+        title="Dumps"
+        variant="ghost"
+        size="icon"
+        onClick={() => {
+          const dumps = recorder.dumps();
+          const blob = new Blob([dumps], { type: "application/json" });
+          saveAs(blob, `grida-canvas-recording-${Date.now()}.jsonl`);
+        }}
+      >
+        <DownloadIcon />
       </Button>
     </div>
   );

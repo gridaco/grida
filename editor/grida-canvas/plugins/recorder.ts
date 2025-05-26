@@ -3,8 +3,8 @@ import type { Action } from "../action";
 import type { Editor } from "../editor";
 
 type Buffer = {
-  action: Action;
-  timestamp: number;
+  a: Action;
+  t: number;
 };
 
 export class EditorRecorder {
@@ -32,8 +32,8 @@ export class EditorRecorder {
     this.ussubscribe = this.editor.subscribe((_, action) => {
       if (!action) return;
       this.buffer.push({
-        action,
-        timestamp: Date.now(),
+        a: action,
+        t: Date.now(),
       });
     });
     this.__notify_status_change();
@@ -88,12 +88,12 @@ export class EditorRecorder {
     for (let i = 0; i < this.buffer.length; i++) {
       const current = this.buffer[i];
       const prev = this.buffer[i - 1] ?? this.buffer[0];
-      const delay = i === 0 ? 0 : current.timestamp - prev.timestamp;
+      const delay = i === 0 ? 0 : current.t - prev.t;
 
       await new Promise((resolve) => setTimeout(resolve, delay));
 
       requestAnimationFrame(() => {
-        this.editor.dispatch(current.action, true);
+        this.editor.dispatch(current.a, true);
       });
     }
   }
@@ -103,5 +103,12 @@ export class EditorRecorder {
     this.editor.locked = false;
     this.editor.reset(this.final!);
     this.__notify_status_change();
+  }
+
+  /**
+   * dumps the buffer as a jsonl string
+   */
+  dumps() {
+    return this.buffer.map((entry) => JSON.stringify(entry)).join("\n");
   }
 }
