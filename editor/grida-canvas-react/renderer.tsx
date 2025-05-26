@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useLayoutEffect, useMemo, useRef } from "react";
+import React, { useContext, useEffect, useMemo } from "react";
 import { useCurrentEditor, useCurrentScene, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
@@ -152,42 +152,23 @@ export function Transformer({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+function useFitInitiallyEffect() {
+  const editor = useCurrentEditor();
+  const documentKey = useEditorState(editor, (state) => state.document_key);
+  const sceneId = useEditorState(editor, (state) => state.scene_id);
+  const { fit } = useTransform();
+
+  useEffect(() => {
+    fit("*");
+  }, [documentKey, sceneId]);
+}
+
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {
-  const scene = useCurrentScene();
-  const { transform, style, setTransform } = useTransform();
+  const { style } = useTransform();
 
-  const applied_initial_transform_key = useRef<string | undefined>("__noop__");
-  useLayoutEffect(() => {
-    if (applied_initial_transform_key.current === scene.id) return;
-
-    const retransform = () => {
-      if (scene.children.length === 0) return;
-      const cdom = new domapi.CanvasDOM(transform);
-      const root_rects = scene.children
-        .map((id) => cdom.getNodeBoundingRect(id))
-        .filter(Boolean) as cmath.Rectangle[];
-
-      const rect: cmath.Rectangle =
-        root_rects.length > 0
-          ? cmath.rect.union(root_rects)
-          : { x: 0, y: 0, width: 0, height: 0 };
-
-      const _vrect = domapi.get_viewport_rect();
-      const vrect = {
-        x: 0,
-        y: 0,
-        width: _vrect.width,
-        height: _vrect.height,
-      };
-      const t = cmath.ext.viewport.transformToFit(vrect, rect!, 64);
-      setTransform(t);
-    };
-
-    retransform();
-    applied_initial_transform_key.current = scene.id;
-  }, [scene.id, scene.children]);
+  useFitInitiallyEffect();
 
   return (
     <div
