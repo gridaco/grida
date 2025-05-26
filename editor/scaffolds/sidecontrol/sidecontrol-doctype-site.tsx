@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import {
   constraints,
   ThemeEditor,
-} from "@/grida-react-canvas-starter-kit/starterkit-theme-editor";
+} from "@/grida-canvas-react-starter-kit/starterkit-theme-editor";
 import { Rnd } from "react-rnd";
 import { Portal } from "@radix-ui/react-portal";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 import parsecolor from "color-parse";
-import { PreviewButton } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 export function SideControlDoctypeSite() {

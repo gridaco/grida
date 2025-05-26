@@ -26,7 +26,7 @@ import type {
   FormClientFetchResponseError,
 } from "@/app/(api)/(public)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
-import { StandaloneDocumentEditor } from "@/grida-react-canvas/provider";
+import { StandaloneDocumentEditor } from "@/grida-canvas-react/provider";
 import grida from "@grida/schema";
 import { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 

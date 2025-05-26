@@ -8,5 +8,13 @@ export {
   useRootTemplateInstanceNode,
   useTemplateDefinition,
 } from "./provider";
-export { StandaloneSceneContent } from "./renderer";
+export {
+  StandaloneSceneContent,
+  UserCustomTemplatesProvider,
+  type UserCustomTemplatesProps,
+  AutoInitialFitTransformer,
+  StandaloneSceneBackground,
+  StandaloneRootNodeContent,
+  type StandaloneDocumentContentProps,
+} from "./renderer";
 export * from "./viewport";

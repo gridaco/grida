@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument, useNode } from "@/grida-react-canvas";
+import { useDocument, useNode } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";
@@ -31,7 +31,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentScene } from "@/grida-react-canvas/provider";
+import { useCurrentScene } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {
   const { backgroundColor, setBackgroundColor } = useCurrentScene();

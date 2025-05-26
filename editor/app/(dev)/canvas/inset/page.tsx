@@ -4,16 +4,14 @@ import * as React from "react";
 import {
   EditorSurface,
   StandaloneSceneContent,
-  ViewportRoot,
-} from "@/grida-react-canvas";
-import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
-import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
-} from "@/grida-react-canvas/renderer";
-import { useEditor } from "@/grida-react-canvas";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { StandaloneDocumentEditor } from "@/grida-react-canvas/provider";
+  ViewportRoot,
+} from "@/grida-canvas-react";
+import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
+import { useEditor } from "@/grida-canvas-react";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
+import { StandaloneDocumentEditor } from "@/grida-canvas-react/provider";
 
 export default function CanvasV2Page() {
   const editor = useEditor({

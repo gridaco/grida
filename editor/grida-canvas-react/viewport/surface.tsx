@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useEventTarget } from "@/grida-react-canvas";
+import { useEventTarget } from "@/grida-canvas-react";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useBrush,

@@ -1,4 +1,4 @@
-import { GoogleFontsPreview } from "@/grida-react-canvas/components/google-fonts";
+import { GoogleFontsPreview } from "@/grida-canvas-react/components/google-fonts";
 import { fonts } from "@/grida-canvas/k/fonts.min";
 import {
   ItemRendererProps,

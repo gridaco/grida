@@ -4,7 +4,7 @@ import {
   useSurfacePathEditor,
   useTool,
   useTransform,
-} from "@/grida-react-canvas/provider";
+} from "@/grida-canvas-react/provider";
 import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/components/lib/utils";

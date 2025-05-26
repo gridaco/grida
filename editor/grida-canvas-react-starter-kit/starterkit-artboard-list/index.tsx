@@ -6,7 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 
 type ArtboardData = {
   name: string;

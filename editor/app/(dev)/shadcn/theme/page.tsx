@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui-editor/dialog";
-import { ThemeEditor } from "@/grida-react-canvas-starter-kit/starterkit-theme-editor";
+import { ThemeEditor } from "@/grida-canvas-react-starter-kit/starterkit-theme-editor";
 import { CardsDemo } from "@/theme/shadcn/example/cards";
 
 export default function ThemeToolPage() {

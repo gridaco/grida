@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useEventTarget, useTransform } from "@/grida-react-canvas/provider";
+import { useEventTarget, useTransform } from "@/grida-canvas-react/provider";
 import { cmath } from "@grida/cmath";
 import { guide } from "@grida/cmath/_snap";
 import { Crosshair } from "./crosshair";

@@ -9,7 +9,7 @@ import {
   TextAlign,
 } from "@/theme/templates/kit/components";
 import type grida from "@grida/schema";
-import { NodeElement } from "@/grida-react-canvas/nodes/node";
+import { NodeElement } from "@/grida-canvas-react/nodes/node";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { factory } from "@grida/tokens";
 

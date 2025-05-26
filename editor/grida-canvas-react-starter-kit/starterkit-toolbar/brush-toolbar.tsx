@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/components/lib/utils";
-import { useBrush, useDocument } from "@/grida-react-canvas/provider";
+import { useBrush, useDocument } from "@/grida-canvas-react/provider";
 import {
   DotsHorizontalIcon,
   TransparencyGridIcon,

@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 import {
   Tree,
   TreeDragLine,
@@ -39,8 +39,8 @@ import {
   useCurrentScene,
   useNodeAction,
   useTransform,
-} from "@/grida-react-canvas/provider";
-import { NodeTypeIcon } from "@/grida-react-canvas-starter-kit/starterkit-icons/node-type-icon";
+} from "@/grida-canvas-react/provider";
+import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
 

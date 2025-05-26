@@ -1,4 +1,4 @@
-import { TemplateComponents } from "@/grida-react-canvas/template-builder";
+import { TemplateComponents } from "@/grida-canvas-react/template-builder";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

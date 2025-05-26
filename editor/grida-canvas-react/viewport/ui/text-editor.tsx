@@ -3,7 +3,7 @@ import {
   useNodeAction,
   useTool,
   useTransform,
-} from "@/grida-react-canvas/provider";
+} from "@/grida-canvas-react/provider";
 import { useEffect, useRef } from "react";
 import { useSingleSelection } from "../surface-hooks";
 import grida from "@grida/schema";

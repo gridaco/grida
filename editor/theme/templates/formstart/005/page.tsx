@@ -26,8 +26,8 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type grida from "@grida/schema";
-import { NodeElement } from "@/grida-react-canvas/nodes/node";
-import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
+import { NodeElement } from "@/grida-canvas-react/nodes/node";
+import { useComputed } from "@/grida-canvas-react/nodes/use-computed";
 import { factory } from "@grida/tokens";
 
 type Messages = typeof _messages;

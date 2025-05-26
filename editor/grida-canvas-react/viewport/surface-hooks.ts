@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
 import { cmath } from "@grida/cmath";

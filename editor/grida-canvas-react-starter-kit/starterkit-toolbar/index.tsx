@@ -24,9 +24,9 @@ import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar/utils";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useEditorFlags, useTool } from "@/grida-react-canvas/provider";
+import { useEditorFlags, useTool } from "@/grida-canvas-react/provider";
 import { cn } from "@/components/lib/utils";
 
 export function ToolbarPosition({

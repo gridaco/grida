@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -12,7 +12,7 @@ import { PlusIcon } from "@radix-ui/react-icons";
 import {
   NodeHierarchyList,
   ScenesList,
-} from "@/grida-react-canvas-starter-kit/starterkit-hierarchy";
+} from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 
 export function ScenesGroup() {
   const { createScene } = useDocument();

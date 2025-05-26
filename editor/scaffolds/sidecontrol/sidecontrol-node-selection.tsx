@@ -45,7 +45,7 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { useComputedNode, useDocument, useNode } from "@/grida-react-canvas";
+import { useComputedNode, useDocument, useNode } from "@/grida-canvas-react";
 import {
   Crosshair2Icon,
   LockClosedIcon,
@@ -64,7 +64,7 @@ import {
   useSelection,
   useSelectionPaints,
   useTopNode,
-} from "@/grida-react-canvas/provider";
+} from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";

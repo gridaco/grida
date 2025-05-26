@@ -11,11 +11,13 @@ import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import type { CampaignMeta } from "@/grida-forms-hosted/types";
 import React, { useMemo } from "react";
 import grida from "@grida/schema";
-import { StandaloneSceneContent } from "@/grida-react-canvas";
+import {
+  StandaloneSceneContent,
+  UserCustomTemplatesProvider,
+} from "@/grida-canvas-react";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { UserCustomTemplatesProvider } from "@/grida-react-canvas/renderer";
 
 export namespace FormStartPage {
   type ClientTemplateDefinition =

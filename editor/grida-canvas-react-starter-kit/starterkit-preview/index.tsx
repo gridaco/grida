@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { useDocument } from "@/grida-react-canvas";
 import {
+  useDocument,
   StandaloneRootNodeContent,
   StandaloneSceneBackground,
   type StandaloneDocumentContentProps,
-} from "@/grida-react-canvas/renderer";
+} from "@/grida-canvas-react";
 import {
   Dialog,
   DialogClose,
@@ -22,7 +22,7 @@ import {
 } from "@radix-ui/react-icons";
 import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useCurrentScene } from "@/grida-react-canvas/provider";
+import { useCurrentScene } from "@/grida-canvas-react/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 import { Input } from "@/components/ui/input";

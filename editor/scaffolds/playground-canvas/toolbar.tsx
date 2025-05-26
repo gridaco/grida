@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { generate } from "@/app/(dev)/canvas/actions";
-import { useDocument, useEventTarget } from "@/grida-react-canvas";
+import { useDocument, useEventTarget } from "@/grida-canvas-react";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +23,11 @@ import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar/utils";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import {
   ToolIcon,
   ToolsGroup,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { ColorPicker } from "../sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
@@ -36,7 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useTool } from "@/grida-react-canvas/provider";
+import { useTool } from "@/grida-canvas-react/provider";
 
 function useGenerate() {
   const streamGeneration = useCallback(

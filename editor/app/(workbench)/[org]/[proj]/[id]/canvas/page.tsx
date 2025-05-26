@@ -5,21 +5,19 @@ import {
   EditorSurface,
   StandaloneSceneContent,
   ViewportRoot,
-} from "@/grida-react-canvas";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { useEditorState } from "@/scaffolds/editor";
-import { SideControl } from "@/scaffolds/sidecontrol";
-import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
-} from "@/grida-react-canvas/renderer";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+} from "@/grida-canvas-react";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
+import { useEditorState } from "@/scaffolds/editor";
+import { SideControl } from "@/scaffolds/sidecontrol";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import Toolbar, {
   ToolbarPosition,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 
 export default function CanvasPage() {
   const [state] = useEditorState();

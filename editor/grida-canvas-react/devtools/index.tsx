@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument } from "@/grida-canvas-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CaretDownIcon, CaretUpIcon } from "@radix-ui/react-icons";
@@ -14,7 +14,7 @@ import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
 import { useCurrentEditor } from "../provider";
 import { useEditorState } from "../use-editor";

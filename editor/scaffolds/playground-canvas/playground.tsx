@@ -22,10 +22,14 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
+  AutoInitialFitTransformer,
+  StandaloneSceneBackground,
+  UserCustomTemplatesProvider,
+  type UserCustomTemplatesProps,
   useDocument,
-} from "@/grida-react-canvas";
+} from "@/grida-canvas-react";
 import { GridaLogo } from "@/components/grida-logo";
-import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
+import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
@@ -83,43 +87,37 @@ import { toast } from "sonner";
 import {
   keybindings_sheet,
   useEditorHotKeys,
-} from "@/grida-react-canvas/viewport/hotkeys";
+} from "@/grida-canvas-react/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
+import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import { datatransfer } from "@/grida-canvas/data-transfer";
-import {
-  AutoInitialFitTransformer,
-  StandaloneSceneBackground,
-  UserCustomTemplatesProvider,
-  UserCustomTemplatesProps,
-} from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { SlackIcon } from "lucide-react";
-import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
+import BrushToolbar from "@/grida-canvas-react-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@grida/io";
 import { canvas_examples } from "./examples";
-import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
+import ArtboardsList from "@/grida-canvas-react-starter-kit/starterkit-artboard-list";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
-import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import {
   PreviewButton,
   PreviewProvider,
-} from "@/grida-react-canvas-starter-kit/starterkit-preview";
+} from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { sitemap } from "@/www/data/sitemap";
 import iosvg from "@grida/io-svg";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
-import { useEditor } from "@/grida-react-canvas";
-import { useCurrentScene, useTool } from "@/grida-react-canvas/provider";
+import { useEditor } from "@/grida-canvas-react";
+import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";

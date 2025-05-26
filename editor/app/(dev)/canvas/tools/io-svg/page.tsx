@@ -8,8 +8,8 @@ import {
   StandaloneSceneContent,
   StandaloneDocumentEditor,
   ViewportRoot,
-} from "@/grida-react-canvas";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+  AutoInitialFitTransformer,
+} from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
@@ -18,7 +18,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { editor } from "@/grida-canvas";
 import iosvg from "@grida/io-svg";
 import Link from "next/link";
-import { useEditor } from "@/grida-react-canvas";
+import { useEditor } from "@/grida-canvas-react";
 
 export default function IOSVGPage() {
   const [raw, setRaw] = useState<string>();
