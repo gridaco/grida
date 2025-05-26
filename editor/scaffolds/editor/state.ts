@@ -24,10 +24,10 @@ import type {
 import type { FormMethod, FormsPageLanguage } from "@/grida-forms-hosted/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
-import type { IDocumentEditorState } from "@/grida-react-canvas/state";
 import type { DataGridLocalFilter } from "../data-table";
 import type { MenuGroup, MenuItem } from "./menu";
 import type { Platform } from "@/lib/platform";
+import type { editor } from "@/grida-canvas";
 import { EditorSymbols } from "./symbols";
 import { DataFormat } from "../data-format";
 
@@ -436,10 +436,16 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   documents: {
-    ["site"]?: SchemaMayVaryDocument<IDocumentEditorState>;
-    ["canvas"]?: SchemaMayVaryDocument<IDocumentEditorState>;
+    ["site"]?: SchemaMayVaryDocument<editor.state.IEditorState>;
+    /**
+     * loaded once, won't change after initial loading. the runtime states are managed via the editor. - this will be removed.
+     * @deprecated
+     */
+    ["canvas"]?: SchemaMayVaryDocument<editor.state.IEditorState>;
     ["form/startpage"]?:
-      | SchemaMayVaryDocument<IDocumentEditorState & { template_id: string }>
+      | SchemaMayVaryDocument<
+          editor.state.IEditorState & { template_id: string }
+        >
       | undefined;
     // [key: string]: ITemplateEditorState;
   };

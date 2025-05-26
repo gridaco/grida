@@ -66,3 +66,81 @@ export function mv<T extends Partial<{ children: string[] }>>(
 
   return nodes;
 }
+/**
+ * Remove a node from the flat tree and unlink it from any parent’s `children`.
+ *
+ * @typeParam T – Node shape, optionally with a `children` array of IDs.
+ * @param nodes – Record mapping node IDs to node objects.
+ * @param id – ID of the node to remove.
+ * @returns void
+ * @mutates nodes – the input map’s `children` arrays are modified directly.
+ * @throws {Error} If `id` does not exist in `nodes`.
+ * @example
+ * ```ts
+ * const nodes = {
+ *   parent: { children: ['child'] },
+ *   child:   { children: [] }
+ * };
+ * unlink(nodes, 'child');
+ * // now nodes.parent.children === []
+ * ```
+ */
+export function unlink<T extends { children?: string[] }>(
+  nodes: Record<string, T>,
+  id: string
+): void {
+  if (!(id in nodes)) {
+    throw new Error(`unlink: cannot unlink '${id}': No such node`);
+  }
+
+  for (const node of Object.values(nodes)) {
+    const idx = node.children?.indexOf(id);
+    if (idx != null && idx >= 0) {
+      node.children!.splice(idx, 1);
+    }
+  }
+
+  delete nodes[id];
+}
+
+/**
+ * Recursively remove a node and its subtree, delegating actual removal to `unlink`,
+ * and return a list of all IDs that were removed.
+ *
+ * @typeParam T – Node shape with optional `children` array of IDs.
+ * @param nodes – Record mapping node IDs to node objects.
+ * @param id – ID of the root node to remove.
+ * @returns Array of removed IDs, in removal order (children first, then the node itself).
+ * @mutates nodes – the input map’s `children` arrays are modified directly.
+ * @throws {Error} If `id` does not exist in `nodes`.
+ * @example
+ * ```ts
+ * const nodes = {
+ *   a: { children: ['b'] },
+ *   b: { children: [] }
+ * };
+ * rm(nodes, 'a');
+ * // now nodes is {}
+ * ```
+ */
+export function rm<T extends { children?: string[] }>(
+  nodes: Record<string, T>,
+  id: string
+): string[] {
+  if (!(id in nodes)) {
+    throw new Error(`rm: cannot remove '${id}': No such node`);
+  }
+
+  const removed: string[] = [];
+
+  // remove children first
+  for (const child of [...(nodes[id].children ?? [])]) {
+    removed.push(...rm(nodes, child));
+  }
+
+  // then unlink this node
+  unlink(nodes, id);
+  removed.push(id);
+
+  return removed;
+}

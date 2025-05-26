@@ -1,35 +1,32 @@
 import React, { useEffect, useReducer } from "react";
-import type { IDocumentEditorInit } from "@/grida-react-canvas";
-import queryattributes from "@/grida-react-canvas/nodes/utils/attributes";
+import queryattributes from "@/grida-canvas-react/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/west-referral/referrer/page";
 import ShareDialog from "@/theme/templates/west-referral/referrer/share";
 import InvitationCouponTemplate from "@/theme/templates/west-referral/invitation/coupon";
 import InvitationPageTemplate from "@/theme/templates/west-referral/invitation/page";
 import {
-  initDocumentEditorState,
   StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
   StandaloneSceneContent,
-  standaloneDocumentReducer,
-  useDocument,
-} from "@/grida-react-canvas";
-import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
-} from "@/grida-react-canvas/renderer";
+  useDocument,
+} from "@/grida-canvas-react";
 import { Zoom } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
-import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
+import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
-import { useTransform } from "@/grida-react-canvas/provider";
+import { useTransform } from "@/grida-canvas-react/provider";
 import MessageAppFrame from "@/components/frames/message-app-frame";
+import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-canvas-react";
 
-const document: IDocumentEditorInit = {
+const document: editor.state.IEditorStateInit = {
   editable: true,
   debug: false,
   document: {
@@ -216,16 +213,13 @@ export function CampaignTemplateDuo001Viewer({
   locale: "en" | "ko";
   onDoubleClick?: () => void;
 }) {
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState(document)
-  );
+  const instance = useEditor(editor.state.init(document));
 
   return (
     <CampaignViewerContextAndPropsContext.Provider
       value={{ ...props, campaign: campaign, locale }}
     >
-      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+      <StandaloneDocumentEditor editor={instance}>
         <EditorUXServer focus={focus} />
         <UserCustomTemplatesProvider
           templates={{

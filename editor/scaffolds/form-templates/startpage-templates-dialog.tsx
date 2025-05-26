@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { SandboxWrapper } from "./sandbox";
-import { StandaloneDocumentEditor } from "@/grida-react-canvas";
+import { StandaloneDocumentEditor } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 
 export function BrowseStartPageTemplatesDialog({
@@ -103,7 +103,8 @@ export function BrowseStartPageTemplatesDialog({
                   onValueCommit?.(template.name);
                 }}
               >
-                <StandaloneDocumentEditor
+                {/* FIXME: fix useEditor */}
+                {/* <StandaloneDocumentEditor
                   editable={false}
                   initial={{
                     templates: {
@@ -138,7 +139,7 @@ export function BrowseStartPageTemplatesDialog({
                     meta={campaign}
                     lang={lang}
                   />
-                </StandaloneDocumentEditor>
+                </StandaloneDocumentEditor> */}
               </SandboxWrapper>
             </motion.div>
           )}

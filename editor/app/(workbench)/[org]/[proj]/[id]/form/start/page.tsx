@@ -55,10 +55,10 @@ import {
   EditorSurface,
   useDocument,
   useRootTemplateInstanceNode,
-} from "@/grida-react-canvas";
+} from "@/grida-canvas-react";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { CanvasAction } from "@/grida-react-canvas";
-import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
+import type { Action as CanvasAction } from "@/grida-canvas";
+import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { ErrorInvalidSchema } from "@/components/error";
@@ -101,9 +101,13 @@ function Exists() {
     );
   }
 
-  return <Ready />;
+  return null;
+  // FIXME: fix useEditor
+  // return <Ready />;
 }
 
+/*
+// FIXME: fix useEditor
 function Ready() {
   const [
     {
@@ -111,18 +115,14 @@ function Ready() {
     },
     dispatch,
   ] = useEditorState();
-
   const state = startpage!.state!;
-
   useSyncFormAgentStartPage();
-
   const startPageDocumentDispatch = useCallback(
     (action: CanvasAction) => {
       dispatch(composeEditorDocumentAction("form/startpage", action));
     },
     [dispatch]
   );
-
   return (
     <StandaloneDocumentEditor
       key={state.template_id}
@@ -145,6 +145,7 @@ function Ready() {
     </StandaloneDocumentEditor>
   );
 }
+ */
 
 function SetupStartPage() {
   const [state, dispatch] = useEditorState();
@@ -208,8 +209,6 @@ function StartPageEditor({ template_id }: { template_id: string }) {
     form: { campaign },
     theme: { lang },
   } = rootstate;
-
-  const { state } = useDocument();
 
   return (
     <>

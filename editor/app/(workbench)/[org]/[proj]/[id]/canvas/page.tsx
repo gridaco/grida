@@ -1,65 +1,23 @@
 "use client";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React from "react";
 import { Spinner } from "@/components/spinner";
 import {
   EditorSurface,
   StandaloneSceneContent,
   ViewportRoot,
-} from "@/grida-react-canvas";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { useEditorState } from "@/scaffolds/editor";
-import { SideControl } from "@/scaffolds/sidecontrol";
-import { createBrowserCanvasClient } from "@/lib/supabase/client";
-import { useDebounce, usePrevious } from "@uidotdev/usehooks";
-import type { CanvasDocumentSnapshotSchema } from "@/types";
-import equal from "deep-equal";
-import grida from "@grida/schema";
-import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
-} from "@/grida-react-canvas/renderer";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+} from "@/grida-canvas-react";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
+import { useEditorState } from "@/scaffolds/editor";
+import { SideControl } from "@/scaffolds/sidecontrol";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import Toolbar, {
   ToolbarPosition,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import { PreviewProvider } from "@/grida-react-canvas-starter-kit/starterkit-preview";
-
-function useSync(document: grida.program.document.Document | undefined) {
-  const [{ document_id }, dispatch] = useEditorState();
-  const debounced = useDebounce(document, 1000);
-  const prev = usePrevious(debounced);
-  const supabase = useMemo(() => createBrowserCanvasClient(), []);
-
-  const setSaving = useCallback(
-    (saving: boolean) => dispatch({ type: "saving", saving: saving }),
-    [dispatch]
-  );
-
-  useEffect(() => {
-    // sync to server
-    if (!equal(prev, debounced)) {
-      setSaving(true);
-      supabase
-        .from("canvas_document")
-        .update({
-          data: debounced
-            ? ({
-                __schema_version: "0.0.1-beta.1+20250303",
-                ...debounced,
-              } satisfies CanvasDocumentSnapshotSchema as {})
-            : null,
-        })
-        .eq("id", document_id!)
-        .then(({ error }) => {
-          if (error) console.error(error);
-          setSaving(false);
-        });
-      return;
-    }
-  }, [debounced, prev, supabase, document_id, setSaving]);
-}
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 
 export default function CanvasPage() {
   const [state] = useEditorState();
@@ -72,27 +30,15 @@ export default function CanvasPage() {
     return <Spinner />;
   }
 
-  return <Ready />;
+  return <GridaCanvas />;
 }
 
-function Ready() {
-  const [state] = useEditorState();
-
-  useSync(state.documents["canvas"]?.state?.document);
-  useEditorHotKeys();
-
-  const {
-    documents: { canvas: document },
-  } = state;
-
-  if (!document) {
-    return <Spinner />;
-  }
-
+function GridaCanvas() {
   return (
     <>
       <div className="flex w-full h-full">
         <PreviewProvider>
+          <Hotkeys />
           <EditorSurfaceClipboardSyncProvider>
             <EditorSurfaceDropzone>
               <EditorSurfaceContextMenu>
@@ -117,4 +63,9 @@ function Ready() {
       </div>
     </>
   );
+}
+
+function Hotkeys() {
+  useEditorHotKeys();
+  return null;
 }

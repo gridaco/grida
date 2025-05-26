@@ -12,23 +12,21 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { NodeHierarchyList } from "@/grida-react-canvas-starter-kit/starterkit-hierarchy";
+import { NodeHierarchyList } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,
+  AutoInitialFitTransformer,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
-  initDocumentEditorState,
-} from "@/grida-react-canvas";
+} from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
+import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import {
@@ -38,16 +36,17 @@ import {
 } from "@/components/ui-editor/dialog";
 import Toolbar, {
   ToolbarPosition,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { Card } from "@/components/ui/card";
 import { PenToolIcon } from "lucide-react";
+import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-canvas-react";
 
 export function GridaCanvasFormField() {
   useDisableSwipeBack();
   const fonts = useGoogleFontsList();
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState({
+  const instance = useEditor(
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},
@@ -66,14 +65,15 @@ export function GridaCanvasFormField() {
       },
     })
   );
+  //
 
   useEffect(() => {
     fetch("/examples/canvas/sketch-teimplate-01.grida").then((res) => {
       res.json().then((file) => {
-        dispatch({
+        instance.dispatch({
           type: "__internal/reset",
           key: "template",
-          state: initDocumentEditorState({
+          state: editor.state.init({
             editable: true,
             document: file.document,
           }),
@@ -104,7 +104,7 @@ export function GridaCanvasFormField() {
         style={{ height: "calc(100vh - 4rem)" }}
         hideCloseButton
       >
-        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <StandaloneDocumentEditor editor={instance}>
           <Hotkyes />
           <div className="flex w-full h-full">
             <EditorSurfaceClipboardSyncProvider>

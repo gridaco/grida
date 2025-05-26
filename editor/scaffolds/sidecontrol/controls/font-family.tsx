@@ -1,5 +1,5 @@
-import { GoogleFontsPreview } from "@/grida-react-canvas/components/google-fonts";
-import { fonts } from "@/grida-react-canvas/k/fonts.min";
+import { GoogleFontsPreview } from "@/grida-canvas-react/components/google-fonts";
+import { fonts } from "@/grida-canvas/k/fonts.min";
 import {
   ItemRendererProps,
   VirtualizedCombobox,

@@ -6,7 +6,6 @@ import type {
   EditorInit,
   FormDocumentEditorInit,
   EditorState,
-  SiteDocumentEditorInit,
   IDataGridState,
   GDocTableID,
   GDocTable,
@@ -30,13 +29,10 @@ import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import { FormStartPage } from "@/theme/templates/formstart";
-import {
-  IDocumentEditorState,
-  initDocumentEditorState,
-} from "@/grida-react-canvas";
 import type { MenuGroup } from "./menu";
-import grida from "@grida/schema";
+import { editor } from "@/grida-canvas";
 import { DataFormat } from "../data-format";
+
 // import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -315,7 +311,7 @@ function initialBucketEditorState(init: BucketDocumentEditorInit): EditorState {
 
 function __init_canvas(
   data: unknown | SchemaMayVaryDocumentServerObject
-): SchemaMayVaryDocument<IDocumentEditorState> | undefined {
+): SchemaMayVaryDocument<editor.state.IEditorState> | undefined {
   // data is empty = no start page is set.
   if (!data) return undefined;
 
@@ -338,7 +334,7 @@ function __init_canvas(
     __schema_version: valid.__schema_version,
     __schema_valid: true,
     state: {
-      ...initDocumentEditorState({
+      ...editor.state.init({
         editable: true,
         debug: false,
         document: valid,
@@ -371,7 +367,7 @@ function __init_form_start_page_state(
     __schema_valid: true,
     state: {
       template_id: valid.template_id,
-      ...initDocumentEditorState({
+      ...editor.state.init({
         editable: true,
         debug: false,
         document: valid,

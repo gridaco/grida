@@ -512,6 +512,28 @@ export namespace cmath {
   }
 }
 
+export namespace cmath.delta {
+  /**
+   * Projects a scalar delta along the given axis through a 2D affine transform.
+   *
+   * @param offset - The delta along the 'x' or 'y' axis.
+   * @param axis - The axis ('x' or 'y') of the delta.
+   * @param transform - The 2×3 affine transform matrix.
+   * @returns The transformed scalar offset in surface space.
+   */
+  export function transform(
+    offset: number,
+    axis: cmath.Axis,
+    transform: cmath.Transform
+  ) {
+    const i = axis === "x" ? 0 : 1;
+    const row = transform[i];
+    // row[0]*x + row[1]*y + row[2],
+    // but x=offset when i=0, y=offset when i=1
+    return row[i] * offset + row[2];
+  }
+}
+
 /**
  * Vector2 computations.
  */
@@ -2955,6 +2977,53 @@ export namespace cmath.transform {
     // Apply scaling to the existing transform
     return multiply(scaledTransform, transform);
   }
+
+  /**
+   * Computes the inverse of a 2D affine transform matrix.
+   *
+   * The inverse transform will undo the original transform, such that:
+   * `invert(T) * T * point = point`
+   *
+   * @param transform - The 2D transform matrix to invert:
+   *   ```
+   *   [
+   *     [a, b, tx],
+   *     [c, d, ty]
+   *   ]
+   *   ```
+   * @returns The inverse transform matrix, or throws an error if the transform is not invertible.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [2, 0, 10], // Scale by 2 and translate by 10
+   *   [0, 2, 20], // Scale by 2 and translate by 20
+   * ];
+   * const inverse = cmath.transform.invert(transform);
+   * // inverse = [
+   * //   [0.5, 0, -5], // Scale by 0.5 and translate by -5
+   * //   [0, 0.5, -10], // Scale by 0.5 and translate by -10
+   * // ]
+   *
+   * @remarks
+   * - The transform must be invertible (determinant must be non-zero).
+   * - For a transform matrix [[a,b,tx],[c,d,ty]], the determinant is (a*d - b*c).
+   * - If the determinant is zero, the transform is not invertible and an error is thrown.
+   */
+  export function invert(transform: Transform): Transform {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const det = a * d - b * c;
+
+    if (det === 0) {
+      throw new Error("Transform is not invertible (determinant is zero)");
+    }
+
+    const invDet = 1 / det;
+    return [
+      [d * invDet, -b * invDet, (b * ty - d * tx) * invDet],
+      [-c * invDet, a * invDet, (c * tx - a * ty) * invDet],
+    ];
+  }
+
   /**
    * Extracts the scaling factors from a 2D transformation matrix.
    *
@@ -4580,6 +4649,25 @@ export namespace cmath.ui {
     x2: number;
     y2: number;
   };
+
+  export function transformPoint(
+    point: cmath.ui.Point,
+    transform: cmath.Transform
+  ): cmath.ui.Point {
+    return {
+      ...point,
+      ...cmath.vector2.transform([point.x, point.y], transform),
+    };
+  }
+
+  export function transformLine(
+    line: cmath.ui.Line,
+    transform: cmath.Transform
+  ): cmath.ui.Line {
+    const [x1p, y1p] = cmath.vector2.transform([line.x1, line.y1], transform);
+    const [x2p, y2p] = cmath.vector2.transform([line.x2, line.y2], transform);
+    return { ...line, x1: x1p, y1: y1p, x2: x2p, y2: y2p };
+  }
 
   /**
    * Ensures that (x1, y1) <= (x2, y2) in a canonical way.

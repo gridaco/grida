@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { generate } from "@/app/(dev)/canvas/actions";
-import { useDocument, useEventTarget } from "@/grida-react-canvas";
+import { useDocument, useEventTarget } from "@/grida-canvas-react";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +23,11 @@ import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
-} from "@/grida-react-canvas/toolbar";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import {
   ToolIcon,
   ToolsGroup,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { ColorPicker } from "../sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { PaintBucketIcon } from "lucide-react";
@@ -36,6 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTool } from "@/grida-canvas-react/provider";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -61,7 +62,7 @@ function useGenerate() {
 }
 
 function useTextRewriteDemo() {
-  const { state, changeNodeText } = useDocument();
+  const { document, changeNodeText } = useDocument();
   const [delta, setDelta] = useState<{} | undefined>();
   const [loading, setLoading] = useState(false);
   const [aiSettings] = useLocalStorage<string | undefined>(
@@ -74,10 +75,10 @@ function useTextRewriteDemo() {
   // TODO: check if text is child of a component or instance.
 
   const editableTextNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
-    return Object.values(state.document.nodes).filter(
+    return Object.values(document.nodes).filter(
       (node) => node.type === "text" && node.locked === false
     ) as Array<grida.program.nodes.TextNode>;
-  }, [state.document.nodes]);
+  }, [document.nodes]);
 
   const action = useCallback(
     (userprompt: string) => {
@@ -140,12 +141,8 @@ ${userprompt}
   return { action, delta, loading };
 }
 
-export function PlaygroundToolbar({
-  onAddButtonClick,
-}: {
-  onAddButtonClick?: () => void;
-}) {
-  const { setTool, tool, content_edit_mode } = useEventTarget();
+export function PlaygroundToolbar() {
+  const { setTool, tool, content_edit_mode } = useTool();
 
   const value = toolmode_to_toolbar_value(tool);
 
@@ -238,7 +235,7 @@ export function PlaygroundToolbar({
 }
 
 function BitmapEditModeAuxiliaryToolbar() {
-  const { tryExitContentEditMode, setTool, tool } = useEventTarget();
+  const { tool, setTool, tryExitContentEditMode } = useTool();
 
   return (
     <div className="rounded-full flex justify-center items-center gap-2 border bg-background shadow px-3 py-1 pointer-events-auto select-none">

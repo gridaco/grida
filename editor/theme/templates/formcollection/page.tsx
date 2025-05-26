@@ -3,29 +3,27 @@
 import React from "react";
 import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { NodeElement } from "@/grida-react-canvas/nodes/node";
+import { NodeElement } from "@/grida-canvas-react/nodes/node";
 import {
   Card_002,
   Card_003,
   Hero_002,
-} from "@/grida-react-canvas/template-builder/components/cards";
-import { Footer_001 } from "@/grida-react-canvas/template-builder/components/footers";
-import { Header_001 } from "@/grida-react-canvas/template-builder/components/headers";
+} from "@/grida-canvas-react/template-builder/components/cards";
+import { Footer_001 } from "@/grida-canvas-react/template-builder/components/footers";
+import { Header_001 } from "@/grida-canvas-react/template-builder/components/headers";
 import * as samples from "./samples";
 import {
   ProgramDataContextHost,
   DataProvider,
 } from "@/grida-react-program-context/data-context";
 import ArrayMap from "@/grida-react-program-context/data-context/array";
-import { useDocument } from "@/grida-react-canvas/provider";
+import { useDocument } from "@/grida-canvas-react/provider";
 import assert from "assert";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
-  const {
-    state: { document, templates },
-  } = useDocument();
+  const { document } = useDocument();
 
   // FIXME: UNKNOWN
   const root = document.nodes["root"];

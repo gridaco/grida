@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument, useNode } from "@/grida-react-canvas";
+import { useDocument, useNode } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";
@@ -31,7 +31,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentScene, useScene } from "@/grida-react-canvas/provider";
+import { useCurrentScene } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {
   const { backgroundColor, setBackgroundColor } = useCurrentScene();
@@ -50,16 +50,14 @@ function SceneBackgroundPropertyLine() {
 
 export function DocumentProperties({ className }: { className?: string }) {
   const {
-    state: {
-      document: { properties },
-    },
+    document,
     schemaDefineProperty,
     schemaRenameProperty,
     schemaDeleteProperty,
     schemaUpdateProperty,
   } = useDocument();
 
-  const keys = Object.keys(properties ?? {});
+  const keys = Object.keys(document.properties ?? {});
 
   const addProperty = () => {
     schemaDefineProperty();
@@ -92,7 +90,7 @@ export function DocumentProperties({ className }: { className?: string }) {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="divide-y m-0 p-0">
           {keys.map((key, i) => {
-            const property = properties![key];
+            const property = document.properties![key];
             return (
               <PropertyDefinitionBlock
                 key={i}

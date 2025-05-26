@@ -1,21 +1,16 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { StateProvider } from "./provider";
-import {
-  useEditorState,
-  useFormFields,
-  useDatabaseTableId,
-  useDatagridTable,
-} from "./use";
+import { useEditorState, useDatabaseTableId, useDatagridTable } from "./use";
 import { reducer } from "./reducer";
 import {
   SchemaDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
-  SiteDocumentEditorInit,
   CanvasDocumentEditorInit,
   BucketDocumentEditorInit,
+  SchemaMayVaryDocument,
 } from "./state";
 import { initialEditorState } from "./init";
 import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
@@ -31,9 +26,14 @@ import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";
 import { FormAgentThemeSyncProvider } from "./sync";
-import { CanvasAction, StandaloneDocumentEditor } from "@/grida-react-canvas";
-import { composeEditorDocumentAction } from "./action";
 import { ErrorInvalidSchema } from "@/components/error";
+import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-canvas-react";
+import { StandaloneDocumentEditor } from "@/grida-canvas-react";
+import grida from "@grida/schema";
+import { createBrowserCanvasClient } from "@/lib/supabase/client";
+import { CanvasDocumentSnapshotSchema } from "@/types";
+import { useDebounceCallback } from "usehooks-ts";
 
 export function EditorProvider({
   initial,
@@ -45,12 +45,6 @@ export function EditorProvider({
         <FormDocumentEditorProvider initial={initial}>
           {children}
         </FormDocumentEditorProvider>
-      );
-    case "v0_site":
-      return (
-        <SiteDocumentEditorProvider initial={initial}>
-          {children}
-        </SiteDocumentEditorProvider>
       );
     case "v0_schema":
       return (
@@ -129,15 +123,24 @@ function CanvasDocumentEditorProvider({
     reducer,
     initialEditorState(initial)
   );
+
+  const setSaving = useCallback(
+    (saving: boolean) => dispatch({ type: "saving", saving: saving }),
+    [dispatch]
+  );
+
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <Multiplayer>
         <TooltipProvider>
           <MediaViewerProvider>
-            <CanvasProvider>
-              {/*  */}
+            <HostedGridaCanvasDocumentProvider
+              document_id={initial.document_id}
+              setSaving={setSaving}
+              initial={state.documents["canvas"]}
+            >
               {children}
-            </CanvasProvider>
+            </HostedGridaCanvasDocumentProvider>
           </MediaViewerProvider>
         </TooltipProvider>
       </Multiplayer>
@@ -145,62 +148,67 @@ function CanvasDocumentEditorProvider({
   );
 }
 
-function SiteDocumentEditorProvider({
+async function saveHostedGridaCanvasDocument(
+  document_id: string,
+  document: grida.program.document.Document | undefined
+) {
+  const client = createBrowserCanvasClient();
+
+  return await client
+    .from("canvas_document")
+    .update({
+      data: document
+        ? ({
+            __schema_version: "0.0.1-beta.1+20250303",
+            ...document,
+          } satisfies CanvasDocumentSnapshotSchema as {})
+        : null,
+    })
+    .eq("id", document_id!);
+}
+
+function HostedGridaCanvasDocumentProvider({
+  document_id,
+  setSaving,
   initial,
   children,
-}: React.PropsWithChildren<{ initial: SiteDocumentEditorInit }>) {
-  const [state, dispatch] = React.useReducer(
-    reducer,
-    initialEditorState(initial)
-  );
-  return (
-    <StateProvider state={state} dispatch={dispatch}>
-      <Multiplayer>
-        <TooltipProvider>
-          <AssetsBackgroundsResolver />
-          <MediaViewerProvider>
-            <CanvasProvider>
-              {/*  */}
-              {children}
-            </CanvasProvider>
-          </MediaViewerProvider>
-        </TooltipProvider>
-      </Multiplayer>
-    </StateProvider>
-  );
-}
-
-function CanvasProvider({ children }: React.PropsWithChildren<{}>) {
-  const [{ selected_page_id, documents }, dispatch] = useEditorState();
-
-  const document = documents[selected_page_id! as "site" | "canvas"];
-
-  const documentDispatch = useCallback(
-    (action: CanvasAction) => {
-      dispatch(
-        composeEditorDocumentAction(
-          selected_page_id! as "site" | "canvas",
-          action
-        )
-      );
-    },
-    [selected_page_id, dispatch]
-  );
-
-  if (!document || !document.__schema_valid) {
+}: React.PropsWithChildren<{
+  document_id: string;
+  setSaving: (saving: boolean) => void;
+  initial?: SchemaMayVaryDocument<editor.state.IEditorState>;
+}>) {
+  if (!initial || !initial.__schema_valid) {
     return (
       <ErrorInvalidSchema
-        data={{ __schema_version: document?.__schema_version }}
+        data={{ __schema_version: initial?.__schema_version }}
       />
     );
   }
 
+  const editor = useEditor(initial.state);
+
+  const save = useCallback(() => {
+    setSaving(true);
+    const json = editor.getDocumentJson();
+    return saveHostedGridaCanvasDocument(document_id, json as any).finally(
+      () => {
+        setSaving(false);
+      }
+    );
+  }, [editor, document_id, setSaving]);
+
+  const debouncedSave = useDebounceCallback(save, 1000);
+
+  useEffect(() => {
+    editor.subscribe(() => {
+      // FIXME: bad performance
+      // save to server (with debounce)
+      debouncedSave();
+    });
+  }, []);
+
   return (
-    <StandaloneDocumentEditor
-      editable
-      initial={document.state}
-      dispatch={documentDispatch}
-    >
+    <StandaloneDocumentEditor editor={editor}>
       {children}
     </StandaloneDocumentEditor>
   );

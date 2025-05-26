@@ -257,39 +257,6 @@ export default async function Layout({
         </Html>
       );
     }
-    case "v0_site": {
-      return (
-        <Html>
-          <EditorProvider
-            initial={{
-              doctype: "v0_site",
-              project: { id: project_ref.id, name: project_ref.name },
-              organization: {
-                id: project_ref.organization!.id,
-                name: project_ref.organization!.name,
-              },
-              user_id: user.id,
-              document_id: masterdoc_ref.id,
-              document_title: masterdoc_ref.title,
-              theme: {
-                appearance: "system",
-                fontFamily: "inter",
-                lang: "en",
-                is_powered_by_branding_enabled: true,
-              },
-            }}
-          >
-            <BaseLayout docid={masterdoc_ref.id}>
-              {/* <p>
-                This document is a site document. Site documents are not
-                supported yet.
-              </p> */}
-              {children}
-            </BaseLayout>
-          </EditorProvider>
-        </Html>
-      );
-    }
     case "v0_schema": {
       const { data, error } = await formsClient
         .from("schema_document")

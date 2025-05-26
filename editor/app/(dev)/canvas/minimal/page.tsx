@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useReducer } from "react";
+import React from "react";
 import {
   Align,
   Selection,
@@ -15,34 +15,33 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
-  initDocumentEditorState,
-} from "@/grida-react-canvas";
+  AutoInitialFitTransformer,
+} from "@/grida-canvas-react";
+import { editor } from "@/grida-canvas";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import Toolbar, {
   ToolbarPosition,
-} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useEditor } from "@/grida-canvas-react";
 
 export default function MinimalCanvasDemo() {
   const fonts = useGoogleFontsList();
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState({
+  const instance = useEditor(
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},
@@ -66,11 +65,7 @@ export default function MinimalCanvasDemo() {
     <TooltipProvider>
       <SidebarProvider>
         <main className="w-screen h-screen overflow-hidden select-none">
-          <StandaloneDocumentEditor
-            editable
-            initial={state}
-            dispatch={dispatch}
-          >
+          <StandaloneDocumentEditor editor={instance}>
             <Hotkyes />
             <Sidebar side="left" variant="floating">
               <SidebarContent>

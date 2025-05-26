@@ -293,7 +293,7 @@ export namespace grida.program.document {
 
   export interface Guide2D {
     readonly axis: cmath.Axis;
-    readonly offset: number;
+    offset: number;
   }
 
   export interface I2DGuides {
@@ -568,26 +568,6 @@ export namespace grida.program.document {
     [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
     [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
     ["data-grida-node-type"]: nodes.Node["type"];
-    // #region dev properties
-
-    /**
-     * Dev property - editor-selected
-     *
-     * if this node is a selected node withing current editor context, when editable
-     *
-     * this is not required to be set, but once configured to set, it is safe to build apon this attribute
-     */
-    ["data-dev-editor-selected"]?: boolean | undefined;
-
-    /**
-     * Dev property - editor-hovered
-     *
-     * if this node is a hovered node withing current editor context, when editable
-     *
-     * this is not required to be set, but once configured to set, it is safe to build apon this attribute
-     */
-    ["data-dev-editor-hovered"]?: boolean | undefined;
-    // #endregion dev properties
   }
 
   /**
@@ -2104,91 +2084,3 @@ const cloneWithUndefinedValues = (
     string,
     undefined
   >;
-
-export namespace grida.program.api {
-  export type NodeID = string & {};
-
-  export interface IStandaloneEditorApi {
-    selection: ReadonlyArray<NodeID>;
-    getNodeById: (node_id: NodeID) => nodes.Node;
-    getNodeDepth: (node_id: NodeID) => number;
-    getNodeAbsoluteRotation: (node_id: NodeID) => number;
-
-    select: (...selectors: document.Selector[]) => void;
-    blur: () => void;
-    undo: () => void;
-    redo: () => void;
-    cut: (target: "selection" | NodeID) => void;
-    copy: (target: "selection" | NodeID) => void;
-    paste: () => void;
-    duplicate: (target: "selection" | NodeID) => void;
-    delete: (target: "selection" | NodeID) => void;
-    rename: (target: "selection" | NodeID, name: string) => void;
-
-    nudge: (
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ) => void;
-    nudgeResize: (
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ) => void;
-
-    align: (
-      target: "selection" | NodeID,
-      alignment: {
-        horizontal?: "none" | "min" | "max" | "center";
-        vertical?: "none" | "min" | "max" | "center";
-      }
-    ) => void;
-    order: (
-      target: "selection" | NodeID,
-      order: "back" | "front" | number
-    ) => void;
-    distributeEvenly: (target: "selection" | NodeID[], axis: "x" | "y") => void;
-
-    toggleActive: (target: "selection" | NodeID) => void;
-    toggleLocked: (target: "selection" | NodeID) => void;
-    toggleBold: (target: "selection" | NodeID) => void;
-    setOpacity: (target: "selection" | NodeID, opacity: number) => void;
-
-    createRectangle(
-      props: Omit<grida.program.nodes.NodePrototype, "type">
-    ): void;
-    createEllipse(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
-    createText(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
-
-    // defineSchemaProperty: (
-    //   name?: string,
-    //   definition?: grida.program.schema.PropertyDefinition
-    // ) => void;
-    // renameSchemaProperty: (name: string, newName: string) => void;
-    // updateSchemaProperty: (
-    //   name: string,
-    //   definition: grida.program.schema.PropertyDefinition
-    // ) => void;
-    // deleteSchemaProperty: (name: string) => void;
-
-    // configureSurfaceRaycastTargeting: (
-    //   config: Partial<SurfaceRaycastTargeting>
-    // ) => void;
-    configureMeasurement: (measurement: "on" | "off") => void;
-    configureTranslateWithCloneModifier: (
-      translate_with_clone: "on" | "off"
-    ) => void;
-    configureTranslateWithAxisLockModifier: (
-      tarnslate_with_axis_lock: "on" | "off"
-    ) => void;
-    configureTransformWithCenterOriginModifier: (
-      transform_with_center_origin: "on" | "off"
-    ) => void;
-    configureTransformWithPreserveAspectRatioModifier: (
-      transform_with_preserve_aspect_ratio: "on" | "off"
-    ) => void;
-    configureRotateWithQuantizeModifier: (
-      rotate_with_quantize: number | "off"
-    ) => void;
-  }
-}

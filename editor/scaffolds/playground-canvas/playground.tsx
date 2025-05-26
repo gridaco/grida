@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
@@ -22,13 +22,14 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
-  initDocumentEditorState,
+  AutoInitialFitTransformer,
+  StandaloneSceneBackground,
+  UserCustomTemplatesProvider,
+  type UserCustomTemplatesProps,
   useDocument,
-  type IDocumentEditorInit,
-} from "@/grida-react-canvas";
+} from "@/grida-canvas-react";
 import { GridaLogo } from "@/components/grida-logo";
-import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
+import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
@@ -86,40 +87,38 @@ import { toast } from "sonner";
 import {
   keybindings_sheet,
   useEditorHotKeys,
-} from "@/grida-react-canvas/viewport/hotkeys";
+} from "@/grida-canvas-react/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
+import { keysymbols } from "@/grida-canvas-react/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
-import {
-  AutoInitialFitTransformer,
-  StandaloneSceneBackground,
-  UserCustomTemplatesProvider,
-  UserCustomTemplatesProps,
-} from "@/grida-react-canvas/renderer";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
+import { datatransfer } from "@/grida-canvas/data-transfer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { SlackIcon } from "lucide-react";
-import BrushToolbar from "@/grida-react-canvas-starter-kit/starterkit-toolbar/brush-toolbar";
+import BrushToolbar from "@/grida-canvas-react-starter-kit/starterkit-toolbar/brush-toolbar";
 import { io } from "@grida/io";
 import { canvas_examples } from "./examples";
-import ArtboardsList from "@/grida-react-canvas-starter-kit/starterkit-artboard-list";
+import ArtboardsList from "@/grida-canvas-react-starter-kit/starterkit-artboard-list";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
-import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import {
   PreviewButton,
   PreviewProvider,
-} from "@/grida-react-canvas-starter-kit/starterkit-preview";
+} from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { sitemap } from "@/www/data/sitemap";
 import iosvg from "@grida/io-svg";
 import iofigma from "@grida/io-figma";
+import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-canvas-react";
+import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
+import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -130,7 +129,7 @@ const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
 export type CanvasPlaygroundProps = {
   src?: string;
-  document?: IDocumentEditorInit;
+  document?: editor.state.IEditorStateInit;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -170,10 +169,10 @@ export default function CanvasPlayground({
     refreshkey: true,
   });
   const fonts = useGoogleFontsList();
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState(document)
-  );
+
+  const instance = useEditor(editor.state.init(document));
+
+  useDisableSwipeBack();
 
   useHotkeys("meta+\\, ctrl+\\", () => {
     setUI((ui) => ({
@@ -203,10 +202,10 @@ export default function CanvasPlayground({
     if (!src) return;
     fetch(src).then((res) => {
       res.json().then((file) => {
-        dispatch({
+        instance.dispatch({
           type: "__internal/reset",
           key: src,
-          state: initDocumentEditorState({
+          state: editor.state.init({
             editable: true,
             document: file.document,
           }),
@@ -218,7 +217,7 @@ export default function CanvasPlayground({
   const onExport = () => {
     const documentData = {
       version: "0.0.1-beta.1+20250303",
-      document: state.document,
+      document: instance.getSnapshot().document,
     } satisfies io.JSONDocumentFileModel;
 
     const blob = new Blob([io.archive.pack(documentData)], {
@@ -227,6 +226,14 @@ export default function CanvasPlayground({
 
     saveAs(blob, `${v4()}.grida`);
   };
+
+  // const should_show_artboards_list =
+  //   state.tool.type === "insert" &&
+  //   state.tool.node === "container" &&
+  //   state.document.scenes[state.scene_id!].constraints.children === "multiple";
+
+  // FIXME:
+  const should_show_artboards_list = false;
 
   return (
     <SidebarProvider className="w-full h-full">
@@ -241,9 +248,9 @@ export default function CanvasPlayground({
             key={importFromJson.refreshkey}
             {...importFromJson.props}
             onImport={(file) => {
-              dispatch({
+              instance.dispatch({
                 type: "__internal/reset",
-                state: initDocumentEditorState({
+                state: editor.state.init({
                   editable: true,
                   document: file.document,
                 }),
@@ -253,7 +260,7 @@ export default function CanvasPlayground({
           <ImportFromFigmaDialog
             {...importFromFigmaDialog.props}
             onImport={(res) => {
-              dispatch({
+              instance.dispatch({
                 type: "insert",
                 document: iofigma.restful.factory.document(
                   res.document as any,
@@ -267,286 +274,235 @@ export default function CanvasPlayground({
           />
           <ErrorBoundary>
             <StandaloneDocumentEditor
-              editable
-              debug={pref.debug}
-              initial={state}
-              dispatch={dispatch}
+              editor={instance}
+              // editable
+              // debug={pref.debug}
+              // initial={state}
+              // dispatch={dispatch}
             >
               <UserCustomTemplatesProvider templates={templates}>
-                <PreviewProvider>
-                  <Hotkyes />
-                  <div className="flex w-full h-full">
-                    {ui.sidebar === "visible" && (
-                      <aside>
-                        {libraryDialog.open ? (
-                          <>
-                            <DialogPrimitive.Root {...libraryDialog.props}>
-                              <DialogPrimitive.Content className="h-full">
-                                <SidebarRoot>
-                                  <LibraryContent />
-                                </SidebarRoot>
-                              </DialogPrimitive.Content>
-                            </DialogPrimitive.Root>
-                          </>
-                        ) : (
-                          <>
-                            <Sidebar>
-                              <SidebarHeader className="p-0">
-                                <DarwinSidebarHeaderDragArea />
-                                <header className="h-11 min-h-11 flex items-center px-4 border-b">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger className="me-2">
-                                      <GridaLogo className="inline-block size-4" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                      align="start"
-                                      className="min-w-52"
-                                    >
-                                      <DropdownMenuItem
-                                        onClick={importFromJson.openDialog}
-                                        className="text-xs"
+                <FontFamilyListProvider fonts={fonts}>
+                  <PreviewProvider>
+                    <Hotkyes />
+                    <div className="flex w-full h-full">
+                      {ui.sidebar === "visible" && (
+                        <aside>
+                          {libraryDialog.open ? (
+                            <>
+                              <DialogPrimitive.Root {...libraryDialog.props}>
+                                <DialogPrimitive.Content className="h-full">
+                                  <SidebarRoot>
+                                    <LibraryContent />
+                                  </SidebarRoot>
+                                </DialogPrimitive.Content>
+                              </DialogPrimitive.Root>
+                            </>
+                          ) : (
+                            <>
+                              <Sidebar>
+                                <SidebarHeader className="p-0">
+                                  <DarwinSidebarHeaderDragArea />
+                                  <header className="h-11 min-h-11 flex items-center px-4 border-b">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger className="me-2">
+                                        <GridaLogo className="inline-block size-4" />
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="start"
+                                        className="min-w-52"
                                       >
-                                        <FileIcon className="size-3.5" />
-                                        Open .grida
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={onExport}
-                                        className="text-xs"
-                                      >
-                                        <DownloadIcon className="size-3.5" />
-                                        Save as .grida
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={
-                                          importFromFigmaDialog.openDialog
-                                        }
-                                        className="text-xs"
-                                      >
-                                        <FigmaLogoIcon className="size-3.5" />
-                                        Import Figma
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={settingsDialog.openDialog}
-                                        className="text-xs"
-                                      >
-                                        <GearIcon className="size-3.5" />
-                                        Settings
-                                      </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={importFromJson.openDialog}
+                                          className="text-xs"
+                                        >
+                                          <FileIcon className="size-3.5" />
+                                          Open .grida
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={onExport}
+                                          className="text-xs"
+                                        >
+                                          <DownloadIcon className="size-3.5" />
+                                          Save as .grida
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={
+                                            importFromFigmaDialog.openDialog
+                                          }
+                                          className="text-xs"
+                                        >
+                                          <FigmaLogoIcon className="size-3.5" />
+                                          Import Figma
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={settingsDialog.openDialog}
+                                          className="text-xs"
+                                        >
+                                          <GearIcon className="size-3.5" />
+                                          Settings
+                                        </DropdownMenuItem>
 
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger className="text-xs">
-                                          <OpenInNewWindowIcon className="size-3.5 me-2" />
-                                          Tools
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent>
-                                          <Link
-                                            href="/canvas/tools/ai"
-                                            target="_blank"
-                                          >
-                                            <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="size-3.5" />
-                                              AI
-                                            </DropdownMenuItem>
-                                          </Link>
-                                          <Link
-                                            href="/canvas/tools/io-figma"
-                                            target="_blank"
-                                          >
-                                            <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="size-3.5" />
-                                              IO Figma
-                                            </DropdownMenuItem>
-                                          </Link>
-                                          <Link
-                                            href="/canvas/tools/io-svg"
-                                            target="_blank"
-                                          >
-                                            <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="size-3.5" />
-                                              IO SVG
-                                            </DropdownMenuItem>
-                                          </Link>
-                                          <Link
-                                            href="https://github.com/gridaco/p666"
-                                            target="_blank"
-                                          >
-                                            <DropdownMenuItem className="text-xs">
-                                              <OpenInNewWindowIcon className="size-3.5" />
-                                              P666 Daemon
-                                            </DropdownMenuItem>
-                                          </Link>
-                                        </DropdownMenuSubContent>
-                                      </DropdownMenuSub>
-                                      <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger className="text-xs">
-                                          <MixIcon className="size-3.5 me-2" />
-                                          Examples
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent>
-                                          {canvas_examples.map((example) => (
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuSub>
+                                          <DropdownMenuSubTrigger className="text-xs">
+                                            <OpenInNewWindowIcon className="size-3.5 me-2" />
+                                            Tools
+                                          </DropdownMenuSubTrigger>
+                                          <DropdownMenuSubContent>
                                             <Link
-                                              key={example.id}
-                                              href={
-                                                "/canvas/examples/" + example.id
-                                              }
+                                              href="/canvas/tools/ai"
                                               target="_blank"
                                             >
                                               <DropdownMenuItem className="text-xs">
                                                 <OpenInNewWindowIcon className="size-3.5" />
-                                                {example.name}
+                                                AI
                                               </DropdownMenuItem>
                                             </Link>
-                                          ))}
-                                        </DropdownMenuSubContent>
-                                      </DropdownMenuSub>
-                                      <DropdownMenuSeparator />
-                                      <Link
-                                        href={sitemap.links.github}
-                                        target="_blank"
+                                            <Link
+                                              href="/canvas/tools/io-figma"
+                                              target="_blank"
+                                            >
+                                              <DropdownMenuItem className="text-xs">
+                                                <OpenInNewWindowIcon className="size-3.5" />
+                                                IO Figma
+                                              </DropdownMenuItem>
+                                            </Link>
+                                            <Link
+                                              href="/canvas/tools/io-svg"
+                                              target="_blank"
+                                            >
+                                              <DropdownMenuItem className="text-xs">
+                                                <OpenInNewWindowIcon className="size-3.5" />
+                                                IO SVG
+                                              </DropdownMenuItem>
+                                            </Link>
+                                            <Link
+                                              href="https://github.com/gridaco/p666"
+                                              target="_blank"
+                                            >
+                                              <DropdownMenuItem className="text-xs">
+                                                <OpenInNewWindowIcon className="size-3.5" />
+                                                P666 Daemon
+                                              </DropdownMenuItem>
+                                            </Link>
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                        <DropdownMenuSub>
+                                          <DropdownMenuSubTrigger className="text-xs">
+                                            <MixIcon className="size-3.5 me-2" />
+                                            Examples
+                                          </DropdownMenuSubTrigger>
+                                          <DropdownMenuSubContent>
+                                            {canvas_examples.map((example) => (
+                                              <Link
+                                                key={example.id}
+                                                href={
+                                                  "/canvas/examples/" +
+                                                  example.id
+                                                }
+                                                target="_blank"
+                                              >
+                                                <DropdownMenuItem className="text-xs">
+                                                  <OpenInNewWindowIcon className="size-3.5" />
+                                                  {example.name}
+                                                </DropdownMenuItem>
+                                              </Link>
+                                            ))}
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                        <DropdownMenuSeparator />
+                                        <Link
+                                          href={sitemap.links.github}
+                                          target="_blank"
+                                        >
+                                          <DropdownMenuItem className="text-xs">
+                                            <GitHubLogoIcon className="size-3.5" />
+                                            GitHub
+                                          </DropdownMenuItem>
+                                        </Link>
+                                        <Link
+                                          href={sitemap.links.slack}
+                                          target="_blank"
+                                        >
+                                          <DropdownMenuItem className="text-xs">
+                                            <SlackIcon className="size-3.5" />
+                                            Slack Community
+                                          </DropdownMenuItem>
+                                        </Link>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <span className="font-bold text-xs">
+                                      Canvas
+                                      <Badge
+                                        variant="outline"
+                                        className="ms-2 text-xs"
                                       >
-                                        <DropdownMenuItem className="text-xs">
-                                          <GitHubLogoIcon className="size-3.5" />
-                                          GitHub
-                                        </DropdownMenuItem>
-                                      </Link>
-                                      <Link
-                                        href={sitemap.links.slack}
-                                        target="_blank"
+                                        BETA
+                                      </Badge>
+                                    </span>
+                                  </header>
+                                </SidebarHeader>
+                                <SidebarContent>
+                                  <ScenesGroup />
+                                  <hr />
+                                  <NodeHierarchyGroup />
+                                </SidebarContent>
+                              </Sidebar>
+                            </>
+                          )}
+                        </aside>
+                      )}
+                      <EditorSurfaceClipboardSyncProvider>
+                        <EditorSurfaceDropzone>
+                          <EditorSurfaceContextMenu>
+                            <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                              <ViewportRoot className="relative w-full h-full overflow-hidden">
+                                <EditorSurface />
+                                <AutoInitialFitTransformer>
+                                  <StandaloneSceneContent />
+                                </AutoInitialFitTransformer>
+                                {ui.sidebar === "visible" && (
+                                  <>
+                                    <div className="absolute top-4 left-4 z-50">
+                                      <Button
+                                        variant={
+                                          libraryDialog.open
+                                            ? "default"
+                                            : "outline"
+                                        }
+                                        className="size-8 rounded-full p-0"
+                                        onClick={libraryDialog.openDialog}
                                       >
-                                        <DropdownMenuItem className="text-xs">
-                                          <SlackIcon className="size-3.5" />
-                                          Slack Community
-                                        </DropdownMenuItem>
-                                      </Link>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                  <span className="font-bold text-xs">
-                                    Canvas
-                                    <Badge
-                                      variant="outline"
-                                      className="ms-2 text-xs"
-                                    >
-                                      BETA
-                                    </Badge>
-                                  </span>
-                                </header>
-                              </SidebarHeader>
-                              <SidebarContent>
-                                <ScenesGroup />
-                                <hr />
-                                <NodeHierarchyGroup />
-                              </SidebarContent>
-                            </Sidebar>
-                          </>
-                        )}
-                      </aside>
-                    )}
-                    <EditorSurfaceClipboardSyncProvider>
-                      <EditorSurfaceDropzone>
-                        <EditorSurfaceContextMenu>
-                          <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                            <ViewportRoot className="relative w-full h-full overflow-hidden">
-                              <EditorSurface />
-                              <AutoInitialFitTransformer>
-                                <StandaloneSceneContent />
-                              </AutoInitialFitTransformer>
-
-                              {ui.sidebar === "visible" && (
-                                <>
-                                  <div className="absolute top-4 left-4 z-50">
-                                    <Button
-                                      variant={
-                                        libraryDialog.open
-                                          ? "default"
-                                          : "outline"
-                                      }
-                                      className="size-8 rounded-full p-0"
-                                      onClick={libraryDialog.openDialog}
-                                    >
-                                      <PlusIcon className="size-4" />
-                                    </Button>
-                                  </div>
-                                </>
-                              )}
-                              {ui.toolbar === "visible" && (
-                                <>
-                                  <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
-                                    <div className="relative left-8">
+                                        <PlusIcon className="size-4" />
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                                {ui.toolbar === "visible" && (
+                                  <>
+                                    <BrushToolbarPosition>
                                       <BrushToolbar />
-                                    </div>
-                                  </div>
-                                  <ToolbarPosition>
-                                    <PlaygroundToolbar
-                                      onAddButtonClick={
-                                        libraryDialog.openDialog
-                                      }
-                                    />
-                                  </ToolbarPosition>
-                                </>
-                              )}
-                            </ViewportRoot>
-                            {pref.debug && <DevtoolsPanel />}
-                          </StandaloneSceneBackground>
-                        </EditorSurfaceContextMenu>
-                      </EditorSurfaceDropzone>
-                    </EditorSurfaceClipboardSyncProvider>
-                    {ui.sidebar === "visible" && (
-                      <aside className="h-full">
-                        <SidebarRoot side="right" className="hidden sm:block">
-                          <header className="h-11 flex items-center px-2 justify-end gap-2">
-                            <Zoom
-                              className={cn(
-                                WorkbenchUI.inputVariants({
-                                  variant: "input",
-                                  size: "xs",
-                                }),
-                                "w-auto"
-                              )}
-                            />
-                            <PreviewButton />
-                          </header>
-                          <hr />
-                          <FontFamilyListProvider fonts={fonts}>
-                            {state.tool.type === "insert" &&
-                            state.tool.node === "container" &&
-                            state.document.scenes[state.scene_id!].constraints
-                              .children === "multiple" ? (
-                              <>
-                                <DialogPrimitive.Root open>
-                                  <DialogPrimitive.Content className="h-full">
-                                    <DialogPrimitive.Title className="sr-only">
-                                      Artboards
-                                    </DialogPrimitive.Title>
-                                    <DialogPrimitive.Description className="sr-only">
-                                      Select an artboard to insert
-                                    </DialogPrimitive.Description>
-                                    <SidebarRoot>
-                                      <ArtboardsList />
-                                    </SidebarRoot>
-                                  </DialogPrimitive.Content>
-                                </DialogPrimitive.Root>
-                              </>
-                            ) : (
-                              <>
-                                <Align />
-                                <hr />
-                                <Selection
-                                  empty={
-                                    <div className="mt-4 mb-10">
-                                      <DocumentProperties />
-                                    </div>
-                                  }
-                                />
-                              </>
-                            )}
-                          </FontFamilyListProvider>
-                        </SidebarRoot>
-                      </aside>
-                    )}
-                  </div>
-                </PreviewProvider>
+                                    </BrushToolbarPosition>
+                                    <ToolbarPosition>
+                                      <PlaygroundToolbar />
+                                    </ToolbarPosition>
+                                  </>
+                                )}
+                              </ViewportRoot>
+                              {pref.debug && <DevtoolsPanel />}
+                            </StandaloneSceneBackground>
+                          </EditorSurfaceContextMenu>
+                        </EditorSurfaceDropzone>
+                      </EditorSurfaceClipboardSyncProvider>
+                      {ui.sidebar === "visible" && (
+                        <aside className="h-full">
+                          <SidebarRight />
+                        </aside>
+                      )}
+                    </div>
+                  </PreviewProvider>
+                </FontFamilyListProvider>
               </UserCustomTemplatesProvider>
             </StandaloneDocumentEditor>
           </ErrorBoundary>
@@ -554,6 +510,79 @@ export default function CanvasPlayground({
         </main>
       </TooltipProvider>
     </SidebarProvider>
+  );
+}
+
+function useArtboardListCondition() {
+  const { tool } = useTool();
+  const { constraints } = useCurrentScene();
+  const should_show_artboards_list =
+    tool.type === "insert" &&
+    tool.node === "container" &&
+    constraints.children === "multiple";
+  return should_show_artboards_list;
+}
+
+function SidebarRight() {
+  const should_show_artboards_list = useArtboardListCondition();
+
+  return (
+    <SidebarRoot side="right" className="hidden sm:block">
+      <header className="h-11 flex items-center px-2 justify-end gap-2">
+        <Zoom
+          className={cn(
+            WorkbenchUI.inputVariants({
+              variant: "input",
+              size: "xs",
+            }),
+            "w-auto"
+          )}
+        />
+        <PreviewButton />
+      </header>
+      <hr />
+      {should_show_artboards_list ? (
+        <>
+          <DialogPrimitive.Root open>
+            <DialogPrimitive.Content className="h-full">
+              <DialogPrimitive.Title className="sr-only">
+                Artboards
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="sr-only">
+                Select an artboard to insert
+              </DialogPrimitive.Description>
+              <SidebarRoot>
+                <ArtboardsList />
+              </SidebarRoot>
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Root>
+        </>
+      ) : (
+        <>
+          <Align />
+          <hr />
+          <Selection
+            empty={
+              <div className="mt-4 mb-10">
+                <DocumentProperties />
+              </div>
+            }
+          />
+        </>
+      )}
+    </SidebarRoot>
+  );
+}
+
+function BrushToolbarPosition({ children }: React.PropsWithChildren<{}>) {
+  const { tool } = useTool();
+
+  if (!(tool.type === "brush" || tool.type === "eraser")) return null;
+
+  return (
+    <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center z-50 pointer-events-none">
+      <div className="relative left-8">{children}</div>
+    </div>
   );
 }
 

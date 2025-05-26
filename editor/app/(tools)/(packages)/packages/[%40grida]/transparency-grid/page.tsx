@@ -3,7 +3,7 @@
 import React from "react";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useGesture } from "@use-gesture/react";
-import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 
 export default function TransparencyGridDemoPage() {
   useDisableSwipeBack();

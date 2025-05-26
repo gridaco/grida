@@ -1,24 +1,24 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useState } from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import {
   EditorSurface,
-  initDocumentEditorState,
   StandaloneSceneContent,
   StandaloneDocumentEditor,
-  standaloneDocumentReducer,
   ViewportRoot,
-} from "@/grida-react-canvas";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+  AutoInitialFitTransformer,
+} from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
 import { Button } from "@/components/ui/button";
 import { useHotkeys } from "react-hotkeys-hook";
-import Link from "next/link";
+import { editor } from "@/grida-canvas";
 import iosvg from "@grida/io-svg";
+import Link from "next/link";
+import { useEditor } from "@/grida-canvas-react";
 
 export default function IOSVGPage() {
   const [raw, setRaw] = useState<string>();
@@ -30,9 +30,8 @@ export default function IOSVGPage() {
     accept: ".svg",
   });
 
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState({
+  const instance = useEditor(
+    editor.state.init({
       editable: true,
       debug: true,
       document: {
@@ -94,9 +93,9 @@ export default function IOSVGPage() {
               )
             );
 
-          dispatch({
+          instance.dispatch({
             type: "__internal/reset",
-            state: initDocumentEditorState({
+            state: editor.state.init({
               editable: true,
               document: doc,
             }),
@@ -160,11 +159,7 @@ export default function IOSVGPage() {
               <section className="flex-1">
                 <span className="text-sm font-bold font-mono">Grida</span>
                 <div className="w-full border h-96">
-                  <StandaloneDocumentEditor
-                    editable
-                    dispatch={dispatch}
-                    initial={state}
-                  >
+                  <StandaloneDocumentEditor editor={instance}>
                     <ViewportRoot className="relative w-full h-full p-4">
                       <EditorSurface />
                       <AutoInitialFitTransformer>

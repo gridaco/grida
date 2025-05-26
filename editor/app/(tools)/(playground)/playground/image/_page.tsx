@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useReducer } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ChatBoxFooter,
   ChatBox,
@@ -42,20 +42,18 @@ import {
   StandaloneSceneContent,
   ViewportRoot,
   EditorSurface,
-  standaloneDocumentReducer,
-  initDocumentEditorState,
+  AutoInitialFitTransformer,
   useDocument,
-} from "@/grida-react-canvas";
+} from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useEditorHotKeys } from "@/grida-react-canvas/viewport/hotkeys";
-import { useGoogleFontsList } from "@/grida-react-canvas/components/google-fonts";
-import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
-import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
-import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
+import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
+import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
-import { ToolbarPosition } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import {
   Sidebar,
   SidebarContent,
@@ -67,11 +65,12 @@ import {
   useContinueWithAuth,
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
+import { editor } from "@/grida-canvas";
+import { useEditor } from "@/grida-canvas-react";
 
 export default function ImagePlayground() {
-  const [state, dispatch] = useReducer(
-    standaloneDocumentReducer,
-    initDocumentEditorState({
+  const instance = useEditor(
+    editor.state.init({
       editable: true,
       document: {
         nodes: {},
@@ -94,7 +93,7 @@ export default function ImagePlayground() {
   return (
     <main className="w-screen h-screen overflow-hidden select-none">
       <AuthProvider>
-        <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <StandaloneDocumentEditor editor={instance}>
           <CanvasConsumer />
         </StandaloneDocumentEditor>
       </AuthProvider>
