@@ -254,7 +254,7 @@ export function useSelectionGroups(
   const grouped = useMemo(() => {
     const activenodes = __node_ids
       .map((id) => document.nodes[id])
-      .filter((n) => n && n.active);
+      .filter((n) => n?.active);
     return Object.groupBy(
       activenodes,
       (it) => editor.dq.getParentId(document_ctx, it.id) ?? ""
