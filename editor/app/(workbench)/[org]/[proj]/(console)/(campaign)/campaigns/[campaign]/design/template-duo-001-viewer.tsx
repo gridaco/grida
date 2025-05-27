@@ -12,7 +12,7 @@ import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
-  useDocument,
+  useCurrentEditor,
 } from "@/grida-canvas-react";
 import { Zoom } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { WorkbenchUI } from "@/components/workbench";
@@ -276,13 +276,13 @@ export function CampaignTemplateDuo001Viewer({
 
 // will be removed after useEditor is ready
 function EditorUXServer({ focus }: { focus: { node?: string } }) {
-  const { select } = useDocument();
+  const editor = useCurrentEditor();
   const { fit } = useTransform();
 
   useEffect(
     () => {
       if (focus.node) {
-        select([focus.node]);
+        editor.select([focus.node]);
         fit([focus.node], { margin: 64, animate: true });
       }
     },

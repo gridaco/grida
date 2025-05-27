@@ -8,10 +8,11 @@ import {
   useClipboardSync,
   useCurrentScene,
   useDocument,
+  useEditorSurface,
   useEventTargetCSSCursor,
   useNode,
-  usePointer,
-  useTool,
+  usePointerState,
+  useToolState,
   useTransform,
 } from "../provider";
 import { useCurrentEditor, useEditorState } from "../use-editor";
@@ -134,6 +135,7 @@ function SurfaceGroup({
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
+  const editor = useCurrentEditor();
   const { transform } = useTransform();
   const {
     zoom,
@@ -157,8 +159,7 @@ export function EditorSurface() {
     dragEnd,
   } = useEventTarget();
   const { brush } = useBrush();
-  const { tool, setTool, content_edit_mode, tryToggleContentEditMode } =
-    useTool();
+  const { tool, content_edit_mode } = useToolState();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
@@ -205,7 +206,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
         if (event.button === 1) {
           __hand_tool_triggered_by_aux_button.current = true;
-          setTool({ type: "hand" });
+          editor.setTool({ type: "hand" });
         }
       },
       onMouseUp: ({ event }) => {
@@ -213,7 +214,7 @@ export function EditorSurface() {
         if (event.button === 1) {
           if (__hand_tool_triggered_by_aux_button.current) {
             __hand_tool_triggered_by_aux_button.current = false;
-            setTool({ type: "cursor" });
+            editor.setTool({ type: "cursor" });
           }
         }
       },
@@ -233,7 +234,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        tryToggleContentEditMode(); // 1
+        editor.tryToggleContentEditMode(); // 1
         doubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
@@ -503,24 +504,24 @@ function NodeTitleBar({
   node_id: string;
   state: "idle" | "hover" | "active";
 }>) {
-  const { select, hoverEnterNode, changeNodeName } = useDocument();
+  const editor = useCurrentEditor();
 
   // TODO: knwon issue: when initially firing up the drag on not-selected node, it will cause the root to fire onDragEnd as soon as the drag starts.
   const bind = useSurfaceGesture(
     {
       onPointerMove: ({ event }) => {
-        hoverEnterNode(node.id);
+        editor.hoverEnterNode(node.id);
       },
       onDoubleClick: ({ event }) => {
         const name = prompt("rename", node.name);
-        if (name) changeNodeName(node.id, name);
+        if (name) editor.changeNodeName(node.id, name);
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
         if (event.shiftKey) {
-          select("selection", [node.id]);
+          editor.select("selection", [node.id]);
         } else {
-          select([node.id]);
+          editor.select([node.id]);
         }
       },
     },
@@ -559,7 +560,7 @@ export function EditorSurfaceClipboardSyncProvider({
 function FloatingCursorTooltip() {
   const { gesture } = useEventTarget();
   const { transform } = useTransform();
-  const pointer = usePointer();
+  const pointer = usePointerState();
   const pos = cmath.vector2.transform(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
   if (value) {
@@ -584,7 +585,7 @@ function FloatingCursorTooltip() {
 
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
   const { transform, scaleX, scaleY } = useTransform();
-  const pointer = usePointer();
+  const pointer = usePointerState();
   const pos = cmath.vector2.transform(
     // quantize position to canvas space 1.
     cmath.vector2.quantize(pointer.position, 1),
@@ -729,10 +730,9 @@ function SelectionGroupOverlay({
 }: SurfaceSelectionGroup & {
   readonly?: boolean;
 }) {
-  const { tool } = useTool();
+  const editor = useCurrentEditor();
+  const { tool } = useToolState();
   const { multipleSelectionOverlayClick } = useEventTarget();
-
-  const { distributeEvenly } = useDocument();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -787,7 +787,7 @@ function SelectionGroupOverlay({
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
           onClick={(axis) => {
-            distributeEvenly("selection", axis);
+            editor.distributeEvenly("selection", axis);
           }}
         />
         {boundingSurfaceRect && (
@@ -954,7 +954,7 @@ function LayerOverlayRotationHandle({
   offset?: number;
   size?: number;
 }) {
-  const { getNodeAbsoluteRotation } = useDocument();
+  const { getNodeAbsoluteRotation } = useEditorSurface();
   const { startRotateGesture } = useEventTarget();
 
   const rotation = getNodeAbsoluteRotation(node_id);
@@ -1050,7 +1050,7 @@ function Edge({
   transform: cmath.Transform;
 }) {
   // normalize a/b to surface space position
-  const { getNodeById } = useDocument();
+  const editor = useCurrentEditor();
 
   const get_pos = (p: grida.program.document.EdgePoint) => {
     switch (p.type) {
@@ -1058,7 +1058,7 @@ function Edge({
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
-          const n = getNodeById(p.target);
+          const n = editor.getNodeById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
           return cmath.vector2.transform([cx, cy], transform);

@@ -1,20 +1,20 @@
 import {
   useNode,
   useNodeAction,
-  useTool,
   useTransform,
-} from "@/grida-canvas-react/provider";
+  useCurrentEditor,
+} from "@/grida-canvas-react";
 import { useEffect, useRef } from "react";
 import { useSingleSelection } from "../surface-hooks";
-import grida from "@grida/schema";
 import { css } from "@/grida-canvas-utils/css";
+import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
+  const editor = useCurrentEditor();
   const { transform } = useTransform();
-  const { tryExitContentEditMode } = useTool();
   const data = useSingleSelection(node_id);
   const node = useNode(node_id!);
 
@@ -58,7 +58,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
             onPointerDown={stopPropagation}
             value={node.text as string}
             maxLength={node.maxLength}
-            onBlur={tryExitContentEditMode}
+            onBlur={editor.tryExitContentEditMode}
             onKeyDown={(e) => {
               stopPropagation(e);
               if (e.key === "Escape") {

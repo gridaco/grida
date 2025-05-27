@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/components/lib/utils";
-import { useBrush, useDocument } from "@/grida-canvas-react/provider";
+import { useBrush, useCurrentEditor } from "@/grida-canvas-react";
 import {
   DotsHorizontalIcon,
   TransparencyGridIcon,
@@ -294,7 +294,7 @@ function BrushItem({
 }
 
 function EyedropButton() {
-  const { setClipboardColor } = useDocument();
+  const editor = useCurrentEditor();
   const { isSupported, open } = useEyeDropper();
 
   const mod = () => {
@@ -302,7 +302,7 @@ function EyedropButton() {
       open()?.then((result) => {
         const rgba = cmath.color.hex_to_rgba8888(result.sRGBHex);
         // editor clipboard
-        setClipboardColor(rgba);
+        editor.setClipboardColor(rgba);
       });
     } else {
       toast.error("This feature is not supported in your browser.");

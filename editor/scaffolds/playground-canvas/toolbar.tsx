@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { generate } from "@/app/(dev)/canvas/actions";
-import { useDocument, useEventTarget } from "@/grida-canvas-react";
+import {
+  useCurrentEditor,
+  useDocument,
+  useEditorState,
+  useEventTarget,
+} from "@/grida-canvas-react";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +41,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useTool } from "@/grida-canvas-react/provider";
+import { useToolState } from "@/grida-canvas-react/provider";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -62,7 +67,8 @@ function useGenerate() {
 }
 
 function useTextRewriteDemo() {
-  const { document, changeNodeText } = useDocument();
+  const editor = useCurrentEditor();
+  const { document } = useDocument();
   const [delta, setDelta] = useState<{} | undefined>();
   const [loading, setLoading] = useState(false);
   const [aiSettings] = useLocalStorage<string | undefined>(
@@ -127,7 +133,7 @@ ${userprompt}
           const { changes } = d as any;
           changes?.forEach((change: { id: string; text: string }) => {
             if (!(change.id && change.text)) return;
-            changeNodeText(change.id, change.text);
+            editor.changeNodeText(change.id, change.text);
           });
         },
         () => {
@@ -135,14 +141,15 @@ ${userprompt}
         }
       );
     },
-    [changeNodeText, generate, editableTextNodes]
+    [editor, generate, editableTextNodes]
   );
 
   return { action, delta, loading };
 }
 
 export function PlaygroundToolbar() {
-  const { setTool, tool, content_edit_mode } = useTool();
+  const editor = useCurrentEditor();
+  const { tool, content_edit_mode } = useToolState();
 
   const value = toolmode_to_toolbar_value(tool);
 
@@ -156,7 +163,7 @@ export function PlaygroundToolbar() {
       <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
         <ToggleGroup
           onValueChange={(v) => {
-            setTool(
+            editor.setTool(
               v
                 ? toolbar_value_to_cursormode(v as ToolbarToolType)
                 : { type: "cursor" }
@@ -173,7 +180,7 @@ export function PlaygroundToolbar() {
               { value: "hand", label: "Hand tool", shortcut: "H" },
             ]}
             onValueChange={(v) => {
-              setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
             }}
           />
           <VerticalDivider />
@@ -192,7 +199,7 @@ export function PlaygroundToolbar() {
               { value: "image", label: "Image" },
             ]}
             onValueChange={(v) => {
-              setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
             }}
           />
           <ToolsGroup
@@ -204,7 +211,7 @@ export function PlaygroundToolbar() {
               { value: "eraser", label: "Eraser tool", shortcut: "E" },
             ]}
             onValueChange={(v) => {
-              setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+              editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
             }}
           />
           <VerticalDivider />
@@ -235,7 +242,8 @@ export function PlaygroundToolbar() {
 }
 
 function BitmapEditModeAuxiliaryToolbar() {
-  const { tool, setTool, tryExitContentEditMode } = useTool();
+  const editor = useCurrentEditor();
+  const { tool } = useToolState();
 
   return (
     <div className="rounded-full flex justify-center items-center gap-2 border bg-background shadow px-3 py-1 pointer-events-auto select-none">
@@ -247,7 +255,7 @@ function BitmapEditModeAuxiliaryToolbar() {
               pressed={tool.type === "flood-fill"}
               onPressedChange={(pressed) => {
                 if (pressed) {
-                  setTool({ type: "flood-fill" });
+                  editor.setTool({ type: "flood-fill" });
                 }
               }}
             >
@@ -264,7 +272,7 @@ function BitmapEditModeAuxiliaryToolbar() {
             variant="ghost"
             size="icon"
             className="p-0.5"
-            onClick={tryExitContentEditMode}
+            onClick={editor.tryExitContentEditMode}
           >
             <Cross2Icon className="w-3.5 h-3.5" />
           </Button>
@@ -300,7 +308,8 @@ const defaultColors = {
 };
 
 function ClipboardColor() {
-  const { clipboardColor, setClipboardColor } = useDocument();
+  const editor = useCurrentEditor();
+  const clipboardColor = useEditorState(editor, (s) => s.user_clipboard_color);
 
   const color = clipboardColor ?? { r: 0, g: 0, b: 0, a: 1 };
 
@@ -333,7 +342,7 @@ function ClipboardColor() {
       >
         <ColorPicker
           color={color}
-          onColorChange={setClipboardColor}
+          onColorChange={editor.setClipboardColor}
           options={options}
         />
       </PopoverContent>

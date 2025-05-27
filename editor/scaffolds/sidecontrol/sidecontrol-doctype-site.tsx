@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Align, Selection, Zoom } from "./sidecontrol-node-selection";
-import { SidebarSection } from "@/components/sidebar";
 import { DocumentProperties } from "./sidecontrol-document-properties";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,7 @@ import {
 import { Rnd } from "react-rnd";
 import { Portal } from "@radix-ui/react-portal";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor } from "@/grida-canvas-react";
 import parsecolor from "color-parse";
 import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { cn } from "@/components/lib/utils";
@@ -66,7 +65,7 @@ function ThemeEditorPortal({
   // persistanceKey?: string;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { schemaPutProperty } = useDocument();
+  const editor = useCurrentEditor();
 
   return (
     <Portal className="fixed inset-0 z-50 pointer-events-none">
@@ -137,7 +136,7 @@ function ThemeEditorPortal({
                 }
                 `;
 
-                schemaPutProperty("user-custom-css", {
+                editor.schemaPutProperty("user-custom-css", {
                   type: "string",
                   default: propertiescss,
                 });

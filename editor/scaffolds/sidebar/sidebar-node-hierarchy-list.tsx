@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor } from "@/grida-canvas-react";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -15,7 +15,7 @@ import {
 } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 
 export function ScenesGroup() {
-  const { createScene } = useDocument();
+  const editor = useCurrentEditor();
 
   return (
     <SidebarGroup
@@ -24,7 +24,7 @@ export function ScenesGroup() {
     >
       <SidebarGroupLabel>
         Scenes
-        <SidebarGroupAction onClick={() => createScene()}>
+        <SidebarGroupAction onClick={() => editor.createScene()}>
           <PlusIcon />
           <span className="sr-only">New Scene</span>
         </SidebarGroupAction>

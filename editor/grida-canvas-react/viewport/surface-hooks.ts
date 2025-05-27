@@ -3,7 +3,7 @@ import { useDocument } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
-import { NodeWithMeta, useTransform } from "../provider";
+import { NodeWithMeta, useEditorSurface, useTransform } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { editor } from "@/grida-canvas";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
@@ -295,7 +295,8 @@ export function useSingleSelection(
     enabled: boolean;
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
-  const { document, document_ctx, getNodeAbsoluteRotation } = useDocument();
+  const { getNodeAbsoluteRotation } = useEditorSurface();
+  const { document, document_ctx } = useDocument();
   const { transform } = useTransform();
   const node = document.nodes[node_id];
 

@@ -8,8 +8,13 @@ export {
   StandaloneDocumentEditor,
   useDocument,
   useNode,
+  useBrush,
   useEventTarget,
   useComputedNode,
+  useNodeAction,
+  useTransform,
+  useToolState,
+  useEditorFlagsState,
   useRootTemplateInstanceNode,
   useTemplateDefinition,
 } from "./provider";

@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import {
   useEventTarget,
-  usePointer,
-  useTool,
+  usePointerState,
+  useToolState,
   useTransform,
 } from "../../provider";
 import { useViewport } from "../context";
@@ -25,9 +25,9 @@ export function EdgeScrollingEffect(
 
 export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
   const { dragging } = useEventTarget();
-  const { tool } = useTool();
+  const { tool } = useToolState();
   const { transform, setTransform } = useTransform();
-  const pointer = usePointer();
+  const pointer = usePointerState();
   const viewport = useViewport();
 
   useEffect(() => {

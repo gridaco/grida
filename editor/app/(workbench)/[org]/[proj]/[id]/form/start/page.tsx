@@ -53,7 +53,6 @@ import {
   StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
-  useDocument,
   useRootTemplateInstanceNode,
 } from "@/grida-canvas-react";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";

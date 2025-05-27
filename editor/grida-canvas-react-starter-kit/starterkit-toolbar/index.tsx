@@ -26,7 +26,11 @@ import {
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useEditorFlags, useTool } from "@/grida-canvas-react/provider";
+import {
+  useCurrentEditor,
+  useEditorFlagsState,
+  useToolState,
+} from "@/grida-canvas-react";
 import { cn } from "@/components/lib/utils";
 
 export function ToolbarPosition({
@@ -48,8 +52,9 @@ export function ToolbarPosition({
 }
 
 export default function Toolbar() {
-  const { setTool, tool } = useTool();
-  const { flags } = useEditorFlags();
+  const editor = useCurrentEditor();
+  const { tool } = useToolState();
+  const { flags } = useEditorFlagsState();
   const value = toolmode_to_toolbar_value(tool);
 
   const tools = useMemo(() => {
@@ -74,7 +79,7 @@ export default function Toolbar() {
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
       <ToggleGroup
         onValueChange={(v) => {
-          setTool(
+          editor.setTool(
             v
               ? toolbar_value_to_cursormode(v as ToolbarToolType)
               : { type: "cursor" }
@@ -91,7 +96,7 @@ export default function Toolbar() {
             { value: "hand", label: "Hand tool", shortcut: "H" },
           ]}
           onValueChange={(v) => {
-            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <VerticalDivider />
@@ -110,14 +115,14 @@ export default function Toolbar() {
             { value: "image", label: "Image" },
           ]}
           onValueChange={(v) => {
-            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
         <ToolsGroup
           value={value}
           options={tools}
           onValueChange={(v) => {
-            setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
+            editor.setTool(toolbar_value_to_cursormode(v as ToolbarToolType));
           }}
         />
       </ToggleGroup>

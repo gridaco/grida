@@ -45,7 +45,12 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { useComputedNode, useDocument, useNode } from "@/grida-canvas-react";
+import {
+  useComputedNode,
+  useCurrentEditor,
+  useDocument,
+  useNode,
+} from "@/grida-canvas-react";
 import {
   Crosshair2Icon,
   LockClosedIcon,
@@ -59,7 +64,7 @@ import grida from "@grida/schema";
 import assert from "assert";
 import {
   useCurrentScene,
-  useEditorFlags,
+  useEditorFlagsState,
   useNodeAction,
   useSelection,
   useSelectionPaints,
@@ -86,7 +91,8 @@ import {
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 
 export function Align() {
-  const { selection, align, distributeEvenly } = useDocument();
+  const editor = useCurrentEditor();
+  const { selection } = useDocument();
   const has_selection = selection.length >= 1;
 
   return (
@@ -94,10 +100,10 @@ export function Align() {
       <_AlignControl
         disabled={!has_selection}
         onAlign={(alignment) => {
-          align("selection", alignment);
+          editor.align("selection", alignment);
         }}
         onDistributeEvenly={(axis) => {
-          distributeEvenly("selection", axis);
+          editor.distributeEvenly("selection", axis);
         }}
       />
     </SidebarSection>
@@ -214,7 +220,7 @@ function SelectionMixedProperties({
   } = properties;
 
   const sid = ids.join(",");
-  const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
+  // const is_root = ids.length === 0 && scene.children.includes(ids[0]); // assuming when root is selected, only root is selected
   const types = new Set(nodes.map((n) => n.type));
   const _types = Array.from(types);
 
@@ -659,7 +665,7 @@ function SelectedNodeProperties({
   config?: ControlsConfig;
 }) {
   const { selection, document } = useDocument();
-  const { debug } = useEditorFlags();
+  const { debug } = useEditorFlagsState();
   const scene = useCurrentScene();
 
   assert(selection.length === 1);
@@ -1202,7 +1208,7 @@ function SelectedNodeProperties({
 }
 
 function SelectionColors() {
-  const { select } = useDocument();
+  const editor = useCurrentEditor();
   const { ids, paints, setPaint } = useSelectionPaints();
 
   // this should show when,
@@ -1235,7 +1241,7 @@ function SelectionColors() {
                 size="xs"
                 className="opacity-0 group-hover:opacity-100"
                 onClick={() => {
-                  select(ids);
+                  editor.select(ids);
                 }}
               >
                 <Crosshair2Icon className="size-3" />

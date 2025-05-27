@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocument } from "@/grida-canvas-react";
 import {
   Tree,
   TreeDragLine,
@@ -52,7 +52,7 @@ function SceneItemContextMenuWrapper({
   scene_id: string;
   onStartRenaming?: () => void;
 }>) {
-  const { deleteScene, duplicateScene } = useDocument();
+  const editor = useCurrentEditor();
 
   return (
     <ContextMenu>
@@ -71,7 +71,7 @@ function SceneItemContextMenuWrapper({
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
-            duplicateScene(scene_id);
+            editor.duplicateScene(scene_id);
           }}
           className="text-xs"
         >
@@ -80,7 +80,7 @@ function SceneItemContextMenuWrapper({
         <ContextMenuSeparator />
         <ContextMenuItem
           onSelect={() => {
-            deleteScene(scene_id);
+            editor.deleteScene(scene_id);
           }}
           className="text-xs"
         >
@@ -92,7 +92,8 @@ function SceneItemContextMenuWrapper({
 }
 
 export function ScenesList() {
-  const { scenes: scenesmap, scene_id, loadScene, renameScene } = useDocument();
+  const editor = useCurrentEditor();
+  const { scenes: scenesmap, scene_id } = useDocument();
 
   const scenes = useMemo(() => {
     return Object.values(scenesmap).sort(
@@ -110,7 +111,7 @@ export function ScenesList() {
       selectedItems: scene_id ? [scene_id] : [],
     },
     setSelectedItems: (items) => {
-      loadScene((items as string[])[0]);
+      editor.loadScene((items as string[])[0]);
     },
     getItemName: (item) => {
       if (item.getId() === "<document>") return "<document>";
@@ -174,7 +175,7 @@ export function ScenesList() {
                   isRenaming={isRenaming}
                   initialValue={scene.name}
                   onValueCommit={(name) => {
-                    renameScene(scene.id, name);
+                    editor.renameScene(scene.id, name);
                     tree.abortRenaming();
                   }}
                   className="font-normal h-8 text-xs! px-2! py-1.5!"
@@ -196,7 +197,7 @@ function NodeHierarchyItemContextMenuWrapper({
   node_id: string;
   onStartRenaming?: () => void;
 }>) {
-  const { copy, deleteNode, order } = useDocument();
+  const editor = useCurrentEditor();
   const { fit } = useTransform();
   const change = useNodeAction(node_id)!;
 
@@ -206,7 +207,7 @@ function NodeHierarchyItemContextMenuWrapper({
       <ContextMenuContent className="min-w-52">
         <ContextMenuItem
           onSelect={() => {
-            copy(node_id);
+            editor.copy(node_id);
           }}
           className="text-xs"
         >
@@ -225,14 +226,14 @@ function NodeHierarchyItemContextMenuWrapper({
         {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
         {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
         <ContextMenuItem
-          onSelect={() => order(node_id, "front")}
+          onSelect={() => editor.order(node_id, "front")}
           className="text-xs"
         >
           Bring to front
           <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
-          onSelect={() => order(node_id, "back")}
+          onSelect={() => editor.order(node_id, "back")}
           className="text-xs"
         >
           Send to back
@@ -260,7 +261,7 @@ function NodeHierarchyItemContextMenuWrapper({
         <ContextMenuSeparator />
         <ContextMenuItem
           onSelect={() => {
-            deleteNode(node_id);
+            editor.deleteNode(node_id);
           }}
           className="text-xs"
         >
@@ -273,15 +274,8 @@ function NodeHierarchyItemContextMenuWrapper({
 }
 
 export function NodeHierarchyList() {
-  const {
-    document,
-    mv,
-    select,
-    hoverNode,
-    toggleNodeLocked,
-    toggleNodeActive,
-    changeNodeName,
-  } = useDocument();
+  const editor = useCurrentEditor();
+  const { document } = useDocument();
 
   const { id, name, children, selection, hovered_node_id } = useCurrentScene();
 
@@ -303,7 +297,7 @@ export function NodeHierarchyList() {
       selectedItems: selection,
     },
     setSelectedItems: (items) => {
-      select(items as string[]);
+      editor.select(items as string[]);
     },
     getItemName: (item) => {
       if (item.getId() === "<root>") {
@@ -320,7 +314,7 @@ export function NodeHierarchyList() {
       const target_id = target.item.getId();
       const index =
         "insertionIndex" in target ? target.insertionIndex : undefined;
-      mv(ids, target_id, index);
+      editor.mv(ids, target_id, index);
     },
     indent: 6,
     dataLoader: {
@@ -373,10 +367,10 @@ export function NodeHierarchyList() {
               item={item}
               className="w-full h-7 max-h-7 py-0.5"
               onPointerEnter={() => {
-                hoverNode(node.id, "enter");
+                editor.hoverNode(node.id, "enter");
               }}
               onPointerLeave={() => {
-                hoverNode(node.id, "leave");
+                editor.hoverNode(node.id, "leave");
               }}
             >
               <TreeItemLabel
@@ -397,7 +391,7 @@ export function NodeHierarchyList() {
                       isRenaming={isRenaming}
                       initialValue={node.name}
                       onValueCommit={(name) => {
-                        changeNodeName(node.id, name);
+                        editor.changeNodeName(node.id, name);
                         tree.abortRenaming();
                       }}
                       className="px-1 py-0.5 font-normal text-[11px]"
@@ -411,7 +405,7 @@ export function NodeHierarchyList() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleNodeLocked(node.id);
+                      editor.toggleNodeLocked(node.id);
                     }}
                   >
                     {node.locked ? (
@@ -423,7 +417,7 @@ export function NodeHierarchyList() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleNodeActive(node.id);
+                      editor.toggleNodeActive(node.id);
                     }}
                   >
                     {node.active ? (

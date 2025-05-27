@@ -1,8 +1,8 @@
 import React from "react";
 import {
-  useEditorFlags,
+  useEditorFlagsState,
   useSurfacePathEditor,
-  useTool,
+  useToolState,
   useTransform,
 } from "@/grida-canvas-react/provider";
 import cmath from "@grida/cmath";
@@ -12,8 +12,8 @@ import { svg } from "@/grida-canvas-utils/svg";
 import assert from "assert";
 
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
-  const { debug } = useEditorFlags();
-  const { tool } = useTool();
+  const { debug } = useEditorFlagsState();
+  const { tool } = useToolState();
   const { transform } = useTransform();
   const {
     node_id,

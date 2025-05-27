@@ -1866,177 +1866,105 @@ export namespace editor.api {
   }
 
   export interface IDocumentEditorActions {
-    loadScene: (scene_id: string) => void;
-    createScene: (scene?: grida.program.document.SceneInit) => void;
-    deleteScene: (scene_id: string) => void;
-    duplicateScene: (scene_id: string) => void;
-    renameScene: (scene_id: string, name: string) => void;
+    loadScene(scene_id: string): void;
+    createScene(scene?: grida.program.document.SceneInit): void;
+    deleteScene(scene_id: string): void;
+    duplicateScene(scene_id: string): void;
+    renameScene(scene_id: string, name: string): void;
+    changeSceneBackground(
+      scene_id: string,
+      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
+    ): void;
+    //
+    setTool(tool: editor.state.ToolMode): void;
+    tryExitContentEditMode(): void;
+    tryToggleContentEditMode(): void;
+    tryEnterContentEditMode(): void;
+    //
+    hoverNode(node_id: string, event: "enter" | "leave"): void;
+    hoverEnterNode(node_id: string): void;
+    hoverLeaveNode(node_id: string): void;
 
     //
-    hoverNode: (node_id: string, event: "enter" | "leave") => void;
-    hoverEnterNode: (node_id: string) => void;
-    hoverLeaveNode: (node_id: string) => void;
-
-    //
-    select: (...selectors: grida.program.document.Selector[]) => void;
-    blur: () => void;
-    undo: () => void;
-    redo: () => void;
-    cut: (target: "selection" | NodeID) => void;
-    copy: (target: "selection" | NodeID) => void;
-    paste: () => void;
-    duplicate: (target: "selection" | NodeID) => void;
+    select(...selectors: grida.program.document.Selector[]): void;
+    blur(): void;
+    undo(): void;
+    redo(): void;
+    cut(target: "selection" | NodeID): void;
+    copy(target: "selection" | NodeID): void;
+    paste(): void;
+    duplicate(target: "selection" | NodeID): void;
 
     setClipboardColor: (color: cg.RGBA8888) => void;
-    deleteNode: (target: "selection" | NodeID) => void;
+    deleteNode(target: "selection" | NodeID): void;
 
     //
-    createNodeId: () => NodeID;
-    getNodeById: (node_id: NodeID) => grida.program.nodes.Node;
-    getNodeDepth: (node_id: NodeID) => number;
-    getNodeAbsoluteRotation: (node_id: NodeID) => number;
-    insertNode: (prototype: grida.program.nodes.NodePrototype) => void;
+    selectVertex(node_id: NodeID, vertex: number): void;
+    deleteVertex(node_id: NodeID, vertex: number): void;
+    //
 
     //
-    nudge: (
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number,
-      config?: NudgeUXConfig
-    ) => void;
-    nudgeResize: (
+    createNodeId(): NodeID;
+    getNodeById(node_id: NodeID): grida.program.nodes.Node;
+    getNodeDepth(node_id: NodeID): number;
+    insertNode(prototype: grida.program.nodes.NodePrototype): void;
+
+    //
+    nudgeResize(
       target: "selection" | NodeID,
       axis: "x" | "y",
       delta: number
-    ) => void;
-    a11yarrow: (
-      target: "selection" | NodeID,
-      direction: "up" | "down" | "left" | "right",
-      shiftKey: boolean,
-      config?: NudgeUXConfig
-    ) => void;
-    align: (
+    ): void;
+    align(
       target: "selection" | NodeID,
       alignment: {
         horizontal?: "none" | "min" | "max" | "center";
         vertical?: "none" | "min" | "max" | "center";
       }
-    ) => void;
-    order: (
-      target: "selection" | NodeID,
-      order: "back" | "front" | number
-    ) => void;
-    mv: (source: NodeID[], target: NodeID, index?: number) => void;
+    ): void;
+    order(target: "selection" | NodeID, order: "back" | "front" | number): void;
+    mv(source: NodeID[], target: NodeID, index?: number): void;
     //
-    distributeEvenly: (target: "selection" | NodeID[], axis: "x" | "y") => void;
-    autoLayout: (target: "selection" | NodeID[]) => void;
-    contain: (target: "selection" | NodeID[]) => void;
-    configureSurfaceRaycastTargeting: (
+    distributeEvenly(target: "selection" | NodeID[], axis: "x" | "y"): void;
+    autoLayout(target: "selection" | NodeID[]): void;
+    contain(target: "selection" | NodeID[]): void;
+    configureSurfaceRaycastTargeting(
       config: Partial<state.HitTestingConfig>
-    ) => void;
-    configureMeasurement: (measurement: "on" | "off") => void;
-    configureTranslateWithCloneModifier: (
+    ): void;
+    configureMeasurement(measurement: "on" | "off"): void;
+    configureTranslateWithCloneModifier(
       translate_with_clone: "on" | "off"
-    ) => void;
-    configureTranslateWithAxisLockModifier: (
+    ): void;
+    configureTranslateWithAxisLockModifier(
       tarnslate_with_axis_lock: "on" | "off"
-    ) => void;
-    configureTransformWithCenterOriginModifier: (
+    ): void;
+    configureTransformWithCenterOriginModifier(
       transform_with_center_origin: "on" | "off"
-    ) => void;
-    configureTransformWithPreserveAspectRatioModifier: (
+    ): void;
+    configureTransformWithPreserveAspectRatioModifier(
       transform_with_preserve_aspect_ratio: "on" | "off"
-    ) => void;
-    configureRotateWithQuantizeModifier: (
+    ): void;
+    configureRotateWithQuantizeModifier(
       rotate_with_quantize: number | "off"
-    ) => void;
+    ): void;
     // //
-    toggleActive: (target: "selection" | NodeID) => void;
-    toggleLocked: (target: "selection" | NodeID) => void;
-    toggleBold: (target: "selection" | NodeID) => void;
+    toggleActive(target: "selection" | NodeID): void;
+    toggleLocked(target: "selection" | NodeID): void;
+    toggleBold(target: "selection" | NodeID): void;
     // //
-    setOpacity: (target: "selection" | NodeID, opacity: number) => void;
+    setOpacity(target: "selection" | NodeID, opacity: number): void;
+
     // //
-    schemaDefineProperty: (
+    schemaDefineProperty(
       key?: string,
       definition?: grida.program.schema.PropertyDefinition
-    ) => void;
-    schemaRenameProperty: (key: string, newName: string) => void;
-    schemaUpdateProperty: (
+    ): void;
+    schemaRenameProperty(key: string, newName: string): void;
+    schemaUpdateProperty(
       key: string,
       definition: grida.program.schema.PropertyDefinition
-    ) => void;
-    schemaPutProperty: (key: string, value: any) => void;
-    schemaDeleteProperty: (key: string) => void;
-  }
-
-  export interface IStandaloneEditorApi {
-    selection: ReadonlyArray<NodeID>;
-    getNodeById: (node_id: NodeID) => grida.program.nodes.Node;
-    getNodeDepth: (node_id: NodeID) => number;
-    getNodeAbsoluteRotation: (node_id: NodeID) => number;
-
-    select: (...selectors: grida.program.document.Selector[]) => void;
-    blur: () => void;
-    undo: () => void;
-    redo: () => void;
-    cut: (target: "selection" | NodeID) => void;
-    copy: (target: "selection" | NodeID) => void;
-    paste: () => void;
-    duplicate: (target: "selection" | NodeID) => void;
-    delete: (target: "selection" | NodeID) => void;
-    rename: (target: "selection" | NodeID, name: string) => void;
-
-    nudge: (
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ) => void;
-    nudgeResize: (
-      target: "selection" | NodeID,
-      axis: "x" | "y",
-      delta: number
-    ) => void;
-
-    align: (
-      target: "selection" | NodeID,
-      alignment: {
-        horizontal?: "none" | "min" | "max" | "center";
-        vertical?: "none" | "min" | "max" | "center";
-      }
-    ) => void;
-    order: (
-      target: "selection" | NodeID,
-      order: "back" | "front" | number
-    ) => void;
-    distributeEvenly: (target: "selection" | NodeID[], axis: "x" | "y") => void;
-
-    toggleActive: (target: "selection" | NodeID) => void;
-    toggleLocked: (target: "selection" | NodeID) => void;
-    toggleBold: (target: "selection" | NodeID) => void;
-    setOpacity: (target: "selection" | NodeID, opacity: number) => void;
-
-    createRectangle(
-      props: Omit<grida.program.nodes.NodePrototype, "type">
     ): void;
-    createEllipse(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
-    createText(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
-
-    configureMeasurement: (measurement: "on" | "off") => void;
-    configureTranslateWithCloneModifier: (
-      translate_with_clone: "on" | "off"
-    ) => void;
-    configureTranslateWithAxisLockModifier: (
-      tarnslate_with_axis_lock: "on" | "off"
-    ) => void;
-    configureTransformWithCenterOriginModifier: (
-      transform_with_center_origin: "on" | "off"
-    ) => void;
-    configureTransformWithPreserveAspectRatioModifier: (
-      transform_with_preserve_aspect_ratio: "on" | "off"
-    ) => void;
-    configureRotateWithQuantizeModifier: (
-      rotate_with_quantize: number | "off"
-    ) => void;
+    schemaPutProperty(key: string, value: any): void;
+    schemaDeleteProperty(key: string): void;
   }
 }

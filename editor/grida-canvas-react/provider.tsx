@@ -24,10 +24,39 @@ import deepEqual from "deep-equal";
 import { toast } from "sonner";
 import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
-import nid from "@/grida-canvas/reducers/tools/id";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
+
+class EditorConsumerError extends Error {
+  context: any;
+  constructor(message: string, context: any) {
+    super(message); // Pass message to the parent Error class
+    this.name = this.constructor.name; // Set the error name
+    this.context = context; // Attach the context object
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
+  }
+}
+
+function throttle<T extends (...args: any[]) => void>(
+  func: T,
+  limit: number
+): T {
+  let inThrottle: boolean;
+  return function (this: any, ...args: Parameters<T>) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  } as T;
+}
 
 type Dispatcher = (action: Action) => void;
 
@@ -1088,7 +1117,7 @@ export function useSelectionPaints() {
   }, [selection, paints, ids, setPaint]);
 }
 
-export function useEditorFlags() {
+export function useEditorFlagsState() {
   const instance = useCurrentEditor();
   const flags = useEditorState(instance, (state) => state.flags);
   const debug = useEditorState(instance, (state) => state.debug);
@@ -1101,271 +1130,29 @@ export function useEditorFlags() {
   }, [flags, debug]);
 }
 
-export function useDocument(): editor.api.IDocumentEditorActions &
-  editor.api.INodeChangeActions & {
-    selection: editor.state.IEditorState["selection"];
-    document: editor.state.IEditorState["document"];
-    document_ctx: editor.state.IEditorState["document_ctx"];
-    scenes: editor.state.IEditorState["document"]["scenes"];
-    scene_id: editor.state.IEditorState["scene_id"];
-    hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-    templates: editor.state.IEditorState["templates"];
-    clipboardColor: editor.state.IEditorState["user_clipboard_color"];
-  } {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    selection: state.selection,
-    document: state.document,
-    document_ctx: state.document_ctx,
-    scenes: state.document.scenes,
-    scene_id: state.scene_id,
-    hovered_node_id: state.hovered_node_id,
-    templates: state.templates,
-    user_clipboard_color: state.user_clipboard_color,
-  }));
+export function useEditorSurface(): {
+  a11yarrow: (
+    target: "selection" | editor.NodeID,
+    direction: "up" | "down" | "left" | "right",
+    shiftKey: boolean,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
+  nudge: (
+    target: "selection" | editor.NodeID,
+    axis: "x" | "y",
+    delta: number,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
+  getNodeAbsoluteRotation: (node_id: editor.NodeID) => number;
+} {
+  const editor = useCurrentEditor();
 
   const dispatch = React.useCallback(
-    (action: Action) => instance.dispatch(action),
-    [instance]
+    (action: Action) => editor.dispatch(action),
+    [editor]
   );
 
-  const {
-    selection,
-    document,
-    document_ctx,
-    scene_id,
-    scenes,
-    hovered_node_id,
-    templates,
-    user_clipboard_color,
-  } = state;
-
-  const nodeActions = __useNodeActions(dispatch);
-
-  const createNodeId: editor.api.IDocumentEditorActions["createNodeId"] =
-    useCallback(() => {
-      return nid();
-    }, []);
-
-  const loadScene: editor.api.IDocumentEditorActions["loadScene"] = useCallback(
-    (scene: string) => {
-      dispatch({
-        type: "load",
-        scene,
-      });
-    },
-    [dispatch]
-  );
-
-  const createScene: editor.api.IDocumentEditorActions["createScene"] =
-    useCallback(
-      (scene?: grida.program.document.SceneInit) => {
-        dispatch({
-          type: "scenes/new",
-          scene,
-        });
-      },
-      [dispatch]
-    );
-
-  const deleteScene: editor.api.IDocumentEditorActions["deleteScene"] =
-    useCallback(
-      (scene: string) => {
-        dispatch({
-          type: "scenes/delete",
-          scene,
-        });
-      },
-      [dispatch]
-    );
-
-  const duplicateScene: editor.api.IDocumentEditorActions["duplicateScene"] =
-    useCallback(
-      (scene: string) => {
-        dispatch({
-          type: "scenes/duplicate",
-          scene,
-        });
-      },
-      [dispatch]
-    );
-
-  const renameScene: editor.api.IDocumentEditorActions["renameScene"] =
-    useCallback(
-      (scene: string, name: string) => {
-        dispatch({
-          type: "scenes/change/name",
-          scene,
-          name,
-        });
-      },
-      [dispatch]
-    );
-
-  const hoverNode: editor.api.IDocumentEditorActions["hoverNode"] = useCallback(
-    (node_id: string, event: "enter" | "leave") => {
-      dispatch({
-        type: "hover",
-        target: node_id,
-        event,
-      });
-    },
-    [dispatch]
-  );
-
-  const hoverEnterNode: editor.api.IDocumentEditorActions["hoverEnterNode"] =
-    useCallback((node_id: string) => hoverNode(node_id, "enter"), [hoverNode]);
-
-  const hoverLeaveNode: editor.api.IDocumentEditorActions["hoverLeaveNode"] =
-    useCallback((node_id: string) => hoverNode(node_id, "leave"), [hoverNode]);
-
-  const select: editor.api.IDocumentEditorActions["select"] = useCallback(
-    (...selectors: grida.program.document.Selector[]) =>
-      dispatch({
-        type: "select",
-        selectors: selectors,
-      }),
-    [dispatch]
-  );
-
-  const blur: editor.api.IDocumentEditorActions["blur"] = useCallback(
-    () =>
-      dispatch({
-        type: "blur",
-      }),
-    [dispatch]
-  );
-
-  const undo: editor.api.IDocumentEditorActions["undo"] = useCallback(() => {
-    dispatch({
-      type: "undo",
-    });
-  }, [dispatch]);
-
-  const redo: editor.api.IDocumentEditorActions["redo"] = useCallback(() => {
-    dispatch({
-      type: "redo",
-    });
-  }, [dispatch]);
-
-  const cut: editor.api.IDocumentEditorActions["cut"] = useCallback(
-    (target: "selection" | (string & {}) = "selection") => {
-      dispatch({
-        type: "cut",
-        target: target,
-      });
-    },
-    [dispatch]
-  );
-
-  const copy: editor.api.IDocumentEditorActions["copy"] = useCallback(
-    (target: "selection" | (string & {}) = "selection") => {
-      dispatch({
-        type: "copy",
-        target: target,
-      });
-    },
-    [dispatch]
-  );
-
-  const paste: editor.api.IDocumentEditorActions["paste"] = useCallback(() => {
-    dispatch({
-      type: "paste",
-    });
-  }, [dispatch]);
-
-  const duplicate: editor.api.IDocumentEditorActions["duplicate"] = useCallback(
-    (target: "selection" | (string & {}) = "selection") => {
-      dispatch({
-        type: "duplicate",
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const clipboardColor = state.user_clipboard_color;
-
-  const setClipboardColor: editor.api.IDocumentEditorActions["setClipboardColor"] =
-    useCallback(
-      (color: cg.RGBA8888) => {
-        dispatch({
-          type: "clip/color",
-          color,
-        });
-      },
-      [dispatch]
-    );
-
-  const deleteNode: editor.api.IDocumentEditorActions["deleteNode"] =
-    useCallback(
-      (target: "selection" | (string & {}) = "selection") => {
-        dispatch({
-          type: "delete",
-          target: target,
-        });
-      },
-      [dispatch]
-    );
-
-  const getNodeById: editor.api.IDocumentEditorActions["getNodeById"] =
-    useCallback(
-      (node_id: string): grida.program.nodes.Node => {
-        return editor.dq.__getNodeById(state, node_id);
-      },
-      [state.document.nodes]
-    );
-
-  const getNodeDepth: editor.api.IDocumentEditorActions["getNodeDepth"] =
-    useCallback(
-      (node_id: string) => {
-        return editor.dq.getDepth(state.document_ctx, node_id);
-      },
-      [state.document_ctx]
-    );
-
-  const getNodeAbsoluteRotation: editor.api.IDocumentEditorActions["getNodeAbsoluteRotation"] =
-    useCallback(
-      (node_id: string) => {
-        const parent_ids = editor.dq.getAncestors(state.document_ctx, node_id);
-
-        let rotation = 0;
-        // Calculate the absolute rotation
-        try {
-          for (const parent_id of parent_ids) {
-            const parent_node = getNodeById(parent_id);
-            assert(parent_node, `parent node not found: ${parent_id}`);
-            if ("rotation" in parent_node) {
-              rotation += parent_node.rotation ?? 0;
-            }
-          }
-
-          // finally, add the node's own rotation
-          const node = getNodeById(node_id);
-          assert(node, `node not found: ${node_id}`);
-          if ("rotation" in node) {
-            rotation += node.rotation ?? 0;
-          }
-        } catch (e) {
-          reportError(e);
-        }
-
-        return rotation;
-      },
-      [state.document_ctx, getNodeById]
-    );
-
-  const insertNode: editor.api.IDocumentEditorActions["insertNode"] =
-    useCallback(
-      (prototype: grida.program.nodes.NodePrototype) => {
-        dispatch({
-          type: "insert",
-          prototype,
-        });
-      },
-      [dispatch]
-    );
-
+  // Keep React-specific functions
   const __gesture_nudge = useCallback(
     (state: "on" | "off") => {
       dispatch({
@@ -1378,9 +1165,9 @@ export function useDocument(): editor.api.IDocumentEditorActions &
 
   const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
 
-  const nudge: editor.api.IDocumentEditorActions["nudge"] = useCallback(
+  const nudge = useCallback(
     (
-      target: "selection" | (string & {}) = "selection",
+      target: "selection" | editor.NodeID = "selection",
       axis: "x" | "y",
       delta: number = 1,
       config: editor.api.NudgeUXConfig = {
@@ -1408,41 +1195,17 @@ export function useDocument(): editor.api.IDocumentEditorActions &
     [dispatch]
   );
 
-  const nudgeResize: editor.api.IDocumentEditorActions["nudgeResize"] =
-    useCallback(
-      (
-        target: "selection" | (string & {}) = "selection",
-        axis: "x" | "y",
-        delta: number = 1
-      ) => {
-        dispatch({
-          type: "nudge-resize",
-          delta,
-          axis,
-          target,
-        });
-      },
-      [dispatch]
-    );
-
-  const a11yarrow: editor.api.IDocumentEditorActions["a11yarrow"] = useCallback(
+  const a11yarrow = useCallback(
     (
-      target: "selection" | (string & {}) = "selection",
+      target: "selection" | editor.NodeID,
       direction: "up" | "down" | "left" | "right",
-      shiftKey: boolean = false,
+      shiftKey: boolean,
       config: editor.api.NudgeUXConfig = {
         delay: 500,
         gesture: true,
       }
     ) => {
       const { gesture = true, delay = 500 } = config;
-
-      const a11ytypes = {
-        up: "a11y/up",
-        down: "a11y/down",
-        left: "a11y/left",
-        right: "a11y/right",
-      } as const;
 
       if (gesture) {
         // Trigger gesture
@@ -1453,7 +1216,7 @@ export function useDocument(): editor.api.IDocumentEditorActions &
       }
 
       dispatch({
-        type: a11ytypes[direction],
+        type: `a11y/${direction}`,
         target,
         shiftKey,
       });
@@ -1461,408 +1224,48 @@ export function useDocument(): editor.api.IDocumentEditorActions &
     [dispatch]
   );
 
-  const align: editor.api.IDocumentEditorActions["align"] = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      alignment: {
-        horizontal?: "none" | "min" | "max" | "center";
-        vertical?: "none" | "min" | "max" | "center";
-      }
-    ) => {
-      dispatch({
-        type: "align",
-        target,
-        alignment,
-      });
+  const getNodeAbsoluteRotation = useCallback(
+    (node_id: editor.NodeID) => {
+      const node = editor.getNodeById(node_id);
+      return (node as any).rotation ?? 0;
     },
-    [dispatch]
+    [editor]
   );
 
-  const order: editor.api.IDocumentEditorActions["order"] = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      order: "back" | "front" | number
-    ) => {
-      dispatch({
-        type: "order",
-        target: target,
-        order,
-      });
-    },
-    [dispatch]
-  );
-
-  const mv: editor.api.IDocumentEditorActions["mv"] = useCallback(
-    (source: string[], target: string, index?: number) => {
-      dispatch({
-        type: "mv",
-        source,
-        target,
-        index,
-      });
-    },
-    [dispatch]
-  );
-
-  const distributeEvenly: editor.api.IDocumentEditorActions["distributeEvenly"] =
-    useCallback(
-      (target: "selection" | string[] = "selection", axis: "x" | "y") => {
-        dispatch({
-          type: "distribute-evenly",
-          target,
-          axis,
-        });
-      },
-      [dispatch]
-    );
-
-  const autoLayout: editor.api.IDocumentEditorActions["autoLayout"] =
-    useCallback(
-      (target: "selection" | string[] = "selection") => {
-        dispatch({
-          type: "autolayout",
-          target,
-        });
-      },
-      [dispatch]
-    );
-
-  const contain: editor.api.IDocumentEditorActions["contain"] = useCallback(
-    (target: "selection" | string[] = "selection") => {
-      dispatch({
-        type: "contain",
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const configureSurfaceRaycastTargeting: editor.api.IDocumentEditorActions["configureSurfaceRaycastTargeting"] =
-    useCallback(
-      (config: Partial<editor.state.HitTestingConfig>) => {
-        dispatch({
-          type: "config/surface/raycast-targeting",
-          config,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureMeasurement: editor.api.IDocumentEditorActions["configureMeasurement"] =
-    useCallback(
-      (measurement: "on" | "off") => {
-        dispatch({
-          type: "config/surface/measurement",
-          measurement,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureTranslateWithCloneModifier: editor.api.IDocumentEditorActions["configureTranslateWithCloneModifier"] =
-    useCallback(
-      (translate_with_clone: "on" | "off") => {
-        dispatch({
-          type: "config/modifiers/translate-with-clone",
-          translate_with_clone,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureTranslateWithAxisLockModifier: editor.api.IDocumentEditorActions["configureTranslateWithAxisLockModifier"] =
-    useCallback(
-      (tarnslate_with_axis_lock: "on" | "off") => {
-        dispatch({
-          type: "config/modifiers/translate-with-axis-lock",
-          tarnslate_with_axis_lock,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureTransformWithCenterOriginModifier: editor.api.IDocumentEditorActions["configureTransformWithCenterOriginModifier"] =
-    useCallback(
-      (transform_with_center_origin: "on" | "off") => {
-        dispatch({
-          type: "config/modifiers/transform-with-center-origin",
-          transform_with_center_origin,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureTransformWithPreserveAspectRatioModifier: editor.api.IDocumentEditorActions["configureTransformWithPreserveAspectRatioModifier"] =
-    useCallback(
-      (transform_with_preserve_aspect_ratio: "on" | "off") => {
-        dispatch({
-          type: "config/modifiers/transform-with-preserve-aspect-ratio",
-          transform_with_preserve_aspect_ratio,
-        });
-      },
-      [dispatch]
-    );
-
-  const configureRotateWithQuantizeModifier: editor.api.IDocumentEditorActions["configureRotateWithQuantizeModifier"] =
-    useCallback(
-      (rotate_with_quantize: number | "off") => {
-        dispatch({
-          type: "config/modifiers/rotate-with-quantize",
-          rotate_with_quantize,
-        });
-      },
-      [dispatch]
-    );
-
-  const toggleActive: editor.api.IDocumentEditorActions["toggleActive"] =
-    useCallback(
-      (target: "selection" | (string & {}) = "selection") => {
-        const target_ids = target === "selection" ? selection : [target];
-        target_ids.forEach((node_id) => {
-          dispatch({
-            type: "node/toggle/active",
-            node_id: node_id,
-          });
-        });
-      },
-      [dispatch, selection]
-    );
-
-  const toggleLocked: editor.api.IDocumentEditorActions["toggleLocked"] =
-    useCallback(
-      (target: "selection" | (string & {}) = "selection") => {
-        const target_ids = target === "selection" ? selection : [target];
-        target_ids.forEach((node_id) => {
-          dispatch({
-            type: "node/toggle/locked",
-            node_id: node_id,
-          });
-        });
-      },
-      [dispatch, selection]
-    );
-
-  const toggleBold: editor.api.IDocumentEditorActions["toggleBold"] =
-    useCallback(
-      (target: "selection" | (string & {}) = "selection") => {
-        const target_ids = target === "selection" ? selection : [target];
-        target_ids.forEach((node_id) => {
-          dispatch({
-            type: "node/toggle/bold",
-            node_id: node_id,
-          });
-        });
-      },
-      [dispatch, selection]
-    );
-
-  const setOpacity: editor.api.IDocumentEditorActions["setOpacity"] =
-    useCallback(
-      (target: "selection" | (string & {}) = "selection", opacity: number) => {
-        const target_ids = target === "selection" ? selection : [target];
-        target_ids.forEach((node_id) => {
-          dispatch({
-            type: "node/change/opacity",
-            node_id: node_id,
-            opacity: { type: "set", value: opacity },
-          });
-        });
-      },
-      [dispatch, selection]
-    );
-
-  const schemaDefineProperty: editor.api.IDocumentEditorActions["schemaDefineProperty"] =
-    useCallback(
-      (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
-        dispatch({
-          type: "document/properties/define",
-          key: name,
-          definition: definition,
-        });
-      },
-      [dispatch]
-    );
-
-  const schemaRenameProperty: editor.api.IDocumentEditorActions["schemaRenameProperty"] =
-    useCallback(
-      (key: string, newName: string) => {
-        dispatch({
-          type: "document/properties/rename",
-          key: key,
-          newKey: newName,
-        });
-      },
-      [dispatch]
-    );
-
-  const schemaUpdateProperty: editor.api.IDocumentEditorActions["schemaUpdateProperty"] =
-    useCallback(
-      (key: string, definition: grida.program.schema.PropertyDefinition) => {
-        dispatch({
-          type: "document/properties/update",
-          key: key,
-          definition: definition,
-        });
-      },
-      [dispatch]
-    );
-
-  const schemaPutProperty: editor.api.IDocumentEditorActions["schemaPutProperty"] =
-    useCallback(
-      (key: string, definition: grida.program.schema.PropertyDefinition) => {
-        dispatch({
-          type: "document/properties/put",
-          key: key,
-          definition: definition,
-        });
-      },
-      [dispatch]
-    );
-
-  const schemaDeleteProperty: editor.api.IDocumentEditorActions["schemaDeleteProperty"] =
-    useCallback(
-      (key: string) => {
-        dispatch({ type: "document/properties/delete", key: key });
-      },
-      [dispatch]
-    );
-
-  return useMemo(() => {
-    return {
-      selection,
-      document,
-      document_ctx,
-      scene_id,
-      scenes,
-      hovered_node_id,
-      templates,
-      user_clipboard_color,
-      //
-      loadScene,
-      createScene,
-      deleteScene,
-      duplicateScene,
-      renameScene,
-
-      //
-      hoverNode,
-      hoverEnterNode,
-      hoverLeaveNode,
-      //
-      select,
-      blur,
-      undo,
-      redo,
-      cut,
-      copy,
-      paste,
-      duplicate,
-      clipboardColor,
-      setClipboardColor,
-      deleteNode,
-      nudge,
-      nudgeResize,
-      a11yarrow,
-      align,
-      order,
-      mv,
-      distributeEvenly,
-      autoLayout,
-      contain,
-      configureSurfaceRaycastTargeting,
-      configureMeasurement,
-      configureTranslateWithCloneModifier,
-      configureTranslateWithAxisLockModifier,
-      configureTransformWithCenterOriginModifier,
-      configureTransformWithPreserveAspectRatioModifier,
-      configureRotateWithQuantizeModifier,
-      //
-      toggleActive,
-      toggleLocked,
-      toggleBold,
-      //
-      setOpacity,
-      //
-      createNodeId,
-      getNodeById,
-      getNodeDepth,
-      getNodeAbsoluteRotation,
-      insertNode,
-      ...nodeActions,
-      schemaDefineProperty,
-      schemaRenameProperty,
-      schemaUpdateProperty,
-      schemaPutProperty,
-      schemaDeleteProperty,
-    };
-  }, [
-    selection,
-    document,
-    document_ctx,
-    scene_id,
-    scenes,
-    hovered_node_id,
-    templates,
-    user_clipboard_color,
-    //
-    scenes,
-    scene_id,
-    loadScene,
-    createScene,
-    deleteScene,
-    duplicateScene,
-    renameScene,
-    //
-    hoverNode,
-    hoverEnterNode,
-    hoverLeaveNode,
-    //
-    select,
-    blur,
-    undo,
-    redo,
-    cut,
-    copy,
-    paste,
-    duplicate,
-    clipboardColor,
-    setClipboardColor,
-    deleteNode,
+  return {
     nudge,
-    nudgeResize,
     a11yarrow,
-    align,
-    order,
-    mv,
-    distributeEvenly,
-    autoLayout,
-    contain,
-    configureSurfaceRaycastTargeting,
-    configureMeasurement,
-    configureTranslateWithCloneModifier,
-    configureTranslateWithAxisLockModifier,
-    configureTransformWithCenterOriginModifier,
-    configureTransformWithPreserveAspectRatioModifier,
-    configureRotateWithQuantizeModifier,
-    //
-    toggleActive,
-    toggleLocked,
-    toggleBold,
-    //
-    setOpacity,
-    //
-    createNodeId,
-    getNodeById,
-    getNodeDepth,
     getNodeAbsoluteRotation,
-    insertNode,
-    nodeActions,
-    schemaDefineProperty,
-    schemaRenameProperty,
-    schemaUpdateProperty,
-    schemaPutProperty,
-    schemaDeleteProperty,
-  ]);
+  };
+}
+
+interface UseDocument {
+  selection: editor.state.IEditorState["selection"];
+  document: editor.state.IEditorState["document"];
+  document_ctx: editor.state.IEditorState["document_ctx"];
+  scenes: editor.state.IEditorState["document"]["scenes"];
+  scene_id: editor.state.IEditorState["scene_id"];
+  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
+  templates: editor.state.IEditorState["templates"];
+  clipboardColor: editor.state.IEditorState["user_clipboard_color"];
+}
+
+export function useDocument(): UseDocument {
+  const editor = useCurrentEditor();
+  return useEditorState<UseDocument>(
+    editor,
+    (state) =>
+      ({
+        selection: state.selection,
+        document: state.document,
+        document_ctx: state.document_ctx,
+        scenes: state.document.scenes,
+        scene_id: state.scene_id,
+        hovered_node_id: state.hovered_node_id,
+        templates: state.templates,
+        clipboardColor: state.user_clipboard_color,
+      }) satisfies UseDocument
+  );
 }
 
 type UseScene = grida.program.document.Scene & {
@@ -1870,14 +1273,11 @@ type UseScene = grida.program.document.Scene & {
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
   hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
   document_ctx: editor.state.IEditorState["document_ctx"];
-  setBackgroundColor: (
-    backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
-  ) => void;
 };
 
 export function useScene(scene_id: string): UseScene {
   const editor = useCurrentEditor();
-  const state = useEditorState(editor, (state) => {
+  return useEditorState(editor, (state) => {
     return {
       selection: state.selection,
       hovered_node_id: state.hovered_node_id,
@@ -1886,32 +1286,6 @@ export function useScene(scene_id: string): UseScene {
       ...state.document.scenes[scene_id],
     } satisfies Omit<UseScene, "setBackgroundColor">;
   });
-
-  const dispatch = React.useCallback(
-    (action: Action) => {
-      editor.dispatch(action);
-    },
-    [editor]
-  );
-
-  const setBackgroundColor = useCallback(
-    (
-      backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
-    ) => {
-      if (!scene_id) return;
-      dispatch({
-        type: "scenes/change/background-color",
-        scene: scene_id,
-        backgroundColor,
-      });
-    },
-    [dispatch, scene_id]
-  );
-
-  return {
-    ...state,
-    setBackgroundColor,
-  };
 }
 
 export function useCurrentScene(): UseScene {
@@ -2127,20 +1501,6 @@ export function useTransform() {
   }, [transform, setTransform, scale, fit, zoomIn, zoomOut]);
 }
 
-function throttle<T extends (...args: any[]) => void>(
-  func: T,
-  limit: number
-): T {
-  let inThrottle: boolean;
-  return function (this: any, ...args: Parameters<T>) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  } as T;
-}
-
 export function useEventTargetCSSCursor() {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
@@ -2176,7 +1536,7 @@ export function useEventTargetCSSCursor() {
   }, [tool]);
 }
 
-export function usePointer() {
+export function usePointerState(): editor.state.IEditorState["pointer"] {
   const editor = useCurrentEditor();
   return useEditorState(editor, (state) => state.pointer);
 }
@@ -2184,13 +1544,9 @@ export function usePointer() {
 interface UseTool {
   tool: editor.state.IEditorState["tool"];
   content_edit_mode: editor.state.IEditorState["content_edit_mode"];
-  setTool: (tool: editor.state.ToolMode) => void;
-  tryExitContentEditMode: () => void;
-  tryToggleContentEditMode: () => void;
-  tryEnterContentEditMode: () => void;
 }
 
-export function useTool(): UseTool {
+export function useToolState(): UseTool {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
   const content_edit_mode = useEditorState(
@@ -2198,65 +1554,12 @@ export function useTool(): UseTool {
     (state) => state.content_edit_mode
   );
 
-  const dispatch = useCallback(
-    (action: Action) => {
-      editor.dispatch(action);
-    },
-    [editor]
-  );
-
-  const setTool = useCallback(
-    (tool: editor.state.ToolMode) => {
-      dispatch({
-        type: "surface/tool",
-        tool: tool,
-      });
-    },
-    [dispatch]
-  );
-
-  /**
-   * Try to enter content edit mode - only works when the selected node is a text or vector node
-   *
-   * when triggered on such invalid context, it should be a no-op
-   */
-  const tryEnterContentEditMode = useCallback(() => {
-    dispatch({
-      type: "surface/content-edit-mode/try-enter",
-    });
-  }, [dispatch]);
-
-  const tryExitContentEditMode = useCallback(() => {
-    dispatch({
-      type: "surface/content-edit-mode/try-exit",
-    });
-  }, [dispatch]);
-
-  const tryToggleContentEditMode = useCallback(() => {
-    if (content_edit_mode) {
-      tryExitContentEditMode();
-    } else {
-      tryEnterContentEditMode();
-    }
-  }, [content_edit_mode]);
-
   return useMemo(() => {
     return {
       tool,
-      setTool,
       content_edit_mode,
-      tryEnterContentEditMode,
-      tryExitContentEditMode,
-      tryToggleContentEditMode,
     };
-  }, [
-    tool,
-    setTool,
-    content_edit_mode,
-    tryEnterContentEditMode,
-    tryExitContentEditMode,
-    tryToggleContentEditMode,
-  ]);
+  }, [tool, content_edit_mode]);
 }
 
 export function useBrush() {
@@ -3191,15 +2494,9 @@ export function useSurfacePathEditor() {
       if (tool.type === "path") {
         return;
       }
-      dispatch({
-        type: "select-vertex",
-        target: {
-          node_id,
-          vertex,
-        },
-      });
+      instance.selectVertex(node_id, vertex);
     },
-    [tool.type, dispatch, node_id]
+    [tool.type, instance.selectVertex, node_id]
   );
 
   const onVertexHover = useCallback(
@@ -3232,15 +2529,9 @@ export function useSurfacePathEditor() {
 
   const onVertexDelete = useCallback(
     (vertex: number) => {
-      dispatch({
-        type: "delete-vertex",
-        target: {
-          node_id,
-          vertex: vertex,
-        },
-      });
+      instance.deleteVertex(node_id, vertex);
     },
-    [node_id, dispatch]
+    [node_id, instance.deleteVertex]
   );
 
   const onCurveControlPointDragStart = useCallback(
@@ -3299,7 +2590,8 @@ export function useSurfacePathEditor() {
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode(root_id: string) {
-  const { document, templates, changeNodeProps } = useDocument();
+  const editor = useCurrentEditor();
+  const { document, templates } = useDocument();
 
   const rootnode = document.nodes[root_id];
 
@@ -3312,9 +2604,9 @@ export function useRootTemplateInstanceNode(root_id: string) {
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
-      changeNodeProps(root_id, key, value);
+      editor.changeNodeProps(root_id, key, value);
     },
-    [changeNodeProps, root_id]
+    [editor, root_id]
   );
 
   return useMemo(
@@ -3326,22 +2618,6 @@ export function useRootTemplateInstanceNode(root_id: string) {
     }),
     [rootProperties, rootProps, rootDefault, changeRootProps]
   );
-}
-
-class EditorConsumerError extends Error {
-  context: any;
-  constructor(message: string, context: any) {
-    super(message); // Pass message to the parent Error class
-    this.name = this.constructor.name; // Set the error name
-    this.context = context; // Attach the context object
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
-    }
-  }
-
-  toString(): string {
-    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
-  }
 }
 
 export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
@@ -3469,99 +2745,6 @@ export function useComputedNode(
   return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
-namespace internal {
-  /**
-   * @deprecated
-   * @returns
-   * This model does not work. it's a proof of concept. - will be removed
-   */
-  export function __createApiProxyNode_experimental(
-    node: grida.program.nodes.Node,
-    context: {
-      dispatcher: Dispatcher;
-    }
-  ): grida.program.nodes.Node {
-    const p = new Proxy(
-      { ...node },
-      {
-        get(target, prop, receiver) {
-          return Reflect.get(target, prop, receiver);
-        },
-        set(target, prop, value, receiver) {
-          switch (prop as keyof grida.program.nodes.UnknwonNode) {
-            case "width":
-              context.dispatcher({
-                type: "node/change/size",
-                axis: "width",
-                node_id: node.id,
-                value: value,
-              });
-              return true;
-            case "height":
-              context.dispatcher({
-                type: "node/change/size",
-                axis: "height",
-                node_id: node.id,
-                value: value,
-              });
-              return true;
-            case "top":
-            case "right":
-            case "bottom":
-            case "left":
-              context.dispatcher({
-                type: "node/change/positioning",
-                node_id: node.id,
-                positioning: {
-                  position: "absolute",
-                  [prop]: value,
-                },
-              });
-              return true;
-            case "opacity": {
-              context.dispatcher({
-                type: "node/change/opacity",
-                node_id: node.id,
-                opacity: value,
-              });
-              return true;
-            }
-            case "rotation": {
-              context.dispatcher({
-                type: "node/change/rotation",
-                node_id: node.id,
-                rotation: value,
-              });
-              return true;
-            }
-            case "fill": {
-              context.dispatcher({
-                type: "node/change/fill",
-                node_id: node.id,
-                fill: value,
-              });
-              return true;
-            }
-            case "cornerRadius": {
-              context.dispatcher({
-                type: "node/change/cornerRadius",
-                node_id: node.id,
-                cornerRadius: value,
-              });
-              return true;
-            }
-            default:
-              console.error(`Unsupported property: ${prop.toString()}`);
-          }
-
-          return false;
-        },
-      }
-    );
-    return p;
-  }
-}
-
 export function useTemplateDefinition(template_id: string) {
   // const {
   //   state: { templates },
@@ -3570,97 +2753,4 @@ export function useTemplateDefinition(template_id: string) {
   const templates = useEditorState(instance, (state) => state.templates);
 
   return templates![template_id];
-}
-
-const __not_implemented = (...args: any): any => {
-  throw new Error("not implemented");
-};
-
-export function useEditorApi() {
-  const instance = useCurrentEditor();
-  const document = useDocument();
-  const dispatcher = instance.dispatch;
-
-  const getNodeById: editor.api.IStandaloneEditorApi["getNodeById"] =
-    useCallback(
-      (id: editor.NodeID) => {
-        const nodedata = document.document.nodes[id];
-        return internal.__createApiProxyNode_experimental(nodedata, {
-          dispatcher,
-        });
-      },
-      [document.document.nodes]
-    );
-
-  const createRectangle = useCallback(
-    (props: Omit<grida.program.nodes.NodePrototype, "type"> = {}) => {
-      dispatcher({
-        type: "insert",
-        prototype: {
-          type: "rectangle",
-          ...props,
-        } as grida.program.nodes.NodePrototype,
-      });
-    },
-    [dispatcher]
-  );
-
-  const createEllipse = useCallback(
-    (props: Omit<grida.program.nodes.NodePrototype, "type">) => {
-      dispatcher({
-        type: "insert",
-        prototype: {
-          type: "ellipse",
-          ...props,
-        } as grida.program.nodes.NodePrototype,
-      });
-    },
-    [dispatcher]
-  );
-
-  const editor: editor.api.IStandaloneEditorApi = useMemo(() => {
-    return {
-      selection: document.selection,
-      getNodeById,
-      createRectangle,
-      createEllipse,
-      createText: __not_implemented,
-      getNodeDepth: document.getNodeDepth,
-      getNodeAbsoluteRotation: document.getNodeAbsoluteRotation,
-      select: document.select,
-      blur: document.blur,
-      undo: document.undo,
-      redo: document.redo,
-      cut: document.cut,
-      copy: document.copy,
-      paste: document.paste,
-      duplicate: document.duplicate,
-      delete: document.deleteNode,
-      rename: document.changeNodeName,
-      nudge: document.nudge,
-      nudgeResize: document.nudgeResize,
-      align: document.align,
-      order: document.order,
-      distributeEvenly: document.distributeEvenly,
-      configureSurfaceRaycastTargeting:
-        document.configureSurfaceRaycastTargeting,
-      configureMeasurement: document.configureMeasurement,
-      configureTranslateWithCloneModifier:
-        document.configureTranslateWithCloneModifier,
-      configureTranslateWithAxisLockModifier:
-        document.configureTranslateWithAxisLockModifier,
-      configureTransformWithCenterOriginModifier:
-        document.configureTransformWithCenterOriginModifier,
-      configureTransformWithPreserveAspectRatioModifier:
-        document.configureTransformWithPreserveAspectRatioModifier,
-      configureRotateWithQuantizeModifier:
-        document.configureRotateWithQuantizeModifier,
-      toggleActive: document.toggleActive,
-      toggleLocked: document.toggleLocked,
-      toggleBold: document.toggleBold,
-      setOpacity: document.setOpacity,
-    };
-  }, [document, getNodeById, createRectangle, createEllipse]);
-
-  return editor;
 }
