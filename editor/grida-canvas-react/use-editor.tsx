@@ -46,46 +46,28 @@ export function useEditorState<Selected>(
   );
 }
 
-export function useRecorder() {
-  const editor = useCurrentEditor();
+export function useRecorder(editor: Editor) {
   const [recorder] = React.useState(new EditorRecorder(editor));
 
-  const start = React.useCallback(() => {
-    recorder.start();
-  }, [recorder]);
-
-  const stop = React.useCallback(() => {
-    recorder.stop();
-  }, [recorder]);
-
-  const flush = React.useCallback(() => {
-    recorder.flush();
-  }, [recorder]);
-
-  const replay = React.useCallback(() => {
-    recorder.replay();
-  }, [recorder]);
-
-  const exit = React.useCallback(() => {
-    recorder.exit();
-  }, [recorder]);
-
-  const dumps = React.useCallback(() => {
-    return recorder.dumps();
-  }, [recorder]);
-
-  const status = useSyncExternalStore(
-    recorder.subscribeStatusChange.bind(recorder),
-    recorder.getStatus.bind(recorder)
+  const state = useSyncExternalStoreWithSelector(
+    recorder.subscribe.bind(recorder),
+    recorder.snapshot.bind(recorder),
+    recorder.snapshot.bind(recorder),
+    (s) => s,
+    deepEqual
   );
 
-  return {
-    start,
-    stop,
-    flush,
-    replay,
-    status,
-    exit,
-    dumps,
-  };
+  return React.useMemo(
+    () => ({
+      status: state.status,
+      nframes: state.nframes,
+      start: () => recorder.start(),
+      stop: () => recorder.stop(),
+      clear: () => recorder.clear(),
+      replay: () => recorder.play(),
+      exit: () => recorder.exit(),
+      dumps: () => recorder.dumps(),
+    }),
+    [state, recorder]
+  );
 }

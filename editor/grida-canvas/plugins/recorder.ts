@@ -7,16 +7,32 @@ type Buffer = {
   t: number;
 };
 
+type Status = "idle" | "playing" | "recording";
+
 export class EditorRecorder {
   private readonly editor: Editor;
-  private ussubscribe: (() => void) | null = null;
+  private unsubscribe: (() => void) | null = null;
   private initial: editor.state.IEditorState | null = null;
   private final: editor.state.IEditorState | null = null;
-  private buffer: Buffer[] = [];
-  private status: "idle" | "playing" | "recording" = "idle";
+  private buffer: Buffer[] | null = null;
+  get nframes() {
+    return this.buffer?.length ?? 0;
+  }
 
-  private listeners: Set<(status: "idle" | "playing" | "recording") => void> =
-    new Set();
+  private _status: Status = "idle";
+  private set status(value: Status) {
+    if (this._status === value) return;
+    this._status = value;
+    this.__notify();
+  }
+  public get status() {
+    return this._status;
+  }
+
+  private listeners: Set<(status: Status) => void> = new Set();
+  private __notify() {
+    this.listeners.forEach((fn) => fn(this.status));
+  }
 
   constructor(editor: Editor) {
     this.editor = editor;
@@ -28,15 +44,16 @@ export class EditorRecorder {
 
     this.initial = this.editor.getSnapshot();
     this.status = "recording";
+    this.buffer = [];
 
-    this.ussubscribe = this.editor.subscribe((_, action) => {
+    this.unsubscribe = this.editor.subscribe((_, action) => {
       if (!action) return;
+      if (!this.buffer) return;
       this.buffer.push({
         a: action,
         t: Date.now(),
       });
     });
-    this.__notify_status_change();
   }
 
   stop() {
@@ -45,45 +62,37 @@ export class EditorRecorder {
 
     this.final = this.editor.getSnapshot();
     this.status = "idle";
-    this.ussubscribe?.();
-    this.ussubscribe = null;
-    this.__notify_status_change();
+    this.unsubscribe?.();
+    this.unsubscribe = null;
   }
 
-  flush() {
+  clear() {
     this.status = "idle";
-    this.buffer = [];
+    this.buffer = null;
     this.initial = null;
-    this.ussubscribe?.();
-    this.ussubscribe = null;
-    this.__notify_status_change();
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.__notify();
   }
 
-  __notify_status_change() {
-    this.listeners.forEach((fn) => fn(this.status));
-  }
-
-  subscribeStatusChange(
-    fn: (status: "idle" | "playing" | "recording") => void
-  ) {
+  subscribe(fn: (status: "idle" | "playing" | "recording") => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
 
-  getStatus() {
-    return this.status;
+  snapshot() {
+    return { status: this.status, nframes: this.nframes };
   }
 
-  async replay() {
+  async play() {
     if (this.status !== "idle")
       throw new Error("Cannot replay while recording");
 
-    if (!this.initial || this.buffer.length === 0) return;
+    if (!this.initial || !this.buffer || this.buffer.length === 0) return;
 
     this.status = "playing";
     this.editor.locked = true;
     this.editor.reset(this.initial, true);
-    this.__notify_status_change();
 
     for (let i = 0; i < this.buffer.length; i++) {
       const current = this.buffer[i];
@@ -96,19 +105,20 @@ export class EditorRecorder {
         this.editor.dispatch(current.a, true);
       });
     }
+
+    this.exit();
   }
 
   exit() {
     this.status = "idle";
     this.editor.locked = false;
     this.editor.reset(this.final!);
-    this.__notify_status_change();
   }
 
   /**
    * dumps the buffer as a jsonl string
    */
   dumps() {
-    return this.buffer.map((entry) => JSON.stringify(entry)).join("\n");
+    return this.buffer?.map((entry) => JSON.stringify(entry)).join("\n");
   }
 }
