@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo } from "react";
-import { useCurrentEditor, useCurrentScene, useTransform } from "./provider";
+import { useCurrentScene, useTransform } from "./provider";
+import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
-import { useEditorState } from "./use-editor";
 
 type CustomComponent = React.ComponentType<any>;
 

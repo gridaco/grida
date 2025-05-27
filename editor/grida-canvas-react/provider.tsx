@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { editor } from "@/grida-canvas";
 import type { tokens } from "@grida/tokens";
 import grida from "@grida/schema";
@@ -33,12 +26,10 @@ import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import nid from "@/grida-canvas/reducers/tools/id";
 import { Editor } from "@/grida-canvas/editor";
-import { useEditorState } from "./use-editor";
+import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 
 type Dispatcher = (action: Action) => void;
-
-const EditorContext = createContext<Editor | null>(null);
 
 function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
   const editor = useCurrentEditor();
@@ -99,16 +90,6 @@ export function StandaloneDocumentEditor({
       </ProgramDataContextHost>
     </EditorContext.Provider>
   );
-}
-
-export function useCurrentEditor() {
-  const editor = useContext(EditorContext);
-  if (!editor) {
-    throw new Error(
-      "useCurrentEditor must be used within an EditorContextV2.Provider"
-    );
-  }
-  return editor;
 }
 
 function __useNodeActions(dispatch: Dispatcher): editor.api.INodeChangeActions {

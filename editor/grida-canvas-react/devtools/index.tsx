@@ -1,10 +1,18 @@
 "use client";
 
-import React from "react";
-import { useDocument } from "@/grida-canvas-react";
+import React, { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { CaretDownIcon, CaretUpIcon } from "@radix-ui/react-icons";
+import {
+  CaretDownIcon,
+  CaretUpIcon,
+  CircleBackslashIcon,
+  DiscIcon,
+  DownloadIcon,
+  PlayIcon,
+  StopIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,29 +20,14 @@ import {
 } from "@/components/ui/collapsible";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
 import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
-import { useCurrentEditor } from "../provider";
-import { useEditorState } from "../use-editor";
+import { useCurrentEditor, useEditorState, useRecorder } from "../use-editor";
+import { saveAs } from "file-saver";
 
 export function DevtoolsPanel() {
-  const editor = useCurrentEditor();
-  const _state = useEditorState(editor, (state) => state);
-  const fonts = useGoogleFontsList();
   const expandable = useDialogState();
-
-  const state = useThrottle(_state, 1000);
-
-  const {
-    document,
-    document_ctx,
-    history,
-    googlefonts,
-    user_clipboard,
-    ...state_without_document
-  } = state;
 
   const onTabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -67,6 +60,13 @@ export function DevtoolsPanel() {
                 className="text-xs uppercase"
               >
                 Document
+              </TabsTrigger>
+              <TabsTrigger
+                onClick={onTabClick}
+                value="recorder"
+                className="text-xs uppercase"
+              >
+                Recorder
               </TabsTrigger>
             </TabsList>
           </div>
@@ -104,30 +104,24 @@ export function DevtoolsPanel() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="hierarchy" className="h-full">
-                <JSONContent
-                  value={devdata_hierarchy_only(document, document_ctx)}
-                />
+                <HierarchyPanel />
               </TabsContent>
               <TabsContent value="document" className="h-full">
-                <JSONContent value={{ document, document_ctx }} />
+                <DocumentPanel />
               </TabsContent>
               <TabsContent value="editor" className="h-full">
-                <JSONContent value={state_without_document} />
+                <EditorPanel />
               </TabsContent>
               <TabsContent value="clipboard" className="h-full">
-                <JSONContent value={user_clipboard} />
+                <UserClipboardPanel />
               </TabsContent>
               <TabsContent value="fonts" className="h-full">
-                <JSONContent
-                  value={{
-                    // used fonts
-                    fonts: googlefonts,
-                    // all fonts
-                    registry: fonts,
-                  }}
-                />
+                <FontsPanel />
               </TabsContent>
             </Tabs>
+          </TabsContent>
+          <TabsContent value="recorder" className="h-full">
+            <RecorderPanel />
           </TabsContent>
         </CollapsibleContent>
       </Tabs>
@@ -155,6 +149,60 @@ function devdata_hierarchy_only(
   };
 }
 
+function HierarchyPanel() {
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => state);
+  const { document, document_ctx } = state;
+
+  return <JSONContent value={devdata_hierarchy_only(document, document_ctx)} />;
+}
+
+function DocumentPanel() {
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => state);
+  const { document, document_ctx } = state;
+  return <JSONContent value={{ document, document_ctx }} />;
+}
+
+function EditorPanel() {
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => state);
+  const {
+    document,
+    document_ctx,
+    history,
+    googlefonts,
+    user_clipboard,
+    ...state_without_document
+  } = state;
+  return <JSONContent value={state_without_document} />;
+}
+
+function UserClipboardPanel() {
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => state);
+  const { user_clipboard } = state;
+  return <JSONContent value={user_clipboard} />;
+}
+
+function FontsPanel() {
+  const editor = useCurrentEditor();
+  const state = useEditorState(editor, (state) => state);
+  const fonts = useGoogleFontsList();
+  const { googlefonts } = state;
+
+  return (
+    <JSONContent
+      value={{
+        // used fonts
+        fonts: googlefonts,
+        // all fonts
+        registry: fonts,
+      }}
+    />
+  );
+}
+
 function JSONContent({ value }: { value: unknown }) {
   return (
     <div className="h-full">
@@ -168,6 +216,75 @@ function JSONContent({ value }: { value: unknown }) {
           readOnly: true,
         }}
       />
+    </div>
+  );
+}
+
+function RecorderPanel() {
+  const editor = useCurrentEditor();
+  const recorder = useRecorder(editor);
+
+  return (
+    <div className="p-10 flex flex-row gap-2">
+      <Button
+        title="Start Recording"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.start}
+        disabled={recorder.status !== "idle"}
+      >
+        <DiscIcon />
+      </Button>
+      <Button
+        title="Stop Recording"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.stop}
+        disabled={recorder.status !== "recording"}
+      >
+        <StopIcon />
+      </Button>
+      <Button
+        title="Replay"
+        variant="ghost"
+        size="icon"
+        onClick={() => recorder.replay()}
+        disabled={recorder.nframes === 0 || recorder.status !== "idle"}
+      >
+        <PlayIcon />
+      </Button>
+      <Button
+        title="Flush"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.clear}
+        disabled={recorder.nframes === 0 || recorder.status !== "idle"}
+      >
+        <TrashIcon />
+      </Button>
+      <Button
+        title="Flush"
+        variant="ghost"
+        size="icon"
+        onClick={recorder.exit}
+        disabled={recorder.nframes === 0 || recorder.status !== "playing"}
+      >
+        <CircleBackslashIcon />
+      </Button>
+      <Button
+        title="Dumps"
+        variant="ghost"
+        size="icon"
+        disabled={recorder.nframes === 0}
+        onClick={() => {
+          const dumps = recorder.dumps();
+          if (!dumps) return;
+          const blob = new Blob([dumps], { type: "application/json" });
+          saveAs(blob, `grida-canvas-recording-${Date.now()}.jsonl`);
+        }}
+      >
+        <DownloadIcon />
+      </Button>
     </div>
   );
 }

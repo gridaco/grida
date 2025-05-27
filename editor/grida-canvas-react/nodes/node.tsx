@@ -2,14 +2,14 @@
 
 import React, { ReactNode, useMemo } from "react";
 import type { TemplateComponent } from "../template-builder/with-template";
-import grida from "@grida/schema";
 import { ReactNodeRenderers } from ".";
-import { useComputedNode, useCurrentEditor, useNode } from "../provider";
-import assert from "assert";
+import { useComputedNode, useNode } from "../provider";
+import { useEditorState, useCurrentEditor } from "../use-editor";
 import { useUserCustomTemplates } from "../renderer";
 import { css } from "@/grida-canvas-utils/css";
+import grida from "@grida/schema";
 import type cg from "@grida/cg";
-import { useEditorState } from "../use-editor";
+import assert from "assert";
 
 class RendererNotFound extends Error {
   constructor(message: string) {

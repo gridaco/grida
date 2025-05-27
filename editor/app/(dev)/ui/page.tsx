@@ -8,6 +8,7 @@ import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import OriginComp569 from "./comp/comp-569";
 import { PhoneInput } from "@/components/extension/phone-input";
+import { Timeline } from "@/grida-react-timeline-wd";
 
 export default function AllComponentsPage() {
   return (
@@ -24,6 +25,8 @@ export default function AllComponentsPage() {
           <__PhoneInput />
           <hr />
           <__RichTextEditor />
+          <hr />
+          <__Timeline />
           <hr />
           <OriginComp569 />
         </div>
@@ -94,6 +97,14 @@ function __RichTextEditor() {
   return (
     <div className="grid gap-4">
       <MinimalTiptapEditor />
+    </div>
+  );
+}
+
+function __Timeline() {
+  return (
+    <div className="grid gap-4">
+      <Timeline />
     </div>
   );
 }

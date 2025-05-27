@@ -7,6 +7,7 @@ import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   ViewportRoot,
+  useCurrentEditor,
 } from "@/grida-canvas-react";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { useEditor } from "@/grida-canvas-react";
@@ -66,6 +67,7 @@ export default function CanvasV2Page() {
               <StandaloneSceneContent />
             </AutoInitialFitTransformer>
           </ViewportRoot>
+          <DebugSlice />
           <DevtoolsPanel />
         </StandaloneSceneBackground>
       </StandaloneDocumentEditor>
@@ -77,4 +79,17 @@ function Hotkyes() {
   useEditorHotKeys();
 
   return <></>;
+}
+
+function DebugSlice() {
+  const [count, setCount] = React.useState(0);
+  const editor = useCurrentEditor();
+
+  console.log("editor", editor);
+
+  React.useEffect(() => {
+    setCount((c) => c + 1);
+  }, [editor]);
+
+  return <div>Did I Update? {count}</div>;
 }

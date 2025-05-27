@@ -6,7 +6,6 @@ import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useBrush,
   useClipboardSync,
-  useCurrentEditor,
   useCurrentScene,
   useDocument,
   useEventTargetCSSCursor,
@@ -15,6 +14,7 @@ import {
   useTool,
   useTransform,
 } from "../provider";
+import { useCurrentEditor, useEditorState } from "../use-editor";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import {
   is_direct_component_consumer,
@@ -55,7 +55,6 @@ import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
-import { useEditorState } from "../use-editor";
 
 const DRAG_THRESHOLD = 2;
 
