@@ -136,6 +136,7 @@
 @theme inline {
   /* Workbench accent colors */
   --color-workbench-accent-sky: oklch(68.5% 0.169 237.323);
+  --color-workbench-accent-yellow: oklch(0.795 0.184 86.047);
   --color-workbench-accent-violet: oklch(60.6% 0.25 292.717);
   --color-workbench-accent-orange: oklch(70.5% 0.213 47.604);
   --color-workbench-accent-red: oklch(63.7% 0.237 25.331);
