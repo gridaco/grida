@@ -5,13 +5,146 @@ import type cg from "@grida/cg";
 import { v4 } from "uuid";
 import assert from "assert";
 
+function defineNodeProperty<
+  K extends keyof grida.program.nodes.UnknwonNode,
+>(handlers: {
+  assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+  apply: (
+    draft: grida.program.nodes.UnknownNodeProperties,
+    value: NonNullable<grida.program.nodes.UnknwonNode[K]>,
+    prev?: grida.program.nodes.UnknwonNode[K]
+  ) => void;
+}) {
+  return handlers;
+}
+
+/**
+ * properties without side effects (re-layout)
+ */
+const safe_properties: Partial<
+  Omit<
+    grida.program.nodes.UnknownNodeProperties<{
+      assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+      apply: (
+        draft: grida.program.nodes.UnknownNodeProperties,
+        value: any,
+        prev?: any
+      ) => void;
+    }>,
+    "type"
+  >
+> = {
+  active: defineNodeProperty<"active">({
+    assert: (node) => typeof node.active === "boolean",
+    apply: (draft, value, prev) => {
+      draft.active = value;
+    },
+  }),
+  locked: defineNodeProperty<"locked">({
+    assert: (node) => typeof node.locked === "boolean",
+    apply: (draft, value, prev) => {
+      draft.locked = value;
+    },
+  }),
+  name: defineNodeProperty<"name">({
+    assert: (node) => typeof node.name === "string",
+    apply: (draft, value, prev) => {
+      draft.name = value;
+    },
+  }),
+  href: defineNodeProperty<"href">({
+    assert: (node) => typeof node.href === "string",
+    apply: (draft, value, prev) => {
+      draft.href = value;
+    },
+  }),
+  target: defineNodeProperty<"target">({
+    assert: (node) => typeof node.target === "string",
+    apply: (draft, value, prev) => {
+      draft.target = value;
+    },
+  }),
+  cursor: defineNodeProperty<"cursor">({
+    assert: (node) => typeof node.cursor === "string",
+    apply: (draft, value, prev) => {
+      draft.cursor = value;
+    },
+  }),
+  src: defineNodeProperty<"src">({
+    assert: (node) => typeof node.src === "string",
+    apply: (draft, value, prev) => {
+      draft.src = value;
+    },
+  }),
+  opacity: defineNodeProperty<"opacity">({
+    assert: (node) => typeof node.opacity === "number",
+    apply: (draft, value, prev) => {
+      draft.opacity = ranged(0, value, 1);
+    },
+  }),
+  zIndex: defineNodeProperty<"zIndex">({
+    assert: (node) => typeof node.zIndex === "number",
+    apply: (draft, value, prev) => {
+      draft.zIndex = value;
+    },
+  }),
+  fit: defineNodeProperty<"fit">({
+    assert: (node) => node.type === "image",
+    apply: (draft, value, prev) => {
+      draft.fit = value;
+    },
+  }),
+  textAlign: defineNodeProperty<"textAlign">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.textAlign = value;
+    },
+  }),
+  textAlignVertical: defineNodeProperty<"textAlignVertical">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.textAlignVertical = value;
+    },
+  }),
+  maxLength: defineNodeProperty<"maxLength">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.maxLength = value;
+    },
+  }),
+};
+
+function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: K,
+  value: any
+) {
+  "use strict";
+  if (!(key in safe_properties)) {
+    throw new Error(`property handler not found: "${key}"`);
+  }
+  const property = safe_properties[key as keyof typeof safe_properties];
+  if (property) {
+    const prev = (draft as any)[key];
+    // TODO: assert - decide pre or after
+    property.apply(draft, value, prev);
+  }
+}
+
 export default function nodeReducer<
   N extends Partial<grida.program.nodes.Node>,
 >(node: N, action: NodeChangeAction): N {
   return produce(node, (draft) => {
     switch (action.type) {
-      case "node/change/active": {
-        draft.active = action.active;
+      case "node/change/*": {
+        const { type: _, node_id: __, ...values } = action;
+        for (const [key, value] of Object.entries(values)) {
+          applyNodeProperty(
+            draft as grida.program.nodes.UnknownNodeProperties,
+            key as keyof grida.program.nodes.UnknwonNode,
+            value
+          );
+        }
         break;
       }
       case "node/change/userdata": {
@@ -26,29 +159,21 @@ export default function nodeReducer<
         draft.userdata = userdata;
         break;
       }
-      case "node/change/locked": {
-        draft.locked = action.locked;
-        break;
-      }
-      case "node/change/name": {
-        (draft as grida.program.nodes.i.IBaseNode).name =
-          action.name || (node.type as string);
-        break;
-      }
+      // keep
       case "node/change/positioning": {
-        const { positioning } = action;
         const pos = draft as grida.program.nodes.i.IPositioning;
-        if ("position" in positioning) {
-          if (positioning.position) {
-            pos.position = positioning.position;
+        if ("position" in action) {
+          if (action.position) {
+            pos.position = action.position;
           }
         }
-        if ("left" in positioning) pos.left = positioning.left;
-        if ("top" in positioning) pos.top = positioning.top;
-        if ("right" in positioning) pos.right = positioning.right;
-        if ("bottom" in positioning) pos.bottom = positioning.bottom;
+        if ("left" in action) pos.left = action.left;
+        if ("top" in action) pos.top = action.top;
+        if ("right" in action) pos.right = action.right;
+        if ("bottom" in action) pos.bottom = action.bottom;
         break;
       }
+      // keep
       case "node/change/positioning-mode": {
         const { position } = action;
         (draft as grida.program.nodes.i.IPositioning).position = position;
@@ -65,22 +190,11 @@ export default function nodeReducer<
         }
         break;
       }
+      // keep
       case "node/change/size": {
         const { axis, value: length } = action;
         // TODO: check the sizing model (fixed or css)
         (draft as grida.program.nodes.i.ICSSDimension)[axis] = length;
-        break;
-      }
-      case "node/change/href": {
-        (draft as grida.program.nodes.i.IHrefable).href = action.href;
-        break;
-      }
-      case "node/change/target": {
-        (draft as grida.program.nodes.i.IHrefable).target = action.target;
-        break;
-      }
-      case "node/change/mouse-cursor": {
-        (draft as grida.program.nodes.i.IMouseCursor).cursor = action.cursor;
         break;
       }
       case "node/change/component": {
@@ -88,40 +202,17 @@ export default function nodeReducer<
         draft.component_id = action.component_id;
         break;
       }
-      case "node/change/src": {
-        assert(draft.type === "image");
-        draft.src = action.src;
-        break;
-      }
       case "node/change/props": {
         assert(draft.type === "instance" || draft.type === "template_instance");
         draft.props = Object.assign({}, draft.props, action.props);
         break;
       }
-      case "node/change/opacity": {
-        const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
-        switch (action.opacity.type) {
-          case "set":
-            node.opacity = ranged(0, action.opacity.value, 1);
-            break;
-          case "delta":
-            node.opacity = ranged(0, node.opacity + action.opacity.value, 1);
-            break;
-        }
-        break;
-      }
       case "node/change/rotation": {
         const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
-        switch (action.rotation.type) {
-          case "set":
-            node.rotation = action.rotation.value;
-            break;
-          case "delta":
-            node.rotation += action.rotation.value;
-            break;
-        }
+        node.rotation = action.rotation;
         break;
       }
+      // keep
       case "node/change/cornerRadius": {
         assert(
           draft.type === "rectangle" ||
@@ -239,20 +330,7 @@ export default function nodeReducer<
             break;
           }
           case "node/change/stroke-width": {
-            switch (action.strokeWidth.type) {
-              case "set":
-                draft.strokeWidth = ranged(0, action.strokeWidth.value);
-                break;
-              case "delta":
-                if (draft.strokeWidth !== undefined) {
-                  draft.strokeWidth = ranged(
-                    0,
-                    draft.strokeWidth + action.strokeWidth.value
-                  );
-                }
-
-                break;
-            }
+            draft.strokeWidth = ranged(0, action.strokeWidth);
             break;
           }
           case "node/change/stroke-cap": {
@@ -260,11 +338,6 @@ export default function nodeReducer<
             break;
           }
         }
-        break;
-      }
-      case "node/change/fit": {
-        assert(draft.type === "image");
-        draft.fit = action.fit;
         break;
       }
       case "node/change/padding": {
@@ -360,19 +433,7 @@ export default function nodeReducer<
       }
       case "node/change/fontSize": {
         assert(draft.type === "text");
-        switch (action.fontSize.type) {
-          case "set":
-            draft.fontSize = ranged(0, action.fontSize.value);
-            break;
-          case "delta":
-            if (draft.fontSize !== undefined) {
-              draft.fontSize = ranged(
-                0,
-                draft.fontSize + action.fontSize.value
-              );
-            }
-            break;
-        }
+        draft.fontSize = ranged(0, action.fontSize);
         break;
       }
       case "node/change/fontWeight": {
@@ -396,31 +457,7 @@ export default function nodeReducer<
       }
       case "node/change/lineHeight": {
         assert(draft.type === "text");
-        switch (action.lineHeight.type) {
-          case "set":
-            draft.lineHeight = action.lineHeight.value;
-            break;
-          case "delta":
-            if (draft.lineHeight !== undefined) {
-              draft.lineHeight += action.lineHeight.value;
-            }
-            break;
-        }
-        break;
-      }
-      case "node/change/textAlign": {
-        assert(draft.type === "text");
-        draft.textAlign = action.textAlign;
-        break;
-      }
-      case "node/change/textAlignVertical": {
-        assert(draft.type === "text");
-        draft.textAlignVertical = action.textAlignVertical;
-        break;
-      }
-      case "node/change/maxlength": {
-        assert(draft.type === "text");
-        draft.maxLength = action.maxlength;
+        draft.lineHeight = action.lineHeight;
         break;
       }
 

@@ -127,7 +127,7 @@ export function useNodeActions(node_id: string | undefined) {
       toggleBold: () => instance.toggleNodeBold(node_id),
       component: (component_id: string) =>
         instance.changeNodeComponent(node_id, component_id),
-      text: (text?: tokens.StringValueExpression) =>
+      text: (text: tokens.StringValueExpression | null) =>
         instance.changeNodeText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
@@ -194,9 +194,8 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
-      lineHeight: (
-        change: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
-      ) => instance.changeTextNodeLineHeight(node_id, change),
+      lineHeight: (change: editor.api.NumberChange) =>
+        instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
         change: editor.api.TChange<
           grida.program.nodes.TextNode["letterSpacing"]
@@ -386,9 +385,7 @@ export function useCurrentSelection() {
   );
 
   const lineHeight = useCallback(
-    (
-      change: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
-    ) => {
+    (change: editor.api.NumberChange) => {
       mixedProperties.lineHeight?.ids.forEach((id) => {
         instance.changeTextNodeLineHeight(id, change);
       });

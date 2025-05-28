@@ -26,6 +26,28 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
+function resolveNumberChangeValue(
+  node: grida.program.nodes.UnknwonNode,
+  key: keyof grida.program.nodes.UnknwonNode,
+  change: editor.api.NumberChange
+): number {
+  switch (change.type) {
+    case "set":
+      return change.value;
+    case "delta": {
+      if (node[key] === null || node[key] === undefined) {
+        throw new Error(`Node ${key} is not set`);
+      }
+      assert(typeof node[key] === "number", `Node ${key} is not a number`);
+      return node[key] + change.value;
+    }
+    default:
+      throw new Error(
+        `Invalid number change type: ${(change as editor.api.NumberChange).type}`
+      );
+  }
+}
+
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
@@ -38,15 +60,22 @@ export class Editor
     editor.api.ICameraActions,
     editor.api.IEventTargetActions
 {
+  private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
-  constructor(initialState: editor.state.IEditorStateInit) {
-    this.listeners = new Set();
+  constructor(
+    initialState: editor.state.IEditorStateInit,
+    instanceConfig: {
+      pointer_move_throttle_ms: number;
+    } = { pointer_move_throttle_ms: 30 }
+  ) {
     this.mstate = editor.state.init(initialState);
+    this.listeners = new Set();
+    this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
   }
 
   private _locked: boolean = false;
@@ -86,6 +115,11 @@ export class Editor
       },
       force
     );
+  }
+
+  private __createNodeId(): editor.NodeID {
+    // TODO: use a instance-wise generator
+    return nid();
   }
 
   public insert(
@@ -293,11 +327,6 @@ export class Editor
     });
   }
 
-  public createNodeId(): editor.NodeID {
-    // TODO: use a instance-wise generator
-    return nid();
-  }
-
   public getNodeById(node_id: editor.NodeID): grida.program.nodes.Node {
     return editor.dq.__getNodeById(this.mstate, node_id);
   }
@@ -334,10 +363,13 @@ export class Editor
   }
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
+    const id = this.__createNodeId();
     this.dispatch({
       type: "insert",
+      id,
       prototype,
     });
+    return id;
   }
 
   public nudgeResize(
@@ -476,23 +508,18 @@ export class Editor
   public toggleActive(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/toggle/active",
-        node_id,
-      });
-    });
+
+    for (const node_id of target_ids) {
+      this.toggleNodeActive(node_id);
+    }
   }
 
   public toggleLocked(target: "selection" | editor.NodeID = "selection") {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/toggle/locked",
-        node_id,
-      });
-    });
+    for (const node_id of target_ids) {
+      this.toggleNodeLocked(node_id);
+    }
   }
 
   public toggleBold(target: "selection" | editor.NodeID = "selection") {
@@ -512,13 +539,9 @@ export class Editor
   ) {
     const target_ids =
       target === "selection" ? this.mstate.selection : [target];
-    target_ids.forEach((node_id) => {
-      this.dispatch({
-        type: "node/change/opacity",
-        node_id,
-        opacity: { type: "set", value: opacity },
-      });
-    });
+    for (const node_id of target_ids) {
+      this.changeNodeOpacity(node_id, { type: "set", value: opacity });
+    }
   }
 
   // #endregion IDocumentEditorActions implementation
@@ -573,16 +596,14 @@ export class Editor
   // #region INodeChangeActions
 
   toggleNodeActive(node_id: string) {
-    this.dispatch({
-      type: "node/toggle/active",
-      node_id: node_id,
-    });
+    const next = !this.getNodeById(node_id).active;
+    this.changeNodeActive(node_id, next);
+    return next;
   }
   toggleNodeLocked(node_id: string) {
-    this.dispatch({
-      type: "node/toggle/locked",
-      node_id: node_id,
-    });
+    const next = !this.getNodeById(node_id).locked;
+    this.changeNodeLocked(node_id, next);
+    return next;
   }
   toggleNodeBold(node_id: string) {
     this.dispatch({
@@ -610,7 +631,7 @@ export class Editor
       component_id: component_id,
     });
   }
-  changeNodeText(node_id: string, text?: tokens.StringValueExpression) {
+  changeNodeText(node_id: string, text: tokens.StringValueExpression | null) {
     this.dispatch({
       type: "node/change/text",
       node_id: node_id,
@@ -619,9 +640,9 @@ export class Editor
   }
   changeNodeName(node_id: string, name: string) {
     this.dispatch({
-      type: "node/change/name",
+      type: "node/change/*",
       node_id: node_id,
-      name: name,
+      name: name ?? "",
     });
   }
   changeNodeUserData(node_id: string, userdata: unknown) {
@@ -633,26 +654,26 @@ export class Editor
   }
   changeNodeActive(node_id: string, active: boolean) {
     this.dispatch({
-      type: "node/change/active",
+      type: "node/change/*",
       node_id: node_id,
       active: active,
     });
   }
   changeNodeLocked(node_id: string, locked: boolean) {
     this.dispatch({
-      type: "node/change/locked",
+      type: "node/change/*",
       node_id: node_id,
       locked: locked,
     });
   }
   changeNodePositioning(
     node_id: string,
-    positioning: grida.program.nodes.i.IPositioning
+    positioning: Partial<grida.program.nodes.i.IPositioning>
   ) {
     this.dispatch({
       type: "node/change/positioning",
       node_id: node_id,
-      positioning,
+      ...positioning,
     });
   }
   changeNodePositioningMode(
@@ -667,7 +688,7 @@ export class Editor
   }
   changeNodeSrc(node_id: string, src?: tokens.StringValueExpression) {
     this.dispatch({
-      type: "node/change/src",
+      type: "node/change/*",
       node_id: node_id,
       src,
     });
@@ -677,7 +698,7 @@ export class Editor
     href?: grida.program.nodes.i.IHrefable["href"]
   ) {
     this.dispatch({
-      type: "node/change/href",
+      type: "node/change/*",
       node_id: node_id,
       href,
     });
@@ -687,27 +708,49 @@ export class Editor
     target?: grida.program.nodes.i.IHrefable["target"]
   ) {
     this.dispatch({
-      type: "node/change/target",
+      type: "node/change/*",
       node_id: node_id,
       target,
     });
   }
   changeNodeOpacity(node_id: string, opacity: editor.api.NumberChange) {
     requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/opacity",
-        node_id: node_id,
-        opacity,
-      });
+      try {
+        const value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "opacity",
+          opacity
+        );
+
+        this.dispatch({
+          type: "node/change/*",
+          node_id: node_id,
+          opacity: value,
+        });
+      } catch (e) {
+        reportError(e);
+        return;
+      }
     });
   }
   changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
     requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/rotation",
-        node_id: node_id,
-        rotation,
-      });
+      try {
+        const value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "rotation",
+          rotation
+        );
+
+        this.dispatch({
+          type: "node/change/rotation",
+          node_id: node_id,
+          rotation: value,
+        });
+      } catch (e) {
+        reportError(e);
+        return;
+      }
     });
   }
   changeNodeSize(
@@ -753,11 +796,22 @@ export class Editor
   }
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/stroke-width",
-        node_id: node_id,
-        strokeWidth,
-      });
+      try {
+        const value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "strokeWidth",
+          strokeWidth
+        );
+
+        this.dispatch({
+          type: "node/change/stroke-width",
+          node_id: node_id,
+          strokeWidth: value,
+        });
+      } catch (e) {
+        reportError(e);
+        return;
+      }
     });
   }
   changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
@@ -772,7 +826,7 @@ export class Editor
   changeNodeFit(node_id: string, fit: cg.BoxFit) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/fit",
+        type: "node/change/*",
         node_id: node_id,
         fit,
       });
@@ -811,17 +865,28 @@ export class Editor
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/fontSize",
-        node_id: node_id,
-        fontSize,
-      });
+      try {
+        const value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "fontSize",
+          fontSize
+        );
+
+        this.dispatch({
+          type: "node/change/fontSize",
+          node_id: node_id,
+          fontSize: value,
+        });
+      } catch (e) {
+        reportError(e);
+        return;
+      }
     });
   }
   changeTextNodeTextAlign(node_id: string, textAlign: cg.TextAlign) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/textAlign",
+        type: "node/change/*",
         node_id: node_id,
         textAlign,
       });
@@ -833,7 +898,7 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/textAlignVertical",
+        type: "node/change/*",
         node_id: node_id,
         textAlignVertical,
       });
@@ -841,14 +906,24 @@ export class Editor
   }
   changeTextNodeLineHeight(
     node_id: string,
-    lineHeight: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
+    lineHeight: editor.api.NumberChange
   ) {
     requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/lineHeight",
-        node_id: node_id,
-        lineHeight,
-      });
+      try {
+        const value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "lineHeight",
+          lineHeight
+        );
+        this.dispatch({
+          type: "node/change/lineHeight",
+          node_id: node_id,
+          lineHeight: value,
+        });
+      } catch (e) {
+        reportError(e);
+        return;
+      }
     });
   }
   changeTextNodeLetterSpacing(
@@ -865,12 +940,12 @@ export class Editor
       });
     });
   }
-  changeTextNodeMaxlength(node_id: string, maxlength: number | undefined) {
+  changeTextNodeMaxlength(node_id: string, maxLength: number | undefined) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/maxlength",
+        type: "node/change/*",
         node_id: node_id,
-        maxlength,
+        maxLength,
       });
     });
   }
@@ -969,7 +1044,7 @@ export class Editor
   //
   changeNodeMouseCursor(node_id: string, cursor: cg.SystemMouseCursor) {
     this.dispatch({
-      type: "node/change/mouse-cursor",
+      type: "node/change/*",
       node_id,
       cursor,
     });
@@ -1263,7 +1338,7 @@ export class Editor
         shiftKey: event.shiftKey,
       });
     },
-    30
+    this.__pointer_move_throttle_ms
   );
 
   pointerMove(event: PointerEvent) {

@@ -1788,7 +1788,7 @@ export namespace editor.api {
       value?: tokens.StringValueExpression
     ): void;
     changeNodeComponent(node_id: NodeID, component: string): void;
-    changeNodeText(node_id: NodeID, text?: tokens.StringValueExpression): void;
+    changeNodeText(node_id: NodeID, text: tokens.StringValueExpression): void;
     changeNodeStyle(
       node_id: NodeID,
       key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
@@ -2015,11 +2015,10 @@ export namespace editor.api {
     //
 
     //
-    createNodeId(): NodeID;
     getNodeById(node_id: NodeID): grida.program.nodes.Node;
     getNodeDepth(node_id: NodeID): number;
     getNodeAbsoluteRotation(node_id: NodeID): number;
-    insertNode(prototype: grida.program.nodes.NodePrototype): void;
+    insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
 
     //
     nudgeResize(

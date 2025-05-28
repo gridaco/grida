@@ -130,9 +130,7 @@ function CanvasConsumer() {
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
-    const id = editor.createNodeId();
-    editor.insertNode({
-      _$id: id,
+    const id = editor.insertNode({
       type: "image",
       name: value.text,
       width: model.width,

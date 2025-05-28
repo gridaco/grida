@@ -1,4 +1,3 @@
-import type { tokens } from "@grida/tokens";
 import type { editor } from "@/grida-canvas";
 import type cmath from "@grida/cmath";
 import type { BitmapEditorBrush } from "@grida/bitmap";
@@ -43,7 +42,6 @@ export type DocumentAction =
   | SurfaceAction
   //
   | NodeChangeAction
-  | NodeToggleBasePropertyAction
   | NodeToggleBoldAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
@@ -572,54 +570,32 @@ interface ITemplateInstanceNodeID {
   template_instance_node_id: string;
 }
 
-interface INodeChangeNameAction extends INodeID {
-  name: string;
-}
-
 interface INodeChangeUserDataAction extends INodeID {
   userdata: grida.program.nodes.i.IBaseNode["userdata"];
 }
 
-interface INodeChangeActiveAction extends INodeID {
-  active: boolean;
-}
+type INodeChangePositioningAction = INodeID &
+  Partial<grida.program.nodes.i.IPositioning>;
 
-interface INodeChangeLockedAction extends INodeID {
-  locked: boolean;
-}
+type INodeChangePositioningModeAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "position">>;
 
-interface INodeChangePositioningAction extends INodeID {
-  positioning: Partial<grida.program.nodes.i.IPositioning>;
-}
+type INodeChangeComponentAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "component_id">>;
 
-interface INodeChangePositioningModeAction extends INodeID {
-  position: grida.program.nodes.i.IPositioning["position"];
-}
-
-interface INodeChangeComponentAction extends INodeID {
-  component_id: string;
-}
-
-interface INodeChangeTextAction extends INodeID {
-  text?: tokens.StringValueExpression;
-}
-
-interface INodeChangeOpacityAction extends INodeID {
-  opacity: editor.api.NumberChange;
-}
+type INodeChangeTextAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "text">>;
 
 interface INodeChangeSizeAction extends INodeID {
   axis: "width" | "height";
   value: grida.program.css.LengthPercentage | "auto";
 }
 
-interface INodeChangeRotationAction extends INodeID {
-  rotation: editor.api.NumberChange;
-}
+type INodeChangeRotationAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "rotation">>;
 
-interface INodeChangeCornerRadiusAction extends INodeID {
-  cornerRadius: number | grida.program.nodes.i.IRectangleCorner["cornerRadius"];
-}
+type INodeChangeCornerRadiusAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "cornerRadius">>;
 
 interface INodeChangeFillAction extends INodeID {
   fill: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
@@ -629,52 +605,33 @@ interface INodeChangeStrokeAction extends INodeID {
   stroke: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
-interface INodeChangeStrokeWidthAction extends INodeID {
-  strokeWidth: editor.api.NumberChange;
-}
+type INodeChangeStrokeWidthAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "strokeWidth">>;
 
-interface INodeChangeStrokeCapAction extends INodeID {
-  strokeCap: cg.StrokeCap;
-}
+type INodeChangeStrokeCapAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "strokeCap">>;
 
 interface INodeChangeBorderAction extends INodeID {
   border: grida.program.css.Border | undefined;
-}
-
-interface INodeChangeFitAction extends INodeID {
-  fit: cg.BoxFit;
 }
 
 interface ITextNodeChangeFontFamilyAction extends INodeID {
   fontFamily: string | undefined;
 }
 
-interface ITextNodeChangeFontWeightAction extends INodeID {
-  fontWeight: cg.NFontWeight;
-}
-interface ITextNodeChangeFontSizeAction extends INodeID {
-  fontSize: editor.api.NumberChange;
-}
-interface ITextNodeChangeTextAlignAction extends INodeID {
-  textAlign: cg.TextAlign;
-}
+type ITextNodeChangeFontWeightAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "fontWeight">>;
 
-interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
-  textAlignVertical: cg.TextAlignVertical;
-}
+type ITextNodeChangeFontSizeAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "fontSize">>;
 
-interface ITextNodeChangeLineHeightAction extends INodeID {
-  lineHeight: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>;
-}
+type ITextNodeChangeLineHeightAction = INodeID &
+  Required<Pick<grida.program.nodes.UnknwonNode, "lineHeight">>;
 
 interface ITextNodeChangeLetterSpacingAction extends INodeID {
   letterSpacing: editor.api.TChange<
     grida.program.nodes.TextNode["letterSpacing"]
   >;
-}
-
-interface ITextNodeChangeMaxlengthAction extends INodeID {
-  maxlength: number | undefined;
 }
 
 //
@@ -715,24 +672,8 @@ interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
   crossAxisGap: grida.program.nodes.i.IFlexContainer["crossAxisGap"];
 }
 
-interface INodeChangeMouseCursorAction extends INodeID {
-  cursor: cg.SystemMouseCursor;
-}
-
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
-}
-
-interface INodeChangeSrcAction extends INodeID {
-  src?: tokens.StringValueExpression;
-}
-
-interface INodeChangeHrefAction extends INodeID {
-  href?: grida.program.nodes.i.IHrefable["href"];
-}
-
-interface INodeChangeTargetAction extends INodeID {
-  target?: grida.program.nodes.i.IHrefable["target"];
 }
 
 interface INodeChangePropsAction extends INodeID {
@@ -740,17 +681,17 @@ interface INodeChangePropsAction extends INodeID {
 }
 
 export type NodeChangeAction =
-  | ({ type: "node/change/name" } & INodeChangeNameAction)
+  | ({
+      type: "node/change/*";
+      node_id: string;
+    } & Partial<Omit<grida.program.nodes.UnknwonNode, "type">>)
   | ({ type: "node/change/userdata" } & INodeChangeUserDataAction)
-  | ({ type: "node/change/active" } & INodeChangeActiveAction)
-  | ({ type: "node/change/locked" } & INodeChangeLockedAction)
   | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
   | ({
       type: "node/change/positioning-mode";
     } & INodeChangePositioningModeAction)
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
   | ({ type: "node/change/text" } & INodeChangeTextAction)
-  | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)
   | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
   | ({ type: "node/change/size" } & INodeChangeSizeAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
@@ -759,29 +700,17 @@ export type NodeChangeAction =
   | ({ type: "node/change/stroke-width" } & INodeChangeStrokeWidthAction)
   | ({ type: "node/change/stroke-cap" } & INodeChangeStrokeCapAction)
   | ({ type: "node/change/border" } & INodeChangeBorderAction)
-  | ({ type: "node/change/fit" } & INodeChangeFitAction)
   //
   | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
   | ({ type: "node/change/fontWeight" } & ITextNodeChangeFontWeightAction)
   | ({ type: "node/change/fontSize" } & ITextNodeChangeFontSizeAction)
-  | ({ type: "node/change/textAlign" } & ITextNodeChangeTextAlignAction)
-  | ({
-      type: "node/change/textAlignVertical";
-    } & ITextNodeChangeTextAlignVerticalAction)
   | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
   | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
-  | ({ type: "node/change/maxlength" } & ITextNodeChangeMaxlengthAction)
   //
-  | ({
-      type: "node/change/padding";
-    } & INodeChangePaddingAction)
-  | ({
-      type: "node/change/box-shadow";
-    } & INodeChangeBoxShadowAction)
+  | ({ type: "node/change/padding" } & INodeChangePaddingAction)
+  | ({ type: "node/change/box-shadow" } & INodeChangeBoxShadowAction)
   //
-  | ({
-      type: "node/change/layout";
-    } & INodeChangeLayoutAction)
+  | ({ type: "node/change/layout" } & INodeChangeLayoutAction)
   | ({
       type: "node/change/direction";
     } & IFlexContainerNodeChangeDirectionAction)
@@ -801,16 +730,8 @@ export type NodeChangeAction =
       type: "node/change/crossAxisGap";
     } & IFlexContainerNodeChangeCrossAxisGapAction)
   //
-  | ({ type: "node/change/mouse-cursor" } & INodeChangeMouseCursorAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
-  | ({ type: "node/change/src" } & INodeChangeSrcAction)
-  | ({ type: "node/change/href" } & INodeChangeHrefAction)
-  | ({ type: "node/change/target" } & INodeChangeTargetAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
-
-export type NodeToggleBasePropertyAction =
-  | ({ type: "node/toggle/active" } & INodeID)
-  | ({ type: "node/toggle/locked" } & INodeID);
 
 export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
 

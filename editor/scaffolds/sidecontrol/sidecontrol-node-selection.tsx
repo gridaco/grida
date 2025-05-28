@@ -892,7 +892,7 @@ function SelectedNodeProperties({
               <StringValueControl
                 value={node.text}
                 maxlength={maxLength}
-                onValueChange={actions.text}
+                onValueChange={(value) => actions.text(value ?? null)}
               />
             </PropertyLine>
             <PropertyLine>

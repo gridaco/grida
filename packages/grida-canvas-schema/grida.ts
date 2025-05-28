@@ -870,7 +870,7 @@ export namespace grida.program.nodes {
   } & i.IBaseNode &
     i.ISceneNode;
 
-  export type UnknownNodeProperties = Record<keyof UnknwonNode, unknown>;
+  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
 
   // #region node prototypes
   export type TextNodePrototype = __TPrototypeNode<
