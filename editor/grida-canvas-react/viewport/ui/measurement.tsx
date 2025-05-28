@@ -5,7 +5,7 @@ import {
 import { MeterLabel } from "./meter";
 import { cn } from "@/components/lib/utils";
 import cmath from "@grida/cmath";
-import { useTransform } from "@/grida-canvas-react/provider";
+import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-canvas/backends/dom";
@@ -64,7 +64,7 @@ function useMeasurement() {
 
 export function MeasurementGuide() {
   const measurement = useMeasurement();
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
 
   if (!measurement) return <></>;
 

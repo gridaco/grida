@@ -8,13 +8,12 @@ import {
   useClipboardSync,
   useCurrentSceneState,
   useDocumentState,
-  useEditorSurface,
   useEventTargetCSSCursor,
   useNode,
   usePointerState,
   useSelectionState,
   useToolState,
-  useTransform,
+  useTransformState,
 } from "../provider";
 import { useCurrentEditor, useEditorState } from "../use-editor";
 import { useIsWindowResizing } from "./hooks/window-resizing";
@@ -137,12 +136,10 @@ function SurfaceGroup({
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
   const editor = useCurrentEditor();
-  const { transform } = useTransform();
+  const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
+  const ruler = useEditorState(editor, (state) => state.ruler);
+  const { transform } = useTransformState();
   const {
-    zoom,
-    pan,
-    ruler,
-    pixelgrid,
     edges,
     marquee,
     hovered_node_id,
@@ -287,10 +284,10 @@ export function EditorSurface() {
           const d = delta[1];
           const sensitivity = 0.01;
           const zoom_delta = -d * sensitivity;
-          zoom(zoom_delta, origin);
+          editor.zoom(zoom_delta, origin);
         } else {
           const sensitivity = 2;
-          pan(
+          editor.pan(
             cmath.vector2.invert(
               cmath.vector2.multiply(delta, [sensitivity, sensitivity])
             )
@@ -420,7 +417,7 @@ export function EditorSurface() {
 }
 
 function DropzoneOverlay(props: editor.state.DropzoneIndication) {
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
   switch (props.type) {
     case "node":
       return <NodeOverlay node_id={props.node_id} readonly />;
@@ -561,7 +558,7 @@ export function EditorSurfaceClipboardSyncProvider({
 
 function FloatingCursorTooltip() {
   const { gesture } = useEventTarget();
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
   const pointer = usePointerState();
   const pos = cmath.vector2.transform(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
@@ -586,7 +583,7 @@ function FloatingCursorTooltip() {
 }
 
 function BrushCursor({ brush }: { brush: BitmapEditorBrush }) {
-  const { transform, scaleX, scaleY } = useTransform();
+  const { transform, scaleX, scaleY } = useTransformState();
   const pointer = usePointerState();
   const pos = cmath.vector2.transform(
     // quantize position to canvas space 1.
@@ -822,7 +819,7 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const { scaleX, scaleY } = useTransform();
+  const { scaleX, scaleY } = useTransformState();
 
   const data = useSingleSelection(node_id);
 
@@ -956,10 +953,10 @@ function LayerOverlayRotationHandle({
   offset?: number;
   size?: number;
 }) {
-  const { getNodeAbsoluteRotation } = useEditorSurface();
+  const editor = useCurrentEditor();
   const { startRotateGesture } = useEventTarget();
 
-  const rotation = getNodeAbsoluteRotation(node_id);
+  const rotation = editor.getNodeAbsoluteRotation(node_id);
 
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
@@ -1142,7 +1139,7 @@ function GapOverlay({
 } & {
   onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
 
   const { x, y, rects: _rects } = distribution;
 
@@ -1374,7 +1371,7 @@ function PixelGridOverlay() {
 
 function RulerGuideOverlay() {
   const { guides, startGuideGesture } = useEventTarget();
-  const { scaleX, scaleY, transform } = useTransform();
+  const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();
 
@@ -1500,8 +1497,9 @@ function Guide({
   offset,
   idx,
 }: grida.program.document.Guide2D & { idx: number }) {
-  const { transform } = useTransform();
-  const { startGuideGesture, deleteGuide } = useEventTarget();
+  const editor = useCurrentEditor();
+  const { transform } = useTransformState();
+  const { startGuideGesture } = useEventTarget();
   const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -1526,7 +1524,7 @@ function Guide({
     },
     onKeyDown: ({ event }) => {
       if (event.key === "Delete" || event.key === "Backspace") {
-        deleteGuide(idx);
+        editor.deleteGuide(idx);
       }
       if (event.key === "Escape") {
         (event.currentTarget as HTMLElement)?.blur();

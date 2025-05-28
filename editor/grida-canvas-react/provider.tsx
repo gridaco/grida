@@ -728,115 +728,6 @@ export function useEditorFlagsState() {
   }, [flags, debug]);
 }
 
-export function useEditorSurface(): {
-  a11yarrow: (
-    target: "selection" | editor.NodeID,
-    direction: "up" | "down" | "left" | "right",
-    shiftKey: boolean,
-    config?: editor.api.NudgeUXConfig
-  ) => void;
-  nudge: (
-    target: "selection" | editor.NodeID,
-    axis: "x" | "y",
-    delta: number,
-    config?: editor.api.NudgeUXConfig
-  ) => void;
-  getNodeAbsoluteRotation: (node_id: editor.NodeID) => number;
-} {
-  const editor = useCurrentEditor();
-
-  const dispatch = React.useCallback(
-    (action: Action) => editor.dispatch(action),
-    [editor]
-  );
-
-  // Keep React-specific functions
-  const __gesture_nudge = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "gesture/nudge",
-        state,
-      });
-    },
-    [dispatch]
-  );
-
-  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
-
-  const nudge = useCallback(
-    (
-      target: "selection" | editor.NodeID = "selection",
-      axis: "x" | "y",
-      delta: number = 1,
-      config: editor.api.NudgeUXConfig = {
-        delay: 500,
-        gesture: true,
-      }
-    ) => {
-      const { gesture = true, delay = 500 } = config;
-
-      if (gesture) {
-        // Trigger gesture
-        __gesture_nudge("on");
-
-        // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
-      }
-
-      dispatch({
-        type: "nudge",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const a11yarrow = useCallback(
-    (
-      target: "selection" | editor.NodeID,
-      direction: "up" | "down" | "left" | "right",
-      shiftKey: boolean,
-      config: editor.api.NudgeUXConfig = {
-        delay: 500,
-        gesture: true,
-      }
-    ) => {
-      const { gesture = true, delay = 500 } = config;
-
-      if (gesture) {
-        // Trigger gesture
-        __gesture_nudge("on");
-
-        // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
-      }
-
-      dispatch({
-        type: `a11y/${direction}`,
-        target,
-        shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const getNodeAbsoluteRotation = useCallback(
-    (node_id: editor.NodeID) => {
-      const node = editor.getNodeById(node_id);
-      return (node as any).rotation ?? 0;
-    },
-    [editor]
-  );
-
-  return {
-    nudge,
-    a11yarrow,
-    getNodeAbsoluteRotation,
-  };
-}
-
 interface UseSelectionState {
   selection: editor.state.IEditorState["selection"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
@@ -895,188 +786,7 @@ export function useCurrentSceneState(): UseSceneState {
   return useSceneState(scene_id);
 }
 
-function animateTransformTo(
-  from: cmath.Transform,
-  to: cmath.Transform,
-  update: (t: cmath.Transform) => void
-) {
-  const duration = 200; // ms
-  const start = performance.now();
-
-  function lerp(a: number, b: number, t: number) {
-    return a + (b - a) * t;
-  }
-
-  function step(now: number) {
-    const elapsed = now - start;
-    const progress = Math.min(elapsed / duration, 1);
-
-    const next: cmath.Transform = [
-      [0, 0, 0],
-      [0, 0, 0],
-    ] as cmath.Transform;
-
-    for (let i = 0; i < 2; i++) {
-      for (let j = 0; j < 3; j++) {
-        next[i][j] = lerp(from[i][j], to[i][j], progress);
-      }
-    }
-
-    update(next);
-
-    if (progress < 1) {
-      requestAnimationFrame(step);
-    }
-  }
-
-  requestAnimationFrame(step);
-}
-
-interface UseCameraActions {
-  scale: (
-    factor: number | cmath.Vector2,
-    origin: cmath.Vector2 | "center"
-  ) => void;
-  fit: (
-    selector: grida.program.document.Selector,
-    options?: {
-      margin?: number | [number, number, number, number];
-      animate?: boolean;
-    }
-  ) => void;
-  zoomIn: () => void;
-  zoomOut: () => void;
-}
-
-export function useCameraActions(): UseCameraActions {
-  const instance = useCurrentEditor();
-
-  const scale = useCallback(
-    (
-      factor: number | cmath.Vector2,
-      origin: cmath.Vector2 | "center" = "center"
-    ) => {
-      const { transform } = instance.state;
-      const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
-      const _scale = transform[0][0];
-      let ox, oy: number;
-      if (origin === "center") {
-        // Canvas size (you need to know or pass this)
-        const { width, height } = domapi.get_viewport_rect();
-
-        // Calculate the absolute transform origin
-        ox = width / 2;
-        oy = height / 2;
-      } else {
-        [ox, oy] = origin;
-      }
-
-      const sx = cmath.clamp(
-        fx,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-      );
-
-      const sy = cmath.clamp(
-        fy,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-      );
-
-      const [tx, ty] = cmath.transform.getTranslate(transform);
-
-      // calculate the offset that should be applied with scale with css transform.
-      const [newx, newy] = [
-        ox - (ox - tx) * (sx / _scale),
-        oy - (oy - ty) * (sy / _scale),
-      ];
-
-      const next: cmath.Transform = [
-        [sx, transform[0][1], newx],
-        [transform[1][0], sy, newy],
-      ];
-
-      instance.transform(next);
-    },
-    [instance]
-  );
-
-  /**
-   * Transform to fit
-   */
-  const fit = useCallback(
-    (
-      selector: grida.program.document.Selector,
-      options: {
-        margin?: number | [number, number, number, number];
-        animate?: boolean;
-      } = {
-        margin: 64,
-        animate: false,
-      }
-    ) => {
-      const { document_ctx, selection, transform } = instance.state;
-      const ids = editor.dq.querySelector(document_ctx, selection, selector);
-
-      const cdom = new domapi.CanvasDOM(transform);
-
-      const rects = ids
-        .map((id) => cdom.getNodeBoundingRect(id))
-        .filter((r) => r) as cmath.Rectangle[];
-
-      if (rects.length === 0) {
-        return;
-      }
-
-      const area = cmath.rect.union(rects);
-
-      const _view = domapi.get_viewport_rect();
-      const view = { x: 0, y: 0, width: _view.width, height: _view.height };
-
-      const next_transform = cmath.ext.viewport.transformToFit(
-        view,
-        area,
-        options.margin
-      );
-
-      if (options.animate) {
-        animateTransformTo(transform, next_transform, (t) => {
-          instance.transform(t);
-        });
-      } else {
-        instance.transform(next_transform);
-      }
-    },
-    [instance]
-  );
-
-  const zoomIn = useCallback(() => {
-    const { transform } = instance.state;
-    const prevscale = transform[0][0];
-    const nextscale = cmath.quantize(prevscale * 2, 0.01);
-
-    scale(nextscale);
-    //
-  }, [scale]);
-
-  const zoomOut = useCallback(() => {
-    const { transform } = instance.state;
-    const prevscale = transform[0][0];
-    const nextscale = cmath.quantize(prevscale / 2, 0.01);
-
-    scale(nextscale);
-    //
-  }, [scale]);
-
-  return {
-    scale,
-    fit,
-    zoomIn,
-    zoomOut,
-  };
-}
-
-export function useTransform() {
+export function useTransformState() {
   const editor = useCurrentEditor();
   const transform = useEditorState(editor, (state) => state.transform);
 
@@ -1163,7 +873,6 @@ export function useBrushState() {
 }
 
 interface UseEventTarget {
-  transform: editor.state.IEditorState["transform"];
   gesture: editor.state.IEditorState["gesture"];
   dragging: editor.state.IEditorState["dragging"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
@@ -1177,16 +886,6 @@ interface UseEventTarget {
   marquee: editor.state.IEditorState["marquee"];
   edges: grida.program.document.Edge2D[];
   guides: grida.program.document.Guide2D[];
-  pixelgrid: editor.state.IEditorState["pixelgrid"];
-  ruler: editor.state.IEditorState["ruler"];
-
-  // Actions/callbacks (write)
-  zoom: (delta: number, origin: cmath.Vector2) => void;
-  pan: (delta: [number, number]) => void;
-  //
-  setPixelGridState: (state: "on" | "off") => void;
-  setRulerState: (state: "on" | "off") => void;
-  deleteGuide: (idx: number) => void;
 
   startGuideGesture: (axis: cmath.Axis, idx: number | -1) => void;
   startScaleGesture: (
@@ -1213,13 +912,34 @@ interface UseEventTarget {
     selection: string[],
     event: MouseEvent
   ) => void;
+
+  a11yarrow: (
+    target: "selection" | editor.NodeID,
+    direction: "up" | "down" | "left" | "right",
+    shiftKey: boolean,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
+  nudge: (
+    target: "selection" | editor.NodeID,
+    axis: "x" | "y",
+    delta: number,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
 }
 
 export function useEventTarget(): UseEventTarget {
-  // const [state, dispatch] = __useInternal();
   const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    transform: state.transform,
+  const scene = useCurrentSceneState();
+  const {
+    surface_snapping,
+    gesture,
+    dragging,
+    hovered_node_id,
+    dropzone,
+    selection,
+    content_edit_mode,
+    marquee,
+  } = useEditorState(instance, (state) => ({
     surface_snapping: state.surface_snapping,
     gesture: state.gesture,
     dragging: state.dragging,
@@ -1227,15 +947,8 @@ export function useEventTarget(): UseEventTarget {
     dropzone: state.dropzone,
     selection: state.selection,
     content_edit_mode: state.content_edit_mode,
-    tool: state.tool,
-    brush: state.brush,
     marquee: state.marquee,
-    debug: state.debug,
-    pixelgrid: state.pixelgrid,
-    ruler: state.ruler,
-    flags: state.flags,
   }));
-  const scene = useCurrentSceneState();
 
   const dispatch = useCallback(
     (action: Action) => {
@@ -1246,24 +959,6 @@ export function useEventTarget(): UseEventTarget {
 
   const { guides, edges } = scene;
 
-  const {
-    transform,
-    surface_snapping,
-    gesture,
-    dragging,
-    hovered_node_id,
-    dropzone,
-    selection,
-    content_edit_mode,
-    tool,
-    brush,
-    marquee,
-    debug,
-    pixelgrid,
-    ruler,
-    flags,
-  } = state;
-
   const is_node_transforming = gesture.type !== "idle";
   const is_node_translating =
     gesture.type === "translate" ||
@@ -1271,26 +966,6 @@ export function useEventTarget(): UseEventTarget {
     gesture.type === "nudge" ||
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
-
-  const setRulerState = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "surface/ruler",
-        state,
-      });
-    },
-    [dispatch]
-  );
-
-  const setPixelGridState = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "surface/pixel-grid",
-        state,
-      });
-    },
-    [dispatch]
-  );
 
   const _throttled_pointer_move_with_raycast = useCallback(
     throttle((event: PointerEvent, position) => {
@@ -1323,51 +998,6 @@ export function useEventTarget(): UseEventTarget {
 
     return position;
   };
-
-  const zoom = useCallback(
-    (delta: number, origin: cmath.Vector2) => {
-      const _scale = transform[0][0];
-      // the origin point of the zooming point in x, y (surface space)
-      const [ox, oy] = origin;
-
-      // Apply proportional zooming
-      const scale = _scale + _scale * delta;
-
-      const newscale = cmath.clamp(
-        scale,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
-        editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
-      );
-      const [tx, ty] = cmath.transform.getTranslate(transform);
-
-      // calculate the offset that should be applied with scale with css transform.
-      const [newx, newy] = [
-        ox - (ox - tx) * (newscale / _scale),
-        oy - (oy - ty) * (newscale / _scale),
-      ];
-
-      const next: cmath.Transform = [
-        [newscale, transform[0][1], newx],
-        [transform[1][0], newscale, newy],
-      ];
-
-      dispatch({
-        type: "transform",
-        transform: next,
-      });
-    },
-    [dispatch, transform]
-  );
-
-  const pan = useCallback(
-    (delta: [dx: number, dy: number]) => {
-      dispatch({
-        type: "transform",
-        transform: cmath.transform.translate(transform, delta),
-      });
-    },
-    [dispatch, transform]
-  );
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -1446,6 +1076,7 @@ export function useEventTarget(): UseEventTarget {
 
   const dragEnd = useCallback(
     (event: PointerEvent) => {
+      const { transform, marquee } = instance.state;
       if (marquee) {
         // test area in canvas space
         const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
@@ -1453,7 +1084,7 @@ export function useEventTarget(): UseEventTarget {
         const cdom = new domapi.CanvasDOM(transform);
         const contained = cdom.getNodesIntersectsArea(area);
 
-        dispatch({
+        instance.dispatch({
           type: "event-target/event/on-drag-end",
           node_ids_from_area: contained,
           shiftKey: event.shiftKey,
@@ -1461,12 +1092,12 @@ export function useEventTarget(): UseEventTarget {
 
         return;
       }
-      dispatch({
+      instance.dispatch({
         type: "event-target/event/on-drag-end",
         shiftKey: event.shiftKey,
       });
     },
-    [dispatch, marquee, transform]
+    [instance]
   );
 
   const drag = useCallback(
@@ -1510,16 +1141,6 @@ export function useEventTarget(): UseEventTarget {
           type: "guide",
           axis,
         },
-      });
-    },
-    [dispatch]
-  );
-
-  const deleteGuide = useCallback(
-    (idx: number) => {
-      dispatch({
-        type: "surface/guide/delete",
-        idx,
       });
     },
     [dispatch]
@@ -1595,32 +1216,91 @@ export function useEventTarget(): UseEventTarget {
     [dispatch]
   );
 
+  // Keep React-specific functions
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | editor.NodeID = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: editor.api.NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const a11yarrow = useCallback(
+    (
+      target: "selection" | editor.NodeID,
+      direction: "up" | "down" | "left" | "right",
+      shiftKey: boolean,
+      config: editor.api.NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: `a11y/${direction}`,
+        target,
+        shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
   return useMemo(() => {
     return {
-      zoom,
-      pan,
       //
-      transform,
-      debug,
-      flags,
       gesture,
       dragging,
       surface_snapping,
       //
       marquee,
-      tool,
-      brush,
       //
-      ruler,
-      setRulerState,
       guides,
       startGuideGesture,
-      deleteGuide,
       //
       edges,
-      //
-      pixelgrid,
-      setPixelGridState,
       //
       hovered_node_id,
       dropzone,
@@ -1649,32 +1329,21 @@ export function useEventTarget(): UseEventTarget {
       //
       multipleSelectionOverlayClick,
       //
+      nudge,
+      a11yarrow,
     };
   }, [
-    zoom,
-    pan,
     //
-    transform,
-    debug,
-    flags,
     gesture,
     dragging,
     surface_snapping,
     //
     marquee,
-    tool,
-    brush,
     //
-    ruler,
-    setRulerState,
     guides,
     startGuideGesture,
-    deleteGuide,
     //
     edges,
-    //
-    pixelgrid,
-    setPixelGridState,
     //
     hovered_node_id,
     dropzone,
@@ -1704,6 +1373,8 @@ export function useEventTarget(): UseEventTarget {
     //
     multipleSelectionOverlayClick,
     //
+    nudge,
+    a11yarrow,
   ]);
 }
 

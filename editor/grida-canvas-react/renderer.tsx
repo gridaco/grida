@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo } from "react";
-import {
-  useCameraActions,
-  useCurrentSceneState,
-  useTransform,
-} from "./provider";
+import { useCurrentSceneState, useTransformState } from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
@@ -142,7 +138,7 @@ export function StandaloneSceneBackground({
 }
 
 export function Transformer({ children }: React.PropsWithChildren<{}>) {
-  const { style } = useTransform();
+  const { style } = useTransformState();
 
   return (
     <div
@@ -160,17 +156,16 @@ function useFitInitiallyEffect() {
   const editor = useCurrentEditor();
   const documentKey = useEditorState(editor, (state) => state.document_key);
   const sceneId = useEditorState(editor, (state) => state.scene_id);
-  const { fit } = useCameraActions();
 
   useEffect(() => {
-    fit("*");
+    editor.fit("*");
   }, [documentKey, sceneId]);
 }
 
 export function AutoInitialFitTransformer({
   children,
 }: React.PropsWithChildren<{}>) {
-  const { style } = useTransform();
+  const { style } = useTransformState();
 
   useFitInitiallyEffect();
 

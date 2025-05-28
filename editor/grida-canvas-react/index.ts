@@ -7,7 +7,7 @@ export {
   useEventTarget,
   useComputedNode,
   useNodeActions as useNodeAction,
-  useTransform,
+  useTransformState as useTransform,
   useToolState,
   useEditorFlagsState,
   useRootTemplateInstanceNode,

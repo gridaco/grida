@@ -1,12 +1,5 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import {
-  useBrushState,
-  useCameraActions,
-  useEditorSurface,
-  useEventTarget,
-  useCurrentSelection,
-  useToolState,
-} from "../provider";
+import { useEventTarget, useCurrentSelection, useToolState } from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
@@ -325,11 +318,8 @@ function useSingleDoublePressHotkey(
 
 export function useEditorHotKeys() {
   const editor = useCurrentEditor();
-  const { ruler, setRulerState, pixelgrid, setPixelGridState } =
-    useEventTarget();
   const { tool, content_edit_mode } = useToolState();
-  const { scale, fit, zoomIn, zoomOut } = useCameraActions();
-  const { a11yarrow } = useEditorSurface();
+  const { a11yarrow } = useEventTarget();
 
   const { selection, actions } = useCurrentSelection();
 
@@ -615,15 +605,13 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+r", () => {
-    const next = ruler === "on" ? "off" : "on";
-    setRulerState(next);
-    toast.success(`Ruler ${next}`);
+    const v = editor.toggleRuler();
+    toast.success(`Ruler ${v === "on" ? "on" : "off"}`);
   });
 
   useHotkeys("shift+\", shift+'", () => {
-    const next = pixelgrid === "on" ? "off" : "on";
-    setPixelGridState(next);
-    toast.success(`Pixel Grid ${next}`);
+    const v = editor.togglePixelGrid();
+    toast.success(`Pixel Grid ${v === "on" ? "on" : "off"}`);
   });
 
   useHotkeys(
@@ -806,24 +794,24 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+0", (e) => {
-    scale(1, "center");
+    editor.scale(1, "center");
     toast.success(`Zoom to 100%`);
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    fit("*", { margin: 64 });
+    editor.fit("*", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 
   useHotkeys("shift+2", (e) => {
-    fit("selection", { margin: 64, animate: true });
+    editor.fit("selection", { margin: 64, animate: true });
     toast.success(`Zoom to selection`);
   });
 
   useHotkeys(
     "meta+=, ctrl+=, meta+plus, ctrl+plus",
     () => {
-      zoomIn();
+      editor.zoomIn();
     },
     { preventDefault: true }
   );
@@ -831,7 +819,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+minus, ctrl+minus",
     () => {
-      zoomOut();
+      editor.zoomOut();
     },
     { preventDefault: true }
   );

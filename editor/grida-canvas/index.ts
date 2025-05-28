@@ -1908,8 +1908,48 @@ export namespace editor.api {
     changeBrushOpacity(opacity: editor.api.NumberChange): void;
   }
 
+  export interface IPixelGridActions {
+    configurePixelGrid(state: "on" | "off"): void;
+    togglePixelGrid(): "on" | "off";
+  }
+
+  export interface IRulerActions {
+    configureRuler(state: "on" | "off"): void;
+    toggleRuler(): "on" | "off";
+  }
+
+  export interface IGuide2DActions {
+    deleteGuide(idx: number): void;
+  }
+
   export interface ICameraActions {
     transform(transform: cmath.Transform): void;
+
+    /**
+     * zoom the camera by the given delta
+     * @param delta the delta to zoom by
+     * @param origin the origin of the zoom
+     */
+    zoom: (delta: number, origin: cmath.Vector2) => void;
+    /**
+     * pan the camera by the given delta
+     * @param delta the delta to pan by
+     */
+    pan: (delta: [number, number]) => void;
+
+    scale(
+      factor: number | cmath.Vector2,
+      origin: cmath.Vector2 | "center"
+    ): void;
+    fit(
+      selector: grida.program.document.Selector,
+      options?: {
+        margin?: number | [number, number, number, number];
+        animate?: boolean;
+      }
+    ): void;
+    zoomIn(): void;
+    zoomOut(): void;
   }
 
   export interface IDocumentEditorActions {
@@ -1954,6 +1994,7 @@ export namespace editor.api {
     createNodeId(): NodeID;
     getNodeById(node_id: NodeID): grida.program.nodes.Node;
     getNodeDepth(node_id: NodeID): number;
+    getNodeAbsoluteRotation(node_id: NodeID): number;
     insertNode(prototype: grida.program.nodes.NodePrototype): void;
 
     //
@@ -2000,7 +2041,9 @@ export namespace editor.api {
     toggleBold(target: "selection" | NodeID): void;
     // //
     setOpacity(target: "selection" | NodeID, opacity: number): void;
+  }
 
+  export interface ISchemaActions {
     // //
     schemaDefineProperty(
       key?: string,

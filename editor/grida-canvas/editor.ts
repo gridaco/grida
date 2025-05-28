@@ -7,12 +7,19 @@ import nid from "./reducers/tools/id";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import cmath from "@grida/cmath";
+import assert from "assert";
+import { domapi } from "./backends/dom";
+import { animateTransformTo } from "./animation";
 
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
+    editor.api.ISchemaActions,
     editor.api.INodeChangeActions,
     editor.api.IBrushToolActions,
+    editor.api.IPixelGridActions,
+    editor.api.IRulerActions,
+    editor.api.IGuide2DActions,
     editor.api.ICameraActions
 {
   private listeners: Set<(editor: this, action?: Action) => void>;
@@ -299,6 +306,33 @@ export class Editor
     return editor.dq.getDepth(this.mstate.document_ctx, node_id);
   }
 
+  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
+    const parent_ids = editor.dq.getAncestors(this.state.document_ctx, node_id);
+
+    let rotation = 0;
+    // Calculate the absolute rotation
+    try {
+      for (const parent_id of parent_ids) {
+        const parent_node = this.getNodeById(parent_id);
+        assert(parent_node, `parent node not found: ${parent_id}`);
+        if ("rotation" in parent_node) {
+          rotation += parent_node.rotation ?? 0;
+        }
+      }
+
+      // finally, add the node's own rotation
+      const node = this.getNodeById(node_id);
+      assert(node, `node not found: ${node_id}`);
+      if ("rotation" in node) {
+        rotation += node.rotation ?? 0;
+      }
+    } catch (e) {
+      reportError(e);
+    }
+
+    return rotation;
+  }
+
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
     this.dispatch({
       type: "insert",
@@ -487,6 +521,9 @@ export class Editor
     });
   }
 
+  // #endregion IDocumentEditorActions implementation
+
+  // #region ISchemaActions implementation
   public schemaDefineProperty(
     key?: string,
     definition?: grida.program.schema.PropertyDefinition
@@ -531,7 +568,7 @@ export class Editor
       key,
     });
   }
-  // #endregion IDocumentEditorActions implementation
+  // #endregion ISchemaActions implementation
 
   // #region INodeChangeActios
 
@@ -975,12 +1012,204 @@ export class Editor
   }
   // #endregion IBrushToolActions implementation
 
+  // #region IPixelGridActions implementation
+  configurePixelGrid(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/pixel-grid",
+      state,
+    });
+  }
+  togglePixelGrid(): "on" | "off" {
+    const { pixelgrid } = this.state;
+    const next = pixelgrid === "on" ? "off" : "on";
+    this.configurePixelGrid(next);
+    return next;
+  }
+  // #endregion IPixelGridActions implementation
+
+  // #region IRulerActions implementation
+  configureRuler(state: "on" | "off") {
+    this.dispatch({
+      type: "surface/ruler",
+      state,
+    });
+  }
+  toggleRuler(): "on" | "off" {
+    const { ruler } = this.state;
+    const next = ruler === "on" ? "off" : "on";
+    this.configureRuler(next);
+    return next;
+  }
+  // #endregion IRulerActions implementation
+
+  // #region IGuide2DActions implementation
+
+  /**
+   * TODO: use id instead of idx
+   */
+  deleteGuide(idx: number) {
+    this.dispatch({
+      type: "surface/guide/delete",
+      idx,
+    });
+  }
+  // #endregion IGuide2DActions implementation
+
   // #region ICameraActions implementation
   transform(transform: cmath.Transform) {
     this.dispatch({
       type: "transform",
       transform,
     });
+  }
+
+  zoom(delta: number, origin: cmath.Vector2) {
+    const { transform } = this.state;
+    const _scale = transform[0][0];
+    // the origin point of the zooming point in x, y (surface space)
+    const [ox, oy] = origin;
+
+    // Apply proportional zooming
+    const scale = _scale + _scale * delta;
+
+    const newscale = cmath.clamp(
+      scale,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+    const [tx, ty] = cmath.transform.getTranslate(transform);
+
+    // calculate the offset that should be applied with scale with css transform.
+    const [newx, newy] = [
+      ox - (ox - tx) * (newscale / _scale),
+      oy - (oy - ty) * (newscale / _scale),
+    ];
+
+    const next: cmath.Transform = [
+      [newscale, transform[0][1], newx],
+      [transform[1][0], newscale, newy],
+    ];
+
+    this.dispatch({
+      type: "transform",
+      transform: next,
+    });
+  }
+
+  pan(delta: [dx: number, dy: number]) {
+    this.dispatch({
+      type: "transform",
+      transform: cmath.transform.translate(this.state.transform, delta),
+    });
+  }
+
+  scale(
+    factor: number | cmath.Vector2,
+    origin: cmath.Vector2 | "center" = "center"
+  ) {
+    const { transform } = this.state;
+    const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
+    const _scale = transform[0][0];
+    let ox, oy: number;
+    if (origin === "center") {
+      // Canvas size (you need to know or pass this)
+      const { width, height } = domapi.get_viewport_rect();
+
+      // Calculate the absolute transform origin
+      ox = width / 2;
+      oy = height / 2;
+    } else {
+      [ox, oy] = origin;
+    }
+
+    const sx = cmath.clamp(
+      fx,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+
+    const sy = cmath.clamp(
+      fy,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MIN,
+      editor.config.DEFAULT_CANVAS_TRANSFORM_SCALE_MAX
+    );
+
+    const [tx, ty] = cmath.transform.getTranslate(transform);
+
+    // calculate the offset that should be applied with scale with css transform.
+    const [newx, newy] = [
+      ox - (ox - tx) * (sx / _scale),
+      oy - (oy - ty) * (sy / _scale),
+    ];
+
+    const next: cmath.Transform = [
+      [sx, transform[0][1], newx],
+      [transform[1][0], sy, newy],
+    ];
+
+    this.transform(next);
+  }
+
+  /**
+   * Transform to fit
+   */
+  fit(
+    selector: grida.program.document.Selector,
+    options: {
+      margin?: number | [number, number, number, number];
+      animate?: boolean;
+    } = {
+      margin: 64,
+      animate: false,
+    }
+  ) {
+    const { document_ctx, selection, transform } = this.state;
+    const ids = editor.dq.querySelector(document_ctx, selection, selector);
+
+    const cdom = new domapi.CanvasDOM(transform);
+
+    const rects = ids
+      .map((id) => cdom.getNodeBoundingRect(id))
+      .filter((r) => r) as cmath.Rectangle[];
+
+    if (rects.length === 0) {
+      return;
+    }
+
+    const area = cmath.rect.union(rects);
+
+    const _view = domapi.get_viewport_rect();
+    const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+
+    const next_transform = cmath.ext.viewport.transformToFit(
+      view,
+      area,
+      options.margin
+    );
+
+    if (options.animate) {
+      animateTransformTo(transform, next_transform, (t) => {
+        this.transform(t);
+      });
+    } else {
+      this.transform(next_transform);
+    }
+  }
+
+  zoomIn() {
+    const { transform } = this.state;
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale * 2, 0.01);
+
+    this.scale(nextscale);
+  }
+
+  zoomOut() {
+    const { transform } = this.state;
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale / 2, 0.01);
+
+    this.scale(nextscale);
   }
   // #endregion ICameraActions implementation
 }

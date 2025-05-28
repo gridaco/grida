@@ -5,7 +5,7 @@ import {
   useEventTarget,
   usePointerState,
   useToolState,
-  useTransform,
+  useTransformState,
 } from "../../provider";
 import { useViewport } from "../context";
 import cmath from "@grida/cmath";
@@ -28,7 +28,7 @@ export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
   const instance = useCurrentEditor();
   const { dragging } = useEventTarget();
   const { tool } = useToolState();
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
   const pointer = usePointerState();
   const viewport = useViewport();
 

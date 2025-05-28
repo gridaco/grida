@@ -21,7 +21,6 @@ import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-pre
 import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
-import { useCameraActions } from "@/grida-canvas-react/provider";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
@@ -277,13 +276,12 @@ export function CampaignTemplateDuo001Viewer({
 // will be removed after useEditor is ready
 function EditorUXServer({ focus }: { focus: { node?: string } }) {
   const editor = useCurrentEditor();
-  const { fit } = useCameraActions();
 
   useEffect(
     () => {
       if (focus.node) {
         editor.select([focus.node]);
-        fit([focus.node], { margin: 64, animate: true });
+        editor.fit([focus.node], { margin: 64, animate: true });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

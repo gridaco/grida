@@ -1,5 +1,8 @@
 import React, { useMemo } from "react";
-import { useEventTarget, useTransform } from "@/grida-canvas-react/provider";
+import {
+  useEventTarget,
+  useTransformState,
+} from "@/grida-canvas-react/provider";
 import cmath from "@grida/cmath";
 import { guide } from "@grida/cmath/_snap";
 import { Crosshair } from "./crosshair";
@@ -7,7 +10,7 @@ import { Rule } from "./rule";
 import { Line } from "./line";
 
 function useSnapGuide(): guide.SnapGuide | undefined {
-  const { transform } = useTransform();
+  const { transform } = useTransformState();
   const { gesture, surface_snapping } = useEventTarget();
 
   return useMemo(() => {

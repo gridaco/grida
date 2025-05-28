@@ -35,10 +35,7 @@ import {
   EyeClosedIcon,
   LockOpen1Icon,
 } from "@radix-ui/react-icons";
-import {
-  useCameraActions,
-  useCurrentSceneState,
-} from "@/grida-canvas-react/provider";
+import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
@@ -198,7 +195,6 @@ function NodeHierarchyItemContextMenuWrapper({
   onStartRenaming?: () => void;
 }>) {
   const editor = useCurrentEditor();
-  const { fit } = useCameraActions();
 
   return (
     <ContextMenu>
@@ -249,7 +245,7 @@ function NodeHierarchyItemContextMenuWrapper({
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
-            fit([node_id], { margin: 64, animate: true });
+            editor.fit([node_id], { margin: 64, animate: true });
           }}
           className="text-xs"
         >

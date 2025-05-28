@@ -10,22 +10,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WorkbenchUI } from "@/components/workbench";
-import cmath from "@grida/cmath";
 import { Input } from "@/components/ui/input";
-import {
-  useCameraActions,
-  useEventTarget,
-  useTransform,
-} from "@/grida-canvas-react/provider";
+import { useTransformState } from "@/grida-canvas-react/provider";
 import { cn } from "@/components/lib/utils";
+import {
+  useCurrentEditor,
+  useEditorState,
+} from "@/grida-canvas-react/use-editor";
 
 export function ZoomControl({ className }: { className?: string }) {
-  const { scale, fit, zoomIn, zoomOut } = useCameraActions();
-  const { transform } = useTransform();
-  const { ruler, setRulerState, pixelgrid, setPixelGridState } =
-    useEventTarget();
-
-  const [scaleX, scaleY] = cmath.transform.getScale(transform);
+  const editor = useCurrentEditor();
+  const ruler = useEditorState(editor, (state) => state.ruler);
+  const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
+  const { scaleX } = useTransformState();
 
   const pct = Math.round(scaleX * 100);
 
@@ -44,14 +41,14 @@ export function ZoomControl({ className }: { className?: string }) {
           max={256}
           onChange={(e) => {
             const v = parseInt(e.target.value) / 100;
-            if (v) scale(v, "center");
+            if (v) editor.scale(v, "center");
           }}
           className={WorkbenchUI.inputVariants({ size: "sm" })}
         />
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={zoomIn}
+          onSelect={editor.zoomIn}
           className="text-xs"
         >
           Zoom in
@@ -59,7 +56,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={zoomOut}
+          onSelect={editor.zoomOut}
           className="text-xs"
         >
           Zoom out
@@ -67,7 +64,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => fit("*")}
+          onSelect={() => editor.fit("*")}
           className="text-xs"
         >
           Zoom to fit
@@ -75,7 +72,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => fit("selection")}
+          onSelect={() => editor.fit("selection")}
           className="text-xs"
         >
           Zoom to selection
@@ -83,14 +80,14 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => scale(0.5, "center")}
+          onSelect={() => editor.scale(0.5, "center")}
           className="text-xs"
         >
           Zoom to 50%
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => scale(1, "center")}
+          onSelect={() => editor.scale(1, "center")}
           className="text-xs"
         >
           Zoom to 100%
@@ -98,7 +95,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => scale(2, "center")}
+          onSelect={() => editor.scale(2, "center")}
           className="text-xs"
         >
           Zoom to 200%
@@ -107,8 +104,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={pixelgrid === "on"}
           onSelect={() => {
-            if (pixelgrid === "on") setPixelGridState("off");
-            if (pixelgrid === "off") setPixelGridState("on");
+            editor.togglePixelGrid();
           }}
           className="text-xs"
         >
@@ -118,8 +114,7 @@ export function ZoomControl({ className }: { className?: string }) {
         <DropdownMenuCheckboxItem
           checked={ruler === "on"}
           onSelect={() => {
-            if (ruler === "on") setRulerState("off");
-            if (ruler === "off") setRulerState("on");
+            editor.toggleRuler();
           }}
           className="text-xs"
         >
