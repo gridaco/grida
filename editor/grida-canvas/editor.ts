@@ -10,6 +10,21 @@ import cmath from "@grida/cmath";
 import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
+import { TCanvasEventTargetDragGestureState } from "./action";
+
+function throttle<T extends (...args: any[]) => void>(
+  func: T,
+  limit: number
+): T {
+  let inThrottle: boolean;
+  return function (this: any, ...args: Parameters<T>) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  } as T;
+}
 
 export class Editor
   implements
@@ -20,7 +35,8 @@ export class Editor
     editor.api.IPixelGridActions,
     editor.api.IRulerActions,
     editor.api.IGuide2DActions,
-    editor.api.ICameraActions
+    editor.api.ICameraActions,
+    editor.api.IEventTargetActions
 {
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
@@ -570,7 +586,7 @@ export class Editor
   }
   // #endregion ISchemaActions implementation
 
-  // #region INodeChangeActios
+  // #region INodeChangeActions
 
   toggleNodeActive(node_id: string) {
     this.dispatch({
@@ -989,7 +1005,7 @@ export class Editor
       });
     });
   }
-  // #endregion INodeChangeActios
+  // #endregion INodeChangeActions
 
   // #region IBrushToolActions implementation
   changeBrush(brush: BitmapEditorBrush) {
@@ -1212,4 +1228,200 @@ export class Editor
     this.scale(nextscale);
   }
   // #endregion ICameraActions implementation
+
+  // #region IEventTargetActions implementation
+
+  pointerDown(event: PointerEvent) {
+    const els = domapi.get_grida_node_elements_from_point(
+      event.clientX,
+      event.clientY
+    );
+
+    this.dispatch({
+      type: "event-target/event/on-pointer-down",
+      node_ids_from_point: els.map((n) => n.id),
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  pointerUp(event: PointerEvent) {
+    this.dispatch({
+      type: "event-target/event/on-pointer-up",
+    });
+  }
+
+  private __canvas_space_position = (
+    pointer_event: PointerEvent | MouseEvent
+  ) => {
+    const { clientX, clientY } = pointer_event;
+
+    const canvas_rect = domapi.get_viewport_rect();
+    const position = {
+      x: clientX - canvas_rect.left,
+      y: clientY - canvas_rect.top,
+    };
+
+    return position;
+  };
+
+  private _throttled_pointer_move_with_raycast = throttle(
+    (event: PointerEvent, position: { x: number; y: number }) => {
+      // this is throttled - as it is expensive
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      this.dispatch({
+        type: "event-target/event/on-pointer-move-raycast",
+        node_ids_from_point: els.map((n) => n.id),
+        position,
+        shiftKey: event.shiftKey,
+      });
+    },
+    30
+  );
+
+  pointerMove(event: PointerEvent) {
+    const position = this.__canvas_space_position(event);
+
+    this.dispatch({
+      type: "event-target/event/on-pointer-move",
+      position_canvas: position,
+      position_client: { x: event.clientX, y: event.clientY },
+    });
+
+    this._throttled_pointer_move_with_raycast(event, position);
+  }
+
+  click(event: MouseEvent) {
+    const els = domapi.get_grida_node_elements_from_point(
+      event.clientX,
+      event.clientY
+    );
+
+    this.dispatch({
+      type: "event-target/event/on-click",
+      node_ids_from_point: els.map((n) => n.id),
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  doubleClick(event: MouseEvent) {
+    this.dispatch({
+      type: "event-target/event/on-double-click",
+    });
+  }
+
+  dragStart(event: PointerEvent) {
+    this.dispatch({
+      type: "event-target/event/on-drag-start",
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  dragEnd(event: PointerEvent) {
+    const { transform, marquee } = this.state;
+    if (marquee) {
+      // test area in canvas space
+      const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
+
+      const cdom = new domapi.CanvasDOM(transform);
+      const contained = cdom.getNodesIntersectsArea(area);
+
+      this.dispatch({
+        type: "event-target/event/on-drag-end",
+        node_ids_from_area: contained,
+        shiftKey: event.shiftKey,
+      });
+
+      return;
+    }
+    this.dispatch({
+      type: "event-target/event/on-drag-end",
+      shiftKey: event.shiftKey,
+    });
+  }
+
+  drag(event: TCanvasEventTargetDragGestureState) {
+    requestAnimationFrame(() => {
+      this.dispatch({
+        type: "event-target/event/on-drag",
+        event,
+      });
+    });
+  }
+
+  //
+
+  startGuideGesture(axis: cmath.Axis, idx: number | -1) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        idx: idx,
+        type: "guide",
+        axis,
+      },
+    });
+  }
+
+  startScaleGesture(
+    selection: string | string[],
+    direction: cmath.CardinalDirection
+  ) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "scale",
+        selection: Array.isArray(selection) ? selection : [selection],
+        direction,
+      },
+    });
+  }
+
+  startSortGesture(selection: string | string[], node_id: string) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "sort",
+        selection: Array.isArray(selection) ? selection : [selection],
+        node_id,
+      },
+    });
+  }
+
+  startGapGesture(selection: string | string[], axis: "x" | "y") {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "gap",
+        selection: selection,
+        axis,
+      },
+    });
+  }
+
+  // #region drag resize handle
+  startCornerRadiusGesture(selection: string) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "corner-radius",
+        node_id: selection,
+      },
+    });
+  }
+  // #endregion drag resize handle
+
+  startRotateGesture(selection: string) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "rotate",
+        selection,
+      },
+    });
+  }
+
+  // #endregion IEventTargetActions implementation
 }

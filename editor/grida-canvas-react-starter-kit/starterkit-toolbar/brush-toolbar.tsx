@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/components/lib/utils";
-import { useBrush, useCurrentEditor } from "@/grida-canvas-react";
+import { useBrushState, useCurrentEditor } from "@/grida-canvas-react";
 import {
   DotsHorizontalIcon,
   TransparencyGridIcon,
@@ -47,7 +47,7 @@ export function useSliderState() {
 
 export default function BrushToolbar() {
   const editor = useCurrentEditor();
-  const brush = useBrush();
+  const brush = useBrushState();
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
   const [detailOpen, setDetailOpen] = useState(false);

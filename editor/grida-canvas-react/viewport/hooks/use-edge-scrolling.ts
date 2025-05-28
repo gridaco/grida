@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import {
-  useEventTarget,
+  useEventTargetState,
   usePointerState,
   useToolState,
   useTransformState,
@@ -26,7 +26,7 @@ export function EdgeScrollingEffect(
 
 export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
   const instance = useCurrentEditor();
-  const { dragging } = useEventTarget();
+  const { dragging } = useEventTargetState();
   const { tool } = useToolState();
   const { transform } = useTransformState();
   const pointer = usePointerState();

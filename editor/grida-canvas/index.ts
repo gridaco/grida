@@ -1,4 +1,8 @@
-import type { Action, EditorAction } from "@/grida-canvas/action";
+import type {
+  Action,
+  EditorAction,
+  TCanvasEventTargetDragGestureState,
+} from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
 import type cg from "@grida/cg";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
@@ -1762,144 +1766,129 @@ export namespace editor.api {
   };
 
   export interface INodeChangeActions {
-    toggleNodeActive: (node_id: NodeID) => void;
-    toggleNodeLocked: (node_id: NodeID) => void;
-    toggleNodeBold: (node_id: NodeID) => void;
-    changeNodeActive: (node_id: NodeID, active: boolean) => void;
-    changeNodeLocked: (node_id: NodeID, locked: boolean) => void;
-    changeNodeName: (node_id: NodeID, name: string) => void;
-    changeNodeUserData: (node_id: NodeID, userdata: unknown) => void;
-    changeNodeSize: (
+    toggleNodeActive(node_id: NodeID): void;
+    toggleNodeLocked(node_id: NodeID): void;
+    toggleNodeBold(node_id: NodeID): void;
+    changeNodeActive(node_id: NodeID, active: boolean): void;
+    changeNodeLocked(node_id: NodeID, locked: boolean): void;
+    changeNodeName(node_id: NodeID, name: string): void;
+    changeNodeUserData(node_id: NodeID, userdata: unknown): void;
+    changeNodeSize(
       node_id: NodeID,
       axis: "width" | "height",
       value: grida.program.css.LengthPercentage | "auto"
-    ) => void;
-    changeNodeBorder: (
+    ): void;
+    changeNodeBorder(
       node_id: NodeID,
       border: grida.program.css.Border | undefined
-    ) => void;
-    changeNodeProps: (
+    ): void;
+    changeNodeProps(
       node_id: string,
       key: string,
       value?: tokens.StringValueExpression
-    ) => void;
-    changeNodeComponent: (node_id: NodeID, component: string) => void;
-    changeNodeText: (
-      node_id: NodeID,
-      text?: tokens.StringValueExpression
-    ) => void;
-    changeNodeStyle: (
+    ): void;
+    changeNodeComponent(node_id: NodeID, component: string): void;
+    changeNodeText(node_id: NodeID, text?: tokens.StringValueExpression): void;
+    changeNodeStyle(
       node_id: NodeID,
       key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
       value: any
-    ) => void;
-    changeNodeMouseCursor: (
+    ): void;
+    changeNodeMouseCursor(
       node_id: NodeID,
       mouseCursor: cg.SystemMouseCursor
-    ) => void;
-    changeNodeSrc: (
-      node_id: NodeID,
-      src?: tokens.StringValueExpression
-    ) => void;
-    changeNodeHref: (
+    ): void;
+    changeNodeSrc(node_id: NodeID, src?: tokens.StringValueExpression): void;
+    changeNodeHref(
       node_id: NodeID,
       href?: grida.program.nodes.i.IHrefable["href"]
-    ) => void;
-    changeNodeTarget: (
+    ): void;
+    changeNodeTarget(
       node_id: NodeID,
       target?: grida.program.nodes.i.IHrefable["target"]
-    ) => void;
-    changeNodePositioning: (
+    ): void;
+    changeNodePositioning(
       node_id: NodeID,
       positioning: grida.program.nodes.i.IPositioning
-    ) => void;
-    changeNodePositioningMode: (
+    ): void;
+    changeNodePositioningMode(
       node_id: NodeID,
       positioningMode: "absolute" | "relative"
-    ) => void;
-    changeNodeCornerRadius: (
+    ): void;
+    changeNodeCornerRadius(
       node_id: NodeID,
       cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-    ) => void;
-    changeNodeFill: (
+    ): void;
+    changeNodeFill(
       node_id: NodeID,
       fill:
         | grida.program.nodes.i.props.SolidPaintToken
         | cg.PaintWithoutID
         | null
-    ) => void;
-    changeNodeStroke: (
+    ): void;
+    changeNodeStroke(
       node_id: NodeID,
       stroke:
         | grida.program.nodes.i.props.SolidPaintToken
         | cg.PaintWithoutID
         | null
-    ) => void;
-    changeNodeStrokeWidth: (
+    ): void;
+    changeNodeStrokeWidth(
       node_id: NodeID,
       strokeWidth: editor.api.NumberChange
-    ) => void;
-    changeNodeStrokeCap: (node_id: NodeID, strokeCap: cg.StrokeCap) => void;
-    changeNodeFit: (node_id: NodeID, fit: cg.BoxFit) => void;
-    changeNodeOpacity: (
-      node_id: NodeID,
-      opacity: editor.api.NumberChange
-    ) => void;
-    changeNodeRotation: (
+    ): void;
+    changeNodeStrokeCap(node_id: NodeID, strokeCap: cg.StrokeCap): void;
+    changeNodeFit(node_id: NodeID, fit: cg.BoxFit): void;
+    changeNodeOpacity(node_id: NodeID, opacity: editor.api.NumberChange): void;
+    changeNodeRotation(
       node_id: NodeID,
       rotation: editor.api.NumberChange
-    ) => void;
-    changeTextNodeFontFamily: (node_id: NodeID, fontFamily: string) => void;
-    changeTextNodeFontWeight: (
-      node_id: NodeID,
-      fontWeight: cg.NFontWeight
-    ) => void;
-    changeTextNodeFontSize: (
+    ): void;
+    changeTextNodeFontFamily(node_id: NodeID, fontFamily: string): void;
+    changeTextNodeFontWeight(node_id: NodeID, fontWeight: cg.NFontWeight): void;
+    changeTextNodeFontSize(
       node_id: NodeID,
       fontSize: editor.api.NumberChange
-    ) => void;
-    changeTextNodeTextAlign: (node_id: NodeID, textAlign: cg.TextAlign) => void;
-    changeTextNodeTextAlignVertical: (
+    ): void;
+    changeTextNodeTextAlign(node_id: NodeID, textAlign: cg.TextAlign): void;
+    changeTextNodeTextAlignVertical(
       node_id: NodeID,
       textAlignVertical: cg.TextAlignVertical
-    ) => void;
-    changeTextNodeLineHeight: (
+    ): void;
+    changeTextNodeLineHeight(
       node_id: NodeID,
       lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
-    ) => void;
-    changeTextNodeLetterSpacing: (
+    ): void;
+    changeTextNodeLetterSpacing(
       node_id: NodeID,
       letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
-    ) => void;
-    changeTextNodeMaxlength: (
+    ): void;
+    changeTextNodeMaxlength(
       node_id: NodeID,
       maxlength: number | undefined
-    ) => void;
-    changeContainerNodePadding: (
+    ): void;
+    changeContainerNodePadding(
       node_id: NodeID,
       padding: grida.program.nodes.i.IPadding["padding"]
-    ) => void;
-    changeNodeBoxShadow: (node_id: NodeID, boxShadow?: cg.BoxShadow) => void;
-    changeContainerNodeLayout: (
+    ): void;
+    changeNodeBoxShadow(node_id: NodeID, boxShadow?: cg.BoxShadow): void;
+    changeContainerNodeLayout(
       node_id: NodeID,
       layout: grida.program.nodes.i.IFlexContainer["layout"]
-    ) => void;
-    changeFlexContainerNodeDirection: (
-      node_id: string,
-      direction: cg.Axis
-    ) => void;
-    changeFlexContainerNodeMainAxisAlignment: (
+    ): void;
+    changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis): void;
+    changeFlexContainerNodeMainAxisAlignment(
       node_id: string,
       mainAxisAlignment: cg.MainAxisAlignment
-    ) => void;
-    changeFlexContainerNodeCrossAxisAlignment: (
+    ): void;
+    changeFlexContainerNodeCrossAxisAlignment(
       node_id: string,
       crossAxisAlignment: cg.CrossAxisAlignment
-    ) => void;
-    changeFlexContainerNodeGap: (
+    ): void;
+    changeFlexContainerNodeGap(
       node_id: string,
       gap: number | { mainAxisGap: number; crossAxisGap: number }
-    ) => void;
+    ): void;
   }
 
   export interface IBrushToolActions {
@@ -1930,12 +1919,12 @@ export namespace editor.api {
      * @param delta the delta to zoom by
      * @param origin the origin of the zoom
      */
-    zoom: (delta: number, origin: cmath.Vector2) => void;
+    zoom(delta: number, origin: cmath.Vector2): void;
     /**
      * pan the camera by the given delta
      * @param delta the delta to pan by
      */
-    pan: (delta: [number, number]) => void;
+    pan(delta: [number, number]): void;
 
     scale(
       factor: number | cmath.Vector2,
@@ -1950,6 +1939,29 @@ export namespace editor.api {
     ): void;
     zoomIn(): void;
     zoomOut(): void;
+  }
+
+  export interface IEventTargetActions {
+    startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
+    startScaleGesture(
+      selection: string | string[],
+      direction: cmath.CardinalDirection
+    ): void;
+    startSortGesture(selection: string | string[], node_id: string): void;
+    startGapGesture(selection: string | string[], axis: "x" | "y"): void;
+    startCornerRadiusGesture(selection: string): void;
+    startRotateGesture(selection: string): void;
+
+    pointerDown(event: PointerEvent): void;
+    pointerUp(event: PointerEvent): void;
+    pointerMove(event: PointerEvent): void;
+
+    click(event: MouseEvent): void;
+    doubleClick(event: MouseEvent): void;
+
+    dragStart(event: PointerEvent): void;
+    dragEnd(event: PointerEvent): void;
+    drag(event: TCanvasEventTargetDragGestureState): void;
   }
 
   export interface IDocumentEditorActions {
@@ -1982,7 +1994,7 @@ export namespace editor.api {
     paste(): void;
     duplicate(target: "selection" | NodeID): void;
 
-    setClipboardColor: (color: cg.RGBA8888) => void;
+    setClipboardColor(color: cg.RGBA8888): void;
     deleteNode(target: "selection" | NodeID): void;
 
     //

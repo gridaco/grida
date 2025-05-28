@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useCurrentEditor, useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";
@@ -51,7 +51,7 @@ function SceneBackgroundPropertyLine() {
 
 export function DocumentProperties({ className }: { className?: string }) {
   const editor = useCurrentEditor();
-  const { document } = useDocument();
+  const { document } = useDocumentState();
 
   const keys = Object.keys(document.properties ?? {});
 

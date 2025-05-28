@@ -26,20 +26,6 @@ import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 
-function throttle<T extends (...args: any[]) => void>(
-  func: T,
-  limit: number
-): T {
-  let inThrottle: boolean;
-  return function (this: any, ...args: Parameters<T>) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  } as T;
-}
-
 type Dispatcher = (action: Action) => void;
 
 function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
@@ -872,244 +858,20 @@ export function useBrushState() {
   return useEditorState(editor, (state) => state.brush);
 }
 
-interface UseEventTarget {
-  gesture: editor.state.IEditorState["gesture"];
-  dragging: editor.state.IEditorState["dragging"];
-  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-  dropzone: editor.state.IEditorState["dropzone"];
-  surface_snapping: editor.state.IEditorState["surface_snapping"];
-  is_node_transforming: boolean;
-  is_node_translating: boolean;
-  is_node_scaling: boolean;
-
-  selection: editor.state.IEditorState["selection"];
-  marquee: editor.state.IEditorState["marquee"];
-  edges: grida.program.document.Edge2D[];
-  guides: grida.program.document.Guide2D[];
-
-  startGuideGesture: (axis: cmath.Axis, idx: number | -1) => void;
-  startScaleGesture: (
-    selection: string | string[],
-    direction: cmath.CardinalDirection
-  ) => void;
-  startSortGesture: (selection: string | string[], node_id: string) => void;
-  startGapGesture: (selection: string | string[], axis: "x" | "y") => void;
-  startCornerRadiusGesture: (selection: string) => void;
-  startRotateGesture: (selection: string) => void;
-
-  pointerDown: (event: PointerEvent) => void;
-  pointerUp: (event: PointerEvent) => void;
-  pointerMove: (event: PointerEvent) => void;
-
-  click: (event: MouseEvent) => void;
-  doubleClick: (event: MouseEvent) => void;
-
-  dragStart: (event: PointerEvent) => void;
-  dragEnd: (event: PointerEvent) => void;
-  drag: (event: TCanvasEventTargetDragGestureState) => void;
-
+interface UseMultipleSelectionOverlayClick {
   multipleSelectionOverlayClick: (
     selection: string[],
     event: MouseEvent
   ) => void;
-
-  a11yarrow: (
-    target: "selection" | editor.NodeID,
-    direction: "up" | "down" | "left" | "right",
-    shiftKey: boolean,
-    config?: editor.api.NudgeUXConfig
-  ) => void;
-  nudge: (
-    target: "selection" | editor.NodeID,
-    axis: "x" | "y",
-    delta: number,
-    config?: editor.api.NudgeUXConfig
-  ) => void;
 }
 
-export function useEventTarget(): UseEventTarget {
+export function useMultipleSelectionOverlayClick(): UseMultipleSelectionOverlayClick {
   const instance = useCurrentEditor();
-  const scene = useCurrentSceneState();
-  const {
-    surface_snapping,
-    gesture,
-    dragging,
-    hovered_node_id,
-    dropzone,
-    selection,
-    content_edit_mode,
-    marquee,
-  } = useEditorState(instance, (state) => ({
-    surface_snapping: state.surface_snapping,
-    gesture: state.gesture,
-    dragging: state.dragging,
-    hovered_node_id: state.hovered_node_id,
-    dropzone: state.dropzone,
-    selection: state.selection,
-    content_edit_mode: state.content_edit_mode,
-    marquee: state.marquee,
-  }));
-
   const dispatch = useCallback(
     (action: Action) => {
       instance.dispatch(action);
     },
     [instance]
-  );
-
-  const { guides, edges } = scene;
-
-  const is_node_transforming = gesture.type !== "idle";
-  const is_node_translating =
-    gesture.type === "translate" ||
-    gesture.type === "sort" ||
-    gesture.type === "nudge" ||
-    gesture.type === "gap";
-  const is_node_scaling = gesture.type === "scale";
-
-  const _throttled_pointer_move_with_raycast = useCallback(
-    throttle((event: PointerEvent, position) => {
-      // this is throttled - as it is expensive
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
-      dispatch({
-        type: "event-target/event/on-pointer-move-raycast",
-        node_ids_from_point: els.map((n) => n.id),
-        position,
-        shiftKey: event.shiftKey,
-      });
-    }, 30),
-    [dispatch]
-  );
-
-  const __canvas_space_position = (
-    pointer_event: PointerEvent | MouseEvent
-  ) => {
-    const { clientX, clientY } = pointer_event;
-
-    const canvas_rect = domapi.get_viewport_rect();
-    const position = {
-      x: clientX - canvas_rect.left,
-      y: clientY - canvas_rect.top,
-    };
-
-    return position;
-  };
-
-  const pointerMove = useCallback(
-    (event: PointerEvent) => {
-      const position = __canvas_space_position(event);
-
-      dispatch({
-        type: "event-target/event/on-pointer-move",
-        position_canvas: position,
-        position_client: { x: event.clientX, y: event.clientY },
-      });
-
-      _throttled_pointer_move_with_raycast(event, position);
-    },
-    [dispatch, _throttled_pointer_move_with_raycast]
-  );
-
-  const pointerDown = useCallback(
-    (event: PointerEvent) => {
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
-      dispatch({
-        type: "event-target/event/on-pointer-down",
-        node_ids_from_point: els.map((n) => n.id),
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const pointerUp = useCallback(
-    (event: PointerEvent) => {
-      dispatch({
-        type: "event-target/event/on-pointer-up",
-      });
-    },
-    [dispatch]
-  );
-
-  const click = useCallback(
-    (event: MouseEvent) => {
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
-      dispatch({
-        type: "event-target/event/on-click",
-        node_ids_from_point: els.map((n) => n.id),
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const doubleClick = useCallback(
-    (event: MouseEvent) => {
-      dispatch({
-        type: "event-target/event/on-double-click",
-      });
-    },
-    [dispatch]
-  );
-
-  const dragStart = useCallback(
-    (event: PointerEvent) => {
-      dispatch({
-        type: "event-target/event/on-drag-start",
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const dragEnd = useCallback(
-    (event: PointerEvent) => {
-      const { transform, marquee } = instance.state;
-      if (marquee) {
-        // test area in canvas space
-        const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
-
-        const cdom = new domapi.CanvasDOM(transform);
-        const contained = cdom.getNodesIntersectsArea(area);
-
-        instance.dispatch({
-          type: "event-target/event/on-drag-end",
-          node_ids_from_area: contained,
-          shiftKey: event.shiftKey,
-        });
-
-        return;
-      }
-      instance.dispatch({
-        type: "event-target/event/on-drag-end",
-        shiftKey: event.shiftKey,
-      });
-    },
-    [instance]
-  );
-
-  const drag = useCallback(
-    (event: TCanvasEventTargetDragGestureState) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "event-target/event/on-drag",
-          event,
-        });
-      });
-    },
-    [dispatch]
   );
 
   //
@@ -1130,90 +892,34 @@ export function useEventTarget(): UseEventTarget {
     [dispatch]
   );
 
-  //
+  return useMemo(() => {
+    return {
+      multipleSelectionOverlayClick,
+    };
+  }, [multipleSelectionOverlayClick]);
+}
 
-  const startGuideGesture = useCallback(
-    (axis: cmath.Axis, idx: number | -1) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          idx: idx,
-          type: "guide",
-          axis,
-        },
-      });
+interface UseA11yActions {
+  a11yarrow: (
+    target: "selection" | editor.NodeID,
+    direction: "up" | "down" | "left" | "right",
+    shiftKey: boolean,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
+  nudge: (
+    target: "selection" | editor.NodeID,
+    axis: "x" | "y",
+    delta: number,
+    config?: editor.api.NudgeUXConfig
+  ) => void;
+}
+export function useA11yActions(): UseA11yActions {
+  const instance = useCurrentEditor();
+  const dispatch = useCallback(
+    (action: Action) => {
+      instance.dispatch(action);
     },
-    [dispatch]
-  );
-
-  const startScaleGesture = useCallback(
-    (selection: string | string[], direction: cmath.CardinalDirection) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "scale",
-          selection: Array.isArray(selection) ? selection : [selection],
-          direction,
-        },
-      });
-    },
-    [dispatch]
-  );
-
-  const startSortGesture = useCallback(
-    (selection: string | string[], node_id: string) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "sort",
-          selection: Array.isArray(selection) ? selection : [selection],
-          node_id,
-        },
-      });
-    },
-    [dispatch]
-  );
-
-  const startGapGesture = useCallback(
-    (selection: string | string[], axis: "x" | "y") => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "gap",
-          selection: selection,
-          axis,
-        },
-      });
-    },
-    [dispatch]
-  );
-
-  // #region drag resize handle
-  const startCornerRadiusGesture = useCallback(
-    (selection: string) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "corner-radius",
-          node_id: selection,
-        },
-      });
-    },
-    [dispatch]
-  );
-  // #endregion drag resize handle
-
-  const startRotateGesture = useCallback(
-    (selection: string) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "rotate",
-          selection,
-        },
-      });
-    },
-    [dispatch]
+    [instance]
   );
 
   // Keep React-specific functions
@@ -1288,6 +994,59 @@ export function useEventTarget(): UseEventTarget {
     [dispatch]
   );
 
+  return {
+    nudge,
+    a11yarrow,
+  };
+}
+
+interface UseEventTargetState {
+  gesture: editor.state.IEditorState["gesture"];
+  dragging: editor.state.IEditorState["dragging"];
+  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
+  dropzone: editor.state.IEditorState["dropzone"];
+  surface_snapping: editor.state.IEditorState["surface_snapping"];
+  is_node_transforming: boolean;
+  is_node_translating: boolean;
+  is_node_scaling: boolean;
+
+  selection: editor.state.IEditorState["selection"];
+  guides: grida.program.document.Guide2D[];
+}
+
+export function useEventTargetState(): UseEventTargetState {
+  const instance = useCurrentEditor();
+  const scene = useCurrentSceneState();
+  const {
+    surface_snapping,
+    gesture,
+    dragging,
+    hovered_node_id,
+    dropzone,
+    selection,
+    content_edit_mode,
+    marquee,
+  } = useEditorState(instance, (state) => ({
+    surface_snapping: state.surface_snapping,
+    gesture: state.gesture,
+    dragging: state.dragging,
+    hovered_node_id: state.hovered_node_id,
+    dropzone: state.dropzone,
+    selection: state.selection,
+    content_edit_mode: state.content_edit_mode,
+    marquee: state.marquee,
+  }));
+
+  const { guides, edges } = scene;
+
+  const is_node_transforming = gesture.type !== "idle";
+  const is_node_translating =
+    gesture.type === "translate" ||
+    gesture.type === "sort" ||
+    gesture.type === "nudge" ||
+    gesture.type === "gap";
+  const is_node_scaling = gesture.type === "scale";
+
   return useMemo(() => {
     return {
       //
@@ -1298,7 +1057,6 @@ export function useEventTarget(): UseEventTarget {
       marquee,
       //
       guides,
-      startGuideGesture,
       //
       edges,
       //
@@ -1309,28 +1067,6 @@ export function useEventTarget(): UseEventTarget {
       is_node_translating,
       is_node_scaling,
       content_edit_mode,
-      //
-
-      startScaleGesture,
-      startSortGesture,
-      startGapGesture,
-      startCornerRadiusGesture,
-      startRotateGesture,
-      //
-      pointerMove,
-      pointerDown,
-      pointerUp,
-      click,
-      doubleClick,
-      //
-      dragStart,
-      dragEnd,
-      drag,
-      //
-      multipleSelectionOverlayClick,
-      //
-      nudge,
-      a11yarrow,
     };
   }, [
     //
@@ -1341,7 +1077,6 @@ export function useEventTarget(): UseEventTarget {
     marquee,
     //
     guides,
-    startGuideGesture,
     //
     edges,
     //
@@ -1354,27 +1089,6 @@ export function useEventTarget(): UseEventTarget {
     is_node_scaling,
     //
     content_edit_mode,
-    //
-    startScaleGesture,
-    startSortGesture,
-    startGapGesture,
-    startCornerRadiusGesture,
-    startRotateGesture,
-    //
-    pointerMove,
-    pointerDown,
-    pointerUp,
-    click,
-    doubleClick,
-    //
-    dragStart,
-    dragEnd,
-    drag,
-    //
-    multipleSelectionOverlayClick,
-    //
-    nudge,
-    a11yarrow,
   ]);
 }
 

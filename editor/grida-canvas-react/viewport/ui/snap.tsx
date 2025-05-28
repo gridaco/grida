@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import {
-  useEventTarget,
+  useEventTargetState,
   useTransformState,
 } from "@/grida-canvas-react/provider";
 import cmath from "@grida/cmath";
@@ -11,7 +11,7 @@ import { Line } from "./line";
 
 function useSnapGuide(): guide.SnapGuide | undefined {
   const { transform } = useTransformState();
-  const { gesture, surface_snapping } = useEventTarget();
+  const { gesture, surface_snapping } = useEventTargetState();
 
   return useMemo(() => {
     if (

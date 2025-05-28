@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { generate } from "@/app/(dev)/canvas/actions";
 import {
   useCurrentEditor,
-  useDocument,
+  useDocumentState,
   useEditorState,
-  useEventTarget,
 } from "@/grida-canvas-react";
-import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -19,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import grida from "@grida/schema";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
-import { Cross2Icon, FrameIcon, MixIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
@@ -68,7 +66,7 @@ function useGenerate() {
 
 function useTextRewriteDemo() {
   const editor = useCurrentEditor();
-  const { document } = useDocument();
+  const { document } = useDocumentState();
   const [delta, setDelta] = useState<{} | undefined>();
   const [loading, setLoading] = useState(false);
   const [aiSettings] = useLocalStorage<string | undefined>(

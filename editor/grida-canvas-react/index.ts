@@ -1,13 +1,13 @@
 export { useEditor, useEditorState, useCurrentEditor } from "./use-editor";
 export {
   StandaloneDocumentEditor,
-  useDocumentState as useDocument,
+  useDocumentState,
   useNode,
-  useBrushState as useBrush,
-  useEventTarget,
+  useBrushState,
+  useEventTargetState,
   useComputedNode,
-  useNodeActions as useNodeAction,
-  useTransformState as useTransform,
+  useNodeActions,
+  useTransformState,
   useToolState,
   useEditorFlagsState,
   useRootTemplateInstanceNode,

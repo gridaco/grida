@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import {
-  useDocument,
+  useDocumentState,
   StandaloneRootNodeContent,
   StandaloneSceneBackground,
   type StandaloneDocumentContentProps,
@@ -44,7 +44,7 @@ const Context = React.createContext<{
 export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
-  const { document, document_ctx } = useDocument();
+  const { document, document_ctx } = useDocumentState();
   const scene = useCurrentSceneState();
   const [mode, setMode] = useState<"framed" | "fullscreen">("framed");
   const [open, setOpen] = useState(false);

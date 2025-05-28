@@ -1,5 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useEventTarget, useCurrentSelection, useToolState } from "../provider";
+import {
+  useEventTargetState,
+  useCurrentSelection,
+  useToolState,
+  useA11yActions,
+} from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
@@ -319,7 +324,7 @@ function useSingleDoublePressHotkey(
 export function useEditorHotKeys() {
   const editor = useCurrentEditor();
   const { tool, content_edit_mode } = useToolState();
-  const { a11yarrow } = useEventTarget();
+  const { a11yarrow } = useA11yActions();
 
   const { selection, actions } = useCurrentSelection();
 

@@ -48,7 +48,7 @@ import { MaxlengthControl } from "./controls/maxlength";
 import {
   useComputedNode,
   useCurrentEditor,
-  useDocument,
+  useDocumentState,
   useEditorState,
 } from "@/grida-canvas-react";
 import {

@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useCurrentEditor, useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
@@ -243,7 +243,7 @@ function computeSurfaceSelectionGroup({
 export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
-  const { document, document_ctx } = useDocument();
+  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
 
   // Use stable node IDs to avoid unnecessary re-renders
@@ -296,7 +296,7 @@ export function useSingleSelection(
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
   const instance = useCurrentEditor();
-  const { document, document_ctx } = useDocument();
+  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
   const node = document.nodes[node_id];
 

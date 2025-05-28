@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useEventTarget } from "@/grida-canvas-react";
+import { useEventTargetState } from "@/grida-canvas-react";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useBrushState,
@@ -9,6 +9,7 @@ import {
   useCurrentSceneState,
   useDocumentState,
   useEventTargetCSSCursor,
+  useMultipleSelectionOverlayClick,
   useNode,
   usePointerState,
   useSelectionState,
@@ -140,22 +141,20 @@ export function EditorSurface() {
   const ruler = useEditorState(editor, (state) => state.ruler);
   const { transform } = useTransformState();
   const {
-    edges,
-    marquee,
     hovered_node_id,
     dropzone,
     selection,
     is_node_transforming,
     is_node_translating,
-    pointerMove,
-    pointerDown,
-    pointerUp,
-    click,
-    doubleClick,
-    drag,
-    dragStart,
-    dragEnd,
-  } = useEventTarget();
+    // pointerMove,
+    // pointerDown,
+    // pointerUp,
+    // click,
+    // doubleClick,
+    // drag,
+    // dragStart,
+    // dragEnd,
+  } = useEventTargetState();
   const brush = useBrushState();
   const { tool, content_edit_mode } = useToolState();
   const cursor = useEventTargetCSSCursor();
@@ -183,7 +182,7 @@ export function EditorSurface() {
       if (event.defaultPrevented) return;
       // for performance reasons, we don't want to update the overlay when transforming (except for translate)
       if (is_node_transforming && !is_node_translating) return;
-      pointerMove(event);
+      editor.pointerMove(event);
     };
 
     et.addEventListener("pointermove", handlePointerMove, {
@@ -218,34 +217,34 @@ export function EditorSurface() {
       },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        pointerDown(event);
+        editor.pointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        pointerUp(event);
+        editor.pointerUp(event);
       },
       onClick: ({ event }) => {
         if (event.defaultPrevented) return;
-        click(event);
+        editor.click(event);
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
         editor.tryToggleContentEditMode(); // 1
-        doubleClick(event); // 2
+        editor.doubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
-        dragStart(event as PointerEvent);
+        editor.dragStart(event as PointerEvent);
       },
       onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
-        dragEnd(event as PointerEvent);
+        editor.dragEnd(event as PointerEvent);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
-        drag({
+        editor.drag({
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,
@@ -332,7 +331,7 @@ export function EditorSurface() {
           (e.target as HTMLDivElement).scrollLeft = 0;
         }}
       >
-        <NetworkOverlay edges={edges} transform={transform} />
+        <NetworkOverlay transform={transform} />
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
         <FloatingCursorTooltip />
@@ -346,17 +345,7 @@ export function EditorSurface() {
           }}
         >
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
-          {marquee && (
-            <div
-              id="marquee-container"
-              className="absolute top-0 left-0 w-0 h-0"
-            >
-              <MarqueeArea
-                a={cmath.vector2.transform(marquee.a, transform)}
-                b={cmath.vector2.transform(marquee.b, transform)}
-              />
-            </div>
-          )}
+          <MarqueeOverlay />
         </div>
         <div
           className="w-full h-full"
@@ -398,9 +387,7 @@ export function EditorSurface() {
             hidden={isWindowResizing || content_edit_mode?.type === "path"}
           >
             <SurfaceGroup
-              hidden={
-                !!marquee || tool.type !== "cursor" || is_node_transforming
-              }
+              hidden={tool.type !== "cursor" || is_node_transforming}
             >
               {hovered_node_id && (
                 // general hover
@@ -413,6 +400,22 @@ export function EditorSurface() {
         </div>
       </div>
     </SurfaceSelectionGroupProvider>
+  );
+}
+
+function MarqueeOverlay() {
+  const editor = useCurrentEditor();
+  const marquee = useEditorState(editor, (state) => state.marquee);
+  const { transform } = useTransformState();
+
+  if (!marquee) return null;
+  return (
+    <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
+      <MarqueeArea
+        a={cmath.vector2.transform(marquee.a, transform)}
+        b={cmath.vector2.transform(marquee.b, transform)}
+      />
+    </div>
   );
 }
 
@@ -557,7 +560,7 @@ export function EditorSurfaceClipboardSyncProvider({
 }
 
 function FloatingCursorTooltip() {
-  const { gesture } = useEventTarget();
+  const { gesture } = useEventTargetState();
   const { transform } = useTransformState();
   const pointer = usePointerState();
   const pos = cmath.vector2.transform(pointer.position, transform);
@@ -660,7 +663,8 @@ function SingleSelectionOverlay({
   node_id: string;
   readonly?: boolean;
 }) {
-  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const editor = useCurrentEditor();
+  const { is_node_translating, gesture } = useEventTargetState();
   const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
@@ -680,7 +684,7 @@ function SingleSelectionOverlay({
                 distribution={distribution}
                 style={style}
                 onGapGestureStart={(axis) => {
-                  startGapGesture(node_id, axis);
+                  editor.startGapGesture(node_id, axis);
                 }}
               />
             </>
@@ -694,7 +698,8 @@ function SingleSelectionOverlay({
 }
 
 function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
-  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const editor = useCurrentEditor();
+  const { is_node_translating, gesture } = useEventTargetState();
   const groups = useSurfaceSelectionGroups();
 
   return (
@@ -708,7 +713,7 @@ function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
                 distribution={g.distribution}
                 style={g.style}
                 onGapGestureStart={(axis) => {
-                  startGapGesture(g.ids, axis);
+                  editor.startGapGesture(g.ids, axis);
                 }}
               />
             )}
@@ -731,7 +736,7 @@ function SelectionGroupOverlay({
 }) {
   const editor = useCurrentEditor();
   const { tool } = useToolState();
-  const { multipleSelectionOverlayClick } = useEventTarget();
+  const { multipleSelectionOverlayClick } = useMultipleSelectionOverlayClick();
 
   const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
@@ -907,12 +912,12 @@ function NodeOverlayCornerRadiusHandle({
   margin?: number;
   size?: number;
 }) {
-  const { startCornerRadiusGesture } = useEventTarget();
+  const editor = useCurrentEditor();
 
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startCornerRadiusGesture(node_id);
+      editor.startCornerRadiusGesture(node_id);
     },
   });
 
@@ -954,14 +959,13 @@ function LayerOverlayRotationHandle({
   size?: number;
 }) {
   const editor = useCurrentEditor();
-  const { startRotateGesture } = useEventTarget();
 
   const rotation = editor.getNodeAbsoluteRotation(node_id);
 
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startRotateGesture(node_id);
+      editor.startRotateGesture(node_id);
     },
   });
 
@@ -1009,7 +1013,7 @@ function LayerOverlayResizeHandle({
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
-  const { startScaleGesture } = useEventTarget();
+  const editor = useCurrentEditor();
 
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
@@ -1017,20 +1021,15 @@ function LayerOverlayResizeHandle({
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startScaleGesture(selection, anchor);
+      editor.startScaleGesture(selection, anchor);
     },
   });
 
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
-function NetworkOverlay({
-  edges,
-  transform,
-}: {
-  edges: grida.program.document.Edge2D[] | undefined | null;
-  transform: cmath.Transform;
-}) {
+function NetworkOverlay({ transform }: { transform: cmath.Transform }) {
+  const { edges } = useCurrentSceneState();
   return (
     <>
       {edges?.map((edge) => {
@@ -1113,14 +1112,14 @@ function RedDotSortHandle({
   node_id: string;
   selection: string[];
 }) {
-  const { startSortGesture } = useEventTarget();
+  const editor = useCurrentEditor();
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startSortGesture(selection, node_id);
+      editor.startSortGesture(selection, node_id);
     },
   });
 
@@ -1216,7 +1215,7 @@ function GapWithHandle({
   offset?: cmath.Vector2;
   onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
-  const { gesture } = useEventTarget();
+  const { gesture } = useEventTargetState();
 
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
@@ -1370,21 +1369,22 @@ function PixelGridOverlay() {
 }
 
 function RulerGuideOverlay() {
-  const { guides, startGuideGesture } = useEventTarget();
+  const editor = useCurrentEditor();
+  const { guides } = useEventTargetState();
   const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();
 
   const bindX = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      startGuideGesture("y", -1);
+      editor.startGuideGesture("y", -1);
       event.preventDefault();
     },
   });
 
   const bindY = useSurfaceGesture({
     onDragStart: ({ event }) => {
-      startGuideGesture("x", -1);
+      editor.startGuideGesture("x", -1);
       event.preventDefault();
     },
   });
@@ -1499,7 +1499,6 @@ function Guide({
 }: grida.program.document.Guide2D & { idx: number }) {
   const editor = useCurrentEditor();
   const { transform } = useTransformState();
-  const { startGuideGesture } = useEventTarget();
   const o = cmath.delta.transform(offset, axis, transform);
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -1532,7 +1531,7 @@ function Guide({
       event.stopPropagation();
     },
     onDragStart: ({ event }) => {
-      startGuideGesture(axis, idx);
+      editor.startGuideGesture(axis, idx);
       event.preventDefault();
     },
   });
