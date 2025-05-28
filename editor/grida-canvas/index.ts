@@ -1865,6 +1865,12 @@ export namespace editor.api {
     ) => void;
   }
 
+  export interface IBrushToolActions {
+    changeBrush(brush: BitmapEditorBrush): void;
+    changeBrushSize(size: TChange<number>): void;
+    changeBrushOpacity(opacity: TChange<number>): void;
+  }
+
   export interface ICameraActions {
     transform(transform: cmath.Transform): void;
   }

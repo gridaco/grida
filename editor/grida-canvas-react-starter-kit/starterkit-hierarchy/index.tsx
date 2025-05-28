@@ -37,7 +37,7 @@ import {
 } from "@radix-ui/react-icons";
 import {
   useCameraActions,
-  useCurrentScene,
+  useCurrentSceneState,
 } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
@@ -282,7 +282,8 @@ export function NodeHierarchyList() {
   const editor = useCurrentEditor();
   const document_ctx = useEditorState(editor, (state) => state.document_ctx);
 
-  const { id, name, children, selection, hovered_node_id } = useCurrentScene();
+  const { id, name, children, selection, hovered_node_id } =
+    useCurrentSceneState();
 
   // root item id must be "<root>"
   const tree = useTree<grida.program.nodes.Node>({

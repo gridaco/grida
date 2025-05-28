@@ -31,11 +31,11 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentScene } from "@/grida-canvas-react/provider";
+import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {
   const editor = useCurrentEditor();
-  const { id: scene_id, backgroundColor } = useCurrentScene();
+  const { id: scene_id, backgroundColor } = useCurrentSceneState();
 
   return (
     <PropertyLine>

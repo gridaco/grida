@@ -6,12 +6,12 @@ export {
 } from "./use-editor";
 export {
   StandaloneDocumentEditor,
-  useDocument,
+  useDocumentState as useDocument,
   useNode,
-  useBrush,
+  useBrushState as useBrush,
   useEventTarget,
   useComputedNode,
-  useNodeAction,
+  useNodeActions as useNodeAction,
   useTransform,
   useToolState,
   useEditorFlagsState,

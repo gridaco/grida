@@ -7,11 +7,13 @@ import nid from "./reducers/tools/id";
 import type { TChange } from "./action";
 import type { tokens } from "@grida/tokens";
 import cmath from "@grida/cmath";
+import type { BitmapEditorBrush } from "@grida/bitmap";
 
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
     editor.api.INodeChangeActions,
+    editor.api.IBrushToolActions,
     editor.api.ICameraActions
 {
   private listeners: Set<(editor: this, action?: Action) => void>;
@@ -950,6 +952,27 @@ export class Editor
     });
   }
   // #endregion INodeChangeActios
+
+  // #region IBrushToolActions implementation
+  changeBrush(brush: BitmapEditorBrush) {
+    this.dispatch({
+      type: "surface/brush",
+      brush,
+    });
+  }
+  changeBrushSize(size: TChange<number>) {
+    this.dispatch({
+      type: "surface/brush/size",
+      size,
+    });
+  }
+  changeBrushOpacity(opacity: TChange<number>) {
+    this.dispatch({
+      type: "surface/brush/opacity",
+      opacity,
+    });
+  }
+  // #endregion IBrushToolActions implementation
 
   // #region ICameraActions implementation
   transform(transform: cmath.Transform) {

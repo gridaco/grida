@@ -63,12 +63,13 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import grida from "@grida/schema";
 import assert from "assert";
 import {
-  useCurrentScene,
+  useCurrentSceneState,
   useEditorFlagsState,
-  useNodeAction,
+  useNodeActions,
   useNodeState,
-  useSelection,
+  useCurrentSelection,
   useSelectionPaints,
+  useSelectionState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -93,7 +94,7 @@ import { editor } from "@/grida-canvas";
 
 export function Align() {
   const editor = useCurrentEditor();
-  const { selection } = useDocument();
+  const { selection } = useSelectionState();
   const has_selection = selection.length >= 1;
 
   return (
@@ -166,9 +167,14 @@ function SelectionMixedProperties({
 }: {
   config?: ControlsConfig;
 }) {
-  const scene = useCurrentScene();
+  const scene = useCurrentSceneState();
 
-  const { selection: ids, nodes, properties, actions: change } = useSelection();
+  const {
+    selection: ids,
+    nodes,
+    properties,
+    actions: change,
+  } = useCurrentSelection();
   const {
     id,
     name,
@@ -676,7 +682,7 @@ function SelectedNodeProperties({
 
   assert(selection.length === 1);
   const node_id = selection[0];
-  const actions = useNodeAction(node_id)!;
+  const actions = useNodeActions(node_id)!;
 
   // const node = useNode(node_id);
   const node = useNodeState(node_id, (node) => ({
@@ -1189,13 +1195,13 @@ function SelectedNodeProperties({
 function SectionPosition({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
   const document_ctx = useEditorState(instance, (state) => state.document_ctx);
-  const scene = useCurrentScene();
+  const scene = useCurrentSceneState();
   const top_id = editor.dq.getTopId(document_ctx, node_id)!;
   const is_root = node_id === top_id;
   const is_single_mode_root =
     scene.constraints.children === "single" && is_root;
 
-  const actions = useNodeAction(node_id)!;
+  const actions = useNodeActions(node_id)!;
 
   const { position, rotation, top, left, right, bottom } = useNodeState(
     node_id,
@@ -1250,7 +1256,7 @@ function SectionDimension({ node_id }: { node_id: string }) {
     height: node.height,
   }));
 
-  const actions = useNodeAction(node_id)!;
+  const actions = useNodeActions(node_id)!;
 
   return (
     <SidebarSection className="border-b pb-4">

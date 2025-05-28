@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/context-menu";
 import {
   useDataTransferEventTarget,
-  useDocument,
-  useSelection,
+  useCurrentSelection,
+  useSelectionState,
 } from "../provider";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
@@ -20,9 +20,9 @@ export function EditorSurfaceContextMenu({
   className,
 }: React.PropsWithChildren<{ className?: string }>) {
   const editor = useCurrentEditor();
-  const { selection } = useDocument();
+  const { selection } = useSelectionState();
   const { insertText } = useDataTransferEventTarget();
-  const { actions } = useSelection();
+  const { actions } = useCurrentSelection();
 
   const has_selection = selection.length > 0;
   const can_copy = has_selection;

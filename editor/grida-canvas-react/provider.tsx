@@ -22,7 +22,6 @@ import type {
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
 import { toast } from "sonner";
-import { BitmapEditorBrush } from "@grida/bitmap";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
@@ -151,7 +150,7 @@ function __useGestureNudgeState(dispatch: Dispatcher) {
   return __gesture_nudge_debounced;
 }
 
-export function useNodeAction(node_id: string | undefined) {
+export function useNodeActions(node_id: string | undefined) {
   const instance = useCurrentEditor();
 
   return useMemo(() => {
@@ -288,7 +287,7 @@ const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
   return deepEqual(a, b);
 };
 
-export function useSelection() {
+export function useCurrentSelection() {
   const instance = useCurrentEditor();
   const state = useEditorState(instance, (state) => ({
     selection: state.selection,
@@ -851,43 +850,44 @@ export function useEditorSurface(): {
   };
 }
 
-interface UseDocument {
+interface UseSelectionState {
   selection: editor.state.IEditorState["selection"];
-  document: editor.state.IEditorState["document"];
-  document_ctx: editor.state.IEditorState["document_ctx"];
-  scenes: editor.state.IEditorState["document"]["scenes"];
-  scene_id: editor.state.IEditorState["scene_id"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-  templates: editor.state.IEditorState["templates"];
-  clipboardColor: editor.state.IEditorState["user_clipboard_color"];
 }
 
-export function useDocument(): UseDocument {
+export function useSelectionState(): UseSelectionState {
   const editor = useCurrentEditor();
-  return useEditorState<UseDocument>(
+  return useEditorState<UseSelectionState>(editor, (state) => ({
+    selection: state.selection,
+    hovered_node_id: state.hovered_node_id,
+  }));
+}
+
+interface UseDocumentState {
+  document: editor.state.IEditorState["document"];
+  document_ctx: editor.state.IEditorState["document_ctx"];
+}
+
+export function useDocumentState(): UseDocumentState {
+  const editor = useCurrentEditor();
+  return useEditorState<UseDocumentState>(
     editor,
     (state) =>
       ({
-        selection: state.selection,
         document: state.document,
         document_ctx: state.document_ctx,
-        scenes: state.document.scenes,
-        scene_id: state.scene_id,
-        hovered_node_id: state.hovered_node_id,
-        templates: state.templates,
-        clipboardColor: state.user_clipboard_color,
-      }) satisfies UseDocument
+      }) satisfies UseDocumentState
   );
 }
 
-type UseScene = grida.program.document.Scene & {
+type UseSceneState = grida.program.document.Scene & {
   selection: editor.state.IEditorState["selection"];
   hovered_node_id: editor.state.IEditorState["hovered_node_id"];
   hovered_vertex_idx: editor.state.IEditorState["hovered_vertex_idx"];
   document_ctx: editor.state.IEditorState["document_ctx"];
 };
 
-export function useScene(scene_id: string): UseScene {
+export function useSceneState(scene_id: string): UseSceneState {
   const editor = useCurrentEditor();
   return useEditorState(editor, (state) => {
     return {
@@ -896,16 +896,16 @@ export function useScene(scene_id: string): UseScene {
       hovered_vertex_idx: state.hovered_vertex_idx,
       document_ctx: state.document_ctx,
       ...state.document.scenes[scene_id],
-    } satisfies Omit<UseScene, "setBackgroundColor">;
+    } satisfies Omit<UseSceneState, "setBackgroundColor">;
   });
 }
 
-export function useCurrentScene(): UseScene {
+export function useCurrentSceneState(): UseSceneState {
   const editor = useCurrentEditor();
   const scene_id = useEditorState(editor, (state) => {
     return state.scene_id!;
   });
-  return useScene(scene_id);
+  return useSceneState(scene_id);
 }
 
 function animateTransformTo(
@@ -1149,12 +1149,12 @@ export function usePointerState(): editor.state.IEditorState["pointer"] {
   return useEditorState(editor, (state) => state.pointer);
 }
 
-interface UseTool {
+interface UseToolState {
   tool: editor.state.IEditorState["tool"];
   content_edit_mode: editor.state.IEditorState["content_edit_mode"];
 }
 
-export function useToolState(): UseTool {
+export function useToolState(): UseToolState {
   const editor = useCurrentEditor();
   const tool = useEditorState(editor, (state) => state.tool);
   const content_edit_mode = useEditorState(
@@ -1170,55 +1170,9 @@ export function useToolState(): UseTool {
   }, [tool, content_edit_mode]);
 }
 
-export function useBrush() {
+export function useBrushState() {
   const editor = useCurrentEditor();
-  const brush = useEditorState(editor, (state) => state.brush);
-
-  const dispatch = useCallback(
-    (action: Action) => {
-      editor.dispatch(action);
-    },
-    [editor]
-  );
-
-  const changeBrush = useCallback(
-    (brush: BitmapEditorBrush) => {
-      dispatch({
-        type: "surface/brush",
-        brush,
-      });
-    },
-    [dispatch]
-  );
-
-  const changeBrushSize = useCallback(
-    (size: TChange<number>) => {
-      dispatch({
-        type: "surface/brush/size",
-        size,
-      });
-    },
-    [dispatch]
-  );
-
-  const changeBrushOpacity = useCallback(
-    (opacity: TChange<number>) => {
-      dispatch({
-        type: "surface/brush/opacity",
-        opacity,
-      });
-    },
-    [dispatch]
-  );
-
-  return useMemo(() => {
-    return {
-      brush,
-      changeBrush,
-      changeBrushSize,
-      changeBrushOpacity,
-    };
-  }, [brush, changeBrush, changeBrushSize, changeBrushOpacity]);
+  return useEditorState(editor, (state) => state.brush);
 }
 
 interface UseEventTarget {
@@ -1294,7 +1248,7 @@ export function useEventTarget(): UseEventTarget {
     ruler: state.ruler,
     flags: state.flags,
   }));
-  const scene = useCurrentScene();
+  const scene = useCurrentSceneState();
 
   const dispatch = useCallback(
     (action: Action) => {
@@ -2199,7 +2153,8 @@ export function useSurfacePathEditor() {
  */
 export function useRootTemplateInstanceNode(root_id: string) {
   const editor = useCurrentEditor();
-  const { document, templates } = useDocument();
+  const templates = useEditorState(editor, (state) => state.templates);
+  const { document } = useDocumentState();
 
   const rootnode = document.nodes[root_id];
 
@@ -2331,10 +2286,6 @@ export function useNode(node_id: string): NodeWithMeta {
       is_flex_parent,
     },
   };
-}
-
-export function useNodeWithoutTransform(node_id: string) {
-  //
 }
 
 export function useComputedNode(

@@ -22,7 +22,7 @@ import {
 } from "@radix-ui/react-icons";
 import { toast } from "sonner";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useCurrentScene } from "@/grida-canvas-react/provider";
+import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,7 @@ export function PreviewProvider({
   children,
 }: React.PropsWithChildren<StandaloneDocumentContentProps>) {
   const { document, document_ctx } = useDocument();
-  const scene = useCurrentScene();
+  const scene = useCurrentSceneState();
   const [mode, setMode] = useState<"framed" | "fullscreen">("framed");
   const [open, setOpen] = useState(false);
   const [id, setId] = useState<string>();

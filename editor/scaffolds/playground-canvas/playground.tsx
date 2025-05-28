@@ -29,7 +29,10 @@ import {
   useEditorState,
   useCurrentEditor,
 } from "@/grida-canvas-react";
-import { useCurrentScene, useToolState } from "@/grida-canvas-react/provider";
+import {
+  useCurrentSceneState,
+  useToolState,
+} from "@/grida-canvas-react/provider";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
@@ -503,7 +506,7 @@ export default function CanvasPlayground({
 
 function useArtboardListCondition() {
   const { tool } = useToolState();
-  const { constraints } = useCurrentScene();
+  const { constraints } = useCurrentSceneState();
   const should_show_artboards_list =
     tool.type === "insert" &&
     tool.node === "container" &&

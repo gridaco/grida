@@ -4,14 +4,15 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-canvas-react";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
-  useBrush,
+  useBrushState,
   useClipboardSync,
-  useCurrentScene,
-  useDocument,
+  useCurrentSceneState,
+  useDocumentState,
   useEditorSurface,
   useEventTargetCSSCursor,
   useNode,
   usePointerState,
+  useSelectionState,
   useToolState,
   useTransform,
 } from "../provider";
@@ -158,7 +159,7 @@ export function EditorSurface() {
     dragStart,
     dragEnd,
   } = useEventTarget();
-  const { brush } = useBrush();
+  const brush = useBrushState();
   const { tool, content_edit_mode } = useToolState();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
@@ -440,8 +441,9 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
 }
 
 function RootFramesBarOverlay() {
-  const { selection, document, hovered_node_id } = useDocument();
-  const scene = useCurrentScene();
+  const { selection, hovered_node_id } = useSelectionState();
+  const { document } = useDocumentState();
+  const scene = useCurrentSceneState();
   const rootframes = useMemo(() => {
     const children = scene.children.map((id) => document.nodes[id]);
     return children.filter(

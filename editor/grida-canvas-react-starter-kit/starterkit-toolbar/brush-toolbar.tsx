@@ -46,9 +46,8 @@ export function useSliderState() {
 }
 
 export default function BrushToolbar() {
-  const { brush, changeBrush, changeBrushSize, changeBrushOpacity } =
-    useBrush();
-
+  const editor = useCurrentEditor();
+  const brush = useBrush();
   const sizepop = useSliderState();
   const opacitypop = useSliderState();
   const [detailOpen, setDetailOpen] = useState(false);
@@ -75,7 +74,7 @@ export default function BrushToolbar() {
               }}
               onValueChange={(values) => {
                 sizepop.onValueChange();
-                changeBrushSize({ type: "set", value: values[0] });
+                editor.changeBrushSize({ type: "set", value: values[0] });
               }}
             />
           </div>
@@ -105,7 +104,7 @@ export default function BrushToolbar() {
               onValueChange={(values) => {
                 opacitypop.onValueChange();
                 const v = values[0] / 100;
-                changeBrushOpacity({ type: "set", value: v });
+                editor.changeBrushOpacity({ type: "set", value: v });
               }}
             />
           </div>
@@ -152,7 +151,7 @@ export default function BrushToolbar() {
                   thumbnail={item.thumbnail}
                   selected={selected}
                   onClick={() => {
-                    changeBrush(item.brush);
+                    editor.changeBrush(item.brush);
                     if (selected) {
                       setDetailOpen(true);
                     }

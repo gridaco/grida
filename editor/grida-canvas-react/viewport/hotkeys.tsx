@@ -1,10 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import {
-  useBrush,
+  useBrushState,
   useCameraActions,
   useEditorSurface,
   useEventTarget,
-  useSelection,
+  useCurrentSelection,
   useToolState,
 } from "../provider";
 import { toast } from "sonner";
@@ -327,12 +327,11 @@ export function useEditorHotKeys() {
   const editor = useCurrentEditor();
   const { ruler, setRulerState, pixelgrid, setPixelGridState } =
     useEventTarget();
-  const { changeBrushSize } = useBrush();
   const { tool, content_edit_mode } = useToolState();
   const { scale, fit, zoomIn, zoomOut } = useCameraActions();
   const { a11yarrow } = useEditorSurface();
 
-  const { selection, actions } = useSelection();
+  const { selection, actions } = useCurrentSelection();
 
   useEffect(() => {
     const cb = (e: any) => {
@@ -839,7 +838,7 @@ export function useEditorHotKeys() {
 
   useHotkeys("]", (e) => {
     if (tool.type === "brush") {
-      changeBrushSize({ type: "delta", value: 1 });
+      editor.changeBrushSize({ type: "delta", value: 1 });
     } else {
       editor.order("selection", "front");
     }
@@ -847,7 +846,7 @@ export function useEditorHotKeys() {
 
   useHotkeys("[", (e) => {
     if (tool.type === "brush") {
-      changeBrushSize({ type: "delta", value: -1 });
+      editor.changeBrushSize({ type: "delta", value: -1 });
     } else {
       editor.order("selection", "back");
     }

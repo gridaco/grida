@@ -72,7 +72,7 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { PropsControl } from "./controls/props";
 import {
-  useDocument,
+  useDocumentState,
   useNode,
   useTemplateDefinition,
 } from "@/grida-canvas-react/provider";

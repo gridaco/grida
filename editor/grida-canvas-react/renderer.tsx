@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo } from "react";
-import { useCameraActions, useCurrentScene, useTransform } from "./provider";
+import {
+  useCameraActions,
+  useCurrentSceneState,
+  useTransform,
+} from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
@@ -50,7 +54,7 @@ export function StandaloneSceneContent({
   primary = true,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & StandaloneDocumentContentProps) {
-  const { children } = useCurrentScene();
+  const { children } = useCurrentSceneState();
 
   return (
     <div
