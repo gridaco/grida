@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo } from "react";
-import { useCurrentScene, useTransform } from "./provider";
+import { useCameraActions, useCurrentScene, useTransform } from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
@@ -156,7 +156,7 @@ function useFitInitiallyEffect() {
   const editor = useCurrentEditor();
   const documentKey = useEditorState(editor, (state) => state.document_key);
   const sceneId = useEditorState(editor, (state) => state.scene_id);
-  const { fit } = useTransform();
+  const { fit } = useCameraActions();
 
   useEffect(() => {
     fit("*");

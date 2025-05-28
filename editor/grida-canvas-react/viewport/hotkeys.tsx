@@ -1,14 +1,13 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import {
   useBrush,
+  useCameraActions,
   useEditorSurface,
   useEventTarget,
   useSelection,
   useToolState,
-  useTransform,
 } from "../provider";
 import { toast } from "sonner";
-import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";
 import cmath from "@grida/cmath";
@@ -330,7 +329,7 @@ export function useEditorHotKeys() {
     useEventTarget();
   const { changeBrushSize } = useBrush();
   const { tool, content_edit_mode } = useToolState();
-  const { scale, fit, zoomIn, zoomOut } = useTransform();
+  const { scale, fit, zoomIn, zoomOut } = useCameraActions();
   const { a11yarrow } = useEditorSurface();
 
   const { selection, actions } = useSelection();

@@ -1,9 +1,4 @@
-import {
-  useNode,
-  useNodeAction,
-  useTransform,
-  useCurrentEditor,
-} from "@/grida-canvas-react";
+import { useNode, useTransform, useCurrentEditor } from "@/grida-canvas-react";
 import { useEffect, useRef } from "react";
 import { useSingleSelection } from "../surface-hooks";
 import { css } from "@/grida-canvas-utils/css";
@@ -12,7 +7,6 @@ import cmath from "@grida/cmath";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
-  const change = useNodeAction(node_id)!;
   const editor = useCurrentEditor();
   const { transform } = useTransform();
   const data = useSingleSelection(node_id);
@@ -66,7 +60,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
               }
             }}
             onChange={(e) => {
-              change.text(e.target.value);
+              editor.changeNodeText(node_id, e.target.value);
             }}
             className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-visible resize-none"
             style={{

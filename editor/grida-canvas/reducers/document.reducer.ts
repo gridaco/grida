@@ -995,7 +995,10 @@ function __self_order(
   }
 
   ichildren.children = reordered;
-  // draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered; // TODO: remove me verified not required
+
+  // update the hierarchy graph
+  const context = editor.dq.Context.from(draft.document);
+  draft.document_ctx = context.snapshot();
 }
 
 function __self_nudge(

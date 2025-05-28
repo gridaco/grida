@@ -49,7 +49,7 @@ import {
   useComputedNode,
   useCurrentEditor,
   useDocument,
-  useNode,
+  useEditorState,
 } from "@/grida-canvas-react";
 import {
   Crosshair2Icon,
@@ -66,9 +66,9 @@ import {
   useCurrentScene,
   useEditorFlagsState,
   useNodeAction,
+  useNodeState,
   useSelection,
   useSelectionPaints,
-  useTopNode,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
@@ -89,6 +89,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
+import { editor } from "@/grida-canvas";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -119,7 +120,8 @@ export function Selection({
   empty?: React.ReactNode;
   config?: ControlsConfig;
 }) {
-  const { selection } = useDocument();
+  const instance = useCurrentEditor();
+  const selection = useEditorState(instance, (state) => state.selection);
 
   const selection_length = selection.length;
 
@@ -664,16 +666,67 @@ function SelectedNodeProperties({
 }: {
   config?: ControlsConfig;
 }) {
-  const { selection, document } = useDocument();
+  const instance = useCurrentEditor();
+  const selection = useEditorState(instance, (state) => state.selection);
+  const documentProperties = useEditorState(
+    instance,
+    (state) => state.document.properties
+  );
   const { debug } = useEditorFlagsState();
-  const scene = useCurrentScene();
 
   assert(selection.length === 1);
   const node_id = selection[0];
   const actions = useNodeAction(node_id)!;
 
-  const node = useNode(node_id);
-  const root = useTopNode(node_id);
+  // const node = useNode(node_id);
+  const node = useNodeState(node_id, (node) => ({
+    id: node.id,
+    name: node.name,
+    active: node.active,
+    locked: node.locked,
+    component_id: node.component_id,
+    properties: node.properties,
+    src: node.src,
+    text: node.text,
+    type: node.type,
+    opacity: node.opacity,
+    cornerRadius: node.cornerRadius,
+    fill: node.fill,
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+    strokeCap: node.strokeCap,
+    fit: node.fit,
+    fontFamily: node.fontFamily,
+    fontWeight: node.fontWeight,
+    fontSize: node.fontSize,
+    lineHeight: node.lineHeight,
+    letterSpacing: node.letterSpacing,
+    textAlign: node.textAlign,
+    textAlignVertical: node.textAlignVertical,
+    maxLength: node.maxLength,
+
+    //
+    border: node.border,
+    //
+    padding: node.padding,
+    boxShadow: node.boxShadow,
+
+    //
+    layout: node.layout,
+    direction: node.direction,
+    mainAxisAlignment: node.mainAxisAlignment,
+    crossAxisAlignment: node.crossAxisAlignment,
+    mainAxisGap: node.mainAxisGap,
+    crossAxisGap: node.crossAxisGap,
+
+    //
+    href: node.href,
+    target: node.target,
+    cursor: node.cursor,
+
+    // x
+    userdata: node.userdata,
+  }));
   const computed = useComputedNode(node_id);
   const {
     id,
@@ -681,22 +734,13 @@ function SelectedNodeProperties({
     active,
     locked,
     component_id,
-    style,
     type,
     opacity,
     cornerRadius,
-    rotation,
     fill,
     stroke,
     strokeWidth,
     strokeCap,
-    position,
-    width,
-    height,
-    left,
-    top,
-    right,
-    bottom,
     fit,
     fontFamily,
     fontWeight,
@@ -730,26 +774,19 @@ function SelectedNodeProperties({
     userdata,
   } = node;
 
-  const document_properties = document.properties;
-  const properties = node.properties;
-  const root_properties = root.properties;
-
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
   const is_templateinstance = type === "template_instance";
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_root = node_id === root.id;
-  const is_single_mode_root =
-    scene.constraints.children === "single" && is_root;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
   return (
     <SchemaProvider
       schema={{
-        properties: document_properties,
+        properties: documentProperties,
       }}
     >
       <div key={node_id} className="mt-4 mb-10">
@@ -794,67 +831,9 @@ function SelectedNodeProperties({
             )}
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection
-          hidden={config.position === "off" || is_single_mode_root}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PositioningConstraintsControl
-                value={{
-                  position: position!,
-                  top,
-                  left,
-                  right,
-                  bottom,
-                }}
-                onValueChange={actions.positioning}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Mode</PropertyLineLabel>
-              <PositioningModeControl
-                value={position}
-                //
-                onValueChange={actions.positioningMode}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Rotate</PropertyLineLabel>
-              <RotateControl
-                value={rotation}
-                onValueChange={actions.rotation}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-        <SidebarSection
-          hidden={config.size === "off"}
-          className="border-b pb-4"
-        >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <LengthPercentageControl
-                value={width}
-                onValueChange={actions.width}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Height</PropertyLineLabel>
-              <LengthPercentageControl
-                value={height}
-                onValueChange={actions.height}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
+        {config.position !== "off" && <SectionPosition node_id={node_id} />}
+        {config.size !== "off" && <SectionDimension node_id={node_id} />}
+
         <SidebarSection
           hidden={config.template === "off" || !is_templateinstance}
           className="border-b pb-4"
@@ -877,10 +856,10 @@ function SelectedNodeProperties({
             <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
 
-          {properties && Object.keys(properties).length ? (
+          {node.properties && Object.keys(node.properties).length ? (
             <SidebarMenuSectionContent className="space-y-2">
               <PropsControl
-                properties={properties}
+                properties={node.properties}
                 props={computed.props || {}}
                 onValueChange={actions.value}
               />
@@ -1204,6 +1183,97 @@ function SelectedNodeProperties({
         </SidebarSection>
       </div>
     </SchemaProvider>
+  );
+}
+
+function SectionPosition({ node_id }: { node_id: string }) {
+  const instance = useCurrentEditor();
+  const document_ctx = useEditorState(instance, (state) => state.document_ctx);
+  const scene = useCurrentScene();
+  const top_id = editor.dq.getTopId(document_ctx, node_id)!;
+  const is_root = node_id === top_id;
+  const is_single_mode_root =
+    scene.constraints.children === "single" && is_root;
+
+  const actions = useNodeAction(node_id)!;
+
+  const { position, rotation, top, left, right, bottom } = useNodeState(
+    node_id,
+    (node) => ({
+      position: node.position,
+      rotation: node.rotation,
+      top: node.top,
+      left: node.left,
+      right: node.right,
+      bottom: node.bottom,
+    })
+  );
+
+  return (
+    <SidebarSection hidden={is_single_mode_root} className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PositioningConstraintsControl
+            value={{
+              position: position!,
+              top,
+              left,
+              right,
+              bottom,
+            }}
+            onValueChange={actions.positioning}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Mode</PropertyLineLabel>
+          <PositioningModeControl
+            value={position}
+            //
+            onValueChange={actions.positioningMode}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Rotate</PropertyLineLabel>
+          <RotateControl value={rotation} onValueChange={actions.rotation} />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function SectionDimension({ node_id }: { node_id: string }) {
+  const { width, height } = useNodeState(node_id, (node) => ({
+    width: node.width,
+    height: node.height,
+  }));
+
+  const actions = useNodeAction(node_id)!;
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel>Width</PropertyLineLabel>
+          <LengthPercentageControl
+            value={width}
+            onValueChange={actions.width}
+          />
+        </PropertyLine>
+        <PropertyLine>
+          <PropertyLineLabel>Height</PropertyLineLabel>
+          <LengthPercentageControl
+            value={height}
+            onValueChange={actions.height}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
   );
 }
 

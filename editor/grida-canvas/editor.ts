@@ -6,12 +6,19 @@ import cg from "@grida/cg";
 import nid from "./reducers/tools/id";
 import type { TChange } from "./action";
 import type { tokens } from "@grida/tokens";
+import cmath from "@grida/cmath";
 
 export class Editor
-  implements editor.api.IDocumentEditorActions, editor.api.INodeChangeActions
+  implements
+    editor.api.IDocumentEditorActions,
+    editor.api.INodeChangeActions,
+    editor.api.ICameraActions
 {
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
+  get state(): Readonly<editor.state.IEditorState> {
+    return this.mstate;
+  }
 
   constructor(initialState: editor.state.IEditorStateInit) {
     this.listeners = new Set();
@@ -84,7 +91,7 @@ export class Editor
     return () => this.listeners.delete(fn);
   }
 
-  public getSnapshot() {
+  public getSnapshot(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
@@ -943,4 +950,13 @@ export class Editor
     });
   }
   // #endregion INodeChangeActios
+
+  // #region ICameraActions implementation
+  transform(transform: cmath.Transform) {
+    this.dispatch({
+      type: "transform",
+      transform,
+    });
+  }
+  // #endregion ICameraActions implementation
 }

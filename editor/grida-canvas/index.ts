@@ -1865,6 +1865,10 @@ export namespace editor.api {
     ) => void;
   }
 
+  export interface ICameraActions {
+    transform(transform: cmath.Transform): void;
+  }
+
   export interface IDocumentEditorActions {
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;

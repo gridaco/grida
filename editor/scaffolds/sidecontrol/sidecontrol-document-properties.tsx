@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useCurrentEditor, useDocument, useNode } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocument } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";

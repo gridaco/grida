@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useCurrentEditor, useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import {
   Tree,
   TreeDragLine,
@@ -36,9 +36,8 @@ import {
   LockOpen1Icon,
 } from "@radix-ui/react-icons";
 import {
+  useCameraActions,
   useCurrentScene,
-  useNodeAction,
-  useTransform,
 } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
@@ -93,7 +92,8 @@ function SceneItemContextMenuWrapper({
 
 export function ScenesList() {
   const editor = useCurrentEditor();
-  const { scenes: scenesmap, scene_id } = useDocument();
+  const scenesmap = useEditorState(editor, (state) => state.document.scenes);
+  const scene_id = useEditorState(editor, (state) => state.scene_id);
 
   const scenes = useMemo(() => {
     return Object.values(scenesmap).sort(
@@ -198,8 +198,7 @@ function NodeHierarchyItemContextMenuWrapper({
   onStartRenaming?: () => void;
 }>) {
   const editor = useCurrentEditor();
-  const { fit } = useTransform();
-  const change = useNodeAction(node_id)!;
+  const { fit } = useCameraActions();
 
   return (
     <ContextMenu>
@@ -241,7 +240,10 @@ function NodeHierarchyItemContextMenuWrapper({
         </ContextMenuItem>
         <ContextMenuSeparator />
         {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
-        <ContextMenuItem onSelect={change.toggleActive} className="text-xs">
+        <ContextMenuItem
+          onSelect={() => editor.toggleNodeActive(node_id)}
+          className="text-xs"
+        >
           Set Active/Inactive
           <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
         </ContextMenuItem>
@@ -254,7 +256,10 @@ function NodeHierarchyItemContextMenuWrapper({
           Zoom to fit
           <ContextMenuShortcut>{"⇧1"}</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onSelect={change.toggleLocked} className="text-xs">
+        <ContextMenuItem
+          onSelect={() => editor.toggleNodeLocked(node_id)}
+          className="text-xs"
+        >
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem>
@@ -275,22 +280,15 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const editor = useCurrentEditor();
-  const { document } = useDocument();
+  const document_ctx = useEditorState(editor, (state) => state.document_ctx);
 
   const { id, name, children, selection, hovered_node_id } = useCurrentScene();
-
-  const expandedItems = useMemo(() => {
-    return children.filter(
-      (id) => (document.nodes[id] as grida.program.nodes.UnknwonNode).expanded
-    );
-  }, [id, children]);
 
   // root item id must be "<root>"
   const tree = useTree<grida.program.nodes.Node>({
     rootItemId: "<root>",
     canReorder: true,
     initialState: {
-      expandedItems: expandedItems,
       selectedItems: selection,
     },
     state: {
@@ -319,16 +317,13 @@ export function NodeHierarchyList() {
     indent: 6,
     dataLoader: {
       getItem(itemId) {
-        return document.nodes[itemId];
+        return editor.state.document.nodes[itemId];
       },
       getChildren: (itemId) => {
         if (itemId === "<root>") {
           return children;
         }
-        const node = document.nodes[itemId];
-        return (
-          (node as grida.program.nodes.i.IChildrenReference)?.children || []
-        );
+        return editor.state.document_ctx.__ctx_nid_to_children_ids[itemId];
       },
     },
     features: [
@@ -341,7 +336,7 @@ export function NodeHierarchyList() {
 
   useEffect(() => {
     tree.rebuildTree();
-  }, [document]);
+  }, [document_ctx]);
 
   return (
     <Tree tree={tree} indent={6}>

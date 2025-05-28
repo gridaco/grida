@@ -12,11 +12,16 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import cmath from "@grida/cmath";
 import { Input } from "@/components/ui/input";
-import { useEventTarget, useTransform } from "@/grida-canvas-react/provider";
+import {
+  useCameraActions,
+  useEventTarget,
+  useTransform,
+} from "@/grida-canvas-react/provider";
 import { cn } from "@/components/lib/utils";
 
 export function ZoomControl({ className }: { className?: string }) {
-  const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
+  const { scale, fit, zoomIn, zoomOut } = useCameraActions();
+  const { transform } = useTransform();
   const { ruler, setRulerState, pixelgrid, setPixelGridState } =
     useEventTarget();
 

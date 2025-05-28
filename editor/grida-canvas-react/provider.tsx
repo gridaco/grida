@@ -121,392 +121,6 @@ export function StandaloneDocumentEditor({
   );
 }
 
-function __useNodeActions(dispatch: Dispatcher): editor.api.INodeChangeActions {
-  const actions = {
-    toggleNodeActive: (node_id: string) =>
-      dispatch({
-        type: "node/toggle/active",
-        node_id: node_id,
-      }),
-    toggleNodeLocked: (node_id: string) =>
-      dispatch({
-        type: "node/toggle/locked",
-        node_id: node_id,
-      }),
-    toggleNodeBold: (node_id: string) =>
-      dispatch({
-        type: "node/toggle/bold",
-        node_id: node_id,
-      }),
-    changeNodeProps: (
-      node_id: string,
-      key: string,
-      value?: tokens.StringValueExpression
-    ) =>
-      dispatch({
-        type: "node/change/props",
-        node_id: node_id,
-        props: {
-          [key]: value,
-        },
-      }),
-    changeNodeComponent: (node_id: string, component_id: string) =>
-      dispatch({
-        type: "node/change/component",
-        node_id: node_id,
-        component_id: component_id,
-      }),
-    changeNodeText: (node_id: string, text?: tokens.StringValueExpression) =>
-      dispatch({
-        type: "node/change/text",
-        node_id: node_id,
-        text,
-      }),
-    changeNodeName: (node_id: string, name: string) =>
-      dispatch({
-        type: "node/change/name",
-        node_id: node_id,
-        name: name,
-      }),
-    changeNodeUserData: (node_id: string, userdata: unknown) =>
-      dispatch({
-        type: "node/change/userdata",
-        node_id: node_id,
-        userdata: userdata as any,
-      }),
-    changeNodeActive: (node_id: string, active: boolean) =>
-      dispatch({
-        type: "node/change/active",
-        node_id: node_id,
-        active: active,
-      }),
-    changeNodeLocked: (node_id: string, locked: boolean) =>
-      dispatch({
-        type: "node/change/locked",
-        node_id: node_id,
-        locked: locked,
-      }),
-    changeNodePositioning: (
-      node_id: string,
-      positioning: grida.program.nodes.i.IPositioning
-    ) =>
-      dispatch({
-        type: "node/change/positioning",
-        node_id: node_id,
-        positioning,
-      }),
-    changeNodePositioningMode: (
-      node_id: string,
-      position: grida.program.nodes.i.IPositioning["position"]
-    ) =>
-      dispatch({
-        type: "node/change/positioning-mode",
-        node_id: node_id,
-        position,
-      }),
-    changeNodeSrc: (node_id: string, src?: tokens.StringValueExpression) =>
-      dispatch({
-        type: "node/change/src",
-        node_id: node_id,
-        src,
-      }),
-    changeNodeHref: (
-      node_id: string,
-      href?: grida.program.nodes.i.IHrefable["href"]
-    ) =>
-      dispatch({
-        type: "node/change/href",
-        node_id: node_id,
-        href,
-      }),
-    changeNodeTarget: (
-      node_id: string,
-      target?: grida.program.nodes.i.IHrefable["target"]
-    ) =>
-      dispatch({
-        type: "node/change/target",
-        node_id: node_id,
-        target,
-      }),
-    changeNodeOpacity: (node_id: string, opacity: TChange<number>) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/opacity",
-          node_id: node_id,
-          opacity,
-        });
-      }),
-    changeNodeRotation: (node_id: string, rotation: TChange<number>) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/rotation",
-          node_id: node_id,
-          rotation,
-        });
-      }),
-    changeNodeSize: (
-      node_id: string,
-      axis: "width" | "height",
-      value: grida.program.css.LengthPercentage | "auto"
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/size",
-          node_id: node_id,
-          axis,
-          value: value,
-        });
-      }),
-    changeNodeFill: (
-      node_id: string,
-      fill:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/fill",
-          node_id: node_id,
-          fill,
-        });
-      }),
-    changeNodeStroke: (
-      node_id: string,
-      stroke:
-        | grida.program.nodes.i.props.SolidPaintToken
-        | cg.PaintWithoutID
-        | null
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/stroke",
-          node_id: node_id,
-          stroke,
-        });
-      }),
-    changeNodeStrokeWidth: (node_id: string, strokeWidth: TChange<number>) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/stroke-width",
-          node_id: node_id,
-          strokeWidth,
-        });
-      }),
-    changeNodeStrokeCap: (node_id: string, strokeCap: cg.StrokeCap) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/stroke-cap",
-          node_id: node_id,
-          strokeCap,
-        });
-      }),
-    changeNodeFit: (node_id: string, fit: cg.BoxFit) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/fit",
-          node_id: node_id,
-          fit,
-        });
-      }),
-    changeNodeCornerRadius: (
-      node_id: string,
-      cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/cornerRadius",
-          node_id: node_id,
-          cornerRadius,
-        });
-      }),
-    // text style
-    changeTextNodeFontFamily: (
-      node_id: string,
-      fontFamily: string | undefined
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/fontFamily",
-          node_id: node_id,
-          fontFamily,
-        });
-      }),
-    changeTextNodeFontWeight: (node_id: string, fontWeight: cg.NFontWeight) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/fontWeight",
-          node_id: node_id,
-          fontWeight,
-        });
-      }),
-    changeTextNodeFontSize: (node_id: string, fontSize: TChange<number>) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/fontSize",
-          node_id: node_id,
-          fontSize,
-        });
-      }),
-    changeTextNodeTextAlign: (node_id: string, textAlign: cg.TextAlign) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/textAlign",
-          node_id: node_id,
-          textAlign,
-        });
-      }),
-    changeTextNodeTextAlignVertical: (
-      node_id: string,
-      textAlignVertical: cg.TextAlignVertical
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/textAlignVertical",
-          node_id: node_id,
-          textAlignVertical,
-        });
-      }),
-    changeTextNodeLineHeight: (
-      node_id: string,
-      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/lineHeight",
-          node_id: node_id,
-          lineHeight,
-        });
-      }),
-    changeTextNodeLetterSpacing: (
-      node_id: string,
-      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/letterSpacing",
-          node_id: node_id,
-          letterSpacing,
-        });
-      }),
-    changeTextNodeMaxlength: (node_id: string, maxlength: number | undefined) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/maxlength",
-          node_id: node_id,
-          maxlength,
-        });
-      }),
-    //
-    changeNodeBorder: (
-      node_id: string,
-      border: grida.program.css.Border | undefined
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/border",
-          node_id: node_id,
-          border: border,
-        });
-      }),
-    //
-    changeContainerNodePadding: (
-      node_id: string,
-      padding: grida.program.nodes.i.IPadding["padding"]
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/padding",
-          node_id: node_id,
-          padding,
-        });
-      }),
-    changeNodeBoxShadow: (node_id: string, boxShadow?: cg.BoxShadow) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/box-shadow",
-          node_id: node_id,
-          boxShadow,
-        });
-      }),
-    changeContainerNodeLayout: (
-      node_id: string,
-      layout: grida.program.nodes.i.IFlexContainer["layout"]
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/layout",
-          node_id: node_id,
-          layout,
-        });
-      }),
-    changeFlexContainerNodeDirection: (node_id: string, direction: cg.Axis) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/direction",
-          node_id: node_id,
-          direction,
-        });
-      }),
-    changeFlexContainerNodeMainAxisAlignment: (
-      node_id: string,
-      mainAxisAlignment: cg.MainAxisAlignment
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/mainAxisAlignment",
-          node_id: node_id,
-          mainAxisAlignment,
-        });
-      }),
-    changeFlexContainerNodeCrossAxisAlignment: (
-      node_id: string,
-      crossAxisAlignment: cg.CrossAxisAlignment
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/crossAxisAlignment",
-          node_id: node_id,
-          crossAxisAlignment,
-        });
-      }),
-    changeFlexContainerNodeGap: (
-      node_id: string,
-      gap: number | { mainAxisGap: number; crossAxisGap: number }
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/gap",
-          node_id: node_id,
-          gap,
-        });
-      }),
-    //
-    changeNodeMouseCursor: (node_id: string, cursor: cg.SystemMouseCursor) =>
-      dispatch({
-        type: "node/change/mouse-cursor",
-        node_id,
-        cursor,
-      }),
-    changeNodeStyle: (
-      node_id: string,
-      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-      value: any
-    ) =>
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "node/change/style",
-          node_id: node_id,
-          style: {
-            [key]: value,
-          },
-        });
-      }),
-  } satisfies editor.api.INodeChangeActions;
-
-  return useMemo(() => actions, [dispatch]);
-}
-
 function __useGestureNudgeState(dispatch: Dispatcher) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -539,130 +153,123 @@ function __useGestureNudgeState(dispatch: Dispatcher) {
 
 export function useNodeAction(node_id: string | undefined) {
   const instance = useCurrentEditor();
-  const dispatch = React.useCallback(
-    (action: Action) => instance.dispatch(action),
-    [instance]
-  );
-  const nodeActions = __useNodeActions(dispatch);
 
   return useMemo(() => {
     if (!node_id) return;
     return {
-      toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
-      toggleActive: () => nodeActions.toggleNodeActive(node_id),
-      toggleBold: () => nodeActions.toggleNodeBold(node_id),
+      toggleLocked: () => instance.toggleNodeLocked(node_id),
+      toggleActive: () => instance.toggleNodeActive(node_id),
+      toggleBold: () => instance.toggleNodeBold(node_id),
       component: (component_id: string) =>
-        nodeActions.changeNodeComponent(node_id, component_id),
+        instance.changeNodeComponent(node_id, component_id),
       text: (text?: tokens.StringValueExpression) =>
-        nodeActions.changeNodeText(node_id, text),
+        instance.changeNodeText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
         value: any
-      ) => nodeActions.changeNodeStyle(node_id, key, value),
+      ) => instance.changeNodeStyle(node_id, key, value),
       value: (key: string, value: any) =>
-        nodeActions.changeNodeProps(node_id, key, value),
+        instance.changeNodeProps(node_id, key, value),
       // attributes
-      userdata: (value: any) => nodeActions.changeNodeUserData(node_id, value),
-      name: (name: string) => nodeActions.changeNodeName(node_id, name),
-      active: (active: boolean) =>
-        nodeActions.changeNodeActive(node_id, active),
-      locked: (locked: boolean) =>
-        nodeActions.changeNodeLocked(node_id, locked),
+      userdata: (value: any) => instance.changeNodeUserData(node_id, value),
+      name: (name: string) => instance.changeNodeName(node_id, name),
+      active: (active: boolean) => instance.changeNodeActive(node_id, active),
+      locked: (locked: boolean) => instance.changeNodeLocked(node_id, locked),
       src: (src?: tokens.StringValueExpression) =>
-        nodeActions.changeNodeSrc(node_id, src),
+        instance.changeNodeSrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
-        nodeActions.changeNodeHref(node_id, href),
+        instance.changeNodeHref(node_id, href),
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
-        nodeActions.changeNodeTarget(node_id, target),
+        instance.changeNodeTarget(node_id, target),
 
       positioning: (value: grida.program.nodes.i.IPositioning) =>
-        nodeActions.changeNodePositioning(node_id, value),
+        instance.changeNodePositioning(node_id, value),
       positioningMode: (value: "absolute" | "relative") =>
-        nodeActions.changeNodePositioningMode(node_id, value),
+        instance.changeNodePositioningMode(node_id, value),
 
       //
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-      ) => nodeActions.changeNodeCornerRadius(node_id, value),
+      ) => instance.changeNodeCornerRadius(node_id, value),
       fill: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken
           | cg.PaintWithoutID
           | null
-      ) => nodeActions.changeNodeFill(node_id, value),
+      ) => instance.changeNodeFill(node_id, value),
       stroke: (
         value:
           | grida.program.nodes.i.props.SolidPaintToken
           | cg.PaintWithoutID
           | null
-      ) => nodeActions.changeNodeStroke(node_id, value),
+      ) => instance.changeNodeStroke(node_id, value),
       strokeWidth: (change: TChange<number>) =>
-        nodeActions.changeNodeStrokeWidth(node_id, change),
+        instance.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: cg.StrokeCap) =>
-        nodeActions.changeNodeStrokeCap(node_id, value),
-      fit: (value: cg.BoxFit) => nodeActions.changeNodeFit(node_id, value),
+        instance.changeNodeStrokeCap(node_id, value),
+      fit: (value: cg.BoxFit) => instance.changeNodeFit(node_id, value),
       // stylable
       opacity: (change: TChange<number>) =>
-        nodeActions.changeNodeOpacity(node_id, change),
+        instance.changeNodeOpacity(node_id, change),
       rotation: (change: TChange<number>) =>
-        nodeActions.changeNodeRotation(node_id, change),
+        instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
-        nodeActions.changeNodeSize(node_id, "width", value),
+        instance.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.LengthPercentage | "auto") =>
-        nodeActions.changeNodeSize(node_id, "height", value),
+        instance.changeNodeSize(node_id, "height", value),
 
       // text style
       fontFamily: (value: string) =>
-        nodeActions.changeTextNodeFontFamily(node_id, value),
+        instance.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: cg.NFontWeight) =>
-        nodeActions.changeTextNodeFontWeight(node_id, value),
+        instance.changeTextNodeFontWeight(node_id, value),
       fontSize: (change: TChange<number>) =>
-        nodeActions.changeTextNodeFontSize(node_id, change),
+        instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>
-        nodeActions.changeTextNodeTextAlign(node_id, value),
+        instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
-        nodeActions.changeTextNodeTextAlignVertical(node_id, value),
+        instance.changeTextNodeTextAlignVertical(node_id, value),
       lineHeight: (
         change: TChange<grida.program.nodes.TextNode["lineHeight"]>
-      ) => nodeActions.changeTextNodeLineHeight(node_id, change),
+      ) => instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
         change: TChange<grida.program.nodes.TextNode["letterSpacing"]>
-      ) => nodeActions.changeTextNodeLetterSpacing(node_id, change),
+      ) => instance.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
-        nodeActions.changeTextNodeMaxlength(node_id, value),
+        instance.changeTextNodeMaxlength(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
-        nodeActions.changeNodeBorder(node_id, value),
+        instance.changeNodeBorder(node_id, value),
 
       padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
-        nodeActions.changeContainerNodePadding(node_id, value),
+        instance.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
       boxShadow: (value?: cg.BoxShadow) =>
-        nodeActions.changeNodeBoxShadow(node_id, value),
+        instance.changeNodeBoxShadow(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
-        nodeActions.changeContainerNodeLayout(node_id, value),
+        instance.changeContainerNodeLayout(node_id, value),
       direction: (value: cg.Axis) =>
-        nodeActions.changeFlexContainerNodeDirection(node_id, value),
+        instance.changeFlexContainerNodeDirection(node_id, value),
       // flexWrap: (value?: string) =>
       //   changeNodeStyle(node_id, "flexWrap", value),
       mainAxisAlignment: (value: cg.MainAxisAlignment) =>
-        nodeActions.changeFlexContainerNodeMainAxisAlignment(node_id, value),
+        instance.changeFlexContainerNodeMainAxisAlignment(node_id, value),
       crossAxisAlignment: (value: cg.CrossAxisAlignment) =>
-        nodeActions.changeFlexContainerNodeCrossAxisAlignment(node_id, value),
+        instance.changeFlexContainerNodeCrossAxisAlignment(node_id, value),
       gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
-        nodeActions.changeFlexContainerNodeGap(node_id, value),
+        instance.changeFlexContainerNodeGap(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>
-        nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
+        instance.changeNodeStyle(node_id, "aspectRatio", value),
       cursor: (value: cg.SystemMouseCursor) =>
-        nodeActions.changeNodeMouseCursor(node_id, value),
+        instance.changeNodeMouseCursor(node_id, value),
     };
-  }, [node_id, nodeActions]);
+  }, [node_id, instance]);
 }
 
 const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
@@ -691,7 +298,7 @@ export function useSelection() {
     (action: Action) => instance.dispatch(action),
     [instance]
   );
-  const __actions = __useNodeActions(dispatch);
+
   const selection = state.selection;
 
   const nodes = useMemo(() => {
@@ -717,10 +324,10 @@ export function useSelection() {
   const name = useCallback(
     (value: string) => {
       selection.forEach((id) => {
-        __actions.changeNodeName(id, value);
+        instance.changeNodeName(id, value);
       });
     },
-    [selection, __actions]
+    [selection, instance.changeNodeName]
   );
 
   const copy = useCallback(() => {
@@ -733,136 +340,139 @@ export function useSelection() {
   const active = useCallback(
     (value: boolean) => {
       selection.forEach((id) => {
-        __actions.changeNodeActive(id, value);
+        instance.changeNodeActive(id, value);
       });
     },
-    [selection, __actions]
+    [selection, instance.changeNodeActive]
   );
 
   const locked = useCallback(
     (value: boolean) => {
       selection.forEach((id) => {
-        __actions.changeNodeLocked(id, value);
+        instance.changeNodeLocked(id, value);
       });
     },
-    [selection, __actions]
+    [selection, instance.changeNodeLocked]
   );
 
   const rotation = useCallback(
     (change: TChange<number>) => {
       mixedProperties.rotation?.ids.forEach((id) => {
-        __actions.changeNodeRotation(id, change);
+        instance.changeNodeRotation(id, change);
       });
     },
-    [mixedProperties.rotation?.ids, __actions]
+    [mixedProperties.rotation?.ids, instance.changeNodeRotation]
   );
 
   const opacity = useCallback(
     (change: TChange<number>) => {
       mixedProperties.opacity?.ids.forEach((id) => {
-        __actions.changeNodeOpacity(id, change);
+        instance.changeNodeOpacity(id, change);
       });
     },
-    [mixedProperties.opacity?.ids, __actions]
+    [mixedProperties.opacity?.ids, instance.changeNodeOpacity]
   );
 
   const width = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.width?.ids.forEach((id) => {
-        __actions.changeNodeSize(id, "width", value);
+        instance.changeNodeSize(id, "width", value);
       });
     },
-    [mixedProperties.width?.ids, __actions]
+    [mixedProperties.width?.ids, instance.changeNodeSize]
   );
 
   const height = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.height?.ids.forEach((id) => {
-        __actions.changeNodeSize(id, "height", value);
+        instance.changeNodeSize(id, "height", value);
       });
     },
-    [mixedProperties.height?.ids, __actions]
+    [mixedProperties.height?.ids, instance.changeNodeSize]
   );
 
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
       mixedProperties.position?.ids.forEach((id) => {
-        __actions.changeNodePositioningMode(id, position);
+        instance.changeNodePositioningMode(id, position);
       });
     },
-    [mixedProperties.position?.ids, __actions]
+    [mixedProperties.position?.ids, instance.changeNodePositioningMode]
   );
 
   const fontFamily = useCallback(
     (value: string) => {
       mixedProperties.fontFamily?.ids.forEach((id) => {
-        __actions.changeTextNodeFontFamily(id, value);
+        instance.changeTextNodeFontFamily(id, value);
       });
     },
-    [mixedProperties.fontFamily?.ids, __actions]
+    [mixedProperties.fontFamily?.ids, instance.changeTextNodeFontFamily]
   );
 
   const fontWeight = useCallback(
     (value: cg.NFontWeight) => {
       mixedProperties.fontWeight?.ids.forEach((id) => {
-        __actions.changeTextNodeFontWeight(id, value);
+        instance.changeTextNodeFontWeight(id, value);
       });
     },
-    [mixedProperties.fontWeight?.ids, __actions]
+    [mixedProperties.fontWeight?.ids, instance.changeTextNodeFontWeight]
   );
 
   const fontSize = useCallback(
     (change: TChange<number>) => {
       mixedProperties.fontSize?.ids.forEach((id) => {
-        __actions.changeTextNodeFontSize(id, change);
+        instance.changeTextNodeFontSize(id, change);
       });
     },
-    [mixedProperties.fontSize?.ids, __actions]
+    [mixedProperties.fontSize?.ids, instance.changeTextNodeFontSize]
   );
 
   const lineHeight = useCallback(
     (change: TChange<grida.program.nodes.TextNode["lineHeight"]>) => {
       mixedProperties.lineHeight?.ids.forEach((id) => {
-        __actions.changeTextNodeLineHeight(id, change);
+        instance.changeTextNodeLineHeight(id, change);
       });
     },
-    [mixedProperties.lineHeight?.ids, __actions]
+    [mixedProperties.lineHeight?.ids, instance.changeTextNodeLineHeight]
   );
 
   const letterSpacing = useCallback(
     (change: TChange<grida.program.nodes.TextNode["letterSpacing"]>) => {
       mixedProperties.letterSpacing?.ids.forEach((id) => {
-        __actions.changeTextNodeLetterSpacing(id, change);
+        instance.changeTextNodeLetterSpacing(id, change);
       });
     },
-    [mixedProperties.letterSpacing?.ids, __actions]
+    [mixedProperties.letterSpacing?.ids, instance.changeTextNodeLetterSpacing]
   );
 
   const textAlign = useCallback(
     (value: cg.TextAlign) => {
       mixedProperties.textAlign?.ids.forEach((id) => {
-        __actions.changeTextNodeTextAlign(id, value);
+        instance.changeTextNodeTextAlign(id, value);
       });
     },
-    [mixedProperties.textAlign?.ids, __actions]
+    [mixedProperties.textAlign?.ids, instance.changeTextNodeTextAlign]
   );
 
   const textAlignVertical = useCallback(
     (value: cg.TextAlignVertical) => {
       mixedProperties.textAlignVertical?.ids.forEach((id) => {
-        __actions.changeTextNodeTextAlignVertical(id, value);
+        instance.changeTextNodeTextAlignVertical(id, value);
       });
     },
-    [mixedProperties.textAlignVertical?.ids, __actions]
+    [
+      mixedProperties.textAlignVertical?.ids,
+      instance.changeTextNodeTextAlignVertical,
+    ]
   );
 
   const fit = useCallback(
     (value: cg.BoxFit) => {
       mixedProperties.fit?.ids.forEach((id) => {
-        __actions.changeNodeFit(id, value);
+        instance.changeNodeFit(id, value);
       });
     },
-    [mixedProperties.fit?.ids, __actions]
+    [mixedProperties.fit?.ids, instance.changeNodeFit]
   );
 
   const fill = useCallback(
@@ -873,10 +483,10 @@ export function useSelection() {
         | null
     ) => {
       mixedProperties.fill?.ids.forEach((id) => {
-        __actions.changeNodeFill(id, value);
+        instance.changeNodeFill(id, value);
       });
     },
-    [mixedProperties.fill?.ids, __actions]
+    [mixedProperties.fill?.ids, instance.changeNodeFill]
   );
 
   const stroke = useCallback(
@@ -887,82 +497,88 @@ export function useSelection() {
         | null
     ) => {
       mixedProperties.stroke?.ids.forEach((id) => {
-        __actions.changeNodeStroke(id, value);
+        instance.changeNodeStroke(id, value);
       });
     },
-    [mixedProperties.stroke?.ids, __actions]
+    [mixedProperties.stroke?.ids, instance.changeNodeStroke]
   );
 
   const strokeWidth = useCallback(
     (change: TChange<number>) => {
       mixedProperties.strokeWidth?.ids.forEach((id) => {
-        __actions.changeNodeStrokeWidth(id, change);
+        instance.changeNodeStrokeWidth(id, change);
       });
     },
-    [mixedProperties.strokeWidth?.ids, __actions]
+    [mixedProperties.strokeWidth?.ids, instance.changeNodeStrokeWidth]
   );
 
   const strokeCap = useCallback(
     (value: cg.StrokeCap) => {
       mixedProperties.strokeCap?.ids.forEach((id) => {
-        __actions.changeNodeStrokeCap(id, value);
+        instance.changeNodeStrokeCap(id, value);
       });
     },
-    [mixedProperties.strokeCap?.ids, __actions]
+    [mixedProperties.strokeCap?.ids, instance.changeNodeStrokeCap]
   );
 
   const layout = useCallback(
     (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
       mixedProperties.layout?.ids.forEach((id) => {
-        __actions.changeContainerNodeLayout(id, value);
+        instance.changeContainerNodeLayout(id, value);
       });
     },
-    [mixedProperties.layout?.ids, __actions]
+    [mixedProperties.layout?.ids, instance.changeContainerNodeLayout]
   );
 
   const direction = useCallback(
     (value: cg.Axis) => {
       mixedProperties.direction?.ids.forEach((id) => {
-        __actions.changeFlexContainerNodeDirection(id, value);
+        instance.changeFlexContainerNodeDirection(id, value);
       });
     },
-    [mixedProperties.direction?.ids, __actions]
+    [mixedProperties.direction?.ids, instance.changeFlexContainerNodeDirection]
   );
 
   const mainAxisAlignment = useCallback(
     (value: cg.MainAxisAlignment) => {
       mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
-        __actions.changeFlexContainerNodeMainAxisAlignment(id, value);
+        instance.changeFlexContainerNodeMainAxisAlignment(id, value);
       });
     },
-    [mixedProperties.mainAxisAlignment?.ids, __actions]
+    [
+      mixedProperties.mainAxisAlignment?.ids,
+      instance.changeFlexContainerNodeMainAxisAlignment,
+    ]
   );
 
   const crossAxisAlignment = useCallback(
     (value: cg.CrossAxisAlignment) => {
       mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
-        __actions.changeFlexContainerNodeCrossAxisAlignment(id, value);
+        instance.changeFlexContainerNodeCrossAxisAlignment(id, value);
       });
     },
-    [mixedProperties.crossAxisAlignment?.ids, __actions]
+    [
+      mixedProperties.crossAxisAlignment?.ids,
+      instance.changeFlexContainerNodeCrossAxisAlignment,
+    ]
   );
 
   const cornerRadius = useCallback(
     (value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]) => {
       mixedProperties.cornerRadius?.ids.forEach((id) => {
-        __actions.changeNodeCornerRadius(id, value);
+        instance.changeNodeCornerRadius(id, value);
       });
     },
-    [mixedProperties.cornerRadius?.ids, __actions]
+    [mixedProperties.cornerRadius?.ids, instance.changeNodeCornerRadius]
   );
 
   const cursor = useCallback(
     (value: cg.SystemMouseCursor) => {
       mixedProperties.cursor?.ids.forEach((id) => {
-        __actions.changeNodeMouseCursor(id, value);
+        instance.changeNodeMouseCursor(id, value);
       });
     },
-    [mixedProperties.cursor?.ids, __actions]
+    [mixedProperties.cursor?.ids, instance.changeNodeMouseCursor]
   );
 
   const actions = useMemo(
@@ -1044,11 +660,7 @@ export function useSelectionPaints() {
     document: state.document,
     document_ctx: state.document_ctx,
   }));
-  const dispatch = React.useCallback(
-    (action: Action) => instance.dispatch(action),
-    [instance]
-  );
-  const __actions = __useNodeActions(dispatch);
+
   const selection = state.selection;
 
   const ids = useMemo(
@@ -1101,10 +713,10 @@ export function useSelectionPaints() {
     ) => {
       const group = paints[index];
       group.ids.forEach((id) => {
-        __actions.changeNodeFill(id, value);
+        instance.changeNodeFill(id, value);
       });
     },
-    [paints, __actions]
+    [paints, instance.changeNodeFill]
   );
 
   return useMemo(() => {
@@ -1333,22 +945,31 @@ function animateTransformTo(
   requestAnimationFrame(step);
 }
 
-export function useTransform() {
+interface UseCameraActions {
+  scale: (
+    factor: number | cmath.Vector2,
+    origin: cmath.Vector2 | "center"
+  ) => void;
+  fit: (
+    selector: grida.program.document.Selector,
+    options?: {
+      margin?: number | [number, number, number, number];
+      animate?: boolean;
+    }
+  ) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+}
+
+export function useCameraActions(): UseCameraActions {
   const instance = useCurrentEditor();
-  const scene = useCurrentScene();
-  const transform = useEditorState(instance, (state) => state.transform);
-  const dispatch = useCallback(
-    (action: Action) => {
-      instance.dispatch(action);
-    },
-    [instance]
-  );
 
   const scale = useCallback(
     (
       factor: number | cmath.Vector2,
       origin: cmath.Vector2 | "center" = "center"
     ) => {
+      const { transform } = instance.state;
       const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
       const _scale = transform[0][0];
       let ox, oy: number;
@@ -1388,12 +1009,9 @@ export function useTransform() {
         [transform[1][0], sy, newy],
       ];
 
-      dispatch({
-        type: "transform",
-        transform: next,
-      });
+      instance.transform(next);
     },
-    [dispatch, transform]
+    [instance]
   );
 
   /**
@@ -1410,11 +1028,8 @@ export function useTransform() {
         animate: false,
       }
     ) => {
-      const ids = editor.dq.querySelector(
-        scene.document_ctx,
-        scene.selection,
-        selector
-      );
+      const { document_ctx, selection, transform } = instance.state;
+      const ids = editor.dq.querySelector(document_ctx, selection, selector);
 
       const cdom = new domapi.CanvasDOM(transform);
 
@@ -1439,46 +1054,44 @@ export function useTransform() {
 
       if (options.animate) {
         animateTransformTo(transform, next_transform, (t) => {
-          dispatch({
-            type: "transform",
-            transform: t,
-          });
+          instance.transform(t);
         });
       } else {
-        dispatch({
-          type: "transform",
-          transform: next_transform,
-        });
+        instance.transform(next_transform);
       }
     },
-    [dispatch, transform, scene.document_ctx, scene.selection, scene.children]
+    [instance]
   );
 
   const zoomIn = useCallback(() => {
+    const { transform } = instance.state;
     const prevscale = transform[0][0];
     const nextscale = cmath.quantize(prevscale * 2, 0.01);
 
     scale(nextscale);
     //
-  }, [scale, transform]);
+  }, [scale]);
 
   const zoomOut = useCallback(() => {
+    const { transform } = instance.state;
     const prevscale = transform[0][0];
     const nextscale = cmath.quantize(prevscale / 2, 0.01);
 
     scale(nextscale);
     //
-  }, [scale, transform]);
+  }, [scale]);
 
-  const setTransform = useCallback(
-    (transform: cmath.Transform) => {
-      dispatch({
-        type: "transform",
-        transform,
-      });
-    },
-    [dispatch]
-  );
+  return {
+    scale,
+    fit,
+    zoomIn,
+    zoomOut,
+  };
+}
+
+export function useTransform() {
+  const editor = useCurrentEditor();
+  const transform = useEditorState(editor, (state) => state.transform);
 
   return useMemo(() => {
     const scaleX = transform[0][0];
@@ -1492,13 +1105,8 @@ export function useTransform() {
         transformOrigin: "0 0",
         transform: matrix,
       } as React.CSSProperties,
-      setTransform,
-      scale,
-      fit,
-      zoomIn,
-      zoomOut,
     };
-  }, [transform, setTransform, scale, fit, zoomIn, zoomOut]);
+  }, [transform]);
 }
 
 export function useEventTargetCSSCursor() {
@@ -2627,6 +2235,21 @@ export type NodeWithMeta = grida.program.nodes.UnknwonNode & {
   };
 };
 
+export function useNodeState<Selected>(
+  node_id: string,
+  selector: (state: grida.program.nodes.UnknwonNode) => Selected
+) {
+  const instance = useCurrentEditor();
+  return useEditorState(instance, (state) => {
+    const node = state.document.nodes[node_id];
+    return selector(node as grida.program.nodes.UnknwonNode);
+  });
+}
+
+/**
+ * @deprecated use {@link useNodeState} instead
+ * @returns
+ */
 export function useNode(node_id: string): NodeWithMeta {
   assert(node_id, "node_id is required");
   // const { state } = useDocument();
@@ -2710,25 +2333,24 @@ export function useNode(node_id: string): NodeWithMeta {
   };
 }
 
-/**
- * @param node_id self or child node id
- */
-export function useTopNode(node_id: string) {
-  // const { state } = useDocument();
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    document_ctx: state.document_ctx,
-  }));
-  const top_id = editor.dq.getTopId(state.document_ctx, node_id)!;
-  return useNode(top_id);
+export function useNodeWithoutTransform(node_id: string) {
+  //
 }
 
 export function useComputedNode(
   node_id: string
 ): grida.program.nodes.UnknwonComputedNode {
-  const node = useNode(node_id);
-  const { active, style, component_id, props, text, html, src, href, fill } =
-    node;
+  const { props, text, html, src, href, fill } = useNodeState(
+    node_id,
+    (node) => ({
+      props: node.props,
+      text: node.text,
+      html: node.html,
+      src: node.src,
+      href: node.href,
+      fill: node.fill,
+    })
+  );
 
   const computed = useComputed(
     {

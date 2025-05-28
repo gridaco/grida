@@ -9,6 +9,7 @@ import {
 } from "../../provider";
 import { useViewport } from "../context";
 import cmath from "@grida/cmath";
+import { useCurrentEditor } from "@/grida-canvas-react";
 
 const EDGE_SCROLLING_THRESHOLD = 16;
 
@@ -24,9 +25,10 @@ export function EdgeScrollingEffect(
 }
 
 export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
+  const instance = useCurrentEditor();
   const { dragging } = useEventTarget();
   const { tool } = useToolState();
-  const { transform, setTransform } = useTransform();
+  const { transform } = useTransform();
   const pointer = usePointerState();
   const viewport = useViewport();
 
@@ -58,7 +60,7 @@ export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
 
       const next = cmath.transform.translate(transform, delta);
 
-      setTransform(next);
+      instance.transform(next);
       rafId = requestAnimationFrame(loop);
     };
 
