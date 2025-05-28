@@ -1,10 +1,6 @@
 import { produce, type Draft } from "immer";
 
-import type {
-  SurfaceAction,
-  EditorSurface_StartGesture,
-  TChange,
-} from "../action";
+import type { SurfaceAction, EditorSurface_StartGesture } from "../action";
 import { editor } from "@/grida-canvas";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
@@ -200,7 +196,7 @@ function __self_set_brush(
 
 function __self_set_brush_size(
   draft: editor.state.IEditorState,
-  size: TChange<number>
+  size: editor.api.NumberChange
 ) {
   if (!(draft.tool.type === "brush" || draft.tool.type === "eraser")) return;
   switch (size.type) {
@@ -219,7 +215,7 @@ function __self_set_brush_size(
 
 function __self_set_brush_opacity(
   draft: editor.state.IEditorState,
-  opacity: TChange<number>
+  opacity: editor.api.NumberChange
 ) {
   if (draft.tool.type !== "brush") return;
   switch (opacity.type) {

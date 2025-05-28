@@ -4,10 +4,9 @@ import reducer from "./reducers";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
 import nid from "./reducers/tools/id";
-import type { TChange } from "./action";
 import type { tokens } from "@grida/tokens";
-import cmath from "@grida/cmath";
 import type { BitmapEditorBrush } from "@grida/bitmap";
+import cmath from "@grida/cmath";
 
 export class Editor
   implements
@@ -656,7 +655,7 @@ export class Editor
       target,
     });
   }
-  changeNodeOpacity(node_id: string, opacity: TChange<number>) {
+  changeNodeOpacity(node_id: string, opacity: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/opacity",
@@ -665,7 +664,7 @@ export class Editor
       });
     });
   }
-  changeNodeRotation(node_id: string, rotation: TChange<number>) {
+  changeNodeRotation(node_id: string, rotation: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/rotation",
@@ -715,7 +714,7 @@ export class Editor
       });
     });
   }
-  changeNodeStrokeWidth(node_id: string, strokeWidth: TChange<number>) {
+  changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/stroke-width",
@@ -773,7 +772,7 @@ export class Editor
       });
     });
   }
-  changeTextNodeFontSize(node_id: string, fontSize: TChange<number>) {
+  changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/fontSize",
@@ -805,7 +804,7 @@ export class Editor
   }
   changeTextNodeLineHeight(
     node_id: string,
-    lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
+    lineHeight: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
@@ -817,7 +816,9 @@ export class Editor
   }
   changeTextNodeLetterSpacing(
     node_id: string,
-    letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+    letterSpacing: editor.api.TChange<
+      grida.program.nodes.TextNode["letterSpacing"]
+    >
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
@@ -960,13 +961,13 @@ export class Editor
       brush,
     });
   }
-  changeBrushSize(size: TChange<number>) {
+  changeBrushSize(size: editor.api.NumberChange) {
     this.dispatch({
       type: "surface/brush/size",
       size,
     });
   }
-  changeBrushOpacity(opacity: TChange<number>) {
+  changeBrushOpacity(opacity: editor.api.NumberChange) {
     this.dispatch({
       type: "surface/brush/opacity",
       opacity,

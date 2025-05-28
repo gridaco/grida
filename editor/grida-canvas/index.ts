@@ -1,4 +1,4 @@
-import type { Action, EditorAction, TChange } from "@/grida-canvas/action";
+import type { Action, EditorAction } from "@/grida-canvas/action";
 import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
 import type cg from "@grida/cg";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
@@ -1714,6 +1714,37 @@ export namespace editor.a11y {
 }
 
 export namespace editor.api {
+  export class EditorConsumerVerboseError extends Error {
+    context: any;
+    constructor(message: string, context: any) {
+      super(message); // Pass message to the parent Error class
+      this.name = this.constructor.name; // Set the error name
+      this.context = context; // Attach the context object
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, this.constructor);
+      }
+    }
+
+    toString(): string {
+      return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
+    }
+  }
+
+  export type TChange<T> =
+    | {
+        type: "set";
+        value: T;
+      }
+    | {
+        type: "delta";
+        value: NonNullable<T>;
+      };
+
+  /**
+   * Numeric value change payload.
+   */
+  export type NumberChange = TChange<number>;
+
   export type NudgeUXConfig = {
     /**
      * when gesture is true, it will set the gesture state to trigger the surface guide rendering.
@@ -1806,12 +1837,18 @@ export namespace editor.api {
     ) => void;
     changeNodeStrokeWidth: (
       node_id: NodeID,
-      strokeWidth: TChange<number>
+      strokeWidth: editor.api.NumberChange
     ) => void;
     changeNodeStrokeCap: (node_id: NodeID, strokeCap: cg.StrokeCap) => void;
     changeNodeFit: (node_id: NodeID, fit: cg.BoxFit) => void;
-    changeNodeOpacity: (node_id: NodeID, opacity: TChange<number>) => void;
-    changeNodeRotation: (node_id: NodeID, rotation: TChange<number>) => void;
+    changeNodeOpacity: (
+      node_id: NodeID,
+      opacity: editor.api.NumberChange
+    ) => void;
+    changeNodeRotation: (
+      node_id: NodeID,
+      rotation: editor.api.NumberChange
+    ) => void;
     changeTextNodeFontFamily: (node_id: NodeID, fontFamily: string) => void;
     changeTextNodeFontWeight: (
       node_id: NodeID,
@@ -1819,7 +1856,7 @@ export namespace editor.api {
     ) => void;
     changeTextNodeFontSize: (
       node_id: NodeID,
-      fontSize: TChange<number>
+      fontSize: editor.api.NumberChange
     ) => void;
     changeTextNodeTextAlign: (node_id: NodeID, textAlign: cg.TextAlign) => void;
     changeTextNodeTextAlignVertical: (
@@ -1867,8 +1904,8 @@ export namespace editor.api {
 
   export interface IBrushToolActions {
     changeBrush(brush: BitmapEditorBrush): void;
-    changeBrushSize(size: TChange<number>): void;
-    changeBrushOpacity(opacity: TChange<number>): void;
+    changeBrushSize(size: editor.api.NumberChange): void;
+    changeBrushOpacity(opacity: editor.api.NumberChange): void;
   }
 
   export interface ICameraActions {

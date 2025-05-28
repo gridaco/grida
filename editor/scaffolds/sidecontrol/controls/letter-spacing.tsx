@@ -1,4 +1,5 @@
-import { TChange, TMixed } from "./utils/types";
+import type { TMixed } from "./utils/types";
+import type { editor } from "@/grida-canvas";
 import { PropertyNumber } from "../ui";
 
 export function LetterSpacingControl({
@@ -6,7 +7,7 @@ export function LetterSpacingControl({
   onValueChange,
 }: {
   value?: TMixed<number>;
-  onValueChange?: (change: TChange<number>) => void;
+  onValueChange?: (change: editor.api.NumberChange) => void;
 }) {
   return (
     <PropertyNumber

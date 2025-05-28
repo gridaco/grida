@@ -23,7 +23,8 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
 import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
-import { useCurrentEditor, useEditorState, useRecorder } from "../use-editor";
+import { useCurrentEditor, useEditorState } from "../use-editor";
+import { useRecorder } from "../plugins/use-recorder";
 import { saveAs } from "file-saver";
 
 export function DevtoolsPanel() {

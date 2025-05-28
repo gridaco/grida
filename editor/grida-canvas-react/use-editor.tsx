@@ -2,7 +2,7 @@ import * as React from "react";
 import { Editor } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
-import { EditorRecorder } from "@/grida-canvas/plugins/recorder";
+
 import type { editor } from "@/grida-canvas";
 import deepEqual from "fast-deep-equal/es6/react.js";
 
@@ -43,31 +43,5 @@ export function useEditorState<Selected>(
     editor.getSnapshot.bind(editor), // for SSR fallback, can be same as getSnapshot
     selector,
     isEqual
-  );
-}
-
-export function useRecorder(editor: Editor) {
-  const [recorder] = React.useState(new EditorRecorder(editor));
-
-  const state = useSyncExternalStoreWithSelector(
-    recorder.subscribe.bind(recorder),
-    recorder.snapshot.bind(recorder),
-    recorder.snapshot.bind(recorder),
-    (s) => s,
-    deepEqual
-  );
-
-  return React.useMemo(
-    () => ({
-      status: state.status,
-      nframes: state.nframes,
-      start: () => recorder.start(),
-      stop: () => recorder.stop(),
-      clear: () => recorder.clear(),
-      replay: () => recorder.play(),
-      exit: () => recorder.exit(),
-      dumps: () => recorder.dumps(),
-    }),
-    [state, recorder]
   );
 }

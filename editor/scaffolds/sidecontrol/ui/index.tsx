@@ -11,10 +11,10 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
-import { TChange } from "@/grida-canvas/action";
 import { cn } from "@/components/lib/utils";
 import { TMixed } from "../controls/utils/types";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
+import type { editor } from "@/grida-canvas";
 
 export function PropertyLine({
   children,
@@ -184,7 +184,7 @@ type NumericPropertyControlProps = Omit<
 } & (
     | {
         mode?: "auto";
-        onValueChange?: (change: TChange<number>) => void;
+        onValueChange?: (change: editor.api.NumberChange) => void;
       }
     | {
         mode?: "fixed";
@@ -222,13 +222,13 @@ export function PropertyNumber({
         switch (mode) {
           case "auto":
             if (e.key === "ArrowUp") {
-              (onValueChange as (change: TChange<number>) => void)?.({
+              (onValueChange as (change: editor.api.NumberChange) => void)?.({
                 type: "delta",
                 value: step * multiplier,
               });
               e.preventDefault();
             } else if (e.key === "ArrowDown") {
-              (onValueChange as (change: TChange<number>) => void)?.({
+              (onValueChange as (change: editor.api.NumberChange) => void)?.({
                 type: "delta",
                 value: -step * multiplier,
               });
@@ -244,7 +244,7 @@ export function PropertyNumber({
         const value = type === "integer" ? parseInt(txt) : parseFloat(txt) || 0;
         switch (mode) {
           case "auto":
-            (onValueChange as (change: TChange<number>) => void)?.({
+            (onValueChange as (change: editor.api.NumberChange) => void)?.({
               type: "set",
               value,
             });

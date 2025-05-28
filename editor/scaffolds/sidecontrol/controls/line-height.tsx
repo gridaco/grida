@@ -1,5 +1,6 @@
 import { WorkbenchUI } from "@/components/workbench";
-import type { TChange, TMixed } from "./utils/types";
+import type { TMixed } from "./utils/types";
+import type { editor } from "@/grida-canvas";
 import { PropertyNumber } from "../ui";
 
 export function LineHeightControl({
@@ -7,7 +8,7 @@ export function LineHeightControl({
   onValueChange,
 }: {
   value?: TMixed<number>;
-  onValueChange?: (change: TChange<number>) => void;
+  onValueChange?: (change: editor.api.NumberChange) => void;
 }) {
   return (
     <PropertyNumber

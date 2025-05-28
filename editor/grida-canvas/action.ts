@@ -505,12 +505,12 @@ export interface EditorSurface_ChangeBrushAction {
 
 export interface EditorSurface_ChangeBrushSizeAction {
   type: "surface/brush/size";
-  size: TChange<number>;
+  size: editor.api.NumberChange;
 }
 
 export interface EditorSurface_ChangeBrushOpacityAction {
   type: "surface/brush/opacity";
-  opacity: TChange<number>;
+  opacity: editor.api.NumberChange;
 }
 
 export interface EditorSurface_DeleteGuideAction {
@@ -605,7 +605,7 @@ interface INodeChangeTextAction extends INodeID {
 }
 
 interface INodeChangeOpacityAction extends INodeID {
-  opacity: TChange<number>;
+  opacity: editor.api.NumberChange;
 }
 
 interface INodeChangeSizeAction extends INodeID {
@@ -613,18 +613,8 @@ interface INodeChangeSizeAction extends INodeID {
   value: grida.program.css.LengthPercentage | "auto";
 }
 
-export type TChange<T> =
-  | {
-      type: "set";
-      value: T;
-    }
-  | {
-      type: "delta";
-      value: NonNullable<T>;
-    };
-
 interface INodeChangeRotationAction extends INodeID {
-  rotation: TChange<grida.program.nodes.i.IRotation["rotation"]>;
+  rotation: editor.api.NumberChange;
 }
 
 interface INodeChangeCornerRadiusAction extends INodeID {
@@ -640,7 +630,7 @@ interface INodeChangeStrokeAction extends INodeID {
 }
 
 interface INodeChangeStrokeWidthAction extends INodeID {
-  strokeWidth: TChange<number>;
+  strokeWidth: editor.api.NumberChange;
 }
 
 interface INodeChangeStrokeCapAction extends INodeID {
@@ -663,7 +653,7 @@ interface ITextNodeChangeFontWeightAction extends INodeID {
   fontWeight: cg.NFontWeight;
 }
 interface ITextNodeChangeFontSizeAction extends INodeID {
-  fontSize: TChange<number>;
+  fontSize: editor.api.NumberChange;
 }
 interface ITextNodeChangeTextAlignAction extends INodeID {
   textAlign: cg.TextAlign;
@@ -674,11 +664,13 @@ interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
 }
 
 interface ITextNodeChangeLineHeightAction extends INodeID {
-  lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>;
+  lineHeight: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>;
 }
 
 interface ITextNodeChangeLetterSpacingAction extends INodeID {
-  letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>;
+  letterSpacing: editor.api.TChange<
+    grida.program.nodes.TextNode["letterSpacing"]
+  >;
 }
 
 interface ITextNodeChangeMaxlengthAction extends INodeID {

@@ -2,9 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { editor } from "@/grida-canvas";
-import type { tokens } from "@grida/tokens";
 import grida from "@grida/schema";
 import iosvg from "@grida/io-svg";
+import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
 import { useComputed } from "./nodes/use-computed";
 import {
@@ -17,7 +17,6 @@ import cmath from "@grida/cmath";
 import type {
   Action,
   TCanvasEventTargetDragGestureState,
-  TChange,
 } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
@@ -26,22 +25,6 @@ import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/support
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
-
-class EditorConsumerError extends Error {
-  context: any;
-  constructor(message: string, context: any) {
-    super(message); // Pass message to the parent Error class
-    this.name = this.constructor.name; // Set the error name
-    this.context = context; // Attach the context object
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
-    }
-  }
-
-  toString(): string {
-    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
-  }
-}
 
 function throttle<T extends (...args: any[]) => void>(
   func: T,
@@ -202,15 +185,15 @@ export function useNodeActions(node_id: string | undefined) {
           | cg.PaintWithoutID
           | null
       ) => instance.changeNodeStroke(node_id, value),
-      strokeWidth: (change: TChange<number>) =>
+      strokeWidth: (change: editor.api.NumberChange) =>
         instance.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: cg.StrokeCap) =>
         instance.changeNodeStrokeCap(node_id, value),
       fit: (value: cg.BoxFit) => instance.changeNodeFit(node_id, value),
       // stylable
-      opacity: (change: TChange<number>) =>
+      opacity: (change: editor.api.NumberChange) =>
         instance.changeNodeOpacity(node_id, change),
-      rotation: (change: TChange<number>) =>
+      rotation: (change: editor.api.NumberChange) =>
         instance.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.LengthPercentage | "auto") =>
         instance.changeNodeSize(node_id, "width", value),
@@ -222,17 +205,19 @@ export function useNodeActions(node_id: string | undefined) {
         instance.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: cg.NFontWeight) =>
         instance.changeTextNodeFontWeight(node_id, value),
-      fontSize: (change: TChange<number>) =>
+      fontSize: (change: editor.api.NumberChange) =>
         instance.changeTextNodeFontSize(node_id, change),
       textAlign: (value: cg.TextAlign) =>
         instance.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: cg.TextAlignVertical) =>
         instance.changeTextNodeTextAlignVertical(node_id, value),
       lineHeight: (
-        change: TChange<grida.program.nodes.TextNode["lineHeight"]>
+        change: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
       ) => instance.changeTextNodeLineHeight(node_id, change),
       letterSpacing: (
-        change: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+        change: editor.api.TChange<
+          grida.program.nodes.TextNode["letterSpacing"]
+        >
       ) => instance.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         instance.changeTextNodeMaxlength(node_id, value),
@@ -271,11 +256,9 @@ export function useNodeActions(node_id: string | undefined) {
   }, [node_id, instance]);
 }
 
-const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
-  key,
-  a,
-  b
-): boolean => {
+const compareNodeProperty: PropertyCompareFn<
+  grida.program.nodes.UnknwonNode
+> = (key, a, b): boolean => {
   switch (key) {
     case "fill":
     case "stroke":
@@ -313,7 +296,7 @@ export function useCurrentSelection() {
         {
           idKey: "id",
           ignoredKey: ["id", "type", "userdata"],
-          compare: compareProperty,
+          compare: compareNodeProperty,
           mixed: grida.mixed,
         }
       ),
@@ -355,7 +338,7 @@ export function useCurrentSelection() {
   );
 
   const rotation = useCallback(
-    (change: TChange<number>) => {
+    (change: editor.api.NumberChange) => {
       mixedProperties.rotation?.ids.forEach((id) => {
         instance.changeNodeRotation(id, change);
       });
@@ -364,7 +347,7 @@ export function useCurrentSelection() {
   );
 
   const opacity = useCallback(
-    (change: TChange<number>) => {
+    (change: editor.api.NumberChange) => {
       mixedProperties.opacity?.ids.forEach((id) => {
         instance.changeNodeOpacity(id, change);
       });
@@ -418,7 +401,7 @@ export function useCurrentSelection() {
   );
 
   const fontSize = useCallback(
-    (change: TChange<number>) => {
+    (change: editor.api.NumberChange) => {
       mixedProperties.fontSize?.ids.forEach((id) => {
         instance.changeTextNodeFontSize(id, change);
       });
@@ -427,7 +410,9 @@ export function useCurrentSelection() {
   );
 
   const lineHeight = useCallback(
-    (change: TChange<grida.program.nodes.TextNode["lineHeight"]>) => {
+    (
+      change: editor.api.TChange<grida.program.nodes.TextNode["lineHeight"]>
+    ) => {
       mixedProperties.lineHeight?.ids.forEach((id) => {
         instance.changeTextNodeLineHeight(id, change);
       });
@@ -436,7 +421,9 @@ export function useCurrentSelection() {
   );
 
   const letterSpacing = useCallback(
-    (change: TChange<grida.program.nodes.TextNode["letterSpacing"]>) => {
+    (
+      change: editor.api.TChange<grida.program.nodes.TextNode["letterSpacing"]>
+    ) => {
       mixedProperties.letterSpacing?.ids.forEach((id) => {
         instance.changeTextNodeLetterSpacing(id, change);
       });
@@ -503,7 +490,7 @@ export function useCurrentSelection() {
   );
 
   const strokeWidth = useCallback(
-    (change: TChange<number>) => {
+    (change: editor.api.NumberChange) => {
       mixedProperties.strokeWidth?.ids.forEach((id) => {
         instance.changeNodeStrokeWidth(id, change);
       });
@@ -692,7 +679,7 @@ export function useSelectionPaints() {
               // "stroke"
             ].includes(key);
           },
-          compare: compareProperty,
+          compare: compareNodeProperty,
           mixed: grida.mixed,
         }
       ),
@@ -2228,7 +2215,7 @@ export function useNode(node_id: string): NodeWithMeta {
   } else {
     assert(
       templates,
-      new EditorConsumerError(
+      new editor.api.EditorConsumerVerboseError(
         `node '${node_id}' is not found under "nodes", but templates are not provided for additional lookup`,
         { state }
       )
