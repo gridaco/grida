@@ -4,7 +4,6 @@ export {
   useDocumentState,
   useNode,
   useBrushState,
-  useEventTargetState,
   useComputedNode,
   useNodeActions,
   useTransformState,

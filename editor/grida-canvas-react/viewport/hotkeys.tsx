@@ -1,10 +1,5 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import {
-  useEventTargetState,
-  useCurrentSelection,
-  useToolState,
-  useA11yActions,
-} from "../provider";
+import { useCurrentSelection, useToolState, useA11yActions } from "../provider";
 import { toast } from "sonner";
 import type cg from "@grida/cg";
 import { useEffect, useRef } from "react";

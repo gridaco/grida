@@ -1942,6 +1942,15 @@ export namespace editor.api {
   }
 
   export interface IEventTargetActions {
+    hoverNode(node_id: string, event: "enter" | "leave"): void;
+    hoverEnterNode(node_id: string): void;
+    hoverLeaveNode(node_id: string): void;
+    hoverVertex(
+      node_id: string,
+      vertex: number,
+      event: "enter" | "leave"
+    ): void;
+
     startGuideGesture(axis: cmath.Axis, idx: number | -1): void;
     startScaleGesture(
       selection: string | string[],
@@ -1951,6 +1960,12 @@ export namespace editor.api {
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
     startCornerRadiusGesture(selection: string): void;
     startRotateGesture(selection: string): void;
+    startTranslateVertexGesture(node_id: string, vertex: number): void;
+    startCurveGesture(
+      node_id: string,
+      segment: number,
+      control: "ta" | "tb"
+    ): void;
 
     pointerDown(event: PointerEvent): void;
     pointerUp(event: PointerEvent): void;
@@ -1980,9 +1995,6 @@ export namespace editor.api {
     tryToggleContentEditMode(): void;
     tryEnterContentEditMode(): void;
     //
-    hoverNode(node_id: string, event: "enter" | "leave"): void;
-    hoverEnterNode(node_id: string): void;
-    hoverLeaveNode(node_id: string): void;
 
     //
     select(...selectors: grida.program.document.Selector[]): void;

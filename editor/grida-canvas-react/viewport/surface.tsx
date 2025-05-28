@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useEventTargetState } from "@/grida-canvas-react";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useBrushState,
@@ -9,6 +8,7 @@ import {
   useCurrentSceneState,
   useDocumentState,
   useEventTargetCSSCursor,
+  useGestureState,
   useMultipleSelectionOverlayClick,
   useNode,
   usePointerState,
@@ -137,26 +137,14 @@ function SurfaceGroup({
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
   const editor = useCurrentEditor();
+  const { transform } = useTransformState();
+  const { is_node_transforming, is_node_translating } = useGestureState();
+  const { hovered_node_id, selection } = useSelectionState();
+  const { tool, content_edit_mode } = useToolState();
   const pixelgrid = useEditorState(editor, (state) => state.pixelgrid);
   const ruler = useEditorState(editor, (state) => state.ruler);
-  const { transform } = useTransformState();
-  const {
-    hovered_node_id,
-    dropzone,
-    selection,
-    is_node_transforming,
-    is_node_translating,
-    // pointerMove,
-    // pointerDown,
-    // pointerUp,
-    // click,
-    // doubleClick,
-    // drag,
-    // dragStart,
-    // dragEnd,
-  } = useEventTargetState();
+  const dropzone = useEditorState(editor, (state) => state.dropzone);
   const brush = useBrushState();
-  const { tool, content_edit_mode } = useToolState();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
@@ -560,7 +548,7 @@ export function EditorSurfaceClipboardSyncProvider({
 }
 
 function FloatingCursorTooltip() {
-  const { gesture } = useEventTargetState();
+  const { gesture } = useGestureState();
   const { transform } = useTransformState();
   const pointer = usePointerState();
   const pos = cmath.vector2.transform(pointer.position, transform);
@@ -664,7 +652,7 @@ function SingleSelectionOverlay({
   readonly?: boolean;
 }) {
   const editor = useCurrentEditor();
-  const { is_node_translating, gesture } = useEventTargetState();
+  const { gesture, is_node_translating } = useGestureState();
   const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
@@ -699,7 +687,7 @@ function SingleSelectionOverlay({
 
 function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
   const editor = useCurrentEditor();
-  const { is_node_translating, gesture } = useEventTargetState();
+  const { gesture, is_node_translating } = useGestureState();
   const groups = useSurfaceSelectionGroups();
 
   return (
@@ -1215,7 +1203,7 @@ function GapWithHandle({
   offset?: cmath.Vector2;
   onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
-  const { gesture } = useEventTargetState();
+  const { gesture } = useGestureState();
 
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
@@ -1370,7 +1358,7 @@ function PixelGridOverlay() {
 
 function RulerGuideOverlay() {
   const editor = useCurrentEditor();
-  const { guides } = useEventTargetState();
+  const { guides } = useCurrentSceneState();
   const { scaleX, scaleY, transform } = useTransformState();
   const viewport = useViewport();
   const d = useSurfaceSelectionGroups();

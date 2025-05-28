@@ -2,14 +2,13 @@
 
 import { useEffect } from "react";
 import {
-  useEventTargetState,
   usePointerState,
   useToolState,
   useTransformState,
 } from "../../provider";
 import { useViewport } from "../context";
 import cmath from "@grida/cmath";
-import { useCurrentEditor } from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 
 const EDGE_SCROLLING_THRESHOLD = 16;
 
@@ -26,7 +25,7 @@ export function EdgeScrollingEffect(
 
 export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
   const instance = useCurrentEditor();
-  const { dragging } = useEventTargetState();
+  const dragging = useEditorState(instance, (state) => state.dragging);
   const { tool } = useToolState();
   const { transform } = useTransformState();
   const pointer = usePointerState();

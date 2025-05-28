@@ -207,22 +207,6 @@ export class Editor
     }
   }
 
-  public hoverNode(node_id: string, event: "enter" | "leave") {
-    this.dispatch({
-      type: "hover",
-      target: node_id,
-      event,
-    });
-  }
-
-  public hoverEnterNode(node_id: string) {
-    this.hoverNode(node_id, "enter");
-  }
-
-  public hoverLeaveNode(node_id: string) {
-    this.hoverNode(node_id, "leave");
-  }
-
   public select(...selectors: grida.program.document.Selector[]) {
     this.dispatch({
       type: "select",
@@ -1354,6 +1338,37 @@ export class Editor
 
   //
 
+  public hoverNode(node_id: string, event: "enter" | "leave") {
+    this.dispatch({
+      type: "hover",
+      target: node_id,
+      event,
+    });
+  }
+
+  public hoverEnterNode(node_id: string) {
+    this.hoverNode(node_id, "enter");
+  }
+
+  public hoverLeaveNode(node_id: string) {
+    this.hoverNode(node_id, "leave");
+  }
+
+  public hoverVertex(
+    node_id: string,
+    vertex: number,
+    event: "enter" | "leave"
+  ) {
+    this.dispatch({
+      type: "hover-vertex",
+      event: event,
+      target: {
+        node_id,
+        vertex,
+      },
+    });
+  }
+
   startGuideGesture(axis: cmath.Axis, idx: number | -1) {
     this.dispatch({
       type: "surface/gesture/start",
@@ -1419,6 +1434,29 @@ export class Editor
       gesture: {
         type: "rotate",
         selection,
+      },
+    });
+  }
+
+  startTranslateVertexGesture(node_id: string, vertex: number) {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "translate-vertex",
+        vertex,
+        node_id,
+      },
+    });
+  }
+
+  startCurveGesture(node_id: string, segment: number, control: "ta" | "tb") {
+    this.dispatch({
+      type: "surface/gesture/start",
+      gesture: {
+        type: "curve",
+        node_id,
+        control,
+        segment,
       },
     });
   }

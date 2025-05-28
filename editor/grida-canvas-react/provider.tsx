@@ -14,10 +14,7 @@ import {
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "../grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
-import type {
-  Action,
-  TCanvasEventTargetDragGestureState,
-} from "@/grida-canvas/action";
+import type { Action } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
 import deepEqual from "deep-equal";
 import { toast } from "sonner";
@@ -262,10 +259,6 @@ export function useCurrentSelection() {
     selection: state.selection,
     document: state.document,
   }));
-  const dispatch = React.useCallback(
-    (action: Action) => instance.dispatch(action),
-    [instance]
-  );
 
   const selection = state.selection;
 
@@ -299,11 +292,8 @@ export function useCurrentSelection() {
   );
 
   const copy = useCallback(() => {
-    dispatch({
-      type: "copy",
-      target: "selection",
-    });
-  }, [dispatch]);
+    instance.copy("selection");
+  }, [instance]);
 
   const active = useCallback(
     (value: boolean) => {
@@ -1000,44 +990,17 @@ export function useA11yActions(): UseA11yActions {
   };
 }
 
-interface UseEventTargetState {
+interface UseGestureState {
   gesture: editor.state.IEditorState["gesture"];
-  dragging: editor.state.IEditorState["dragging"];
-  hovered_node_id: editor.state.IEditorState["hovered_node_id"];
-  dropzone: editor.state.IEditorState["dropzone"];
-  surface_snapping: editor.state.IEditorState["surface_snapping"];
   is_node_transforming: boolean;
   is_node_translating: boolean;
   is_node_scaling: boolean;
-
-  selection: editor.state.IEditorState["selection"];
-  guides: grida.program.document.Guide2D[];
 }
 
-export function useEventTargetState(): UseEventTargetState {
+export function useGestureState(): UseGestureState {
   const instance = useCurrentEditor();
-  const scene = useCurrentSceneState();
-  const {
-    surface_snapping,
-    gesture,
-    dragging,
-    hovered_node_id,
-    dropzone,
-    selection,
-    content_edit_mode,
-    marquee,
-  } = useEditorState(instance, (state) => ({
-    surface_snapping: state.surface_snapping,
-    gesture: state.gesture,
-    dragging: state.dragging,
-    hovered_node_id: state.hovered_node_id,
-    dropzone: state.dropzone,
-    selection: state.selection,
-    content_edit_mode: state.content_edit_mode,
-    marquee: state.marquee,
-  }));
 
-  const { guides, edges } = scene;
+  const gesture = useEditorState(instance, (state) => state.gesture);
 
   const is_node_transforming = gesture.type !== "idle";
   const is_node_translating =
@@ -1047,49 +1010,12 @@ export function useEventTargetState(): UseEventTargetState {
     gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
 
-  return useMemo(() => {
-    return {
-      //
-      gesture,
-      dragging,
-      surface_snapping,
-      //
-      marquee,
-      //
-      guides,
-      //
-      edges,
-      //
-      hovered_node_id,
-      dropzone,
-      selection,
-      is_node_transforming,
-      is_node_translating,
-      is_node_scaling,
-      content_edit_mode,
-    };
-  }, [
-    //
+  return {
     gesture,
-    dragging,
-    surface_snapping,
-    //
-    marquee,
-    //
-    guides,
-    //
-    edges,
-    //
-    hovered_node_id,
-    dropzone,
-    selection,
-    //
     is_node_transforming,
     is_node_translating,
     is_node_scaling,
-    //
-    content_edit_mode,
-  ]);
+  };
 }
 
 export function useDataTransferEventTarget() {
@@ -1097,13 +1023,6 @@ export function useDataTransferEventTarget() {
   const state = useEditorState(instance, (state) => ({
     transform: state.transform,
   }));
-
-  const dispatch = useCallback(
-    (action: Action) => {
-      instance.dispatch(action);
-    },
-    [instance]
-  );
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) => {
@@ -1116,22 +1035,6 @@ export function useDataTransferEventTarget() {
       return cmath.vector2.sub(xy, viewport_pos, translate);
     },
     [state.transform]
-  );
-
-  const paste = useCallback(() => {
-    dispatch({
-      type: "paste",
-    });
-  }, [dispatch]);
-
-  const insertNode = useCallback(
-    (prototype: grida.program.nodes.NodePrototype) => {
-      dispatch({
-        type: "insert",
-        prototype,
-      });
-    },
-    [dispatch]
   );
 
   const insertText = useCallback(
@@ -1154,9 +1057,9 @@ export function useDataTransferEventTarget() {
         left: x,
         top: y,
       } satisfies grida.program.nodes.NodePrototype;
-      insertNode(node);
+      instance.insertNode(node);
     },
-    [insertNode, canvasXY]
+    [instance, canvasXY]
   );
 
   const insertImage = useCallback(
@@ -1183,9 +1086,9 @@ export function useDataTransferEventTarget() {
         left: x,
         top: y,
       } satisfies grida.program.nodes.NodePrototype;
-      insertNode(node);
+      instance.insertNode(node);
     },
-    [insertNode, canvasXY]
+    [instance, canvasXY]
   );
 
   const insertSVG = useCallback(
@@ -1223,13 +1126,13 @@ export function useDataTransferEventTarget() {
 
             result.left = x;
             result.top = y;
-            insertNode(result);
+            instance.insertNode(result);
           } else {
             throw new Error("Failed to convert SVG");
           }
         });
     },
-    [insertNode, canvasXY]
+    [instance, canvasXY]
   );
 
   const insertFromFile = useCallback(
@@ -1281,7 +1184,7 @@ export function useDataTransferEventTarget() {
       if (event.target instanceof HTMLTextAreaElement) return;
 
       if (!event.clipboardData) {
-        paste();
+        instance.paste();
         return;
       }
 
@@ -1312,10 +1215,10 @@ export function useDataTransferEventTarget() {
 
       if (!pasted_from_data_transfer) {
         event.preventDefault();
-        paste();
+        instance.paste();
       }
     },
-    [insertFromFile, insertText]
+    [instance, insertFromFile, insertText]
   );
 
   const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
@@ -1367,16 +1270,16 @@ export function useDataTransferEventTarget() {
 }
 
 export function useClipboardSync() {
-  // const { state } = useDocument();
   const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    user_clipboard: state.user_clipboard,
-  }));
+  const user_clipboard = useEditorState(
+    instance,
+    (state) => state.user_clipboard
+  );
 
   useEffect(() => {
     try {
-      if (state.user_clipboard) {
-        const serializedData = JSON.stringify(state.user_clipboard);
+      if (user_clipboard) {
+        const serializedData = JSON.stringify(user_clipboard);
         const htmltxt = `<meta>${serializedData}`;
         const blob = new Blob([htmltxt], {
           type: "text/html",
@@ -1393,12 +1296,11 @@ export function useClipboardSync() {
     } catch (e) {
       //
     }
-  }, [state.user_clipboard]);
+  }, [user_clipboard]);
   //
 }
 
 export function useSurfacePathEditor() {
-  // const [state, dispatch] = __useInternal();
   const instance = useCurrentEditor();
   const state = useEditorState(instance, (state) => ({
     content_edit_mode: state.content_edit_mode,
@@ -1406,10 +1308,7 @@ export function useSurfacePathEditor() {
     hovered_vertex_idx: state.hovered_vertex_idx,
     tool: state.tool,
   }));
-  const dispatch = React.useCallback(
-    (action: Action) => instance.dispatch(action),
-    [instance]
-  );
+
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
   const { hovered_vertex_idx: hovered_point, tool } = state;
@@ -1435,30 +1334,16 @@ export function useSurfacePathEditor() {
 
   const onVertexHover = useCallback(
     (vertex: number, eventType: "enter" | "leave") => {
-      dispatch({
-        type: "hover-vertex",
-        event: eventType,
-        target: {
-          node_id,
-          vertex,
-        },
-      });
+      instance.hoverVertex(node_id, vertex, eventType);
     },
-    [dispatch, node_id]
+    [instance, node_id]
   );
 
   const onVertexDragStart = useCallback(
     (vertex: number) => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "translate-vertex",
-          vertex,
-          node_id,
-        },
-      });
+      instance.startTranslateVertexGesture(node_id, vertex);
     },
-    [dispatch, node_id]
+    [instance, node_id]
   );
 
   const onVertexDelete = useCallback(
@@ -1470,17 +1355,9 @@ export function useSurfacePathEditor() {
 
   const onCurveControlPointDragStart = useCallback(
     (segment: number, control: "ta" | "tb") => {
-      dispatch({
-        type: "surface/gesture/start",
-        gesture: {
-          type: "curve",
-          node_id,
-          control,
-          segment,
-        },
-      });
+      instance.startCurveGesture(node_id, segment, control);
     },
-    [dispatch, node_id]
+    [instance, node_id]
   );
 
   return useMemo(
@@ -1691,11 +1568,8 @@ export function useComputedNode(
 }
 
 export function useTemplateDefinition(template_id: string) {
-  // const {
-  //   state: { templates },
-  // } = useDocument();
-  const instance = useCurrentEditor();
-  const templates = useEditorState(instance, (state) => state.templates);
+  const editor = useCurrentEditor();
+  const templates = useEditorState(editor, (state) => state.templates);
 
   return templates![template_id];
 }
