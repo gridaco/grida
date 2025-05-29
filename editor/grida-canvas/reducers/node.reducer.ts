@@ -362,9 +362,8 @@ const safe_properties: Partial<
 function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(
   draft: grida.program.nodes.UnknownNodeProperties,
   key: K,
-  value: any
+  value: grida.program.nodes.UnknwonNode[K]
 ) {
-  "use strict";
   if (!(key in safe_properties)) {
     throw new Error(`property handler not found: "${key}"`);
   }
