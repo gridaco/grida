@@ -792,35 +792,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     // }
 
     case "node/change/*":
-    case "node/change/userdata":
     case "node/change/positioning":
     case "node/change/positioning-mode":
-    case "node/change/size":
     case "node/change/component":
     case "node/change/props":
-    case "node/change/rotation":
-    case "node/change/cornerRadius":
-    case "node/change/fill":
-    case "node/change/border":
-    case "node/change/stroke":
-    case "node/change/stroke-width":
-    case "node/change/stroke-cap":
-    case "node/change/padding":
-    case "node/change/box-shadow":
-    case "node/change/layout":
-    case "node/change/direction":
-    case "node/change/mainAxisAlignment":
-    case "node/change/crossAxisAlignment":
-    case "node/change/gap":
-    case "node/change/mainAxisGap":
-    case "node/change/crossAxisGap":
     case "node/change/style":
-    case "node/change/fontSize":
-    case "node/change/fontWeight":
-    case "node/change/fontFamily":
-    case "node/change/letterSpacing":
-    case "node/change/lineHeight":
-    case "node/change/text": {
+    case "node/change/fontFamily": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
         const node = editor.dq.__getNodeById(draft, node_id);

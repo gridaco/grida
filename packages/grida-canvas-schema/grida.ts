@@ -1187,7 +1187,8 @@ export namespace grida.program.nodes {
      * Node that can be filled with color - such as rectangle, ellipse, etc.
      */
     export interface IFill<T> {
-      fill?: T;
+      // FIXME: make it nullable
+      fill?: T | undefined;
     }
 
     /**

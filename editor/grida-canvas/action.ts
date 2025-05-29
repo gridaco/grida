@@ -570,10 +570,6 @@ interface ITemplateInstanceNodeID {
   template_instance_node_id: string;
 }
 
-interface INodeChangeUserDataAction extends INodeID {
-  userdata: grida.program.nodes.i.IBaseNode["userdata"];
-}
-
 type INodeChangePositioningAction = INodeID &
   Partial<grida.program.nodes.i.IPositioning>;
 
@@ -583,93 +579,8 @@ type INodeChangePositioningModeAction = INodeID &
 type INodeChangeComponentAction = INodeID &
   Required<Pick<grida.program.nodes.UnknwonNode, "component_id">>;
 
-type INodeChangeTextAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "text">>;
-
-interface INodeChangeSizeAction extends INodeID {
-  axis: "width" | "height";
-  value: grida.program.css.LengthPercentage | "auto";
-}
-
-type INodeChangeRotationAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "rotation">>;
-
-type INodeChangeCornerRadiusAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "cornerRadius">>;
-
-interface INodeChangeFillAction extends INodeID {
-  fill: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
-}
-
-interface INodeChangeStrokeAction extends INodeID {
-  stroke: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
-}
-
-type INodeChangeStrokeWidthAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "strokeWidth">>;
-
-type INodeChangeStrokeCapAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "strokeCap">>;
-
-interface INodeChangeBorderAction extends INodeID {
-  border: grida.program.css.Border | undefined;
-}
-
 interface ITextNodeChangeFontFamilyAction extends INodeID {
   fontFamily: string | undefined;
-}
-
-type ITextNodeChangeFontWeightAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "fontWeight">>;
-
-type ITextNodeChangeFontSizeAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "fontSize">>;
-
-type ITextNodeChangeLineHeightAction = INodeID &
-  Required<Pick<grida.program.nodes.UnknwonNode, "lineHeight">>;
-
-interface ITextNodeChangeLetterSpacingAction extends INodeID {
-  letterSpacing: editor.api.TChange<
-    grida.program.nodes.TextNode["letterSpacing"]
-  >;
-}
-
-//
-interface INodeChangePaddingAction extends INodeID {
-  padding: grida.program.nodes.i.IPadding["padding"];
-}
-
-interface INodeChangeBoxShadowAction extends INodeID {
-  boxShadow?: grida.program.nodes.i.IBoxShadow["boxShadow"];
-}
-
-// #region layout
-interface INodeChangeLayoutAction extends INodeID {
-  layout: grida.program.nodes.i.IFlexContainer["layout"];
-}
-
-interface IFlexContainerNodeChangeDirectionAction extends INodeID {
-  direction: grida.program.nodes.i.IFlexContainer["direction"];
-}
-
-interface IFlexContainerNodeChangeMainAxisAlignmentAction extends INodeID {
-  mainAxisAlignment: grida.program.nodes.i.IFlexContainer["mainAxisAlignment"];
-}
-
-interface IFlexContainerNodeChangeCrossAxisAlignmentAction extends INodeID {
-  crossAxisAlignment: grida.program.nodes.i.IFlexContainer["crossAxisAlignment"];
-}
-
-interface IFlexContainerNodeChangeGapAction extends INodeID {
-  gap: number | { mainAxisGap: number; crossAxisGap: number };
-}
-
-interface IFlexContainerNodeChangeMainAxisGapAction extends INodeID {
-  mainAxisGap: grida.program.nodes.i.IFlexContainer["mainAxisGap"];
-}
-
-interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
-  crossAxisGap: grida.program.nodes.i.IFlexContainer["crossAxisGap"];
 }
 
 interface INodeChangeStyleAction extends INodeID {
@@ -685,51 +596,12 @@ export type NodeChangeAction =
       type: "node/change/*";
       node_id: string;
     } & Partial<Omit<grida.program.nodes.UnknwonNode, "type">>)
-  | ({ type: "node/change/userdata" } & INodeChangeUserDataAction)
   | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
   | ({
       type: "node/change/positioning-mode";
     } & INodeChangePositioningModeAction)
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
-  | ({ type: "node/change/text" } & INodeChangeTextAction)
-  | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
-  | ({ type: "node/change/size" } & INodeChangeSizeAction)
-  | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
-  | ({ type: "node/change/fill" } & INodeChangeFillAction)
-  | ({ type: "node/change/stroke" } & INodeChangeStrokeAction)
-  | ({ type: "node/change/stroke-width" } & INodeChangeStrokeWidthAction)
-  | ({ type: "node/change/stroke-cap" } & INodeChangeStrokeCapAction)
-  | ({ type: "node/change/border" } & INodeChangeBorderAction)
-  //
   | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
-  | ({ type: "node/change/fontWeight" } & ITextNodeChangeFontWeightAction)
-  | ({ type: "node/change/fontSize" } & ITextNodeChangeFontSizeAction)
-  | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
-  | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
-  //
-  | ({ type: "node/change/padding" } & INodeChangePaddingAction)
-  | ({ type: "node/change/box-shadow" } & INodeChangeBoxShadowAction)
-  //
-  | ({ type: "node/change/layout" } & INodeChangeLayoutAction)
-  | ({
-      type: "node/change/direction";
-    } & IFlexContainerNodeChangeDirectionAction)
-  | ({
-      type: "node/change/mainAxisAlignment";
-    } & IFlexContainerNodeChangeMainAxisAlignmentAction)
-  | ({
-      type: "node/change/crossAxisAlignment";
-    } & IFlexContainerNodeChangeCrossAxisAlignmentAction)
-  | ({
-      type: "node/change/gap";
-    } & IFlexContainerNodeChangeGapAction)
-  | ({
-      type: "node/change/mainAxisGap";
-    } & IFlexContainerNodeChangeMainAxisGapAction)
-  | ({
-      type: "node/change/crossAxisGap";
-    } & IFlexContainerNodeChangeCrossAxisGapAction)
-  //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
 

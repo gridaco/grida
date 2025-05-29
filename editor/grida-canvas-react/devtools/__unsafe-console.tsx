@@ -2,9 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
-import { toast } from "sonner";
 import { AutoHeightThemedMonacoEditor } from "@/components/monaco";
-import { useCurrentEditor } from "@/grida-canvas-react";
+import { toast } from "sonner";
 
 const IS_UNSAFE_SANDBOX =
   process.env.NEXT_PUBLIC_GRIDA_UNSAFE_DEVELOPER_SANDBOX === "1";
@@ -41,14 +40,8 @@ export function __UNSAFE_CONSOLE() {
       output: any;
     }[]
   >([]);
-  const editor = useCurrentEditor();
   const entriesRef = useRef(entries); // Ref to track the latest entries state
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-
-  useEffect(() => {
-    // @ts-expect-error
-    globalThis["grida"] = editor;
-  }, [editor]);
 
   // Keep the ref in sync with the state
   useEffect(() => {

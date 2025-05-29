@@ -932,7 +932,7 @@ function __self_evt_on_drag(
           Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
         );
         draft.document.nodes[node_id] = nodeReducer(node, {
-          type: "node/change/cornerRadius",
+          type: "node/change/*",
           // TODO: resolve by anchor
           cornerRadius: nextRadiusClamped,
           node_id,
@@ -992,9 +992,10 @@ function __self_evt_on_drag(
 
             const container = editor.dq.__getNodeById(draft, layout.group);
             draft.document.nodes[layout.group] = nodeReducer(container, {
-              type: "node/change/gap",
-              gap: gap,
+              type: "node/change/*",
               node_id: container.id,
+              mainAxisGap: gap,
+              crossAxisGap: gap,
             });
 
             draft.gesture.gap = gap;

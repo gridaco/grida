@@ -633,7 +633,7 @@ export class Editor
   }
   changeNodeText(node_id: string, text: tokens.StringValueExpression | null) {
     this.dispatch({
-      type: "node/change/text",
+      type: "node/change/*",
       node_id: node_id,
       text,
     });
@@ -647,7 +647,7 @@ export class Editor
   }
   changeNodeUserData(node_id: string, userdata: unknown) {
     this.dispatch({
-      type: "node/change/userdata",
+      type: "node/change/*",
       node_id: node_id,
       userdata: userdata as any,
     });
@@ -743,7 +743,7 @@ export class Editor
         );
 
         this.dispatch({
-          type: "node/change/rotation",
+          type: "node/change/*",
           node_id: node_id,
           rotation: value,
         });
@@ -760,10 +760,9 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/size",
+        type: "node/change/*",
         node_id: node_id,
-        axis,
-        value: value,
+        [axis]: value,
       });
     });
   }
@@ -773,9 +772,9 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/fill",
+        type: "node/change/*",
         node_id: node_id,
-        fill,
+        fill: fill as cg.Paint,
       });
     });
   }
@@ -788,48 +787,42 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/stroke",
+        type: "node/change/*",
         node_id: node_id,
-        stroke,
+        stroke: stroke as cg.Paint,
       });
     });
   }
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
-    requestAnimationFrame(() => {
-      try {
-        const value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
-          "strokeWidth",
-          strokeWidth
-        );
+    try {
+      const value = resolveNumberChangeValue(
+        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        "strokeWidth",
+        strokeWidth
+      );
 
-        this.dispatch({
-          type: "node/change/stroke-width",
-          node_id: node_id,
-          strokeWidth: value,
-        });
-      } catch (e) {
-        reportError(e);
-        return;
-      }
-    });
-  }
-  changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/stroke-cap",
-        node_id: node_id,
-        strokeCap,
-      });
-    });
-  }
-  changeNodeFit(node_id: string, fit: cg.BoxFit) {
-    requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        fit,
+        strokeWidth: value,
       });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+  }
+  changeNodeStrokeCap(node_id: string, strokeCap: cg.StrokeCap) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      strokeCap,
+    });
+  }
+  changeNodeFit(node_id: string, fit: cg.BoxFit) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fit,
     });
   }
   changeNodeCornerRadius(
@@ -838,7 +831,7 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/cornerRadius",
+        type: "node/change/*",
         node_id: node_id,
         cornerRadius,
       });
@@ -846,109 +839,113 @@ export class Editor
   }
   // text style
   changeTextNodeFontFamily(node_id: string, fontFamily: string | undefined) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/fontFamily",
-        node_id: node_id,
-        fontFamily,
-      });
+    this.dispatch({
+      type: "node/change/fontFamily",
+      node_id: node_id,
+      fontFamily,
     });
   }
   changeTextNodeFontWeight(node_id: string, fontWeight: cg.NFontWeight) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/fontWeight",
-        node_id: node_id,
-        fontWeight,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      fontWeight,
     });
   }
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
-    requestAnimationFrame(() => {
-      try {
-        const value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
-          "fontSize",
-          fontSize
-        );
+    try {
+      const value = resolveNumberChangeValue(
+        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        "fontSize",
+        fontSize
+      );
 
-        this.dispatch({
-          type: "node/change/fontSize",
-          node_id: node_id,
-          fontSize: value,
-        });
-      } catch (e) {
-        reportError(e);
-        return;
-      }
-    });
-  }
-  changeTextNodeTextAlign(node_id: string, textAlign: cg.TextAlign) {
-    requestAnimationFrame(() => {
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        textAlign,
+        fontSize: value,
       });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+  }
+  changeTextNodeTextAlign(node_id: string, textAlign: cg.TextAlign) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textAlign,
     });
   }
   changeTextNodeTextAlignVertical(
     node_id: string,
     textAlignVertical: cg.TextAlignVertical
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/*",
-        node_id: node_id,
-        textAlignVertical,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      textAlignVertical,
     });
   }
+
   changeTextNodeLineHeight(
     node_id: string,
     lineHeight: editor.api.NumberChange
   ) {
-    requestAnimationFrame(() => {
-      try {
-        const value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
-          "lineHeight",
-          lineHeight
-        );
-        this.dispatch({
-          type: "node/change/lineHeight",
-          node_id: node_id,
-          lineHeight: value,
-        });
-      } catch (e) {
-        reportError(e);
-        return;
-      }
-    });
+    try {
+      const value = resolveNumberChangeValue(
+        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        "lineHeight",
+        lineHeight
+      );
+      this.dispatch({
+        type: "node/change/*",
+        node_id: node_id,
+        lineHeight: value,
+      });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
   }
+
   changeTextNodeLetterSpacing(
     node_id: string,
     letterSpacing: editor.api.TChange<
       grida.program.nodes.TextNode["letterSpacing"]
     >
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/letterSpacing",
-        node_id: node_id,
-        letterSpacing,
-      });
-    });
-  }
-  changeTextNodeMaxlength(node_id: string, maxLength: number | undefined) {
-    requestAnimationFrame(() => {
+    try {
+      let value: number | undefined;
+      if (letterSpacing.value === undefined) {
+        value = undefined;
+      } else {
+        value = resolveNumberChangeValue(
+          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          "letterSpacing",
+          letterSpacing as editor.api.NumberChange
+        );
+      }
+
       this.dispatch({
         type: "node/change/*",
         node_id: node_id,
-        maxLength,
+        letterSpacing: value,
       });
+    } catch (e) {
+      reportError(e);
+      return;
+    }
+  }
+
+  changeTextNodeMaxlength(node_id: string, maxLength: number | undefined) {
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      maxLength,
     });
   }
+
   //
   changeNodeBorder(
     node_id: string,
@@ -956,7 +953,7 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/border",
+        type: "node/change/*",
         node_id: node_id,
         border: border,
       });
@@ -969,64 +966,61 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/padding",
+        type: "node/change/*",
         node_id: node_id,
         padding,
       });
     });
   }
+
   changeNodeBoxShadow(node_id: string, boxShadow?: cg.BoxShadow) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/box-shadow",
+        type: "node/change/*",
         node_id: node_id,
         boxShadow,
       });
     });
   }
+
   changeContainerNodeLayout(
     node_id: string,
     layout: grida.program.nodes.i.IFlexContainer["layout"]
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/layout",
-        node_id: node_id,
-        layout,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      layout,
     });
   }
+
   changeFlexContainerNodeDirection(node_id: string, direction: cg.Axis) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/direction",
-        node_id: node_id,
-        direction,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      direction,
     });
   }
+
   changeFlexContainerNodeMainAxisAlignment(
     node_id: string,
     mainAxisAlignment: cg.MainAxisAlignment
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/mainAxisAlignment",
-        node_id: node_id,
-        mainAxisAlignment,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      mainAxisAlignment,
     });
   }
+
   changeFlexContainerNodeCrossAxisAlignment(
     node_id: string,
     crossAxisAlignment: cg.CrossAxisAlignment
   ) {
-    requestAnimationFrame(() => {
-      this.dispatch({
-        type: "node/change/crossAxisAlignment",
-        node_id: node_id,
-        crossAxisAlignment,
-      });
+    this.dispatch({
+      type: "node/change/*",
+      node_id: node_id,
+      crossAxisAlignment,
     });
   }
   changeFlexContainerNodeGap(
@@ -1035,9 +1029,10 @@ export class Editor
   ) {
     requestAnimationFrame(() => {
       this.dispatch({
-        type: "node/change/gap",
+        type: "node/change/*",
         node_id: node_id,
-        gap,
+        mainAxisGap: typeof gap === "number" ? gap : gap.mainAxisGap,
+        crossAxisGap: typeof gap === "number" ? gap : gap.crossAxisGap,
       });
     });
   }

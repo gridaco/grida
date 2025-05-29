@@ -123,6 +123,7 @@ import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
+import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/api-host";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -270,6 +271,7 @@ export default function CanvasPlayground({
           />
           <ErrorBoundary>
             <StandaloneDocumentEditor editor={instance}>
+              <WindowCurrentEditorProvider />
               <SettingsDialog {...settingsDialog.props} />
               <UserCustomTemplatesProvider templates={templates}>
                 <FontFamilyListProvider fonts={fonts}>

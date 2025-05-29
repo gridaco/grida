@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
+import { __UNSAFE_CONSOLE } from "@/grida-canvas-react/devtools/__unsafe-console";
 import { useGoogleFontsList } from "@/grida-canvas-react/components/google-fonts";
 import type grida from "@grida/schema";
 import { useCurrentEditor, useEditorState } from "../use-editor";
