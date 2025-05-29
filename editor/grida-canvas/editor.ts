@@ -327,8 +327,16 @@ export class Editor
     });
   }
 
-  public getNodeById(node_id: editor.NodeID): grida.program.nodes.Node {
+  public getNodeSnapshotById(
+    node_id: editor.NodeID
+  ): Readonly<grida.program.nodes.Node> {
     return editor.dq.__getNodeById(this.mstate, node_id);
+  }
+
+  public getNodeById(
+    node_id: editor.NodeID
+  ): NodeProxy<grida.program.nodes.Node> {
+    return new NodeProxy(this, node_id);
   }
 
   public getNodeDepth(node_id: editor.NodeID): number {
@@ -342,7 +350,7 @@ export class Editor
     // Calculate the absolute rotation
     try {
       for (const parent_id of parent_ids) {
-        const parent_node = this.getNodeById(parent_id);
+        const parent_node = this.getNodeSnapshotById(parent_id);
         assert(parent_node, `parent node not found: ${parent_id}`);
         if ("rotation" in parent_node) {
           rotation += parent_node.rotation ?? 0;
@@ -350,7 +358,7 @@ export class Editor
       }
 
       // finally, add the node's own rotation
-      const node = this.getNodeById(node_id);
+      const node = this.getNodeSnapshotById(node_id);
       assert(node, `node not found: ${node_id}`);
       if ("rotation" in node) {
         rotation += node.rotation ?? 0;
@@ -596,12 +604,12 @@ export class Editor
   // #region INodeChangeActions
 
   toggleNodeActive(node_id: string) {
-    const next = !this.getNodeById(node_id).active;
+    const next = !this.getNodeSnapshotById(node_id).active;
     this.changeNodeActive(node_id, next);
     return next;
   }
   toggleNodeLocked(node_id: string) {
-    const next = !this.getNodeById(node_id).locked;
+    const next = !this.getNodeSnapshotById(node_id).locked;
     this.changeNodeLocked(node_id, next);
     return next;
   }
@@ -717,7 +725,7 @@ export class Editor
     requestAnimationFrame(() => {
       try {
         const value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
           "opacity",
           opacity
         );
@@ -737,7 +745,7 @@ export class Editor
     requestAnimationFrame(() => {
       try {
         const value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
           "rotation",
           rotation
         );
@@ -796,7 +804,7 @@ export class Editor
   changeNodeStrokeWidth(node_id: string, strokeWidth: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
         "strokeWidth",
         strokeWidth
       );
@@ -855,7 +863,7 @@ export class Editor
   changeTextNodeFontSize(node_id: string, fontSize: editor.api.NumberChange) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
         "fontSize",
         fontSize
       );
@@ -894,7 +902,7 @@ export class Editor
   ) {
     try {
       const value = resolveNumberChangeValue(
-        this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+        this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
         "lineHeight",
         lineHeight
       );
@@ -921,7 +929,7 @@ export class Editor
         value = undefined;
       } else {
         value = resolveNumberChangeValue(
-          this.getNodeById(node_id) as grida.program.nodes.UnknwonNode,
+          this.getNodeSnapshotById(node_id) as grida.program.nodes.UnknwonNode,
           "letterSpacing",
           letterSpacing as editor.api.NumberChange
         );
@@ -1532,4 +1540,32 @@ export class Editor
   }
 
   // #endregion IEventTargetActions implementation
+}
+
+export class NodeProxy<T extends grida.program.nodes.Node> {
+  constructor(
+    private editor: Editor,
+    private node_id: string
+  ) {
+    // @ts-expect-error - this is a workaround to allow the proxy to be used as a node
+    return new Proxy(this, {
+      get: (target, prop: string) => {
+        return (target.editor.getNodeSnapshotById(target.node_id) as T)[
+          prop as keyof T
+        ];
+      },
+      set: (target, prop: string, value) => {
+        try {
+          target.editor.dispatch({
+            type: "node/change/*",
+            node_id: target.node_id,
+            [prop]: value,
+          });
+          return true;
+        } catch (e) {
+          return false; // unknown prop
+        }
+      },
+    }) as T;
+  }
 }

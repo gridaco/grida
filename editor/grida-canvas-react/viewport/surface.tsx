@@ -1044,7 +1044,7 @@ function Edge({
         return cmath.vector2.transform([p.x, p.y], transform);
       case "anchor":
         try {
-          const n = editor.getNodeById(p.target);
+          const n = editor.getNodeSnapshotById(p.target);
           const cx = (n as any).left + (n as any).width / 2;
           const cy = (n as any).top + (n as any).height / 2;
           return cmath.vector2.transform([cx, cy], transform);

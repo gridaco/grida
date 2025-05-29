@@ -7,6 +7,7 @@ import type { BitmapEditorBrush, BitmapLayerEditor } from "@grida/bitmap";
 import type cg from "@grida/cg";
 import type { SnapToObjectsResult } from "@grida/cmath/_snap";
 import type { tokens } from "@grida/tokens";
+import type { NodeProxy } from "./editor";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import assert from "assert";
@@ -2015,7 +2016,8 @@ export namespace editor.api {
     //
 
     //
-    getNodeById(node_id: NodeID): grida.program.nodes.Node;
+    getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
+    getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
     getNodeDepth(node_id: NodeID): number;
     getNodeAbsoluteRotation(node_id: NodeID): number;
     insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
