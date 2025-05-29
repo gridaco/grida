@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   useNode,
   useTransformState,
@@ -21,7 +21,19 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
     e.stopPropagation();
   };
 
-  if (!data) return <></>;
+  // initially focus & select all text
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const sel = window.getSelection()!;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    requestAnimationFrame(() => {
+      el.focus();
+    });
+  }, [ref]);
 
   return (
     <div
@@ -29,13 +41,19 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
       className="fixed left-0 top-0 w-0 h-0 z-10"
     >
       <div
-        style={{
-          position: "absolute",
-          ...data.style,
-          willChange: "transform",
-          resize: "none",
-          zIndex: 1,
-        }}
+        style={
+          data
+            ? {
+                position: "absolute",
+                ...data.style,
+                willChange: "transform",
+                resize: "none",
+                zIndex: 1,
+              }
+            : {
+                display: "none",
+              }
+        }
       >
         <div
           style={{
@@ -51,12 +69,12 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
             onPointerDown={stopPropagation}
             onDoubleClick={stopPropagation}
             onKeyDown={(e) => {
-              stopPropagation(e);
               if (e.key === "Escape") {
                 e.currentTarget.blur();
               }
+              stopPropagation(e);
             }}
-            onBlur={() => editor.tryExitContentEditMode}
+            onBlur={() => editor.tryExitContentEditMode()}
             html={node.text as string}
             onChange={(e) => {
               const txt = e.currentTarget.textContent;
