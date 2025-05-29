@@ -1072,18 +1072,31 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
+      // TODO: uploader is not implemented. use uploader configured by user.
+
       const url = URL.createObjectURL(file);
-      const node = {
-        type: "image",
-        name: name,
-        width: "auto",
-        height: "auto",
-        fit: "cover",
-        src: url,
-        left: x,
-        top: y,
-      } satisfies grida.program.nodes.NodePrototype;
-      instance.insertNode(node);
+      const img = new Image();
+      const createAndInsertNode = (width: number, height: number) => {
+        const node = {
+          type: "image",
+          name: name,
+          width,
+          height,
+          fit: "cover",
+          src: url,
+          left: x,
+          top: y,
+        } satisfies grida.program.nodes.NodePrototype;
+        instance.insertNode(node);
+      };
+
+      img.onload = () => {
+        createAndInsertNode(img.naturalWidth, img.naturalHeight);
+      };
+      img.onerror = () => {
+        createAndInsertNode(100, 100);
+      };
+      img.src = url;
     },
     [instance, canvasXY]
   );
