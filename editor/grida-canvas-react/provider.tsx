@@ -1073,17 +1073,36 @@ export function useDataTransferEventTarget() {
       );
 
       const url = URL.createObjectURL(file);
-      const node = {
-        type: "image",
-        name: name,
-        width: "auto",
-        height: "auto",
-        fit: "cover",
-        src: url,
-        left: x,
-        top: y,
-      } satisfies grida.program.nodes.NodePrototype;
-      instance.insertNode(node);
+      const img = new Image();
+      img.onload = () => {
+        const node = {
+          type: "image",
+          name: name,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          fit: "cover",
+          src: url,
+          left: x,
+          top: y,
+        } satisfies grida.program.nodes.NodePrototype;
+        instance.insertNode(node);
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        const node = {
+          type: "image",
+          name: name,
+          width: 100,
+          height: 100,
+          fit: "cover",
+          src: url,
+          left: x,
+          top: y,
+        } satisfies grida.program.nodes.NodePrototype;
+        instance.insertNode(node);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
     },
     [instance, canvasXY]
   );
