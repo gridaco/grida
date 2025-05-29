@@ -6,7 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor } from "@/grida-canvas-react";
 
 type ArtboardData = {
   name: string;
@@ -15,10 +15,10 @@ type ArtboardData = {
 };
 
 const ArtboardList = () => {
-  const { insertNode } = useDocument();
+  const editor = useCurrentEditor();
 
   const onClickItem = (item: ArtboardData) => {
-    insertNode({
+    editor.insertNode({
       type: "container",
       position: "absolute",
       name: item.name,

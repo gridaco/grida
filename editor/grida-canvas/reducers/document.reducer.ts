@@ -4,7 +4,6 @@ import type {
   DocumentAction,
   EditorSelectAction,
   NodeChangeAction,
-  NodeToggleBasePropertyAction,
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
@@ -792,47 +791,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     //   });
     // }
 
-    case "node/change/active":
-    case "node/change/locked":
-    case "node/change/name":
-    case "node/change/userdata":
+    case "node/change/*":
     case "node/change/positioning":
     case "node/change/positioning-mode":
-    case "node/change/size":
     case "node/change/component":
-    case "node/change/href":
-    case "node/change/target":
-    case "node/change/mouse-cursor":
-    case "node/change/src":
     case "node/change/props":
-    case "node/change/opacity":
-    case "node/change/rotation":
-    case "node/change/cornerRadius":
-    case "node/change/fill":
-    case "node/change/border":
-    case "node/change/stroke":
-    case "node/change/stroke-width":
-    case "node/change/stroke-cap":
-    case "node/change/fit":
-    case "node/change/padding":
-    case "node/change/box-shadow":
-    case "node/change/layout":
-    case "node/change/direction":
-    case "node/change/mainAxisAlignment":
-    case "node/change/crossAxisAlignment":
-    case "node/change/gap":
-    case "node/change/mainAxisGap":
-    case "node/change/crossAxisGap":
     case "node/change/style":
-    case "node/change/fontSize":
-    case "node/change/fontWeight":
-    case "node/change/fontFamily":
-    case "node/change/letterSpacing":
-    case "node/change/lineHeight":
-    case "node/change/textAlign":
-    case "node/change/textAlignVertical":
-    case "node/change/maxlength":
-    case "node/change/text": {
+    case "node/change/fontFamily": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
         const node = editor.dq.__getNodeById(draft, node_id);
@@ -848,22 +813,6 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       });
     }
     //
-    case "node/toggle/locked": {
-      return produce(state, (draft) => {
-        const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = editor.dq.__getNodeById(draft, node_id);
-        assert(node, `node not found with node_id: "${node_id}"`);
-        node.locked = !node.locked;
-      });
-    }
-    case "node/toggle/active": {
-      return produce(state, (draft) => {
-        const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = editor.dq.__getNodeById(draft, node_id);
-        assert(node, `node not found with node_id: "${node_id}"`);
-        node.active = !node.active;
-      });
-    }
     case "node/toggle/bold": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBoldAction>action;
@@ -995,7 +944,10 @@ function __self_order(
   }
 
   ichildren.children = reordered;
-  // draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered; // TODO: remove me verified not required
+
+  // update the hierarchy graph
+  const context = editor.dq.Context.from(draft.document);
+  draft.document_ctx = context.snapshot();
 }
 
 function __self_nudge(

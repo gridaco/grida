@@ -4,6 +4,7 @@ let i = 0;
 
 /**
  * Node ID generator
+ * @deprecated use editor.id() instead
  * @returns
  */
 export default function nid() {

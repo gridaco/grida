@@ -870,7 +870,7 @@ export namespace grida.program.nodes {
   } & i.IBaseNode &
     i.ISceneNode;
 
-  export type UnknownNodeProperties = Record<keyof UnknwonNode, unknown>;
+  export type UnknownNodeProperties<T = unknown> = Record<keyof UnknwonNode, T>;
 
   // #region node prototypes
   export type TextNodePrototype = __TPrototypeNode<
@@ -1187,7 +1187,8 @@ export namespace grida.program.nodes {
      * Node that can be filled with color - such as rectangle, ellipse, etc.
      */
     export interface IFill<T> {
-      fill?: T;
+      // FIXME: make it nullable
+      fill?: T | undefined;
     }
 
     /**

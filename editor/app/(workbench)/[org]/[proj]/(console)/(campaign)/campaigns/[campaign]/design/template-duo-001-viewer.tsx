@@ -12,7 +12,7 @@ import {
   AutoInitialFitTransformer,
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
-  useDocument,
+  useCurrentEditor,
 } from "@/grida-canvas-react";
 import { Zoom } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { WorkbenchUI } from "@/components/workbench";
@@ -21,7 +21,6 @@ import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-pre
 import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/west-referral/templates";
 import { ReadonlyPropsEditorInstance } from "@/scaffolds/props-editor";
-import { useTransform } from "@/grida-canvas-react/provider";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
@@ -276,14 +275,13 @@ export function CampaignTemplateDuo001Viewer({
 
 // will be removed after useEditor is ready
 function EditorUXServer({ focus }: { focus: { node?: string } }) {
-  const { select } = useDocument();
-  const { fit } = useTransform();
+  const editor = useCurrentEditor();
 
   useEffect(
     () => {
       if (focus.node) {
-        select([focus.node]);
-        fit([focus.node], { margin: 64, animate: true });
+        editor.select([focus.node]);
+        editor.fit([focus.node], { margin: 64, animate: true });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

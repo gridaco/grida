@@ -22,7 +22,7 @@ import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { Align, Selection } from "./sidecontrol-node-selection";
-import { useDocument } from "@/grida-canvas-react/provider";
+import { useSelectionState } from "@/grida-canvas-react/provider";
 
 export function SideControlDoctypeForm() {
   const [state] = useEditorState();
@@ -53,7 +53,7 @@ function SelectedPageForm() {
 }
 
 function SelectedPageFormStart() {
-  const { selection } = useDocument();
+  const { selection } = useSelectionState();
   if (selection.length === 0) {
     return <SideControlGlobal />;
   } else {

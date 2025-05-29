@@ -17,13 +17,13 @@ import {
   DataProvider,
 } from "@/grida-react-program-context/data-context";
 import ArrayMap from "@/grida-react-program-context/data-context/array";
-import { useDocument } from "@/grida-canvas-react/provider";
+import { useDocumentState } from "@/grida-canvas-react/provider";
 import assert from "assert";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
-  const { document } = useDocument();
+  const { document } = useDocumentState();
 
   // FIXME: UNKNOWN
   const root = document.nodes["root"];

@@ -72,7 +72,7 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { PropsControl } from "./controls/props";
 import {
-  useDocument,
+  useDocumentState,
   useNode,
   useTemplateDefinition,
 } from "@/grida-canvas-react/provider";
@@ -86,6 +86,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useCurrentEditor } from "@/grida-canvas-react";
 
 const { default: all, ...variants } = _variants;
 
@@ -154,7 +155,7 @@ export function SideControlGlobal() {
 }
 
 function FormStartPageControl() {
-  const { changeNodeProps } = useDocument();
+  const editor = useCurrentEditor();
 
   // FIXME: 250303 UNKNOWN
   const { props, template_id, properties } = useNode("page");
@@ -184,7 +185,7 @@ function FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              changeNodeProps("page", k, v);
+              editor.changeNodeProps("page", k, v);
             }}
           />
         </SidebarMenuSectionContent>

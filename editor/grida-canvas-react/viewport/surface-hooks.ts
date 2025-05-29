@@ -1,9 +1,9 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useDocument } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
-import { NodeWithMeta, useTransform } from "../provider";
+import { NodeWithMeta, useTransformState } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { editor } from "@/grida-canvas";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
@@ -243,8 +243,8 @@ function computeSurfaceSelectionGroup({
 export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
-  const { document, document_ctx } = useDocument();
-  const { transform } = useTransform();
+  const { document, document_ctx } = useDocumentState();
+  const { transform } = useTransformState();
 
   // Use stable node IDs to avoid unnecessary re-renders
   const __node_ids = useStableNodeIds(node_ids);
@@ -295,8 +295,9 @@ export function useSingleSelection(
     enabled: boolean;
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
-  const { document, document_ctx, getNodeAbsoluteRotation } = useDocument();
-  const { transform } = useTransform();
+  const instance = useCurrentEditor();
+  const { document, document_ctx } = useDocumentState();
+  const { transform } = useTransformState();
   const node = document.nodes[node_id];
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
@@ -342,7 +343,7 @@ export function useSingleSelection(
     const width = element.clientWidth;
     const height = element.clientHeight;
     const size: cmath.Vector2 = [width, height];
-    const absolute_rotation = getNodeAbsoluteRotation(node_id);
+    const absolute_rotation = instance.getNodeAbsoluteRotation(node_id);
 
     const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
     const centerY = boundingSurfaceRect.y + boundingSurfaceRect.height / 2;
@@ -404,7 +405,7 @@ export function useSingleSelection(
         },
       },
     });
-  }, [getNodeAbsoluteRotation, node, node_id, transform, enabled]);
+  }, [node, node_id, transform, enabled]);
 
   return data;
 }

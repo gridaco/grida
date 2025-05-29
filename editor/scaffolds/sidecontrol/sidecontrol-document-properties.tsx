@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument, useNode } from "@/grida-canvas-react";
+import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./controls/color";
@@ -31,17 +31,18 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCurrentScene } from "@/grida-canvas-react/provider";
+import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {
-  const { backgroundColor, setBackgroundColor } = useCurrentScene();
+  const editor = useCurrentEditor();
+  const { id: scene_id, backgroundColor } = useCurrentSceneState();
 
   return (
     <PropertyLine>
       <RGBAColorControl
         value={backgroundColor ? backgroundColor : undefined}
         onValueChange={(color) => {
-          setBackgroundColor(color);
+          editor.changeSceneBackground(scene_id, color);
         }}
       />
     </PropertyLine>
@@ -49,18 +50,13 @@ function SceneBackgroundPropertyLine() {
 }
 
 export function DocumentProperties({ className }: { className?: string }) {
-  const {
-    document,
-    schemaDefineProperty,
-    schemaRenameProperty,
-    schemaDeleteProperty,
-    schemaUpdateProperty,
-  } = useDocument();
+  const editor = useCurrentEditor();
+  const { document } = useDocumentState();
 
   const keys = Object.keys(document.properties ?? {});
 
   const addProperty = () => {
-    schemaDefineProperty();
+    editor.schemaDefineProperty();
   };
 
   return (
@@ -97,13 +93,13 @@ export function DocumentProperties({ className }: { className?: string }) {
                 definition={property}
                 name={key}
                 onNameChange={(newName) => {
-                  schemaRenameProperty(key, newName);
+                  editor.schemaRenameProperty(key, newName);
                 }}
                 onDefinitionChange={(value) => {
-                  schemaUpdateProperty(key, value);
+                  editor.schemaUpdateProperty(key, value);
                 }}
                 onRemove={() => {
-                  schemaDeleteProperty(key);
+                  editor.schemaDeleteProperty(key);
                 }}
               />
             );

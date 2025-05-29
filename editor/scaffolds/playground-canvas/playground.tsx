@@ -26,11 +26,13 @@ import {
   StandaloneSceneBackground,
   UserCustomTemplatesProvider,
   type UserCustomTemplatesProps,
-  useDocument,
   useEditorState,
   useCurrentEditor,
 } from "@/grida-canvas-react";
-import { useCurrentScene, useTool } from "@/grida-canvas-react/provider";
+import {
+  useCurrentSceneState,
+  useToolState,
+} from "@/grida-canvas-react/provider";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-canvas-react/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
@@ -121,6 +123,7 @@ import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
+import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/api-host";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -268,6 +271,7 @@ export default function CanvasPlayground({
           />
           <ErrorBoundary>
             <StandaloneDocumentEditor editor={instance}>
+              <WindowCurrentEditorProvider />
               <SettingsDialog {...settingsDialog.props} />
               <UserCustomTemplatesProvider templates={templates}>
                 <FontFamilyListProvider fonts={fonts}>
@@ -503,8 +507,8 @@ export default function CanvasPlayground({
 }
 
 function useArtboardListCondition() {
-  const { tool } = useTool();
-  const { constraints } = useCurrentScene();
+  const { tool } = useToolState();
+  const { constraints } = useCurrentSceneState();
   const should_show_artboards_list =
     tool.type === "insert" &&
     tool.node === "container" &&
@@ -564,7 +568,7 @@ function SidebarRight() {
 }
 
 function BrushToolbarPosition({ children }: React.PropsWithChildren<{}>) {
-  const { tool } = useTool();
+  const { tool } = useToolState();
 
   if (!(tool.type === "brush" || tool.type === "eraser")) return null;
 
@@ -703,7 +707,7 @@ const widgets = [
 ];
 
 function LibraryContent() {
-  const { insertNode } = useDocument();
+  const editor = useCurrentEditor();
 
   const icons_data = useReflectIconsData();
   const icons = useMemo(() => {
@@ -729,7 +733,7 @@ function LibraryContent() {
     }
 
     // insert widget tree
-    insertNode(pre);
+    editor.insertNode(pre);
   };
 
   const onInsertSvgSrc = (name: string, src: string) => {
@@ -746,7 +750,7 @@ function LibraryContent() {
           })
           .then((result) => {
             if (result) {
-              insertNode(result);
+              editor.insertNode(result);
             } else {
               throw new Error("Failed to convert SVG");
             }

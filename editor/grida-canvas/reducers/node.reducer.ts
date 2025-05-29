@@ -1,54 +1,412 @@
 import { produce, type Draft } from "immer";
-import grida from "@grida/schema";
+import type grida from "@grida/schema";
 import type { NodeChangeAction } from "../action";
 import type cg from "@grida/cg";
 import { v4 } from "uuid";
 import assert from "assert";
+
+function defineNodeProperty<
+  K extends keyof grida.program.nodes.UnknwonNode,
+>(handlers: {
+  assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+  apply: (
+    draft: grida.program.nodes.UnknownNodeProperties,
+    value: NonNullable<grida.program.nodes.UnknwonNode[K]>,
+    prev?: grida.program.nodes.UnknwonNode[K]
+  ) => void;
+}) {
+  return handlers;
+}
+
+/**
+ * properties without side effects (re-layout)
+ */
+const safe_properties: Partial<
+  Omit<
+    grida.program.nodes.UnknownNodeProperties<{
+      assert?: (node: grida.program.nodes.UnknwonNode) => boolean;
+      apply: (
+        draft: grida.program.nodes.UnknownNodeProperties,
+        value: any,
+        prev?: any
+      ) => void;
+    }>,
+    "type"
+  >
+> = {
+  active: defineNodeProperty<"active">({
+    assert: (node) => typeof node.active === "boolean",
+    apply: (draft, value, prev) => {
+      draft.active = value;
+    },
+  }),
+  locked: defineNodeProperty<"locked">({
+    assert: (node) => typeof node.locked === "boolean",
+    apply: (draft, value, prev) => {
+      draft.locked = value;
+    },
+  }),
+  name: defineNodeProperty<"name">({
+    assert: (node) => typeof node.name === "string",
+    apply: (draft, value, prev) => {
+      draft.name = value;
+    },
+  }),
+  width: defineNodeProperty<"width">({
+    apply: (draft, value, prev) => {
+      if (typeof value === "number") {
+        draft.width = ranged(0, value);
+      } else {
+        draft.width = value;
+      }
+    },
+  }),
+  height: defineNodeProperty<"height">({
+    apply: (draft, value, prev) => {
+      if (typeof value === "number") {
+        draft.height = ranged(0, value);
+      } else {
+        draft.height = value;
+      }
+    },
+  }),
+  rotation: defineNodeProperty<"rotation">({
+    assert: (node) => typeof node.rotation === "number",
+    apply: (draft, value, prev) => {
+      draft.rotation = value;
+    },
+  }),
+  href: defineNodeProperty<"href">({
+    assert: (node) => typeof node.href === "string",
+    apply: (draft, value, prev) => {
+      draft.href = value;
+    },
+  }),
+  target: defineNodeProperty<"target">({
+    assert: (node) => typeof node.target === "string",
+    apply: (draft, value, prev) => {
+      draft.target = value;
+    },
+  }),
+  cursor: defineNodeProperty<"cursor">({
+    assert: (node) => typeof node.cursor === "string",
+    apply: (draft, value, prev) => {
+      draft.cursor = value;
+    },
+  }),
+  src: defineNodeProperty<"src">({
+    assert: (node) => typeof node.src === "string",
+    apply: (draft, value, prev) => {
+      draft.src = value;
+    },
+  }),
+  opacity: defineNodeProperty<"opacity">({
+    assert: (node) => typeof node.opacity === "number",
+    apply: (draft, value, prev) => {
+      draft.opacity = ranged(0, value, 1);
+    },
+  }),
+  fill: defineNodeProperty<"fill">({
+    assert: (node) =>
+      node.type === "vector" ||
+      node.type === "path" ||
+      node.type === "image" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse" ||
+      node.type === "text" ||
+      node.type === "richtext" ||
+      node.type === "container" ||
+      node.type === "component",
+    apply: (draft, value, prev) => {
+      if (value === null) {
+        draft.fill = undefined;
+        return;
+      }
+
+      switch (value.type) {
+        case "linear_gradient":
+        case "radial_gradient":
+          draft.fill = {
+            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
+            id: `gradient-${v4()}`,
+          };
+          break;
+        case "solid":
+          draft.fill = value as
+            | grida.program.nodes.i.props.SolidPaintToken
+            | cg.SolidPaint;
+          break;
+      }
+    },
+  }),
+  cornerRadius: defineNodeProperty<"cornerRadius">({
+    assert: (node) =>
+      node.type === "rectangle" ||
+      node.type === "image" ||
+      node.type === "video" ||
+      node.type === "container" ||
+      node.type === "component",
+    apply: (draft, value, prev) => {
+      // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
+
+      const each =
+        typeof value == "number"
+          ? {
+              tl: Math.max(value, 0),
+              tr: Math.max(value, 0),
+              br: Math.max(value, 0),
+              bl: Math.max(value, 0),
+            }
+          : {
+              tl: Math.max(value[0], 0),
+              tr: Math.max(value[1], 0),
+              br: Math.max(value[2], 0),
+              bl: Math.max(value[3], 0),
+            };
+      if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
+        draft.cornerRadius = each.tl;
+      } else {
+        draft.cornerRadius = [each.tl, each.tr, each.br, each.bl];
+      }
+    },
+  }),
+  border: defineNodeProperty<"border">({
+    assert: (node) =>
+      // node.type === "text" ||
+      node.type === "image" ||
+      node.type === "video" ||
+      node.type === "container" ||
+      node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.border = value;
+    },
+  }),
+  stroke: defineNodeProperty<"stroke">({
+    assert: (node) =>
+      node.type === "path" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse",
+    apply: (draft, value, prev) => {
+      if (value === null) {
+        draft.stroke = undefined;
+        return;
+      }
+
+      switch (value.type) {
+        case "linear_gradient":
+        case "radial_gradient":
+          draft.stroke = {
+            ...(value as cg.LinearGradientPaint | cg.RadialGradientPaint),
+            id: `gradient-${v4()}`,
+          };
+          break;
+        case "solid":
+          draft.stroke = value as
+            | grida.program.nodes.i.props.SolidPaintToken
+            | cg.SolidPaint;
+          break;
+      }
+    },
+  }),
+  strokeWidth: defineNodeProperty<"strokeWidth">({
+    assert: (node) =>
+      node.type === "path" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse",
+    apply: (draft, value, prev) => {
+      draft.strokeWidth = ranged(0, value);
+    },
+  }),
+  strokeCap: defineNodeProperty<"strokeCap">({
+    assert: (node) =>
+      node.type === "path" ||
+      node.type === "line" ||
+      node.type === "rectangle" ||
+      node.type === "ellipse",
+    apply: (draft, value, prev) => {
+      draft.strokeCap = value;
+    },
+  }),
+  boxShadow: defineNodeProperty<"boxShadow">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.boxShadow = value;
+    },
+  }),
+  zIndex: defineNodeProperty<"zIndex">({
+    assert: (node) => typeof node.zIndex === "number",
+    apply: (draft, value, prev) => {
+      draft.zIndex = value;
+    },
+  }),
+  fit: defineNodeProperty<"fit">({
+    assert: (node) => node.type === "image",
+    apply: (draft, value, prev) => {
+      draft.fit = value;
+    },
+  }),
+  padding: defineNodeProperty<"padding">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.padding = value;
+    },
+  }),
+  layout: defineNodeProperty<"layout">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.layout = value;
+      if (prev !== "flex" && value === "flex") {
+        // initialize flex layout
+        // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
+        if (!draft.direction) draft.direction = "horizontal";
+        if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
+        if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
+        if (!draft.mainAxisGap) draft.mainAxisGap = 0;
+        if (!draft.crossAxisGap) draft.crossAxisGap = 0;
+      }
+    },
+  }),
+  direction: defineNodeProperty<"direction">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.direction = value;
+    },
+  }),
+  mainAxisAlignment: defineNodeProperty<"mainAxisAlignment">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.mainAxisAlignment = value;
+    },
+  }),
+  crossAxisAlignment: defineNodeProperty<"crossAxisAlignment">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.crossAxisAlignment = value;
+    },
+  }),
+  mainAxisGap: defineNodeProperty<"mainAxisGap">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.mainAxisGap = value;
+    },
+  }),
+  crossAxisGap: defineNodeProperty<"crossAxisGap">({
+    assert: (node) => node.type === "container" || node.type === "component",
+    apply: (draft, value, prev) => {
+      draft.crossAxisGap = value;
+    },
+  }),
+  textAlign: defineNodeProperty<"textAlign">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.textAlign = value;
+    },
+  }),
+  textAlignVertical: defineNodeProperty<"textAlignVertical">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.textAlignVertical = value;
+    },
+  }),
+  fontWeight: defineNodeProperty<"fontWeight">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.fontWeight = value;
+    },
+  }),
+  fontSize: defineNodeProperty<"fontSize">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.fontSize = ranged(1, value);
+    },
+  }),
+  lineHeight: defineNodeProperty<"lineHeight">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.lineHeight = value;
+    },
+  }),
+  letterSpacing: defineNodeProperty<"letterSpacing">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.letterSpacing = value;
+    },
+  }),
+  maxLength: defineNodeProperty<"maxLength">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.maxLength = value;
+    },
+  }),
+  text: defineNodeProperty<"text">({
+    assert: (node) => node.type === "text",
+    apply: (draft, value, prev) => {
+      draft.text = value ?? null;
+    },
+  }),
+  userdata: defineNodeProperty<"userdata">({
+    apply: (draft, value, prev) => {
+      assert(
+        value === undefined ||
+          value === null ||
+          (typeof value === "object" && !Array.isArray(value)),
+        "userdata must be an k:v object"
+      );
+      draft.userdata = value;
+    },
+  }),
+};
+
+function applyNodeProperty<K extends keyof grida.program.nodes.UnknwonNode>(
+  draft: grida.program.nodes.UnknownNodeProperties,
+  key: K,
+  value: any
+) {
+  "use strict";
+  if (!(key in safe_properties)) {
+    throw new Error(`property handler not found: "${key}"`);
+  }
+  const property = safe_properties[key as keyof typeof safe_properties];
+  if (property) {
+    const prev = (draft as any)[key];
+    // TODO: assert - decide pre or after
+    property.apply(draft, value, prev);
+  }
+}
 
 export default function nodeReducer<
   N extends Partial<grida.program.nodes.Node>,
 >(node: N, action: NodeChangeAction): N {
   return produce(node, (draft) => {
     switch (action.type) {
-      case "node/change/active": {
-        draft.active = action.active;
+      case "node/change/*": {
+        const { type: _, node_id: __, ...values } = action;
+        for (const [key, value] of Object.entries(values)) {
+          applyNodeProperty(
+            draft as grida.program.nodes.UnknownNodeProperties,
+            key as keyof grida.program.nodes.UnknwonNode,
+            value
+          );
+        }
         break;
       }
-      case "node/change/userdata": {
-        const { userdata } = action;
-        // double check if the userdata is serializable and k:v structure
-        assert(
-          userdata === undefined ||
-            userdata === null ||
-            (typeof userdata === "object" && !Array.isArray(userdata)),
-          "userdata must be an k:v object"
-        );
-        draft.userdata = userdata;
-        break;
-      }
-      case "node/change/locked": {
-        draft.locked = action.locked;
-        break;
-      }
-      case "node/change/name": {
-        (draft as grida.program.nodes.i.IBaseNode).name =
-          action.name || (node.type as string);
-        break;
-      }
+      // keep
       case "node/change/positioning": {
-        const { positioning } = action;
         const pos = draft as grida.program.nodes.i.IPositioning;
-        if ("position" in positioning) {
-          if (positioning.position) {
-            pos.position = positioning.position;
+        if ("position" in action) {
+          if (action.position) {
+            pos.position = action.position;
           }
         }
-        if ("left" in positioning) pos.left = positioning.left;
-        if ("top" in positioning) pos.top = positioning.top;
-        if ("right" in positioning) pos.right = positioning.right;
-        if ("bottom" in positioning) pos.bottom = positioning.bottom;
+        if ("left" in action) pos.left = action.left;
+        if ("top" in action) pos.top = action.top;
+        if ("right" in action) pos.right = action.right;
+        if ("bottom" in action) pos.bottom = action.bottom;
         break;
       }
+      // keep
       case "node/change/positioning-mode": {
         const { position } = action;
         (draft as grida.program.nodes.i.IPositioning).position = position;
@@ -65,277 +423,14 @@ export default function nodeReducer<
         }
         break;
       }
-      case "node/change/size": {
-        const { axis, value: length } = action;
-        // TODO: check the sizing model (fixed or css)
-        (draft as grida.program.nodes.i.ICSSDimension)[axis] = length;
-        break;
-      }
-      case "node/change/href": {
-        (draft as grida.program.nodes.i.IHrefable).href = action.href;
-        break;
-      }
-      case "node/change/target": {
-        (draft as grida.program.nodes.i.IHrefable).target = action.target;
-        break;
-      }
-      case "node/change/mouse-cursor": {
-        (draft as grida.program.nodes.i.IMouseCursor).cursor = action.cursor;
-        break;
-      }
       case "node/change/component": {
         assert(draft.type === "instance");
         draft.component_id = action.component_id;
         break;
       }
-      case "node/change/src": {
-        assert(draft.type === "image");
-        draft.src = action.src;
-        break;
-      }
       case "node/change/props": {
         assert(draft.type === "instance" || draft.type === "template_instance");
         draft.props = Object.assign({}, draft.props, action.props);
-        break;
-      }
-      case "node/change/opacity": {
-        const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
-        switch (action.opacity.type) {
-          case "set":
-            node.opacity = ranged(0, action.opacity.value, 1);
-            break;
-          case "delta":
-            node.opacity = ranged(0, node.opacity + action.opacity.value, 1);
-            break;
-        }
-        break;
-      }
-      case "node/change/rotation": {
-        const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
-        switch (action.rotation.type) {
-          case "set":
-            node.rotation = action.rotation.value;
-            break;
-          case "delta":
-            node.rotation += action.rotation.value;
-            break;
-        }
-        break;
-      }
-      case "node/change/cornerRadius": {
-        assert(
-          draft.type === "rectangle" ||
-            draft.type === "image" ||
-            draft.type === "video" ||
-            draft.type === "container" ||
-            draft.type === "component",
-          "node type does not support cornerRadius"
-        );
-
-        // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
-
-        const each =
-          typeof action.cornerRadius == "number"
-            ? {
-                tl: Math.max(action.cornerRadius, 0),
-                tr: Math.max(action.cornerRadius, 0),
-                br: Math.max(action.cornerRadius, 0),
-                bl: Math.max(action.cornerRadius, 0),
-              }
-            : {
-                tl: Math.max(action.cornerRadius[0], 0),
-                tr: Math.max(action.cornerRadius[1], 0),
-                br: Math.max(action.cornerRadius[2], 0),
-                bl: Math.max(action.cornerRadius[3], 0),
-              };
-        if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
-          draft.cornerRadius = each.tl;
-        } else {
-          draft.cornerRadius = [each.tl, each.tr, each.br, each.bl];
-        }
-        break;
-      }
-      case "node/change/fill": {
-        assert(
-          draft.type === "vector" ||
-            draft.type === "path" ||
-            draft.type === "image" ||
-            draft.type === "rectangle" ||
-            draft.type === "ellipse" ||
-            draft.type === "text" ||
-            draft.type === "richtext" ||
-            draft.type === "container" ||
-            draft.type === "component"
-        );
-
-        if (action.fill === null) {
-          draft.fill = undefined;
-          break;
-        }
-
-        switch (action.fill.type) {
-          case "linear_gradient":
-          case "radial_gradient":
-            draft.fill = {
-              ...(action.fill as
-                | cg.LinearGradientPaint
-                | cg.RadialGradientPaint),
-              id: `gradient-${v4()}`,
-            };
-            break;
-          case "solid":
-            draft.fill = action.fill as
-              | grida.program.nodes.i.props.SolidPaintToken
-              | cg.SolidPaint;
-            break;
-        }
-        break;
-      }
-      case "node/change/border": {
-        assert(
-          // draft.type === "text" ||
-          draft.type === "image" ||
-            draft.type === "video" ||
-            draft.type === "container" ||
-            draft.type === "component"
-        );
-        draft.border = action.border;
-        break;
-      }
-      case "node/change/stroke":
-      case "node/change/stroke-width":
-      case "node/change/stroke-cap": {
-        assert(
-          draft.type === "path" ||
-            draft.type === "line" ||
-            draft.type === "rectangle" ||
-            draft.type === "ellipse"
-        );
-        switch (action.type) {
-          case "node/change/stroke": {
-            if (action.stroke === null) {
-              draft.stroke = undefined;
-              break;
-            }
-
-            switch (action.stroke.type) {
-              case "linear_gradient":
-              case "radial_gradient":
-                draft.stroke = {
-                  ...(action.stroke as
-                    | cg.LinearGradientPaint
-                    | cg.RadialGradientPaint),
-                  id: `gradient-${v4()}`,
-                };
-                break;
-              case "solid":
-                // FIXME:
-                // @ts-expect-error
-                draft.stroke = action.stroke as
-                  | grida.program.nodes.i.props.SolidPaintToken
-                  | cg.SolidPaint;
-                break;
-            }
-            break;
-          }
-          case "node/change/stroke-width": {
-            switch (action.strokeWidth.type) {
-              case "set":
-                draft.strokeWidth = ranged(0, action.strokeWidth.value);
-                break;
-              case "delta":
-                if (draft.strokeWidth !== undefined) {
-                  draft.strokeWidth = ranged(
-                    0,
-                    draft.strokeWidth + action.strokeWidth.value
-                  );
-                }
-
-                break;
-            }
-            break;
-          }
-          case "node/change/stroke-cap": {
-            draft.strokeCap = action.strokeCap;
-            break;
-          }
-        }
-        break;
-      }
-      case "node/change/fit": {
-        assert(draft.type === "image");
-        draft.fit = action.fit;
-        break;
-      }
-      case "node/change/padding": {
-        assert(draft.type === "container" || draft.type === "component");
-        draft.padding = action.padding;
-        break;
-      }
-      case "node/change/box-shadow": {
-        assert(draft.type === "container" || draft.type === "component");
-        draft.boxShadow = action.boxShadow;
-        break;
-      }
-      case "node/change/layout": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(action.layout, "layout is required");
-        draft.layout = action.layout;
-        if (action.layout === "flex") {
-          // initialize flex layout
-          // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
-          if (!draft.direction) draft.direction = "horizontal";
-          if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
-          if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
-          if (!draft.mainAxisGap) draft.mainAxisGap = 0;
-          if (!draft.crossAxisGap) draft.crossAxisGap = 0;
-        }
-        break;
-      }
-      case "node/change/direction": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(action.direction, "direction is required");
-        draft.direction = action.direction;
-        break;
-      }
-      case "node/change/mainAxisAlignment": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(action.mainAxisAlignment, "mainAxisAlignment is required");
-        draft.mainAxisAlignment = action.mainAxisAlignment;
-        break;
-      }
-      case "node/change/crossAxisAlignment": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(action.crossAxisAlignment, "crossAxisAlignment is required");
-        draft.crossAxisAlignment = action.crossAxisAlignment;
-        break;
-      }
-      case "node/change/gap": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(
-          typeof action.gap === "number" ||
-            typeof action.gap.mainAxisGap === "number",
-          "invalid gap value"
-        );
-        if (typeof action.gap === "number") {
-          draft.mainAxisGap = action.gap;
-          draft.crossAxisGap = action.gap;
-        } else {
-          draft.mainAxisGap = action.gap.mainAxisGap;
-          draft.crossAxisGap = action.gap.crossAxisGap;
-        }
-        break;
-      }
-      case "node/change/mainAxisGap": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(typeof action.mainAxisGap === "number", "invalid gap value");
-        draft.mainAxisGap = action.mainAxisGap;
-        break;
-      }
-      case "node/change/crossAxisGap": {
-        assert(draft.type === "container" || draft.type === "component");
-        assert(typeof action.crossAxisGap === "number", "invalid gap value");
-        draft.crossAxisGap = action.crossAxisGap;
         break;
       }
       case "node/change/style": {
@@ -348,79 +443,9 @@ export default function nodeReducer<
           );
         break;
       }
-      case "node/change/text": {
-        assert(draft.type === "text");
-        draft.text = action.text ?? null;
-        break;
-      }
       case "node/change/fontFamily": {
         assert(draft.type === "text");
         draft.fontFamily = action.fontFamily;
-        break;
-      }
-      case "node/change/fontSize": {
-        assert(draft.type === "text");
-        switch (action.fontSize.type) {
-          case "set":
-            draft.fontSize = ranged(0, action.fontSize.value);
-            break;
-          case "delta":
-            if (draft.fontSize !== undefined) {
-              draft.fontSize = ranged(
-                0,
-                draft.fontSize + action.fontSize.value
-              );
-            }
-            break;
-        }
-        break;
-      }
-      case "node/change/fontWeight": {
-        assert(draft.type === "text");
-        draft.fontWeight = action.fontWeight;
-        break;
-      }
-      case "node/change/letterSpacing": {
-        assert(draft.type === "text");
-        switch (action.letterSpacing.type) {
-          case "set":
-            draft.letterSpacing = action.letterSpacing.value;
-            break;
-          case "delta":
-            if (draft.letterSpacing !== undefined) {
-              draft.letterSpacing += action.letterSpacing.value;
-            }
-            break;
-        }
-        break;
-      }
-      case "node/change/lineHeight": {
-        assert(draft.type === "text");
-        switch (action.lineHeight.type) {
-          case "set":
-            draft.lineHeight = action.lineHeight.value;
-            break;
-          case "delta":
-            if (draft.lineHeight !== undefined) {
-              draft.lineHeight += action.lineHeight.value;
-            }
-            break;
-        }
-        break;
-      }
-      case "node/change/textAlign": {
-        assert(draft.type === "text");
-        draft.textAlign = action.textAlign;
-        break;
-      }
-      case "node/change/textAlignVertical": {
-        assert(draft.type === "text");
-        draft.textAlignVertical = action.textAlignVertical;
-        break;
-      }
-      case "node/change/maxlength": {
-        assert(draft.type === "text");
-        draft.maxLength = action.maxlength;
         break;
       }
 

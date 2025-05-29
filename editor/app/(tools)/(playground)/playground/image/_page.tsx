@@ -43,7 +43,7 @@ import {
   ViewportRoot,
   EditorSurface,
   AutoInitialFitTransformer,
-  useDocument,
+  useCurrentEditor,
 } from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
@@ -124,15 +124,13 @@ export default function ImagePlayground() {
 function CanvasConsumer() {
   const { withAuth, session } = useContinueWithAuth();
   const credits = useCredits();
-  const editor = useDocument();
+  const editor = useCurrentEditor();
   const [prompt, setPrompt] = useState("");
   const model = useImageModelConfig("black-forest-labs/flux-schnell");
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
-    const id = editor.createNodeId();
-    editor.insertNode({
-      _$id: id,
+    const id = editor.insertNode({
       type: "image",
       name: value.text,
       width: model.width,

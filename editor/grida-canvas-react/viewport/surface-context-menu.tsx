@@ -8,20 +8,21 @@ import {
 } from "@/components/ui/context-menu";
 import {
   useDataTransferEventTarget,
-  useDocument,
-  useSelection,
+  useCurrentSelection,
+  useSelectionState,
 } from "../provider";
 import { toast } from "sonner";
 import { cn } from "@/components/lib/utils";
+import { useCurrentEditor } from "../use-editor";
 
 export function EditorSurfaceContextMenu({
   children,
   className,
 }: React.PropsWithChildren<{ className?: string }>) {
-  const { selection, paste, order, autoLayout, contain, deleteNode } =
-    useDocument();
+  const editor = useCurrentEditor();
+  const { selection } = useSelectionState();
   const { insertText } = useDataTransferEventTarget();
-  const { actions } = useSelection();
+  const { actions } = useCurrentSelection();
 
   const has_selection = selection.length > 0;
   const can_copy = has_selection;
@@ -49,7 +50,7 @@ export function EditorSurfaceContextMenu({
           }
         }
       }
-      paste();
+      editor.paste();
     } catch (e) {}
   };
 
@@ -80,7 +81,7 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!can_bring_to_front}
           onSelect={() => {
-            order("selection", "front");
+            editor.order("selection", "front");
           }}
           className="text-xs"
         >
@@ -90,7 +91,7 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!can_send_to_back}
           onSelect={() => {
-            order("selection", "back");
+            editor.order("selection", "back");
           }}
           className="text-xs"
         >
@@ -101,7 +102,7 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!has_selection}
           onSelect={() => {
-            contain("selection");
+            editor.contain("selection");
           }}
           className="text-xs"
         >
@@ -111,7 +112,7 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!has_selection}
           onSelect={() => {
-            autoLayout("selection");
+            editor.autoLayout("selection");
           }}
           className="text-xs"
         >
@@ -122,7 +123,7 @@ export function EditorSurfaceContextMenu({
         <ContextMenuItem
           disabled={!has_selection}
           onSelect={() => {
-            deleteNode("selection");
+            editor.deleteNode("selection");
           }}
           className="text-xs"
         >
