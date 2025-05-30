@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import iosvg from "@grida/io-svg";
+import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
 import { dq } from "@/grida-canvas/query";
@@ -24,11 +25,6 @@ import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 import nid from "../grida-canvas/reducers/tools/id";
-import {
-  encodeClipboardHtml,
-  decodeClipboardHtml,
-  type ClipboardPayload,
-} from "./clipboard";
 
 type Dispatcher = (action: Action) => void;
 
@@ -1223,16 +1219,17 @@ export function useDataTransferEventTarget() {
         } else if (item.kind === "string" && item.type === "text/html") {
           pasted_from_data_transfer = true;
           item.getAsString((html) => {
-            const data = decodeClipboardHtml(html);
+            const data = io.clipboard.decodeClipboardHtml(html);
             if (data) {
               if (current_clipboard?.payload_id === data.payload_id) {
                 instance.paste();
               } else {
                 data.prototypes.forEach((p) => {
-                  const sub = grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                    p,
-                    nid
-                  );
+                  const sub =
+                    grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                      p,
+                      nid
+                    );
                   instance.insert({ document: sub });
                 });
               }
@@ -1312,7 +1309,9 @@ export function useClipboardSync() {
   useEffect(() => {
     try {
       if (user_clipboard) {
-        const htmltxt = encodeClipboardHtml(user_clipboard as ClipboardPayload);
+        const htmltxt = io.clipboard.encodeClipboardHtml(
+          user_clipboard as io.clipboard.ClipboardPayload
+        );
         const blob = new Blob([htmltxt], { type: "text/html" });
 
         const clipboardItem = new ClipboardItem({
