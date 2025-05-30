@@ -618,29 +618,35 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent
+      // group by parent, considering root nodes when scene allows
       const groups = Object.groupBy(
-        // omit root node
-        target_node_ids.filter((id) => !scene.children.includes(id)),
-        (node_id) => {
-          return editor.dq.getParentId(state.document_ctx, node_id)!;
-        }
+        target_node_ids.filter((id) => {
+          const is_root = scene.children.includes(id);
+          return scene.constraints.children !== "single" || !is_root;
+        }),
+        (node_id) =>
+          editor.dq.getParentId(state.document_ctx, node_id) ?? "<root>"
       );
 
       return produce(state, (draft) => {
         const insertions: grida.program.nodes.NodeID[] = [];
         Object.keys(groups).forEach((parent_id) => {
           const g = groups[parent_id]!;
+          const is_root = parent_id === "<root>";
           const cdom = new domapi.CanvasDOM(state.transform);
 
-          const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+          let delta: cmath.Vector2;
+          if (is_root) {
+            delta = [0, 0];
+          } else {
+            const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+            delta = [-parent_rect.x, -parent_rect.y];
+          }
 
           const rects = g
             .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
             // make the rects relative to the parent
-            .map((rect) =>
-              cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
-            )
+            .map((rect) => cmath.rect.translate(rect, delta))
             .map((rect) => cmath.rect.quantize(rect, 1));
 
           const union = cmath.rect.union(rects);
@@ -660,7 +666,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           const container_id = self_insertSubDocument(
             draft,
-            parent_id,
+            is_root ? null : parent_id,
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               container_prototype,
               nid

@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -179,17 +178,17 @@ export function VirtualizedCombobox({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
+        <button
+          type="button"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between", className)}
+          className={cn("flex w-full justify-between items-center", className)}
         >
-          <span className="text-ellipsis overflow-hidden">
+          <span className="line-clamp-1 text-left">
             {value ? options.find((option) => option === value) : placeholder}
           </span>
-          <CaretSortIcon className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
+          <CaretSortIcon className="ml-2 size-4 shrink-0 text-muted-foreground opacity-50" />
+        </button>
       </PopoverTrigger>
       <PopoverContent
         className="p-0"

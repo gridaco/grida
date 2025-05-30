@@ -91,6 +91,7 @@ This document lists all implemented features including the ones that are not yet
 - [x] lock to dominant axis while translate (`shift`)
 - [x] preserve aspect ratio while scale (`shift`)
 - [x] quantize rotation (rotate by 15 degrees) (`shift`)
+- [x] quantize rotation by 1 degree by default
 
 **Snapping**
 
@@ -103,6 +104,13 @@ This document lists all implemented features including the ones that are not yet
 **Rotation**
 
 - [ ] rotation based on atan relative to the center, based on rotation handle position
+
+**Edge Scrolling**
+
+> "edge scrolling" scrolls the canvas when the pointer is near the edge of the viewport, while dragging.
+
+- [x] edge scrolling
+- [ ] edge scrolling with pointer synchronization (the updated transform should also be applied to current gesture)
 
 ### Controls
 

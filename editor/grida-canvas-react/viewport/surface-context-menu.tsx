@@ -61,7 +61,7 @@ export function EditorSurfaceContextMenu({
         {children}
       </ContextMenuTrigger>
       {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
-      <ContextMenuContent className="min-w-52">
+      <ContextMenuContent className="w-52">
         <ContextMenuItem
           disabled={!can_copy}
           onSelect={actions.copy}
@@ -155,7 +155,7 @@ export function EditorSurfaceContextMenu({
             });
           }}
         >
-          <span className="font-mono text-[9px] text-muted-foreground">
+          <span className="font-mono text-[9px] text-muted-foreground truncate">
             ID: {selection.join(", ")}
           </span>
         </ContextMenuItem>
