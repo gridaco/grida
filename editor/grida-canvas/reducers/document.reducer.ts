@@ -108,6 +108,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return produce(state, (draft) => {
         // [copy]
         draft.user_clipboard = {
+          payload_id: crypto.randomUUID(),
           ids: target_node_ids,
           prototypes: target_node_ids.map((id) =>
             grida.program.nodes.factory.createPrototypeFromSnapshot(

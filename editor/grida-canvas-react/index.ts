@@ -22,3 +22,4 @@ export {
   type StandaloneDocumentContentProps,
 } from "./renderer";
 export * from "./viewport";
+export { encodeClipboardHtml, decodeClipboardHtml } from "./clipboard";
