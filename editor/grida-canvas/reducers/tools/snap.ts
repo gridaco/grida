@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 
 const q = 1;
 
@@ -109,9 +110,9 @@ export function getSnapTargets(
     new Set(
       selection
         .map((node_id) =>
-          editor.dq
+          dq
             .getSiblings(document_ctx, node_id)
-            .concat(editor.dq.getParentId(document_ctx, node_id) ?? [])
+            .concat(dq.getParentId(document_ctx, node_id) ?? [])
         )
         .flat()
     )

@@ -549,8 +549,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "tab",
     () => {
-      // TODO: select next sibling
-      toast.error("[next sibling] is not implemented yet");
+      editor.select("~+");
     },
     {
       preventDefault: true,
@@ -562,8 +561,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+tab",
     () => {
-      // TODO: select previous sibling
-      toast.error("[prev sibling] is not implemented yet");
+      editor.select("~-");
     },
     {
       preventDefault: true,
@@ -592,13 +590,29 @@ export function useEditorHotKeys() {
   });
   // #endregion
 
-  useHotkeys("undo, meta+z, ctrl+z", () => {
-    editor.undo();
-  });
+  useHotkeys(
+    "undo, meta+z, ctrl+z",
+    () => {
+      editor.undo();
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
-  useHotkeys("redo, meta+shift+z, ctrl+shift+z", () => {
-    editor.redo();
-  });
+  useHotkeys(
+    "redo, meta+shift+z, ctrl+shift+z",
+    () => {
+      editor.redo();
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
   useHotkeys("meta+b, ctrl+b", () => {
     editor.toggleBold("selection");

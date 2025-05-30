@@ -56,7 +56,7 @@ export function ImportFromGridaFileJsonDialog({
         </DialogHeader>
         <div className="space-y-4">
           <Label>Select a .grida file</Label>
-          <Card className="flex items-center justify-center">
+          <Card className="flex items-center justify-center p-0">
             <Button
               onClick={openFilePicker}
               disabled={loading}

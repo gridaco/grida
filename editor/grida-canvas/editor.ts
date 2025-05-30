@@ -2,6 +2,7 @@ import produce from "immer";
 import { Action, editor } from ".";
 import reducer from "./reducers";
 import grida from "@grida/schema";
+import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";
 import nid from "./reducers/tools/id";
 import type { tokens } from "@grida/tokens";
@@ -138,6 +139,10 @@ export class Editor
     });
   }
 
+  public __get_node_siblings(node_id: string): string[] {
+    return dq.getSiblings(this.mstate.document_ctx, node_id);
+  }
+
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action);
@@ -242,10 +247,27 @@ export class Editor
   }
 
   public select(...selectors: grida.program.document.Selector[]) {
-    this.dispatch({
-      type: "select",
-      selectors,
-    });
+    const { document_ctx, selection } = this.mstate;
+    const ids = Array.from(
+      new Set(
+        selectors.flatMap((selector) =>
+          dq.querySelector(document_ctx, selection, selector)
+        )
+      )
+    );
+
+    if (ids.length === 0) {
+      // if no ids found, keep the current selection
+      // e.g. this can happen whe `>` (select children) is used but no children found
+      return false;
+    } else {
+      this.dispatch({
+        type: "select",
+        selection: ids,
+      });
+    }
+
+    return ids;
   }
 
   public blur() {
@@ -330,7 +352,7 @@ export class Editor
   public getNodeSnapshotById(
     node_id: editor.NodeID
   ): Readonly<grida.program.nodes.Node> {
-    return editor.dq.__getNodeById(this.mstate, node_id);
+    return dq.__getNodeById(this.mstate, node_id);
   }
 
   public getNodeById(
@@ -340,11 +362,11 @@ export class Editor
   }
 
   public getNodeDepth(node_id: editor.NodeID): number {
-    return editor.dq.getDepth(this.mstate.document_ctx, node_id);
+    return dq.getDepth(this.mstate.document_ctx, node_id);
   }
 
   public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
-    const parent_ids = editor.dq.getAncestors(this.state.document_ctx, node_id);
+    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
 
     let rotation = 0;
     // Calculate the absolute rotation
@@ -1242,7 +1264,7 @@ export class Editor
     }
   ) {
     const { document_ctx, selection, transform } = this.state;
-    const ids = editor.dq.querySelector(document_ctx, selection, selector);
+    const ids = dq.querySelector(document_ctx, selection, selector);
 
     const cdom = new domapi.CanvasDOM(transform);
 

@@ -28,7 +28,7 @@ import ErrorBoundary from "@/scaffolds/playground-canvas/error-boundary";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
-import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 
 const min = { width: 100, height: 100 };
 
@@ -57,7 +57,7 @@ export function PreviewProvider({
 
   const getPreviewNode = (node_id?: string) => {
     function tryGetTopPreviewNode(node_id: string) {
-      const topid = editor.dq.getTopId(document_ctx, node_id);
+      const topid = dq.getTopId(document_ctx, node_id);
       if (!topid) return null;
       const top = document.nodes[topid];
       if (!top) return null;

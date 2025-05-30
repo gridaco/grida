@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish"
   },
   "packageManager": "pnpm@10.10.0",

@@ -11,6 +11,13 @@ import { cn } from "@/components/lib/utils";
 import { svg } from "@/grida-canvas-utils/svg";
 import assert from "assert";
 
+function transformDelta(v: cmath.Vector2, t: cmath.Transform): cmath.Vector2 {
+  return cmath.vector2.transform(v, [
+    [t[0][0], t[0][1], 0],
+    [t[1][0], t[1][1], 0],
+  ]);
+}
+
 export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
   const { debug } = useEditorFlagsState();
   const { tool } = useToolState();
@@ -84,7 +91,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
               transform
             )}
             b={cmath.vector2.transform(path_cursor_position, transform)}
-            ta={next_ta ? next_ta : undefined}
+            ta={next_ta ? transformDelta(next_ta, transform) : undefined}
           />
         </>
       )}
@@ -93,6 +100,8 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
         const b = vertices[s.b].p;
         const ta = s.ta;
         const tb = s.tb;
+        const ta_scaled = transformDelta(ta, transform);
+        const tb_scaled = transformDelta(tb, transform);
         const is_neighbouring = a_point === s.a || a_point === s.b;
         if (!is_neighbouring) return null;
 
@@ -115,6 +124,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
                     cmath.vector2.add(a, offset, ta),
                     transform
                   )}
+                  ta={ta_scaled}
                 />
               )}
               {!cmath.vector2.isZero(tb) && (
@@ -129,6 +139,7 @@ export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
                     cmath.vector2.add(b, offset, tb),
                     transform
                   )}
+                  tb={tb_scaled}
                 />
               )}
               {/* preview the next ta - cannot be edited */}

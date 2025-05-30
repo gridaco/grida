@@ -1167,13 +1167,9 @@ importers:
 
   packages/grida-mixed-properties:
     dependencies:
-      deep-equal:
-        specifier: ^2.2.3
-        version: 2.2.3
-    devDependencies:
-      '@types/deep-equal':
-        specifier: ^1.0.4
-        version: 1.0.4
+      fast-deep-equal:
+        specifier: ^3.1.3
+        version: 3.1.3
 
   packages/grida-tokens: {}
 

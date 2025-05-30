@@ -1,6 +1,7 @@
 import type { Draft } from "immer";
 import { editor } from "@/grida-canvas";
 import assert from "assert";
+import { dq } from "@/grida-canvas/query";
 
 /**
  * TODO:
@@ -14,7 +15,7 @@ export function self_selectNode<S extends editor.state.IEditorState>(
   for (const node_id of node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
-      editor.dq.__getNodeById(draft, node_id),
+      dq.__getNodeById(draft, node_id),
       `Node not found with id: "${node_id}"`
     );
   }
@@ -22,10 +23,7 @@ export function self_selectNode<S extends editor.state.IEditorState>(
   switch (mode) {
     case "add": {
       const set = new Set([...draft.selection, ...node_ids]);
-      const pruned = editor.dq.pruneNestedNodes(
-        draft.document_ctx,
-        Array.from(set)
-      );
+      const pruned = dq.pruneNestedNodes(draft.document_ctx, Array.from(set));
       draft.selection = pruned;
       break;
     }
@@ -38,17 +36,14 @@ export function self_selectNode<S extends editor.state.IEditorState>(
           set.add(node_id);
         }
       }
-      const pruned = editor.dq.pruneNestedNodes(
-        draft.document_ctx,
-        Array.from(set)
-      );
+      const pruned = dq.pruneNestedNodes(draft.document_ctx, Array.from(set));
       draft.selection = pruned;
       break;
     }
     case "reset": {
       // only apply if actually changed
       if (JSON.stringify(node_ids) !== JSON.stringify(draft.selection)) {
-        const pruned = editor.dq.pruneNestedNodes(draft.document_ctx, node_ids);
+        const pruned = dq.pruneNestedNodes(draft.document_ctx, node_ids);
         draft.selection = pruned;
 
         // reset the active duplication as selection changed. see ActiveDuplication's note
