@@ -179,6 +179,7 @@ export function VirtualizedCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          type="button"
           role="combobox"
           aria-expanded={open}
           className={cn("flex w-full justify-between items-center", className)}

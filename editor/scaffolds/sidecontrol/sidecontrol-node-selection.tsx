@@ -129,7 +129,9 @@ export function Selection({
   return (
     <div>
       {selection_length === 0 && empty && empty}
-      {selection_length === 1 && <SelectedNodeProperties config={config} />}
+      {selection_length === 1 && (
+        <SelectedNodeProperties config={config} node_id={selection[0]} />
+      )}
       {selection_length > 1 && <SelectionMixedProperties config={config} />}
     </div>
   );
@@ -668,20 +670,19 @@ function SelectionMixedProperties({
 }
 
 function SelectedNodeProperties({
+  node_id,
   config = __default_controls_config,
 }: {
+  node_id: string;
   config?: ControlsConfig;
 }) {
   const instance = useCurrentEditor();
-  const selection = useEditorState(instance, (state) => state.selection);
   const documentProperties = useEditorState(
     instance,
     (state) => state.document.properties
   );
   const { debug } = useEditorFlagsState();
 
-  assert(selection.length === 1);
-  const node_id = selection[0];
   const actions = useNodeActions(node_id)!;
 
   // const node = useNode(node_id);
