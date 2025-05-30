@@ -55,6 +55,13 @@ export namespace editor.config {
        */
       __unstable_brush_tool: "on" | "off";
     };
+
+    /**
+     * base quantization step for rotation in degrees
+     *
+     * @default 1
+     */
+    rotation_quantize_step: number;
   }
 
   /**
@@ -87,6 +94,11 @@ export namespace editor.config {
    * snap threshold applyed when nudge (fake gesture) is applied
    */
   export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
+
+  /**
+   * default quantization step for rotation gestures (in degrees)
+   */
+  export const DEFAULT_ROTATION_QUANTIZE_STEP = 1;
 
   export const DEFAULT_HIT_TESTING_CONFIG: state.HitTestingConfig = {
     target: "auto",
@@ -546,7 +558,9 @@ export namespace editor.state {
       //
       editor.state.IEditorHistoryExtensionState,
       editor.state.IDocumentState,
-      grida.program.document.IDocumentTemplatesRepository {}
+      grida.program.document.IDocumentTemplatesRepository {
+    rotation_quantize_step: number;
+  }
 
   /**
    * @deprecated
@@ -588,7 +602,9 @@ export namespace editor.state {
 
   export interface IEditorStateInit
     extends Pick<editor.config.IEditorConfig, "editable" | "debug">,
-      Partial<Pick<editor.config.IEditorConfig, "flags">>,
+      Partial<
+        Pick<editor.config.IEditorConfig, "flags" | "rotation_quantize_step">
+      >,
       grida.program.document.IDocumentTemplatesRepository {
     document: Pick<
       grida.program.document.Document,
@@ -653,6 +669,9 @@ export namespace editor.state {
       flags: {
         __unstable_brush_tool: "off",
       },
+      rotation_quantize_step:
+        init.rotation_quantize_step ??
+        editor.config.DEFAULT_ROTATION_QUANTIZE_STEP,
       ...__RESET_SCENE_STATE,
       ...init,
       document: doc,

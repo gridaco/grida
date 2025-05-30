@@ -586,6 +586,7 @@ function __self_update_gesture_transform_rotate(
   assert(draft.gesture.type === "rotate", "Gesture type must be rotate");
   const { movement, selection } = draft.gesture;
   const { rotate_with_quantize } = draft.gesture_modifiers;
+  const { rotation_quantize_step } = draft;
 
   const _angle = cmath.principalAngle(
     // TODO: need to store the initial angle and subtract
@@ -595,8 +596,9 @@ function __self_update_gesture_transform_rotate(
   );
 
   const _user_q =
-    typeof rotate_with_quantize === "number" ? rotate_with_quantize : 0;
-  // quantize value - even when quantize modifier is off, we still use 0.01 as the default value
+    typeof rotate_with_quantize === "number"
+      ? rotate_with_quantize
+      : rotation_quantize_step;
   const q = Math.max(0.01, _user_q);
   const angle = cmath.quantize(_angle, q);
 
