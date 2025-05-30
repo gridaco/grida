@@ -157,3 +157,6 @@ pnpm turbo dev
 # run typecheck
 pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
 ```
+
+Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
+To handle this, you can build the `/packages/*`, then run typecheck. (when networking is not available)
