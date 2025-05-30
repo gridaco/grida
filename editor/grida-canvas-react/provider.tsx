@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
 import iosvg from "@grida/io-svg";
+import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
 import { dq } from "@/grida-canvas/query";
@@ -23,6 +24,7 @@ import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/support
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
+import nid from "../grida-canvas/reducers/tools/id";
 
 type Dispatcher = (action: Action) => void;
 
@@ -1013,6 +1015,7 @@ export function useDataTransferEventTarget() {
   const state = useEditorState(instance, (state) => ({
     transform: state.transform,
   }));
+  const current_clipboard = useEditorState(instance, (s) => s.user_clipboard);
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) => {
@@ -1213,6 +1216,30 @@ export function useDataTransferEventTarget() {
               clientY: window.innerHeight / 2,
             });
           });
+        } else if (item.kind === "string" && item.type === "text/html") {
+          pasted_from_data_transfer = true;
+          item.getAsString((html) => {
+            const data = io.clipboard.decodeClipboardHtml(html);
+            if (data) {
+              if (current_clipboard?.payload_id === data.payload_id) {
+                instance.paste();
+              } else {
+                data.prototypes.forEach((p) => {
+                  const sub =
+                    grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                      p,
+                      nid
+                    );
+                  instance.insert({ document: sub });
+                });
+              }
+              return;
+            }
+            insertText(html, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+          });
         }
       }
 
@@ -1221,7 +1248,7 @@ export function useDataTransferEventTarget() {
         instance.paste();
       }
     },
-    [instance, insertFromFile, insertText]
+    [instance, insertFromFile, insertText, current_clipboard]
   );
 
   const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
@@ -1282,17 +1309,13 @@ export function useClipboardSync() {
   useEffect(() => {
     try {
       if (user_clipboard) {
-        const serializedData = JSON.stringify(user_clipboard);
-        const htmltxt = `<meta>${serializedData}`;
-        const blob = new Blob([htmltxt], {
-          type: "text/html",
-        });
+        const htmltxt = io.clipboard.encodeClipboardHtml(
+          user_clipboard as io.clipboard.ClipboardPayload
+        );
+        const blob = new Blob([htmltxt], { type: "text/html" });
 
         const clipboardItem = new ClipboardItem({
           "text/html": blob,
-          // Optional: Add plain text for fallback
-          // TODO: copy content as texts. (if text)
-          // "text/plain": new Blob([serializedData], { type: "text/plain" }),
         });
         navigator.clipboard.write([clipboardItem]);
       }

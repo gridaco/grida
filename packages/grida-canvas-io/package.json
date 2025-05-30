@@ -3,13 +3,20 @@
   "description": "IO model for Grida Canvas",
   "version": "0.0.0",
   "private": true,
+  "scripts": {
+    "test": "jest"
+  },
   "dependencies": {
     "@grida/cmath": "workspace:*",
     "fast-png": "^6.3.0",
+    "fast-xml-parser": "^5.2.3",
     "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@grida/cg": "workspace:*",
     "@grida/schema": "workspace:*"
+  },
+  "jest": {
+    "preset": "ts-jest"
   }
 }

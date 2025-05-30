@@ -323,6 +323,8 @@ export namespace editor.state {
      * user clipboard - copied data
      */
     user_clipboard?: {
+      /** unique payload id for distinguishing clipboard contents */
+      payload_id: string;
       /**
        * copied node data as prototype
        */

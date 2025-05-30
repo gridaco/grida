@@ -2,8 +2,77 @@ import type grida from "@grida/schema";
 import type cmath from "@grida/cmath";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 import { encode, decode, type PngDataArray } from "fast-png";
+import { XMLParser } from "fast-xml-parser";
 
 export namespace io {
+  export namespace clipboard {
+    const __data_grida_io_prefix = "data-grida-io-";
+    const __data_grida_clipboard = "data-grida-io-clipboard";
+
+    export interface ClipboardPayload {
+      payload_id: string;
+      prototypes: grida.program.nodes.NodePrototype[];
+      ids: string[];
+    }
+
+    export function encodeClipboardHtml(payload: ClipboardPayload): string {
+      const json = JSON.stringify(payload);
+      const utf8Bytes = new TextEncoder().encode(json);
+      const base64 = btoa(String.fromCharCode(...utf8Bytes));
+      return `<span ${__data_grida_clipboard}="b64:${base64}"></span>`;
+    }
+
+    /**
+     * Decodes clipboard HTML content into a ClipboardPayload object.
+     *
+     * This function is designed to be resilient against browser modifications to the clipboard HTML.
+     * When content is copied to the clipboard, browsers often wrap the content with additional HTML tags
+     * like <meta>, <html>, <head>, and <body>. This function handles such cases by:
+     *
+     * 1. Using XMLParser to parse the HTML structure
+     * 2. Looking for the clipboard data in both possible locations:
+     *    - Under html.body.span (when browser adds wrapper tags)
+     *    - Directly under span (when no wrapper tags are present)
+     *
+     * @param html - The HTML string from the clipboard, which may contain browser-appended tags
+     * @returns The decoded ClipboardPayload object, or null if the data is invalid or missing
+     *
+     * @example
+     * // Original clipboard data
+     * const html = '<span data-grida-io-clipboard="b64:..."></span>';
+     *
+     * // Browser-modified clipboard data
+     * const browserHtml = '<meta charset="utf-8"><html><head></head><body><span data-grida-io-clipboard="b64:..."></span></body></html>';
+     *
+     * // Both will work correctly
+     * const payload1 = decodeClipboardHtml(html);
+     * const payload2 = decodeClipboardHtml(browserHtml);
+     */
+    export function decodeClipboardHtml(html: string): ClipboardPayload | null {
+      try {
+        const parser = new XMLParser({
+          ignoreAttributes: (key) => !key.startsWith(__data_grida_io_prefix),
+          attributeNamePrefix: "@",
+          unpairedTags: ["meta"],
+        });
+        const parsed = parser.parse(html);
+        const span = parsed.html?.body?.span || parsed.span;
+        const data = span?.[`@${__data_grida_clipboard}`];
+        if (!data || !data.startsWith("b64:")) return null;
+        const base64 = data.slice(4);
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const json = new TextDecoder().decode(bytes);
+        return JSON.parse(json) as ClipboardPayload;
+      } catch {
+        return null;
+      }
+    }
+  }
+
   export interface LoadedDocument {
     version: typeof grida.program.document.SCHEMA_VERSION;
     document: grida.program.document.Document;
