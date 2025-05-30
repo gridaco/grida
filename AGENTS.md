@@ -154,6 +154,6 @@ pnpm turbo build
 # run dev
 pnpm turbo dev
 
-# package-specific (if possible)
-pnpm typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+# run typecheck
+pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
 ```
