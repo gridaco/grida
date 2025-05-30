@@ -1,6 +1,7 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 
 export function getInitialCurveGesture(
   state: editor.state.IEditorState,
@@ -17,10 +18,7 @@ export function getInitialCurveGesture(
 ): editor.gesture.GestureCurve {
   const { node_id, segment: segment_idx, control, invert } = target;
 
-  const node = editor.dq.__getNodeById(
-    state,
-    node_id
-  ) as grida.program.nodes.PathNode;
+  const node = dq.__getNodeById(state, node_id) as grida.program.nodes.PathNode;
 
   const segment = node.vectorNetwork.segments[segment_idx];
   const tangent = segment[control];

@@ -9,6 +9,7 @@ import type {
   NodeToggleBoldAction,
 } from "@/grida-canvas/action";
 import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import assert from "assert";
 import nodeReducer from "./node.reducer";
@@ -62,7 +63,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const ids = Array.from(
           new Set(
             selectors.flatMap((selector) =>
-              editor.dq.querySelector(document_ctx, selection, selector)
+              dq.querySelector(document_ctx, selection, selector)
             )
           )
         );
@@ -141,7 +142,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           selection
             .filter((node_id) => !ids.includes(node_id))
             .filter((node_id) => {
-              const node = editor.dq.__getNodeById(draft, node_id);
+              const node = dq.__getNodeById(draft, node_id);
               return node.type === "container";
             });
 
@@ -351,7 +352,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const node = editor.dq.__getNodeById(draft, node_id);
+          const node = dq.__getNodeById(draft, node_id);
 
           draft.document.nodes[node_id] = nodeTransformReducer(node, {
             type: "resize",
@@ -372,7 +373,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         target === "selection" ? state.selection : [target];
 
       const nodes = target_node_ids.map((node_id) =>
-        editor.dq.__getNodeById(state, node_id)
+        dq.__getNodeById(state, node_id)
       );
 
       const in_flow_node_ids = nodes
@@ -432,13 +433,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // if a single node is selected, align it with its container. (if not root)
         // TODO: Knwon issue: this does not work accurately if the node overflows the container
         const node_id = target_node_ids[0];
-        const top_id = editor.dq.getTopId(state.document_ctx, node_id);
+        const top_id = dq.getTopId(state.document_ctx, node_id);
         if (node_id !== top_id) {
           // get container (parent)
-          const parent_node_id = editor.dq.getParentId(
-            state.document_ctx,
-            node_id
-          );
+          const parent_node_id = dq.getParentId(state.document_ctx, node_id);
           assert(parent_node_id, "parent node not found");
           bounding_node_ids.push(parent_node_id);
         }
@@ -463,7 +461,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of bounding_node_ids) {
-          const node = editor.dq.__getNodeById(state, node_id);
+          const node = dq.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -502,7 +500,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
-          const node = editor.dq.__getNodeById(state, node_id);
+          const node = dq.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -524,7 +522,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         // omit root node
         target_node_ids.filter((id) => !scene.children.includes(id)),
         (node_id) => {
-          return editor.dq.getParentId(state.document_ctx, node_id)!;
+          return dq.getParentId(state.document_ctx, node_id)!;
         }
       );
 
@@ -593,7 +591,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // [reset children position]
           children.forEach((child_id) => {
-            const child = editor.dq.__getNodeById(draft, child_id);
+            const child = dq.__getNodeById(draft, child_id);
             (draft.document.nodes[
               child_id
             ] as grida.program.nodes.i.IPositioning) = {
@@ -624,8 +622,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           const is_root = scene.children.includes(id);
           return scene.constraints.children !== "single" || !is_root;
         }),
-        (node_id) =>
-          editor.dq.getParentId(state.document_ctx, node_id) ?? "<root>"
+        (node_id) => dq.getParentId(state.document_ctx, node_id) ?? "<root>"
       );
 
       return produce(state, (draft) => {
@@ -680,7 +677,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
           // [adjust children position]
           g.forEach((id) => {
-            const child = editor.dq.__getNodeById(draft, id);
+            const child = dq.__getNodeById(draft, id);
             if ("left" in child && typeof child.left === "number")
               child.left -= union.x;
             if ("top" in child && typeof child.top === "number")
@@ -702,7 +699,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         const {
           target: { node_id, vertex },
         } = action;
-        const node = editor.dq.__getNodeById(draft, node_id);
+        const node = dq.__getNodeById(draft, node_id);
 
         switch (action.type) {
           case "delete-vertex": {
@@ -775,7 +772,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
       return produce(state, (draft) => {
-        const root_template_instance = editor.dq.__getNodeById(
+        const root_template_instance = dq.__getNodeById(
           draft,
           // FIXME: update api interface
           scene.children[0]
@@ -806,7 +803,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "node/change/fontFamily": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
-        const node = editor.dq.__getNodeById(draft, node_id);
+        const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
 
@@ -822,7 +819,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "node/toggle/bold": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBoldAction>action;
-        const node = editor.dq.__getNodeById(draft, node_id);
+        const node = dq.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
@@ -843,7 +840,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const template_instance_node = editor.dq.__getNodeById(
+        const template_instance_node = dq.__getNodeById(
           draft,
           template_instance_node_id
         );
@@ -898,11 +895,11 @@ function __self_order(
   assert(draft.scene_id, "scene_id is required for order");
   const scene = draft.document.scenes[draft.scene_id];
 
-  const parent_id = editor.dq.getParentId(draft.document_ctx, node_id);
+  const parent_id = dq.getParentId(draft.document_ctx, node_id);
   // if (!parent_id) return; // root node case
   let ichildren: grida.program.nodes.i.IChildrenReference;
   if (parent_id) {
-    ichildren = editor.dq.__getNodeById(
+    ichildren = dq.__getNodeById(
       draft,
       parent_id
     ) as grida.program.nodes.i.IChildrenReference;
@@ -952,7 +949,7 @@ function __self_order(
   ichildren.children = reordered;
 
   // update the hierarchy graph
-  const context = editor.dq.Context.from(draft.document);
+  const context = dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 }
 
@@ -986,7 +983,7 @@ function __self_nudge(
   }
 
   for (const node_id of targets) {
-    const node = editor.dq.__getNodeById(draft, node_id);
+    const node = dq.__getNodeById(draft, node_id);
 
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "translate",

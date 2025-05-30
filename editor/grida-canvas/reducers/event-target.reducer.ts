@@ -14,6 +14,7 @@ import type {
   EditorEventTarget_MultipleSelectionLayer_Click,
 } from "../action";
 import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import nodeReducer from "./node.reducer";
 import initialNode from "./tools/initial-node";
@@ -64,7 +65,7 @@ function __self_evt_on_pointer_move(
     const { tarnslate_with_axis_lock } = draft.gesture_modifiers;
 
     if (typeof a_point === "number" && tarnslate_with_axis_lock === "on") {
-      const node = editor.dq.__getNodeById(
+      const node = dq.__getNodeById(
         draft,
         node_id
       ) as grida.program.nodes.PathNode;
@@ -257,7 +258,7 @@ function __self_evt_on_pointer_down(
         const { node_id, path_cursor_position, a_point, next_ta } =
           draft.content_edit_mode;
 
-        const node = editor.dq.__getNodeById(
+        const node = dq.__getNodeById(
           draft,
           node_id
         ) as grida.program.nodes.PathNode;
@@ -550,7 +551,7 @@ function __self_evt_on_drag_start(
       assert(selected_vertices.length === 1);
       const vertex = selected_vertices[0];
 
-      const node = editor.dq.__getNodeById(
+      const node = dq.__getNodeById(
         draft,
         node_id
       ) as grida.program.nodes.PathNode;
@@ -758,7 +759,7 @@ function __self_evt_on_drag(
         const { origin, points, node_id } =
           draft.gesture as editor.gesture.GestureDraw;
 
-        const node = editor.dq.__getNodeById(
+        const node = dq.__getNodeById(
           draft,
           node_id
         ) as grida.program.nodes.PathNode;
@@ -805,7 +806,7 @@ function __self_evt_on_drag(
         assert(draft.content_edit_mode?.type === "path");
         const { node_id, segment, initial, control, invert } = draft.gesture;
 
-        const node = editor.dq.__getNodeById(
+        const node = dq.__getNodeById(
           draft,
           node_id
         ) as grida.program.nodes.PathNode;
@@ -863,7 +864,7 @@ function __self_evt_on_drag(
         assert(draft.content_edit_mode?.type === "path");
         const { content_edit_mode } = draft;
         const { node_id } = content_edit_mode;
-        const node = editor.dq.__getNodeById(
+        const node = dq.__getNodeById(
           draft,
           node_id
         ) as grida.program.nodes.PathNode;
@@ -913,7 +914,7 @@ function __self_evt_on_drag(
         const { node_id } = draft.gesture;
         const [dx, dy] = delta;
         const d = -Math.round(dx);
-        const node = editor.dq.__getNodeById(draft, node_id);
+        const node = dq.__getNodeById(draft, node_id);
 
         if (!("cornerRadius" in node)) {
           return;
@@ -974,7 +975,7 @@ function __self_evt_on_drag(
 
             // Apply transform to the actual nodes.
             transformed.forEach((obj) => {
-              const node = editor.dq.__getNodeById(
+              const node = dq.__getNodeById(
                 draft,
                 obj.id
               ) as grida.program.nodes.i.IPositioning;
@@ -990,7 +991,7 @@ function __self_evt_on_drag(
               1
             );
 
-            const container = editor.dq.__getNodeById(draft, layout.group);
+            const container = dq.__getNodeById(draft, layout.group);
             draft.document.nodes[layout.group] = nodeReducer(container, {
               type: "node/change/*",
               node_id: container.id,
@@ -1078,7 +1079,7 @@ function __self_prepare_bitmap_node(
 
     self_try_insert_node(draft, parent, bitmap);
 
-    const node = editor.dq.__getNodeById(
+    const node = dq.__getNodeById(
       draft,
       new_node_id
     ) as grida.program.nodes.BitmapNode;
@@ -1087,10 +1088,7 @@ function __self_prepare_bitmap_node(
 
     return node;
   } else {
-    return editor.dq.__getNodeById(
-      draft,
-      node_id
-    ) as grida.program.nodes.BitmapNode;
+    return dq.__getNodeById(draft, node_id) as grida.program.nodes.BitmapNode;
   }
 }
 
@@ -1318,7 +1316,7 @@ function __get_insertion_target(
 
   const hits = state.hits.slice();
   for (const hit of hits) {
-    const node = editor.dq.__getNodeById(state, hit);
+    const node = dq.__getNodeById(state, hit);
     if (node.type === "container") return hit;
   }
   return null;

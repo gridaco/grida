@@ -1,4 +1,4 @@
-import { editor } from "../index";
+import { dq } from "../index";
 
 describe("sibling query selectors", () => {
   const doc = {
@@ -11,15 +11,15 @@ describe("sibling query selectors", () => {
     },
   } as any;
 
-  const ctx = editor.dq.Context.from(doc).snapshot();
+  const ctx = dq.Context.from(doc).snapshot();
 
   test("~+ selects next sibling and loops", () => {
-    expect(editor.dq.querySelector(ctx, ["a"], "~+")).toEqual(["b"]);
-    expect(editor.dq.querySelector(ctx, ["c"], "~+")).toEqual(["a"]);
+    expect(dq.querySelector(ctx, ["a"], "~+")).toEqual(["b"]);
+    expect(dq.querySelector(ctx, ["c"], "~+")).toEqual(["a"]);
   });
 
   test("~- selects previous sibling and loops", () => {
-    expect(editor.dq.querySelector(ctx, ["b"], "~-")).toEqual(["a"]);
-    expect(editor.dq.querySelector(ctx, ["a"], "~-")).toEqual(["c"]);
+    expect(dq.querySelector(ctx, ["b"], "~-")).toEqual(["a"]);
+    expect(dq.querySelector(ctx, ["a"], "~-")).toEqual(["c"]);
   });
 });

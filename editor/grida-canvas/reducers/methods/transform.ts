@@ -4,6 +4,7 @@ import { self_insertSubDocument } from "./insert";
 import { self_try_remove_node } from "./delete";
 import cmath from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
+import { dq } from "@/grida-canvas/query";
 import { domapi } from "../../backends/dom";
 import {
   getSnapTargets,
@@ -104,7 +105,7 @@ function __self_update_gesture_transform_translate(
       const to_be_cloned = initial_selection.slice();
 
       to_be_cloned.forEach((original_id, i) => {
-        const initial_parent_id = editor.dq.getParentId(
+        const initial_parent_id = dq.getParentId(
           initial_snapshot.document_ctx,
           original_id
         );
@@ -201,15 +202,11 @@ function __self_update_gesture_transform_translate(
       const hierarchy_ids = [
         ...initial_selection,
         ...initial_selection
-          .map((node_id) =>
-            editor.dq.getChildren(draft.document_ctx, node_id, true)
-          )
+          .map((node_id) => dq.getChildren(draft.document_ctx, node_id, true))
           .flat(),
         ...initial_clone_ids,
         ...initial_clone_ids
-          .map((node_id) =>
-            editor.dq.getChildren(draft.document_ctx, node_id, true)
-          )
+          .map((node_id) => dq.getChildren(draft.document_ctx, node_id, true))
           .flat(),
       ];
 
@@ -218,7 +215,7 @@ function __self_update_gesture_transform_translate(
         // [1]
         if (hierarchy_ids.includes(node_id)) return false;
 
-        const node = editor.dq.__getNodeById(draft, node_id);
+        const node = dq.__getNodeById(draft, node_id);
         // [2]
         if (node.type !== "container") return false;
 
@@ -233,17 +230,14 @@ function __self_update_gesture_transform_translate(
       // update the parent of the current selection
       current_selection.forEach((node_id) => {
         //
-        const prev_parent_id = editor.dq.getParentId(
-          draft.document_ctx,
-          node_id
-        );
+        const prev_parent_id = dq.getParentId(draft.document_ctx, node_id);
         if (prev_parent_id === new_parent_id) return;
 
         is_parent_changed = true;
 
         // unregister the node from the previous parent
         if (prev_parent_id) {
-          const parent = editor.dq.__getNodeById(
+          const parent = dq.__getNodeById(
             draft,
             prev_parent_id
           ) as grida.program.nodes.i.IChildrenReference;
@@ -256,7 +250,7 @@ function __self_update_gesture_transform_translate(
 
         // register the node to the new parent
         if (new_parent_id) {
-          const new_parent = editor.dq.__getNodeById(
+          const new_parent = dq.__getNodeById(
             draft,
             new_parent_id
           ) as grida.program.nodes.i.IChildrenReference;
@@ -268,7 +262,7 @@ function __self_update_gesture_transform_translate(
         }
 
         // update the context
-        draft.document_ctx = editor.dq.Context.from(draft.document).snapshot();
+        draft.document_ctx = dq.Context.from(draft.document).snapshot();
       });
 
       if (is_parent_changed) {
@@ -313,10 +307,10 @@ function __self_update_gesture_transform_translate(
     let i = 0;
 
     for (const node_id of current_selection) {
-      const node = editor.dq.__getNodeById(draft, node_id);
+      const node = dq.__getNodeById(draft, node_id);
       const r = translated[i++];
 
-      const parent_id = editor.dq.getParentId(draft.document_ctx, node_id);
+      const parent_id = dq.getParentId(draft.document_ctx, node_id);
 
       let relative_position: cmath.Vector2;
       if (parent_id) {
@@ -374,7 +368,7 @@ function __self_update_gesture_transform_translate_sort(
   // [moving node]
   // apply movement as-is to moving node
   const moving_rect = cmath.rect.translate(node_initial_rect, movement);
-  const moving_node = editor.dq.__getNodeById(
+  const moving_node = dq.__getNodeById(
     draft,
     node_id
   ) as grida.program.nodes.i.IPositioning;
@@ -429,7 +423,7 @@ function __self_update_gesture_transform_translate_sort(
   // update the position of the real nodes (except the moving node)
   layout.objects.forEach((obj, i) => {
     if (obj.id === node_id) return;
-    const node = editor.dq.__getNodeById(
+    const node = dq.__getNodeById(
       draft,
       obj.id
     ) as grida.program.nodes.i.IPositioning;
@@ -528,7 +522,7 @@ function __self_update_gesture_transform_scale(
       });
     } else {
       const cdom = new domapi.CanvasDOM(draft.transform);
-      const parent_id = editor.dq.getParentId(draft.document_ctx, node_id)!;
+      const parent_id = dq.getParentId(draft.document_ctx, node_id)!;
       const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
 
       assert(
@@ -602,7 +596,7 @@ function __self_update_gesture_transform_rotate(
   const q = Math.max(0.01, _user_q);
   const angle = cmath.quantize(_angle, q);
 
-  const node = editor.dq.__getNodeById(draft, selection);
+  const node = dq.__getNodeById(draft, selection);
 
   draft.gesture.rotation = angle;
   draft.document.nodes[selection] = nodeReducer(node, {

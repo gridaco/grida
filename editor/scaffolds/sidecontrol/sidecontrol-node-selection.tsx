@@ -61,7 +61,6 @@ import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
 import grida from "@grida/schema";
-import assert from "assert";
 import {
   useCurrentSceneState,
   useEditorFlagsState,
@@ -90,7 +89,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
-import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 
 export function Align() {
   const editor = useCurrentEditor();
@@ -1197,7 +1196,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
   const instance = useCurrentEditor();
   const document_ctx = useEditorState(instance, (state) => state.document_ctx);
   const scene = useCurrentSceneState();
-  const top_id = editor.dq.getTopId(document_ctx, node_id)!;
+  const top_id = dq.getTopId(document_ctx, node_id)!;
   const is_root = node_id === top_id;
   const is_single_mode_root =
     scene.constraints.children === "single" && is_root;

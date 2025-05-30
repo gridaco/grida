@@ -6,6 +6,7 @@ import grida from "@grida/schema";
 import iosvg from "@grida/io-svg";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
+import { dq } from "@/grida-canvas/query";
 import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
@@ -619,7 +620,7 @@ export function useSelectionPaints() {
     () => [
       ...selection,
       ...selection
-        .map((s) => editor.dq.getChildren(state.document_ctx, s, true))
+        .map((s) => dq.getChildren(state.document_ctx, s, true))
         .flat(),
     ],
     [selection, state.document_ctx]

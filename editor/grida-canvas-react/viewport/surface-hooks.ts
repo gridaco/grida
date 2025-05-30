@@ -5,10 +5,9 @@ import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
-import { editor } from "@/grida-canvas";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
-
+import { dq } from "@/grida-canvas/query";
 import "core-js/features/object/group-by";
 
 export interface SurfaceNodeObject {
@@ -257,7 +256,7 @@ export function useSelectionGroups(
       .filter((n) => n?.active);
     return Object.groupBy(
       activenodes,
-      (it) => editor.dq.getParentId(document_ctx, it.id) ?? ""
+      (it) => dq.getParentId(document_ctx, it.id) ?? ""
     );
   }, [document.nodes, document_ctx, __node_ids]);
 
@@ -370,7 +369,7 @@ export function useSingleSelection(
       const container = node as grida.program.nodes.ContainerNode;
       const { direction, mainAxisGap, crossAxisGap } = container;
       const axis = direction === "horizontal" ? "x" : "y";
-      const children = editor.dq.getChildren(document_ctx, node_id);
+      const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
         .map((id) => cdom.getNodeBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);
