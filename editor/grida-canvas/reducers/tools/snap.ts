@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { SnapToObjectsResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { editor } from "@/grida-canvas";
+import { domapi } from "../../backends/dom";
 
 const q = 1;
 
@@ -100,8 +101,12 @@ export function getSnapTargets(
   selection: string[],
   {
     document_ctx,
+    scene_id,
+    document,
   }: {
     document_ctx: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext;
+    scene_id?: string;
+    document?: grida.program.document.Document;
   }
 ): string[] {
   // set of each sibling and parent of selection
@@ -116,6 +121,16 @@ export function getSnapTargets(
         .flat()
     )
   ).filter((node_id) => !selection.includes(node_id));
+
+  if (snap_target_node_ids.length === 0) {
+    const is_root_only = selection.every(
+      (node_id) => editor.dq.getParentId(document_ctx, node_id) === null
+    );
+
+    if (is_root_only) {
+      snap_target_node_ids.push(domapi.k.EDITOR_CONTENT_ELEMENT_ID);
+    }
+  }
 
   return snap_target_node_ids;
 }
