@@ -3,6 +3,7 @@ import { produce, type Draft } from "immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
+  self_insertSubDocument,
 } from "./methods";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
@@ -111,16 +112,30 @@ export default function reducer<S extends editor.state.IEditorState>(
         id: nid(),
         name: origin.name + " copy",
         order: origin.order ? origin.order + 1 : undefined,
+        children: [],
       });
 
       return produce(state, (draft: Draft<S>) => {
-        // FIXME: clone nodes entirely
         // 0. add the new scene
         draft.document.scenes[next.id] = next;
-        // 1. change the scene_id
+        // 1. change the scene_id to the new scene
         draft.scene_id = next.id;
         // 2. clear scene-specific state
         Object.assign(draft, editor.state.__RESET_SCENE_STATE);
+
+        // 3. clone nodes recursively
+        for (const child_id of origin.children) {
+          const prototype = grida.program.nodes.factory.createPrototypeFromSnapshot(
+            state.document,
+            child_id
+          );
+          const sub =
+            grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+              prototype,
+              nid
+            );
+          self_insertSubDocument(draft, null, sub);
+        }
       });
     }
     case "scenes/change/name": {
