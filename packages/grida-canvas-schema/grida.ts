@@ -202,6 +202,8 @@ export namespace grida.program.document {
    *    - does not include the current selection
    *    - if multiple selection, this is only valid if all selected nodes are siblings
    * - ">" - children of current selection
+   * - "~+" - next sibling of current selection
+   * - "~-" - previous sibling of current selection
    * - "selection" - current selection
    * - [] - specific nodes
    *
@@ -211,7 +213,15 @@ export namespace grida.program.document {
    * - Select self and siblings: ["selection", "~"]
    * - Select children of current selection: ">"
    */
-  export type Selector = "*" | "~" | ">" | ".." | "selection" | nodes.NodeID[];
+  export type Selector =
+    | "*"
+    | "~"
+    | "~+"
+    | "~-"
+    | ">"
+    | ".."
+    | "selection"
+    | nodes.NodeID[];
 
   export namespace k {
     /**

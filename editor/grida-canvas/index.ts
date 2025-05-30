@@ -1203,6 +1203,16 @@ export namespace editor.dq {
           return siblings;
         }
       }
+      case "~+": {
+        if (selection.length === 0) return [];
+        const next = dq.getNextSibling(context, selection[0], true);
+        return next ? [next] : [];
+      }
+      case "~-": {
+        if (selection.length === 0) return [];
+        const prev = dq.getPreviousSibling(context, selection[0], true);
+        return prev ? [prev] : [];
+      }
       case ">": {
         return selection.flatMap((node_id) => dq.getChildren(context, node_id));
       }
@@ -1480,6 +1490,38 @@ export namespace editor.dq {
       allChildren.push(...getChildren(context, child, true));
     }
     return allChildren;
+  }
+
+  export function getNextSibling(
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
+    node_id: string,
+    loop: boolean = false
+  ): NodeID | null {
+    const siblings = getSiblings(context, node_id);
+
+    const idx = siblings.indexOf(node_id);
+    if (idx === -1 || siblings.length === 0) return null;
+    const nextIdx = idx + 1;
+    if (nextIdx < siblings.length) {
+      return siblings[nextIdx];
+    }
+    return loop ? siblings[0] : null;
+  }
+
+  export function getPreviousSibling(
+    context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
+    node_id: string,
+    loop: boolean = false
+  ): NodeID | null {
+    const siblings = getSiblings(context, node_id);
+
+    const idx = siblings.indexOf(node_id);
+    if (idx === -1 || siblings.length === 0) return null;
+    const prevIdx = idx - 1;
+    if (prevIdx >= 0) {
+      return siblings[prevIdx];
+    }
+    return loop ? siblings[siblings.length - 1] : null;
   }
 
   export function getParentId(

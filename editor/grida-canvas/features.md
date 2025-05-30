@@ -52,15 +52,17 @@ This document lists all implemented features including the ones that are not yet
 
 **General**
 
-- [x] cut
-- [x] copy
-- [x] paste
-- [x] delete
-- [x] duplicate
-- [ ] repeating duplicate
-- [x] undo
-- [x] redo
-- [x] select all siblings
+- [x] cut (`meta+x`)
+- [x] copy (`meta+c`)
+- [x] paste (`meta+v`)
+- [x] delete (`delete, backspace`)
+- [x] duplicate (`meta+d`)
+- [x] repeating duplicate (`meta+d`)
+- [x] undo (`meta+z`)
+- [x] redo (`meta+shift+z`)
+- [x] select all siblings (`meta+a`)
+- [x] select next sibling (`tab`)
+- [x] select previous sibling (`shift+tab`)
 - [x] select all children (go inner) (`enter`)
 - [x] select all parents (go outer) (`shift+enter`)
 - [x] toggle bold (`meta+b`)
@@ -74,7 +76,7 @@ This document lists all implemented features including the ones that are not yet
 ### Marqyee
 
 - [x] marquee
-- [x] marquee selection
+- [x] marquee selection (`drag`)
 - [x] marquee boolean selection (`shift + drag`)
 
 ### Measurement
