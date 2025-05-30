@@ -519,13 +519,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent
+      // group by parent, considering root nodes when scene allows
       const groups = Object.groupBy(
-        // omit root node
-        target_node_ids.filter((id) => !scene.children.includes(id)),
-        (node_id) => {
-          return editor.dq.getParentId(state.document_ctx, node_id)!;
-        }
+        target_node_ids.filter((id) => {
+          const is_root = scene.children.includes(id);
+          return scene.constraints.children !== "single" || !is_root;
+        }),
+        (node_id) =>
+          editor.dq.getParentId(state.document_ctx, node_id) ?? "<root>"
       );
 
       const cdom = new domapi.CanvasDOM(state.transform);
@@ -618,29 +619,33 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      // group by parent
+      // group by parent, considering root nodes when scene allows
       const groups = Object.groupBy(
-        // omit root node
-        target_node_ids.filter((id) => !scene.children.includes(id)),
-        (node_id) => {
-          return editor.dq.getParentId(state.document_ctx, node_id)!;
-        }
+        target_node_ids.filter((id) => {
+          const is_root = scene.children.includes(id);
+          return scene.constraints.children !== "single" || !is_root;
+        }),
+        (node_id) =>
+          editor.dq.getParentId(state.document_ctx, node_id) ?? "<root>"
       );
 
       return produce(state, (draft) => {
         const insertions: grida.program.nodes.NodeID[] = [];
-        Object.keys(groups).forEach((parent_id) => {
-          const g = groups[parent_id]!;
+        Object.keys(groups).forEach((parent_id_str) => {
+          const g = groups[parent_id_str]!;
           const cdom = new domapi.CanvasDOM(state.transform);
 
-          const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+          const parent_id = parent_id_str === "<root>" ? null : parent_id_str;
 
           const rects = g
             .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
-            // make the rects relative to the parent
-            .map((rect) =>
-              cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
-            )
+            .map((rect) => {
+              if (parent_id) {
+                const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+                return cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y]);
+              }
+              return rect;
+            })
             .map((rect) => cmath.rect.quantize(rect, 1));
 
           const union = cmath.rect.union(rects);
