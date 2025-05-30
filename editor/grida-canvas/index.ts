@@ -1980,7 +1980,7 @@ export namespace editor.api {
     startSortGesture(selection: string | string[], node_id: string): void;
     startGapGesture(selection: string | string[], axis: "x" | "y"): void;
     startCornerRadiusGesture(selection: string): void;
-    startRotateGesture(selection: string): void;
+    startRotateGesture(selection: string, anchor: cmath.CardinalDirection): void;
     startTranslateVertexGesture(node_id: string, vertex: number): void;
     startCurveGesture(
       node_id: string,

@@ -10,6 +10,26 @@ import grida from "@grida/schema";
 import { self_clearSelection, self_selectNode } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 
+function rotation_handle_offset(
+  rect: cmath.Rectangle,
+  anchor: cmath.CardinalDirection
+): cmath.Vector2 {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const anchor_pos: Record<cmath.CardinalDirection, cmath.Vector2> = {
+    nw: [rect.x, rect.y],
+    ne: [rect.x + rect.width, rect.y],
+    se: [rect.x + rect.width, rect.y + rect.height],
+    sw: [rect.x, rect.y + rect.height],
+    n: [rect.x + rect.width / 2, rect.y],
+    e: [rect.x + rect.width, rect.y + rect.height / 2],
+    s: [rect.x + rect.width / 2, rect.y + rect.height],
+    w: [rect.x, rect.y + rect.height / 2],
+  };
+  const pos = anchor_pos[anchor];
+  return cmath.vector2.sub(pos, [cx, cy]);
+}
+
 function createLayoutSnapshot(
   state: editor.state.IEditorState,
   group: string | null,
@@ -328,14 +348,17 @@ function __self_start_gesture(
       break;
     }
     case "rotate": {
-      const { selection } = gesture;
+      const { selection, anchor } = gesture;
 
       self_selectNode(draft, "reset", selection);
+      const rect = cdom.getNodeBoundingRect(selection)!;
+
+      const offset = rotation_handle_offset(rect, anchor);
+
       __self_start_gesture_rotate(draft, {
         selection: selection,
-        initial_bounding_rectangle: cdom.getNodeBoundingRect(selection)!,
-        // TODO: the offset of rotation handle relative to the center of the rectangle
-        offset: cmath.vector2.zero,
+        initial_bounding_rectangle: rect,
+        offset: offset,
       });
       //
       break;

@@ -534,7 +534,9 @@ export type EditorSurface_StartGesture = {
   gesture:
     | Pick<editor.gesture.GestureGuide, "type" | "axis" | "idx">
     | Pick<editor.gesture.GestureScale, "type" | "direction" | "selection">
-    | Pick<editor.gesture.GestureRotate, "type" | "selection">
+    | (Pick<editor.gesture.GestureRotate, "type" | "selection"> & {
+        anchor: cmath.CardinalDirection;
+      })
     | (Pick<editor.gesture.GestureSort, "type" | "node_id"> & {
         selection: string[];
       })

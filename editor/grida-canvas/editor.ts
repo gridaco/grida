@@ -1510,12 +1510,13 @@ export class Editor
   }
   // #endregion drag resize handle
 
-  startRotateGesture(selection: string) {
+  startRotateGesture(selection: string, anchor: cmath.CardinalDirection) {
     this.dispatch({
       type: "surface/gesture/start",
       gesture: {
         type: "rotate",
         selection,
+        anchor,
       },
     });
   }

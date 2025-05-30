@@ -584,23 +584,27 @@ function __self_update_gesture_transform_rotate(
   draft: Draft<editor.state.IEditorState>
 ) {
   assert(draft.gesture.type === "rotate", "Gesture type must be rotate");
-  const { movement, selection } = draft.gesture;
+  const { selection, offset, initial_bounding_rectangle, rotation: initial_rotation } =
+    draft.gesture;
   const { rotate_with_quantize } = draft.gesture_modifiers;
   const { rotation_quantize_step } = draft;
 
-  const _angle = cmath.principalAngle(
-    // TODO: need to store the initial angle and subtract
-    // TODO: get anchor and calculate the offset
-    // TODO: translate the movement (distance) relative to the center of the node
-    cmath.vector2.angle(cmath.vector2.zero, movement)
-  );
+  const center: cmath.Vector2 = [
+    initial_bounding_rectangle.x + initial_bounding_rectangle.width / 2,
+    initial_bounding_rectangle.y + initial_bounding_rectangle.height / 2,
+  ];
+
+  const pointer_angle = cmath.vector2.angle(center, draft.pointer.position);
+  const handle_angle = cmath.vector2.angle(cmath.vector2.zero, offset);
+
+  const delta = cmath.principalAngle(pointer_angle - handle_angle);
 
   const _user_q =
     typeof rotate_with_quantize === "number"
       ? rotate_with_quantize
       : rotation_quantize_step;
   const q = Math.max(0.01, _user_q);
-  const angle = cmath.quantize(_angle, q);
+  const angle = cmath.quantize(initial_rotation + delta, q);
 
   const node = editor.dq.__getNodeById(draft, selection);
 

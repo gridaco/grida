@@ -953,7 +953,7 @@ function LayerOverlayRotationHandle({
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      editor.startRotateGesture(node_id);
+      editor.startRotateGesture(node_id, anchor);
     },
   });
 
