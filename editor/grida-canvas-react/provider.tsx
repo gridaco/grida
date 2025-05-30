@@ -16,7 +16,7 @@ import { domapi } from "../grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
-import deepEqual from "deep-equal";
+import deepEqual from "fast-deep-equal";
 import { toast } from "sonner";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { Editor } from "@/grida-canvas/editor";

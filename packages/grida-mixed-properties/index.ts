@@ -1,4 +1,4 @@
-import deepEqual from "deep-equal";
+import equal from "fast-deep-equal";
 
 type MixedProperties<T, S> = {
   [K in keyof T]: MixedProperty<T[K], S>;
@@ -89,7 +89,7 @@ export default function mixed<T extends Record<string, any>, S>(
     idKey,
     ignoredKey: ignoredKeys = [],
     mixed: mixedIndicator,
-    compare = (_key: any, a: any, b: any) => deepEqual(a, b),
+    compare = (_key: any, a: any, b: any) => equal(a, b),
   }: MixedOptions<T, S>
 ): MixedProperties<T, S> {
   if (!objects.length) return {} as MixedProperties<T, S>;

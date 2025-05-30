@@ -7,7 +7,7 @@ import {
 } from "./methods";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
-import equal from "deep-equal";
+import equal from "fast-deep-equal";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import nid from "./tools/id";
