@@ -30,6 +30,7 @@ import nid from "./tools/id";
 import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
+import { v4 } from "uuid";
 import "core-js/features/object/group-by";
 
 /**
@@ -94,7 +95,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return produce(state, (draft) => {
         // [copy]
         draft.user_clipboard = {
-          payload_id: crypto.randomUUID(),
+          payload_id: v4(),
           ids: target_node_ids,
           prototypes: target_node_ids.map((id) =>
             grida.program.nodes.factory.createPrototypeFromSnapshot(

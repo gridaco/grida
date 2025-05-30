@@ -68,7 +68,7 @@ describe("clipboard", () => {
     // Test with invalid base64 data
     expect(
       io.clipboard.decodeClipboardHtml(
-        '<span data-grida-clipboard="b64:invalid"></span>'
+        '<span data-grida-io-clipboard="b64:invalid"></span>'
       )
     ).toBeNull();
   });
