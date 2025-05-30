@@ -542,12 +542,15 @@ export namespace grida.program.document {
         __ctx_nid_to_children_ids: {},
       };
 
+      // First, default every node’s parent to null
+      for (const node_id of ctx.__ctx_nids) {
+        ctx.__ctx_nid_to_parent_id[node_id] = null;
+        ctx.__ctx_nid_to_children_ids[node_id] = [];
+      }
+
+      // Then walk through and hook up actual parent/children relationships
       for (const node_id in nodes) {
         const node = nodes[node_id];
-
-        // Ensure the parent has an array in __ctx_nid_to_children_ids
-        ctx.__ctx_nid_to_children_ids[node_id] =
-          ctx.__ctx_nid_to_children_ids[node_id] ?? [];
 
         // If the node has children, map each child to its parent and add to the parent’s child array
         if (Array.isArray((node as nodes.UnknwonNode).children)) {

@@ -138,6 +138,10 @@ export class Editor
     });
   }
 
+  public __get_node_siblings(node_id: string): string[] {
+    return editor.dq.getSiblings(this.mstate.document_ctx, node_id);
+  }
+
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action);
