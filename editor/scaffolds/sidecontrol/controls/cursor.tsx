@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui-editor/select";
 import { cursors } from "./k/cursors";
 import Image from "next/image";
 import { WorkbenchUI } from "@/components/workbench";

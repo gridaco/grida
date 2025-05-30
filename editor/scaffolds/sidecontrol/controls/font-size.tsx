@@ -1,8 +1,11 @@
-import { Select } from "@radix-ui/react-select";
-import { SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui-editor/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Button } from "@/components/ui-editor/button";
-import { CaretDownIcon } from "@radix-ui/react-icons";
+import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils";
 import type { editor } from "@/grida-canvas";
 import type { TMixed } from "./utils/types";
@@ -38,9 +41,9 @@ export function FontSizeControl({
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>
-            <Button variant="ghost" size="xs" className="size-6 m-0.5 p-0">
-              <CaretDownIcon />
-            </Button>
+            <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-2 opacity-50">
+              <ChevronDownIcon />
+            </button>
           </SelectPrimitive.SelectTrigger>
           <SelectContent align="end">
             {Object.entries(twsizes).map(([key, value]) => (
