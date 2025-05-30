@@ -638,7 +638,7 @@ export namespace editor.state {
       ),
     };
 
-    const s = new dq.DocumentState(doc);
+    const s = new dq.DocumentStateQuery(doc);
 
     return {
       transform: cmath.transform.identity,
@@ -2059,8 +2059,13 @@ export namespace editor.api {
     tryEnterContentEditMode(): void;
     //
 
-    //
-    select(...selectors: grida.program.document.Selector[]): void;
+    /**
+     * select the nodes by the given selectors.
+     *
+     * @param selectors - {@link grida.program.document.Selector}[]
+     * @returns the selected node ids. or `false` if ignored.
+     */
+    select(...selectors: grida.program.document.Selector[]): NodeID[] | false;
     blur(): void;
     undo(): void;
     redo(): void;

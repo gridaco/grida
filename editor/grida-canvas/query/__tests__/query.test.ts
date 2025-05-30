@@ -18,13 +18,32 @@ describe("query selectors", () => {
 
   describe("sibling selectors", () => {
     test("~+ selects next sibling and loops", () => {
-      expect(dq.querySelector(ctx, ["a"], "~+")).toEqual([]);
-      expect(dq.querySelector(ctx, ["c"], "~+")).toEqual([]);
+      expect(dq.querySelector(ctx, ["a"], "~+")).toEqual(["b"]);
+      expect(dq.querySelector(ctx, ["c"], "~+")).toEqual(["a"]);
     });
 
     test("~- selects previous sibling and loops", () => {
-      expect(dq.querySelector(ctx, ["b"], "~-")).toEqual([]);
-      expect(dq.querySelector(ctx, ["a"], "~-")).toEqual([]);
+      expect(dq.querySelector(ctx, ["b"], "~-")).toEqual(["a"]);
+      expect(dq.querySelector(ctx, ["a"], "~-")).toEqual(["c"]);
+    });
+
+    // FIXME: this is not scoped by the scene - may result unexpected behavior.
+    test("~+ on root-level node with null parent loops to itself", () => {
+      expect(dq.querySelector(ctx, ["root"], "~+")).toEqual(["root"]);
+    });
+
+    test("~- on root-level node with null parent loops to itself", () => {
+      expect(dq.querySelector(ctx, ["root"], "~-")).toEqual(["root"]);
+    });
+
+    test("~+ works on nested siblings at deeper levels", () => {
+      expect(dq.querySelector(ctx, ["a1"], "~+")).toEqual(["a2"]);
+      expect(dq.querySelector(ctx, ["a2"], "~+")).toEqual(["a1"]);
+    });
+
+    test("~- works on nested siblings at deeper levels", () => {
+      expect(dq.querySelector(ctx, ["a1"], "~-")).toEqual(["a2"]);
+      expect(dq.querySelector(ctx, ["a2"], "~-")).toEqual(["a1"]);
     });
 
     test("~ selects all siblings", () => {

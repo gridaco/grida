@@ -247,10 +247,27 @@ export class Editor
   }
 
   public select(...selectors: grida.program.document.Selector[]) {
-    this.dispatch({
-      type: "select",
-      selectors,
-    });
+    const { document_ctx, selection } = this.mstate;
+    const ids = Array.from(
+      new Set(
+        selectors.flatMap((selector) =>
+          dq.querySelector(document_ctx, selection, selector)
+        )
+      )
+    );
+
+    if (ids.length === 0) {
+      // if no ids found, keep the current selection
+      // e.g. this can happen whe `>` (select children) is used but no children found
+      return false;
+    } else {
+      this.dispatch({
+        type: "select",
+        selection: ids,
+      });
+    }
+
+    return ids;
   }
 
   public blur() {

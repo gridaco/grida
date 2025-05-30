@@ -422,35 +422,45 @@ export namespace dq {
     return allChildren;
   }
 
+  // FIXME: this is not scoped by the scene - may result unexpected behavior.
   export function getNextSibling(
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string,
     loop: boolean = false
   ): NodeID | null {
-    const siblings = getSiblings(context, node_id);
-
-    const idx = siblings.indexOf(node_id);
-    if (idx === -1 || siblings.length === 0) return null;
-    const nextIdx = idx + 1;
-    if (nextIdx < siblings.length) {
-      return siblings[nextIdx];
-    }
+    const parent_id = getParentId(context, node_id);
+    // Determine siblings even if parent is null (root-level)
+    const siblings =
+      parent_id !== null
+        ? context.__ctx_nid_to_children_ids[parent_id] || []
+        : Object.keys(context.__ctx_nid_to_parent_id).filter(
+            (id) => context.__ctx_nid_to_parent_id[id] === null
+          );
+    const index = siblings.indexOf(node_id);
+    if (index === -1) return null;
+    const next = siblings[index + 1];
+    if (next !== undefined) return next;
     return loop ? siblings[0] : null;
   }
 
+  // FIXME: this is not scoped by the scene - may result unexpected behavior.
   export function getPreviousSibling(
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string,
     loop: boolean = false
   ): NodeID | null {
-    const siblings = getSiblings(context, node_id);
-
-    const idx = siblings.indexOf(node_id);
-    if (idx === -1 || siblings.length === 0) return null;
-    const prevIdx = idx - 1;
-    if (prevIdx >= 0) {
-      return siblings[prevIdx];
-    }
+    const parent_id = getParentId(context, node_id);
+    // Determine siblings even if parent is null (root-level)
+    const siblings =
+      parent_id !== null
+        ? context.__ctx_nid_to_children_ids[parent_id] || []
+        : Object.keys(context.__ctx_nid_to_parent_id).filter(
+            (id) => context.__ctx_nid_to_parent_id[id] === null
+          );
+    const index = siblings.indexOf(node_id);
+    if (index === -1) return null;
+    const prev = siblings[index - 1];
+    if (prev !== undefined) return prev;
     return loop ? siblings[siblings.length - 1] : null;
   }
 
@@ -609,44 +619,6 @@ export namespace dq {
       };
     }
 
-    // [NOT USED] - did not yet decided how to implement the callback (for updating the document - none-context)
-    // delete(node_id: NodeID) {
-    //   const deleted_node_ids = new Set<NodeID>(node_id);
-    //   // recursively delete children
-    //   const children_ids = this.__ctx_nid_to_children_ids[node_id] || [];
-    //   for (const child_id of children_ids) {
-    //     const deleted = this.delete(child_id);
-    //     deleted.forEach(deleted_node_ids.add, deleted_node_ids);
-    //   }
-
-    //   // detach from parent
-    //   const parent_id = this.__ctx_nid_to_parent_id[node_id];
-    //   if (parent_id) {
-    //     const parent_children_ids = this.__ctx_nid_to_children_ids[parent_id];
-    //     const index = parent_children_ids.indexOf(node_id);
-
-    //     if (index > -1) {
-    //       // remove from parent node's children array
-    //       // (
-    //       //   draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
-    //       // ).children!.splice(index, 1);
-
-    //       // remove from document context
-    //       parent_children_ids.splice(index, 1);
-    //     }
-    //   }
-
-    //   // delete self from context
-    //   delete this.__ctx_nid_to_parent_id[node_id];
-    //   delete this.__ctx_nid_to_children_ids[node_id];
-    //   const index = this.__ctx_nids.indexOf(node_id);
-    //   if (index > -1) {
-    //     this.__ctx_nids.splice(index, 1);
-    //   }
-
-    //   return Array.from(deleted_node_ids);
-    // }
-
     getAncestors(node_id: NodeID): NodeID[] {
       return getAncestors(this, node_id);
     }
@@ -658,7 +630,7 @@ export namespace dq {
 
   //
 
-  export class DocumentState {
+  export class DocumentStateQuery {
     constructor(
       private readonly document: grida.program.document.IDocumentDefinition
     ) {}
