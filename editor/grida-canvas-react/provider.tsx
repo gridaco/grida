@@ -16,7 +16,7 @@ import { domapi } from "../grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
-import deepEqual from "deep-equal";
+import equal from "fast-deep-equal";
 import { toast } from "sonner";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
@@ -247,25 +247,17 @@ const compareNodeProperty: PropertyCompareFn<
       // support gradient (as the id should be ignored)
       const { id: __, ..._a } = (a ?? {}) as cg.AnyPaint;
       const { id: _, ..._b } = (b ?? {}) as cg.AnyPaint;
-      return deepEqual(_a, _b);
+      return equal(_a, _b);
   }
-  return deepEqual(a, b);
+  return equal(a, b);
 };
 
 export function useCurrentSelection() {
   const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => ({
-    selection: state.selection,
-    document: state.document,
-  }));
-
-  const selection = state.selection;
-
-  const nodes = useMemo(() => {
-    return selection.map((node_id) => {
-      return state.document.nodes[node_id];
-    });
-  }, [selection, state.document.nodes]);
+  const selection = useEditorState(instance, (state) => state.selection);
+  const nodes = useEditorState(instance, (state) =>
+    selection.map((id) => state.document.nodes[id])
+  );
 
   const mixedProperties = useMemo(
     () =>

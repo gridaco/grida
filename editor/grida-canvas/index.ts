@@ -1418,6 +1418,7 @@ export namespace editor.dq {
     const parent_id = getParentId(context, node_id);
 
     if (!parent_id) {
+      // FIXME: this is not scoped by the scene - may result unexpected behavior.
       // If the node has no parent, it is at the root level, and all nodes without parents are its "siblings."
       return Object.keys(context.__ctx_nid_to_parent_id).filter(
         (id) => context.__ctx_nid_to_parent_id[id] === null
