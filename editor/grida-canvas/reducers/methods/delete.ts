@@ -2,6 +2,7 @@ import type { Draft } from "immer";
 import type grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import { rm } from "@grida/tree";
+import { dq } from "@/grida-canvas/query";
 import assert from "assert";
 
 /**
@@ -44,7 +45,7 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
   delete nodes["<root>"];
 
   // rebuild context
-  const context = editor.dq.Context.from(draft.document);
+  const context = dq.Context.from(draft.document);
   draft.document_ctx = context.snapshot();
 
   //

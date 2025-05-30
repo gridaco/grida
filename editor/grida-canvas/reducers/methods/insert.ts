@@ -1,6 +1,7 @@
 import type { Draft } from "immer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
+import { dq } from "@/grida-canvas/query";
 import assert from "assert";
 
 export function self_insertSubDocument<S extends editor.state.IEditorState>(
@@ -11,8 +12,8 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.scenes[draft.scene_id];
 
-  const sub_state = new editor.dq.DocumentState(sub);
-  const sub_ctx = editor.dq.Context.from(sub);
+  const sub_state = new dq.DocumentStateQuery(sub);
+  const sub_ctx = dq.Context.from(sub);
   const sub_fonts = sub_state.fonts();
 
   if (parent_id) {
@@ -65,7 +66,7 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
   ).map((family) => ({ family }));
 
   // Update the hierarchy with parent-child relationships
-  const context = new editor.dq.Context(draft.document_ctx);
+  const context = new dq.Context(draft.document_ctx);
   sub.scene.children.forEach((c) => {
     context.blindlymove(c, parent_id);
   });
@@ -119,11 +120,11 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
   }
 
   // Update the document's font registry
-  const s = new editor.dq.DocumentState(draft.document);
+  const s = new dq.DocumentStateQuery(draft.document);
   draft.googlefonts = s.fonts().map((family) => ({ family }));
 
   // Update the runtime context with parent-child relationships
-  const context = new editor.dq.Context(draft.document_ctx);
+  const context = new dq.Context(draft.document_ctx);
   context.insert(node_id, parent_id);
   draft.document_ctx = context.snapshot();
 

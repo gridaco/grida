@@ -7,6 +7,7 @@ import assert from "assert";
 import cmath from "@grida/cmath";
 import { domapi } from "../backends/dom";
 import grida from "@grida/schema";
+import { dq } from "@/grida-canvas/query";
 import { self_clearSelection, self_selectNode } from "./methods";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 
@@ -20,7 +21,7 @@ function createLayoutSnapshot(
   let reldelta: cmath.Vector2 = [0, 0];
   let parent: grida.program.nodes.Node | null = null;
   if (group) {
-    parent = editor.dq.__getNodeById(state, group);
+    parent = dq.__getNodeById(state, group);
     const parent_rect = cdom.getNodeBoundingRect(group)!;
     reldelta = [-parent_rect.x, -parent_rect.y];
   }
@@ -79,7 +80,7 @@ function __self_try_enter_content_edit_mode(
   draft: editor.state.IEditorState,
   node_id: string
 ) {
-  const node = editor.dq.__getNodeById(draft, node_id);
+  const node = dq.__getNodeById(draft, node_id);
 
   switch (node.type) {
     case "text": {
@@ -116,7 +117,7 @@ function __self_try_enter_content_edit_mode(
     //   //
     // }
     case "bitmap": {
-      const node = editor.dq.__getNodeById(
+      const node = dq.__getNodeById(
         draft,
         node_id
       ) as grida.program.nodes.BitmapNode;
@@ -346,7 +347,7 @@ function __self_start_gesture(
       const { content_edit_mode } = draft;
       assert(content_edit_mode && content_edit_mode.type === "path");
       const { node_id } = content_edit_mode;
-      const node = editor.dq.__getNodeById(
+      const node = dq.__getNodeById(
         draft,
         node_id
       ) as grida.program.nodes.PathNode;
@@ -373,10 +374,10 @@ function __self_start_gesture(
       const { selection, node_id } = gesture;
 
       // assure the selection shares the same parent
-      const parent_id = editor.dq.getParentId(draft.document_ctx, node_id);
+      const parent_id = dq.getParentId(draft.document_ctx, node_id);
       if (
         !selection.every(
-          (it) => editor.dq.getParentId(draft.document_ctx, it) === parent_id
+          (it) => dq.getParentId(draft.document_ctx, it) === parent_id
         )
       ) {
         return;
@@ -416,13 +417,10 @@ function __self_start_gesture(
 
       if (Array.isArray(selection)) {
         // assure the selection shares the same parent
-        const parent_id = editor.dq.getParentId(
-          draft.document_ctx,
-          selection[0]
-        );
+        const parent_id = dq.getParentId(draft.document_ctx, selection[0]);
         if (
           !selection.every(
-            (it) => editor.dq.getParentId(draft.document_ctx, it) === parent_id
+            (it) => dq.getParentId(draft.document_ctx, it) === parent_id
           )
         ) {
           return;
@@ -458,7 +456,7 @@ function __self_start_gesture(
         };
       } else {
         // assert the selection to be a flex container
-        const node = editor.dq.__getNodeById(draft, selection);
+        const node = dq.__getNodeById(draft, selection);
         assert(
           node.type === "container" && node.layout === "flex",
           "the selection is not a flex container"
@@ -466,7 +464,7 @@ function __self_start_gesture(
         // (we only support main axis gap for now) - ignoring the input axis.
         const { direction, mainAxisGap } = node;
 
-        const children = editor.dq.getChildren(draft.document_ctx, selection);
+        const children = dq.getChildren(draft.document_ctx, selection);
 
         const layout = createLayoutSnapshot(draft, selection, children);
 
@@ -517,7 +515,7 @@ function __self_start_gesture_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = editor.dq.__getNodeById(draft, node_id);
+    const node = dq.__getNodeById(draft, node_id);
     const rect = rects[i++];
 
     // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
@@ -570,7 +568,7 @@ function __self_start_gesture_rotate(
     offset: cmath.Vector2;
   }
 ) {
-  const { rotation } = editor.dq.__getNodeById(
+  const { rotation } = dq.__getNodeById(
     draft,
     selection
   ) as grida.program.nodes.i.IRotation;

@@ -202,6 +202,8 @@ export namespace grida.program.document {
    *    - does not include the current selection
    *    - if multiple selection, this is only valid if all selected nodes are siblings
    * - ">" - children of current selection
+   * - "~+" - next sibling of current selection
+   * - "~-" - previous sibling of current selection
    * - "selection" - current selection
    * - [] - specific nodes
    *
@@ -211,7 +213,15 @@ export namespace grida.program.document {
    * - Select self and siblings: ["selection", "~"]
    * - Select children of current selection: ">"
    */
-  export type Selector = "*" | "~" | ">" | ".." | "selection" | nodes.NodeID[];
+  export type Selector =
+    | "*"
+    | "~"
+    | "~+"
+    | "~-"
+    | ">"
+    | ".."
+    | "selection"
+    | nodes.NodeID[];
 
   export namespace k {
     /**
@@ -522,47 +532,6 @@ export namespace grida.program.document {
        * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
        */
       readonly __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
-    }
-
-    /**
-     * Builds the runtime context for document hierarchy, providing mappings for
-     * parent-child relationships without modifying core node structure.
-     *
-     * @param repository - The document definition containing all nodes.
-     * @returns {grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext} The hierarchy context,
-     * containing mappings of each node's parent and children.
-     */
-    export function create_nodes_repository_runtime_hierarchy_context(
-      repository: INodesRepository
-    ): INodesRepositoryRuntimeHierarchyContext {
-      const { nodes } = repository;
-      const ctx: INodesRepositoryRuntimeHierarchyContext = {
-        __ctx_nids: Object.keys(nodes),
-        __ctx_nid_to_parent_id: {},
-        __ctx_nid_to_children_ids: {},
-      };
-
-      // First, default every node’s parent to null
-      for (const node_id of ctx.__ctx_nids) {
-        ctx.__ctx_nid_to_parent_id[node_id] = null;
-        ctx.__ctx_nid_to_children_ids[node_id] = [];
-      }
-
-      // Then walk through and hook up actual parent/children relationships
-      for (const node_id in nodes) {
-        const node = nodes[node_id];
-
-        // If the node has children, map each child to its parent and add to the parent’s child array
-        if (Array.isArray((node as nodes.UnknwonNode).children)) {
-          for (const child_id of (node as nodes.i.IChildrenReference)
-            .children) {
-            ctx.__ctx_nid_to_parent_id[child_id] = node_id;
-            ctx.__ctx_nid_to_children_ids[node_id].push(child_id);
-          }
-        }
-      }
-
-      return ctx;
     }
   }
 

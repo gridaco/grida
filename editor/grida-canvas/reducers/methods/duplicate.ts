@@ -7,6 +7,7 @@ import nid from "../tools/id";
 import grida from "@grida/schema";
 import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
+import { dq } from "@/grida-canvas/query";
 
 export function self_duplicateNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
@@ -39,7 +40,7 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
         nid
       );
 
-    const parent_id = editor.dq.getParentId(draft.document_ctx, origin_id);
+    const parent_id = dq.getParentId(draft.document_ctx, origin_id);
 
     // insert the sub document
     const clone_id = self_insertSubDocument(draft, parent_id, sub)[0];

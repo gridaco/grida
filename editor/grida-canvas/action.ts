@@ -143,7 +143,7 @@ export interface ChangeSceneBackgroundAction {
 
 export interface EditorSelectAction {
   type: "select";
-  selectors: grida.program.document.Selector[];
+  selection: NodeID[];
 }
 
 export interface EditorHoverAction {
