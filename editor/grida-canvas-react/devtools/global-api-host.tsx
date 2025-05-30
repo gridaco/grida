@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useCurrentEditor } from "../use-editor";
 
 export function useWindowCurrentEditor() {
