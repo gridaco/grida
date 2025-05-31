@@ -1111,19 +1111,14 @@ export function useDataTransferEventTarget() {
 
   const insertFromFile = useCallback(
     (
+      type: io.clipboard.ValidFileType,
       file: File,
       position?: {
         clientX: number;
         clientY: number;
       }
     ) => {
-      const type = file.type || file.name.split(".").pop() || file.name;
-      const is_svg = type === "image/svg+xml";
-      const is_png = type === "image/png";
-      const is_jpg = type === "image/jpeg";
-      const is_gif = type === "image/gif";
-
-      if (is_svg) {
+      if (type === "image/svg+xml") {
         const reader = new FileReader();
         reader.onload = (e) => {
           const svgContent = e.target?.result as string;
@@ -1132,21 +1127,21 @@ export function useDataTransferEventTarget() {
         };
         reader.readAsText(file);
         return;
-      }
-
-      if (is_png || is_jpg || is_gif) {
+      } else if (
+        type === "image/png" ||
+        type === "image/jpeg" ||
+        type === "image/gif"
+      ) {
         const name = file.name.split(".")[0];
         insertImage(name, file, position);
         return;
       }
-
-      toast.error(`insertion of file type ${type} is not supported`);
     },
     [insertImage, insertSVG]
   );
 
   const onpaste = useCallback(
-    (event: ClipboardEvent) => {
+    async (event: ClipboardEvent) => {
       if (event.defaultPrevented) return;
       // cancel if on contenteditable / form element
       if (
@@ -1162,52 +1157,65 @@ export function useDataTransferEventTarget() {
         return;
       }
 
-      const items = event.clipboardData.items;
-
       let pasted_from_data_transfer = false;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === "file") {
-          const file = item.getAsFile();
-          if (file) {
-            insertFromFile(file, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
-            pasted_from_data_transfer = true;
-          }
-        } else if (item.kind === "string" && item.type === "text/plain") {
+
+      const items: io.clipboard.DecodedItem[] = [];
+      for (let i = 0; i < event.clipboardData.items.length; i++) {
+        try {
+          const item = event.clipboardData.items[i];
+          const payload = await io.clipboard.decode(item);
+          items.push(payload);
+        } catch {}
+      }
+
+      const grida_payload = items.find((item) => item.type === "clipboard");
+
+      // if there is a grida html clipboard, use it and ignore all others.
+      if (grida_payload) {
+        if (
+          current_clipboard?.payload_id === grida_payload.clipboard.payload_id
+        ) {
+          instance.paste();
           pasted_from_data_transfer = true;
-          item.getAsString((data) => {
-            insertText(data, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
+        } else {
+          grida_payload.clipboard.prototypes.forEach((p) => {
+            const sub =
+              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                p,
+                nid
+              );
+            instance.insert({ document: sub });
           });
-        } else if (item.kind === "string" && item.type === "text/html") {
           pasted_from_data_transfer = true;
-          item.getAsString((html) => {
-            const data = io.clipboard.decodeClipboardHtml(html);
-            if (data) {
-              if (current_clipboard?.payload_id === data.payload_id) {
-                instance.paste();
-              } else {
-                data.prototypes.forEach((p) => {
-                  const sub =
-                    grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                      p,
-                      nid
-                    );
-                  instance.insert({ document: sub });
+        }
+      } else {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          try {
+            switch (item.type) {
+              case "text": {
+                const { text } = item;
+                insertText(text, {
+                  clientX: window.innerWidth / 2,
+                  clientY: window.innerHeight / 2,
                 });
+                pasted_from_data_transfer = true;
+                break;
               }
-              return;
+              case "image/gif":
+              case "image/jpeg":
+              case "image/png":
+              case "image/svg+xml": {
+                const { type, file } = item;
+                insertFromFile(type, file, {
+                  clientX: window.innerWidth / 2,
+                  clientY: window.innerHeight / 2,
+                });
+                pasted_from_data_transfer = true;
+                break;
+              }
             }
-            insertText(html, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
-          });
+          } catch {}
         }
       }
 
@@ -1257,7 +1265,12 @@ export function useDataTransferEventTarget() {
       const files = event.dataTransfer.files;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        insertFromFile(file, event);
+        const [valid, type] = io.clipboard.filetype(file);
+        if (valid) {
+          insertFromFile(type, file, event);
+        } else {
+          toast.error(`file type '${type}' is not supported`);
+        }
       }
     },
     [insertFromFile]
@@ -1277,15 +1290,14 @@ export function useClipboardSync() {
   useEffect(() => {
     try {
       if (user_clipboard) {
-        const htmltxt = io.clipboard.encodeClipboardHtml(
+        const items = io.clipboard.encode(
           user_clipboard as io.clipboard.ClipboardPayload
         );
-        const blob = new Blob([htmltxt], { type: "text/html" });
 
-        const clipboardItem = new ClipboardItem({
-          "text/html": blob,
-        });
-        navigator.clipboard.write([clipboardItem]);
+        if (items) {
+          const clipboardItem = new ClipboardItem(items);
+          navigator.clipboard.write([clipboardItem]);
+        }
       }
     } catch (e) {
       reportError(e);
