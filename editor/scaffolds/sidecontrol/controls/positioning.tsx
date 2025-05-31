@@ -1,25 +1,9 @@
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { WorkbenchUI } from "@/components/workbench";
+import InputPropertyNumber from "../ui/number";
 import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
 import { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
-
-function parseIntFallback(
-  value: string,
-  fallback: number | undefined = undefined
-): number | undefined {
-  const i = parseInt(value);
-  const v = Number.isNaN(i) ? fallback : i;
-  return v;
-}
 
 type PositioningMode = grida.program.nodes.i.IPositioning["position"];
 
@@ -58,28 +42,30 @@ export function PositioningConstraintsControl({
   return (
     <div className="w-full">
       <div className="flex items-center justify-center">
-        <Input
+        <InputPropertyNumber
+          mode="fixed"
           placeholder="--"
           type="number"
           value={value.top ?? ""}
-          onChange={(e) => {
+          onValueCommit={(v) => {
             onValueChange?.({
               ...value,
-              top: parseIntFallback(e.target.value),
+              top: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
         />
       </div>
       <div className="flex items-center justify-center">
-        <Input
+        <InputPropertyNumber
+          mode="fixed"
           placeholder="--"
           type="number"
           value={value.left ?? ""}
-          onChange={(e) => {
+          onValueCommit={(v) => {
             onValueChange?.({
               ...value,
-              left: parseIntFallback(e.target.value),
+              left: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
@@ -98,28 +84,30 @@ export function PositioningConstraintsControl({
             });
           }}
         />
-        <Input
+        <InputPropertyNumber
+          mode="fixed"
           placeholder="--"
           type="number"
           value={value.right ?? ""}
-          onChange={(e) => {
+          onValueCommit={(v) => {
             onValueChange?.({
               ...value,
-              right: parseIntFallback(e.target.value),
+              right: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}
         />
       </div>
       <div className="flex items-center justify-center">
-        <Input
+        <InputPropertyNumber
+          mode="fixed"
           placeholder="--"
           type="number"
           value={value.bottom ?? ""}
-          onChange={(e) => {
+          onValueCommit={(v) => {
             onValueChange?.({
               ...value,
-              bottom: parseIntFallback(e.target.value),
+              bottom: v,
             });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-16")}

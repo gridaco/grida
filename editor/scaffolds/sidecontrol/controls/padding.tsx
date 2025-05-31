@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 
@@ -6,13 +6,14 @@ type Padding = grida.program.nodes.i.IPadding["padding"];
 
 export function PaddingControl({
   value = 0,
-  onValueChange,
+  onValueCommit,
 }: {
   value: Padding;
-  onValueChange?: (value: Padding) => void;
+  onValueCommit?: (value: Padding) => void;
 }) {
   return (
-    <Input
+    <InputPropertyNumber
+      mode="fixed"
       type="number"
       value={
         typeof value === "number"
@@ -24,9 +25,7 @@ export function PaddingControl({
       min={0}
       step={1}
       className={WorkbenchUI.inputVariants({ size: "xs" })}
-      onChange={(e) => {
-        onValueChange?.(parseInt(e.target.value));
-      }}
+      onValueCommit={onValueCommit}
     />
   );
 }

@@ -310,7 +310,7 @@ function SelectionMixedProperties({
               <PropertyLineLabel>Rotate</PropertyLineLabel>
               <RotateControl
                 value={rotation?.value}
-                onValueChange={change.rotation}
+                onValueCommit={change.rotation}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -327,14 +327,14 @@ function SelectionMixedProperties({
               <PropertyLineLabel>Width</PropertyLineLabel>
               <LengthPercentageControl
                 value={width!.value}
-                onValueChange={change.width}
+                onValueCommit={change.width}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Height</PropertyLineLabel>
               <LengthPercentageControl
                 value={height!.value}
-                onValueChange={change.height}
+                onValueCommit={change.height}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -398,21 +398,21 @@ function SelectionMixedProperties({
               <PropertyLineLabel>Size</PropertyLineLabel>
               <FontSizeControl
                 value={fontSize?.value}
-                onValueChange={change.fontSize}
+                onValueCommit={change.fontSize}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Line</PropertyLineLabel>
               <LineHeightControl
                 value={lineHeight?.value}
-                onValueChange={change.lineHeight}
+                onValueCommit={change.lineHeight}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Letter</PropertyLineLabel>
               <LetterSpacingControl
                 value={letterSpacing?.value}
-                onValueChange={change.letterSpacing}
+                onValueCommit={change.letterSpacing}
               />
             </PropertyLine>
             <PropertyLine>
@@ -524,18 +524,19 @@ function SelectionMixedProperties({
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
                 value={opacity?.value}
-                onValueChange={change.opacity}
+                // onValueChange={change.opacity}
+                onValueCommit={change.opacity}
               />
             </PropertyLine>
             {supports_corner_radius && (
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 {cornerRadius?.mixed ? (
-                  <CornerRadiusControl onValueChange={change.cornerRadius} />
+                  <CornerRadiusControl onValueCommit={change.cornerRadius} />
                 ) : (
                   <CornerRadiusControl
                     value={cornerRadius?.value}
-                    onValueChange={change.cornerRadius}
+                    onValueCommit={change.cornerRadius}
                   />
                 )}
               </PropertyLine>
@@ -604,7 +605,7 @@ function SelectionMixedProperties({
                 <PropertyLineLabel>Width</PropertyLineLabel>
                 <StrokeWidthControl
                   value={strokeWidth?.value}
-                  onValueChange={change.strokeWidth}
+                  onValueCommit={change.strokeWidth}
                 />
               </PropertyLine>
               <PropertyLine hidden={!supports_stroke_cap}>
@@ -915,21 +916,21 @@ function SelectedNodeProperties({
               <PropertyLineLabel>Size</PropertyLineLabel>
               <FontSizeControl
                 value={fontSize}
-                onValueChange={actions.fontSize}
+                onValueCommit={actions.fontSize}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Line</PropertyLineLabel>
               <LineHeightControl
                 value={lineHeight}
-                onValueChange={actions.lineHeight}
+                onValueCommit={actions.lineHeight}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Letter</PropertyLineLabel>
               <LetterSpacingControl
                 value={letterSpacing}
-                onValueChange={actions.letterSpacing}
+                onValueCommit={actions.letterSpacing}
               />
             </PropertyLine>
             <PropertyLine>
@@ -953,7 +954,7 @@ function SelectedNodeProperties({
                 placeholder={(
                   computed.text as any as string
                 )?.length?.toString()}
-                onValueChange={actions.maxLength}
+                onValueCommit={actions.maxLength}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -1025,7 +1026,7 @@ function SelectedNodeProperties({
                     mainAxisGap: mainAxisGap!,
                     crossAxisGap: crossAxisGap!,
                   }}
-                  onValueChange={actions.gap}
+                  onValueCommit={actions.gap}
                 />
               </PropertyLine>
               {/* <PropertyLine hidden={!is_flex_container}>
@@ -1039,7 +1040,7 @@ function SelectedNodeProperties({
                 <PropertyLineLabel>Padding</PropertyLineLabel>
                 <PaddingControl
                   value={padding!}
-                  onValueChange={actions.padding}
+                  onValueCommit={actions.padding}
                 />
               </PropertyLine>
             </SidebarMenuSectionContent>
@@ -1054,7 +1055,7 @@ function SelectedNodeProperties({
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
                 value={opacity as any}
-                onValueChange={actions.opacity}
+                onValueCommit={actions.opacity}
               />
             </PropertyLine>
             {supports.cornerRadius(node.type) && (
@@ -1062,7 +1063,7 @@ function SelectedNodeProperties({
                 <PropertyLineLabel>Radius</PropertyLineLabel>
                 <CornerRadiusControl
                   value={cornerRadius}
-                  onValueChange={actions.cornerRadius}
+                  onValueCommit={actions.cornerRadius}
                 />
               </PropertyLine>
             )}
@@ -1104,7 +1105,7 @@ function SelectedNodeProperties({
                 <PropertyLineLabel>Width</PropertyLineLabel>
                 <StrokeWidthControl
                   value={strokeWidth}
-                  onValueChange={actions.strokeWidth}
+                  onValueCommit={actions.strokeWidth}
                 />
               </PropertyLine>
               <PropertyLine hidden={!supports.strokeCap(node.type)}>
@@ -1243,7 +1244,7 @@ function SectionPosition({ node_id }: { node_id: string }) {
         </PropertyLine>
         <PropertyLine>
           <PropertyLineLabel>Rotate</PropertyLineLabel>
-          <RotateControl value={rotation} onValueChange={actions.rotation} />
+          <RotateControl value={rotation} onValueCommit={actions.rotation} />
         </PropertyLine>
       </SidebarMenuSectionContent>
     </SidebarSection>
@@ -1268,14 +1269,14 @@ function SectionDimension({ node_id }: { node_id: string }) {
           <PropertyLineLabel>Width</PropertyLineLabel>
           <LengthPercentageControl
             value={width}
-            onValueChange={actions.width}
+            onValueCommit={actions.width}
           />
         </PropertyLine>
         <PropertyLine>
           <PropertyLineLabel>Height</PropertyLineLabel>
           <LengthPercentageControl
             value={height}
-            onValueChange={actions.height}
+            onValueCommit={actions.height}
           />
         </PropertyLine>
       </SidebarMenuSectionContent>

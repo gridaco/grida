@@ -1,30 +1,27 @@
-import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
+import InputPropertyNumber from "../ui/number";
 
 export function MaxlengthControl({
   value,
   placeholder,
-  onValueChange,
+  onValueCommit,
   disabled,
 }: {
   value?: number;
   placeholder?: string;
-  onValueChange?: (value: number | undefined) => void;
+  onValueCommit?: (value: number | undefined) => void;
   disabled?: boolean;
 }) {
   return (
-    <Input
+    <InputPropertyNumber
       disabled={disabled}
+      mode="fixed"
       type="number"
       placeholder={placeholder}
       min={0}
       className={WorkbenchUI.inputVariants({ size: "xs" })}
       value={value ?? ""}
-      onChange={(e) => {
-        const v = parseFloat(e.target.value);
-        const value = isNaN(v) ? undefined : v;
-        onValueChange?.(value);
-      }}
+      onValueCommit={onValueCommit}
     />
   );
 }

@@ -1,12 +1,11 @@
 import { Input } from "@/components/ui/input";
-import grida from "@grida/schema";
 import type cg from "@grida/cg";
 import { RGBAColorControl } from "./color";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
-import { PropertyNumber } from "../ui";
+import InputPropertyNumber from "../ui/number";
 import cmath from "@grida/cmath";
 import { css } from "@/grida-canvas-utils/css";
 
@@ -30,15 +29,16 @@ export function GradientControl({
       />
       <hr className="my-4 w-full" />
       <div>
-        <PropertyNumber
+        <InputPropertyNumber
+          mode="fixed"
           type="number"
           placeholder="angle"
-          mode="fixed"
           step={1}
           value={
             value.transform ? cmath.transform.angle(value.transform) : undefined
           }
-          onValueChange={(v) => {
+          onValueCommit={(v) => {
+            // change on commit
             const t = cmath.transform.computeRelativeLinearGradientTransform(v);
             onValueChange?.({
               ...value,
