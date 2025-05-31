@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
+import InputPropertyNumber from "../ui/number";
 import grida from "@grida/schema";
 import type { TMixed } from "./utils/types";
 import { PropertyEnum } from "../ui";
@@ -25,10 +26,10 @@ function val(value: TMixed<LengthPercentage | "auto">): {
 
 export function LengthPercentageControl({
   value = "auto",
-  onValueChange,
+  onValueCommit,
 }: {
   value?: TMixed<LengthPercentage | "auto">;
-  onValueChange?: (value: LengthPercentage | "auto") => void;
+  onValueCommit?: (value: LengthPercentage | "auto") => void;
 }) {
   const mode =
     value === grida.mixed
@@ -42,49 +43,20 @@ export function LengthPercentageControl({
   const onModeChange = (mode: Mode) => {
     switch (mode) {
       case "fixed":
-        onValueChange?.(0);
+        onValueCommit?.(0);
         return;
       case "percentage":
-        onValueChange?.({ type: "percentage", value: 100 });
+        onValueCommit?.({ type: "percentage", value: 100 });
         return;
       case "auto":
-        onValueChange?.("auto");
+        onValueCommit?.("auto");
         return;
     }
   };
 
-  const { value: _value, type: _type } = val(value);
-
   return (
     <div className="flex items-center gap-2">
-      <Input
-        type={_type}
-        value={_value}
-        disabled={mode === "auto"}
-        placeholder="<length-percentage> | auto"
-        onChange={(e) => {
-          const r = e.target.value;
-          const n = parseFloat(r);
-          if (isNaN(n)) {
-            onValueChange?.("auto");
-            return;
-          } else {
-            switch (mode) {
-              case "fixed":
-                onValueChange?.(n);
-                return;
-              case "percentage":
-                onValueChange?.({ type: "percentage", value: n });
-                return;
-              case "auto":
-                onValueChange?.(n);
-                return;
-            }
-            return;
-          }
-        }}
-        className={WorkbenchUI.inputVariants({ size: "xs" })}
-      />
+      <__Input value={value} mode={mode} onValueCommit={onValueCommit} />
       <PropertyEnum<Mode>
         value={mode}
         onValueChange={onModeChange}
@@ -105,4 +77,45 @@ export function LengthPercentageControl({
       />
     </div>
   );
+}
+
+function __Input({
+  value,
+  mode,
+  onValueCommit,
+}: {
+  value: TMixed<LengthPercentage | "auto">;
+  mode: Mode | typeof grida.mixed;
+  onValueCommit?: (value: LengthPercentage | "auto") => void;
+}) {
+  const { value: _value, type: _type } = val(value);
+
+  if (_type === "number") {
+    return (
+      <InputPropertyNumber
+        mode="fixed"
+        value={_value as number}
+        onValueCommit={(v) => {
+          switch (mode) {
+            case "fixed":
+              onValueCommit?.(v);
+              return;
+            case "percentage":
+              onValueCommit?.({ type: "percentage", value: v });
+              return;
+          }
+        }}
+      />
+    );
+  } else {
+    return (
+      <Input
+        type={_type}
+        value={_value}
+        disabled
+        placeholder="<length-percentage> | auto"
+        className={WorkbenchUI.inputVariants({ size: "xs" })}
+      />
+    );
+  }
 }

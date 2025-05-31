@@ -1,21 +1,24 @@
 import type { TMixed } from "./utils/types";
 import type { editor } from "@/grida-canvas";
-import { PropertyNumber } from "../ui";
+import InputPropertyNumber from "../ui/number";
 
 export function StrokeWidthControl({
   value,
   onValueChange,
+  onValueCommit,
 }: {
   value?: TMixed<number>;
   onValueChange?: (change: editor.api.NumberChange) => void;
+  onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
   return (
-    <PropertyNumber
+    <InputPropertyNumber
       type="number"
       value={value}
       min={0}
       step={1}
       onValueChange={onValueChange}
+      onValueCommit={onValueCommit}
     />
   );
 }

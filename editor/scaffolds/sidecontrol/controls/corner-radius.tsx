@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import InputPropertyNumber from "../ui/number";
 import {
   Popover,
   PopoverContent,
@@ -15,16 +15,16 @@ import {
   CornerBottomLeftIcon,
   CornersIcon,
 } from "@radix-ui/react-icons";
-import { PropertyInput } from "../ui";
+import { PropertyInputContainer } from "../ui";
 
 export function CornerRadiusControl({
   disabled,
   value,
-  onValueChange,
+  onValueCommit,
 }: {
   disabled?: boolean;
   value?: grida.program.nodes.i.IRectangleCorner["cornerRadius"];
-  onValueChange?: (
+  onValueCommit?: (
     value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
   ) => void;
 }) {
@@ -39,17 +39,15 @@ export function CornerRadiusControl({
             size: "xs",
           })}
         >
-          <Input
+          <InputPropertyNumber
+            mode="fixed"
             disabled={disabled}
             type="number"
             value={mode === "all" ? (value as number) : ""}
             placeholder={mode === "all" ? "0" : "mixed"}
             min={0}
             step={1}
-            className={WorkbenchUI.inputVariants({ size: "xs" })}
-            onChange={(e) => {
-              onValueChange?.(parseInt(e.target.value));
-            }}
+            onValueCommit={onValueCommit}
           />
           <PopoverTrigger asChild>
             <Button
@@ -72,12 +70,12 @@ export function CornerRadiusControl({
                 ? [value, value, value, value]
                 : [0, 0, 0, 0]
           }
-          onValueChange={(v) => {
+          onValueCommit={(v) => {
             if (cg.cornerRadius4Identical(v)) {
-              onValueChange?.(v[0]);
+              onValueCommit?.(v[0]);
               return;
             }
-            onValueChange?.(v);
+            onValueCommit?.(v);
           }}
         />
       </PopoverContent>
@@ -87,49 +85,61 @@ export function CornerRadiusControl({
 
 function CornerRadius4Control({
   value,
-  onValueChange,
+  onValueCommit,
 }: {
   value: cg.CornerRadius4;
-  onValueChange?: (value: cg.CornerRadius4) => void;
+  onValueCommit?: (value: cg.CornerRadius4) => void;
 }) {
   const [topLeft, topRight, bottomRight, bottomLeft] = value;
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const onCommit = (v: number, index: number) => {
     const newValue = [...value];
-    const n = parseInt(e.target.value) || 0;
+    const n = v || 0;
     newValue[index] = n;
-    onValueChange?.(newValue as cg.CornerRadius4);
+    onValueCommit?.(newValue as cg.CornerRadius4);
   };
 
   return (
     <div className="grid gap-2">
       <div className="flex items-center gap-2">
-        <PropertyInput
-          type="number"
-          value={topLeft}
-          onChange={(e) => onChange(e, 0)}
-          icon={<CornerTopLeftIcon className="size-3" />}
-        />
-        <PropertyInput
-          type="number"
-          value={topRight}
-          onChange={(e) => onChange(e, 1)}
-          icon={<CornerTopRightIcon className="size-3" />}
-        />
+        <PropertyInputContainer>
+          <CornerTopLeftIcon className="size-3" />
+          <InputPropertyNumber
+            mode="fixed"
+            type="number"
+            value={topLeft}
+            onValueCommit={(v) => onCommit(v, 0)}
+          />
+        </PropertyInputContainer>
+        <PropertyInputContainer>
+          <CornerTopRightIcon className="size-3" />
+          <InputPropertyNumber
+            mode="fixed"
+            type="number"
+            value={topRight}
+            onValueCommit={(v) => onCommit(v, 1)}
+          />
+        </PropertyInputContainer>
       </div>
       <div className="flex items-center gap-2">
-        <PropertyInput
-          type="number"
-          value={bottomLeft}
-          onChange={(e) => onChange(e, 3)}
-          icon={<CornerBottomLeftIcon className="size-3" />}
-        />
-        <PropertyInput
-          type="number"
-          value={bottomRight}
-          onChange={(e) => onChange(e, 2)}
-          icon={<CornerBottomRightIcon className="size-3" />}
-        />
+        <PropertyInputContainer>
+          <CornerBottomLeftIcon className="size-3" />
+          <InputPropertyNumber
+            mode="fixed"
+            type="number"
+            value={bottomLeft}
+            onValueCommit={(v) => onCommit(v, 3)}
+          />
+        </PropertyInputContainer>
+        <PropertyInputContainer>
+          <CornerBottomRightIcon className="size-3" />
+          <InputPropertyNumber
+            mode="fixed"
+            type="number"
+            value={bottomRight}
+            onValueCommit={(v) => onCommit(v, 2)}
+          />
+        </PropertyInputContainer>
       </div>
     </div>
   );

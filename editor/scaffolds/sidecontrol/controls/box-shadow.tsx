@@ -15,7 +15,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PropertyLine, PropertyLineLabel, PropertyNumber } from "../ui";
+import { PropertyLine, PropertyLineLabel } from "../ui";
+import InputPropertyNumber from "../ui/number";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { RGBAColorControl } from "./color";
 
@@ -114,10 +115,10 @@ export function BoxShadowControl({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>X</PropertyLineLabel>
-              <PropertyNumber
+              <InputPropertyNumber
                 mode="fixed"
                 value={value.offset[0]}
-                onValueChange={(v) =>
+                onValueCommit={(v) =>
                   onValueChange?.({
                     ...value,
                     offset: [v || 0, value.offset[1]],
@@ -127,10 +128,10 @@ export function BoxShadowControl({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Y</PropertyLineLabel>
-              <PropertyNumber
+              <InputPropertyNumber
                 mode="fixed"
                 value={value.offset[1]}
-                onValueChange={(v) =>
+                onValueCommit={(v) =>
                   onValueChange?.({
                     ...value,
                     offset: [value.offset[0], v || 0],
@@ -140,20 +141,20 @@ export function BoxShadowControl({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Blur</PropertyLineLabel>
-              <PropertyNumber
+              <InputPropertyNumber
                 mode="fixed"
                 value={value.blur}
-                onValueChange={(v) =>
+                onValueCommit={(v) =>
                   onValueChange?.({ ...value, blur: v || 0 })
                 }
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Spread</PropertyLineLabel>
-              <PropertyNumber
+              <InputPropertyNumber
                 mode="fixed"
                 value={value.spread}
-                onValueChange={(v) =>
+                onValueCommit={(v) =>
                   onValueChange?.({ ...value, spread: v || 0 })
                 }
               />

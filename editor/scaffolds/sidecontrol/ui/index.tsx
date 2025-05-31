@@ -1,4 +1,3 @@
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 import { cn } from "@/components/lib/utils";
-import { TMixed } from "../controls/utils/types";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
-import type { editor } from "@/grida-canvas";
+import type { TMixed } from "../controls/utils/types";
 
 export function PropertyLine({
   children,
@@ -47,6 +45,24 @@ export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
 
 export function PropertySeparator() {
   return <Separator />;
+}
+
+export function PropertyInputContainer({
+  children,
+  className,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return (
+    <div
+      className={cn(
+        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function PropertyInput({
@@ -171,89 +187,5 @@ export function PropertyEnumToggle<T extends string>({
         );
       })}
     </ToggleGroup>
-  );
-}
-
-type NumericPropertyControlProps = Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "type" | "onChange" | "value" | "step"
-> & {
-  type?: "integer" | "number";
-  value?: TMixed<number | "">;
-  step?: number;
-} & (
-    | {
-        mode?: "auto";
-        onValueChange?: (change: editor.api.NumberChange) => void;
-      }
-    | {
-        mode?: "fixed";
-        onValueChange?: (value: number) => void;
-      }
-  );
-
-export function PropertyNumber({
-  type = "number",
-  placeholder,
-  value,
-  className,
-  onKeyDown,
-  mode = "auto",
-  onValueChange,
-  step = 1,
-  ...props
-}: NumericPropertyControlProps) {
-  const mixed = value === grida.mixed;
-
-  return (
-    <Input
-      {...props}
-      type={mixed ? "text" : "number"}
-      placeholder={placeholder}
-      className={cn(WorkbenchUI.inputVariants({ size: "xs" }), className)}
-      value={mixed ? "mixed" : value}
-      onKeyDown={(e) => {
-        onKeyDown?.(e);
-
-        if (e.defaultPrevented) return;
-
-        const multiplier = e.shiftKey ? 10 : 1;
-
-        switch (mode) {
-          case "auto":
-            if (e.key === "ArrowUp") {
-              (onValueChange as (change: editor.api.NumberChange) => void)?.({
-                type: "delta",
-                value: step * multiplier,
-              });
-              e.preventDefault();
-            } else if (e.key === "ArrowDown") {
-              (onValueChange as (change: editor.api.NumberChange) => void)?.({
-                type: "delta",
-                value: -step * multiplier,
-              });
-              e.preventDefault();
-            }
-            break;
-          case "fixed":
-            break;
-        }
-      }}
-      onChange={(e) => {
-        const txt = e.target.value;
-        const value = type === "integer" ? parseInt(txt) : parseFloat(txt) || 0;
-        switch (mode) {
-          case "auto":
-            (onValueChange as (change: editor.api.NumberChange) => void)?.({
-              type: "set",
-              value,
-            });
-            break;
-          case "fixed":
-            (onValueChange as (change: number) => void)?.(value);
-            break;
-        }
-      }}
-    />
   );
 }

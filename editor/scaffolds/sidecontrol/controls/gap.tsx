@@ -1,26 +1,24 @@
-import { Input } from "@/components/ui/input";
-import { WorkbenchUI } from "@/components/workbench";
+import InputPropertyNumber from "../ui/number";
 
 export function GapControl({
   value,
-  onValueChange,
+  onValueCommit,
 }: {
   value: { mainAxisGap: number; crossAxisGap: number };
-  onValueChange?: (
+  onValueCommit?: (
     value: number | { mainAxisGap: number; crossAxisGap: number }
   ) => void;
 }) {
   return (
-    <Input
+    <InputPropertyNumber
+      mode="fixed"
       type="number"
       // TODO: individual gap control
       value={value.mainAxisGap === value.crossAxisGap ? value.mainAxisGap : ""}
       placeholder="gap"
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "xs" })}
-      onChange={(e) => {
-        onValueChange?.(parseInt(e.target.value));
-      }}
+      min={0}
+      onValueCommit={onValueCommit}
     />
   );
 }

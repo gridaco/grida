@@ -4,29 +4,32 @@ import {
   SelectItem,
 } from "@/components/ui-editor/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Button } from "@/components/ui-editor/button";
+import InputPropertyNumber from "../ui/number";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils";
 import type { editor } from "@/grida-canvas";
 import type { TMixed } from "./utils/types";
-import { PropertyNumber } from "../ui";
 
 export function FontSizeControl({
   value,
   onValueChange,
+  onValueCommit,
 }: {
   value?: TMixed<number>;
   onValueChange?: (change: editor.api.NumberChange) => void;
+  onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
   return (
     <div className="relative">
-      <PropertyNumber
+      <InputPropertyNumber
+        mode="auto"
         type="integer"
         value={value}
         placeholder="inherit"
         min={1}
         step={1}
         onValueChange={onValueChange}
+        onValueCommit={onValueCommit}
         className={cn(
           "overflow-hidden",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
