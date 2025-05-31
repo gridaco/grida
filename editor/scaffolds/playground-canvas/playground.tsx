@@ -213,14 +213,13 @@ export default function CanvasPlayground({
     if (!src) return;
     fetch(src).then((res) => {
       res.json().then((file) => {
-        instance.dispatch({
-          type: "__internal/reset",
-          key: src,
-          state: editor.state.init({
+        instance.reset(
+          editor.state.init({
             editable: true,
             document: file.document,
           }),
-        });
+          src
+        );
       });
     });
   }, [src]);
@@ -250,7 +249,8 @@ export default function CanvasPlayground({
                 editor.state.init({
                   editable: true,
                   document: file.document,
-                })
+                }),
+                Date.now() + ""
               );
             }}
           />

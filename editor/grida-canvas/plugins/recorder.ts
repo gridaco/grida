@@ -92,7 +92,7 @@ export class EditorRecorder {
 
     this.status = "playing";
     this.editor.locked = true;
-    this.editor.reset(this.initial, true);
+    this.editor.reset(this.initial, undefined, true);
 
     for (let i = 0; i < this.buffer.length; i++) {
       const current = this.buffer[i];

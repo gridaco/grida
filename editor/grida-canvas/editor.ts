@@ -109,10 +109,15 @@ export class Editor
     return this.debug;
   }
 
-  public reset(state: editor.state.IEditorState, force: boolean = false) {
+  public reset(
+    state: editor.state.IEditorState,
+    key: string | undefined = undefined,
+    force: boolean = false
+  ) {
     this.dispatch(
       {
         type: "__internal/reset",
+        key,
         state,
       },
       force

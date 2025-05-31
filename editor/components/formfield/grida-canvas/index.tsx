@@ -70,14 +70,13 @@ export function GridaCanvasFormField() {
   useEffect(() => {
     fetch("/examples/canvas/sketch-teimplate-01.grida").then((res) => {
       res.json().then((file) => {
-        instance.dispatch({
-          type: "__internal/reset",
-          key: "template",
-          state: editor.state.init({
+        instance.reset(
+          editor.state.init({
             editable: true,
             document: file.document,
           }),
-        });
+          "template"
+        );
       });
     });
   }, []);
