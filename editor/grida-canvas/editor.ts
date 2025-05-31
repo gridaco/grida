@@ -12,6 +12,7 @@ import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
 import { TCanvasEventTargetDragGestureState } from "./action";
+import iosvg from "@grida/io-svg";
 
 function throttle<T extends (...args: any[]) => void>(
   func: T,
@@ -108,10 +109,15 @@ export class Editor
     return this.debug;
   }
 
-  public reset(state: editor.state.IEditorState, force: boolean = false) {
+  public reset(
+    state: editor.state.IEditorState,
+    key: string | undefined = undefined,
+    force: boolean = false
+  ) {
     this.dispatch(
       {
         type: "__internal/reset",
+        key,
         state,
       },
       force
@@ -141,6 +147,15 @@ export class Editor
 
   public __get_node_siblings(node_id: string): string[] {
     return dq.getSiblings(this.mstate.document_ctx, node_id);
+  }
+
+  public reduce(
+    reducer: (
+      state: editor.state.IEditorState
+    ) => Readonly<editor.state.IEditorState>
+  ) {
+    this.mstate = produce(this.mstate, reducer);
+    this.listeners.forEach((l) => l(this));
   }
 
   public dispatch(action: Action, force: boolean = false) {
@@ -212,6 +227,40 @@ export class Editor
       scene: scene_id,
       backgroundColor,
     });
+  }
+
+  async createImage(
+    src: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const bytes = await blob.arrayBuffer();
+    const type = blob.type;
+
+    const { width, height } = await new Promise<{
+      width: number;
+      height: number;
+    }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = src;
+    });
+
+    const ref: grida.program.document.ImageRef = {
+      url: src,
+      width,
+      height,
+      bytes: bytes.byteLength,
+      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+    };
+
+    this.reduce((state) => {
+      state.document.images[src] = ref;
+      return state;
+    });
+
+    return ref;
   }
 
   setTool(tool: editor.state.ToolMode) {
@@ -322,13 +371,6 @@ export class Editor
     });
   }
 
-  public deleteNode(target: "selection" | editor.NodeID) {
-    this.dispatch({
-      type: "delete",
-      target,
-    });
-  }
-
   public selectVertex(node_id: editor.NodeID, vertex: number) {
     this.dispatch({
       type: "select-vertex",
@@ -355,9 +397,9 @@ export class Editor
     return dq.__getNodeById(this.mstate, node_id);
   }
 
-  public getNodeById(
+  public getNodeById<T extends grida.program.nodes.Node>(
     node_id: editor.NodeID
-  ): NodeProxy<grida.program.nodes.Node> {
+  ): NodeProxy<T> {
     return new NodeProxy(this, node_id);
   }
 
@@ -400,6 +442,93 @@ export class Editor
       prototype,
     });
     return id;
+  }
+
+  public deleteNode(target: "selection" | editor.NodeID) {
+    this.dispatch({
+      type: "delete",
+      target,
+    });
+  }
+
+  public async createNodeFromSvg(
+    svg: string
+  ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
+    const id = this.__createNodeId();
+    const optimized = iosvg.v0.optimize(svg).data;
+    let result = await iosvg.v0.convert(optimized, {
+      name: "svg",
+      currentColor: { r: 0, g: 0, b: 0, a: 1 },
+    });
+    if (result) {
+      result = result as grida.program.nodes.i.IPositioning &
+        grida.program.nodes.i.IFixedDimension;
+
+      this.insert({
+        id: id,
+        prototype: result,
+      });
+
+      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
+    } else {
+      throw new Error("Failed to convert SVG");
+    }
+  }
+
+  public createImageNode(
+    image: grida.program.document.ImageRef
+  ): NodeProxy<grida.program.nodes.ImageNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "image",
+        _$id: id,
+        src: image.url,
+        width: image.width,
+        height: image.height,
+      },
+    });
+
+    return this.getNodeById(id);
+  }
+
+  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "text",
+        _$id: id,
+        text: "",
+        width: "auto",
+        height: "auto",
+      },
+    });
+
+    return this.getNodeById(id);
+  }
+
+  public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "rectangle",
+        _$id: id,
+        width: 100,
+        height: 100,
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      },
+    });
+
+    return this.getNodeById(id);
   }
 
   public nudgeResize(
@@ -1566,9 +1695,11 @@ export class Editor
 
 export class NodeProxy<T extends grida.program.nodes.Node> {
   constructor(
-    private editor: Editor,
-    private node_id: string
-  ) {
+    private readonly editor: Editor,
+    private readonly node_id: string
+  ) {}
+
+  get $() {
     // @ts-expect-error - this is a workaround to allow the proxy to be used as a node
     return new Proxy(this, {
       get: (target, prop: string) => {

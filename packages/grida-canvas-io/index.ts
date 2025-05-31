@@ -15,6 +15,51 @@ export namespace io {
       ids: string[];
     }
 
+    export function encode(
+      payload: ClipboardPayload
+    ): Record<string, string | Blob> | null {
+      const result: Record<string, string | Blob> = {};
+
+      if (payload.prototypes.length === 0) {
+        return null;
+      }
+
+      // text/html (grida)
+      const __main_html = encodeClipboardHtml(payload);
+      const utf8Html = new TextEncoder().encode(__main_html);
+      result["text/html"] = new Blob([utf8Html], {
+        type: "text/html;charset=utf-8",
+      });
+
+      // text/plain (universal)
+      const __text_plain = encodeClipboardText(payload);
+      if (__text_plain) {
+        const utf8 = new TextEncoder().encode(__text_plain);
+        result["text/plain"] = new Blob([utf8], {
+          type: "text/plain;charset=utf-8",
+        });
+      }
+
+      return result;
+    }
+
+    export function encodeClipboardText(
+      payload: ClipboardPayload
+    ): string | null {
+      let __text_plain = "";
+      for (const p of payload.prototypes) {
+        if (p.type === "text") {
+          __text_plain += p.text + "\n";
+        }
+      }
+
+      if (__text_plain.trim().length > 0) {
+        return __text_plain;
+      }
+
+      return null;
+    }
+
     export function encodeClipboardHtml(payload: ClipboardPayload): string {
       const json = JSON.stringify(payload);
       const utf8Bytes = new TextEncoder().encode(json);
@@ -70,6 +115,114 @@ export namespace io {
       } catch {
         return null;
       }
+    }
+
+    export function filetype(
+      file: File
+    ): [true, ValidFileType] | [false, string] {
+      const type = file.type || file.name.split(".").pop() || file.name;
+      if (type === "image/svg+xml") {
+        return [true, "image/svg+xml" as const];
+      } else if (type === "image/png") {
+        return [true, "image/png" as const];
+      } else if (type === "image/jpeg") {
+        return [true, "image/jpeg" as const];
+      } else if (type === "image/gif") {
+        return [true, "image/gif" as const];
+      } else {
+        return [false, type];
+      }
+    }
+
+    export type ValidFileType =
+      | "image/svg+xml"
+      | "image/png"
+      | "image/jpeg"
+      | "image/gif";
+
+    export type DecodedItem =
+      | {
+          type: "image/svg+xml" | "image/png" | "image/jpeg" | "image/gif";
+          file: File;
+        }
+      | { type: "text"; text: string }
+      | { type: "clipboard"; clipboard: ClipboardPayload };
+
+    /**
+     * Decodes a DataTransferItem from the clipboard into a structured payload.
+     *
+     * This function supports three types of clipboard data:
+     * - File: Returns a payload with type 'file' and the File object.
+     * - Plain Text: Returns a payload with type 'text' and the text string.
+     * - Grida Clipboard HTML: Returns a payload with type 'clipboard' and the decoded ClipboardPayload object.
+     *
+     * The function automatically detects the kind and type of the DataTransferItem and resolves the appropriate payload.
+     *
+     * @param item The DataTransferItem from the clipboard event to decode.
+     * @returns A Promise that resolves to one of the following payloads:
+     *   - `{ type: "file", file: File }` if the item is a file
+     *   - `{ type: "text", text: string }` if the item is plain text
+     *   - `{ type: "clipboard", clipboard: ClipboardPayload }` if the item is Grida clipboard HTML
+     *
+     * @throws If the item cannot be decoded or is of an unknown/unsupported type.
+     *
+     * @example
+     * // Usage inside a paste event handler:
+     * for (const item of event.clipboardData.items) {
+     *   const payload = await io.clipboard.decode(item);
+     *   switch (payload.type) {
+     *     case 'file':
+     *       // handle file
+     *       break;
+     *     case 'text':
+     *       // handle text
+     *       break;
+     *     case 'clipboard':
+     *       // handle Grida clipboard payload
+     *       break;
+     *   }
+     * }
+     */
+    export function decode(
+      item: DataTransferItem,
+      config: {
+        noEmptyText: boolean;
+      } = { noEmptyText: true }
+    ): Promise<DecodedItem | null> {
+      return new Promise((resolve, reject) => {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            const [valid, type] = filetype(file);
+
+            if (valid) {
+              return resolve({ type: type, file });
+            } else {
+              return reject(new Error(`Unsupported file type: ${type}`));
+            }
+          } else {
+            return reject(new Error("File is not a valid file"));
+          }
+        } else if (item.kind === "string" && item.type === "text/plain") {
+          item.getAsString((data) => {
+            if (config.noEmptyText && data.trim().length === 0) {
+              return resolve(null);
+            }
+            return resolve({ type: "text", text: data });
+          });
+        } else if (item.kind === "string" && item.type === "text/html") {
+          item.getAsString((html) => {
+            const data = io.clipboard.decodeClipboardHtml(html);
+            if (data) {
+              return resolve({ type: "clipboard", clipboard: data });
+            } else {
+              return reject(new Error("Unknown HTML payload"));
+            }
+          });
+        } else {
+          return resolve(null);
+        }
+      });
     }
   }
 
@@ -227,6 +380,7 @@ export namespace io {
           nodes: json.document.nodes,
           scenes: json.document.scenes,
           bitmaps: bitmaps,
+          images: json.document.images ?? {},
           properties: json.document.properties ?? {},
         },
       } satisfies JSONDocumentFileModel;

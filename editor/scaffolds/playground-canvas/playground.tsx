@@ -118,7 +118,6 @@ import {
   PreviewProvider,
 } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { sitemap } from "@/www/data/sitemap";
-import iosvg from "@grida/io-svg";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";
@@ -214,14 +213,13 @@ export default function CanvasPlayground({
     if (!src) return;
     fetch(src).then((res) => {
       res.json().then((file) => {
-        instance.dispatch({
-          type: "__internal/reset",
-          key: src,
-          state: editor.state.init({
+        instance.reset(
+          editor.state.init({
             editable: true,
             document: file.document,
           }),
-        });
+          src
+        );
       });
     });
   }, [src]);
@@ -251,7 +249,8 @@ export default function CanvasPlayground({
                 editor.state.init({
                   editable: true,
                   document: file.document,
-                })
+                }),
+                Date.now() + ""
               );
             }}
           />
@@ -742,19 +741,9 @@ function LibraryContent() {
     }).then((res) => {
       // svg content
       res.text().then((svg) => {
-        const optimized = iosvg.v0.optimize(svg).data;
-        iosvg.v0
-          .convert(optimized, {
-            name: name.split(".svg")[0],
-            currentColor: { r: 0, g: 0, b: 0, a: 1 },
-          })
-          .then((result) => {
-            if (result) {
-              editor.insertNode(result);
-            } else {
-              throw new Error("Failed to convert SVG");
-            }
-          });
+        editor.createNodeFromSvg(svg).then((node) => {
+          node.$.name = name.split(".svg")[0];
+        });
       });
     });
 

@@ -189,10 +189,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "insert": {
       let sub: grida.program.document.IPackedSceneDocument;
       if ("prototype" in action) {
+        const { id, prototype } = action;
         sub =
           grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-            action.prototype,
-            nid
+            prototype,
+            (_, depth) => (depth === 0 ? (id ?? nid()) : nid())
           );
       } else if ("document" in action) {
         sub = action.document;

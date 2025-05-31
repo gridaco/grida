@@ -278,7 +278,27 @@ export namespace grida.program.document {
   }
 
   /**
-   * contains all images (data) under this defined document in k:v pair
+   * reference to an registered image
+   */
+  export type ImageRef = {
+    type: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    url: string;
+    width: number;
+    height: number;
+    bytes: number;
+  };
+
+  /**
+   * contains all images (ref) under this defined document in k:v pair
+   *
+   * @see {@link IDocumentDefinition}
+   */
+  export interface IImagesRepository {
+    images: Record<string, ImageRef>;
+  }
+
+  /**
+   * contains all bitmaps (data) under this defined document in k:v pair
    *
    * @see {@link IDocumentDefinition}
    */
@@ -402,7 +422,8 @@ export namespace grida.program.document {
    * ```
    */
   export interface IDocumentDefinition
-    extends IBitmapsRepository,
+    extends IImagesRepository,
+      IBitmapsRepository,
       document.INodesRepository,
       IDocumentProperties {
     // scene: Scene;
@@ -1932,6 +1953,7 @@ export namespace grida.program.nodes {
     ): document.IPackedSceneDocument {
       const document: document.IPackedSceneDocument = {
         bitmaps: {},
+        images: {},
         nodes: {},
         scene: {
           type: "scene",

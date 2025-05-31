@@ -629,6 +629,7 @@ export namespace editor.state {
   }): editor.state.IEditorState {
     const doc: grida.program.document.Document = {
       bitmaps: {},
+      images: {},
       properties: {},
       ...init.document,
       scenes: Object.entries(init.document.scenes ?? {}).reduce(
@@ -2054,6 +2055,14 @@ export namespace editor.api {
       scene_id: string,
       backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
     ): void;
+
+    //
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImage(src: string): Promise<grida.program.document.ImageRef>;
+
     //
     setTool(tool: editor.state.ToolMode): void;
     tryExitContentEditMode(): void;
@@ -2077,7 +2086,6 @@ export namespace editor.api {
     duplicate(target: "selection" | NodeID): void;
 
     setClipboardColor(color: cg.RGBA8888): void;
-    deleteNode(target: "selection" | NodeID): void;
 
     //
     selectVertex(node_id: NodeID, vertex: number): void;
@@ -2089,7 +2097,20 @@ export namespace editor.api {
     getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
     getNodeDepth(node_id: NodeID): number;
     getNodeAbsoluteRotation(node_id: NodeID): number;
+
+    //
     insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;
+    deleteNode(target: "selection" | NodeID): void;
+    //
+
+    createNodeFromSvg(
+      svg: string
+    ): Promise<NodeProxy<grida.program.nodes.ContainerNode>>;
+    createImageNode(
+      image: grida.program.document.ImageRef
+    ): NodeProxy<grida.program.nodes.ImageNode>;
+    createTextNode(text: string): NodeProxy<grida.program.nodes.TextNode>;
+    createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
     //
     nudgeResize(

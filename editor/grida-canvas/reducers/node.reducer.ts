@@ -52,6 +52,31 @@ const safe_properties: Partial<
       draft.name = value;
     },
   }),
+  position: defineNodeProperty<"position">({
+    apply: (draft, value, prev) => {
+      draft.position = value;
+    },
+  }),
+  left: defineNodeProperty<"left">({
+    apply: (draft, value, prev) => {
+      draft.left = value;
+    },
+  }),
+  top: defineNodeProperty<"top">({
+    apply: (draft, value, prev) => {
+      draft.top = value;
+    },
+  }),
+  right: defineNodeProperty<"right">({
+    apply: (draft, value, prev) => {
+      draft.right = value;
+    },
+  }),
+  bottom: defineNodeProperty<"bottom">({
+    apply: (draft, value, prev) => {
+      draft.bottom = value;
+    },
+  }),
   width: defineNodeProperty<"width">({
     apply: (draft, value, prev) => {
       if (typeof value === "number") {

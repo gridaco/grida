@@ -93,13 +93,12 @@ export default function IOSVGPage() {
               )
             );
 
-          instance.dispatch({
-            type: "__internal/reset",
-            state: editor.state.init({
+          instance.reset(
+            editor.state.init({
               editable: true,
               document: doc,
-            }),
-          });
+            })
+          );
         }
         setResult(result);
         //

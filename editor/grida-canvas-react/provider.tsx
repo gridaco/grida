@@ -1025,7 +1025,10 @@ export function useDataTransferEventTarget() {
         viewportdomrect.y,
       ];
       const translate = cmath.transform.getTranslate(state.transform);
-      return cmath.vector2.sub(xy, viewport_pos, translate);
+      return cmath.vector2.quantize(
+        cmath.vector2.sub(xy, viewport_pos, translate),
+        1
+      );
     },
     [state.transform]
   );
@@ -1042,21 +1045,17 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      const node = {
-        type: "text",
-        text: text,
-        width: "auto",
-        height: "auto",
-        left: x,
-        top: y,
-      } satisfies grida.program.nodes.NodePrototype;
-      instance.insertNode(node);
+      const node = instance.createTextNode();
+      node.$.name = text;
+      node.$.text = text;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
 
   const insertImage = useCallback(
-    (
+    async (
       name: string,
       file: File,
       position?: {
@@ -1069,36 +1068,19 @@ export function useDataTransferEventTarget() {
       );
 
       // TODO: uploader is not implemented. use uploader configured by user.
-
       const url = URL.createObjectURL(file);
-      const img = new Image();
-      const createAndInsertNode = (width: number, height: number) => {
-        const node = {
-          type: "image",
-          name: name,
-          width,
-          height,
-          fit: "cover",
-          src: url,
-          left: x,
-          top: y,
-        } satisfies grida.program.nodes.NodePrototype;
-        instance.insertNode(node);
-      };
-
-      img.onload = () => {
-        createAndInsertNode(img.naturalWidth, img.naturalHeight);
-      };
-      img.onerror = () => {
-        createAndInsertNode(100, 100);
-      };
-      img.src = url;
+      const image = await instance.createImage(url);
+      const node = instance.createImageNode(image);
+      node.$.position = "absolute";
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
 
   const insertSVG = useCallback(
-    (
+    async (
       name: string,
       svg: string,
       position?: {
@@ -1106,56 +1088,42 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const optimized = iosvg.v0.optimize(svg).data;
-      iosvg.v0
-        .convert(optimized, {
-          name: name,
-          currentColor: { r: 0, g: 0, b: 0, a: 1 },
-        })
-        .then((result) => {
-          if (result) {
-            result = result as grida.program.nodes.i.IPositioning &
-              grida.program.nodes.i.IFixedDimension;
+      const node = await instance.createNodeFromSvg(svg);
 
-            const center_dx =
-              typeof result.width === "number" ? result.width / 2 : 0;
+      const center_dx =
+        typeof node.$.width === "number" && node.$.width > 0
+          ? node.$.width / 2
+          : 0;
 
-            const center_dy =
-              typeof result.height === "number" ? result.height / 2 : 0;
+      const center_dy =
+        typeof node.$.height === "number" && node.$.height > 0
+          ? node.$.height / 2
+          : 0;
 
-            const [x, y] = canvasXY(
-              cmath.vector2.sub(
-                position ? [position.clientX, position.clientY] : [0, 0],
-                [center_dx, center_dy]
-              )
-            );
+      const [x, y] = canvasXY(
+        cmath.vector2.sub(
+          position ? [position.clientX, position.clientY] : [0, 0],
+          [center_dx, center_dy]
+        )
+      );
 
-            result.left = x;
-            result.top = y;
-            instance.insertNode(result);
-          } else {
-            throw new Error("Failed to convert SVG");
-          }
-        });
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
 
   const insertFromFile = useCallback(
     (
+      type: io.clipboard.ValidFileType,
       file: File,
       position?: {
         clientX: number;
         clientY: number;
       }
     ) => {
-      const type = file.type || file.name.split(".").pop() || file.name;
-      const is_svg = type === "image/svg+xml";
-      const is_png = type === "image/png";
-      const is_jpg = type === "image/jpeg";
-      const is_gif = type === "image/gif";
-
-      if (is_svg) {
+      if (type === "image/svg+xml") {
         const reader = new FileReader();
         reader.onload = (e) => {
           const svgContent = e.target?.result as string;
@@ -1164,21 +1132,29 @@ export function useDataTransferEventTarget() {
         };
         reader.readAsText(file);
         return;
-      }
-
-      if (is_png || is_jpg || is_gif) {
+      } else if (
+        type === "image/png" ||
+        type === "image/jpeg" ||
+        type === "image/gif"
+      ) {
         const name = file.name.split(".")[0];
         insertImage(name, file, position);
         return;
       }
-
-      toast.error(`insertion of file type ${type} is not supported`);
     },
     [insertImage, insertSVG]
   );
 
+  /**
+   * pasting from os clipboard (or fallbacks to local clipboard)
+   *
+   * 1. if the payload contains valid grida payload, insert it (or if identical to local clipboard, paste it)
+   * 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+   * 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
+   *
+   */
   const onpaste = useCallback(
-    (event: ClipboardEvent) => {
+    async (event: ClipboardEvent) => {
       if (event.defaultPrevented) return;
       // cancel if on contenteditable / form element
       if (
@@ -1194,58 +1170,79 @@ export function useDataTransferEventTarget() {
         return;
       }
 
-      const items = event.clipboardData.items;
-
       let pasted_from_data_transfer = false;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === "file") {
-          const file = item.getAsFile();
-          if (file) {
-            insertFromFile(file, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
-            pasted_from_data_transfer = true;
-          }
-        } else if (item.kind === "string" && item.type === "text/plain") {
-          pasted_from_data_transfer = true;
-          item.getAsString((data) => {
-            insertText(data, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
-          });
-        } else if (item.kind === "string" && item.type === "text/html") {
-          pasted_from_data_transfer = true;
-          item.getAsString((html) => {
-            const data = io.clipboard.decodeClipboardHtml(html);
-            if (data) {
-              if (current_clipboard?.payload_id === data.payload_id) {
-                instance.paste();
-              } else {
-                data.prototypes.forEach((p) => {
-                  const sub =
-                    grida.program.nodes.factory.create_packed_scene_document_from_prototype(
-                      p,
-                      nid
-                    );
-                  instance.insert({ document: sub });
-                });
-              }
-              return;
+
+      // NOTE: the read of the clipboard data should be non-blocking. (in safari, this will fail without any error)
+      const items = (
+        await Promise.all(
+          Array.from(event.clipboardData.items).map(async (item) => {
+            try {
+              const payload = await io.clipboard.decode(item);
+              return payload;
+            } catch {
+              return null;
             }
-            insertText(html, {
-              clientX: window.innerWidth / 2,
-              clientY: window.innerHeight / 2,
-            });
+          })
+        )
+      ).filter((item) => item !== null);
+
+      const grida_payload = items.find((item) => item.type === "clipboard");
+
+      // 1. if there is a grida html clipboard, use it and ignore all others.
+      if (grida_payload) {
+        if (
+          current_clipboard?.payload_id === grida_payload.clipboard.payload_id
+        ) {
+          instance.paste();
+          pasted_from_data_transfer = true;
+        } else {
+          grida_payload.clipboard.prototypes.forEach((p) => {
+            const sub =
+              grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+                p,
+                nid
+              );
+            instance.insert({ document: sub });
           });
+          pasted_from_data_transfer = true;
+        }
+      }
+      // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+      else {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          try {
+            switch (item.type) {
+              case "text": {
+                const { text } = item;
+                insertText(text, {
+                  clientX: window.innerWidth / 2,
+                  clientY: window.innerHeight / 2,
+                });
+                pasted_from_data_transfer = true;
+                break;
+              }
+              case "image/gif":
+              case "image/jpeg":
+              case "image/png":
+              case "image/svg+xml": {
+                const { type, file } = item;
+                insertFromFile(type, file, {
+                  clientX: window.innerWidth / 2,
+                  clientY: window.innerHeight / 2,
+                });
+                pasted_from_data_transfer = true;
+                break;
+              }
+            }
+          } catch {}
         }
       }
 
+      // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
       if (!pasted_from_data_transfer) {
-        event.preventDefault();
         instance.paste();
+        event.preventDefault();
       }
     },
     [instance, insertFromFile, insertText, current_clipboard]
@@ -1289,7 +1286,12 @@ export function useDataTransferEventTarget() {
       const files = event.dataTransfer.files;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        insertFromFile(file, event);
+        const [valid, type] = io.clipboard.filetype(file);
+        if (valid) {
+          insertFromFile(type, file, event);
+        } else {
+          toast.error(`file type '${type}' is not supported`);
+        }
       }
     },
     [insertFromFile]
@@ -1309,18 +1311,17 @@ export function useClipboardSync() {
   useEffect(() => {
     try {
       if (user_clipboard) {
-        const htmltxt = io.clipboard.encodeClipboardHtml(
+        const items = io.clipboard.encode(
           user_clipboard as io.clipboard.ClipboardPayload
         );
-        const blob = new Blob([htmltxt], { type: "text/html" });
 
-        const clipboardItem = new ClipboardItem({
-          "text/html": blob,
-        });
-        navigator.clipboard.write([clipboardItem]);
+        if (items) {
+          const clipboardItem = new ClipboardItem(items);
+          navigator.clipboard.write([clipboardItem]);
+        }
       }
     } catch (e) {
-      //
+      reportError(e);
     }
   }, [user_clipboard]);
   //
