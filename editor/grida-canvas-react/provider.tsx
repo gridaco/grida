@@ -1140,6 +1140,14 @@ export function useDataTransferEventTarget() {
     [insertImage, insertSVG]
   );
 
+  /**
+   * pasting from os clipboard (or fallbacks to local clipboard)
+   *
+   * 1. if the payload contains valid grida payload, insert it (or if identical to local clipboard, paste it)
+   * 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+   * 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
+   *
+   */
   const onpaste = useCallback(
     async (event: ClipboardEvent) => {
       if (event.defaultPrevented) return;
@@ -1159,18 +1167,23 @@ export function useDataTransferEventTarget() {
 
       let pasted_from_data_transfer = false;
 
-      const items: io.clipboard.DecodedItem[] = [];
-      for (let i = 0; i < event.clipboardData.items.length; i++) {
-        try {
-          const item = event.clipboardData.items[i];
-          const payload = await io.clipboard.decode(item);
-          items.push(payload);
-        } catch {}
-      }
+      // NOTE: the read of the clipboard data should be non-blocking. (in safari, this will fail without any error)
+      const items = (
+        await Promise.all(
+          Array.from(event.clipboardData.items).map(async (item) => {
+            try {
+              const payload = await io.clipboard.decode(item);
+              return payload;
+            } catch {
+              return null;
+            }
+          })
+        )
+      ).filter((item) => item !== null);
 
       const grida_payload = items.find((item) => item.type === "clipboard");
 
-      // if there is a grida html clipboard, use it and ignore all others.
+      // 1. if there is a grida html clipboard, use it and ignore all others.
       if (grida_payload) {
         if (
           current_clipboard?.payload_id === grida_payload.clipboard.payload_id
@@ -1188,7 +1201,9 @@ export function useDataTransferEventTarget() {
           });
           pasted_from_data_transfer = true;
         }
-      } else {
+      }
+      // 2. if the payload contains text/plain, image/png, image/jpeg, image/gif, image/svg+xml, insert it
+      else {
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           try {
@@ -1219,9 +1234,10 @@ export function useDataTransferEventTarget() {
         }
       }
 
+      // 3. if the payload contains no valid payload, fallback to local clipboard, and paste it
       if (!pasted_from_data_transfer) {
-        event.preventDefault();
         instance.paste();
+        event.preventDefault();
       }
     },
     [instance, insertFromFile, insertText, current_clipboard]

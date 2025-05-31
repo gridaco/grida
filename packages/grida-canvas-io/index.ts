@@ -183,7 +183,12 @@ export namespace io {
      *   }
      * }
      */
-    export function decode(item: DataTransferItem): Promise<DecodedItem> {
+    export function decode(
+      item: DataTransferItem,
+      config: {
+        noEmptyText: boolean;
+      } = { noEmptyText: true }
+    ): Promise<DecodedItem | null> {
       return new Promise((resolve, reject) => {
         if (item.kind === "file") {
           const file = item.getAsFile();
@@ -200,6 +205,9 @@ export namespace io {
           }
         } else if (item.kind === "string" && item.type === "text/plain") {
           item.getAsString((data) => {
+            if (config.noEmptyText && data.trim().length === 0) {
+              return resolve(null);
+            }
             return resolve({ type: "text", text: data });
           });
         } else if (item.kind === "string" && item.type === "text/html") {
