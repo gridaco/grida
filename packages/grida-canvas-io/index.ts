@@ -219,6 +219,8 @@ export namespace io {
               return reject(new Error("Unknown HTML payload"));
             }
           });
+        } else {
+          return resolve(null);
         }
       });
     }
