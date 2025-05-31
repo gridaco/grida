@@ -12,6 +12,7 @@ import assert from "assert";
 import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
 import { TCanvasEventTargetDragGestureState } from "./action";
+import iosvg from "@grida/io-svg";
 
 function throttle<T extends (...args: any[]) => void>(
   func: T,
@@ -148,7 +149,7 @@ export class Editor
       state: editor.state.IEditorState
     ) => Readonly<editor.state.IEditorState>
   ) {
-    this.mstate = reducer(this.mstate);
+    this.mstate = produce(this.mstate, reducer);
     this.listeners.forEach((l) => l(this));
   }
 
@@ -365,13 +366,6 @@ export class Editor
     });
   }
 
-  public deleteNode(target: "selection" | editor.NodeID) {
-    this.dispatch({
-      type: "delete",
-      target,
-    });
-  }
-
   public selectVertex(node_id: editor.NodeID, vertex: number) {
     this.dispatch({
       type: "select-vertex",
@@ -398,9 +392,9 @@ export class Editor
     return dq.__getNodeById(this.mstate, node_id);
   }
 
-  public getNodeById(
+  public getNodeById<T extends grida.program.nodes.Node>(
     node_id: editor.NodeID
-  ): NodeProxy<grida.program.nodes.Node> {
+  ): NodeProxy<T> {
     return new NodeProxy(this, node_id);
   }
 
@@ -443,6 +437,94 @@ export class Editor
       prototype,
     });
     return id;
+  }
+
+  public deleteNode(target: "selection" | editor.NodeID) {
+    this.dispatch({
+      type: "delete",
+      target,
+    });
+  }
+
+  public async createNodeFromSvg(
+    svg: string
+  ): Promise<NodeProxy<grida.program.nodes.ContainerNode>> {
+    const id = this.__createNodeId();
+    const optimized = iosvg.v0.optimize(svg).data;
+    let result = await iosvg.v0.convert(optimized, {
+      name: "svg",
+      currentColor: { r: 0, g: 0, b: 0, a: 1 },
+    });
+    if (result) {
+      result = result as grida.program.nodes.i.IPositioning &
+        grida.program.nodes.i.IFixedDimension;
+
+      this.insert({
+        id: id,
+        prototype: result,
+      });
+
+      return this.getNodeById<grida.program.nodes.ContainerNode>(id);
+    } else {
+      throw new Error("Failed to convert SVG");
+    }
+  }
+
+  public createImageNode(
+    image: grida.program.document.ImageRef
+  ): NodeProxy<grida.program.nodes.ImageNode> {
+    const id = this.__createNodeId();
+    console.log("id", id);
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "image",
+        _$id: id,
+        src: image.url,
+        width: image.width,
+        height: image.height,
+      },
+    });
+
+    return this.getNodeById(id);
+  }
+
+  public createTextNode(): NodeProxy<grida.program.nodes.TextNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "text",
+        _$id: id,
+        text: "",
+        width: "auto",
+        height: "auto",
+      },
+    });
+
+    return this.getNodeById(id);
+  }
+
+  public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
+    const id = this.__createNodeId();
+    this.dispatch({
+      type: "insert",
+      id: id,
+      prototype: {
+        type: "rectangle",
+        _$id: id,
+        width: 100,
+        height: 100,
+        fill: {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      },
+    });
+
+    return this.getNodeById(id);
   }
 
   public nudgeResize(
@@ -1609,9 +1691,11 @@ export class Editor
 
 export class NodeProxy<T extends grida.program.nodes.Node> {
   constructor(
-    private editor: Editor,
-    private node_id: string
-  ) {
+    private readonly editor: Editor,
+    private readonly node_id: string
+  ) {}
+
+  get $() {
     // @ts-expect-error - this is a workaround to allow the proxy to be used as a node
     return new Proxy(this, {
       get: (target, prop: string) => {

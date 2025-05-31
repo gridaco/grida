@@ -1025,7 +1025,10 @@ export function useDataTransferEventTarget() {
         viewportdomrect.y,
       ];
       const translate = cmath.transform.getTranslate(state.transform);
-      return cmath.vector2.sub(xy, viewport_pos, translate);
+      return cmath.vector2.quantize(
+        cmath.vector2.sub(xy, viewport_pos, translate),
+        1
+      );
     },
     [state.transform]
   );
@@ -1042,21 +1045,17 @@ export function useDataTransferEventTarget() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      const node = {
-        type: "text",
-        text: text,
-        width: "auto",
-        height: "auto",
-        left: x,
-        top: y,
-      } satisfies grida.program.nodes.NodePrototype;
-      instance.insertNode(node);
+      const node = instance.createTextNode();
+      node.$.name = text;
+      node.$.text = text;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
 
   const insertImage = useCallback(
-    (
+    async (
       name: string,
       file: File,
       position?: {
@@ -1069,36 +1068,19 @@ export function useDataTransferEventTarget() {
       );
 
       // TODO: uploader is not implemented. use uploader configured by user.
-
       const url = URL.createObjectURL(file);
-      const img = new Image();
-      const createAndInsertNode = (width: number, height: number) => {
-        const node = {
-          type: "image",
-          name: name,
-          width,
-          height,
-          fit: "cover",
-          src: url,
-          left: x,
-          top: y,
-        } satisfies grida.program.nodes.NodePrototype;
-        instance.insertNode(node);
-      };
-
-      img.onload = () => {
-        createAndInsertNode(img.naturalWidth, img.naturalHeight);
-      };
-      img.onerror = () => {
-        createAndInsertNode(100, 100);
-      };
-      img.src = url;
+      const image = await instance.createImage(url);
+      const node = instance.createImageNode(image);
+      node.$.position = "absolute";
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
 
   const insertSVG = useCallback(
-    (
+    async (
       name: string,
       svg: string,
       position?: {
@@ -1106,37 +1088,23 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const optimized = iosvg.v0.optimize(svg).data;
-      iosvg.v0
-        .convert(optimized, {
-          name: name,
-          currentColor: { r: 0, g: 0, b: 0, a: 1 },
-        })
-        .then((result) => {
-          if (result) {
-            result = result as grida.program.nodes.i.IPositioning &
-              grida.program.nodes.i.IFixedDimension;
+      const node = await instance.createNodeFromSvg(svg);
 
-            const center_dx =
-              typeof result.width === "number" ? result.width / 2 : 0;
+      const center_dx = typeof node.$.width === "number" ? node.$.width / 2 : 0;
 
-            const center_dy =
-              typeof result.height === "number" ? result.height / 2 : 0;
+      const center_dy =
+        typeof node.$.height === "number" ? node.$.height / 2 : 0;
 
-            const [x, y] = canvasXY(
-              cmath.vector2.sub(
-                position ? [position.clientX, position.clientY] : [0, 0],
-                [center_dx, center_dy]
-              )
-            );
+      const [x, y] = canvasXY(
+        cmath.vector2.sub(
+          position ? [position.clientX, position.clientY] : [0, 0],
+          [center_dx, center_dy]
+        )
+      );
 
-            result.left = x;
-            result.top = y;
-            instance.insertNode(result);
-          } else {
-            throw new Error("Failed to convert SVG");
-          }
-        });
+      node.$.name = name;
+      node.$.left = x;
+      node.$.top = y;
     },
     [instance, canvasXY]
   );
