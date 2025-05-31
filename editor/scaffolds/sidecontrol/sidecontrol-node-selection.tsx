@@ -1231,14 +1231,13 @@ function SectionPosition({ node_id }: { node_id: string }) {
               right,
               bottom,
             }}
-            onValueChange={actions.positioning}
+            onValueCommit={actions.positioning}
           />
         </PropertyLine>
         <PropertyLine>
           <PropertyLineLabel>Mode</PropertyLineLabel>
           <PositioningModeControl
             value={position}
-            //
             onValueChange={actions.positioningMode}
           />
         </PropertyLine>

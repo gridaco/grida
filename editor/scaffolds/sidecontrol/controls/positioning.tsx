@@ -34,10 +34,10 @@ export function PositioningModeControl({
 
 export function PositioningConstraintsControl({
   value,
-  onValueChange,
+  onValueCommit,
 }: {
   value: grida.program.nodes.i.IPositioning;
-  onValueChange?: (value: grida.program.nodes.i.IPositioning) => void;
+  onValueCommit?: (value: grida.program.nodes.i.IPositioning) => void;
 }) {
   return (
     <div className="w-full">
@@ -48,7 +48,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.top ?? ""}
           onValueCommit={(v) => {
-            onValueChange?.({
+            onValueCommit?.({
               ...value,
               top: v,
             });
@@ -63,7 +63,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.left ?? ""}
           onValueCommit={(v) => {
-            onValueChange?.({
+            onValueCommit?.({
               ...value,
               left: v,
             });
@@ -78,7 +78,7 @@ export function PositioningConstraintsControl({
             bottom: value.bottom !== undefined,
           }}
           onConstraintChange={(side, checked) => {
-            onValueChange?.({
+            onValueCommit?.({
               ...value,
               [side]: checked ? 0 : undefined,
             });
@@ -90,7 +90,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.right ?? ""}
           onValueCommit={(v) => {
-            onValueChange?.({
+            onValueCommit?.({
               ...value,
               right: v,
             });
@@ -105,7 +105,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.bottom ?? ""}
           onValueCommit={(v) => {
-            onValueChange?.({
+            onValueCommit?.({
               ...value,
               bottom: v,
             });
