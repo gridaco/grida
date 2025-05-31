@@ -479,7 +479,6 @@ export class Editor
     image: grida.program.document.ImageRef
   ): NodeProxy<grida.program.nodes.ImageNode> {
     const id = this.__createNodeId();
-    console.log("id", id);
     this.dispatch({
       type: "insert",
       id: id,

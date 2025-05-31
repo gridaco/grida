@@ -1090,10 +1090,15 @@ export function useDataTransferEventTarget() {
     ) => {
       const node = await instance.createNodeFromSvg(svg);
 
-      const center_dx = typeof node.$.width === "number" ? node.$.width / 2 : 0;
+      const center_dx =
+        typeof node.$.width === "number" && node.$.width > 0
+          ? node.$.width / 2
+          : 0;
 
       const center_dy =
-        typeof node.$.height === "number" ? node.$.height / 2 : 0;
+        typeof node.$.height === "number" && node.$.height > 0
+          ? node.$.height / 2
+          : 0;
 
       const [x, y] = canvasXY(
         cmath.vector2.sub(
