@@ -227,6 +227,7 @@ export namespace io {
           nodes: json.document.nodes,
           scenes: json.document.scenes,
           bitmaps: bitmaps,
+          images: json.document.images ?? {},
           properties: json.document.properties ?? {},
         },
       } satisfies JSONDocumentFileModel;

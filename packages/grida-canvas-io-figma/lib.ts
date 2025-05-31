@@ -234,6 +234,7 @@ export namespace iofigma {
           },
           // TODO:
           bitmaps: {},
+          images: {},
           properties: {},
         };
       }

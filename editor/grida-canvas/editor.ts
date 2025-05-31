@@ -143,6 +143,15 @@ export class Editor
     return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
+  public reduce(
+    reducer: (
+      state: editor.state.IEditorState
+    ) => Readonly<editor.state.IEditorState>
+  ) {
+    this.mstate = reducer(this.mstate);
+    this.listeners.forEach((l) => l(this));
+  }
+
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action);
@@ -212,6 +221,40 @@ export class Editor
       scene: scene_id,
       backgroundColor,
     });
+  }
+
+  async createImage(
+    src: string
+  ): Promise<Readonly<grida.program.document.ImageRef>> {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const bytes = await blob.arrayBuffer();
+    const type = blob.type;
+
+    const { width, height } = await new Promise<{
+      width: number;
+      height: number;
+    }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = src;
+    });
+
+    const ref: grida.program.document.ImageRef = {
+      url: src,
+      width,
+      height,
+      bytes: bytes.byteLength,
+      type: type as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+    };
+
+    this.reduce((state) => {
+      state.document.images[src] = ref;
+      return state;
+    });
+
+    return ref;
   }
 
   setTool(tool: editor.state.ToolMode) {

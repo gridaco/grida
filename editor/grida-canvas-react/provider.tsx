@@ -1320,7 +1320,7 @@ export function useClipboardSync() {
         navigator.clipboard.write([clipboardItem]);
       }
     } catch (e) {
-      //
+      reportError(e);
     }
   }, [user_clipboard]);
   //

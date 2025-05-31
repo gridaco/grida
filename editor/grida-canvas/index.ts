@@ -629,6 +629,7 @@ export namespace editor.state {
   }): editor.state.IEditorState {
     const doc: grida.program.document.Document = {
       bitmaps: {},
+      images: {},
       properties: {},
       ...init.document,
       scenes: Object.entries(init.document.scenes ?? {}).reduce(
@@ -2054,6 +2055,14 @@ export namespace editor.api {
       scene_id: string,
       backgroundColor: grida.program.document.ISceneBackground["backgroundColor"]
     ): void;
+
+    //
+    /**
+     * creates an image (data) from the given src, registers it to the document
+     * @param src
+     */
+    createImage(src: string): Promise<grida.program.document.ImageRef>;
+
     //
     setTool(tool: editor.state.ToolMode): void;
     tryExitContentEditMode(): void;

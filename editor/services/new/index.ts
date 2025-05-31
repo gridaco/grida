@@ -256,6 +256,7 @@ export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantS
             }),
           },
           bitmaps: {},
+          images: {},
           properties: {},
         } satisfies CanvasDocumentSnapshotSchema as {},
       })
