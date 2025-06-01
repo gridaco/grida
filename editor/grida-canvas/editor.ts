@@ -13,6 +13,7 @@ import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
 import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
+import { io } from "@grida/io";
 
 function throttle<T extends (...args: any[]) => void>(
   func: T,
@@ -122,6 +123,19 @@ export class Editor
       },
       force
     );
+  }
+
+  public archive(): Blob {
+    const documentData = {
+      version: "0.0.1-beta.1+20250303",
+      document: this.getSnapshot().document,
+    } satisfies io.JSONDocumentFileModel;
+
+    const blob = new Blob([io.archive.pack(documentData)], {
+      type: "application/zip",
+    });
+
+    return blob;
   }
 
   private __createNodeId(): editor.NodeID {
