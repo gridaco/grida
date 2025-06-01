@@ -1,4 +1,5 @@
 import type { Editor } from "../editor";
+import equal from "fast-deep-equal";
 
 export class EditorFollowPlugin {
   private _isFollowing: boolean = false;
@@ -28,7 +29,8 @@ export class EditorFollowPlugin {
         if (cursor?.transform) {
           editor.transform(cursor.transform, false);
         }
-      }
+      },
+      equal
     );
 
     this._isFollowing = true;

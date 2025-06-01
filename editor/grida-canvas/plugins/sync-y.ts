@@ -5,6 +5,7 @@ import type { Editor } from "../editor";
 import { type Action, editor } from "..";
 import type cmath from "@grida/cmath";
 import { dq } from "../query";
+import equal from "fast-deep-equal";
 
 type AwarenessPayload = {
   player: {
@@ -125,7 +126,8 @@ export class EditorYSyncPlugin {
           transform,
           selection,
         } satisfies AwarenessPayload["player"]);
-      }
+      },
+      equal
     );
 
     // Subscribe with selector for document sync
