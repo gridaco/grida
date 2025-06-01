@@ -870,6 +870,9 @@ importers:
       y-webrtc:
         specifier: ^10.3.0
         version: 10.3.0(yjs@13.6.27)
+      y-websocket:
+        specifier: ^3.0.0
+        version: 3.0.0(yjs@13.6.27)
       yjs:
         specifier: ^13.6.27
         version: 13.6.27
@@ -13378,6 +13381,12 @@ packages:
     hasBin: true
     peerDependencies:
       yjs: ^13.6.8
+
+  y-websocket@3.0.0:
+    resolution: {integrity: sha512-mUHy7AzkOZ834T/7piqtlA8Yk6AchqKqcrCXjKW8J1w2lPtRDjz8W5/CvXz9higKAHgKRKqpI3T33YkRFLkPtg==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      yjs: ^13.5.6
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
@@ -28812,6 +28821,12 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  y-websocket@3.0.0(yjs@13.6.27):
+    dependencies:
+      lib0: 0.2.107
+      y-protocols: 1.0.6(yjs@13.6.27)
+      yjs: 13.6.27
 
   y18n@5.0.8: {}
 

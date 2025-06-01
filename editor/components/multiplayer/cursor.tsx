@@ -37,6 +37,7 @@ export function PointerCursor({
           fill="none"
           className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none"
           style={{
+            willChange: "transform",
             color: fill,
             transform: `translateX(${x}px) translateY(${y}px)`,
             zIndex: 999,

@@ -163,6 +163,15 @@ export class Editor
     return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
+  public __sync_cursors(
+    cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
+  ) {
+    this.reduce((state) => {
+      state.cursors = cursors;
+      return state;
+    });
+  }
+
   public reduce(
     reducer: (
       state: editor.state.IEditorState

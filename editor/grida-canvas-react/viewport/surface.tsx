@@ -9,6 +9,7 @@ import {
   useDocumentState,
   useEventTargetCSSCursor,
   useGestureState,
+  useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
   useNode,
   usePointerState,
@@ -38,6 +39,7 @@ import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
 import { cursors } from "../components/cursor";
+import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
@@ -333,6 +335,7 @@ export function EditorSurface() {
           }}
         >
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
+          <RemoteCursorOverlay />
           <MarqueeOverlay />
         </div>
         <div
@@ -388,6 +391,39 @@ export function EditorSurface() {
         </div>
       </div>
     </SurfaceSelectionGroupProvider>
+  );
+}
+
+function RemoteCursorOverlay() {
+  const cursors = useMultiplayerCursorState();
+  const { transform } = useTransformState();
+
+  if (!cursors.length) return null;
+  return (
+    <>
+      {cursors.map((c) => {
+        const pos = cmath.vector2.transform(c.position, transform);
+
+        return (
+          <React.Fragment key={c.id}>
+            {c.marquee && (
+              <MarqueeArea
+                a={cmath.vector2.transform(c.marquee.a, transform)}
+                b={cmath.vector2.transform(c.marquee.b, transform)}
+                color={{ hue: c.color, fill: "rgba(0,0,0,0.1)" }}
+              />
+            )}
+            <PointerCursor
+              key={c.id}
+              local={false}
+              x={pos[0]}
+              y={pos[1]}
+              color={{ hue: c.color, fill: c.color }}
+            />
+          </React.Fragment>
+        );
+      })}
+    </>
   );
 }
 

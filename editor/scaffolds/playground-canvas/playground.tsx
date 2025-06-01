@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { SidebarRoot } from "@/components/sidebar";
 import {
   Align,
@@ -115,6 +115,8 @@ import { useEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
+import { EditorSyncYjsPlugin } from "@/grida-canvas/plugins/sync-yjs";
+import { Editor } from "@/grida-canvas/editor";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -122,6 +124,23 @@ type UIConfig = {
 };
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
+
+function useSyncMultiplayerCursors(editor: Editor) {
+  const pluginRef = useRef<EditorSyncYjsPlugin | null>(null);
+
+  useEffect(() => {
+    if (!pluginRef.current) {
+      pluginRef.current = new EditorSyncYjsPlugin(editor, "grida-canvas-demo");
+    }
+
+    return () => {
+      if (pluginRef.current) {
+        pluginRef.current.destroy();
+        pluginRef.current = null;
+      }
+    };
+  }, [editor]);
+}
 
 export type CanvasPlaygroundProps = {
   src?: string;
@@ -152,14 +171,54 @@ export default function CanvasPlayground({
   templates,
   src,
 }: CanvasPlaygroundProps) {
+  const instance = useEditor(editor.state.init(document));
+  useSyncMultiplayerCursors(instance);
+  const fonts = useGoogleFontsList();
+
+  useEffect(() => {
+    if (!src) return;
+    fetch(src).then((res) => {
+      res.json().then((file) => {
+        instance.reset(
+          editor.state.init({
+            editable: true,
+            document: file.document,
+          }),
+          src
+        );
+      });
+    });
+  }, [src]);
+
+  return (
+    <>
+      <FontFamilyListProvider fonts={fonts}>
+        <SidebarProvider className="w-full h-full">
+          <TooltipProvider>
+            <main className="w-full h-full select-none">
+              <ErrorBoundary>
+                <StandaloneDocumentEditor editor={instance}>
+                  <WindowCurrentEditorProvider />
+                  <UserCustomTemplatesProvider templates={templates}>
+                    <Consumer />
+                  </UserCustomTemplatesProvider>
+                </StandaloneDocumentEditor>
+              </ErrorBoundary>
+            </main>
+          </TooltipProvider>
+        </SidebarProvider>
+      </FontFamilyListProvider>
+    </>
+  );
+}
+
+function Consumer() {
   const [ui, setUI] = useState<UIConfig>({
     sidebar: "visible",
     toolbar: "visible",
   });
 
-  const fonts = useGoogleFontsList();
-
-  const instance = useEditor(editor.state.init(document));
+  const instance = useCurrentEditor();
   const debug = useEditorState(instance, (state) => state.debug);
 
   useDisableSwipeBack();
@@ -195,79 +254,52 @@ export default function CanvasPlayground({
     }
   );
 
-  useEffect(() => {
-    if (!src) return;
-    fetch(src).then((res) => {
-      res.json().then((file) => {
-        instance.reset(
-          editor.state.init({
-            editable: true,
-            document: file.document,
-          }),
-          src
-        );
-      });
-    });
-  }, [src]);
-
   const onExport = () => {
     const blob = instance.archive();
     saveAs(blob, `${v4()}.grida`);
   };
 
   return (
-    <SidebarProvider className="w-full h-full">
-      <TooltipProvider>
-        <main className="w-full h-full select-none">
-          <ErrorBoundary>
-            <StandaloneDocumentEditor editor={instance}>
-              <WindowCurrentEditorProvider />
-              <UserCustomTemplatesProvider templates={templates}>
-                <FontFamilyListProvider fonts={fonts}>
-                  <PreviewProvider>
-                    <div className="flex w-full h-full">
-                      {ui.sidebar === "visible" && <SidebarLeft />}
-                      <EditorSurfaceClipboardSyncProvider>
-                        <EditorSurfaceDropzone>
-                          <EditorSurfaceContextMenu>
-                            <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
-                              <ViewportRoot className="relative w-full h-full overflow-hidden">
-                                <Hotkyes />
-                                <EditorSurface />
-                                <AutoInitialFitTransformer>
-                                  <StandaloneSceneContent />
-                                </AutoInitialFitTransformer>
-                                {ui.toolbar === "visible" && (
-                                  <>
-                                    <BrushToolbarPosition>
-                                      <BrushToolbar />
-                                    </BrushToolbarPosition>
-                                    <ToolbarPosition>
-                                      <PlaygroundToolbar />
-                                    </ToolbarPosition>
-                                  </>
-                                )}
-                              </ViewportRoot>
-                              {debug && <DevtoolsPanel />}
-                            </StandaloneSceneBackground>
-                          </EditorSurfaceContextMenu>
-                        </EditorSurfaceDropzone>
-                      </EditorSurfaceClipboardSyncProvider>
-                      {ui.sidebar === "visible" && (
-                        <aside className="h-full">
-                          <SidebarRight />
-                        </aside>
-                      )}
-                    </div>
-                  </PreviewProvider>
-                </FontFamilyListProvider>
-              </UserCustomTemplatesProvider>
-            </StandaloneDocumentEditor>
-          </ErrorBoundary>
-          {ui.toolbar === "visible" && <HelpFab />}
-        </main>
-      </TooltipProvider>
-    </SidebarProvider>
+    <>
+      <PreviewProvider>
+        <div className="flex w-full h-full">
+          {ui.sidebar === "visible" && <SidebarLeft />}
+          <EditorSurfaceClipboardSyncProvider>
+            <EditorSurfaceDropzone>
+              <EditorSurfaceContextMenu>
+                <StandaloneSceneBackground className="w-full h-full flex flex-col relative ">
+                  <ViewportRoot className="relative w-full h-full overflow-hidden">
+                    <Hotkyes />
+                    <EditorSurface />
+                    <AutoInitialFitTransformer>
+                      <StandaloneSceneContent />
+                    </AutoInitialFitTransformer>
+                    {ui.toolbar === "visible" && (
+                      <>
+                        <BrushToolbarPosition>
+                          <BrushToolbar />
+                        </BrushToolbarPosition>
+                        <ToolbarPosition>
+                          <PlaygroundToolbar />
+                        </ToolbarPosition>
+                      </>
+                    )}
+                  </ViewportRoot>
+                  {debug && <DevtoolsPanel />}
+                </StandaloneSceneBackground>
+              </EditorSurfaceContextMenu>
+            </EditorSurfaceDropzone>
+          </EditorSurfaceClipboardSyncProvider>
+          {ui.sidebar === "visible" && (
+            <aside className="h-full">
+              <SidebarRight />
+            </aside>
+          )}
+        </div>
+      </PreviewProvider>
+
+      {ui.toolbar === "visible" && <HelpFab />}
+    </>
   );
 }
 

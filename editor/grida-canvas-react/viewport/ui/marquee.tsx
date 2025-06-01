@@ -12,7 +12,13 @@ type Marquee = {
   b: cmath.Vector2;
 };
 
-export function MarqueeArea({ a, b }: Marquee) {
+export function MarqueeArea({
+  a,
+  b,
+  color,
+}: Marquee & {
+  color?: { hue: string; fill: string };
+}) {
   const r = useMemo(() => cmath.rect.fromPoints([a, b]), [a, b]);
 
   return (
@@ -23,6 +29,8 @@ export function MarqueeArea({ a, b }: Marquee) {
         top: r.y,
         width: r.width,
         height: r.height,
+        borderColor: color ? color.hue : undefined,
+        backgroundColor: color ? color.fill : undefined,
       }}
     />
   );
