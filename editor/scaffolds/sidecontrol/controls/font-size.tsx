@@ -41,6 +41,7 @@ export function FontSizeControl({
           onValueChange={(_v) => {
             const value = parseInt(_v);
             onValueChange?.({ type: "set", value });
+            onValueCommit?.({ type: "set", value });
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>
