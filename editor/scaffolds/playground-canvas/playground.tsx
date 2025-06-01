@@ -411,6 +411,10 @@ function Presense() {
             src: undefined,
             fallback: "?",
           }}
+          tooltip="Click to follow"
+          onClick={() => {
+            instance.follow(cursor.id);
+          }}
         />
       ))}
     </div>

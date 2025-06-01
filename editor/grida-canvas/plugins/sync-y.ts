@@ -24,6 +24,7 @@ export class EditorYSyncPlugin {
   private readonly __unsubscribe_document_change: () => void;
   private readonly ymap: Y.Map<any>;
   private throttle_ms: number = 5;
+  private _tid: number = 0;
 
   constructor(
     private readonly _editor: Editor,
@@ -56,7 +57,7 @@ export class EditorYSyncPlugin {
       );
 
       if (Object.keys(updates).length > 0) {
-        this._editor.reset(
+        this._tid = this._editor.reset(
           {
             ...currentState,
             document: { ...currentState.document, ...updates },
@@ -71,7 +72,7 @@ export class EditorYSyncPlugin {
       }
     });
 
-    const update = () => {
+    const aware = () => {
       const states = Array.from(this.awareness.getStates().entries())
         .filter(([id]) => id !== this.awareness.clientID)
         .map((_: any) => {
@@ -100,9 +101,9 @@ export class EditorYSyncPlugin {
       this._editor.__sync_cursors(states);
     };
 
-    this.awareness.on("change", update);
-    this.awareness.on("remove", update);
-    update();
+    this.awareness.on("change", aware);
+    this.awareness.on("remove", aware);
+    aware();
 
     // Subscribe to cursor changes for awareness updates (pointer, marquee, etc.)
     this.__unsubscribe_player_change = this._editor.subscribeWithSelector(
@@ -112,7 +113,8 @@ export class EditorYSyncPlugin {
         selection: state.selection,
         transform: state.transform,
       }),
-      (_, next) => {
+      (editor, next) => {
+        if (editor.locked) return;
         const { pointer, marquee, selection, transform } = next;
 
         // Update awareness for cursor position
@@ -130,9 +132,10 @@ export class EditorYSyncPlugin {
     this.__unsubscribe_document_change = this._editor.subscribeWithSelector(
       (state) => state.document,
       editor.throttle(
-        (_, next, __, action?: Action) => {
-          // prevent loop mirroring // use more reliable way, e.g. transaction id.
-          if (action?.type === "__internal/reset") return;
+        (editor: Editor, next, __, action?: Action) => {
+          if (editor.locked) return;
+          // prevent loop mirroring
+          if (editor.tid === this._tid) return;
           this.ymap.set("nodes", next.nodes);
           this.ymap.set("scenes", next.scenes);
           this.ymap.set("properties", next.properties);

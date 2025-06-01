@@ -1609,4 +1609,9 @@ export namespace editor.api {
     schemaPutProperty(key: string, value: any): void;
     schemaDeleteProperty(key: string): void;
   }
+
+  export interface IFollowPluginActions {
+    follow(cursor_id: string): void;
+    unfollow(): void;
+  }
 }

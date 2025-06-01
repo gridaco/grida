@@ -14,6 +14,7 @@ import { animateTransformTo } from "./animation";
 import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
+import { EditorFollowPlugin } from "./plugins/follow";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -47,7 +48,8 @@ export class Editor
     editor.api.IRulerActions,
     editor.api.IGuide2DActions,
     editor.api.ICameraActions,
-    editor.api.IEventTargetActions
+    editor.api.IEventTargetActions,
+    editor.api.IFollowPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
@@ -73,6 +75,14 @@ export class Editor
   private _locked: boolean = false;
 
   /**
+   * @internal Transaction ID - does not clear on reset.
+   */
+  private _tid: number = 0;
+  public get tid(): number {
+    return this._tid;
+  }
+
+  /**
    * If the editor is locked, no actions will be dispatched. (unless forced)
    */
   get locked() {
@@ -88,10 +98,10 @@ export class Editor
   }
 
   set debug(value: boolean) {
-    this.mstate = produce(this.mstate, (draft) => {
-      draft.debug = value;
+    this.reduce((state) => {
+      state.debug = value;
+      return state;
     });
-    this.listeners.forEach((l) => l?.(this));
   }
 
   public toggleDebug() {
@@ -103,7 +113,7 @@ export class Editor
     state: editor.state.IEditorState,
     key: string | undefined = undefined,
     force: boolean = false
-  ) {
+  ): number {
     this.dispatch(
       {
         type: "__internal/reset",
@@ -112,6 +122,7 @@ export class Editor
       },
       force
     );
+    return this._tid;
   }
 
   public archive(): Blob {
@@ -167,12 +178,14 @@ export class Editor
     ) => Readonly<editor.state.IEditorState>
   ) {
     this.mstate = produce(this.mstate, reducer);
+    this._tid++;
     this.listeners.forEach((l) => l?.(this));
   }
 
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action);
+    this._tid++;
     this.listeners.forEach((l) => l(this, action));
   }
 
@@ -1316,10 +1329,11 @@ export class Editor
   // #endregion IGuide2DActions implementation
 
   // #region ICameraActions implementation
-  transform(transform: cmath.Transform) {
+  transform(transform: cmath.Transform, sync: boolean = true) {
     this.dispatch({
       type: "transform",
       transform,
+      sync,
     });
   }
 
@@ -1350,17 +1364,14 @@ export class Editor
       [transform[1][0], newscale, newy],
     ];
 
-    this.dispatch({
-      type: "transform",
-      transform: next,
-    });
+    this.transform(next, true);
   }
 
   pan(delta: [dx: number, dy: number]) {
-    this.dispatch({
-      type: "transform",
-      transform: cmath.transform.translate(this.state.transform, delta),
-    });
+    this.transform(
+      cmath.transform.translate(this.state.transform, delta),
+      true
+    );
   }
 
   scale(
@@ -1722,6 +1733,19 @@ export class Editor
   }
 
   // #endregion IEventTargetActions implementation
+
+  __pligin_follow: EditorFollowPlugin | null = null;
+  // #region IFollowPluginActions implementation
+  follow(cursor_id: string): void {
+    this.__pligin_follow = new EditorFollowPlugin(this);
+    this.__pligin_follow.follow(cursor_id);
+  }
+
+  unfollow(): void {
+    this.__pligin_follow?.unfollow();
+    this.__pligin_follow = null;
+  }
+  // #endregion IFollowPluginActions implementation
 }
 
 export class NodeProxy<T extends grida.program.nodes.Node> {

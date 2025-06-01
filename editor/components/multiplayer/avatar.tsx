@@ -14,6 +14,7 @@ export function PlayerAvatar({
   zIndex,
   avatar,
   onClick,
+  tooltip,
 }: {
   selected?: boolean;
   type: "local" | "remote" | "anonymous";
@@ -27,6 +28,7 @@ export function PlayerAvatar({
     src?: string;
     fallback: string;
   };
+  tooltip?: string | React.ReactNode;
   onClick?: () => void;
 }) {
   return (
@@ -56,7 +58,9 @@ export function PlayerAvatar({
           </Avatar>
         </button>
       </TooltipTrigger>
-      <TooltipContent>{tolltip(avatar.fallback, type)}</TooltipContent>
+      <TooltipContent>
+        {tooltip ?? mktooltip(avatar.fallback, type)}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -65,7 +69,10 @@ const fallback = (txt: string) => {
   return txt.slice(0, 2).toUpperCase();
 };
 
-const tolltip = (fallback: string, type: "local" | "remote" | "anonymous") => {
+const mktooltip = (
+  fallback: string,
+  type: "local" | "remote" | "anonymous"
+) => {
   switch (type) {
     case "local":
       return fallback + " (You)";
