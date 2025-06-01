@@ -15,20 +15,6 @@ import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 
-function throttle<T extends (...args: any[]) => void>(
-  func: T,
-  limit: number
-): T {
-  let inThrottle: boolean;
-  return function (this: any, ...args: Parameters<T>) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  } as T;
-}
-
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
   key: keyof grida.program.nodes.UnknwonNode,
@@ -1522,7 +1508,7 @@ export class Editor
     return position;
   };
 
-  private _throttled_pointer_move_with_raycast = throttle(
+  private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
       const els = domapi.get_grida_node_elements_from_point(

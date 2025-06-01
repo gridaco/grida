@@ -2,7 +2,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import type { Editor } from "../editor";
-import type { editor } from "..";
+import { editor } from "..";
 import type cmath from "@grida/cmath";
 
 type AwarenessPayload = {
@@ -23,9 +23,10 @@ export class EditorYSyncPlugin {
   private readonly __unsubscribe_document_change: () => void;
   private readonly ymap: Y.Map<any>;
   private isUpdatingFromYjs: boolean = false;
+  private throttle_ms: number = 5;
 
   constructor(
-    private readonly editor: Editor,
+    private readonly _editor: Editor,
     private readonly room_id: string,
     private readonly cursor: {
       palette: editor.state.MultiplayerCursorColorPalette;
@@ -51,8 +52,8 @@ export class EditorYSyncPlugin {
           const value = this.ymap.get(key);
           if (key === "document") {
             this.isUpdatingFromYjs = true;
-            const currentState = this.editor.getSnapshot();
-            this.editor.reset(
+            const currentState = this._editor.getSnapshot();
+            this._editor.reset(
               {
                 ...currentState,
                 document: value,
@@ -92,7 +93,7 @@ export class EditorYSyncPlugin {
           } satisfies editor.state.MultiplayerCursor;
         });
 
-      this.editor.__sync_cursors(states);
+      this._editor.__sync_cursors(states);
     };
 
     this.awareness.on("change", update);
@@ -100,7 +101,7 @@ export class EditorYSyncPlugin {
     update();
 
     // Subscribe to cursor changes for awareness updates (pointer, marquee, etc.)
-    this.__unsubscribe_player_change = this.editor.subscribeWithSelector(
+    this.__unsubscribe_player_change = this._editor.subscribeWithSelector(
       (state) => ({
         pointer: state.pointer,
         marquee: state.marquee,
@@ -122,12 +123,16 @@ export class EditorYSyncPlugin {
     );
 
     // Subscribe with selector for document sync
-    this.__unsubscribe_document_change = this.editor.subscribeWithSelector(
+    this.__unsubscribe_document_change = this._editor.subscribeWithSelector(
       (state) => state.document,
-      (next) => {
-        if (this.isUpdatingFromYjs) return;
-        this.ymap.set("document", next);
-      }
+      editor.throttle(
+        (next) => {
+          if (this.isUpdatingFromYjs) return;
+          this.ymap.set("document", next);
+        },
+        this.throttle_ms,
+        { trailing: true }
+      )
     );
   }
 

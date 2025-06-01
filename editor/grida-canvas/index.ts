@@ -15,6 +15,54 @@ import grida from "@grida/schema";
 export { type Action };
 
 export namespace editor {
+  /**
+   * Creates a throttled function that only invokes the provided function at most once per every `limit` milliseconds.
+   * When `options.trailing` is true, the function will be called one more time after the limit period to ensure the last change is processed.
+   *
+   * @param func - The function to throttle
+   * @param limit - The time limit in milliseconds
+   * @param options - Configuration options for the throttle behavior
+   * @param options.trailing - Whether to invoke the function one more time after the limit period. Defaults to false.
+   * @returns A throttled version of the provided function
+   *
+   * @example
+   * ```ts
+   * const throttledFn = throttle((x) => console.log(x), 1000, { trailing: true });
+   * throttledFn(1); // logs: 1
+   * throttledFn(2); // ignored
+   * throttledFn(3); // ignored
+   * // after 1000ms
+   * // logs: 3 (because trailing is true)
+   * ```
+   */
+  export function throttle<T extends (...args: any[]) => void>(
+    func: T,
+    limit: number,
+    options: {
+      trailing?: boolean;
+    } = { trailing: false }
+  ): T {
+    let inThrottle: boolean;
+    let lastArgs: Parameters<T> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    return function (this: any, ...args: Parameters<T>) {
+      if (!inThrottle) {
+        func.apply(this, args);
+        inThrottle = true;
+        timeoutId = setTimeout(() => {
+          inThrottle = false;
+          if (options.trailing && lastArgs) {
+            func.apply(this, lastArgs);
+            lastArgs = null;
+          }
+        }, limit);
+      } else if (options.trailing) {
+        lastArgs = args;
+      }
+    } as T;
+  }
+
   export type NodeID = string & {};
 
   /**
