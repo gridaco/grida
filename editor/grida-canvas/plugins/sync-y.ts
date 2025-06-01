@@ -2,8 +2,9 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import type { Awareness } from "y-protocols/awareness";
 import type { Editor } from "../editor";
-import { editor } from "..";
+import { type Action, editor } from "..";
 import type cmath from "@grida/cmath";
+import { dq } from "../query";
 
 type AwarenessPayload = {
   player: {
@@ -22,7 +23,6 @@ export class EditorYSyncPlugin {
   private readonly __unsubscribe_player_change: () => void;
   private readonly __unsubscribe_document_change: () => void;
   private readonly ymap: Y.Map<any>;
-  private isUpdatingFromYjs: boolean = false;
   private throttle_ms: number = 5;
 
   constructor(
@@ -44,27 +44,31 @@ export class EditorYSyncPlugin {
 
     // Sync document state
     this.ymap.observe((event) => {
-      if (this.isUpdatingFromYjs) return;
-
       const changes = event.changes.keys;
-      changes.forEach((change, key) => {
-        if (change.action === "add" || change.action === "update") {
-          const value = this.ymap.get(key);
-          if (key === "document") {
-            this.isUpdatingFromYjs = true;
-            const currentState = this._editor.getSnapshot();
-            this._editor.reset(
-              {
-                ...currentState,
-                document: value,
-              },
-              undefined,
-              true
-            );
-            this.isUpdatingFromYjs = false;
-          }
-        }
-      });
+      const currentState = this._editor.getSnapshot();
+      const updates = Object.fromEntries(
+        Array.from(changes.entries())
+          .filter(
+            ([_, change]) =>
+              change.action === "add" || change.action === "update"
+          )
+          .map(([key]) => [key, this.ymap.get(key)])
+      );
+
+      if (Object.keys(updates).length > 0) {
+        this._editor.reset(
+          {
+            ...currentState,
+            document: { ...currentState.document, ...updates },
+            document_ctx: dq.Context.from({
+              ...currentState.document,
+              ...updates,
+            }),
+          },
+          undefined,
+          true
+        );
+      }
     });
 
     const update = () => {
@@ -108,7 +112,7 @@ export class EditorYSyncPlugin {
         selection: state.selection,
         transform: state.transform,
       }),
-      (next) => {
+      (_, next) => {
         const { pointer, marquee, selection, transform } = next;
 
         // Update awareness for cursor position
@@ -126,9 +130,12 @@ export class EditorYSyncPlugin {
     this.__unsubscribe_document_change = this._editor.subscribeWithSelector(
       (state) => state.document,
       editor.throttle(
-        (next) => {
-          if (this.isUpdatingFromYjs) return;
-          this.ymap.set("document", next);
+        (_, next, __, action?: Action) => {
+          // prevent loop mirroring // use more reliable way, e.g. transaction id.
+          if (action?.type === "__internal/reset") return;
+          this.ymap.set("nodes", next.nodes);
+          this.ymap.set("scenes", next.scenes);
+          this.ymap.set("properties", next.properties);
         },
         this.throttle_ms,
         { trailing: true }

@@ -183,15 +183,15 @@ export class Editor
 
   public subscribeWithSelector<T>(
     selector: (state: editor.state.IEditorState) => T,
-    listener: (selected: T, previous: T) => void,
+    listener: (editor: this, selected: T, previous: T, action?: Action) => void,
     isEqual: (a: T, b: T) => boolean = Object.is
   ): () => void {
     let previous = selector(this.mstate);
 
-    const wrapped = () => {
+    const wrapped = (_: this, action?: Action) => {
       const next = selector(this.mstate);
       if (!isEqual(previous, next)) {
-        listener(next, previous);
+        listener(this, next, previous, action);
         previous = next;
       }
     };
