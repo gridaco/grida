@@ -388,6 +388,7 @@ export namespace editor.state {
     palette: MultiplayerCursorColorPalette;
     marquee: editor.state.Marquee | null;
     selection: string[];
+    scene_id: string | undefined;
   };
 
   /**

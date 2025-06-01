@@ -1738,16 +1738,14 @@ export class Editor
 
   // #endregion IEventTargetActions implementation
 
-  __pligin_follow: EditorFollowPlugin | null = null;
+  readonly __pligin_follow: EditorFollowPlugin = new EditorFollowPlugin(this);
   // #region IFollowPluginActions implementation
   follow(cursor_id: string): void {
-    this.__pligin_follow = new EditorFollowPlugin(this);
     this.__pligin_follow.follow(cursor_id);
   }
 
   unfollow(): void {
-    this.__pligin_follow?.unfollow();
-    this.__pligin_follow = null;
+    this.__pligin_follow.unfollow();
   }
   // #endregion IFollowPluginActions implementation
 }

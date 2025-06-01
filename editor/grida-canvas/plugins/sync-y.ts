@@ -14,6 +14,7 @@ type AwarenessPayload = {
     position: [number, number];
     marquee_a: [number, number] | null;
     selection: string[];
+    scene_id: string | undefined;
   };
 };
 
@@ -84,6 +85,7 @@ export class EditorYSyncPlugin {
             marquee_a,
             transform,
             selection,
+            scene_id,
           } = state.player ?? {};
 
           const marquee = marquee_a ? { a: marquee_a, b: position } : null;
@@ -96,6 +98,7 @@ export class EditorYSyncPlugin {
             marquee: marquee,
             transform,
             selection,
+            scene_id,
           } satisfies editor.state.MultiplayerCursor;
         });
 
@@ -113,10 +116,11 @@ export class EditorYSyncPlugin {
         marquee: state.marquee,
         selection: state.selection,
         transform: state.transform,
+        scene_id: state.scene_id,
       }),
       (editor, next) => {
         if (editor.locked) return;
-        const { pointer, marquee, selection, transform } = next;
+        const { pointer, marquee, selection, transform, scene_id } = next;
 
         // Update awareness for cursor position
         this.awareness.setLocalStateField("player", {
@@ -125,6 +129,7 @@ export class EditorYSyncPlugin {
           marquee_a: marquee?.a ?? null,
           transform,
           selection,
+          scene_id,
         } satisfies AwarenessPayload["player"]);
       },
       equal

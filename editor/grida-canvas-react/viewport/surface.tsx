@@ -59,6 +59,7 @@ import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
+import { useFollowPlugin } from "../plugins/use-follow";
 
 const DRAG_THRESHOLD = 2;
 
@@ -321,6 +322,7 @@ export function EditorSurface() {
           (e.target as HTMLDivElement).scrollLeft = 0;
         }}
       >
+        <FollowingFrameOverlay />
         <NetworkOverlay transform={transform} />
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
@@ -392,6 +394,47 @@ export function EditorSurface() {
         </div>
       </div>
     </SurfaceSelectionGroupProvider>
+  );
+}
+
+function FollowingFrameOverlay() {
+  const instance = useCurrentEditor();
+  const { isFollowing, cursor: cursorId } = useFollowPlugin(
+    instance.__pligin_follow
+  );
+
+  const cursor = useEditorState(instance, (state) =>
+    state.cursors.find((c) => c.id === cursorId)
+  );
+
+  const stop = React.useCallback(
+    (e: React.SyntheticEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      instance.unfollow();
+    },
+    [instance]
+  );
+
+  if (!isFollowing || !cursor) return null;
+
+  return (
+    <div
+      className="absolute inset-1.5 rounded-2xl z-50 pointer-events-auto border-2 overflow-hidden"
+      style={{ borderColor: cursor.palette["500"] }}
+      onPointerDown={stop}
+      onWheel={stop}
+    >
+      <div
+        className="absolute top-0 right-0 px-3 py-1 rounded-bl-2xl text-xs"
+        style={{
+          background: cursor.palette["500"],
+          color: cursor.palette["100"],
+        }}
+      >
+        <button onClick={stop}>Stop following</button>
+      </div>
+    </div>
   );
 }
 
