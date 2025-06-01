@@ -332,6 +332,7 @@ export function EditorSurface() {
         <div
           style={{
             position: "absolute",
+            pointerEvents: "none",
           }}
         >
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
@@ -403,20 +404,8 @@ function RemoteCursorOverlay() {
     <>
       {cursors.map((c) => {
         const pos = cmath.vector2.transform(c.position, transform);
-
         return (
           <React.Fragment key={c.id}>
-            {c.marquee && (
-              <MarqueeArea
-                a={cmath.vector2.transform(c.marquee.a, transform)}
-                b={cmath.vector2.transform(c.marquee.b, transform)}
-                color={{
-                  hue: c.palette["500"],
-                  // oklch
-                  fill: `color-mix(in oklch, ${c.palette["400"]} 10%, transparent)`,
-                }}
-              />
-            )}
             <PointerCursor
               key={c.id}
               local={false}
@@ -424,6 +413,25 @@ function RemoteCursorOverlay() {
               y={pos[1]}
               color={{ hue: c.palette["100"], fill: c.palette["400"] }}
             />
+            {c.marquee && (
+              <MarqueeArea
+                a={cmath.vector2.transform(c.marquee.a, transform)}
+                b={cmath.vector2.transform(c.marquee.b, transform)}
+                color={{
+                  hue: c.palette["500"],
+                  fill: `color-mix(in oklch, ${c.palette["400"]} 10%, transparent)`,
+                }}
+              />
+            )}
+            {c.selection?.map((node_id) => (
+              <NodeOverlay
+                key={node_id}
+                node_id={node_id}
+                readonly
+                borderWidth={2}
+                borderColor={c.palette["400"]}
+              />
+            ))}
           </React.Fragment>
         );
       })}
@@ -846,11 +854,15 @@ function NodeOverlay({
   readonly,
   zIndex,
   focused,
+  borderColor,
+  borderWidth,
 }: {
   node_id: string;
   readonly?: boolean;
   zIndex?: number;
   focused?: boolean;
+  borderColor?: string;
+  borderWidth?: number;
 }) {
   const { scaleX, scaleY } = useTransformState();
 
@@ -882,6 +894,8 @@ function NodeOverlay({
         transform={style}
         zIndex={zIndex}
         isComponentConsumer={is_component_consumer}
+        borderColor={borderColor}
+        borderWidth={borderWidth}
       >
         {focused && !readonly && (
           <>

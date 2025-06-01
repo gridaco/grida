@@ -339,6 +339,7 @@ export namespace editor.state {
     position: cmath.Vector2;
     palette: MultiplayerCursorColorPalette;
     marquee: editor.state.Marquee | null;
+    selection: string[];
   };
 
   /**

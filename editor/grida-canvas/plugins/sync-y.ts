@@ -11,6 +11,7 @@ type AwarenessPayload = {
     transform: cmath.Transform;
     position: [number, number];
     marquee_a: [number, number] | null;
+    selection: string[];
   };
 };
 
@@ -74,6 +75,7 @@ export class EditorYSyncPlugin {
             position = [0, 0],
             marquee_a,
             transform,
+            selection,
           } = state.player ?? {};
 
           const marquee = marquee_a ? { a: marquee_a, b: position } : null;
@@ -85,6 +87,7 @@ export class EditorYSyncPlugin {
             palette,
             marquee: marquee,
             transform,
+            selection,
           } satisfies editor.state.MultiplayerCursor;
         });
 
@@ -98,14 +101,15 @@ export class EditorYSyncPlugin {
     // Subscribe to editor changes and sync document state
     this.__unsubscribe_editor = this.editor.subscribe((editor) => {
       const snapshot = editor.getSnapshot();
-      const { pointer, marquee, transform, document } = snapshot;
+      const { pointer, marquee, selection, transform, document } = snapshot;
 
       // Update awareness for cursor position
       this.awareness.setLocalStateField("player", {
-        palette: this.cursor.palette,
+        palette: this.cursor.palette, // TODO: palette needs to be synced only once
         position: pointer.position,
         marquee_a: marquee?.a ?? null,
         transform,
+        selection,
       } satisfies AwarenessPayload["player"]);
 
       if (this.isUpdatingFromYjs) return;
