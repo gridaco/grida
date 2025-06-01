@@ -31,8 +31,8 @@ export function PointerCursor({
     <>
       {!local && (
         <svg
-          width="18"
-          height="24"
+          width="12"
+          height="16"
           viewBox="0 0 18 24"
           fill="none"
           className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none"
