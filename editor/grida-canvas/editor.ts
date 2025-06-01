@@ -204,8 +204,12 @@ export class Editor
     const wrapped = (_: this, action?: Action) => {
       const next = selector(this.mstate);
       if (!isEqual(previous, next)) {
-        listener(this, next, previous, action);
+        const prev = previous;
+        // previous is assigned before invoking the listener, preventing recursive dispatch loops
+        // [1]
         previous = next;
+        // [2]
+        listener(this, next, prev, action);
       }
     };
 
