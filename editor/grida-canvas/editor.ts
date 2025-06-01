@@ -195,6 +195,25 @@ export class Editor
     return () => this.listeners.delete(fn);
   }
 
+  public subscribeWithSelector<T>(
+    selector: (state: editor.state.IEditorState) => T,
+    listener: (selected: T, previous: T) => void,
+    isEqual: (a: T, b: T) => boolean = Object.is
+  ): () => void {
+    let previous = selector(this.mstate);
+
+    const wrapped = () => {
+      const next = selector(this.mstate);
+      if (!isEqual(previous, next)) {
+        listener(next, previous);
+        previous = next;
+      }
+    };
+
+    this.listeners.add(wrapped);
+    return () => this.listeners.delete(wrapped);
+  }
+
   public getSnapshot(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }

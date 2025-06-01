@@ -19,7 +19,8 @@ export class EditorYSyncPlugin {
   public readonly doc: Y.Doc;
   public readonly provider: WebsocketProvider;
   public readonly awareness: Awareness;
-  private readonly __unsubscribe_editor: () => void;
+  private readonly __unsubscribe_player_change: () => void;
+  private readonly __unsubscribe_document_change: () => void;
   private readonly ymap: Y.Map<any>;
   private isUpdatingFromYjs: boolean = false;
 
@@ -98,28 +99,41 @@ export class EditorYSyncPlugin {
     this.awareness.on("remove", update);
     update();
 
-    // Subscribe to editor changes and sync document state
-    this.__unsubscribe_editor = this.editor.subscribe((editor) => {
-      const snapshot = editor.getSnapshot();
-      const { pointer, marquee, selection, transform, document } = snapshot;
+    // Subscribe to cursor changes for awareness updates (pointer, marquee, etc.)
+    this.__unsubscribe_player_change = this.editor.subscribeWithSelector(
+      (state) => ({
+        pointer: state.pointer,
+        marquee: state.marquee,
+        selection: state.selection,
+        transform: state.transform,
+      }),
+      (next) => {
+        const { pointer, marquee, selection, transform } = next;
 
-      // Update awareness for cursor position
-      this.awareness.setLocalStateField("player", {
-        palette: this.cursor.palette, // TODO: palette needs to be synced only once
-        position: pointer.position,
-        marquee_a: marquee?.a ?? null,
-        transform,
-        selection,
-      } satisfies AwarenessPayload["player"]);
+        // Update awareness for cursor position
+        this.awareness.setLocalStateField("player", {
+          palette: this.cursor.palette, // TODO: palette needs to be synced only once
+          position: pointer.position,
+          marquee_a: marquee?.a ?? null,
+          transform,
+          selection,
+        } satisfies AwarenessPayload["player"]);
+      }
+    );
 
-      if (this.isUpdatingFromYjs) return;
-      // Update document state
-      this.ymap.set("document", document);
-    });
+    // Subscribe with selector for document sync
+    this.__unsubscribe_document_change = this.editor.subscribeWithSelector(
+      (state) => state.document,
+      (next) => {
+        if (this.isUpdatingFromYjs) return;
+        this.ymap.set("document", next);
+      }
+    );
   }
 
   public destroy() {
-    this.__unsubscribe_editor();
+    this.__unsubscribe_player_change();
+    this.__unsubscribe_document_change();
     this.provider.destroy();
     this.doc.destroy();
   }
