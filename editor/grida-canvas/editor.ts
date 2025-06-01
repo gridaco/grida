@@ -74,11 +74,14 @@ export class Editor
     initialState: editor.state.IEditorStateInit,
     instanceConfig: {
       pointer_move_throttle_ms: number;
+      onCreate?: (editor: Editor) => void;
     } = { pointer_move_throttle_ms: 30 }
   ) {
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
+    //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
+    instanceConfig.onCreate?.(this);
   }
 
   private _locked: boolean = false;
@@ -102,7 +105,7 @@ export class Editor
     this.mstate = produce(this.mstate, (draft) => {
       draft.debug = value;
     });
-    this.listeners.forEach((l) => l(this));
+    this.listeners.forEach((l) => l?.(this));
   }
 
   public toggleDebug() {
@@ -178,7 +181,7 @@ export class Editor
     ) => Readonly<editor.state.IEditorState>
   ) {
     this.mstate = produce(this.mstate, reducer);
-    this.listeners.forEach((l) => l(this));
+    this.listeners.forEach((l) => l?.(this));
   }
 
   public dispatch(action: Action, force: boolean = false) {

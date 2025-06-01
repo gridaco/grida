@@ -115,8 +115,13 @@ import { useEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
-import { EditorSyncYjsPlugin } from "@/grida-canvas/plugins/sync-yjs";
+import { EditorYSyncPlugin } from "@/grida-canvas/plugins/sync-y";
 import { Editor } from "@/grida-canvas/editor";
+import { PlayerAvatar } from "@/components/multiplayer/avatar";
+import colors, {
+  neutral_colors,
+  randomcolorname,
+} from "@/theme/tailwindcolors";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -126,11 +131,13 @@ type UIConfig = {
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
 function useSyncMultiplayerCursors(editor: Editor) {
-  const pluginRef = useRef<EditorSyncYjsPlugin | null>(null);
+  const pluginRef = useRef<EditorYSyncPlugin | null>(null);
 
   useEffect(() => {
     if (!pluginRef.current) {
-      pluginRef.current = new EditorSyncYjsPlugin(editor, "grida-canvas-demo");
+      pluginRef.current = new EditorYSyncPlugin(editor, "grida-canvas-demo", {
+        palette: colors[randomcolorname({ exclude: neutral_colors })],
+      });
     }
 
     return () => {
@@ -371,22 +378,66 @@ function useArtboardListCondition() {
   return should_show_artboards_list;
 }
 
+function Presense() {
+  const instance = useCurrentEditor();
+  const cursors = useEditorState(instance, (state) => state.cursors);
+
+  return (
+    <div className="flex ms-0 -space-x-2 -mx-2">
+      <PlayerAvatar
+        type="local"
+        colors={{
+          ring: "",
+          fill: "",
+          text: "",
+        }}
+        zIndex={cursors.length + 1}
+        avatar={{
+          src: undefined,
+          fallback: "ME",
+        }}
+      />
+      {cursors.map((cursor, i) => (
+        <PlayerAvatar
+          key={cursor.id}
+          type={"remote"}
+          colors={{
+            ring: cursor.palette["400"],
+            fill: cursor.palette["600"],
+            text: cursor.palette["100"],
+          }}
+          zIndex={cursors.length - i}
+          avatar={{
+            src: undefined,
+            fallback: "?",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function SidebarRight() {
   const should_show_artboards_list = useArtboardListCondition();
 
   return (
     <SidebarRoot side="right" className="hidden sm:block">
-      <header className="h-11 flex items-center px-2 justify-end gap-2">
-        <Zoom
-          className={cn(
-            WorkbenchUI.inputVariants({
-              variant: "input",
-              size: "xs",
-            }),
-            "w-auto"
-          )}
-        />
-        <PreviewButton />
+      <header className="flex h-11 px-2 justify-between items-center gap-2">
+        <div className="flex-1">
+          <Presense />
+        </div>
+        <div className="flex items-center">
+          <Zoom
+            className={cn(
+              WorkbenchUI.inputVariants({
+                variant: "input",
+                size: "xs",
+              }),
+              "w-auto"
+            )}
+          />
+          <PreviewButton />
+        </div>
       </header>
       <hr />
       {should_show_artboards_list ? (

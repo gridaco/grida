@@ -318,11 +318,26 @@ export namespace editor.state {
     active_duplication: editor.state.ActiveDuplication | null;
   }
 
+  export type MultiplayerCursorColorPalette = {
+    "50": string;
+    "100": string;
+    "200": string;
+    "300": string;
+    "400": string;
+    "500": string;
+    "600": string;
+    "700": string;
+    "800": string;
+    "900": string;
+    "950": string;
+  };
+
   export type MultiplayerCursor = {
     t: number;
     id: string;
+    transform: cmath.Transform | null;
     position: cmath.Vector2;
-    color: string;
+    palette: MultiplayerCursorColorPalette;
     marquee: editor.state.Marquee | null;
   };
 

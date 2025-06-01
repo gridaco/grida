@@ -410,7 +410,11 @@ function RemoteCursorOverlay() {
               <MarqueeArea
                 a={cmath.vector2.transform(c.marquee.a, transform)}
                 b={cmath.vector2.transform(c.marquee.b, transform)}
-                color={{ hue: c.color, fill: "rgba(0,0,0,0.1)" }}
+                color={{
+                  hue: c.palette["500"],
+                  // oklch
+                  fill: `color-mix(in oklch, ${c.palette["400"]} 10%, transparent)`,
+                }}
               />
             )}
             <PointerCursor
@@ -418,7 +422,7 @@ function RemoteCursorOverlay() {
               local={false}
               x={pos[0]}
               y={pos[1]}
-              color={{ hue: c.color, fill: c.color }}
+              color={{ hue: c.palette["100"], fill: c.palette["400"] }}
             />
           </React.Fragment>
         );
