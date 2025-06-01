@@ -1,7 +1,10 @@
 "use client";
 
 import React from "react";
-import { NodeHierarchyGroup, ScenesGroup } from "./sidebar-node-hierarchy-list";
+import {
+  ScenesGroup,
+  NodeHierarchyGroup,
+} from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 
 export function ModeDesign() {
   return (

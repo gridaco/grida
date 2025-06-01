@@ -31,12 +31,13 @@ export function PointerCursor({
     <>
       {!local && (
         <svg
-          width="18"
-          height="24"
+          width="12"
+          height="16"
           viewBox="0 0 18 24"
           fill="none"
-          className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none"
+          className="absolute top-0 left-0 transform pointer-events-none"
           style={{
+            willChange: "transform",
             color: fill,
             transform: `translateX(${x}px) translateY(${y}px)`,
             zIndex: 999,
@@ -119,7 +120,7 @@ function PointerCursorMessageBubble({
           onMessageChange?.("");
         }
       }}
-      className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none data-[local='true']:duration-0"
+      className="absolute top-0 left-0 transform pointer-events-none data-[local='true']:duration-0"
       style={{
         transform: `translateX(${x}px) translateY(${y}px)`,
         zIndex: 999 - 1,

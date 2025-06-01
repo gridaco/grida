@@ -7,9 +7,9 @@ import {
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import {
-  NodeHierarchyGroup,
   ScenesGroup,
-} from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
+  NodeHierarchyGroup,
+} from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,

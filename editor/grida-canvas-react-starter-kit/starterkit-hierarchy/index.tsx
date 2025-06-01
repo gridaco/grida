@@ -34,7 +34,14 @@ import {
   EyeOpenIcon,
   EyeClosedIcon,
   LockOpen1Icon,
+  PlusIcon,
 } from "@radix-ui/react-icons";
+import {
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+} from "@/components/ui/sidebar";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import { NodeTypeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons/node-type-icon";
 import { cn } from "@/components/lib/utils";
@@ -566,5 +573,40 @@ function NameInput({
         </div>
       )}
     </div>
+  );
+}
+
+//
+
+export function ScenesGroup() {
+  const editor = useCurrentEditor();
+
+  return (
+    <SidebarGroup
+      onContextMenu={(e) => e.preventDefault()}
+      className="min-h-16 max-h-56 overflow-y-auto"
+    >
+      <SidebarGroupLabel>
+        Scenes
+        <SidebarGroupAction onClick={() => editor.createScene()}>
+          <PlusIcon />
+          <span className="sr-only">New Scene</span>
+        </SidebarGroupAction>
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <ScenesList />
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+export function NodeHierarchyGroup() {
+  return (
+    <SidebarGroup className="flex-1" onContextMenu={(e) => e.preventDefault()}>
+      <SidebarGroupLabel>Layers</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <NodeHierarchyList />
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

@@ -383,6 +383,10 @@ interface ICanvasEventTargetDragEvent {
 export type EditorCameraAction = {
   type: "transform";
   transform: cmath.Transform;
+  /**
+   * if true, the transform will also re-calculate the cursor position.
+   */
+  sync: boolean;
 };
 
 export type EventTargetAction =

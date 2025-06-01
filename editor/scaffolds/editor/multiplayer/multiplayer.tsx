@@ -1,11 +1,9 @@
 "use client";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { useEditorState } from "../use";
-import { PointerCursor } from "./pointer";
 import { useMouse, useThrottle } from "@uidotdev/usehooks";
 import { usePathname } from "next/navigation";
 import {
-  IMultiplayerCursor,
   IMultiplayerCursorPresence,
   IMultiplayerCursorNotify,
   MultiplayerStateProvider,
@@ -16,6 +14,7 @@ import {
 import { useMultiplayerRoom } from "./room";
 import { ICursorPos, ICursorNode } from "./types";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { PointerCursor } from "@/components/multiplayer/cursor";
 
 const RT_THROTTLE_MS = 50;
 
