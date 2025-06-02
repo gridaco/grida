@@ -1,11 +1,66 @@
 "use client";
 import * as React from "react";
-import CanvasKitInit, { type CanvasKit } from "canvaskit-wasm";
+import CanvasKitInit, {
+  type Color,
+  type CanvasKit,
+  type Surface,
+  Paint,
+} from "canvaskit-wasm";
+import type grida from "@grida/schema";
+import cg from "@grida/cg";
+
+const rectNode: grida.program.nodes.RectangleNode = {
+  type: "rectangle",
+  id: "1",
+  name: "Rectangle",
+  active: true,
+  locked: false,
+  position: "absolute",
+  left: 100,
+  top: 50,
+  width: 200,
+  height: 100,
+  fill: { type: "solid", color: { r: 255, g: 0, b: 0, a: 1 } },
+  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+  strokeWidth: 4,
+  cornerRadius: 12,
+  opacity: 0.8,
+  rotation: 15,
+  zIndex: 0,
+  strokeCap: "butt",
+  effects: [],
+};
 
 class CanvasKitRenderer {
   private kit: CanvasKit | null = null;
-  private surface: any = null;
+  private get $kit(): CanvasKit {
+    return this.kit!;
+  }
+  private surface: Surface | null = null;
   private canvas: HTMLCanvasElement | null = null;
+
+  private _fillPaint: Paint | null = null;
+  private _strokePaint: Paint | null = null;
+  private _textPaint: Paint | null = null;
+
+  private get $fillPaint(): Paint {
+    if (!this._fillPaint) {
+      this._fillPaint = new this.$kit.Paint();
+    }
+    return this._fillPaint;
+  }
+  private get $strokePaint(): Paint {
+    if (!this._strokePaint) {
+      this._strokePaint = new this.$kit.Paint();
+    }
+    return this._strokePaint;
+  }
+  private get $textPaint(): Paint {
+    if (!this._textPaint) {
+      this._textPaint = new this.$kit.Paint();
+    }
+    return this._textPaint;
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -19,133 +74,115 @@ class CanvasKitRenderer {
     }).then((CanvasKit) => {
       this.kit = CanvasKit;
       this.surface = this.kit.MakeWebGLCanvasSurface(this.canvas!);
-      this.draw();
+      this._fillPaint = new this.$kit.Paint();
+      this._strokePaint = new this.$kit.Paint();
+      this._strokePaint.setStyle(this.$kit.PaintStyle.Stroke);
+      this.drawDemo();
     });
   }
 
-  private draw() {
+  private drawDemo() {
     if (!this.kit || !this.surface) return;
+    const canvas = this.surface.getCanvas();
+
+    // Clear white
+    canvas.clear(this.kit.Color(255, 255, 255, 1));
+
+    // Example RectangleNode data
+
+    this.$draw(rectNode);
+    this.surface.flush();
+  }
+
+  private $draw(node: grida.program.nodes.Node) {
+    switch (node.type) {
+      case "rectangle":
+        this.renderRectangle(node as grida.program.nodes.RectangleNode);
+        break;
+      default:
+        throw new Error("Unsupported node type");
+    }
+  }
+
+  private $fill(p: cg.Paint | null): Paint {
+    this.$fillPaint.setAntiAlias(true);
+
+    if (!p) {
+      this.$fillPaint.setStyle(this.$kit.PaintStyle.Fill);
+      this.$fillPaint.setColor(this.$kit.Color(0, 0, 0, 0));
+      return this.$fillPaint;
+    }
+
+    switch (p.type) {
+      case "solid":
+        this.$fillPaint.setStyle(this.$kit.PaintStyle.Fill);
+        this.$fillPaint.setColor(
+          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a)
+        );
+        return this.$fillPaint;
+      default:
+        throw new Error("Unsupported fill");
+    }
+  }
+
+  private $stroke(p: cg.Paint | null, width: number): Paint {
+    this.$strokePaint.setAntiAlias(true);
+
+    if (!p) {
+      this.$strokePaint.setStyle(this.$kit.PaintStyle.Stroke);
+      this.$strokePaint.setStrokeWidth(width);
+      this.$strokePaint.setColor(this.$kit.Color(0, 0, 0, 0));
+      return this.$strokePaint;
+    }
+    switch (p.type) {
+      case "solid":
+        this.$strokePaint.setStyle(this.$kit.PaintStyle.Stroke);
+        this.$strokePaint.setStrokeWidth(width);
+        this.$strokePaint.setColor(
+          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a)
+        );
+        return this.$strokePaint;
+      default:
+        throw new Error("Unsupported stroke");
+    }
+  }
+
+  private renderRectangle(node: grida.program.nodes.RectangleNode) {
+    if (!this.kit) return;
+    if (!this.surface) return;
+    const { left: x = 0, top: y = 0, width, height } = node;
+    const paint = new this.kit.Paint();
+    const innerRect = this.kit.LTRBRect(x, y, x + width, y + height);
+    const rrect = this.kit.RRectXY(
+      innerRect,
+      typeof node.cornerRadius === "number" ? node.cornerRadius : 0,
+      typeof node.cornerRadius === "number" ? node.cornerRadius : 0
+    );
 
     const canvas = this.surface.getCanvas();
-    const paint = new this.kit.Paint();
-    const textPaint = new this.kit.Paint();
-    const font = new this.kit.Font(null, 20);
+    // Apply rotation & opacity via save() / restore()
+    canvas.restore();
+    canvas.save();
 
-    // Clear canvas
-    canvas.clear(this.kit.Color(255, 255, 255, 1.0));
+    // move pivot to rect center, rotate, then restore pivot
+    if (node.rotation) {
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      canvas.translate(cx, cy);
+      canvas.rotate(node.rotation, cx, cy);
+      canvas.translate(-cx, -cy);
+    }
 
-    // Helper function to draw shapes with labels
-    const drawShapeWithLabel = (
-      x: number,
-      y: number,
-      drawFn: () => void,
-      label: string
-    ) => {
-      // Draw shape
-      drawFn();
+    // Fill
+    canvas.drawRRect(rrect, this.$fill(node.fill ?? null));
 
-      // Draw label
-      textPaint.setColor(this.kit!.Color(0, 0, 0, 1.0));
-      canvas.drawText(label, x, y + 100, textPaint, font);
-    };
-
-    // Rectangle
-    drawShapeWithLabel(
-      100,
-      50,
-      () => {
-        paint.setColor(this.kit!.Color(255, 0, 0, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Fill);
-        canvas.drawRect(this.kit!.LTRBRect(100, 50, 200, 100), paint);
-      },
-      "Rectangle"
+    // Stroke (if provided)
+    canvas.drawRRect(
+      rrect,
+      this.$stroke(node.stroke ?? null, node.strokeWidth)
     );
 
-    // Circle
-    drawShapeWithLabel(
-      300,
-      50,
-      () => {
-        paint.setColor(this.kit!.Color(0, 255, 0, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Fill);
-        canvas.drawCircle(350, 75, 25, paint);
-      },
-      "Circle"
-    );
-
-    // Ellipse
-    drawShapeWithLabel(
-      500,
-      50,
-      () => {
-        paint.setColor(this.kit!.Color(0, 0, 255, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Fill);
-        canvas.drawOval(this.kit!.LTRBRect(500, 50, 600, 100), paint);
-      },
-      "Ellipse"
-    );
-
-    // Triangle (Polygon)
-    drawShapeWithLabel(
-      100,
-      200,
-      () => {
-        paint.setColor(this.kit!.Color(255, 165, 0, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Fill);
-        const path = new this.kit!.Path();
-        path.moveTo(150, 200);
-        path.lineTo(100, 250);
-        path.lineTo(200, 250);
-        path.close();
-        canvas.drawPath(path, paint);
-      },
-      "Triangle"
-    );
-
-    // Line
-    drawShapeWithLabel(
-      300,
-      200,
-      () => {
-        paint.setColor(this.kit!.Color(128, 0, 128, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Stroke);
-        paint.setStrokeWidth(3);
-        canvas.drawLine(300, 225, 400, 225, paint);
-      },
-      "Line"
-    );
-
-    // Text
-    drawShapeWithLabel(
-      500,
-      200,
-      () => {
-        paint.setColor(this.kit!.Color(0, 128, 128, 1.0));
-        canvas.drawText("Hello", 500, 225, paint, font);
-      },
-      "Text"
-    );
-
-    // SVG Path
-    drawShapeWithLabel(
-      100,
-      350,
-      () => {
-        paint.setColor(this.kit!.Color(255, 192, 203, 1.0));
-        paint.setStyle(this.kit!.PaintStyle.Fill);
-        const path = new this.kit!.Path();
-        // Draw a heart shape
-        path.moveTo(150, 350);
-        path.cubicTo(150, 350, 100, 300, 100, 350);
-        path.cubicTo(100, 400, 150, 450, 150, 450);
-        path.cubicTo(150, 450, 200, 400, 200, 350);
-        path.cubicTo(200, 300, 150, 350, 150, 350);
-        canvas.drawPath(path, paint);
-      },
-      "SVG Path"
-    );
-
-    this.surface.flush();
+    canvas.restore();
   }
 }
 
