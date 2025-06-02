@@ -329,10 +329,12 @@ export class CanvasKitRenderer {
       textStyle: {
         color: this.kit.Color(0, 0, 0, opacity),
         fontFamilies: ["Roboto"],
-        fontSize: 28,
+        fontSize: node.fontSize || 16,
       },
       textAlign: this.kit.TextAlign.Left,
+      textDirection: this.kit.TextDirection.LTR,
     });
+
     const text = String(node.text || "");
     const builder = this.kit.ParagraphBuilder.Make(paraStyle, fontMgr!);
     builder.addText(text);
@@ -342,19 +344,26 @@ export class CanvasKitRenderer {
     let textX = 0;
     let textY = 0;
 
+    // Handle horizontal alignment
     if (node.textAlign === "center") {
       textX = w / 2;
+      paragraph.layout(w);
     } else if (node.textAlign === "right") {
       textX = w;
+      paragraph.layout(w);
+    } else {
+      paragraph.layout(w);
     }
 
+    // Handle vertical alignment
     if (node.textAlignVertical === "center") {
-      textY = h / 2;
+      textY = (h - paragraph.getHeight()) / 2;
     } else if (node.textAlignVertical === "bottom") {
-      textY = h;
+      textY = h - paragraph.getHeight();
     }
 
-    canvas.drawParagraph(paragraph, textX, textY);
+    // Draw text with a slight offset to ensure visibility
+    canvas.drawParagraph(paragraph, textX, textY + 1);
     canvas.restore();
   }
 
