@@ -7,110 +7,6 @@ import CanvasKitInit, {
 import type grida from "@grida/schema";
 import cg from "@grida/cg";
 
-const imageNode: grida.program.nodes.ImageNode = {
-  type: "image",
-  id: "1",
-  name: "Image",
-  active: true,
-  locked: false,
-  style: {},
-  opacity: 1,
-  rotation: 0,
-  zIndex: 0,
-  position: "absolute",
-  left: 300,
-  top: 300,
-  width: 100,
-  height: 100,
-  fit: "contain",
-  src: "/images/abstract-placeholder.jpg",
-  cornerRadius: 0,
-};
-
-const textNode: grida.program.nodes.TextNode = {
-  type: "text",
-  id: "1",
-  name: "Text",
-  active: true,
-  locked: false,
-  style: {},
-  fontFamily: "Arial",
-  opacity: 1,
-  rotation: 0,
-  zIndex: 0,
-  position: "absolute",
-  width: 200,
-  height: 100,
-  textAlign: "left",
-  textAlignVertical: "top",
-  textDecoration: "none",
-  fontSize: 16,
-  fontWeight: 100,
-  text: "Hello, world!",
-};
-
-const lineNode: grida.program.nodes.LineNode = {
-  type: "line",
-  id: "1",
-  name: "Line",
-  active: true,
-  locked: false,
-  height: 0,
-  top: 50,
-  left: 100,
-  position: "absolute",
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 1,
-  strokeCap: "butt",
-  width: 200,
-  opacity: 1,
-  zIndex: 0,
-  rotation: 0,
-};
-
-const rectNode: grida.program.nodes.RectangleNode = {
-  type: "rectangle",
-  id: "1",
-  name: "Rectangle",
-  active: true,
-  locked: false,
-  position: "absolute",
-  left: 100,
-  top: 50,
-  width: 200,
-  height: 100,
-  fill: { type: "solid", color: { r: 255, g: 0, b: 0, a: 1 } },
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 4,
-  cornerRadius: 12,
-  opacity: 0.8,
-  rotation: 15,
-  zIndex: 0,
-  strokeCap: "butt",
-  effects: [],
-};
-
-const ellipseNode: grida.program.nodes.EllipseNode = {
-  type: "ellipse",
-  id: "1",
-  name: "Ellipse",
-  active: true,
-  locked: false,
-  position: "absolute",
-  left: 100,
-  top: 200,
-  width: 100,
-  height: 200,
-  fill: { type: "solid", color: { r: 0, g: 0, b: 255, a: 1 } },
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 4,
-  opacity: 0.8,
-  rotation: 15,
-  zIndex: 0,
-  strokeCap: "butt",
-  effects: [],
-};
-
 export class CanvasKitRenderer {
   private kit: CanvasKit | null = null;
   private get $kit(): CanvasKit {
@@ -118,6 +14,13 @@ export class CanvasKitRenderer {
   }
   private surface: Surface | null = null;
   private canvas: HTMLCanvasElement | null = null;
+
+  private nodeMap: Record<string, grida.program.nodes.Node> = {};
+  private rootId: string | null = null;
+
+  private _imageMap: Record<string, ReturnType<CanvasKit["MakeImageFromEncoded"]> | null> = {};
+  private _imageLoading: Record<string, Promise<void> | undefined> = {};
+  private _renderScheduled = false;
 
   private _fillPaint: Paint | null = null;
   private _strokePaint: Paint | null = null;
@@ -168,28 +71,42 @@ export class CanvasKitRenderer {
           this.__roboto_data = roboto;
         })
         .finally(() => {
-          this.drawDemo();
+          this.requestRender();
         });
     });
   }
 
-  private drawDemo() {
+  public setDocument(
+    nodes: Record<string, grida.program.nodes.Node>,
+    rootId: string,
+  ) {
+    this.nodeMap = nodes;
+    this.rootId = rootId;
+    this.requestRender();
+  }
+
+  private requestRender() {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    requestAnimationFrame(() => {
+      this._renderScheduled = false;
+      this.render();
+    });
+  }
+
+  private render() {
     if (!this.kit || !this.surface) return;
     const canvas = this.surface.getCanvas();
-
-    // Clear white
+    canvas.save();
     canvas.clear(this.kit.Color(255, 255, 255, 1));
-
-    // Draw nodes
-    this.$draw(rectNode);
-    this.$draw(lineNode);
-    this.$draw(ellipseNode);
-    this.$draw(textNode);
-    this.$draw(imageNode);
-
-    // Don't flush here since image rendering is async
-    // FIXME: add this after making image rendering async
-    // this.surface.flush();
+    if (this.rootId) {
+      const root = this.nodeMap[this.rootId];
+      if (root) {
+        this.$draw(root);
+      }
+    }
+    canvas.restore();
+    this.surface.flush();
   }
 
   private $draw(node: grida.program.nodes.Node) {
@@ -208,6 +125,9 @@ export class CanvasKitRenderer {
         break;
       case "image":
         this.drawImageNode(node as grida.program.nodes.ImageNode);
+        break;
+      case "container":
+        this.drawContainerNode(node as grida.program.nodes.ContainerNode);
         break;
       default:
         throw new Error("Unsupported node type");
@@ -258,11 +178,9 @@ export class CanvasKitRenderer {
   }
 
   private drawRectangleNode(node: grida.program.nodes.RectangleNode) {
-    if (!this.kit) return;
-    if (!this.surface) return;
+    if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width, height } = node;
-    const paint = new this.kit.Paint();
-    const innerRect = this.kit.LTRBRect(x, y, x + width, y + height);
+    const innerRect = this.kit.LTRBRect(0, 0, width, height);
     const rrect = this.kit.RRectXY(
       innerRect,
       typeof node.cornerRadius === "number" ? node.cornerRadius : 0,
@@ -270,14 +188,13 @@ export class CanvasKitRenderer {
     );
 
     const canvas = this.surface.getCanvas();
-    // Apply rotation & opacity via save() / restore()
-    canvas.restore();
     canvas.save();
+    canvas.translate(x, y);
 
-    // move pivot to rect center, rotate, then restore pivot
+    // move pivot to rect center for rotation
     if (node.rotation) {
-      const cx = x + width / 2;
-      const cy = y + height / 2;
+      const cx = width / 2;
+      const cy = height / 2;
       canvas.translate(cx, cy);
       canvas.rotate(node.rotation, cx, cy);
       canvas.translate(-cx, -cy);
@@ -296,58 +213,44 @@ export class CanvasKitRenderer {
   }
 
   private drawLineNode(node: grida.program.nodes.LineNode) {
-    if (!this.kit) return;
-    if (!this.surface) return;
+    if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width } = node;
     const canvas = this.surface.getCanvas();
 
-    // Apply rotation & opacity via save() / restore()
-    canvas.restore();
     canvas.save();
+    canvas.translate(x, y);
 
-    // move pivot to line center, rotate, then restore pivot
     if (node.rotation) {
-      const cx = x + width / 2;
-      const cy = y;
+      const cx = width / 2;
+      const cy = 0;
       canvas.translate(cx, cy);
       canvas.rotate(node.rotation, cx, cy);
       canvas.translate(-cx, -cy);
     }
 
-    // Draw the line
-    canvas.drawLine(
-      x,
-      y,
-      x + width,
-      y,
-      this.$stroke(node.stroke ?? null, node.strokeWidth)
-    );
+    canvas.drawLine(0, 0, width, 0, this.$stroke(node.stroke ?? null, node.strokeWidth));
 
     canvas.restore();
   }
 
   private drawEllipseNode(node: grida.program.nodes.EllipseNode) {
-    if (!this.kit) return;
-    if (!this.surface) return;
+    if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width, height } = node;
     const canvas = this.surface.getCanvas();
 
-    // Apply rotation & opacity via save() / restore()
-    canvas.restore();
     canvas.save();
+    canvas.translate(x, y);
 
-    // move pivot to ellipse center, rotate, then restore pivot
     if (node.rotation) {
-      const cx = x + width / 2;
-      const cy = y + height / 2;
+      const cx = width / 2;
+      const cy = height / 2;
       canvas.translate(cx, cy);
       canvas.rotate(node.rotation, cx, cy);
       canvas.translate(-cx, -cy);
     }
 
-    // Create an oval path
     const oval = new this.kit.Path();
-    oval.addOval(this.kit.LTRBRect(x, y, x + width, y + height));
+    oval.addOval(this.kit.LTRBRect(0, 0, width, height));
 
     // Fill
     canvas.drawPath(oval, this.$fill(node.fill ?? null));
@@ -362,19 +265,18 @@ export class CanvasKitRenderer {
   }
 
   private drawTextNode(node: grida.program.nodes.TextNode) {
-    if (!this.kit) return;
-    if (!this.surface) return;
+    if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
+    const w = Number(width);
+    const h = Number(height);
     const canvas = this.surface.getCanvas();
 
-    // Apply rotation & opacity via save() / restore()
-    canvas.restore();
     canvas.save();
+    canvas.translate(x, y);
 
-    // move pivot to text center, rotate, then restore pivot
     if (node.rotation) {
-      const cx = x + (width as number) / 2;
-      const cy = y + (height as number) / 2;
+      const cx = w / 2;
+      const cy = h / 2;
       canvas.translate(cx, cy);
       canvas.rotate(node.rotation, cx, cy);
       canvas.translate(-cx, -cy);
@@ -395,86 +297,80 @@ export class CanvasKitRenderer {
     const paragraph = builder.build();
 
     // Calculate text position based on alignment
-    let textX = x;
-    let textY = y;
+    let textX = 0;
+    let textY = 0;
 
     if (node.textAlign === "center") {
-      textX = x + (width as number) / 2;
+      textX = w / 2;
     } else if (node.textAlign === "right") {
-      textX = x + (width as number);
+      textX = w;
     }
 
     if (node.textAlignVertical === "center") {
-      textY = y + (height as number) / 2;
+      textY = h / 2;
     } else if (node.textAlignVertical === "bottom") {
-      textY = y + (height as number);
+      textY = h;
     }
 
-    canvas.drawParagraph(paragraph, 10, 10);
+    canvas.drawParagraph(paragraph, textX, textY);
     canvas.restore();
   }
 
-  private __image_cache: Record<string, Uint8Array> = {};
+  private async loadImage(src: string): Promise<void> {
+    if (this._imageMap[src]) return;
+    if (this._imageLoading[src]) return this._imageLoading[src];
 
-  private async loadImage(src: string): Promise<Uint8Array> {
-    if (!this.__image_cache) this.__image_cache = {};
-    if (this.__image_cache[src]) return this.__image_cache[src];
+    this._imageLoading[src] = fetch(src)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch image: ${src}`);
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        const uint8 = new Uint8Array(buffer);
+        const img = this.$kit.MakeImageFromEncoded(uint8);
+        if (img) {
+          this._imageMap[src] = img;
+        }
+      })
+      .finally(() => {
+        delete this._imageLoading[src];
+        this.requestRender();
+      });
 
-    return new Promise((resolve, reject) => {
-      fetch(src)
-        .then((res) => {
-          if (!res.ok) throw new Error(`Failed to fetch image: ${src}`);
-          return res.arrayBuffer();
-        })
-        .then((buffer) => {
-          const uint8 = new Uint8Array(buffer);
-          this.__image_cache[src] = uint8;
-          resolve(uint8);
-        })
-        .catch(reject);
-    });
+    return this._imageLoading[src];
   }
 
   private drawImageNode(node: grida.program.nodes.ImageNode) {
-    if (!this.kit) return;
-    if (!this.surface) return;
+    if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
+    const w = Number(width);
+    const h = Number(height);
     const canvas = this.surface.getCanvas();
 
-    // Apply rotation & opacity via save() / restore()
-    canvas.restore();
     canvas.save();
+    canvas.translate(x, y);
 
-    // move pivot to image center, rotate, then restore pivot
     if (node.rotation) {
-      const cx = x + (width as number) / 2;
-      const cy = y + (height as number) / 2;
+      const cx = w / 2;
+      const cy = h / 2;
       canvas.translate(cx, cy);
       canvas.rotate(node.rotation, cx, cy);
       canvas.translate(-cx, -cy);
     }
 
-    // Load and draw image
-    this.loadImage(String(node.src || ""))
-      .then((img) => {
-        // Create SkImage from ImageData
-        const image = this.kit!.MakeImageFromEncoded(img)!;
-        if (!image) {
-          reportError("Failed to create SkImage from encoded data");
-          return;
-        }
+    const src = String(node.src || "");
+    const image = this._imageMap[src];
+    if (!image) {
+      this.loadImage(src);
+      canvas.restore();
+      return;
+    }
 
-        // Get image dimensions
-        const imgWidth = image.width();
-        const imgHeight = image.height();
+    const imgWidth = image.width();
+    const imgHeight = image.height();
 
         // Create destination rect (where to draw)
-        const dstRect = this.kit!.LTRBRect(
-          x,
-          y,
-          x + (width as number),
-          y + (height as number)
-        );
+        const dstRect = this.kit!.LTRBRect(0, 0, w, h);
 
         // Create source rect (what part of image to draw)
         const srcRect = this.kit!.LTRBRect(0, 0, imgWidth, imgHeight);
@@ -487,27 +383,27 @@ export class CanvasKitRenderer {
           case "contain": {
             // Calculate aspect ratios
             const imgAspect = imgWidth / imgHeight;
-            const dstAspect = (width as number) / (height as number);
+            const dstAspect = w / h;
 
             if (imgAspect > dstAspect) {
               // Image is wider than destination
-              const newHeight = (width as number) / imgAspect;
-              const yOffset = ((height as number) - newHeight) / 2;
+              const newHeight = w / imgAspect;
+              const yOffset = (h - newHeight) / 2;
               finalDstRect = this.kit!.LTRBRect(
-                x,
-                y + yOffset,
-                x + (width as number),
-                y + yOffset + newHeight
+                0,
+                yOffset,
+                w,
+                yOffset + newHeight
               );
             } else {
               // Image is taller than destination
-              const newWidth = (height as number) * imgAspect;
-              const xOffset = ((width as number) - newWidth) / 2;
+              const newWidth = h * imgAspect;
+              const xOffset = (w - newWidth) / 2;
               finalDstRect = this.kit!.LTRBRect(
-                x + xOffset,
-                y,
-                x + xOffset + newWidth,
-                y + (height as number)
+                xOffset,
+                0,
+                xOffset + newWidth,
+                h
               );
             }
             break;
@@ -515,39 +411,34 @@ export class CanvasKitRenderer {
           case "cover": {
             // Calculate aspect ratios
             const imgAspect = imgWidth / imgHeight;
-            const dstAspect = (width as number) / (height as number);
+            const dstAspect = w / h;
 
             if (imgAspect > dstAspect) {
               // Image is wider than destination
-              const newWidth = (height as number) * imgAspect;
-              const xOffset = (newWidth - (width as number)) / 2;
+              const newWidth = h * imgAspect;
+              const xOffset = (newWidth - w) / 2;
               finalSrcRect = this.kit!.LTRBRect(
                 xOffset,
                 0,
-                xOffset + (width as number),
+                xOffset + w,
                 imgHeight
               );
             } else {
               // Image is taller than destination
-              const newHeight = (width as number) / imgAspect;
-              const yOffset = (newHeight - (height as number)) / 2;
+              const newHeight = w / imgAspect;
+              const yOffset = (newHeight - h) / 2;
               finalSrcRect = this.kit!.LTRBRect(
                 0,
                 yOffset,
                 imgWidth,
-                yOffset + (height as number)
+                yOffset + h
               );
             }
             break;
           }
           case "none": {
             // Use original image dimensions
-            finalDstRect = this.kit!.LTRBRect(
-              x,
-              y,
-              x + imgWidth,
-              y + imgHeight
-            );
+            finalDstRect = this.kit!.LTRBRect(0, 0, imgWidth, imgHeight);
             break;
           }
         }
@@ -576,15 +467,49 @@ export class CanvasKitRenderer {
           );
         }
 
-        // Clean up
-        image.delete();
+    this.surface.flush();
+    canvas.restore();
+  }
 
-        // Flush the surface after drawing
-        this.surface!.flush();
-      })
-      .catch((error) => {
-        reportError("Failed to load image: " + error);
-      });
+  private drawContainerNode(node: grida.program.nodes.ContainerNode) {
+    if (!this.kit || !this.surface) return;
+    const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
+    const w = Number(width);
+    const h = Number(height);
+    const canvas = this.surface.getCanvas();
+
+    canvas.save();
+    canvas.translate(x, y);
+
+    if (node.rotation) {
+      const cx = w / 2;
+      const cy = h / 2;
+      canvas.translate(cx, cy);
+      canvas.rotate(node.rotation, cx, cy);
+      canvas.translate(-cx, -cy);
+    }
+
+    const rect = this.kit.LTRBRect(0, 0, w, h);
+    const rrect = this.kit.RRectXY(
+      rect,
+      typeof node.cornerRadius === "number" ? node.cornerRadius : 0,
+      typeof node.cornerRadius === "number" ? node.cornerRadius : 0,
+    );
+
+    if (node.fill) {
+      canvas.drawRRect(rrect, this.$fill(node.fill));
+    }
+
+    if (node.style?.overflow === "clip") {
+      canvas.clipRRect(rrect, this.$kit.ClipOp.Intersect, true);
+    }
+
+    for (const childId of node.children || []) {
+      const child = this.nodeMap[childId];
+      if (child) {
+        this.$draw(child);
+      }
+    }
 
     canvas.restore();
   }
