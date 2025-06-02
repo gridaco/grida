@@ -111,33 +111,47 @@ export class CanvasKitRenderer {
     this.surface.flush();
   }
 
-  private $draw(node: grida.program.nodes.Node) {
+  private $draw(node: grida.program.nodes.Node, parentOpacity: number = 1) {
+    const currentOpacity =
+      ("opacity" in node ? node.opacity : 1) * parentOpacity;
+
     switch (node.type) {
       case "rectangle":
-        this.drawRectangleNode(node as grida.program.nodes.RectangleNode);
+        this.drawRectangleNode(
+          node as grida.program.nodes.RectangleNode,
+          currentOpacity
+        );
         break;
       case "line":
-        this.drawLineNode(node as grida.program.nodes.LineNode);
+        this.drawLineNode(node as grida.program.nodes.LineNode, currentOpacity);
         break;
       case "ellipse":
-        this.drawEllipseNode(node as grida.program.nodes.EllipseNode);
+        this.drawEllipseNode(
+          node as grida.program.nodes.EllipseNode,
+          currentOpacity
+        );
         break;
       case "text":
-        this.drawTextNode(node as grida.program.nodes.TextNode);
+        this.drawTextNode(node as grida.program.nodes.TextNode, currentOpacity);
         break;
       case "image":
-        this.drawImageNode(node as grida.program.nodes.ImageNode);
+        this.drawImageNode(
+          node as grida.program.nodes.ImageNode,
+          currentOpacity
+        );
         break;
       case "container":
-        this.drawContainerNode(node as grida.program.nodes.ContainerNode);
+        this.drawContainerNode(
+          node as grida.program.nodes.ContainerNode,
+          currentOpacity
+        );
         break;
       default:
         reportError(`Unsupported node type: ${node.type}`);
-      // throw new Error("Unsupported node type");
     }
   }
 
-  private $fill(p: cg.Paint | null): Paint {
+  private $fill(p: cg.Paint | null, opacity: number = 1): Paint {
     this.$fillPaint.setAntiAlias(true);
 
     if (!p) {
@@ -150,7 +164,7 @@ export class CanvasKitRenderer {
       case "solid":
         this.$fillPaint.setStyle(this.$kit.PaintStyle.Fill);
         this.$fillPaint.setColor(
-          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a)
+          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a * opacity)
         );
         return this.$fillPaint;
       default:
@@ -158,7 +172,11 @@ export class CanvasKitRenderer {
     }
   }
 
-  private $stroke(p: cg.Paint | null, width: number): Paint {
+  private $stroke(
+    p: cg.Paint | null,
+    width: number,
+    opacity: number = 1
+  ): Paint {
     this.$strokePaint.setAntiAlias(true);
 
     if (!p) {
@@ -172,7 +190,7 @@ export class CanvasKitRenderer {
         this.$strokePaint.setStyle(this.$kit.PaintStyle.Stroke);
         this.$strokePaint.setStrokeWidth(width);
         this.$strokePaint.setColor(
-          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a)
+          this.$kit.Color(p.color.r, p.color.g, p.color.b, p.color.a * opacity)
         );
         return this.$strokePaint;
       default:
@@ -180,7 +198,10 @@ export class CanvasKitRenderer {
     }
   }
 
-  private drawRectangleNode(node: grida.program.nodes.RectangleNode) {
+  private drawRectangleNode(
+    node: grida.program.nodes.RectangleNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width, height } = node;
     const innerRect = this.kit.LTRBRect(0, 0, width, height);
@@ -204,18 +225,21 @@ export class CanvasKitRenderer {
     }
 
     // Fill
-    canvas.drawRRect(rrect, this.$fill(node.fill ?? null));
+    canvas.drawRRect(rrect, this.$fill(node.fill ?? null, opacity));
 
     // Stroke (if provided)
     canvas.drawRRect(
       rrect,
-      this.$stroke(node.stroke ?? null, node.strokeWidth)
+      this.$stroke(node.stroke ?? null, node.strokeWidth, opacity)
     );
 
     canvas.restore();
   }
 
-  private drawLineNode(node: grida.program.nodes.LineNode) {
+  private drawLineNode(
+    node: grida.program.nodes.LineNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width } = node;
     const canvas = this.surface.getCanvas();
@@ -236,13 +260,16 @@ export class CanvasKitRenderer {
       0,
       width,
       0,
-      this.$stroke(node.stroke ?? null, node.strokeWidth)
+      this.$stroke(node.stroke ?? null, node.strokeWidth, opacity)
     );
 
     canvas.restore();
   }
 
-  private drawEllipseNode(node: grida.program.nodes.EllipseNode) {
+  private drawEllipseNode(
+    node: grida.program.nodes.EllipseNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width, height } = node;
     const canvas = this.surface.getCanvas();
@@ -262,10 +289,13 @@ export class CanvasKitRenderer {
     oval.addOval(this.kit.LTRBRect(0, 0, width, height));
 
     // Fill
-    canvas.drawPath(oval, this.$fill(node.fill ?? null));
+    canvas.drawPath(oval, this.$fill(node.fill ?? null, opacity));
 
     // Stroke (if provided)
-    canvas.drawPath(oval, this.$stroke(node.stroke ?? null, node.strokeWidth));
+    canvas.drawPath(
+      oval,
+      this.$stroke(node.stroke ?? null, node.strokeWidth, opacity)
+    );
 
     // Clean up
     oval.delete();
@@ -273,7 +303,10 @@ export class CanvasKitRenderer {
     canvas.restore();
   }
 
-  private drawTextNode(node: grida.program.nodes.TextNode) {
+  private drawTextNode(
+    node: grida.program.nodes.TextNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
     const w = Number(width);
@@ -294,7 +327,7 @@ export class CanvasKitRenderer {
     const fontMgr = this.kit.FontMgr.FromData(this.__roboto_data!);
     const paraStyle = new this.kit.ParagraphStyle({
       textStyle: {
-        color: this.kit.BLACK,
+        color: this.kit.Color(0, 0, 0, opacity),
         fontFamilies: ["Roboto"],
         fontSize: 28,
       },
@@ -349,7 +382,10 @@ export class CanvasKitRenderer {
     return this._imageLoading[src];
   }
 
-  private drawImageNode(node: grida.program.nodes.ImageNode) {
+  private drawImageNode(
+    node: grida.program.nodes.ImageNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
     const w = Number(width);
@@ -432,6 +468,9 @@ export class CanvasKitRenderer {
       }
     }
 
+    // Set opacity for image
+    this.$fillPaint.setAlphaf(opacity);
+
     // Draw image with corner radius if specified
     if (typeof node.cornerRadius === "number") {
       const rrect = this.kit!.RRectXY(
@@ -454,7 +493,10 @@ export class CanvasKitRenderer {
     canvas.restore();
   }
 
-  private drawContainerNode(node: grida.program.nodes.ContainerNode) {
+  private drawContainerNode(
+    node: grida.program.nodes.ContainerNode,
+    opacity: number = 1
+  ) {
     if (!this.kit || !this.surface) return;
     const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
     const w = Number(width);
@@ -480,7 +522,7 @@ export class CanvasKitRenderer {
     );
 
     if (node.fill) {
-      canvas.drawRRect(rrect, this.$fill(node.fill as cg.Paint));
+      canvas.drawRRect(rrect, this.$fill(node.fill as cg.Paint, opacity));
     }
 
     if (node.style?.overflow === "clip") {
@@ -490,7 +532,7 @@ export class CanvasKitRenderer {
     for (const childId of node.children || []) {
       const child = this.nodeMap[childId];
       if (child) {
-        this.$draw(child);
+        this.$draw(child, opacity);
       }
     }
 
