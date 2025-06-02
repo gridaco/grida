@@ -7,110 +7,6 @@ import CanvasKitInit, {
 import type grida from "@grida/schema";
 import cg from "@grida/cg";
 
-const imageNode: grida.program.nodes.ImageNode = {
-  type: "image",
-  id: "1",
-  name: "Image",
-  active: true,
-  locked: false,
-  style: {},
-  opacity: 1,
-  rotation: 0,
-  zIndex: 0,
-  position: "absolute",
-  left: 300,
-  top: 300,
-  width: 100,
-  height: 100,
-  fit: "contain",
-  src: "/images/abstract-placeholder.jpg",
-  cornerRadius: 0,
-};
-
-const textNode: grida.program.nodes.TextNode = {
-  type: "text",
-  id: "1",
-  name: "Text",
-  active: true,
-  locked: false,
-  style: {},
-  fontFamily: "Arial",
-  opacity: 1,
-  rotation: 0,
-  zIndex: 0,
-  position: "absolute",
-  width: 200,
-  height: 100,
-  textAlign: "left",
-  textAlignVertical: "top",
-  textDecoration: "none",
-  fontSize: 16,
-  fontWeight: 100,
-  text: "Hello, world!",
-};
-
-const lineNode: grida.program.nodes.LineNode = {
-  type: "line",
-  id: "1",
-  name: "Line",
-  active: true,
-  locked: false,
-  height: 0,
-  top: 50,
-  left: 100,
-  position: "absolute",
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 1,
-  strokeCap: "butt",
-  width: 200,
-  opacity: 1,
-  zIndex: 0,
-  rotation: 0,
-};
-
-const rectNode: grida.program.nodes.RectangleNode = {
-  type: "rectangle",
-  id: "1",
-  name: "Rectangle",
-  active: true,
-  locked: false,
-  position: "absolute",
-  left: 100,
-  top: 50,
-  width: 200,
-  height: 100,
-  fill: { type: "solid", color: { r: 255, g: 0, b: 0, a: 1 } },
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 4,
-  cornerRadius: 12,
-  opacity: 0.8,
-  rotation: 15,
-  zIndex: 0,
-  strokeCap: "butt",
-  effects: [],
-};
-
-const ellipseNode: grida.program.nodes.EllipseNode = {
-  type: "ellipse",
-  id: "1",
-  name: "Ellipse",
-  active: true,
-  locked: false,
-  position: "absolute",
-  left: 100,
-  top: 200,
-  width: 100,
-  height: 200,
-  fill: { type: "solid", color: { r: 0, g: 0, b: 255, a: 1 } },
-  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-  strokeWidth: 4,
-  opacity: 0.8,
-  rotation: 15,
-  zIndex: 0,
-  strokeCap: "butt",
-  effects: [],
-};
-
 export class CanvasKitRenderer {
   private kit: CanvasKit | null = null;
   private get $kit(): CanvasKit {
@@ -118,6 +14,15 @@ export class CanvasKitRenderer {
   }
   private surface: Surface | null = null;
   private canvas: HTMLCanvasElement | null = null;
+
+  private nodes: grida.program.nodes.Node[] = [];
+
+  private _imageMap: Record<
+    string,
+    ReturnType<CanvasKit["MakeImageFromEncoded"]> | null
+  > = {};
+  private _imageLoading: Record<string, Promise<void> | undefined> = {};
+  private _renderScheduled = false;
 
   private _fillPaint: Paint | null = null;
   private _strokePaint: Paint | null = null;
@@ -168,28 +73,33 @@ export class CanvasKitRenderer {
           this.__roboto_data = roboto;
         })
         .finally(() => {
-          this.drawDemo();
+          this.requestRender();
         });
     });
   }
 
-  private drawDemo() {
+  public setNodes(nodes: grida.program.nodes.Node[]) {
+    this.nodes = nodes;
+    this.requestRender();
+  }
+
+  private requestRender() {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    requestAnimationFrame(() => {
+      this._renderScheduled = false;
+      this.render();
+    });
+  }
+
+  private render() {
     if (!this.kit || !this.surface) return;
     const canvas = this.surface.getCanvas();
-
-    // Clear white
     canvas.clear(this.kit.Color(255, 255, 255, 1));
-
-    // Draw nodes
-    this.$draw(rectNode);
-    this.$draw(lineNode);
-    this.$draw(ellipseNode);
-    this.$draw(textNode);
-    this.$draw(imageNode);
-
-    // Don't flush here since image rendering is async
-    // FIXME: add this after making image rendering async
-    // this.surface.flush();
+    for (const node of this.nodes) {
+      this.$draw(node);
+    }
+    this.surface.flush();
   }
 
   private $draw(node: grida.program.nodes.Node) {
@@ -414,25 +324,28 @@ export class CanvasKitRenderer {
     canvas.restore();
   }
 
-  private __image_cache: Record<string, Uint8Array> = {};
+  private async loadImage(src: string): Promise<void> {
+    if (this._imageMap[src]) return;
+    if (this._imageLoading[src]) return this._imageLoading[src];
 
-  private async loadImage(src: string): Promise<Uint8Array> {
-    if (!this.__image_cache) this.__image_cache = {};
-    if (this.__image_cache[src]) return this.__image_cache[src];
+    this._imageLoading[src] = fetch(src)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch image: ${src}`);
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        const uint8 = new Uint8Array(buffer);
+        const img = this.$kit.MakeImageFromEncoded(uint8);
+        if (img) {
+          this._imageMap[src] = img;
+        }
+      })
+      .finally(() => {
+        delete this._imageLoading[src];
+        this.requestRender();
+      });
 
-    return new Promise((resolve, reject) => {
-      fetch(src)
-        .then((res) => {
-          if (!res.ok) throw new Error(`Failed to fetch image: ${src}`);
-          return res.arrayBuffer();
-        })
-        .then((buffer) => {
-          const uint8 = new Uint8Array(buffer);
-          this.__image_cache[src] = uint8;
-          resolve(uint8);
-        })
-        .catch(reject);
-    });
+    return this._imageLoading[src];
   }
 
   private drawImageNode(node: grida.program.nodes.ImageNode) {
@@ -454,138 +367,115 @@ export class CanvasKitRenderer {
       canvas.translate(-cx, -cy);
     }
 
-    // Load and draw image
-    this.loadImage(String(node.src || ""))
-      .then((img) => {
-        // Create SkImage from ImageData
-        const image = this.kit!.MakeImageFromEncoded(img)!;
-        if (!image) {
-          reportError("Failed to create SkImage from encoded data");
-          return;
-        }
+    const src = String(node.src || "");
+    const image = this._imageMap[src];
+    if (!image) {
+      this.loadImage(src);
+      canvas.restore();
+      return;
+    }
 
-        // Get image dimensions
-        const imgWidth = image.width();
-        const imgHeight = image.height();
+    const imgWidth = image.width();
+    const imgHeight = image.height();
 
-        // Create destination rect (where to draw)
-        const dstRect = this.kit!.LTRBRect(
-          x,
-          y,
-          x + (width as number),
-          y + (height as number)
-        );
+    // Create destination rect (where to draw)
+    const dstRect = this.kit!.LTRBRect(
+      x,
+      y,
+      x + (width as number),
+      y + (height as number)
+    );
 
-        // Create source rect (what part of image to draw)
-        const srcRect = this.kit!.LTRBRect(0, 0, imgWidth, imgHeight);
+    // Create source rect (what part of image to draw)
+    const srcRect = this.kit!.LTRBRect(0, 0, imgWidth, imgHeight);
 
-        // Calculate source and destination rectangles based on fit
-        let finalSrcRect = srcRect;
-        let finalDstRect = dstRect;
+    // Calculate source and destination rectangles based on fit
+    let finalSrcRect = srcRect;
+    let finalDstRect = dstRect;
 
-        switch (node.fit) {
-          case "contain": {
-            // Calculate aspect ratios
-            const imgAspect = imgWidth / imgHeight;
-            const dstAspect = (width as number) / (height as number);
+    switch (node.fit) {
+      case "contain": {
+        // Calculate aspect ratios
+        const imgAspect = imgWidth / imgHeight;
+        const dstAspect = (width as number) / (height as number);
 
-            if (imgAspect > dstAspect) {
-              // Image is wider than destination
-              const newHeight = (width as number) / imgAspect;
-              const yOffset = ((height as number) - newHeight) / 2;
-              finalDstRect = this.kit!.LTRBRect(
-                x,
-                y + yOffset,
-                x + (width as number),
-                y + yOffset + newHeight
-              );
-            } else {
-              // Image is taller than destination
-              const newWidth = (height as number) * imgAspect;
-              const xOffset = ((width as number) - newWidth) / 2;
-              finalDstRect = this.kit!.LTRBRect(
-                x + xOffset,
-                y,
-                x + xOffset + newWidth,
-                y + (height as number)
-              );
-            }
-            break;
-          }
-          case "cover": {
-            // Calculate aspect ratios
-            const imgAspect = imgWidth / imgHeight;
-            const dstAspect = (width as number) / (height as number);
-
-            if (imgAspect > dstAspect) {
-              // Image is wider than destination
-              const newWidth = (height as number) * imgAspect;
-              const xOffset = (newWidth - (width as number)) / 2;
-              finalSrcRect = this.kit!.LTRBRect(
-                xOffset,
-                0,
-                xOffset + (width as number),
-                imgHeight
-              );
-            } else {
-              // Image is taller than destination
-              const newHeight = (width as number) / imgAspect;
-              const yOffset = (newHeight - (height as number)) / 2;
-              finalSrcRect = this.kit!.LTRBRect(
-                0,
-                yOffset,
-                imgWidth,
-                yOffset + (height as number)
-              );
-            }
-            break;
-          }
-          case "none": {
-            // Use original image dimensions
-            finalDstRect = this.kit!.LTRBRect(
-              x,
-              y,
-              x + imgWidth,
-              y + imgHeight
-            );
-            break;
-          }
-        }
-
-        // Draw image with corner radius if specified
-        if (typeof node.cornerRadius === "number") {
-          const rrect = this.kit!.RRectXY(
-            finalDstRect,
-            node.cornerRadius,
-            node.cornerRadius
-          );
-          canvas.drawImageRect(
-            image,
-            finalSrcRect,
-            rrect,
-            this.$fillPaint,
-            true
+        if (imgAspect > dstAspect) {
+          // Image is wider than destination
+          const newHeight = (width as number) / imgAspect;
+          const yOffset = ((height as number) - newHeight) / 2;
+          finalDstRect = this.kit!.LTRBRect(
+            x,
+            y + yOffset,
+            x + (width as number),
+            y + yOffset + newHeight
           );
         } else {
-          canvas.drawImageRect(
-            image,
-            finalSrcRect,
-            finalDstRect,
-            this.$fillPaint,
-            true
+          // Image is taller than destination
+          const newWidth = (height as number) * imgAspect;
+          const xOffset = ((width as number) - newWidth) / 2;
+          finalDstRect = this.kit!.LTRBRect(
+            x + xOffset,
+            y,
+            x + xOffset + newWidth,
+            y + (height as number)
           );
         }
+        break;
+      }
+      case "cover": {
+        // Calculate aspect ratios
+        const imgAspect = imgWidth / imgHeight;
+        const dstAspect = (width as number) / (height as number);
 
-        // Clean up
-        image.delete();
+        if (imgAspect > dstAspect) {
+          // Image is wider than destination
+          const newWidth = (height as number) * imgAspect;
+          const xOffset = (newWidth - (width as number)) / 2;
+          finalSrcRect = this.kit!.LTRBRect(
+            xOffset,
+            0,
+            xOffset + (width as number),
+            imgHeight
+          );
+        } else {
+          // Image is taller than destination
+          const newHeight = (width as number) / imgAspect;
+          const yOffset = (newHeight - (height as number)) / 2;
+          finalSrcRect = this.kit!.LTRBRect(
+            0,
+            yOffset,
+            imgWidth,
+            yOffset + (height as number)
+          );
+        }
+        break;
+      }
+      case "none": {
+        // Use original image dimensions
+        finalDstRect = this.kit!.LTRBRect(x, y, x + imgWidth, y + imgHeight);
+        break;
+      }
+    }
 
-        // Flush the surface after drawing
-        this.surface!.flush();
-      })
-      .catch((error) => {
-        reportError("Failed to load image: " + error);
-      });
+    // Draw image with corner radius if specified
+    if (typeof node.cornerRadius === "number") {
+      const rrect = this.kit!.RRectXY(
+        finalDstRect,
+        node.cornerRadius,
+        node.cornerRadius
+      );
+      canvas.drawImageRect(image, finalSrcRect, rrect, this.$fillPaint, true);
+    } else {
+      canvas.drawImageRect(
+        image,
+        finalSrcRect,
+        finalDstRect,
+        this.$fillPaint,
+        true
+      );
+    }
 
+    this.surface.flush();
     canvas.restore();
   }
 }
