@@ -9,6 +9,47 @@ import CanvasKitInit, {
 import type grida from "@grida/schema";
 import cg from "@grida/cg";
 
+const textNode: grida.program.nodes.TextNode = {
+  type: "text",
+  id: "1",
+  name: "Text",
+  active: true,
+  locked: false,
+  style: {},
+  fontFamily: "Arial",
+  opacity: 1,
+  rotation: 0,
+  zIndex: 0,
+  position: "absolute",
+  width: 200,
+  height: 100,
+  textAlign: "left",
+  textAlignVertical: "top",
+  textDecoration: "none",
+  fontSize: 16,
+  fontWeight: 100,
+  text: "Hello, world!",
+};
+
+const lineNode: grida.program.nodes.LineNode = {
+  type: "line",
+  id: "1",
+  name: "Line",
+  active: true,
+  locked: false,
+  height: 0,
+  top: 50,
+  left: 100,
+  position: "absolute",
+  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+  strokeWidth: 1,
+  strokeCap: "butt",
+  width: 200,
+  opacity: 1,
+  zIndex: 0,
+  rotation: 0,
+};
+
 const rectNode: grida.program.nodes.RectangleNode = {
   type: "rectangle",
   id: "1",
@@ -24,6 +65,27 @@ const rectNode: grida.program.nodes.RectangleNode = {
   stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
   strokeWidth: 4,
   cornerRadius: 12,
+  opacity: 0.8,
+  rotation: 15,
+  zIndex: 0,
+  strokeCap: "butt",
+  effects: [],
+};
+
+const ellipseNode: grida.program.nodes.EllipseNode = {
+  type: "ellipse",
+  id: "1",
+  name: "Ellipse",
+  active: true,
+  locked: false,
+  position: "absolute",
+  left: 100,
+  top: 200,
+  width: 100,
+  height: 200,
+  fill: { type: "solid", color: { r: 0, g: 0, b: 255, a: 1 } },
+  stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+  strokeWidth: 4,
   opacity: 0.8,
   rotation: 15,
   zIndex: 0,
@@ -62,6 +124,8 @@ class CanvasKitRenderer {
     return this._textPaint;
   }
 
+  private __roboto_data: ArrayBuffer | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.__init();
@@ -77,7 +141,17 @@ class CanvasKitRenderer {
       this._fillPaint = new this.$kit.Paint();
       this._strokePaint = new this.$kit.Paint();
       this._strokePaint.setStyle(this.$kit.PaintStyle.Stroke);
-      this.drawDemo();
+      const loadFont = fetch(
+        "https://storage.googleapis.com/skia-cdn/misc/Roboto-Regular.ttf"
+      ).then((response) => response.arrayBuffer());
+
+      loadFont
+        .then((roboto) => {
+          this.__roboto_data = roboto;
+        })
+        .finally(() => {
+          this.drawDemo();
+        });
     });
   }
 
@@ -91,6 +165,9 @@ class CanvasKitRenderer {
     // Example RectangleNode data
 
     this.$draw(rectNode);
+    this.$draw(lineNode);
+    this.$draw(ellipseNode);
+    this.$draw(textNode);
     this.surface.flush();
   }
 
@@ -98,6 +175,15 @@ class CanvasKitRenderer {
     switch (node.type) {
       case "rectangle":
         this.renderRectangle(node as grida.program.nodes.RectangleNode);
+        break;
+      case "line":
+        this.renderLine(node as grida.program.nodes.LineNode);
+        break;
+      case "ellipse":
+        this.renderEllipse(node as grida.program.nodes.EllipseNode);
+        break;
+      case "text":
+        this.renderText(node as grida.program.nodes.TextNode);
         break;
       default:
         throw new Error("Unsupported node type");
@@ -182,6 +268,125 @@ class CanvasKitRenderer {
       this.$stroke(node.stroke ?? null, node.strokeWidth)
     );
 
+    canvas.restore();
+  }
+
+  private renderLine(node: grida.program.nodes.LineNode) {
+    if (!this.kit) return;
+    if (!this.surface) return;
+    const { left: x = 0, top: y = 0, width } = node;
+    const canvas = this.surface.getCanvas();
+
+    // Apply rotation & opacity via save() / restore()
+    canvas.restore();
+    canvas.save();
+
+    // move pivot to line center, rotate, then restore pivot
+    if (node.rotation) {
+      const cx = x + width / 2;
+      const cy = y;
+      canvas.translate(cx, cy);
+      canvas.rotate(node.rotation, cx, cy);
+      canvas.translate(-cx, -cy);
+    }
+
+    // Draw the line
+    canvas.drawLine(
+      x,
+      y,
+      x + width,
+      y,
+      this.$stroke(node.stroke ?? null, node.strokeWidth)
+    );
+
+    canvas.restore();
+  }
+
+  private renderEllipse(node: grida.program.nodes.EllipseNode) {
+    if (!this.kit) return;
+    if (!this.surface) return;
+    const { left: x = 0, top: y = 0, width, height } = node;
+    const canvas = this.surface.getCanvas();
+
+    // Apply rotation & opacity via save() / restore()
+    canvas.restore();
+    canvas.save();
+
+    // move pivot to ellipse center, rotate, then restore pivot
+    if (node.rotation) {
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      canvas.translate(cx, cy);
+      canvas.rotate(node.rotation, cx, cy);
+      canvas.translate(-cx, -cy);
+    }
+
+    // Create an oval path
+    const oval = new this.kit.Path();
+    oval.addOval(this.kit.LTRBRect(x, y, x + width, y + height));
+
+    // Fill
+    canvas.drawPath(oval, this.$fill(node.fill ?? null));
+
+    // Stroke (if provided)
+    canvas.drawPath(oval, this.$stroke(node.stroke ?? null, node.strokeWidth));
+
+    // Clean up
+    oval.delete();
+
+    canvas.restore();
+  }
+
+  private renderText(node: grida.program.nodes.TextNode) {
+    if (!this.kit) return;
+    if (!this.surface) return;
+    const { left: x = 0, top: y = 0, width = 0, height = 0 } = node;
+    const canvas = this.surface.getCanvas();
+
+    // Apply rotation & opacity via save() / restore()
+    canvas.restore();
+    canvas.save();
+
+    // move pivot to text center, rotate, then restore pivot
+    if (node.rotation) {
+      const cx = x + (width as number) / 2;
+      const cy = y + (height as number) / 2;
+      canvas.translate(cx, cy);
+      canvas.rotate(node.rotation, cx, cy);
+      canvas.translate(-cx, -cy);
+    }
+
+    const fontMgr = this.kit.FontMgr.FromData(this.__roboto_data!);
+    const paraStyle = new this.kit.ParagraphStyle({
+      textStyle: {
+        color: this.kit.BLACK,
+        fontFamilies: ["Roboto"],
+        fontSize: 28,
+      },
+      textAlign: this.kit.TextAlign.Left,
+    });
+    const text = String(node.text || "");
+    const builder = this.kit.ParagraphBuilder.Make(paraStyle, fontMgr!);
+    builder.addText(text);
+    const paragraph = builder.build();
+
+    // Calculate text position based on alignment
+    let textX = x;
+    let textY = y;
+
+    if (node.textAlign === "center") {
+      textX = x + (width as number) / 2;
+    } else if (node.textAlign === "right") {
+      textX = x + (width as number);
+    }
+
+    if (node.textAlignVertical === "center") {
+      textY = y + (height as number) / 2;
+    } else if (node.textAlignVertical === "bottom") {
+      textY = y + (height as number);
+    }
+
+    canvas.drawParagraph(paragraph, 10, 10);
     canvas.restore();
   }
 }
