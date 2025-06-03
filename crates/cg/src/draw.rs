@@ -100,20 +100,32 @@ impl Renderer {
     pub fn draw_ellipse_node(ptr: *mut Surface, node: &EllipseNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
-        let paint = sk_paint(
+        let fill_paint = sk_paint(
             &node.fill,
             node.opacity,
             (node.size.width, node.size.height),
         );
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
         let rect = Rect::from_xywh(
             -node.size.width / 2.0,
             -node.size.height / 2.0,
             node.size.width,
             node.size.height,
         );
-        canvas.draw_oval(rect, &paint);
+        canvas.save();
+        canvas.concat(&sk_matrix(node.transform.matrix));
+        // Draw fill
+        canvas.draw_oval(rect, &fill_paint);
+        // Draw stroke if stroke_width > 0
+        if node.stroke_width > 0.0 {
+            let mut stroke_paint = sk_paint(
+                &node.stroke,
+                node.opacity,
+                (node.size.width, node.size.height),
+            );
+            stroke_paint.set_stroke(true);
+            stroke_paint.set_stroke_width(node.stroke_width);
+            canvas.draw_oval(rect, &stroke_paint);
+        }
         canvas.restore();
     }
 

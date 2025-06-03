@@ -47,7 +47,7 @@ fn main() {
         }),
     };
 
-    // Create a test ellipse node with radial gradient
+    // Create a test ellipse node with radial gradient and a visible stroke
     let ellipse_node = EllipseNode {
         base: BaseNode {
             id: "test_ellipse".to_string(),
@@ -78,6 +78,10 @@ fn main() {
                 },
             ],
         }),
+        stroke: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black stroke
+        }),
+        stroke_width: 6.0,
     };
 
     // Create a test line node with solid color
