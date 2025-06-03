@@ -81,8 +81,9 @@ pub struct ContainerNode {
 pub struct LineNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
-    pub size: Size,
-    pub fill: Paint,
+    pub size: Size, // height is always 0 (ignored)
+    pub stroke: Paint,
+    pub stroke_width: f32,
     pub opacity: f32,
 }
 

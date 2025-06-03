@@ -1,4 +1,4 @@
-use cg::draw::{draw_ellipse_node, draw_line_node, draw_rect_node, free, init};
+use cg::draw::Renderer;
 use cg::schema::{
     BaseNode, Color, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
     RadialGradientPaint, RectNode, RectangularCornerRadius, Size, SolidPaint,
@@ -9,8 +9,8 @@ fn main() {
     let width = 800;
     let height = 600;
 
-    // Initialize the surface using the library function
-    let surface_ptr = init(width, height);
+    // Initialize the surface using the Renderer
+    let surface_ptr = Renderer::init(width, height);
 
     // Create a test rectangle node with linear gradient
     let rect_node = RectNode {
@@ -91,21 +91,22 @@ fn main() {
         transform: AffineTransform::new(100.0, 400.0, 30.0),
         size: Size {
             width: 200.0,
-            height: 100.0,
+            height: 0.0, // ignored
         },
-        fill: Paint::Solid(SolidPaint {
+        stroke: Paint::Solid(SolidPaint {
             color: Color(0, 255, 0, 255), // Green color
         }),
+        stroke_width: 4.0,
     };
 
     // Draw the rectangle using our schema
-    draw_rect_node(surface_ptr, &rect_node);
+    Renderer::draw_rect_node(surface_ptr, &rect_node);
 
     // Draw the ellipse using our schema
-    draw_ellipse_node(surface_ptr, &ellipse_node);
+    Renderer::draw_ellipse_node(surface_ptr, &ellipse_node);
 
     // Draw the line using our schema
-    draw_line_node(surface_ptr, &line_node);
+    Renderer::draw_line_node(surface_ptr, &line_node);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };
@@ -116,7 +117,7 @@ fn main() {
         .expect("Failed to save PNG");
 
     // Free the surface
-    free(surface_ptr);
+    Renderer::free(surface_ptr);
 
     println!("Saved output.png");
 }
