@@ -6,6 +6,43 @@ pub type NodeId = String;
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
+/// Represents filter effects inspired by SVG `<filter>` primitives.
+///
+/// See also:
+/// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
+/// - https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feGaussianBlur
+#[derive(Debug, Clone)]
+pub enum FilterEffect {
+    /// Drop shadow filter: offset + blur + color
+    DropShadow(FeDropShadow),
+
+    /// Gaussian blur filter: blur only
+    GaussianBlur(FeGaussianBlur),
+}
+
+/// A drop shadow filter effect (`<feDropShadow>`)
+#[derive(Debug, Clone, Copy)]
+pub struct FeDropShadow {
+    /// Horizontal shadow offset in px
+    pub dx: f32,
+
+    /// Vertical shadow offset in px
+    pub dy: f32,
+
+    /// Blur radius (`stdDeviation` in SVG)
+    pub blur: f32,
+
+    /// Shadow color (includes alpha)
+    pub color: Color,
+}
+
+/// A standalone blur filter effect (`<feGaussianBlur>`)
+#[derive(Debug, Clone, Copy)]
+pub struct FeGaussianBlur {
+    /// Blur radius (`stdDeviation` in SVG)
+    pub radius: f32,
+}
+
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
@@ -134,10 +171,12 @@ pub struct RectangularCornerRadius {
     pub br: f32,
 }
 
+// region: Node Definitions
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Container(ContainerNode),
-    Rectangle(RectNode),
+    Rectangle(RectangleNode),
     Ellipse(EllipseNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
@@ -171,16 +210,20 @@ pub struct LineNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct RectNode {
+pub struct RectangleNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub fill: Paint,
+    pub stroke: Paint,
+    pub stroke_width: f32,
     pub opacity: f32,
+    pub effect: Option<FilterEffect>,
 }
 
 #[derive(Debug, Clone)]
+#[deprecated(note = "Not implemented yet")]
 pub struct ImageNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
@@ -310,6 +353,7 @@ pub struct TextSpanNode {
 }
 
 #[derive(Debug, Clone)]
+#[deprecated(note = "Not implemented yet")]
 pub struct TextNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
@@ -319,6 +363,8 @@ pub struct TextNode {
     pub fill: Paint,
     pub opacity: f32,
 }
+
+// endregion
 
 // Example doc tree container
 pub type NodeMap = HashMap<NodeId, Node>;

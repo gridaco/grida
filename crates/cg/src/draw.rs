@@ -1,7 +1,7 @@
 use crate::schema::{
-    Color as SchemaColor, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
-    PolygonNode, RadialGradientPaint, RectNode, RectangularCornerRadius, RegularPolygonNode,
-    TextAlign, TextAlignVertical, TextSpanNode,
+    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, LineNode, LinearGradientPaint,
+    Paint, PolygonNode, RadialGradientPaint, RectangleNode, RectangularCornerRadius,
+    RegularPolygonNode, TextAlign, TextAlignVertical, TextSpanNode,
 };
 use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{
@@ -69,7 +69,7 @@ impl Renderer {
         canvas.draw_rect(Rect::from_xywh(x, y, w, h), &paint);
     }
 
-    pub fn draw_rect_node(ptr: *mut Surface, node: &RectNode) {
+    pub fn draw_rect_node(ptr: *mut Surface, node: &RectangleNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
         let paint = sk_paint(
@@ -81,6 +81,42 @@ impl Renderer {
         canvas.concat(&sk_matrix(node.transform.matrix));
         let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
         let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
+        // Draw drop shadow effect if present
+        if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
+            use skia_safe::{MaskFilter, Paint as SkiaPaint};
+            let mut shadow_paint = SkiaPaint::default();
+            let crate::schema::Color(r, g, b, a) = shadow.color;
+            shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
+            shadow_paint.set_anti_alias(true);
+            if shadow.blur > 0.0 {
+                shadow_paint.set_mask_filter(MaskFilter::blur(
+                    skia_safe::BlurStyle::Normal,
+                    shadow.blur,
+                    None,
+                ));
+            }
+            let offset_x = shadow.dx;
+            let offset_y = shadow.dy;
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(tl, tl), // top-left
+                        Point::new(tr, tr), // top-right
+                        Point::new(br, br), // bottom-right
+                        Point::new(bl, bl), // bottom-left
+                    ],
+                );
+                let mut shadow_rrect = rrect;
+                shadow_rrect.offset((offset_x, offset_y));
+                canvas.draw_rrect(shadow_rrect, &shadow_paint);
+            } else {
+                let mut shadow_rect = rect;
+                shadow_rect.offset((offset_x, offset_y));
+                canvas.draw_rect(shadow_rect, &shadow_paint);
+            }
+        }
+        // Draw fill and stroke as before
         if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
             let rrect = RRect::new_rect_radii(
                 rect,
@@ -92,8 +128,30 @@ impl Renderer {
                 ],
             );
             canvas.draw_rrect(rrect, &paint);
+            // Draw stroke if stroke_width > 0
+            if node.stroke_width > 0.0 {
+                let mut stroke_paint = sk_paint(
+                    &node.stroke,
+                    node.opacity,
+                    (node.size.width, node.size.height),
+                );
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                canvas.draw_rrect(rrect, &stroke_paint);
+            }
         } else {
             canvas.draw_rect(rect, &paint);
+            // Draw stroke if stroke_width > 0
+            if node.stroke_width > 0.0 {
+                let mut stroke_paint = sk_paint(
+                    &node.stroke,
+                    node.opacity,
+                    (node.size.width, node.size.height),
+                );
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                canvas.draw_rect(rect, &stroke_paint);
+            }
         }
         canvas.restore();
     }
