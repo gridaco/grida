@@ -1,5 +1,8 @@
 use cg::draw::{draw_ellipse_node, draw_line_node, draw_rect_node, free, init};
-use cg::schema::{BaseNode, Color, EllipseNode, LineNode, RectNode, RectangularCornerRadius, Size};
+use cg::schema::{
+    BaseNode, Color, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
+    RadialGradientPaint, RectNode, RectangularCornerRadius, Size, SolidPaint,
+};
 use cg::transform::AffineTransform;
 
 fn main() {
@@ -9,14 +12,14 @@ fn main() {
     // Initialize the surface using the library function
     let surface_ptr = init(width, height);
 
-    // Create a test rectangle node
+    // Create a test rectangle node with linear gradient
     let rect_node = RectNode {
         base: BaseNode {
             id: "test_rect".to_string(),
             name: "Test Rectangle".to_string(),
             active: true,
         },
-        opacity: 0.3,
+        opacity: 1.0,
         transform: AffineTransform::new(200.0, 100.0, 15.0),
         size: Size {
             width: 200.0,
@@ -28,10 +31,23 @@ fn main() {
             bl: 50.0,
             br: 100.0,
         },
-        fill: Color(255, 0, 0, 255), // Red color
+        fill: Paint::LinearGradient(LinearGradientPaint {
+            id: "gradient1".to_string(),
+            transform: AffineTransform::identity(),
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Color(255, 0, 0, 255), // Red
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Color(0, 0, 255, 255), // Blue
+                },
+            ],
+        }),
     };
 
-    // Create a test ellipse node
+    // Create a test ellipse node with radial gradient
     let ellipse_node = EllipseNode {
         base: BaseNode {
             id: "test_ellipse".to_string(),
@@ -44,10 +60,27 @@ fn main() {
             width: 150.0,
             height: 100.0,
         },
-        fill: Color(0, 0, 255, 255), // Blue color
+        fill: Paint::RadialGradient(RadialGradientPaint {
+            id: "gradient2".to_string(),
+            transform: AffineTransform::identity(),
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Color(0, 255, 0, 255), // Green
+                },
+                GradientStop {
+                    offset: 0.5,
+                    color: Color(255, 255, 0, 255), // Yellow
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Color(255, 0, 255, 255), // Magenta
+                },
+            ],
+        }),
     };
 
-    // Create a test line node
+    // Create a test line node with solid color
     let line_node = LineNode {
         base: BaseNode {
             id: "test_line".to_string(),
@@ -60,7 +93,9 @@ fn main() {
             width: 200.0,
             height: 100.0,
         },
-        fill: Color(0, 255, 0, 255), // Green color
+        fill: Paint::Solid(SolidPaint {
+            color: Color(0, 255, 0, 255), // Green color
+        }),
     };
 
     // Draw the rectangle using our schema
