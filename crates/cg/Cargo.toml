@@ -15,6 +15,8 @@ wasm-bindgen = "0.2.100"
 skia-safe = "0.86.0" 
 console_error_panic_hook = "0.1.7"
 wee_alloc = { version = "0.4.5", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+reqwest = "0.12.19"
 
 [features]
 default = ["wee_alloc"]

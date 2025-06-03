@@ -2,19 +2,66 @@ use cg::draw::Renderer;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
-    BaseNode, BlendMode, Color, ContainerNode, EllipseNode, FontWeight, GradientStop, GroupNode,
-    LineNode, LinearGradientPaint, Node, NodeMap, Paint, RadialGradientPaint, RectangleNode,
-    RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
-    TextSpanNode, TextStyle,
+    BaseNode, BlendMode, Color, EllipseNode, FontWeight, GradientStop, GroupNode, ImageNode,
+    LineNode, LinearGradientPaint, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint,
+    RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical,
+    TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
+use reqwest;
+use skia_safe::Image;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let width = 800;
     let height = 600;
 
-    // Initialize the surface using the Renderer
+    // Initialize the renderer with image cache
+    let mut renderer = Renderer::new();
     let surface_ptr = Renderer::init(width, height);
+
+    let demo_image_id = "demo_image";
+    let demo_image_url = "https://grida.co/images/abstract-placeholder.jpg".to_string();
+
+    // Preload the image
+    if let Ok(response) = reqwest::get(&demo_image_url).await {
+        if let Ok(bytes) = response.bytes().await {
+            if let Some(image) = Image::from_encoded(skia_safe::Data::new_copy(&bytes)) {
+                renderer.add_image(demo_image_id.to_string(), image);
+            }
+        }
+    }
+
+    // Create a test image node with URL
+    let image_node = ImageNode {
+        base: BaseNode {
+            id: "test_image".to_string(),
+            name: "Test Image".to_string(),
+            active: true,
+            blend_mode: BlendMode::Normal,
+        },
+        transform: AffineTransform::new(50.0, 50.0, 0.0),
+        size: Size {
+            width: 200.0,
+            height: 200.0,
+        },
+        corner_radius: RectangularCornerRadius::all(20.0),
+        fill: Paint::Solid(SolidPaint {
+            color: Color(255, 255, 255, 255),
+        }),
+        stroke: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255),
+        }),
+        stroke_width: 2.0,
+        effect: Some(FilterEffect::DropShadow(FeDropShadow {
+            dx: 4.0,
+            dy: 4.0,
+            blur: 8.0,
+            color: Color(0, 0, 0, 77),
+        })),
+        opacity: 1.0,
+        _ref: demo_image_id.to_string(),
+    };
 
     // Create a test rectangle node with linear gradient
     let rect_node = RectangleNode {
@@ -25,17 +72,12 @@ fn main() {
             blend_mode: BlendMode::Normal,
         },
         opacity: 1.0,
-        transform: AffineTransform::new(50.0, 50.0, 45.0),
+        transform: AffineTransform::new(50.0, 300.0, 45.0),
         size: Size {
             width: 200.0,
             height: 100.0,
         },
-        corner_radius: RectangularCornerRadius {
-            tl: 10.0,
-            tr: 10.0,
-            bl: 10.0,
-            br: 10.0,
-        },
+        corner_radius: RectangularCornerRadius::all(10.0),
         fill: Paint::Solid(SolidPaint {
             color: Color(255, 0, 0, 255), // Red fill
         }),
@@ -60,7 +102,7 @@ fn main() {
             blend_mode: BlendMode::Multiply, // Example of using a different blend mode
         },
         opacity: 1.0,
-        transform: AffineTransform::new(300.0, 50.0, 45.0), // Rotated 45 degrees
+        transform: AffineTransform::new(300.0, 300.0, 45.0), // Rotated 45 degrees
         size: Size {
             width: 200.0,
             height: 200.0,
@@ -227,6 +269,7 @@ fn main() {
             "shapes_group".to_string(),
             "test_text".to_string(),
             "test_line".to_string(),
+            "test_image".to_string(),
         ],
         opacity: 1.0,
     };
@@ -243,10 +286,11 @@ fn main() {
     nodemap.insert("shapes_group".to_string(), Node::Group(shapes_group_node));
     nodemap.insert("test_text".to_string(), Node::TextSpan(text_span_node));
     nodemap.insert("test_line".to_string(), Node::Line(line_node));
+    nodemap.insert("test_image".to_string(), Node::Image(image_node));
     nodemap.insert("root_group".to_string(), Node::Group(root_group_node));
 
     // Render the root group node and its children
-    Renderer::render_node(surface_ptr, &"root_group".to_string(), &nodemap);
+    renderer.render_node(surface_ptr, &"root_group".to_string(), &nodemap);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };

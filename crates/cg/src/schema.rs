@@ -1,5 +1,6 @@
 use crate::transform::AffineTransform;
 use std::collections::HashMap;
+use std::f32::consts::PI;
 
 pub type NodeId = String;
 
@@ -242,6 +243,21 @@ pub struct RectangularCornerRadius {
     pub br: f32,
 }
 
+impl RectangularCornerRadius {
+    pub fn zero() -> Self {
+        Self::all(0.0)
+    }
+
+    pub fn all(value: f32) -> Self {
+        Self {
+            tl: value,
+            tr: value,
+            bl: value,
+            br: value,
+        }
+    }
+}
+
 // region: Scene
 #[derive(Debug, Clone)]
 pub struct SceneNode {
@@ -263,6 +279,7 @@ pub enum Node {
     RegularPolygon(RegularPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
+    Image(ImageNode),
 }
 
 #[derive(Debug, Clone)]
@@ -274,7 +291,6 @@ pub struct BaseNode {
 }
 
 #[derive(Debug, Clone)]
-#[deprecated(note = "Partially implemented")]
 pub struct GroupNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
@@ -315,14 +331,17 @@ pub struct RectangleNode {
 }
 
 #[derive(Debug, Clone)]
-#[deprecated(note = "Not implemented yet")]
 pub struct ImageNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
-    pub src: String,
+    pub fill: Paint,
+    pub stroke: Paint,
+    pub stroke_width: f32,
     pub opacity: f32,
+    pub effect: Option<FilterEffect>,
+    pub _ref: String,
 }
 
 #[derive(Debug, Clone)]
@@ -404,6 +423,39 @@ pub struct RegularPolygonNode {
 
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
+}
+
+impl RegularPolygonNode {
+    pub fn to_polygon(&self) -> PolygonNode {
+        let cx = self.size.width / 2.0;
+        let cy = self.size.height / 2.0;
+        let r = cx.min(cy); // fit within bounding box
+
+        let angle_offset = if self.point_count % 2 == 0 {
+            PI / self.point_count as f32
+        } else {
+            -PI / 2.0
+        };
+
+        let points: Vec<(f32, f32)> = (0..self.point_count)
+            .map(|i| {
+                let angle = (i as f32 / self.point_count as f32) * 2.0 * PI + angle_offset;
+                let x = cx + r * angle.cos();
+                let y = cy + r * angle.sin();
+                (x, y)
+            })
+            .collect();
+
+        PolygonNode {
+            base: self.base.clone(),
+            transform: self.transform,
+            points,
+            fill: self.fill.clone(),
+            stroke: self.stroke.clone(),
+            stroke_width: self.stroke_width,
+            opacity: self.opacity,
+        }
+    }
 }
 
 /// A node representing a plain text block (non-rich).

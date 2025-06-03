@@ -1,16 +1,15 @@
 use crate::schema::{
-    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, GroupNode, LineNode,
-    LinearGradientPaint, Node, NodeId, NodeMap, Paint, PolygonNode, RadialGradientPaint,
-    RectangleNode, RectangularCornerRadius, RegularPolygonNode, TextAlign, TextAlignVertical,
-    TextSpanNode,
+    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, GroupNode, ImageNode, LineNode,
+    Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode, RectangularCornerRadius,
+    RegularPolygonNode, TextAlign, TextAlignVertical, TextSpanNode,
 };
 use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{
-    Color, Font, FontMgr, FontStyle, Paint as SkiaPaint, Point, RRect, Rect, Shader, Surface,
-    TextBlob, Typeface, surfaces,
+    Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
+    Shader, Surface, TextBlob, Typeface, surfaces,
 };
 use std::cell::RefCell;
-use std::f32::consts::PI;
+use std::collections::HashMap;
 
 thread_local! {
     static DEFAULT_TYPEFACE: RefCell<Option<Typeface>> = RefCell::new(None);
@@ -34,9 +33,21 @@ fn default_typeface() -> Typeface {
     })
 }
 
-pub struct Renderer;
+pub struct Renderer {
+    image_cache: HashMap<String, Image>,
+}
 
 impl Renderer {
+    pub fn new() -> Self {
+        Self {
+            image_cache: HashMap::new(),
+        }
+    }
+
+    pub fn add_image(&mut self, src: String, image: Image) {
+        self.image_cache.insert(src, image);
+    }
+
     pub fn init(width: i32, height: i32) -> *mut Surface {
         init_panic_hook();
         let surface = surfaces::raster_n32_premul((width, height)).unwrap();
@@ -44,6 +55,7 @@ impl Renderer {
     }
 
     pub fn draw_rect(
+        &self,
         ptr: *mut Surface,
         x: f32,
         y: f32,
@@ -70,7 +82,7 @@ impl Renderer {
         canvas.draw_rect(Rect::from_xywh(x, y, w, h), &paint);
     }
 
-    pub fn draw_rect_node(ptr: *mut Surface, node: &RectangleNode) {
+    pub fn draw_rect_node(&self, ptr: *mut Surface, node: &RectangleNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
         let paint = sk_paint(
@@ -84,9 +96,8 @@ impl Renderer {
         let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
         // Draw drop shadow effect if present
         if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
-            use skia_safe::{MaskFilter, Paint as SkiaPaint};
             let mut shadow_paint = SkiaPaint::default();
-            let crate::schema::Color(r, g, b, a) = shadow.color;
+            let SchemaColor(r, g, b, a) = shadow.color;
             shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
             shadow_paint.set_anti_alias(true);
             if shadow.blur > 0.0 {
@@ -164,6 +175,7 @@ impl Renderer {
     }
 
     pub fn draw_ellipse(
+        &self,
         ptr: *mut Surface,
         x: f32,
         y: f32,
@@ -190,7 +202,7 @@ impl Renderer {
         canvas.draw_oval(Rect::from_xywh(x - rx, y - ry, rx * 2.0, ry * 2.0), &paint);
     }
 
-    pub fn draw_ellipse_node(ptr: *mut Surface, node: &EllipseNode) {
+    pub fn draw_ellipse_node(&self, ptr: *mut Surface, node: &EllipseNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
         let fill_paint = sk_paint(
@@ -225,7 +237,7 @@ impl Renderer {
         canvas.restore();
     }
 
-    pub fn draw_line_node(ptr: *mut Surface, node: &LineNode) {
+    pub fn draw_line_node(&self, ptr: *mut Surface, node: &LineNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
         let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
@@ -242,7 +254,7 @@ impl Renderer {
         canvas.restore();
     }
 
-    pub fn draw_polygon_node(ptr: *mut Surface, node: &crate::schema::PolygonNode) {
+    pub fn draw_polygon_node(&self, ptr: *mut Surface, node: &PolygonNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
         if node.points.len() < 3 {
@@ -276,12 +288,12 @@ impl Renderer {
         canvas.restore();
     }
 
-    pub fn draw_regular_polygon_node(ptr: *mut Surface, node: &RegularPolygonNode) {
-        let poly = cg_regular_to_polygon(node);
-        Self::draw_polygon_node(ptr, &poly);
+    pub fn draw_regular_polygon_node(&self, ptr: *mut Surface, node: &RegularPolygonNode) {
+        let poly = node.to_polygon();
+        self.draw_polygon_node(ptr, &poly);
     }
 
-    pub fn draw_text_span_node(ptr: *mut Surface, node: &TextSpanNode) {
+    pub fn draw_text_span_node(&self, ptr: *mut Surface, node: &TextSpanNode) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
 
@@ -340,6 +352,94 @@ impl Renderer {
         canvas.restore();
     }
 
+    pub fn draw_image_node(&self, ptr: *mut Surface, node: &ImageNode) {
+        let surface = unsafe { &mut *ptr };
+        let canvas = surface.canvas();
+
+        if let Some(image) = self.image_cache.get(&node._ref) {
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+
+            // Draw drop shadow effect if present
+            if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
+                let mut shadow_paint = SkiaPaint::default();
+                let SchemaColor(r, g, b, a) = shadow.color;
+                shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
+                shadow_paint.set_anti_alias(true);
+                if shadow.blur > 0.0 {
+                    shadow_paint.set_mask_filter(MaskFilter::blur(
+                        skia_safe::BlurStyle::Normal,
+                        shadow.blur,
+                        None,
+                    ));
+                }
+                let offset_x = shadow.dx;
+                let offset_y = shadow.dy;
+                let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+                let mut shadow_rect = rect;
+                shadow_rect.offset((offset_x, offset_y));
+                canvas.draw_image_rect(image, None, shadow_rect, &shadow_paint);
+            }
+
+            // Draw the image
+            let mut paint = SkiaPaint::default();
+            paint.set_anti_alias(true);
+            paint.set_blend_mode(node.base.blend_mode.into());
+            paint.set_alpha((node.opacity * 255.0) as u8);
+
+            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+            let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
+
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(tl, tl), // top-left
+                        Point::new(tr, tr), // top-right
+                        Point::new(br, br), // bottom-right
+                        Point::new(bl, bl), // bottom-left
+                    ],
+                );
+                // For rounded rectangles, we need to use a clip path
+                canvas.save();
+                canvas.clip_rrect(rrect, None, true);
+                canvas.draw_image_rect(image, None, rect, &paint);
+                canvas.restore();
+            } else {
+                canvas.draw_image_rect(image, None, rect, &paint);
+            }
+
+            // Draw stroke if stroke_width > 0
+            if node.stroke_width > 0.0 {
+                let mut stroke_paint = sk_paint(
+                    &node.stroke,
+                    node.opacity,
+                    (node.size.width, node.size.height),
+                );
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                stroke_paint.set_blend_mode(node.base.blend_mode.into());
+
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl), // top-left
+                            Point::new(tr, tr), // top-right
+                            Point::new(br, br), // bottom-right
+                            Point::new(bl, bl), // bottom-left
+                        ],
+                    );
+                    canvas.draw_rrect(rrect, &stroke_paint);
+                } else {
+                    canvas.draw_rect(rect, &stroke_paint);
+                }
+            }
+
+            canvas.restore();
+        }
+    }
+
     pub fn flush(_ptr: *mut Surface) {
         // No flush needed for raster surfaces
     }
@@ -348,25 +448,26 @@ impl Renderer {
         unsafe { Box::from_raw(ptr) };
     }
 
-    pub fn render_node(ptr: *mut Surface, id: &NodeId, nodemap: &NodeMap) {
+    pub fn render_node(&self, ptr: *mut Surface, id: &NodeId, nodemap: &NodeMap) {
         let node = match nodemap.get(id) {
             Some(node) => node,
             None => return, // Skip if node not found
         };
 
         match node {
-            Node::Group(node) => Self::draw_group_node(ptr, node, nodemap),
-            Node::Rectangle(node) => Self::draw_rect_node(ptr, node),
-            Node::Ellipse(node) => Self::draw_ellipse_node(ptr, node),
-            Node::Polygon(node) => Self::draw_polygon_node(ptr, node),
-            Node::RegularPolygon(node) => Self::draw_regular_polygon_node(ptr, node),
-            Node::TextSpan(node) => Self::draw_text_span_node(ptr, node),
-            Node::Line(node) => Self::draw_line_node(ptr, node),
+            Node::Group(node) => self.draw_group_node(ptr, node, nodemap),
+            Node::Rectangle(node) => self.draw_rect_node(ptr, node),
+            Node::Ellipse(node) => self.draw_ellipse_node(ptr, node),
+            Node::Polygon(node) => self.draw_polygon_node(ptr, node),
+            Node::RegularPolygon(node) => self.draw_regular_polygon_node(ptr, node),
+            Node::TextSpan(node) => self.draw_text_span_node(ptr, node),
+            Node::Line(node) => self.draw_line_node(ptr, node),
+            Node::Image(node) => self.draw_image_node(ptr, node),
             _ => {}
         }
     }
 
-    pub fn draw_group_node(ptr: *mut Surface, node: &GroupNode, nodemap: &NodeMap) {
+    pub fn draw_group_node(&self, ptr: *mut Surface, node: &GroupNode, nodemap: &NodeMap) {
         let surface = unsafe { &mut *ptr };
         let canvas = surface.canvas();
 
@@ -383,7 +484,7 @@ impl Renderer {
 
         // Recursively render children
         for child_id in &node.children {
-            Renderer::render_node(ptr, child_id, nodemap);
+            self.render_node(ptr, child_id, nodemap);
         }
 
         if needs_opacity_layer {
@@ -456,46 +557,4 @@ fn cg_build_gradient_stops(stops: &[GradientStop], opacity: f32) -> (Vec<Color>,
     }
 
     (colors, positions)
-}
-
-pub fn cg_regular_to_polygon(node: &RegularPolygonNode) -> PolygonNode {
-    let RegularPolygonNode {
-        base,
-        transform,
-        size,
-        point_count,
-        fill,
-        stroke,
-        stroke_width,
-        opacity,
-    } = node;
-
-    let cx = size.width / 2.0;
-    let cy = size.height / 2.0;
-    let r = cx.min(cy); // fit within bounding box
-
-    let angle_offset = if point_count % 2 == 0 {
-        PI / *point_count as f32
-    } else {
-        -PI / 2.0
-    };
-
-    let points: Vec<(f32, f32)> = (0..*point_count)
-        .map(|i| {
-            let angle = (i as f32 / *point_count as f32) * 2.0 * PI + angle_offset;
-            let x = cx + r * angle.cos();
-            let y = cy + r * angle.sin();
-            (x, y)
-        })
-        .collect();
-
-    PolygonNode {
-        base: base.clone(),
-        transform: *transform,
-        points,
-        fill: fill.clone(),
-        stroke: stroke.clone(),
-        stroke_width: *stroke_width,
-        opacity: *opacity,
-    }
 }
