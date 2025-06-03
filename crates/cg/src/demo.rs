@@ -10,6 +10,7 @@ use cg::schema::{
 use cg::transform::AffineTransform;
 use reqwest;
 use skia_safe::Image;
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() {
@@ -20,10 +21,11 @@ async fn main() {
     let mut renderer = Renderer::new();
     let surface_ptr = Renderer::init(width, height);
 
+    // Preload image before timing
     let demo_image_id = "demo_image";
     let demo_image_url = "https://grida.co/images/abstract-placeholder.jpg".to_string();
-
-    // Preload the image
+    println!("Loading image...");
+    let image_load_start = Instant::now();
     if let Ok(response) = reqwest::get(&demo_image_url).await {
         if let Ok(bytes) = response.bytes().await {
             if let Some(image) = Image::from_encoded(skia_safe::Data::new_copy(&bytes)) {
@@ -31,6 +33,7 @@ async fn main() {
             }
         }
     }
+    println!("Image load time: {:?}", image_load_start.elapsed());
 
     // Create a test image node with URL
     let image_node = ImageNode {
@@ -289,16 +292,69 @@ async fn main() {
     nodemap.insert("test_image".to_string(), Node::Image(image_node));
     nodemap.insert("root_group".to_string(), Node::Group(root_group_node));
 
-    // Render the root group node and its children
+    // Test performance with individual nodes first
+    println!("\nTesting individual node performance:");
+
+    let test_nodes = [
+        ("test_rect", "Rectangle"),
+        ("test_ellipse", "Ellipse"),
+        ("test_polygon", "Polygon"),
+        ("test_regular_polygon", "Regular Polygon"),
+        ("test_text", "Text"),
+        ("test_line", "Line"),
+        ("test_image", "Image"),
+    ];
+
+    for (id, name) in test_nodes.iter() {
+        // Clear canvas before each render
+        let surface = unsafe { &mut *surface_ptr };
+        let canvas = surface.canvas();
+        let mut paint = skia_safe::Paint::default();
+        paint.set_color(skia_safe::Color::WHITE);
+        canvas.draw_rect(
+            skia_safe::Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
+            &paint,
+        );
+
+        let start = Instant::now();
+        renderer.render_node(surface_ptr, &id.to_string(), &nodemap);
+        let time = start.elapsed();
+        println!(
+            "{} render time: {:?} (FPS: {:.2})",
+            name,
+            time,
+            1.0 / time.as_secs_f64()
+        );
+    }
+
+    // Now test the full scene
+    println!("\nTesting full scene performance:");
+
+    // Clear canvas before full scene render
+    let surface = unsafe { &mut *surface_ptr };
+    let canvas = surface.canvas();
+    let mut paint = skia_safe::Paint::default();
+    paint.set_color(skia_safe::Color::WHITE);
+    canvas.draw_rect(
+        skia_safe::Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
+        &paint,
+    );
+
+    let start_time = Instant::now();
     renderer.render_node(surface_ptr, &"root_group".to_string(), &nodemap);
+    let render_time = start_time.elapsed();
+    println!("Full scene render time: {:?}", render_time);
+    println!("Full scene FPS: {:.2}", 1.0 / render_time.as_secs_f64());
 
     // Get the surface from the pointer to save the image
+    let save_start = Instant::now();
     let surface = unsafe { &mut *surface_ptr };
     let image = surface.image_snapshot();
     image
         .encode_to_data(skia_safe::EncodedImageFormat::PNG)
         .and_then(|data| std::fs::write("output.png", data.as_bytes()).ok())
         .expect("Failed to save PNG");
+    println!("Save time: {:?}", save_start.elapsed());
 
     // Free the surface
     Renderer::free(surface_ptr);
