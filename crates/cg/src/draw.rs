@@ -1,10 +1,37 @@
 use crate::schema::{
     Color as SchemaColor, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
     PolygonNode, RadialGradientPaint, RectNode, RectangularCornerRadius, RegularPolygonNode,
+    TextAlign, TextAlignVertical, TextSpanNode,
 };
 use console_error_panic_hook::set_once as init_panic_hook;
-use skia_safe::{Color, Paint as SkiaPaint, Point, RRect, Rect, Shader, Surface, surfaces};
+use skia_safe::{
+    Color, Font, FontMgr, FontStyle, Paint as SkiaPaint, Point, RRect, Rect, Shader, Surface,
+    TextBlob, Typeface, surfaces,
+};
+use std::cell::RefCell;
 use std::f32::consts::PI;
+
+thread_local! {
+    static DEFAULT_TYPEFACE: RefCell<Option<Typeface>> = RefCell::new(None);
+}
+
+fn default_typeface() -> Typeface {
+    DEFAULT_TYPEFACE.with(|typeface| {
+        let mut typeface = typeface.borrow_mut();
+        if typeface.is_none() {
+            let font_mgr = FontMgr::new();
+            *typeface = Some(
+                font_mgr
+                    .legacy_make_typeface(None, FontStyle::default())
+                    .unwrap(),
+            );
+        }
+        typeface
+            .as_ref()
+            .expect("Failed to initialize default typeface")
+            .clone()
+    })
+}
 
 pub struct Renderer;
 
@@ -180,6 +207,53 @@ impl Renderer {
     pub fn draw_regular_polygon_node(ptr: *mut Surface, node: &RegularPolygonNode) {
         let poly = cg_regular_to_polygon(node);
         Self::draw_polygon_node(ptr, &poly);
+    }
+
+    pub fn draw_text_span_node(ptr: *mut Surface, node: &TextSpanNode) {
+        let surface = unsafe { &mut *ptr };
+        let canvas = surface.canvas();
+
+        // Create font with the specified size
+        let font = Font::from_typeface(default_typeface(), node.text_style.font_size);
+
+        // Create text blob
+        let blob = TextBlob::from_str(&node.text, &font).unwrap();
+
+        // Create paint with the fill color
+        let mut paint = sk_paint(
+            &node.fill,
+            node.opacity,
+            (node.size.width, node.size.height),
+        );
+
+        // Calculate text position based on alignment
+        let (x, y) = match (node.text_align, node.text_align_vertical) {
+            (TextAlign::Left, TextAlignVertical::Top) => (0.0, node.text_style.font_size),
+            (TextAlign::Left, TextAlignVertical::Center) => (0.0, node.size.height / 2.0),
+            (TextAlign::Left, TextAlignVertical::Bottom) => (0.0, node.size.height),
+            (TextAlign::Center, TextAlignVertical::Top) => {
+                (node.size.width / 2.0, node.text_style.font_size)
+            }
+            (TextAlign::Center, TextAlignVertical::Center) => {
+                (node.size.width / 2.0, node.size.height / 2.0)
+            }
+            (TextAlign::Center, TextAlignVertical::Bottom) => {
+                (node.size.width / 2.0, node.size.height)
+            }
+            (TextAlign::Right, TextAlignVertical::Top) => {
+                (node.size.width, node.text_style.font_size)
+            }
+            (TextAlign::Right, TextAlignVertical::Center) => {
+                (node.size.width, node.size.height / 2.0)
+            }
+            (TextAlign::Right, TextAlignVertical::Bottom) => (node.size.width, node.size.height),
+            (TextAlign::Justify, _) => (0.0, node.text_style.font_size), // Justify not supported yet
+        };
+
+        canvas.save();
+        canvas.concat(&sk_matrix(node.transform.matrix));
+        canvas.draw_text_blob(&blob, (x, y), &paint);
+        canvas.restore();
     }
 
     pub fn flush(_ptr: *mut Surface) {

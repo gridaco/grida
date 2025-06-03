@@ -6,6 +6,87 @@ pub type NodeId = String;
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
+/// Supported text decoration modes.
+///
+/// Only `Underline` and `None` are supported in the current version.
+///
+/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
+#[derive(Debug, Clone, Copy)]
+pub enum TextDecoration {
+    None,
+    Underline,
+}
+
+/// Supported horizontal text alignment.
+///
+/// Does not include `Start` or `End`, as they are not supported currently.
+///
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
+/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
+#[derive(Debug, Clone, Copy)]
+pub enum TextAlign {
+    Left,
+    Right,
+    Center,
+    Justify,
+}
+
+/// Supported vertical alignment values for text.
+///
+/// In CSS, this maps to `align-content`.
+///
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
+/// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
+#[derive(Debug, Clone, Copy)]
+pub enum TextAlignVertical {
+    Top,
+    Center,
+    Bottom,
+}
+
+/// Supported font weights, mapped from CSS/OpenType numeric values.
+///
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight)  
+/// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
+/// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
+#[derive(Debug, Clone, Copy)]
+pub enum FontWeight {
+    W100,
+    W200,
+    W300,
+    W400,
+    W500,
+    W600,
+    W700,
+    W800,
+    W900,
+}
+
+/// A set of style properties that can be applied to a text or text span.
+#[derive(Debug, Clone)]
+pub struct TextStyle {
+    /// Text decoration (e.g. underline or none).
+    pub text_decoration: TextDecoration,
+
+    /// Optional font family name (e.g. "Roboto").
+    pub font_family: Option<String>,
+
+    /// Font size in logical pixels.
+    pub font_size: f32,
+
+    /// Font weight (100–900).
+    pub font_weight: FontWeight,
+
+    /// Additional spacing between characters, in logical pixels.  
+    /// Default is `0.0`.
+    pub letter_spacing: Option<f32>,
+
+    /// Line height (deprecated).
+    #[deprecated(note = "Line height is not currently supported or recommended.")]
+    pub line_height: Option<f32>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
@@ -187,6 +268,38 @@ pub struct RegularPolygonNode {
     pub stroke_width: f32,
 
     /// Overall node opacity (0.0–1.0)
+    pub opacity: f32,
+}
+
+/// A node representing a plain text block (non-rich).
+/// For multi-style content, see `RichTextNode` (not implemented yet).
+#[derive(Debug, Clone)]
+pub struct TextSpanNode {
+    /// Metadata and identity.
+    pub base: BaseNode,
+
+    /// Transform applied to the text container.
+    pub transform: AffineTransform,
+
+    /// Layout bounds (used for wrapping and alignment).
+    pub size: Size,
+
+    /// Text content (plain UTF-8).
+    pub text: String,
+
+    /// Font & fill appearance.
+    pub text_style: TextStyle,
+
+    /// Horizontal alignment.
+    pub text_align: TextAlign,
+
+    /// Vertical alignment.
+    pub text_align_vertical: TextAlignVertical,
+
+    /// Fill paint (solid or gradient)
+    pub fill: Paint,
+
+    /// Overall node opacity.
     pub opacity: f32,
 }
 

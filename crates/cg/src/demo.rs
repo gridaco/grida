@@ -1,7 +1,8 @@
 use cg::draw::Renderer;
 use cg::schema::{
-    BaseNode, Color, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
-    RadialGradientPaint, RectNode, RectangularCornerRadius, Size, SolidPaint,
+    BaseNode, Color, EllipseNode, FontWeight, GradientStop, LineNode, LinearGradientPaint, Paint,
+    RadialGradientPaint, RectNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
+    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
 
@@ -154,6 +155,35 @@ fn main() {
         opacity: 1.0,
     };
 
+    // Create a test text span node
+    let text_span_node = TextSpanNode {
+        base: BaseNode {
+            id: "test_text".to_string(),
+            name: "Test Text".to_string(),
+            active: true,
+        },
+        transform: AffineTransform::new(100.0, 100.0, 0.0),
+        size: Size {
+            width: 300.0,
+            height: 100.0,
+        },
+        text: "Grida Canvas SKIA Bindings Backend".to_string(),
+        text_style: TextStyle {
+            text_decoration: TextDecoration::None,
+            font_family: None,
+            font_size: 24.0,
+            font_weight: FontWeight::W400,
+            letter_spacing: None,
+            line_height: None,
+        },
+        text_align: TextAlign::Center,
+        text_align_vertical: TextAlignVertical::Center,
+        fill: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black text
+        }),
+        opacity: 1.0,
+    };
+
     // Draw the rectangle using our schema
     Renderer::draw_rect_node(surface_ptr, &rect_node);
 
@@ -168,6 +198,9 @@ fn main() {
 
     // Draw the regular polygon using our schema
     Renderer::draw_regular_polygon_node(surface_ptr, &regular_polygon_node);
+
+    // Draw the text span node
+    Renderer::draw_text_span_node(surface_ptr, &text_span_node);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };
