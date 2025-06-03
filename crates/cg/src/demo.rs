@@ -2,9 +2,10 @@ use cg::draw::Renderer;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
-    BaseNode, BlendMode, Color, EllipseNode, FontWeight, GradientStop, LineNode,
-    LinearGradientPaint, Paint, RadialGradientPaint, RectangleNode, RectangularCornerRadius, Size,
-    SolidPaint, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
+    BaseNode, BlendMode, Color, ContainerNode, EllipseNode, FontWeight, GradientStop, GroupNode,
+    LineNode, LinearGradientPaint, Node, NodeMap, Paint, RadialGradientPaint, RectangleNode,
+    RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
+    TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
 
@@ -138,7 +139,7 @@ fn main() {
             color: Color(0, 0, 0, 255), // Black stroke
         }),
         stroke_width: 4.0,
-        opacity: 1.0,
+        opacity: 0.5,
     };
 
     // Create a test text span node
@@ -195,23 +196,57 @@ fn main() {
         stroke_width: 4.0,
     };
 
-    // Draw the rectangle using our schema
-    Renderer::draw_rect_node(surface_ptr, &rect_node);
+    // Create a group node for the shapes (rectangle, ellipse, polygon)
+    let shapes_group_node = GroupNode {
+        base: BaseNode {
+            id: "shapes_group".to_string(),
+            name: "Shapes Group".to_string(),
+            active: true,
+            blend_mode: BlendMode::Normal,
+        },
+        transform: AffineTransform::new(0.0, 0.0, -15.0),
+        children: vec![
+            "test_rect".to_string(),
+            "test_ellipse".to_string(),
+            "test_polygon".to_string(),
+            "test_regular_polygon".to_string(),
+        ],
+        opacity: 0.8,
+    };
 
-    // Draw the ellipse using our schema
-    Renderer::draw_ellipse_node(surface_ptr, &ellipse_node);
+    // Create a root group node containing the shapes group, text, and line
+    let root_group_node = GroupNode {
+        base: BaseNode {
+            id: "root_group".to_string(),
+            name: "Root Group".to_string(),
+            active: true,
+            blend_mode: BlendMode::Normal,
+        },
+        transform: AffineTransform::identity(),
+        children: vec![
+            "shapes_group".to_string(),
+            "test_text".to_string(),
+            "test_line".to_string(),
+        ],
+        opacity: 1.0,
+    };
 
-    // Draw the polygon using our schema
-    Renderer::draw_polygon_node(surface_ptr, &polygon_node);
+    // Create a node map and add all nodes
+    let mut nodemap = NodeMap::new();
+    nodemap.insert("test_rect".to_string(), Node::Rectangle(rect_node));
+    nodemap.insert("test_ellipse".to_string(), Node::Ellipse(ellipse_node));
+    nodemap.insert("test_polygon".to_string(), Node::Polygon(polygon_node));
+    nodemap.insert(
+        "test_regular_polygon".to_string(),
+        Node::RegularPolygon(regular_polygon_node),
+    );
+    nodemap.insert("shapes_group".to_string(), Node::Group(shapes_group_node));
+    nodemap.insert("test_text".to_string(), Node::TextSpan(text_span_node));
+    nodemap.insert("test_line".to_string(), Node::Line(line_node));
+    nodemap.insert("root_group".to_string(), Node::Group(root_group_node));
 
-    // Draw the regular polygon using our schema
-    Renderer::draw_regular_polygon_node(surface_ptr, &regular_polygon_node);
-
-    // Draw the text span node
-    Renderer::draw_text_span_node(surface_ptr, &text_span_node);
-
-    // Draw the line using our schema
-    Renderer::draw_line_node(surface_ptr, &line_node);
+    // Render the root group node and its children
+    Renderer::render_node(surface_ptr, &"root_group".to_string(), &nodemap);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };

@@ -242,16 +242,27 @@ pub struct RectangularCornerRadius {
     pub br: f32,
 }
 
+// region: Scene
+#[derive(Debug, Clone)]
+pub struct SceneNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub children: Vec<NodeId>,
+}
+
+// endregion
+
 // region: Node Definitions
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Container(ContainerNode),
+    Group(GroupNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
-    Text(TextNode),
+    Line(LineNode),
+    TextSpan(TextSpanNode),
 }
 
 #[derive(Debug, Clone)]
@@ -260,6 +271,15 @@ pub struct BaseNode {
     pub name: String,
     pub active: bool,
     pub blend_mode: BlendMode,
+}
+
+#[derive(Debug, Clone)]
+#[deprecated(note = "Partially implemented")]
+pub struct GroupNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub children: Vec<NodeId>,
+    pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]

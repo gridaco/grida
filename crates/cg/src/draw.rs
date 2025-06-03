@@ -1,7 +1,8 @@
 use crate::schema::{
-    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, LineNode, LinearGradientPaint,
-    Paint, PolygonNode, RadialGradientPaint, RectangleNode, RectangularCornerRadius,
-    RegularPolygonNode, TextAlign, TextAlignVertical, TextSpanNode,
+    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, GroupNode, LineNode,
+    LinearGradientPaint, Node, NodeId, NodeMap, Paint, PolygonNode, RadialGradientPaint,
+    RectangleNode, RectangularCornerRadius, RegularPolygonNode, TextAlign, TextAlignVertical,
+    TextSpanNode,
 };
 use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{
@@ -345,6 +346,53 @@ impl Renderer {
 
     pub fn free(ptr: *mut Surface) {
         unsafe { Box::from_raw(ptr) };
+    }
+
+    pub fn render_node(ptr: *mut Surface, id: &NodeId, nodemap: &NodeMap) {
+        let node = match nodemap.get(id) {
+            Some(node) => node,
+            None => return, // Skip if node not found
+        };
+
+        match node {
+            Node::Group(node) => Self::draw_group_node(ptr, node, nodemap),
+            Node::Rectangle(node) => Self::draw_rect_node(ptr, node),
+            Node::Ellipse(node) => Self::draw_ellipse_node(ptr, node),
+            Node::Polygon(node) => Self::draw_polygon_node(ptr, node),
+            Node::RegularPolygon(node) => Self::draw_regular_polygon_node(ptr, node),
+            Node::TextSpan(node) => Self::draw_text_span_node(ptr, node),
+            Node::Line(node) => Self::draw_line_node(ptr, node),
+            _ => {}
+        }
+    }
+
+    pub fn draw_group_node(ptr: *mut Surface, node: &GroupNode, nodemap: &NodeMap) {
+        let surface = unsafe { &mut *ptr };
+        let canvas = surface.canvas();
+
+        // Save canvas state for transform
+        canvas.save();
+        canvas.concat(&sk_matrix(node.transform.matrix));
+
+        let needs_opacity_layer = node.opacity < 1.0;
+
+        if needs_opacity_layer {
+            // Start new layer with opacity
+            canvas.save_layer_alpha(None, (node.opacity * 255.0) as u32);
+        }
+
+        // Recursively render children
+        for child_id in &node.children {
+            Renderer::render_node(ptr, child_id, nodemap);
+        }
+
+        if needs_opacity_layer {
+            // End opacity layer
+            canvas.restore();
+        }
+
+        // Restore transform
+        canvas.restore();
     }
 }
 
