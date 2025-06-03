@@ -1,5 +1,6 @@
-use cg::schema::{BaseNode, Color, EllipseNode, RectNode, Size, Transform};
-use cg::{draw_ellipse_node, draw_rect_node, free, init};
+use cg::draw::{draw_ellipse_node, draw_rect_node, free, init};
+use cg::schema::{BaseNode, Color, EllipseNode, RectNode, RectangularCornerRadius, Size};
+use cg::transform::AffineTransform;
 
 fn main() {
     let width = 800;
@@ -15,18 +16,18 @@ fn main() {
             name: "Test Rectangle".to_string(),
             active: true,
         },
-        transform: Transform {
-            x: 200.0,
-            y: 100.0,
-            z: 0,
-            rotation: 0.0,
-            opacity: 1.0,
-        },
+        opacity: 0.3,
+        transform: AffineTransform::new(200.0, 100.0, 15.0),
         size: Size {
             width: 200.0,
             height: 150.0,
         },
-        corner_radius: 10.0,
+        corner_radius: RectangularCornerRadius {
+            tl: 0.0,
+            tr: 25.0,
+            bl: 50.0,
+            br: 100.0,
+        },
         fill: Color(255, 0, 0, 255), // Red color
     };
 
@@ -37,13 +38,8 @@ fn main() {
             name: "Test Ellipse".to_string(),
             active: true,
         },
-        transform: Transform {
-            x: 500.0,
-            y: 300.0,
-            z: 0,
-            rotation: 45.0, // Rotated 45 degrees
-            opacity: 1.0,
-        },
+        opacity: 1.0,
+        transform: AffineTransform::new(500.0, 300.0, 45.0), // Rotated 45 degrees
         size: Size {
             width: 150.0,
             height: 100.0,
