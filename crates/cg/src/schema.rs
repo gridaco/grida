@@ -180,6 +180,12 @@ pub struct RegularPolygonNode {
     /// Fill paint (solid or gradient)
     pub fill: Paint,
 
+    /// The stroke paint used to outline the polygon.
+    pub stroke: Paint,
+
+    /// The stroke width used to outline the polygon.
+    pub stroke_width: f32,
+
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
 }

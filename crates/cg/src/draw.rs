@@ -1,9 +1,10 @@
 use crate::schema::{
     Color as SchemaColor, EllipseNode, GradientStop, LineNode, LinearGradientPaint, Paint,
-    RadialGradientPaint, RectNode, RectangularCornerRadius, SolidPaint,
+    PolygonNode, RadialGradientPaint, RectNode, RectangularCornerRadius, RegularPolygonNode,
 };
 use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{Color, Paint as SkiaPaint, Point, RRect, Rect, Shader, Surface, surfaces};
+use std::f32::consts::PI;
 
 pub struct Renderer;
 
@@ -176,6 +177,11 @@ impl Renderer {
         canvas.restore();
     }
 
+    pub fn draw_regular_polygon_node(ptr: *mut Surface, node: &RegularPolygonNode) {
+        let poly = cg_regular_to_polygon(node);
+        Self::draw_polygon_node(ptr, &poly);
+    }
+
     pub fn flush(_ptr: *mut Surface) {
         // No flush needed for raster surfaces
     }
@@ -245,4 +251,46 @@ fn cg_build_gradient_stops(stops: &[GradientStop], opacity: f32) -> (Vec<Color>,
     }
 
     (colors, positions)
+}
+
+pub fn cg_regular_to_polygon(node: &RegularPolygonNode) -> PolygonNode {
+    let RegularPolygonNode {
+        base,
+        transform,
+        size,
+        point_count,
+        fill,
+        stroke,
+        stroke_width,
+        opacity,
+    } = node;
+
+    let cx = size.width / 2.0;
+    let cy = size.height / 2.0;
+    let r = cx.min(cy); // fit within bounding box
+
+    let angle_offset = if point_count % 2 == 0 {
+        PI / *point_count as f32
+    } else {
+        -PI / 2.0
+    };
+
+    let points: Vec<(f32, f32)> = (0..*point_count)
+        .map(|i| {
+            let angle = (i as f32 / *point_count as f32) * 2.0 * PI + angle_offset;
+            let x = cx + r * angle.cos();
+            let y = cy + r * angle.sin();
+            (x, y)
+        })
+        .collect();
+
+    PolygonNode {
+        base: base.clone(),
+        transform: *transform,
+        points,
+        fill: fill.clone(),
+        stroke: stroke.clone(),
+        stroke_width: *stroke_width,
+        opacity: *opacity,
+    }
 }

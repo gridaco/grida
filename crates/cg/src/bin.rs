@@ -131,6 +131,29 @@ fn main() {
         opacity: 1.0,
     };
 
+    // Create a test regular polygon node (hexagon)
+    let regular_polygon_node = cg::schema::RegularPolygonNode {
+        base: BaseNode {
+            id: "test_regular_polygon".to_string(),
+            name: "Test Regular Polygon".to_string(),
+            active: true,
+        },
+        transform: AffineTransform::new(600.0, 350.0, 0.0),
+        size: Size {
+            width: 120.0,
+            height: 120.0,
+        },
+        point_count: 6, // hexagon
+        fill: Paint::Solid(SolidPaint {
+            color: Color(0, 200, 255, 255), // Cyan fill
+        }),
+        stroke: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black stroke
+        }),
+        stroke_width: 4.0,
+        opacity: 1.0,
+    };
+
     // Draw the rectangle using our schema
     Renderer::draw_rect_node(surface_ptr, &rect_node);
 
@@ -142,6 +165,9 @@ fn main() {
 
     // Draw the polygon using our schema
     Renderer::draw_polygon_node(surface_ptr, &polygon_node);
+
+    // Draw the regular polygon using our schema
+    Renderer::draw_regular_polygon_node(surface_ptr, &regular_polygon_node);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };
