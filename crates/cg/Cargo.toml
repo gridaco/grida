@@ -1,0 +1,25 @@
+[package]
+name = "cg"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "bin"
+path = "src/bin.rs"
+
+[dependencies]
+wasm-bindgen = "0.2.100"
+skia-safe = "0.86.0" 
+console_error_panic_hook = "0.1.7"
+wee_alloc = { version = "0.4.5", optional = true }
+
+[features]
+default = ["wee_alloc"]
+
+[target.wasm32-unknown-emscripten]
+rustflags = [
+  "-s ERROR_ON_UNDEFINED_SYMBOLS=0"
+]
