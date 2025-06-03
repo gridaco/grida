@@ -1,4 +1,6 @@
-use crate::schema::{Color as SchemaColor, EllipseNode, RectNode, RectangularCornerRadius};
+use crate::schema::{
+    Color as SchemaColor, EllipseNode, LineNode, RectNode, RectangularCornerRadius,
+};
 use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{Color, Paint, Point, RRect, Rect, Surface, surfaces};
 
@@ -118,6 +120,30 @@ pub fn draw_ellipse_node(ptr: *mut Surface, node: &EllipseNode) {
         node.size.height,
     );
     canvas.draw_oval(rect, &paint);
+
+    canvas.restore();
+}
+
+pub fn draw_line_node(ptr: *mut Surface, node: &LineNode) {
+    let surface = unsafe { &mut *ptr };
+    let canvas = surface.canvas();
+
+    let mut paint = Paint::default();
+    let SchemaColor(r, g, b, a) = node.fill;
+    let final_alpha = (a as f32 * node.opacity) as u8;
+    paint.set_color(Color::from_argb(final_alpha, r, g, b));
+
+    canvas.save();
+    let [[a, c, tx], [b, d, ty]] = node.transform.matrix;
+    let matrix = [a, b, c, d, tx, ty];
+    canvas.concat(&skia_safe::Matrix::from_affine(&matrix));
+
+    // Draw a line from (0,0) to (width,height)
+    canvas.draw_line(
+        Point::new(0.0, 0.0),
+        Point::new(node.size.width, node.size.height),
+        &paint,
+    );
 
     canvas.restore();
 }

@@ -41,6 +41,7 @@ pub struct RectangularCornerRadius {
     pub br: f32,
 }
 
+#[derive(Debug, Clone)]
 pub struct LineNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
@@ -56,6 +57,16 @@ pub struct RectNode {
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub fill: Color,
+    pub opacity: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImageNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub size: Size,
+    pub corner_radius: RectangularCornerRadius,
+    pub src: String,
     pub opacity: f32,
 }
 
