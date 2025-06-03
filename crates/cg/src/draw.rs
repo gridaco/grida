@@ -127,7 +127,9 @@ impl Renderer {
                     Point::new(bl, bl), // bottom-left
                 ],
             );
-            canvas.draw_rrect(rrect, &paint);
+            let mut fill_paint = paint.clone();
+            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.draw_rrect(rrect, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
                 let mut stroke_paint = sk_paint(
@@ -137,10 +139,13 @@ impl Renderer {
                 );
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
+                stroke_paint.set_blend_mode(node.base.blend_mode.into());
                 canvas.draw_rrect(rrect, &stroke_paint);
             }
         } else {
-            canvas.draw_rect(rect, &paint);
+            let mut fill_paint = paint.clone();
+            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.draw_rect(rect, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
                 let mut stroke_paint = sk_paint(
@@ -150,6 +155,7 @@ impl Renderer {
                 );
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
+                stroke_paint.set_blend_mode(node.base.blend_mode.into());
                 canvas.draw_rect(rect, &stroke_paint);
             }
         }
@@ -200,6 +206,8 @@ impl Renderer {
         canvas.save();
         canvas.concat(&sk_matrix(node.transform.matrix));
         // Draw fill
+        let mut fill_paint = fill_paint.clone();
+        fill_paint.set_blend_mode(node.base.blend_mode.into());
         canvas.draw_oval(rect, &fill_paint);
         // Draw stroke if stroke_width > 0
         if node.stroke_width > 0.0 {
@@ -210,6 +218,7 @@ impl Renderer {
             );
             stroke_paint.set_stroke(true);
             stroke_paint.set_stroke_width(node.stroke_width);
+            stroke_paint.set_blend_mode(node.base.blend_mode.into());
             canvas.draw_oval(rect, &stroke_paint);
         }
         canvas.restore();
@@ -221,6 +230,7 @@ impl Renderer {
         let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
         paint.set_stroke(true);
         paint.set_stroke_width(node.stroke_width);
+        paint.set_blend_mode(node.base.blend_mode.into());
         canvas.save();
         canvas.concat(&sk_matrix(node.transform.matrix));
         canvas.draw_line(
@@ -251,12 +261,15 @@ impl Renderer {
         canvas.save();
         canvas.concat(&sk_matrix(node.transform.matrix));
         // Draw fill
+        let mut fill_paint = fill_paint.clone();
+        fill_paint.set_blend_mode(node.base.blend_mode.into());
         canvas.draw_path(&path, &fill_paint);
         // Draw stroke if stroke_width > 0
         if node.stroke_width > 0.0 {
             let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
             stroke_paint.set_stroke(true);
             stroke_paint.set_stroke_width(node.stroke_width);
+            stroke_paint.set_blend_mode(node.base.blend_mode.into());
             canvas.draw_path(&path, &stroke_paint);
         }
         canvas.restore();
@@ -310,15 +323,17 @@ impl Renderer {
                 sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
             stroke_paint.set_style(skia_safe::paint::Style::Stroke);
             stroke_paint.set_stroke_width(stroke_width);
+            stroke_paint.set_blend_mode(node.base.blend_mode.into());
             canvas.draw_text_blob(&blob, (x, y), &stroke_paint);
         }
 
         // Draw fill
-        let fill_paint = sk_paint(
+        let mut fill_paint = sk_paint(
             &node.fill,
             node.opacity,
             (node.size.width, node.size.height),
         );
+        fill_paint.set_blend_mode(node.base.blend_mode.into());
         canvas.draw_text_blob(&blob, (x, y), &fill_paint);
 
         canvas.restore();

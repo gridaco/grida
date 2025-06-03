@@ -43,6 +43,77 @@ pub struct FeGaussianBlur {
     pub radius: f32,
 }
 
+/// Blend modes for compositing layers, compatible with Skia and SVG/CSS.
+///
+/// - SVG: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/mix-blend-mode
+/// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
+/// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlendMode {
+    // Skia: kSrcOver, CSS: normal
+    Normal,
+
+    // Skia: kMultiply
+    Multiply,
+    // Skia: kScreen
+    Screen,
+    // Skia: kOverlay
+    Overlay,
+    // Skia: kDarken
+    Darken,
+    // Skia: kLighten
+    Lighten,
+    // Skia: kColorDodge
+    ColorDodge,
+    // Skia: kColorBurn
+    ColorBurn,
+    // Skia: kHardLight
+    HardLight,
+    // Skia: kSoftLight
+    SoftLight,
+    // Skia: kDifference
+    Difference,
+    // Skia: kExclusion
+    Exclusion,
+    // Skia: kHue
+    Hue,
+    // Skia: kSaturation
+    Saturation,
+    // Skia: kColor
+    Color,
+    // Skia: kLuminosity
+    Luminosity,
+
+    /// Like `Normal`, but means no blending at all (pass-through).
+    /// This is Figma-specific, and typically treated the same as `Normal`.
+    PassThrough,
+}
+
+impl From<BlendMode> for skia_safe::BlendMode {
+    fn from(mode: BlendMode) -> Self {
+        use skia_safe::BlendMode::*;
+        match mode {
+            BlendMode::Normal => SrcOver,
+            BlendMode::Multiply => Multiply,
+            BlendMode::Screen => Screen,
+            BlendMode::Overlay => Overlay,
+            BlendMode::Darken => Darken,
+            BlendMode::Lighten => Lighten,
+            BlendMode::ColorDodge => ColorDodge,
+            BlendMode::ColorBurn => ColorBurn,
+            BlendMode::HardLight => HardLight,
+            BlendMode::SoftLight => SoftLight,
+            BlendMode::Difference => Difference,
+            BlendMode::Exclusion => Exclusion,
+            BlendMode::Hue => Hue,
+            BlendMode::Saturation => Saturation,
+            BlendMode::Color => Color,
+            BlendMode::Luminosity => Luminosity,
+            BlendMode::PassThrough => SrcOver, // fallback
+        }
+    }
+}
+
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
@@ -188,6 +259,7 @@ pub struct BaseNode {
     pub id: NodeId,
     pub name: String,
     pub active: bool,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]

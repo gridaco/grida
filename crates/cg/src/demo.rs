@@ -2,9 +2,9 @@ use cg::draw::Renderer;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
-    BaseNode, Color, EllipseNode, FontWeight, GradientStop, LineNode, LinearGradientPaint, Paint,
-    RadialGradientPaint, RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
-    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
+    BaseNode, BlendMode, Color, EllipseNode, FontWeight, GradientStop, LineNode,
+    LinearGradientPaint, Paint, RadialGradientPaint, RectangleNode, RectangularCornerRadius, Size,
+    SolidPaint, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
 
@@ -21,6 +21,7 @@ fn main() {
             id: "test_rect".to_string(),
             name: "Test Rectangle".to_string(),
             active: true,
+            blend_mode: BlendMode::Normal,
         },
         opacity: 1.0,
         transform: AffineTransform::new(50.0, 50.0, 45.0),
@@ -55,6 +56,7 @@ fn main() {
             id: "test_ellipse".to_string(),
             name: "Test Ellipse".to_string(),
             active: true,
+            blend_mode: BlendMode::Multiply, // Example of using a different blend mode
         },
         opacity: 1.0,
         transform: AffineTransform::new(300.0, 50.0, 45.0), // Rotated 45 degrees
@@ -101,6 +103,7 @@ fn main() {
             id: "test_polygon".to_string(),
             name: "Test Polygon".to_string(),
             active: true,
+            blend_mode: BlendMode::Screen, // Example of using Screen blend mode
         },
         transform: AffineTransform::identity(),
         points: pentagon_points,
@@ -120,6 +123,7 @@ fn main() {
             id: "test_regular_polygon".to_string(),
             name: "Test Regular Polygon".to_string(),
             active: true,
+            blend_mode: BlendMode::Overlay, // Example of using Overlay blend mode
         },
         transform: AffineTransform::new(300.0, 300.0, 0.0),
         size: Size {
@@ -143,6 +147,7 @@ fn main() {
             id: "test_text".to_string(),
             name: "Test Text".to_string(),
             active: true,
+            blend_mode: BlendMode::Normal,
         },
         transform: AffineTransform::identity(),
         size: Size {
@@ -176,6 +181,7 @@ fn main() {
             id: "test_line".to_string(),
             name: "Test Line".to_string(),
             active: true,
+            blend_mode: BlendMode::Normal,
         },
         opacity: 0.8,
         transform: AffineTransform::new(0.0, height as f32 - 50.0, 0.0),
