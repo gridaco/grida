@@ -179,8 +179,12 @@ fn main() {
         text_align: TextAlign::Center,
         text_align_vertical: TextAlignVertical::Center,
         fill: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black text
+            color: Color(255, 255, 255, 255), // White text
         }),
+        stroke: Some(Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black stroke
+        })),
+        stroke_width: Some(4.0),
         opacity: 1.0,
     };
 

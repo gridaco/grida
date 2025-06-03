@@ -299,6 +299,12 @@ pub struct TextSpanNode {
     /// Fill paint (solid or gradient)
     pub fill: Paint,
 
+    /// Stroke paint (solid or gradient)
+    pub stroke: Option<Paint>,
+
+    /// Stroke width
+    pub stroke_width: Option<f32>,
+
     /// Overall node opacity.
     pub opacity: f32,
 }

@@ -219,13 +219,6 @@ impl Renderer {
         // Create text blob
         let blob = TextBlob::from_str(&node.text, &font).unwrap();
 
-        // Create paint with the fill color
-        let mut paint = sk_paint(
-            &node.fill,
-            node.opacity,
-            (node.size.width, node.size.height),
-        );
-
         // Calculate text position based on alignment
         let (x, y) = match (node.text_align, node.text_align_vertical) {
             (TextAlign::Left, TextAlignVertical::Top) => (0.0, node.text_style.font_size),
@@ -252,7 +245,24 @@ impl Renderer {
 
         canvas.save();
         canvas.concat(&sk_matrix(node.transform.matrix));
-        canvas.draw_text_blob(&blob, (x, y), &paint);
+
+        // Draw stroke if specified
+        if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
+            let mut stroke_paint =
+                sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
+            stroke_paint.set_style(skia_safe::paint::Style::Stroke);
+            stroke_paint.set_stroke_width(stroke_width);
+            canvas.draw_text_blob(&blob, (x, y), &stroke_paint);
+        }
+
+        // Draw fill
+        let fill_paint = sk_paint(
+            &node.fill,
+            node.opacity,
+            (node.size.width, node.size.height),
+        );
+        canvas.draw_text_blob(&blob, (x, y), &fill_paint);
+
         canvas.restore();
     }
 
