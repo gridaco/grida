@@ -1,4 +1,4 @@
-use cg::draw::Renderer;
+use cg::draw::{Backend, Renderer};
 use cg::schema::{
     BaseNode, BlendMode, Color, Node, NodeMap, Paint, RectangleNode, RectangularCornerRadius, Size,
     SolidPaint,
@@ -91,8 +91,9 @@ fn bench_rectangles(c: &mut Criterion) {
     // 1K rectangles
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
-            let renderer = Renderer::new();
-            let surface_ptr = Renderer::init(width, height);
+            let mut renderer = Renderer::new();
+            let surface_ptr = Renderer::init_raster(width, height);
+            renderer.set_backend(Backend::Raster(surface_ptr));
 
             let (nodemap, _) = create_rectangles(black_box(1_000), false);
 
@@ -106,16 +107,17 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(surface_ptr, &"root".to_string(), &nodemap);
-            Renderer::free(surface_ptr);
+            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.free();
         })
     });
 
     // 10K rectangles
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
-            let renderer = Renderer::new();
-            let surface_ptr = Renderer::init(width, height);
+            let mut renderer = Renderer::new();
+            let surface_ptr = Renderer::init_raster(width, height);
+            renderer.set_backend(Backend::Raster(surface_ptr));
 
             let (nodemap, _) = create_rectangles(black_box(10_000), false);
 
@@ -129,15 +131,16 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(surface_ptr, &"root".to_string(), &nodemap);
-            Renderer::free(surface_ptr);
+            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.free();
         })
     });
 
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
-            let renderer = Renderer::new();
-            let surface_ptr = Renderer::init(width, height);
+            let mut renderer = Renderer::new();
+            let surface_ptr = Renderer::init_raster(width, height);
+            renderer.set_backend(Backend::Raster(surface_ptr));
 
             let (nodemap, _) = create_rectangles(black_box(10_000), true);
 
@@ -151,16 +154,17 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(surface_ptr, &"root".to_string(), &nodemap);
-            Renderer::free(surface_ptr);
+            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.free();
         })
     });
 
     // 50K rectangles
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
-            let renderer = Renderer::new();
-            let surface_ptr = Renderer::init(width, height);
+            let mut renderer = Renderer::new();
+            let surface_ptr = Renderer::init_raster(width, height);
+            renderer.set_backend(Backend::Raster(surface_ptr));
 
             let (nodemap, _) = create_rectangles(black_box(50_000), false);
 
@@ -174,15 +178,16 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(surface_ptr, &"root".to_string(), &nodemap);
-            Renderer::free(surface_ptr);
+            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.free();
         })
     });
 
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
-            let renderer = Renderer::new();
-            let surface_ptr = Renderer::init(width, height);
+            let mut renderer = Renderer::new();
+            let surface_ptr = Renderer::init_raster(width, height);
+            renderer.set_backend(Backend::Raster(surface_ptr));
 
             let (nodemap, _) = create_rectangles(black_box(50_000), true);
 
@@ -196,8 +201,8 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(surface_ptr, &"root".to_string(), &nodemap);
-            Renderer::free(surface_ptr);
+            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.free();
         })
     });
 

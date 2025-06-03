@@ -12,12 +12,17 @@ path = "src/demo.rs"
 
 [dependencies]
 wasm-bindgen = "0.2.100"
-skia-safe = "0.86.0" 
+skia-safe = { version = "0.86.0", features = ["gpu", "gl"] }
 console_error_panic_hook = "0.1.7"
 wee_alloc = { version = "0.4.5", optional = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 reqwest = "0.12.19"
 criterion = "0.5"
+gl = "0.14.0"
+glutin = "0.32.0"
+glutin-winit = "0.5.0"
+raw-window-handle = "0.6.0"
+winit = "0.30.0"
 
 [features]
 default = ["wee_alloc"]

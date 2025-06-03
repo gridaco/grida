@@ -1,4 +1,4 @@
-use cg::draw::Renderer;
+use cg::draw::{Backend, Renderer};
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
@@ -8,9 +8,179 @@ use cg::schema::{
     TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
+use console_error_panic_hook::set_once as init_panic_hook;
+use gl::types::*;
+use glutin::prelude::*;
+use glutin::{
+    config::{ConfigTemplateBuilder, GlConfig},
+    context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
+    display::{GetGlDisplay, GlDisplay},
+    prelude::{GlSurface, NotCurrentGlContext},
+    surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
+};
+use glutin_winit::DisplayBuilder;
+use raw_window_handle::HasRawWindowHandle;
 use reqwest;
-use skia_safe::Image;
+use skia_safe::{Image, Surface, gpu};
 use std::time::Instant;
+use winit::{
+    application::ApplicationHandler,
+    dpi::{LogicalSize, PhysicalSize},
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::{Window, WindowAttributes},
+};
+
+fn init_window(
+    width: i32,
+    height: i32,
+) -> (
+    *mut Surface,
+    EventLoop<()>,
+    Window,
+    GlutinSurface<WindowSurface>,
+    PossiblyCurrentContext,
+    glutin::config::Config,
+    gpu::gl::FramebufferInfo,
+    skia_safe::gpu::DirectContext,
+) {
+    init_panic_hook();
+
+    // Create event loop and window
+    let el = EventLoop::new().expect("Failed to create event loop");
+    let window_attributes = WindowAttributes::default()
+        .with_title("Grida Canvas")
+        .with_inner_size(LogicalSize::new(width as f64, height as f64))
+        .with_visible(true)
+        .with_transparent(true);
+
+    // Create GL config template
+    let template = ConfigTemplateBuilder::new()
+        .with_alpha_size(8)
+        .with_transparency(true);
+
+    // Build display and get window
+    let display_builder = DisplayBuilder::new().with_window_attributes(window_attributes.into());
+    let (window, gl_config) = display_builder
+        .build(&el, template, |configs| {
+            configs
+                .reduce(|accum, config| {
+                    let transparency_check = config.supports_transparency().unwrap_or(false)
+                        & !accum.supports_transparency().unwrap_or(false);
+                    if transparency_check || config.num_samples() < accum.num_samples() {
+                        config
+                    } else {
+                        accum
+                    }
+                })
+                .unwrap()
+        })
+        .unwrap();
+
+    let window = window.expect("Could not create window with OpenGL context");
+    let raw_window_handle = window
+        .raw_window_handle()
+        .expect("Failed to retrieve RawWindowHandle");
+
+    // Create GL context
+    let context_attributes = ContextAttributesBuilder::new().build(Some(raw_window_handle));
+    let fallback_context_attributes = ContextAttributesBuilder::new()
+        .with_context_api(ContextApi::Gles(None))
+        .build(Some(raw_window_handle));
+
+    let not_current_gl_context = unsafe {
+        gl_config
+            .display()
+            .create_context(&gl_config, &context_attributes)
+            .unwrap_or_else(|_| {
+                gl_config
+                    .display()
+                    .create_context(&gl_config, &fallback_context_attributes)
+                    .expect("failed to create context")
+            })
+    };
+
+    // Create GL surface
+    let (width, height): (u32, u32) = window.inner_size().into();
+    let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+        raw_window_handle,
+        std::num::NonZeroU32::new(width).unwrap(),
+        std::num::NonZeroU32::new(height).unwrap(),
+    );
+
+    let gl_surface = unsafe {
+        gl_config
+            .display()
+            .create_window_surface(&gl_config, &attrs)
+            .expect("Could not create gl window surface")
+    };
+
+    let gl_context = not_current_gl_context
+        .make_current(&gl_surface)
+        .expect("Could not make GL context current");
+
+    // Load GL functions
+    gl::load_with(|s| {
+        gl_config
+            .display()
+            .get_proc_address(std::ffi::CString::new(s).unwrap().as_c_str())
+    });
+
+    // Create Skia GL interface
+    let interface = skia_safe::gpu::gl::Interface::new_load_with(|name| {
+        if name == "eglGetCurrentDisplay" {
+            return std::ptr::null();
+        }
+        gl_config
+            .display()
+            .get_proc_address(std::ffi::CString::new(name).unwrap().as_c_str())
+    })
+    .expect("Could not create interface");
+
+    // Create Skia GPU context
+    let mut gr_context = skia_safe::gpu::direct_contexts::make_gl(interface, None)
+        .expect("Could not create direct context");
+
+    // Get framebuffer info
+    let fb_info = {
+        let mut fboid: GLint = 0;
+        unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+        gpu::gl::FramebufferInfo {
+            fboid: fboid.try_into().unwrap(),
+            format: skia_safe::gpu::gl::Format::RGBA8.into(),
+            ..Default::default()
+        }
+    };
+
+    // Create Skia surface
+    let backend_render_target = gpu::backend_render_targets::make_gl(
+        (width as i32, height as i32),
+        gl_config.num_samples() as usize,
+        gl_config.stencil_size() as usize,
+        fb_info,
+    );
+
+    let surface = gpu::surfaces::wrap_backend_render_target(
+        &mut gr_context,
+        &backend_render_target,
+        skia_safe::gpu::SurfaceOrigin::BottomLeft,
+        skia_safe::ColorType::RGBA8888,
+        None,
+        None,
+    )
+    .expect("Could not create skia surface");
+
+    (
+        Box::into_raw(Box::new(surface)),
+        el,
+        window,
+        gl_surface,
+        gl_context,
+        gl_config,
+        fb_info,
+        gr_context,
+    )
+}
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +189,9 @@ async fn main() {
 
     // Initialize the renderer with image cache
     let mut renderer = Renderer::new();
-    let surface_ptr = Renderer::init(width, height);
+    let (surface_ptr, el, window, mut gl_surface, gl_context, gl_config, fb_info, mut gr_context) =
+        init_window(width, height);
+    renderer.set_backend(Backend::GL(surface_ptr));
 
     // Preload image before timing
     let demo_image_id = "demo_image";
@@ -292,72 +464,99 @@ async fn main() {
     nodemap.insert("test_image".to_string(), Node::Image(image_node));
     nodemap.insert("root_group".to_string(), Node::Group(root_group_node));
 
-    // Test performance with individual nodes first
-    println!("\nTesting individual node performance:");
-
-    let test_nodes = [
-        ("test_rect", "Rectangle"),
-        ("test_ellipse", "Ellipse"),
-        ("test_polygon", "Polygon"),
-        ("test_regular_polygon", "Regular Polygon"),
-        ("test_text", "Text"),
-        ("test_line", "Line"),
-        ("test_image", "Image"),
-    ];
-
-    for (id, name) in test_nodes.iter() {
-        // Clear canvas before each render
-        let surface = unsafe { &mut *surface_ptr };
-        let canvas = surface.canvas();
-        let mut paint = skia_safe::Paint::default();
-        paint.set_color(skia_safe::Color::WHITE);
-        canvas.draw_rect(
-            skia_safe::Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
-            &paint,
-        );
-
-        let start = Instant::now();
-        renderer.render_node(surface_ptr, &id.to_string(), &nodemap);
-        let time = start.elapsed();
-        println!(
-            "{} render time: {:?} (FPS: {:.2})",
-            name,
-            time,
-            1.0 / time.as_secs_f64()
-        );
+    struct App {
+        renderer: Renderer,
+        surface_ptr: *mut Surface,
+        gl_surface: GlutinSurface<WindowSurface>,
+        gl_context: PossiblyCurrentContext,
+        window: Window,
+        nodemap: NodeMap,
+        gl_config: glutin::config::Config,
+        fb_info: gpu::gl::FramebufferInfo,
+        gr_context: skia_safe::gpu::DirectContext,
     }
 
-    // Now test the full scene
-    println!("\nTesting full scene performance:");
+    let mut app = App {
+        renderer,
+        surface_ptr,
+        gl_surface,
+        gl_context,
+        window,
+        nodemap,
+        gl_config,
+        fb_info,
+        gr_context,
+    };
 
-    // Clear canvas before full scene render
-    let surface = unsafe { &mut *surface_ptr };
-    let canvas = surface.canvas();
-    let mut paint = skia_safe::Paint::default();
-    paint.set_color(skia_safe::Color::WHITE);
-    canvas.draw_rect(
-        skia_safe::Rect::from_xywh(0.0, 0.0, width as f32, height as f32),
-        &paint,
-    );
+    impl ApplicationHandler for App {
+        fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {}
 
-    let start_time = Instant::now();
-    renderer.render_node(surface_ptr, &"root_group".to_string(), &nodemap);
-    let render_time = start_time.elapsed();
-    println!("Full scene render time: {:?}", render_time);
-    println!("Full scene FPS: {:.2}", 1.0 / render_time.as_secs_f64());
+        fn window_event(
+            &mut self,
+            event_loop: &winit::event_loop::ActiveEventLoop,
+            _window_id: winit::window::WindowId,
+            event: WindowEvent,
+        ) {
+            match event {
+                WindowEvent::CloseRequested => {
+                    self.renderer.free();
+                    event_loop.exit();
+                }
+                WindowEvent::Resized(new_size) => {
+                    self.gl_surface.resize(
+                        &self.gl_context,
+                        new_size.width.try_into().unwrap(),
+                        new_size.height.try_into().unwrap(),
+                    );
+                    // Fix: skip if window is minimized or has zero size
+                    if new_size.width == 0 || new_size.height == 0 {
+                        return;
+                    }
+                    // Fix: ensure GL context is current before recreating surface
+                    self.gl_context.make_current(&self.gl_surface).unwrap();
+                    // Recreate Skia surface to match new window size
+                    let backend_render_target = gpu::backend_render_targets::make_gl(
+                        (new_size.width as i32, new_size.height as i32),
+                        self.gl_config.num_samples() as usize,
+                        self.gl_config.stencil_size() as usize,
+                        self.fb_info,
+                    );
+                    let new_surface = gpu::surfaces::wrap_backend_render_target(
+                        &mut self.gr_context,
+                        &backend_render_target,
+                        skia_safe::gpu::SurfaceOrigin::BottomLeft,
+                        skia_safe::ColorType::RGBA8888,
+                        None,
+                        None,
+                    )
+                    .expect("Could not recreate skia surface");
+                    // Free the old surface
+                    self.renderer.free();
+                    // Update surface_ptr and backend
+                    self.surface_ptr = Box::into_raw(Box::new(new_surface));
+                    self.renderer.set_backend(Backend::GL(self.surface_ptr));
+                }
+                WindowEvent::RedrawRequested => {
+                    let size = self.window.inner_size();
+                    let width = size.width as f32;
+                    let height = size.height as f32;
 
-    // Get the surface from the pointer to save the image
-    let save_start = Instant::now();
-    let surface = unsafe { &mut *surface_ptr };
-    let image = surface.image_snapshot();
-    image
-        .encode_to_data(skia_safe::EncodedImageFormat::PNG)
-        .and_then(|data| std::fs::write("output.png", data.as_bytes()).ok())
-        .expect("Failed to save PNG");
-    println!("Save time: {:?}", save_start.elapsed());
+                    let surface = unsafe { &mut *self.surface_ptr };
+                    let canvas = surface.canvas();
+                    let mut paint = skia_safe::Paint::default();
+                    paint.set_color(skia_safe::Color::TRANSPARENT);
+                    canvas.draw_rect(skia_safe::Rect::from_xywh(0.0, 0.0, width, height), &paint);
 
-    // Free the surface
-    Renderer::free(surface_ptr);
+                    self.renderer
+                        .render_node(&"root_group".to_string(), &self.nodemap);
+                    self.renderer.flush();
 
-    println!("Saved output.png");
+                    self.gl_surface.swap_buffers(&self.gl_context).unwrap();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    el.run_app(&mut app).expect("Failed to run event loop");
 }

@@ -3,7 +3,6 @@ use crate::schema::{
     Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode, RectangularCornerRadius,
     RegularPolygonNode, TextAlign, TextAlignVertical, TextSpanNode,
 };
-use console_error_panic_hook::set_once as init_panic_hook;
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
     Shader, Surface, TextBlob, Typeface, surfaces,
@@ -33,333 +32,78 @@ fn default_typeface() -> Typeface {
     })
 }
 
+pub enum Backend {
+    GL(*mut Surface),
+    Raster(*mut Surface),
+}
+
+impl Backend {
+    pub fn get_surface(&self) -> *mut Surface {
+        match self {
+            Backend::GL(ptr) | Backend::Raster(ptr) => *ptr,
+        }
+    }
+}
+
 pub struct Renderer {
     image_cache: HashMap<String, Image>,
+    backend: Option<Backend>,
 }
 
 impl Renderer {
     pub fn new() -> Self {
         Self {
             image_cache: HashMap::new(),
+            backend: None,
         }
+    }
+
+    pub fn init_raster(width: i32, height: i32) -> *mut Surface {
+        let surface =
+            surfaces::raster_n32_premul((width, height)).expect("Failed to create raster surface");
+        Box::into_raw(Box::new(surface))
+    }
+
+    pub fn set_backend(&mut self, backend: Backend) {
+        self.backend = Some(backend);
     }
 
     pub fn add_image(&mut self, src: String, image: Image) {
         self.image_cache.insert(src, image);
     }
 
-    pub fn init(width: i32, height: i32) -> *mut Surface {
-        init_panic_hook();
-        let surface = surfaces::raster_n32_premul((width, height)).unwrap();
-        Box::into_raw(Box::new(surface))
-    }
+    pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
 
-    pub fn draw_rect(
-        &self,
-        ptr: *mut Surface,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        r: f32,
-        g: f32,
-        b: f32,
-        a: f32,
-    ) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-
-        let color = Color::from_argb(
-            (a * 255.0) as u8,
-            (r * 255.0) as u8,
-            (g * 255.0) as u8,
-            (b * 255.0) as u8,
-        );
-
-        let mut paint = SkiaPaint::default();
-        paint.set_color(color);
-
-        canvas.draw_rect(Rect::from_xywh(x, y, w, h), &paint);
-    }
-
-    pub fn draw_rect_node(&self, ptr: *mut Surface, node: &RectangleNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-        let paint = sk_paint(
-            &node.fill,
-            node.opacity,
-            (node.size.width, node.size.height),
-        );
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
-        let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
-        let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
-        // Draw drop shadow effect if present
-        if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
-            let mut shadow_paint = SkiaPaint::default();
-            let SchemaColor(r, g, b, a) = shadow.color;
-            shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
-            shadow_paint.set_anti_alias(true);
-            if shadow.blur > 0.0 {
-                shadow_paint.set_mask_filter(MaskFilter::blur(
-                    skia_safe::BlurStyle::Normal,
-                    shadow.blur,
-                    None,
-                ));
-            }
-            let offset_x = shadow.dx;
-            let offset_y = shadow.dy;
-            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-                let rrect = RRect::new_rect_radii(
-                    rect,
-                    &[
-                        Point::new(tl, tl), // top-left
-                        Point::new(tr, tr), // top-right
-                        Point::new(br, br), // bottom-right
-                        Point::new(bl, bl), // bottom-left
-                    ],
-                );
-                let mut shadow_rrect = rrect;
-                shadow_rrect.offset((offset_x, offset_y));
-                canvas.draw_rrect(shadow_rrect, &shadow_paint);
-            } else {
-                let mut shadow_rect = rect;
-                shadow_rect.offset((offset_x, offset_y));
-                canvas.draw_rect(shadow_rect, &shadow_paint);
-            }
-        }
-        // Draw fill and stroke as before
-        if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-            let rrect = RRect::new_rect_radii(
-                rect,
-                &[
-                    Point::new(tl, tl), // top-left
-                    Point::new(tr, tr), // top-right
-                    Point::new(br, br), // bottom-right
-                    Point::new(bl, bl), // bottom-left
-                ],
+            let color = Color::from_argb(
+                (a * 255.0) as u8,
+                (r * 255.0) as u8,
+                (g * 255.0) as u8,
+                (b * 255.0) as u8,
             );
-            let mut fill_paint = paint.clone();
-            fill_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_rrect(rrect, &fill_paint);
-            // Draw stroke if stroke_width > 0
-            if node.stroke_width > 0.0 {
-                let mut stroke_paint = sk_paint(
-                    &node.stroke,
-                    node.opacity,
-                    (node.size.width, node.size.height),
-                );
-                stroke_paint.set_stroke(true);
-                stroke_paint.set_stroke_width(node.stroke_width);
-                stroke_paint.set_blend_mode(node.base.blend_mode.into());
-                canvas.draw_rrect(rrect, &stroke_paint);
-            }
-        } else {
-            let mut fill_paint = paint.clone();
-            fill_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_rect(rect, &fill_paint);
-            // Draw stroke if stroke_width > 0
-            if node.stroke_width > 0.0 {
-                let mut stroke_paint = sk_paint(
-                    &node.stroke,
-                    node.opacity,
-                    (node.size.width, node.size.height),
-                );
-                stroke_paint.set_stroke(true);
-                stroke_paint.set_stroke_width(node.stroke_width);
-                stroke_paint.set_blend_mode(node.base.blend_mode.into());
-                canvas.draw_rect(rect, &stroke_paint);
-            }
+
+            let mut paint = SkiaPaint::default();
+            paint.set_color(color);
+
+            canvas.draw_rect(Rect::from_xywh(x, y, w, h), &paint);
         }
-        canvas.restore();
     }
 
-    pub fn draw_ellipse(
-        &self,
-        ptr: *mut Surface,
-        x: f32,
-        y: f32,
-        rx: f32,
-        ry: f32,
-        r: f32,
-        g: f32,
-        b: f32,
-        a: f32,
-    ) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-
-        let color = Color::from_argb(
-            (a * 255.0) as u8,
-            (r * 255.0) as u8,
-            (g * 255.0) as u8,
-            (b * 255.0) as u8,
-        );
-
-        let mut paint = SkiaPaint::default();
-        paint.set_color(color);
-
-        canvas.draw_oval(Rect::from_xywh(x - rx, y - ry, rx * 2.0, ry * 2.0), &paint);
-    }
-
-    pub fn draw_ellipse_node(&self, ptr: *mut Surface, node: &EllipseNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-        let fill_paint = sk_paint(
-            &node.fill,
-            node.opacity,
-            (node.size.width, node.size.height),
-        );
-        let rect = Rect::from_xywh(
-            -node.size.width / 2.0,
-            -node.size.height / 2.0,
-            node.size.width,
-            node.size.height,
-        );
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
-        // Draw fill
-        let mut fill_paint = fill_paint.clone();
-        fill_paint.set_blend_mode(node.base.blend_mode.into());
-        canvas.draw_oval(rect, &fill_paint);
-        // Draw stroke if stroke_width > 0
-        if node.stroke_width > 0.0 {
-            let mut stroke_paint = sk_paint(
-                &node.stroke,
+    pub fn draw_rect_node(&self, node: &RectangleNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            let paint = sk_paint(
+                &node.fill,
                 node.opacity,
                 (node.size.width, node.size.height),
             );
-            stroke_paint.set_stroke(true);
-            stroke_paint.set_stroke_width(node.stroke_width);
-            stroke_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_oval(rect, &stroke_paint);
-        }
-        canvas.restore();
-    }
-
-    pub fn draw_line_node(&self, ptr: *mut Surface, node: &LineNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-        let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
-        paint.set_stroke(true);
-        paint.set_stroke_width(node.stroke_width);
-        paint.set_blend_mode(node.base.blend_mode.into());
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
-        canvas.draw_line(
-            Point::new(0.0, 0.0),
-            Point::new(node.size.width, 0.0),
-            &paint,
-        );
-        canvas.restore();
-    }
-
-    pub fn draw_polygon_node(&self, ptr: *mut Surface, node: &PolygonNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-        if node.points.len() < 3 {
-            // Not enough points to form a polygon
-            return;
-        }
-        let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
-        let mut path = skia_safe::Path::new();
-        let mut points_iter = node.points.iter();
-        if let Some(&(x0, y0)) = points_iter.next() {
-            path.move_to((x0, y0));
-            for &(x, y) in points_iter {
-                path.line_to((x, y));
-            }
-            path.close();
-        }
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
-        // Draw fill
-        let mut fill_paint = fill_paint.clone();
-        fill_paint.set_blend_mode(node.base.blend_mode.into());
-        canvas.draw_path(&path, &fill_paint);
-        // Draw stroke if stroke_width > 0
-        if node.stroke_width > 0.0 {
-            let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
-            stroke_paint.set_stroke(true);
-            stroke_paint.set_stroke_width(node.stroke_width);
-            stroke_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_path(&path, &stroke_paint);
-        }
-        canvas.restore();
-    }
-
-    pub fn draw_regular_polygon_node(&self, ptr: *mut Surface, node: &RegularPolygonNode) {
-        let poly = node.to_polygon();
-        self.draw_polygon_node(ptr, &poly);
-    }
-
-    pub fn draw_text_span_node(&self, ptr: *mut Surface, node: &TextSpanNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-
-        // Create font with the specified size
-        let font = Font::from_typeface(default_typeface(), node.text_style.font_size);
-
-        // Create text blob
-        let blob = TextBlob::from_str(&node.text, &font).unwrap();
-
-        // Calculate text position based on alignment
-        let (x, y) = match (node.text_align, node.text_align_vertical) {
-            (TextAlign::Left, TextAlignVertical::Top) => (0.0, node.text_style.font_size),
-            (TextAlign::Left, TextAlignVertical::Center) => (0.0, node.size.height / 2.0),
-            (TextAlign::Left, TextAlignVertical::Bottom) => (0.0, node.size.height),
-            (TextAlign::Center, TextAlignVertical::Top) => {
-                (node.size.width / 2.0, node.text_style.font_size)
-            }
-            (TextAlign::Center, TextAlignVertical::Center) => {
-                (node.size.width / 2.0, node.size.height / 2.0)
-            }
-            (TextAlign::Center, TextAlignVertical::Bottom) => {
-                (node.size.width / 2.0, node.size.height)
-            }
-            (TextAlign::Right, TextAlignVertical::Top) => {
-                (node.size.width, node.text_style.font_size)
-            }
-            (TextAlign::Right, TextAlignVertical::Center) => {
-                (node.size.width, node.size.height / 2.0)
-            }
-            (TextAlign::Right, TextAlignVertical::Bottom) => (node.size.width, node.size.height),
-            (TextAlign::Justify, _) => (0.0, node.text_style.font_size), // Justify not supported yet
-        };
-
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
-
-        // Draw stroke if specified
-        if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
-            let mut stroke_paint =
-                sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
-            stroke_paint.set_style(skia_safe::paint::Style::Stroke);
-            stroke_paint.set_stroke_width(stroke_width);
-            stroke_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_text_blob(&blob, (x, y), &stroke_paint);
-        }
-
-        // Draw fill
-        let mut fill_paint = sk_paint(
-            &node.fill,
-            node.opacity,
-            (node.size.width, node.size.height),
-        );
-        fill_paint.set_blend_mode(node.base.blend_mode.into());
-        canvas.draw_text_blob(&blob, (x, y), &fill_paint);
-
-        canvas.restore();
-    }
-
-    pub fn draw_image_node(&self, ptr: *mut Surface, node: &ImageNode) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
-
-        if let Some(image) = self.image_cache.get(&node._ref) {
             canvas.save();
             canvas.concat(&sk_matrix(node.transform.matrix));
-
+            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+            let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
             // Draw drop shadow effect if present
             if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
                 let mut shadow_paint = SkiaPaint::default();
@@ -375,21 +119,26 @@ impl Renderer {
                 }
                 let offset_x = shadow.dx;
                 let offset_y = shadow.dy;
-                let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
-                let mut shadow_rect = rect;
-                shadow_rect.offset((offset_x, offset_y));
-                canvas.draw_image_rect(image, None, shadow_rect, &shadow_paint);
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl), // top-left
+                            Point::new(tr, tr), // top-right
+                            Point::new(br, br), // bottom-right
+                            Point::new(bl, bl), // bottom-left
+                        ],
+                    );
+                    let mut shadow_rrect = rrect;
+                    shadow_rrect.offset((offset_x, offset_y));
+                    canvas.draw_rrect(shadow_rrect, &shadow_paint);
+                } else {
+                    let mut shadow_rect = rect;
+                    shadow_rect.offset((offset_x, offset_y));
+                    canvas.draw_rect(shadow_rect, &shadow_paint);
+                }
             }
-
-            // Draw the image
-            let mut paint = SkiaPaint::default();
-            paint.set_anti_alias(true);
-            paint.set_blend_mode(node.base.blend_mode.into());
-            paint.set_alpha((node.opacity * 255.0) as u8);
-
-            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
-            let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
-
+            // Draw fill and stroke as before
             if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
                 let rrect = RRect::new_rect_radii(
                     rect,
@@ -400,15 +149,82 @@ impl Renderer {
                         Point::new(bl, bl), // bottom-left
                     ],
                 );
-                // For rounded rectangles, we need to use a clip path
-                canvas.save();
-                canvas.clip_rrect(rrect, None, true);
-                canvas.draw_image_rect(image, None, rect, &paint);
-                canvas.restore();
+                let mut fill_paint = paint.clone();
+                fill_paint.set_blend_mode(node.base.blend_mode.into());
+                canvas.draw_rrect(rrect, &fill_paint);
+                // Draw stroke if stroke_width > 0
+                if node.stroke_width > 0.0 {
+                    let mut stroke_paint = sk_paint(
+                        &node.stroke,
+                        node.opacity,
+                        (node.size.width, node.size.height),
+                    );
+                    stroke_paint.set_stroke(true);
+                    stroke_paint.set_stroke_width(node.stroke_width);
+                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                    canvas.draw_rrect(rrect, &stroke_paint);
+                }
             } else {
-                canvas.draw_image_rect(image, None, rect, &paint);
+                let mut fill_paint = paint.clone();
+                fill_paint.set_blend_mode(node.base.blend_mode.into());
+                canvas.draw_rect(rect, &fill_paint);
+                // Draw stroke if stroke_width > 0
+                if node.stroke_width > 0.0 {
+                    let mut stroke_paint = sk_paint(
+                        &node.stroke,
+                        node.opacity,
+                        (node.size.width, node.size.height),
+                    );
+                    stroke_paint.set_stroke(true);
+                    stroke_paint.set_stroke_width(node.stroke_width);
+                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                    canvas.draw_rect(rect, &stroke_paint);
+                }
             }
+            canvas.restore();
+        }
+    }
 
+    pub fn draw_ellipse(&self, x: f32, y: f32, rx: f32, ry: f32, r: f32, g: f32, b: f32, a: f32) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+
+            let color = Color::from_argb(
+                (a * 255.0) as u8,
+                (r * 255.0) as u8,
+                (g * 255.0) as u8,
+                (b * 255.0) as u8,
+            );
+
+            let mut paint = SkiaPaint::default();
+            paint.set_color(color);
+
+            canvas.draw_oval(Rect::from_xywh(x - rx, y - ry, rx * 2.0, ry * 2.0), &paint);
+        }
+    }
+
+    pub fn draw_ellipse_node(&self, node: &EllipseNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            let fill_paint = sk_paint(
+                &node.fill,
+                node.opacity,
+                (node.size.width, node.size.height),
+            );
+            let rect = Rect::from_xywh(
+                -node.size.width / 2.0,
+                -node.size.height / 2.0,
+                node.size.width,
+                node.size.height,
+            );
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+            // Draw fill
+            let mut fill_paint = fill_paint.clone();
+            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.draw_oval(rect, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
                 let mut stroke_paint = sk_paint(
@@ -419,6 +235,173 @@ impl Renderer {
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
                 stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                canvas.draw_oval(rect, &stroke_paint);
+            }
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_line_node(&self, node: &LineNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
+            paint.set_stroke(true);
+            paint.set_stroke_width(node.stroke_width);
+            paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+            canvas.draw_line(
+                Point::new(0.0, 0.0),
+                Point::new(node.size.width, 0.0),
+                &paint,
+            );
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_polygon_node(&self, node: &PolygonNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            if node.points.len() < 3 {
+                // Not enough points to form a polygon
+                return;
+            }
+            let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
+            let mut path = skia_safe::Path::new();
+            let mut points_iter = node.points.iter();
+            if let Some(&(x0, y0)) = points_iter.next() {
+                path.move_to((x0, y0));
+                for &(x, y) in points_iter {
+                    path.line_to((x, y));
+                }
+                path.close();
+            }
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+            // Draw fill
+            let mut fill_paint = fill_paint.clone();
+            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.draw_path(&path, &fill_paint);
+            // Draw stroke if stroke_width > 0
+            if node.stroke_width > 0.0 {
+                let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                canvas.draw_path(&path, &stroke_paint);
+            }
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
+        let poly = node.to_polygon();
+        self.draw_polygon_node(&poly);
+    }
+
+    pub fn draw_text_span_node(&self, node: &TextSpanNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+
+            // Create font with the specified size
+            let font = Font::from_typeface(default_typeface(), node.text_style.font_size);
+
+            // Create text blob
+            let blob = TextBlob::from_str(&node.text, &font).unwrap();
+
+            // Calculate text position based on alignment
+            let (x, y) = match (node.text_align, node.text_align_vertical) {
+                (TextAlign::Left, TextAlignVertical::Top) => (0.0, node.text_style.font_size),
+                (TextAlign::Left, TextAlignVertical::Center) => (0.0, node.size.height / 2.0),
+                (TextAlign::Left, TextAlignVertical::Bottom) => (0.0, node.size.height),
+                (TextAlign::Center, TextAlignVertical::Top) => {
+                    (node.size.width / 2.0, node.text_style.font_size)
+                }
+                (TextAlign::Center, TextAlignVertical::Center) => {
+                    (node.size.width / 2.0, node.size.height / 2.0)
+                }
+                (TextAlign::Center, TextAlignVertical::Bottom) => {
+                    (node.size.width / 2.0, node.size.height)
+                }
+                (TextAlign::Right, TextAlignVertical::Top) => {
+                    (node.size.width, node.text_style.font_size)
+                }
+                (TextAlign::Right, TextAlignVertical::Center) => {
+                    (node.size.width, node.size.height / 2.0)
+                }
+                (TextAlign::Right, TextAlignVertical::Bottom) => {
+                    (node.size.width, node.size.height)
+                }
+                (TextAlign::Justify, _) => (0.0, node.text_style.font_size), // Justify not supported yet
+            };
+
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+
+            // Draw stroke if specified
+            if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
+                let mut stroke_paint =
+                    sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
+                stroke_paint.set_style(skia_safe::paint::Style::Stroke);
+                stroke_paint.set_stroke_width(stroke_width);
+                stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                canvas.draw_text_blob(&blob, (x, y), &stroke_paint);
+            }
+
+            // Draw fill
+            let mut fill_paint = sk_paint(
+                &node.fill,
+                node.opacity,
+                (node.size.width, node.size.height),
+            );
+            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            canvas.draw_text_blob(&blob, (x, y), &fill_paint);
+
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_image_node(&self, node: &ImageNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+
+            if let Some(image) = self.image_cache.get(&node._ref) {
+                canvas.save();
+                canvas.concat(&sk_matrix(node.transform.matrix));
+
+                // Draw drop shadow effect if present
+                if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
+                    let mut shadow_paint = SkiaPaint::default();
+                    let SchemaColor(r, g, b, a) = shadow.color;
+                    shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
+                    shadow_paint.set_anti_alias(true);
+                    if shadow.blur > 0.0 {
+                        shadow_paint.set_mask_filter(MaskFilter::blur(
+                            skia_safe::BlurStyle::Normal,
+                            shadow.blur,
+                            None,
+                        ));
+                    }
+                    let offset_x = shadow.dx;
+                    let offset_y = shadow.dy;
+                    let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+                    let mut shadow_rect = rect;
+                    shadow_rect.offset((offset_x, offset_y));
+                    canvas.draw_image_rect(image, None, shadow_rect, &shadow_paint);
+                }
+
+                // Draw the image
+                let mut paint = SkiaPaint::default();
+                paint.set_anti_alias(true);
+                paint.set_blend_mode(node.base.blend_mode.into());
+                paint.set_alpha((node.opacity * 255.0) as u8);
+
+                let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+                let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
 
                 if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
                     let rrect = RRect::new_rect_radii(
@@ -430,70 +413,117 @@ impl Renderer {
                             Point::new(bl, bl), // bottom-left
                         ],
                     );
-                    canvas.draw_rrect(rrect, &stroke_paint);
+                    // For rounded rectangles, we need to use a clip path
+                    canvas.save();
+                    canvas.clip_rrect(rrect, None, true);
+                    canvas.draw_image_rect(image, None, rect, &paint);
+                    canvas.restore();
                 } else {
-                    canvas.draw_rect(rect, &stroke_paint);
+                    canvas.draw_image_rect(image, None, rect, &paint);
                 }
-            }
 
-            canvas.restore();
+                // Draw stroke if stroke_width > 0
+                if node.stroke_width > 0.0 {
+                    let mut stroke_paint = sk_paint(
+                        &node.stroke,
+                        node.opacity,
+                        (node.size.width, node.size.height),
+                    );
+                    stroke_paint.set_stroke(true);
+                    stroke_paint.set_stroke_width(node.stroke_width);
+                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+
+                    if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                        let rrect = RRect::new_rect_radii(
+                            rect,
+                            &[
+                                Point::new(tl, tl), // top-left
+                                Point::new(tr, tr), // top-right
+                                Point::new(br, br), // bottom-right
+                                Point::new(bl, bl), // bottom-left
+                            ],
+                        );
+                        canvas.draw_rrect(rrect, &stroke_paint);
+                    } else {
+                        canvas.draw_rect(rect, &stroke_paint);
+                    }
+                }
+
+                canvas.restore();
+            }
         }
     }
 
-    pub fn flush(_ptr: *mut Surface) {
-        // No flush needed for raster surfaces
+    pub fn flush(&self) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            if let Some(mut gr_context) = surface.recording_context() {
+                if let Some(mut direct_context) = gr_context.as_direct_context() {
+                    direct_context.flush_and_submit();
+                }
+            }
+        }
     }
 
-    pub fn free(ptr: *mut Surface) {
-        unsafe { Box::from_raw(ptr) };
+    pub fn free(&mut self) {
+        if let Some(backend) = self.backend.take() {
+            let surface = unsafe { Box::from_raw(backend.get_surface()) };
+            if let Some(mut gr_context) = surface.recording_context() {
+                if let Some(mut direct_context) = gr_context.as_direct_context() {
+                    direct_context.abandon();
+                }
+            }
+        }
     }
 
-    pub fn render_node(&self, ptr: *mut Surface, id: &NodeId, nodemap: &NodeMap) {
+    pub fn render_node(&self, id: &NodeId, nodemap: &NodeMap) {
         let node = match nodemap.get(id) {
             Some(node) => node,
             None => return, // Skip if node not found
         };
 
         match node {
-            Node::Group(node) => self.draw_group_node(ptr, node, nodemap),
-            Node::Rectangle(node) => self.draw_rect_node(ptr, node),
-            Node::Ellipse(node) => self.draw_ellipse_node(ptr, node),
-            Node::Polygon(node) => self.draw_polygon_node(ptr, node),
-            Node::RegularPolygon(node) => self.draw_regular_polygon_node(ptr, node),
-            Node::TextSpan(node) => self.draw_text_span_node(ptr, node),
-            Node::Line(node) => self.draw_line_node(ptr, node),
-            Node::Image(node) => self.draw_image_node(ptr, node),
+            Node::Group(node) => self.draw_group_node(node, nodemap),
+            Node::Rectangle(node) => self.draw_rect_node(node),
+            Node::Ellipse(node) => self.draw_ellipse_node(node),
+            Node::Polygon(node) => self.draw_polygon_node(node),
+            Node::RegularPolygon(node) => self.draw_regular_polygon_node(node),
+            Node::TextSpan(node) => self.draw_text_span_node(node),
+            Node::Line(node) => self.draw_line_node(node),
+            Node::Image(node) => self.draw_image_node(node),
             _ => {}
         }
     }
 
-    pub fn draw_group_node(&self, ptr: *mut Surface, node: &GroupNode, nodemap: &NodeMap) {
-        let surface = unsafe { &mut *ptr };
-        let canvas = surface.canvas();
+    pub fn draw_group_node(&self, node: &GroupNode, nodemap: &NodeMap) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
 
-        // Save canvas state for transform
-        canvas.save();
-        canvas.concat(&sk_matrix(node.transform.matrix));
+            // Save canvas state for transform
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
 
-        let needs_opacity_layer = node.opacity < 1.0;
+            let needs_opacity_layer = node.opacity < 1.0;
 
-        if needs_opacity_layer {
-            // Start new layer with opacity
-            canvas.save_layer_alpha(None, (node.opacity * 255.0) as u32);
-        }
+            if needs_opacity_layer {
+                // Start new layer with opacity
+                canvas.save_layer_alpha(None, (node.opacity * 255.0) as u32);
+            }
 
-        // Recursively render children
-        for child_id in &node.children {
-            self.render_node(ptr, child_id, nodemap);
-        }
+            // Recursively render children
+            for child_id in &node.children {
+                self.render_node(child_id, nodemap);
+            }
 
-        if needs_opacity_layer {
-            // End opacity layer
+            if needs_opacity_layer {
+                // End opacity layer
+                canvas.restore();
+            }
+
+            // Restore transform
             canvas.restore();
         }
-
-        // Restore transform
-        canvas.restore();
     }
 }
 
