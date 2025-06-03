@@ -103,6 +103,34 @@ fn main() {
         stroke_width: 4.0,
     };
 
+    // Create a test polygon node (pentagon)
+    let pentagon_points = (0..5)
+        .map(|i| {
+            let angle = std::f32::consts::PI * 2.0 * (i as f32) / 5.0 - std::f32::consts::FRAC_PI_2;
+            let radius = 60.0;
+            let x = 600.0 + radius * angle.cos();
+            let y = 150.0 + radius * angle.sin();
+            (x, y)
+        })
+        .collect::<Vec<_>>();
+    let polygon_node = cg::schema::PolygonNode {
+        base: BaseNode {
+            id: "test_polygon".to_string(),
+            name: "Test Polygon".to_string(),
+            active: true,
+        },
+        transform: AffineTransform::identity(),
+        points: pentagon_points,
+        fill: Paint::Solid(SolidPaint {
+            color: Color(255, 200, 0, 255), // Orange fill
+        }),
+        stroke: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black stroke
+        }),
+        stroke_width: 5.0,
+        opacity: 1.0,
+    };
+
     // Draw the rectangle using our schema
     Renderer::draw_rect_node(surface_ptr, &rect_node);
 
@@ -111,6 +139,9 @@ fn main() {
 
     // Draw the line using our schema
     Renderer::draw_line_node(surface_ptr, &line_node);
+
+    // Draw the polygon using our schema
+    Renderer::draw_polygon_node(surface_ptr, &polygon_node);
 
     // Get the surface from the pointer to save the image
     let surface = unsafe { &mut *surface_ptr };

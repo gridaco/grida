@@ -145,6 +145,37 @@ impl Renderer {
         canvas.restore();
     }
 
+    pub fn draw_polygon_node(ptr: *mut Surface, node: &crate::schema::PolygonNode) {
+        let surface = unsafe { &mut *ptr };
+        let canvas = surface.canvas();
+        if node.points.len() < 3 {
+            // Not enough points to form a polygon
+            return;
+        }
+        let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
+        let mut path = skia_safe::Path::new();
+        let mut points_iter = node.points.iter();
+        if let Some(&(x0, y0)) = points_iter.next() {
+            path.move_to((x0, y0));
+            for &(x, y) in points_iter {
+                path.line_to((x, y));
+            }
+            path.close();
+        }
+        canvas.save();
+        canvas.concat(&sk_matrix(node.transform.matrix));
+        // Draw fill
+        canvas.draw_path(&path, &fill_paint);
+        // Draw stroke if stroke_width > 0
+        if node.stroke_width > 0.0 {
+            let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
+            stroke_paint.set_stroke(true);
+            stroke_paint.set_stroke_width(node.stroke_width);
+            canvas.draw_path(&path, &stroke_paint);
+        }
+        canvas.restore();
+    }
+
     pub fn flush(_ptr: *mut Surface) {
         // No flush needed for raster surfaces
     }
