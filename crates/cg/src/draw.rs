@@ -491,7 +491,6 @@ impl Renderer {
             Node::TextSpan(node) => self.draw_text_span_node(node),
             Node::Line(node) => self.draw_line_node(node),
             Node::Image(node) => self.draw_image_node(node),
-            _ => {}
         }
     }
 

@@ -3,9 +3,9 @@ use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
     BaseNode, BlendMode, Color, EllipseNode, FontWeight, GradientStop, GroupNode, ImageNode,
-    LineNode, LinearGradientPaint, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint,
-    RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical,
-    TextDecoration, TextSpanNode, TextStyle,
+    LineNode, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint, RectangleNode,
+    RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
+    TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
 use console_error_panic_hook::set_once as init_panic_hook;
@@ -21,11 +21,11 @@ use glutin_winit::DisplayBuilder;
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
 use skia_safe::{Image, Surface, gpu};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalSize},
-    event::{Event, WindowEvent},
+    dpi::LogicalSize,
+    event::WindowEvent,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
@@ -192,7 +192,6 @@ struct App {
     surface_ptr: *mut Surface,
     gl_surface: GlutinSurface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
-    window: Window,
     nodemap: NodeMap,
 }
 
@@ -405,7 +404,7 @@ async fn main() {
             (x, y)
         })
         .collect::<Vec<_>>();
-    let polygon_node = cg::schema::PolygonNode {
+    let polygon_node = PolygonNode {
         base: BaseNode {
             id: "test_polygon".to_string(),
             name: "Test Polygon".to_string(),
@@ -466,7 +465,7 @@ async fn main() {
             text_decoration: TextDecoration::None,
             font_family: None,
             font_size: 32.0,
-            font_weight: FontWeight::W400,
+            font_weight: FontWeight::default(),
             letter_spacing: None,
             line_height: None,
         },
@@ -563,7 +562,6 @@ async fn main() {
         surface_ptr,
         gl_surface,
         gl_context,
-        window,
         nodemap,
     };
 

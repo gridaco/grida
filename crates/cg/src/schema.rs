@@ -1,4 +1,5 @@
 use crate::transform::AffineTransform;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 
@@ -121,9 +122,11 @@ impl From<BlendMode> for skia_safe::BlendMode {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum TextDecoration {
+    #[serde(rename = "none")]
     None,
+    #[serde(rename = "underline")]
     Underline,
 }
 
@@ -133,11 +136,15 @@ pub enum TextDecoration {
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum TextAlign {
+    #[serde(rename = "left")]
     Left,
+    #[serde(rename = "right")]
     Right,
+    #[serde(rename = "center")]
     Center,
+    #[serde(rename = "justify")]
     Justify,
 }
 
@@ -147,29 +154,50 @@ pub enum TextAlign {
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
 /// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum TextAlignVertical {
+    #[serde(rename = "top")]
     Top,
+    #[serde(rename = "center")]
     Center,
+    #[serde(rename = "bottom")]
     Bottom,
 }
 
-/// Supported font weights, mapped from CSS/OpenType numeric values.
+/// Font weight value (1-1000).
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
-#[derive(Debug, Clone, Copy)]
-pub enum FontWeight {
-    W100,
-    W200,
-    W300,
-    W400,
-    W500,
-    W600,
-    W700,
-    W800,
-    W900,
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct FontWeight(pub u16);
+
+impl FontWeight {
+    /// Creates a new font weight value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The font weight value (1-1000)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not between 1 and 1000.
+    pub fn new(value: u16) -> Self {
+        assert!(
+            value >= 1 && value <= 1000,
+            "Font weight must be between 1 and 1000"
+        );
+        Self(value)
+    }
+
+    /// Returns the font weight value.
+    pub fn value(&self) -> u16 {
+        self.0
+    }
+
+    pub fn default() -> Self {
+        Self(400)
+    }
 }
 
 /// A set of style properties that can be applied to a text or text span.
@@ -191,8 +219,7 @@ pub struct TextStyle {
     /// Default is `0.0`.
     pub letter_spacing: Option<f32>,
 
-    /// Line height (deprecated).
-    #[deprecated(note = "Line height is not currently supported or recommended.")]
+    /// Line height
     pub line_height: Option<f32>,
 }
 

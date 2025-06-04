@@ -291,6 +291,8 @@ dependencies = [
  "glutin-winit",
  "raw-window-handle",
  "reqwest",
+ "serde",
+ "serde_json",
  "skia-safe",
  "tokio",
  "wasm-bindgen",
