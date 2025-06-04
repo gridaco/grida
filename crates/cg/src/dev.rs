@@ -1,4 +1,5 @@
 use cg::draw::{Backend, Renderer};
+use cg::factory::NodeFactory;
 use cg::io::parse;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
@@ -278,7 +279,7 @@ async fn load_scene_from_file(file_path: &str) -> Scene {
     }
 }
 
-async fn demo_static(renderer: &mut Renderer) -> Scene {
+async fn demo_basic(renderer: &mut Renderer) -> Scene {
     let font_caveat_path: &str = "resources/Caveat-VariableFont_wght.ttf";
     let font_caveat_data = fs::read(font_caveat_path).expect("failed to read file");
     let font_caveat_family = "Caveat".to_string();
@@ -300,29 +301,20 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
     println!("Font load time: {:?}", font_load_start.elapsed());
 
     // Add a background rectangle node
-    let background_rect_node = RectangleNode {
-        base: BaseNode {
-            id: "background_rect".to_string(),
-            name: "Background Rect".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        opacity: 1.0,
-        transform: AffineTransform::identity(),
-        size: Size {
-            width: 800.0,
-            height: 600.0,
-        },
-        corner_radius: RectangularCornerRadius::all(0.0),
-        fill: Paint::Solid(SolidPaint {
-            color: Color(230, 240, 255, 255), // Light blue for visibility
-        }),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 0), // No stroke
-        }),
-        stroke_width: 0.0,
-        effect: None,
+    let mut background_rect_node = NodeFactory::create_rectangle_node();
+    background_rect_node.base.id = "background_rect".to_string();
+    background_rect_node.base.name = "Background Rect".to_string();
+    background_rect_node.size = Size {
+        width: 800.0,
+        height: 600.0,
     };
+    background_rect_node.fill = Paint::Solid(SolidPaint {
+        color: Color(230, 240, 255, 255), // Light blue for visibility
+    });
+    background_rect_node.stroke = Paint::Solid(SolidPaint {
+        color: Color(0, 0, 0, 0), // No stroke
+    });
+    background_rect_node.stroke_width = 0.0;
 
     // Preload image before timing
     let demo_image_id = "demo_image";
@@ -339,103 +331,74 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
     println!("Image load time: {:?}", image_load_start.elapsed());
 
     // Create a test image node with URL
-    let image_node = ImageNode {
-        base: BaseNode {
-            id: "test_image".to_string(),
-            name: "Test Image".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        transform: AffineTransform::new(50.0, 50.0, 0.0),
-        size: Size {
-            width: 200.0,
-            height: 200.0,
-        },
-        corner_radius: RectangularCornerRadius::all(20.0),
-        fill: Paint::Solid(SolidPaint {
-            color: Color(255, 255, 255, 255),
-        }),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255),
-        }),
-        stroke_width: 2.0,
-        effect: Some(FilterEffect::DropShadow(FeDropShadow {
-            dx: 4.0,
-            dy: 4.0,
-            blur: 8.0,
-            color: Color(0, 0, 0, 77),
-        })),
-        opacity: 1.0,
-        _ref: demo_image_id.to_string(),
+    let mut image_node = NodeFactory::create_image_node();
+    image_node.base.id = "test_image".to_string();
+    image_node.base.name = "Test Image".to_string();
+    image_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
+    image_node.size = Size {
+        width: 200.0,
+        height: 200.0,
     };
+    image_node.corner_radius = RectangularCornerRadius::all(20.0);
+    image_node.stroke_width = 2.0;
+    image_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+        dx: 4.0,
+        dy: 4.0,
+        blur: 8.0,
+        color: Color(0, 0, 0, 77),
+    }));
+    image_node._ref = demo_image_id.to_string();
 
     // Create a test rectangle node with linear gradient
-    let rect_node = RectangleNode {
-        base: BaseNode {
-            id: "test_rect".to_string(),
-            name: "Test Rectangle".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        opacity: 1.0,
-        transform: AffineTransform::new(50.0, 300.0, 45.0),
-        size: Size {
-            width: 200.0,
-            height: 100.0,
-        },
-        corner_radius: RectangularCornerRadius::all(10.0),
-        fill: Paint::Solid(SolidPaint {
-            color: Color(255, 0, 0, 255), // Red fill
-        }),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black stroke
-        }),
-        stroke_width: 2.0,
-        effect: Some(FilterEffect::DropShadow(FeDropShadow {
-            dx: 4.0,
-            dy: 4.0,
-            blur: 8.0,
-            color: Color(0, 0, 0, 77), // Semi-transparent black (0.3 * 255 ≈ 77)
-        })),
+    let mut rect_node = NodeFactory::create_rectangle_node();
+    rect_node.base.id = "test_rect".to_string();
+    rect_node.base.name = "Test Rectangle".to_string();
+    rect_node.transform = AffineTransform::new(50.0, 300.0, 45.0);
+    rect_node.size = Size {
+        width: 200.0,
+        height: 100.0,
     };
+    rect_node.corner_radius = RectangularCornerRadius::all(10.0);
+    rect_node.fill = Paint::Solid(SolidPaint {
+        color: Color(255, 0, 0, 255), // Red fill
+    });
+    rect_node.stroke_width = 2.0;
+    rect_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
+        dx: 4.0,
+        dy: 4.0,
+        blur: 8.0,
+        color: Color(0, 0, 0, 77),
+    }));
 
     // Create a test ellipse node with radial gradient and a visible stroke
-    let ellipse_node = EllipseNode {
-        base: BaseNode {
-            id: "test_ellipse".to_string(),
-            name: "Test Ellipse".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Multiply, // Example of using a different blend mode
-        opacity: 1.0,
-        transform: AffineTransform::new(300.0, 300.0, 45.0), // Rotated 45 degrees
-        size: Size {
-            width: 200.0,
-            height: 200.0,
-        },
-        fill: Paint::RadialGradient(RadialGradientPaint {
-            id: "gradient2".to_string(),
-            transform: AffineTransform::identity(),
-            stops: vec![
-                GradientStop {
-                    offset: 0.0,
-                    color: Color(0, 255, 0, 255), // Green
-                },
-                GradientStop {
-                    offset: 0.5,
-                    color: Color(255, 255, 0, 255), // Yellow
-                },
-                GradientStop {
-                    offset: 1.0,
-                    color: Color(255, 0, 255, 255), // Magenta
-                },
-            ],
-        }),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black stroke
-        }),
-        stroke_width: 6.0,
+    let mut ellipse_node = NodeFactory::create_ellipse_node();
+    ellipse_node.base.id = "test_ellipse".to_string();
+    ellipse_node.base.name = "Test Ellipse".to_string();
+    ellipse_node.blend_mode = BlendMode::Multiply;
+    ellipse_node.transform = AffineTransform::new(300.0, 300.0, 45.0);
+    ellipse_node.size = Size {
+        width: 200.0,
+        height: 200.0,
     };
+    ellipse_node.fill = Paint::RadialGradient(RadialGradientPaint {
+        id: "gradient2".to_string(),
+        transform: AffineTransform::identity(),
+        stops: vec![
+            GradientStop {
+                offset: 0.0,
+                color: Color(0, 255, 0, 255), // Green
+            },
+            GradientStop {
+                offset: 0.5,
+                color: Color(255, 255, 0, 255), // Yellow
+            },
+            GradientStop {
+                offset: 1.0,
+                color: Color(255, 0, 255, 255), // Magenta
+            },
+        ],
+    });
+    ellipse_node.stroke_width = 6.0;
 
     // Create a test polygon node (pentagon)
     let pentagon_points = (0..5)
@@ -453,7 +416,7 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
             name: "Test Polygon".to_string(),
             active: true,
         },
-        blend_mode: BlendMode::Screen, // Example of using Screen blend mode
+        blend_mode: BlendMode::Screen,
         transform: AffineTransform::identity(),
         points: pentagon_points,
         fill: Paint::Solid(SolidPaint {
@@ -467,152 +430,104 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
     };
 
     // Create a test regular polygon node (hexagon)
-    let regular_polygon_node = cg::schema::RegularPolygonNode {
-        base: BaseNode {
-            id: "test_regular_polygon".to_string(),
-            name: "Test Regular Polygon".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Overlay, // Example of using Overlay blend mode
-        transform: AffineTransform::new(300.0, 300.0, 0.0),
-        size: Size {
-            width: 200.0,
-            height: 200.0,
-        },
-        point_count: 6, // hexagon
-        fill: Paint::Solid(SolidPaint {
-            color: Color(0, 200, 255, 255), // Cyan fill
-        }),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black stroke
-        }),
-        stroke_width: 4.0,
-        opacity: 0.5,
+    let mut regular_polygon_node = NodeFactory::create_regular_polygon_node();
+    regular_polygon_node.base.id = "test_regular_polygon".to_string();
+    regular_polygon_node.base.name = "Test Regular Polygon".to_string();
+    regular_polygon_node.blend_mode = BlendMode::Overlay;
+    regular_polygon_node.transform = AffineTransform::new(300.0, 300.0, 0.0);
+    regular_polygon_node.size = Size {
+        width: 200.0,
+        height: 200.0,
     };
+    regular_polygon_node.point_count = 6; // hexagon
+    regular_polygon_node.fill = Paint::Solid(SolidPaint {
+        color: Color(0, 200, 255, 255), // Cyan fill
+    });
+    regular_polygon_node.stroke_width = 4.0;
+    regular_polygon_node.opacity = 0.5;
 
     // Create a test text span node
-    let text_span_node = TextSpanNode {
-        base: BaseNode {
-            id: "test_text".to_string(),
-            name: "Test Text".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        transform: AffineTransform::new(50.0, 50.0, 15.0),
-        size: Size {
-            width: 300.0,
-            height: 200.0,
-        },
-        text: "Grida Canvas SKIA Bindings Backend".to_string(),
-        text_style: TextStyle {
-            text_decoration: TextDecoration::LineThrough,
-            // font_family: font_roboto_family.clone(),
-            font_family: font_caveat_family.clone(),
-            font_size: 32.0,
-            font_weight: FontWeight::new(900),
-            letter_spacing: None,
-            line_height: None,
-        },
-        text_align: TextAlign::Center,
-        text_align_vertical: TextAlignVertical::Center,
-        fill: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // White text
-        }),
-        stroke: Some(Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black stroke
-        })),
-        stroke_width: Some(4.0),
-        opacity: 1.0,
+    let mut text_span_node = NodeFactory::create_text_span_node();
+    text_span_node.base.id = "test_text".to_string();
+    text_span_node.base.name = "Test Text".to_string();
+    text_span_node.transform = AffineTransform::new(50.0, 50.0, 15.0);
+    text_span_node.size = Size {
+        width: 300.0,
+        height: 200.0,
     };
+    text_span_node.text = "Grida Canvas SKIA Bindings Backend".to_string();
+    text_span_node.text_style = TextStyle {
+        text_decoration: TextDecoration::LineThrough,
+        font_family: font_caveat_family.clone(),
+        font_size: 32.0,
+        font_weight: FontWeight::new(900),
+        letter_spacing: None,
+        line_height: None,
+    };
+    text_span_node.text_align = TextAlign::Center;
+    text_span_node.text_align_vertical = TextAlignVertical::Center;
+    text_span_node.stroke = Some(Paint::Solid(SolidPaint {
+        color: Color(0, 0, 0, 255), // Black stroke
+    }));
+    text_span_node.stroke_width = Some(4.0);
 
     // Create a test path node
-    let path_node = PathNode {
-        base: BaseNode {
-            id: "test_path".to_string(),
-            name: "Test Path".to_string(),
-            active: true,
-        },
-        // blend_mode: BlendMode::Normal,
-        opacity: 1.0,
-        transform: AffineTransform::new(200.0, 200.0, 0.0),
-        fill: Paint::Solid(SolidPaint {
-            color: Color(0, 0, 0, 255), // Black fill
-        }),
-        data: "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string(),
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(255, 0, 0, 255), // Red stroke
-        }),
-        stroke_width: 4.0,
-    };
+    let mut path_node = NodeFactory::create_path_node();
+    path_node.base.id = "test_path".to_string();
+    path_node.base.name = "Test Path".to_string();
+    path_node.transform = AffineTransform::new(200.0, 200.0, 0.0);
+    path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
+    path_node.stroke = Paint::Solid(SolidPaint {
+        color: Color(255, 0, 0, 255), // Red stroke
+    });
+    path_node.stroke_width = 4.0;
 
     // Create a test line node with solid color
-    let line_node = LineNode {
-        base: BaseNode {
-            id: "test_line".to_string(),
-            name: "Test Line".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        opacity: 0.8,
-        transform: AffineTransform::new(0.0, 700.0, 0.0),
-        size: Size {
-            width: 800.0,
-            height: 0.0, // ignored
-        },
-        stroke: Paint::Solid(SolidPaint {
-            color: Color(0, 255, 0, 255), // Green color
-        }),
-        stroke_width: 4.0,
+    let mut line_node = NodeFactory::create_line_node();
+    line_node.base.id = "test_line".to_string();
+    line_node.base.name = "Test Line".to_string();
+    line_node.opacity = 0.8;
+    line_node.transform = AffineTransform::new(0.0, 700.0, 0.0);
+    line_node.size = Size {
+        width: 800.0,
+        height: 0.0, // ignored
     };
+    line_node.stroke = Paint::Solid(SolidPaint {
+        color: Color(0, 255, 0, 255), // Green color
+    });
+    line_node.stroke_width = 4.0;
 
     // Create a group node for the shapes (rectangle, ellipse, polygon)
-    let shapes_group_node = GroupNode {
-        base: BaseNode {
-            id: "shapes_group".to_string(),
-            name: "Shapes Group".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        transform: AffineTransform::new(0.0, 0.0, -15.0),
-        children: vec![
-            "test_rect".to_string(),
-            "test_ellipse".to_string(),
-            "test_polygon".to_string(),
-            "test_regular_polygon".to_string(),
-        ],
-        opacity: 0.8,
-    };
+    let mut shapes_group_node = NodeFactory::create_group_node();
+    shapes_group_node.base.id = "shapes_group".to_string();
+    shapes_group_node.base.name = "Shapes Group".to_string();
+    shapes_group_node.transform = AffineTransform::new(0.0, 0.0, -15.0);
+    shapes_group_node.children = vec![
+        "test_rect".to_string(),
+        "test_ellipse".to_string(),
+        "test_polygon".to_string(),
+        "test_regular_polygon".to_string(),
+    ];
+    shapes_group_node.opacity = 0.8;
 
-    // Create a root group node containing the shapes group, text, and line
-    let root_container_node = ContainerNode {
-        base: BaseNode {
-            id: "root_container".to_string(),
-            name: "Root Container".to_string(),
-            active: true,
-        },
-        blend_mode: BlendMode::Normal,
-        transform: AffineTransform::identity(),
-        children: vec![
-            "background_rect".to_string(),
-            "shapes_group".to_string(),
-            "test_text".to_string(),
-            "test_line".to_string(),
-            "test_path".to_string(),
-            "test_image".to_string(),
-        ],
-        opacity: 1.0,
-        size: Size {
-            width: 1080.0,
-            height: 1080.0,
-        },
-        corner_radius: RectangularCornerRadius::all(0.0),
-        fill: Paint::Solid(SolidPaint {
-            color: Color(255, 255, 255, 255),
-        }),
-        stroke: None,
-        stroke_width: 0.0,
-        effect: None,
+    // Create a root container node containing the shapes group, text, and line
+    let mut root_container_node = NodeFactory::create_container_node();
+    root_container_node.base.id = "root_container".to_string();
+    root_container_node.base.name = "Root Container".to_string();
+    root_container_node.children = vec![
+        "background_rect".to_string(),
+        "shapes_group".to_string(),
+        "test_text".to_string(),
+        "test_line".to_string(),
+        "test_path".to_string(),
+        "test_image".to_string(),
+    ];
+    root_container_node.size = Size {
+        width: 1080.0,
+        height: 1080.0,
     };
+    root_container_node.stroke = None;
+    root_container_node.stroke_width = 0.0;
 
     // Create a node map and add all nodes
     let mut nodemap = NodeMap::new();
@@ -684,7 +599,7 @@ async fn main() {
     // Load the appropriate scene based on command line arguments
     let scene = match cli.command {
         Commands::Example { name } => match name.as_str() {
-            "basic" => demo_static(&mut renderer).await,
+            "basic" => demo_basic(&mut renderer).await,
             _ => {
                 eprintln!("Unknown example: {}", name);
                 eprintln!("Available examples: basic");
