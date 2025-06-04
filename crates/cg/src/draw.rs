@@ -97,6 +97,7 @@ impl Renderer {
             for child_id in &scene.children {
                 self.render_node(child_id, &scene.nodes);
             }
+            canvas.restore();
         }
     }
 

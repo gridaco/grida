@@ -6,9 +6,6 @@ edition = "2024"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[[bin]]
-name = "dev"
-path = "src/dev.rs"
 
 [dependencies]
 wasm-bindgen = "0.2.100"
@@ -40,5 +37,5 @@ rustflags = [
 criterion = "0.5"
 
 [[bench]]
-name = "render_bench"
+name = "bench_rectangles"
 harness = false
