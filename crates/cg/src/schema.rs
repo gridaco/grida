@@ -1,4 +1,5 @@
 use crate::transform::AffineTransform;
+use core::str;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -315,8 +316,11 @@ impl RectangularCornerRadius {
 // region: Scene
 #[derive(Debug, Clone)]
 pub struct Scene {
+    pub id: String,
+    pub name: String,
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
+    pub nodes: NodeMap,
 }
 
 // endregion
@@ -326,12 +330,14 @@ pub struct Scene {
 #[derive(Debug, Clone)]
 pub enum Node {
     Group(GroupNode),
+    Container(ContainerNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
+    Path(PathNode),
     Image(ImageNode),
 }
 
@@ -356,20 +362,14 @@ pub struct ContainerNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub size: Size,
+    pub corner_radius: RectangularCornerRadius,
     pub children: Vec<NodeId>,
-    pub opacity: f32,
-    pub blend_mode: BlendMode,
-}
-
-#[derive(Debug, Clone)]
-pub struct LineNode {
-    pub base: BaseNode,
-    pub transform: AffineTransform,
-    pub size: Size, // height is always 0 (ignored)
-    pub stroke: Paint,
+    pub fill: Paint,
+    pub stroke: Option<Paint>,
     pub stroke_width: f32,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 #[derive(Debug, Clone)]
@@ -384,6 +384,17 @@ pub struct RectangleNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LineNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub size: Size, // height is always 0 (ignored)
+    pub stroke: Paint,
+    pub stroke_width: f32,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -445,6 +456,19 @@ pub struct PolygonNode {
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
+}
+
+///
+/// SVG Path compatible path node.
+///
+#[derive(Debug, Clone)]
+pub struct PathNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub size: Size,
+    pub fill: Paint,
+    pub data: String,
+    pub stroke: Paint,
 }
 
 /// A node representing a regular polygon (triangle, square, pentagon, etc.)

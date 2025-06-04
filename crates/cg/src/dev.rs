@@ -3,9 +3,9 @@ use cg::io::parse;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
-    BaseNode, BlendMode, Color, EllipseNode, FontWeight, GradientStop, GroupNode, ImageNode,
-    LineNode, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint, RectangleNode,
-    RectangularCornerRadius, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
+    BaseNode, BlendMode, Color, ContainerNode, EllipseNode, FontWeight, GradientStop, GroupNode,
+    ImageNode, LineNode, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint, RectangleNode,
+    RectangularCornerRadius, Scene, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
     TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
@@ -58,7 +58,7 @@ fn init_window(
     let el = EventLoop::new().expect("Failed to create event loop");
     let window_attributes = WindowAttributes::default()
         .with_title("Grida Canvas")
-        .with_inner_size(LogicalSize::new(400, 300));
+        .with_inner_size(LogicalSize::new(1080, 1080));
 
     // Create GL config template
     let template = ConfigTemplateBuilder::new()
@@ -205,7 +205,6 @@ struct App {
     surface_ptr: *mut Surface,
     gl_surface: GlutinSurface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
-    nodemap: NodeMap,
 }
 
 impl ApplicationHandler for App {
@@ -233,52 +232,34 @@ impl ApplicationHandler for App {
     }
 }
 
-async fn demo_json() {
-    let file: String = fs::read_to_string("resources/document.json").expect("failed to read file");
+async fn demo_json() -> Scene {
+    let path = "resources/document-2.json";
+    // let path = "resources/document.json";
+    // let path = "resources/hero-main-demo.grida";
+    let file: String = fs::read_to_string(path).expect("failed to read file");
     let canvas_file = parse(&file).expect("failed to parse file");
-    println!("{:?}", canvas_file);
+    let nodes = canvas_file.document.nodes;
+    // entry_scene_id or scenes[0]
+    let scene_id = canvas_file.document.entry_scene_id.unwrap_or(
+        canvas_file
+            .document
+            .scenes
+            .keys()
+            .next()
+            .unwrap()
+            .to_string(),
+    );
+    let scene = canvas_file.document.scenes.get(&scene_id).unwrap();
+    Scene {
+        nodes: nodes.into_iter().map(|(k, v)| (k, v.into())).collect(),
+        id: scene_id,
+        name: scene.name.clone(),
+        transform: AffineTransform::identity(),
+        children: scene.children.clone(),
+    }
 }
 
-async fn demo_static() {
-    //
-}
-
-#[tokio::main]
-async fn main() {
-    let width = 800;
-    let height = 600;
-
-    // Initialize the renderer with image cache
-    let mut renderer = Renderer::new();
-    let (
-        surface_ptr,
-        el,
-        window,
-        gl_surface,
-        gl_context,
-        _gl_config,
-        _fb_info,
-        _gr_context,
-        scale_factor,
-    ) = init_window(width, height);
-    renderer.set_backend(Backend::GL(surface_ptr));
-
-    // Log DPI and size info
-    let logical_size = window.inner_size();
-    let physical_width = (logical_size.width as f64 * scale_factor).round() as u32;
-    let physical_height = (logical_size.height as f64 * scale_factor).round() as u32;
-    println!("[DPI DEBUG] scale_factor: {}", scale_factor);
-    println!(
-        "[DPI DEBUG] logical_size: {} x {}",
-        logical_size.width, logical_size.height
-    );
-    println!(
-        "[DPI DEBUG] physical_size: {} x {}",
-        physical_width, physical_height
-    );
-    // Get logical canvas size for background
-    // let logical_size = window.inner_size();
-
+async fn demo_static(renderer: &mut Renderer) -> Scene {
     let font_caveat_path: &str = "resources/Caveat-VariableFont_wght.ttf";
     let font_caveat_data = fs::read(font_caveat_path).expect("failed to read file");
     let font_caveat_family = "Caveat".to_string();
@@ -534,9 +515,9 @@ async fn main() {
         },
         blend_mode: BlendMode::Normal,
         opacity: 0.8,
-        transform: AffineTransform::new(0.0, height as f32 - 50.0, 0.0),
+        transform: AffineTransform::new(0.0, 700.0, 0.0),
         size: Size {
-            width: width as f32,
+            width: 800.0,
             height: 0.0, // ignored
         },
         stroke: Paint::Solid(SolidPaint {
@@ -564,14 +545,14 @@ async fn main() {
     };
 
     // Create a root group node containing the shapes group, text, and line
-    let root_group_node = GroupNode {
+    let root_container_node = ContainerNode {
         base: BaseNode {
-            id: "root_group".to_string(),
-            name: "Root Group".to_string(),
+            id: "root_container".to_string(),
+            name: "Root Container".to_string(),
             active: true,
         },
         blend_mode: BlendMode::Normal,
-        transform: AffineTransform::new(0.0, 0.0, 0.0),
+        transform: AffineTransform::identity(),
         children: vec![
             "background_rect".to_string(),
             "shapes_group".to_string(),
@@ -580,6 +561,17 @@ async fn main() {
             "test_image".to_string(),
         ],
         opacity: 1.0,
+        size: Size {
+            width: 1080.0,
+            height: 1080.0,
+        },
+        corner_radius: RectangularCornerRadius::all(0.0),
+        fill: Paint::Solid(SolidPaint {
+            color: Color(255, 255, 255, 255),
+        }),
+        stroke: None,
+        stroke_width: 0.0,
+        effect: None,
     };
 
     // Create a node map and add all nodes
@@ -599,14 +591,64 @@ async fn main() {
     nodemap.insert("test_text".to_string(), Node::TextSpan(text_span_node));
     nodemap.insert("test_line".to_string(), Node::Line(line_node));
     nodemap.insert("test_image".to_string(), Node::Image(image_node));
-    nodemap.insert("root_group".to_string(), Node::Group(root_group_node));
+    nodemap.insert(
+        "root_container".to_string(),
+        Node::Container(root_container_node),
+    );
+
+    Scene {
+        id: "scene".to_string(),
+        name: "Demo".to_string(),
+        transform: AffineTransform::identity(),
+        children: vec!["root_container".to_string()],
+        nodes: nodemap,
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let width = 1080;
+    let height = 1080;
+
+    // Initialize the renderer with image cache
+    let mut renderer = Renderer::new();
+    let (
+        surface_ptr,
+        el,
+        window,
+        gl_surface,
+        gl_context,
+        _gl_config,
+        _fb_info,
+        _gr_context,
+        scale_factor,
+    ) = init_window(width, height);
+    renderer.set_backend(Backend::GL(surface_ptr));
+
+    // Log DPI and size info
+    let logical_size = window.inner_size();
+    let physical_width = (logical_size.width as f64 * scale_factor).round() as u32;
+    let physical_height = (logical_size.height as f64 * scale_factor).round() as u32;
+    println!("[DPI DEBUG] scale_factor: {}", scale_factor);
+    println!(
+        "[DPI DEBUG] logical_size: {} x {}",
+        logical_size.width, logical_size.height
+    );
+    println!(
+        "[DPI DEBUG] physical_size: {} x {}",
+        physical_width, physical_height
+    );
+    // Get logical canvas size for background
+    // let logical_size = window.inner_size();
+
+    // let scene = demo_static(&mut renderer).await;
+    let scene = demo_json().await;
 
     let mut app = App {
         renderer,
         surface_ptr,
         gl_surface,
         gl_context,
-        nodemap,
     };
 
     // Render once at startup
@@ -614,8 +656,7 @@ async fn main() {
     let canvas = surface.canvas();
     canvas.clear(skia_safe::Color::WHITE);
 
-    app.renderer
-        .render_node(&"root_group".to_string(), &app.nodemap);
+    app.renderer.render_scene(&scene);
     app.renderer.flush();
     if let Err(e) = app.gl_surface.swap_buffers(&app.gl_context) {
         eprintln!("Error swapping buffers: {:?}", e);

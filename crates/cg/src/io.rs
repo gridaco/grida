@@ -76,8 +76,11 @@ pub struct ContainerNode {
     pub fill: Option<Fill>,
     pub border: Option<Border>,
     pub style: Option<HashMap<String, serde_json::Value>>,
-    #[serde(rename = "cornerRadius")]
-    pub corner_radius: Option<serde_json::Value>,
+    #[serde(
+        rename = "cornerRadius",
+        deserialize_with = "deserialize_corner_radius"
+    )]
+    pub corner_radius: Option<RectangularCornerRadius>,
     pub padding: Option<serde_json::Value>,
     pub layout: Option<String>,
     pub direction: Option<String>,
@@ -89,6 +92,42 @@ pub struct ContainerNode {
     pub main_axis_gap: Option<f32>,
     #[serde(rename = "crossAxisGap")]
     pub cross_axis_gap: Option<f32>,
+}
+
+fn deserialize_corner_radius<'de, D>(
+    deserializer: D,
+) -> Result<Option<RectangularCornerRadius>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+
+    match value {
+        None => Ok(None),
+        Some(v) => match v {
+            serde_json::Value::Number(n) => {
+                let radius = n.as_f64().unwrap_or(0.0) as f32;
+                Ok(Some(RectangularCornerRadius::all(radius)))
+            }
+            serde_json::Value::Array(arr) => {
+                if arr.len() == 4 {
+                    let values: Vec<f32> = arr
+                        .into_iter()
+                        .map(|v| v.as_f64().unwrap_or(0.0) as f32)
+                        .collect();
+                    Ok(Some(RectangularCornerRadius {
+                        tl: values[0],
+                        tr: values[1],
+                        bl: values[2],
+                        br: values[3],
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Ok(None),
+        },
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -300,6 +339,13 @@ impl From<ContainerNode> for SchemaContainerNode {
             blend_mode: BlendMode::Normal,
             transform: AffineTransform::new(node.left, node.top, node.rotation),
             size: Size { width, height },
+            corner_radius: node
+                .corner_radius
+                .unwrap_or(RectangularCornerRadius::zero()),
+            fill: node.fill.into(),
+            stroke: None,
+            stroke_width: 0.0,
+            effect: None,
             children: node.children,
             opacity: node.opacity,
         }
@@ -391,6 +437,28 @@ impl From<VectorNode> for SchemaNode {
             stroke_width: 0.0,
             opacity: node.opacity,
         })
+    }
+}
+
+impl From<Node> for SchemaNode {
+    fn from(node: Node) -> Self {
+        match node {
+            Node::Container(container) => SchemaNode::Container(container.into()),
+            Node::Text(text) => SchemaNode::TextSpan(text.into()),
+            Node::Vector(vector) => vector.into(),
+            Node::Ellipse(ellipse) => ellipse.into(),
+            Node::Unknown => SchemaNode::Group(GroupNode {
+                base: BaseNode {
+                    id: "unknown".to_string(),
+                    name: "Unknown Node".to_string(),
+                    active: false,
+                },
+                transform: AffineTransform::identity(),
+                children: vec![],
+                opacity: 0.0,
+                blend_mode: BlendMode::Normal,
+            }),
+        }
     }
 }
 

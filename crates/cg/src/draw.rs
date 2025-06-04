@@ -1,8 +1,8 @@
 use crate::schema::{
-    Color as SchemaColor, EllipseNode, FilterEffect, FontWeight, GradientStop, GroupNode,
-    ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, TextAlign, TextAlignVertical, TextDecoration,
-    TextNode, TextSpanNode,
+    Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight, GradientStop,
+    GroupNode, ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode,
+    RectangularCornerRadius, RegularPolygonNode, Scene, TextAlign, TextAlignVertical,
+    TextDecoration, TextNode, TextSpanNode,
 };
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
@@ -509,6 +509,12 @@ impl Renderer {
         }
     }
 
+    pub fn render_scene(&self, scene: &Scene) {
+        for child_id in &scene.children {
+            self.render_node(child_id, &scene.nodes);
+        }
+    }
+
     pub fn render_node(&self, id: &NodeId, nodemap: &NodeMap) {
         let node = match nodemap.get(id) {
             Some(node) => node,
@@ -517,6 +523,7 @@ impl Renderer {
 
         match node {
             Node::Group(node) => self.draw_group_node(node, nodemap),
+            Node::Container(node) => self.draw_container_node(node, nodemap),
             Node::Rectangle(node) => self.draw_rect_node(node),
             Node::Ellipse(node) => self.draw_ellipse_node(node),
             Node::Polygon(node) => self.draw_polygon_node(node),
@@ -541,6 +548,124 @@ impl Renderer {
             if needs_opacity_layer {
                 // Start new layer with opacity
                 canvas.save_layer_alpha(None, (node.opacity * 255.0) as u32);
+            }
+
+            // Recursively render children
+            for child_id in &node.children {
+                self.render_node(child_id, nodemap);
+            }
+
+            if needs_opacity_layer {
+                // End opacity layer
+                canvas.restore();
+            }
+
+            // Restore transform
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_container_node(&self, node: &ContainerNode, nodemap: &NodeMap) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+
+            // Save canvas state for transform
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+
+            let needs_opacity_layer = node.opacity < 1.0;
+
+            if needs_opacity_layer {
+                // Start new layer with opacity
+                canvas.save_layer_alpha(None, (node.opacity * 255.0) as u32);
+            }
+
+            // Draw the background rectangle
+            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+            let RectangularCornerRadius { tl, tr, bl, br } = node.corner_radius;
+
+            // Draw drop shadow effect if present
+            if let Some(FilterEffect::DropShadow(shadow)) = &node.effect {
+                let mut shadow_paint = SkiaPaint::default();
+                let SchemaColor(r, g, b, a) = shadow.color;
+                shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
+                shadow_paint.set_anti_alias(true);
+                if shadow.blur > 0.0 {
+                    shadow_paint.set_mask_filter(MaskFilter::blur(
+                        skia_safe::BlurStyle::Normal,
+                        shadow.blur,
+                        None,
+                    ));
+                }
+                let offset_x = shadow.dx;
+                let offset_y = shadow.dy;
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl), // top-left
+                            Point::new(tr, tr), // top-right
+                            Point::new(br, br), // bottom-right
+                            Point::new(bl, bl), // bottom-left
+                        ],
+                    );
+                    let mut shadow_rrect = rrect;
+                    shadow_rrect.offset((offset_x, offset_y));
+                    canvas.draw_rrect(shadow_rrect, &shadow_paint);
+                } else {
+                    let mut shadow_rect = rect;
+                    shadow_rect.offset((offset_x, offset_y));
+                    canvas.draw_rect(shadow_rect, &shadow_paint);
+                }
+            }
+
+            // Draw fill
+            let fill_paint = sk_paint(
+                &node.fill,
+                node.opacity,
+                (node.size.width, node.size.height),
+            );
+            let mut fill_paint = fill_paint.clone();
+            fill_paint.set_blend_mode(node.blend_mode.into());
+
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(tl, tl), // top-left
+                        Point::new(tr, tr), // top-right
+                        Point::new(br, br), // bottom-right
+                        Point::new(bl, bl), // bottom-left
+                    ],
+                );
+                canvas.draw_rrect(rrect, &fill_paint);
+            } else {
+                canvas.draw_rect(rect, &fill_paint);
+            }
+
+            // Draw stroke if present
+            if let Some(stroke) = &node.stroke {
+                let mut stroke_paint =
+                    sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                stroke_paint.set_blend_mode(node.blend_mode.into());
+
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl), // top-left
+                            Point::new(tr, tr), // top-right
+                            Point::new(br, br), // bottom-right
+                            Point::new(bl, bl), // bottom-left
+                        ],
+                    );
+                    canvas.draw_rrect(rrect, &stroke_paint);
+                } else {
+                    canvas.draw_rect(rect, &stroke_paint);
+                }
             }
 
             // Recursively render children
