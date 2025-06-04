@@ -7,8 +7,8 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "demo"
-path = "src/demo.rs"
+name = "dev"
+path = "src/dev.rs"
 
 [dependencies]
 wasm-bindgen = "0.2.100"
@@ -18,10 +18,10 @@ wee_alloc = { version = "0.4.5", optional = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 reqwest = "0.12.19"
 criterion = "0.5"
-gl = "0.14.0"
 glutin = "0.32.0"
 glutin-winit = "0.5.0"
 raw-window-handle = "0.6.0"
+gl-rs = { version = "0.14.0", package = "gl" }
 winit = "0.30.0"
 serde = "1.0.219"
 serde_json = "1.0.140"

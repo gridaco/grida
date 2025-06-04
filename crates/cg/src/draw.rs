@@ -1,7 +1,7 @@
 use crate::schema::{
     Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, GroupNode, ImageNode, LineNode,
     Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode, RectangularCornerRadius,
-    RegularPolygonNode, TextAlign, TextAlignVertical, TextSpanNode,
+    RegularPolygonNode, TextAlign, TextAlignVertical, TextNode, TextSpanNode,
 };
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,

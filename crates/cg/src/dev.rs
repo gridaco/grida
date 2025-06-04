@@ -10,6 +10,7 @@ use cg::schema::{
 use cg::transform::AffineTransform;
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
+use gl_rs as gl;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
@@ -18,10 +19,15 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+#[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
 use skia_safe::{Image, Surface, gpu};
-use std::time::Instant;
+use std::{
+    ffi::CString,
+    num::NonZeroU32,
+    time::{Duration, Instant},
+};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
@@ -50,21 +56,26 @@ fn init_window(
     let el = EventLoop::new().expect("Failed to create event loop");
     let window_attributes = WindowAttributes::default()
         .with_title("Grida Canvas")
-        .with_inner_size(LogicalSize::new(width as f64, height as f64))
-        .with_visible(true);
+        .with_inner_size(LogicalSize::new(400, 300));
 
     // Create GL config template
-    let template = ConfigTemplateBuilder::new().with_alpha_size(8);
+    let template = ConfigTemplateBuilder::new()
+        .with_alpha_size(8)
+        .with_transparency(true);
 
     // Build display and get window
     let display_builder = DisplayBuilder::new().with_window_attributes(window_attributes.into());
-
     let (window, gl_config) = display_builder
         .build(&el, template, |configs| {
+            // Find the config with the minimum number of samples. Usually Skia takes care of
+            // anti-aliasing and may not be able to create appropriate Surfaces for samples > 0.
+            // See https://github.com/rust-skia/rust-skia/issues/782
+            // And https://github.com/rust-skia/rust-skia/issues/764
             configs
                 .reduce(|accum, config| {
                     let transparency_check = config.supports_transparency().unwrap_or(false)
                         & !accum.supports_transparency().unwrap_or(false);
+
                     if transparency_check || config.num_samples() < accum.num_samples() {
                         config
                     } else {
@@ -74,7 +85,7 @@ fn init_window(
                 .unwrap()
         })
         .unwrap();
-
+    println!("Picked a config with {} samples", gl_config.num_samples());
     let window = window.expect("Could not create window with OpenGL context");
     let raw_window_handle = window
         .raw_window_handle()
@@ -82,13 +93,15 @@ fn init_window(
 
     // --- DPI handling ---
     let scale_factor = window.scale_factor();
-    let logical_size = window.inner_size();
-    let physical_width = (logical_size.width as f64 * scale_factor).round() as u32;
-    let physical_height = (logical_size.height as f64 * scale_factor).round() as u32;
     // ---
 
-    // Create GL context
+    // The context creation part. It can be created before surface and that's how
+    // it's expected in multithreaded + multiwindow operation mode, since you
+    // can send NotCurrentContext, but not Surface.
     let context_attributes = ContextAttributesBuilder::new().build(Some(raw_window_handle));
+
+    // Since glutin by default tries to create OpenGL core context, which may not be
+    // present we should try gles.
     let fallback_context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::Gles(None))
         .build(Some(raw_window_handle));
@@ -105,11 +118,12 @@ fn init_window(
             })
     };
 
-    // Create GL surface
+    let (width, height): (u32, u32) = window.inner_size().into();
+
     let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
         raw_window_handle,
-        std::num::NonZeroU32::new(physical_width).unwrap(),
-        std::num::NonZeroU32::new(physical_height).unwrap(),
+        NonZeroU32::new(width).unwrap(),
+        NonZeroU32::new(height).unwrap(),
     );
 
     let gl_surface = unsafe {
@@ -123,25 +137,22 @@ fn init_window(
         .make_current(&gl_surface)
         .expect("Could not make GL context current");
 
-    // Load GL functions
     gl::load_with(|s| {
         gl_config
             .display()
-            .get_proc_address(std::ffi::CString::new(s).unwrap().as_c_str())
+            .get_proc_address(CString::new(s).unwrap().as_c_str())
     });
 
-    // Create Skia GL interface
     let interface = skia_safe::gpu::gl::Interface::new_load_with(|name| {
         if name == "eglGetCurrentDisplay" {
             return std::ptr::null();
         }
         gl_config
             .display()
-            .get_proc_address(std::ffi::CString::new(name).unwrap().as_c_str())
+            .get_proc_address(CString::new(name).unwrap().as_c_str())
     })
     .expect("Could not create interface");
 
-    // Create Skia GPU context
     let mut gr_context = skia_safe::gpu::direct_contexts::make_gl(interface, None)
         .expect("Could not create direct context");
 
@@ -527,7 +538,7 @@ async fn main() {
             active: true,
             blend_mode: BlendMode::Normal,
         },
-        transform: AffineTransform::new(0.0, 100.0, 0.0),
+        transform: AffineTransform::new(0.0, 0.0, 0.0),
         children: vec![
             "background_rect".to_string(),
             "shapes_group".to_string(),

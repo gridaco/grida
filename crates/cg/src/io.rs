@@ -14,6 +14,7 @@ pub struct Document {
     pub properties: HashMap<String, serde_json::Value>,
     pub nodes: HashMap<String, Node>,
     pub scenes: HashMap<String, Scene>,
+    pub entry_scene_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
