@@ -1,5 +1,12 @@
-use crate::schema::{FontWeight, TextAlign, TextAlignVertical, TextDecoration};
+use crate::schema::{
+    BaseNode, BlendMode, Color as SchemaColor, ContainerNode as SchemaContainerNode,
+    EllipseNode as SchemaEllipseNode, FontWeight, GroupNode, Node as SchemaNode, NodeId, Paint,
+    PolygonNode, RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
+    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
+};
+use crate::transform::AffineTransform;
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
@@ -240,6 +247,151 @@ fn default_font_weight() -> FontWeight {
 
 pub fn parse(file: &str) -> Result<CanvasFile, serde_json::Error> {
     serde_json::from_str(file)
+}
+
+impl From<Color> for SchemaColor {
+    fn from(color: Color) -> Self {
+        SchemaColor(color.r, color.g, color.b, (color.a * 255.0) as u8)
+    }
+}
+
+impl From<Option<Fill>> for Paint {
+    fn from(fill: Option<Fill>) -> Self {
+        match fill {
+            Some(fill) => match fill.kind.as_str() {
+                "solid" => {
+                    if let Some(color) = fill.color {
+                        Paint::Solid(SolidPaint {
+                            color: SchemaColor(color.r, color.g, color.b, (color.a * 255.0) as u8),
+                        })
+                    } else {
+                        Paint::Solid(SolidPaint {
+                            color: SchemaColor(0, 0, 0, 0),
+                        })
+                    }
+                }
+                _ => Paint::Solid(SolidPaint {
+                    color: SchemaColor(0, 0, 0, 0),
+                }),
+            },
+            None => Paint::Solid(SolidPaint {
+                color: SchemaColor(0, 0, 0, 0),
+            }),
+        }
+    }
+}
+
+impl From<ContainerNode> for SchemaContainerNode {
+    fn from(node: ContainerNode) -> Self {
+        let width = match node.width {
+            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
+            _ => 0.0,
+        };
+        let height = match node.height {
+            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
+            _ => 0.0,
+        };
+        SchemaContainerNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform: AffineTransform::new(node.left, node.top, node.rotation),
+            size: Size { width, height },
+            children: node.children,
+            opacity: node.opacity,
+        }
+    }
+}
+
+impl From<TextNode> for TextSpanNode {
+    fn from(node: TextNode) -> Self {
+        let width = match node.width {
+            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
+            _ => 0.0,
+        };
+        let height = match node.height {
+            Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
+            _ => 0.0,
+        };
+        TextSpanNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform: AffineTransform::new(node.left, node.top, node.rotation),
+            size: Size { width, height },
+            text: node.text,
+            text_style: TextStyle {
+                text_decoration: node.text_decoration,
+                font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
+                font_size: node.font_size.unwrap_or(14.0),
+                font_weight: node.font_weight,
+                letter_spacing: node.letter_spacing,
+                line_height: node.line_height,
+            },
+            text_align: node.text_align,
+            text_align_vertical: node.text_align_vertical,
+            fill: node.fill.into(),
+            stroke: None,
+            stroke_width: None,
+            opacity: node.opacity,
+        }
+    }
+}
+
+impl From<EllipseNode> for SchemaNode {
+    fn from(node: EllipseNode) -> Self {
+        let transform = AffineTransform::new(node.left, node.top, node.rotation);
+
+        SchemaNode::Ellipse(SchemaEllipseNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform,
+            size: Size {
+                width: node.width,
+                height: node.height,
+            },
+            fill: node.fill.into(),
+            stroke: Paint::Solid(SolidPaint {
+                color: SchemaColor(0, 0, 0, 255),
+            }),
+            stroke_width: node.stroke_width.unwrap_or(0.0),
+            opacity: node.opacity,
+        })
+    }
+}
+
+impl From<VectorNode> for SchemaNode {
+    fn from(node: VectorNode) -> Self {
+        let transform = AffineTransform::new(node.left, node.top, node.rotation);
+
+        // For vector nodes, we'll create a polygon node with the path data
+        SchemaNode::Polygon(PolygonNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform,
+            points: vec![],
+            fill: node.fill.into(),
+            stroke: Paint::Solid(SolidPaint {
+                color: SchemaColor(0, 0, 0, 255),
+            }),
+            stroke_width: 0.0,
+            opacity: node.opacity,
+        })
+    }
 }
 
 #[cfg(test)]

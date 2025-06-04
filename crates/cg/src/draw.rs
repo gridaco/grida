@@ -141,7 +141,7 @@ impl Renderer {
                     ],
                 );
                 let mut fill_paint = paint.clone();
-                fill_paint.set_blend_mode(node.base.blend_mode.into());
+                fill_paint.set_blend_mode(node.blend_mode.into());
                 canvas.draw_rrect(rrect, &fill_paint);
                 // Draw stroke if stroke_width > 0
                 if node.stroke_width > 0.0 {
@@ -152,12 +152,12 @@ impl Renderer {
                     );
                     stroke_paint.set_stroke(true);
                     stroke_paint.set_stroke_width(node.stroke_width);
-                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                    stroke_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_rrect(rrect, &stroke_paint);
                 }
             } else {
                 let mut fill_paint = paint.clone();
-                fill_paint.set_blend_mode(node.base.blend_mode.into());
+                fill_paint.set_blend_mode(node.blend_mode.into());
                 canvas.draw_rect(rect, &fill_paint);
                 // Draw stroke if stroke_width > 0
                 if node.stroke_width > 0.0 {
@@ -168,7 +168,7 @@ impl Renderer {
                     );
                     stroke_paint.set_stroke(true);
                     stroke_paint.set_stroke_width(node.stroke_width);
-                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                    stroke_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_rect(rect, &stroke_paint);
                 }
             }
@@ -214,7 +214,7 @@ impl Renderer {
             canvas.concat(&sk_matrix(node.transform.matrix));
             // Draw fill
             let mut fill_paint = fill_paint.clone();
-            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            fill_paint.set_blend_mode(node.blend_mode.into());
             canvas.draw_oval(rect, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
@@ -225,7 +225,7 @@ impl Renderer {
                 );
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
-                stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                stroke_paint.set_blend_mode(node.blend_mode.into());
                 canvas.draw_oval(rect, &stroke_paint);
             }
             canvas.restore();
@@ -239,7 +239,7 @@ impl Renderer {
             let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
             paint.set_stroke(true);
             paint.set_stroke_width(node.stroke_width);
-            paint.set_blend_mode(node.base.blend_mode.into());
+            paint.set_blend_mode(node.blend_mode.into());
             canvas.save();
             canvas.concat(&sk_matrix(node.transform.matrix));
             canvas.draw_line(
@@ -273,14 +273,14 @@ impl Renderer {
             canvas.concat(&sk_matrix(node.transform.matrix));
             // Draw fill
             let mut fill_paint = fill_paint.clone();
-            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            fill_paint.set_blend_mode(node.blend_mode.into());
             canvas.draw_path(&path, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
                 let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
-                stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                stroke_paint.set_blend_mode(node.blend_mode.into());
                 canvas.draw_path(&path, &stroke_paint);
             }
             canvas.restore();
@@ -303,7 +303,7 @@ impl Renderer {
                 node.opacity,
                 (node.size.width, node.size.height),
             );
-            fill_paint.set_blend_mode(node.base.blend_mode.into());
+            fill_paint.set_blend_mode(node.blend_mode.into());
 
             // font
             let mut font_collection = FontCollection::new();
@@ -430,7 +430,7 @@ impl Renderer {
                 // Draw the image
                 let mut paint = SkiaPaint::default();
                 paint.set_anti_alias(true);
-                paint.set_blend_mode(node.base.blend_mode.into());
+                paint.set_blend_mode(node.blend_mode.into());
                 paint.set_alpha((node.opacity * 255.0) as u8);
 
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
@@ -464,7 +464,7 @@ impl Renderer {
                     );
                     stroke_paint.set_stroke(true);
                     stroke_paint.set_stroke_width(node.stroke_width);
-                    stroke_paint.set_blend_mode(node.base.blend_mode.into());
+                    stroke_paint.set_blend_mode(node.blend_mode.into());
 
                     if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
                         let rrect = RRect::new_rect_radii(

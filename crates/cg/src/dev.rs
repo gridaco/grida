@@ -1,4 +1,5 @@
 use cg::draw::{Backend, Renderer};
+use cg::io::parse;
 use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
@@ -232,6 +233,16 @@ impl ApplicationHandler for App {
     }
 }
 
+async fn demo_json() {
+    let file: String = fs::read_to_string("resources/document.json").expect("failed to read file");
+    let canvas_file = parse(&file).expect("failed to parse file");
+    println!("{:?}", canvas_file);
+}
+
+async fn demo_static() {
+    //
+}
+
 #[tokio::main]
 async fn main() {
     let width = 800;
@@ -294,8 +305,8 @@ async fn main() {
             id: "background_rect".to_string(),
             name: "Background Rect".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         opacity: 1.0,
         transform: AffineTransform::identity(),
         size: Size {
@@ -333,8 +344,8 @@ async fn main() {
             id: "test_image".to_string(),
             name: "Test Image".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         transform: AffineTransform::new(50.0, 50.0, 0.0),
         size: Size {
             width: 200.0,
@@ -364,8 +375,8 @@ async fn main() {
             id: "test_rect".to_string(),
             name: "Test Rectangle".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         opacity: 1.0,
         transform: AffineTransform::new(50.0, 300.0, 45.0),
         size: Size {
@@ -394,8 +405,8 @@ async fn main() {
             id: "test_ellipse".to_string(),
             name: "Test Ellipse".to_string(),
             active: true,
-            blend_mode: BlendMode::Multiply, // Example of using a different blend mode
         },
+        blend_mode: BlendMode::Multiply, // Example of using a different blend mode
         opacity: 1.0,
         transform: AffineTransform::new(300.0, 300.0, 45.0), // Rotated 45 degrees
         size: Size {
@@ -441,8 +452,8 @@ async fn main() {
             id: "test_polygon".to_string(),
             name: "Test Polygon".to_string(),
             active: true,
-            blend_mode: BlendMode::Screen, // Example of using Screen blend mode
         },
+        blend_mode: BlendMode::Screen, // Example of using Screen blend mode
         transform: AffineTransform::identity(),
         points: pentagon_points,
         fill: Paint::Solid(SolidPaint {
@@ -461,8 +472,8 @@ async fn main() {
             id: "test_regular_polygon".to_string(),
             name: "Test Regular Polygon".to_string(),
             active: true,
-            blend_mode: BlendMode::Overlay, // Example of using Overlay blend mode
         },
+        blend_mode: BlendMode::Overlay, // Example of using Overlay blend mode
         transform: AffineTransform::new(300.0, 300.0, 0.0),
         size: Size {
             width: 200.0,
@@ -485,8 +496,8 @@ async fn main() {
             id: "test_text".to_string(),
             name: "Test Text".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         transform: AffineTransform::new(50.0, 50.0, 15.0),
         size: Size {
             width: 300.0,
@@ -520,8 +531,8 @@ async fn main() {
             id: "test_line".to_string(),
             name: "Test Line".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         opacity: 0.8,
         transform: AffineTransform::new(0.0, height as f32 - 50.0, 0.0),
         size: Size {
@@ -540,8 +551,8 @@ async fn main() {
             id: "shapes_group".to_string(),
             name: "Shapes Group".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         transform: AffineTransform::new(0.0, 0.0, -15.0),
         children: vec![
             "test_rect".to_string(),
@@ -558,8 +569,8 @@ async fn main() {
             id: "root_group".to_string(),
             name: "Root Group".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         transform: AffineTransform::new(0.0, 0.0, 0.0),
         children: vec![
             "background_rect".to_string(),

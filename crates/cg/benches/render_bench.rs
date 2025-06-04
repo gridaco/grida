@@ -17,11 +17,11 @@ fn create_rectangles(count: usize, with_effects: bool) -> (NodeMap, Vec<String>)
                 id: id.clone(),
                 name: format!("Rectangle {}", i),
                 active: true,
-                blend_mode: if i % 2 == 0 {
-                    BlendMode::Normal
-                } else {
-                    BlendMode::Multiply
-                },
+            },
+            blend_mode: if i % 2 == 0 {
+                BlendMode::Normal
+            } else {
+                BlendMode::Multiply
             },
             transform: AffineTransform::new(
                 (i % 100) as f32 * 10.0, // x position
@@ -69,8 +69,8 @@ fn create_rectangles(count: usize, with_effects: bool) -> (NodeMap, Vec<String>)
             id: "root".to_string(),
             name: "Root Group".to_string(),
             active: true,
-            blend_mode: BlendMode::Normal,
         },
+        blend_mode: BlendMode::Normal,
         transform: AffineTransform::identity(),
         children: ids.clone(),
         opacity: 1.0,

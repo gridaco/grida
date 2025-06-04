@@ -314,8 +314,7 @@ impl RectangularCornerRadius {
 
 // region: Scene
 #[derive(Debug, Clone)]
-pub struct SceneNode {
-    pub base: BaseNode,
+pub struct Scene {
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
 }
@@ -341,7 +340,6 @@ pub struct BaseNode {
     pub id: NodeId,
     pub name: String,
     pub active: bool,
-    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -350,6 +348,7 @@ pub struct GroupNode {
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -359,6 +358,7 @@ pub struct ContainerNode {
     pub size: Size,
     pub children: Vec<NodeId>,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -369,6 +369,7 @@ pub struct LineNode {
     pub stroke: Paint,
     pub stroke_width: f32,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -381,6 +382,7 @@ pub struct RectangleNode {
     pub stroke: Paint,
     pub stroke_width: f32,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
 }
 
@@ -394,6 +396,7 @@ pub struct ImageNode {
     pub stroke: Paint,
     pub stroke_width: f32,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
     pub _ref: String,
 }
@@ -407,6 +410,7 @@ pub struct EllipseNode {
     pub stroke: Paint,
     pub stroke_width: f32,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
@@ -440,6 +444,7 @@ pub struct PolygonNode {
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 /// A node representing a regular polygon (triangle, square, pentagon, etc.)
@@ -477,6 +482,7 @@ pub struct RegularPolygonNode {
 
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 impl RegularPolygonNode {
@@ -508,6 +514,7 @@ impl RegularPolygonNode {
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
             opacity: self.opacity,
+            blend_mode: self.blend_mode,
         }
     }
 }
@@ -548,6 +555,7 @@ pub struct TextSpanNode {
 
     /// Overall node opacity.
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 #[derive(Debug, Clone)]
@@ -560,6 +568,7 @@ pub struct TextNode {
     pub font_size: f32,
     pub fill: Paint,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
 }
 
 // endregion
