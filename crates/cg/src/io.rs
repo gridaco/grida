@@ -1,7 +1,7 @@
 use crate::schema::{
     BaseNode, BlendMode, Color as SchemaColor, ContainerNode as SchemaContainerNode,
     EllipseNode as SchemaEllipseNode, FontWeight, GroupNode, Node as SchemaNode, NodeId, Paint,
-    PolygonNode, RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
+    PathNode, PolygonNode, RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
     TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
 };
 use crate::transform::AffineTransform;
@@ -420,17 +420,22 @@ impl From<VectorNode> for SchemaNode {
     fn from(node: VectorNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
-        // For vector nodes, we'll create a polygon node with the path data
-        SchemaNode::Polygon(PolygonNode {
+        // For vector nodes, we'll create a path node with the path data
+        SchemaNode::Path(PathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
                 active: node.active,
             },
-            blend_mode: BlendMode::Normal,
             transform,
-            points: vec![],
             fill: node.fill.into(),
+            data: node.paths.map_or("".to_string(), |paths| {
+                paths
+                    .iter()
+                    .map(|path| path.d.clone())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            }),
             stroke: Paint::Solid(SolidPaint {
                 color: SchemaColor(0, 0, 0, 255),
             }),

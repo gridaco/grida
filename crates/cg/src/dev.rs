@@ -4,9 +4,9 @@ use cg::schema::FeDropShadow;
 use cg::schema::FilterEffect;
 use cg::schema::{
     BaseNode, BlendMode, Color, ContainerNode, EllipseNode, FontWeight, GradientStop, GroupNode,
-    ImageNode, LineNode, Node, NodeMap, Paint, PolygonNode, RadialGradientPaint, RectangleNode,
-    RectangularCornerRadius, Scene, Size, SolidPaint, TextAlign, TextAlignVertical, TextDecoration,
-    TextSpanNode, TextStyle,
+    ImageNode, LineNode, Node, NodeMap, Paint, PathNode, PolygonNode, RadialGradientPaint,
+    RectangleNode, RectangularCornerRadius, Scene, Size, SolidPaint, TextAlign, TextAlignVertical,
+    TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
 use console_error_panic_hook::set_once as init_panic_hook;
@@ -506,6 +506,26 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
         opacity: 1.0,
     };
 
+    // Create a test path node
+    let path_node = PathNode {
+        base: BaseNode {
+            id: "test_path".to_string(),
+            name: "Test Path".to_string(),
+            active: true,
+        },
+        // blend_mode: BlendMode::Normal,
+        opacity: 1.0,
+        transform: AffineTransform::new(200.0, 200.0, 0.0),
+        fill: Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 255), // Black fill
+        }),
+        data: "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string(),
+        stroke: Paint::Solid(SolidPaint {
+            color: Color(255, 0, 0, 255), // Red stroke
+        }),
+        stroke_width: 4.0,
+    };
+
     // Create a test line node with solid color
     let line_node = LineNode {
         base: BaseNode {
@@ -558,6 +578,7 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
             "shapes_group".to_string(),
             "test_text".to_string(),
             "test_line".to_string(),
+            "test_path".to_string(),
             "test_image".to_string(),
         ],
         opacity: 1.0,
@@ -591,6 +612,7 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
     nodemap.insert("test_text".to_string(), Node::TextSpan(text_span_node));
     nodemap.insert("test_line".to_string(), Node::Line(line_node));
     nodemap.insert("test_image".to_string(), Node::Image(image_node));
+    nodemap.insert("test_path".to_string(), Node::Path(path_node));
     nodemap.insert(
         "root_container".to_string(),
         Node::Container(root_container_node),

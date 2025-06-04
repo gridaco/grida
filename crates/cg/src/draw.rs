@@ -1,8 +1,8 @@
 use crate::schema::{
     Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight, GradientStop,
-    GroupNode, ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, Scene, TextAlign, TextAlignVertical,
-    TextDecoration, TextNode, TextSpanNode,
+    GroupNode, ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PathNode, PolygonNode,
+    RectangleNode, RectangularCornerRadius, RegularPolygonNode, Scene, TextAlign,
+    TextAlignVertical, TextDecoration, TextNode, TextSpanNode,
 };
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
@@ -61,6 +61,54 @@ impl Renderer {
 
     pub fn add_font(&mut self, bytes: &[u8]) {
         self.font_mgr.new_from_data(bytes, None);
+    }
+
+    pub fn flush(&self) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            if let Some(mut gr_context) = surface.recording_context() {
+                if let Some(mut direct_context) = gr_context.as_direct_context() {
+                    direct_context.flush_and_submit();
+                }
+            }
+        }
+    }
+
+    pub fn free(&mut self) {
+        if let Some(backend) = self.backend.take() {
+            let surface = unsafe { Box::from_raw(backend.get_surface()) };
+            if let Some(mut gr_context) = surface.recording_context() {
+                if let Some(mut direct_context) = gr_context.as_direct_context() {
+                    direct_context.abandon();
+                }
+            }
+        }
+    }
+
+    pub fn render_scene(&self, scene: &Scene) {
+        for child_id in &scene.children {
+            self.render_node(child_id, &scene.nodes);
+        }
+    }
+
+    pub fn render_node(&self, id: &NodeId, nodemap: &NodeMap) {
+        let node = match nodemap.get(id) {
+            Some(node) => node,
+            None => return, // Skip if node not found
+        };
+
+        match node {
+            Node::Group(node) => self.draw_group_node(node, nodemap),
+            Node::Container(node) => self.draw_container_node(node, nodemap),
+            Node::Rectangle(node) => self.draw_rect_node(node),
+            Node::Ellipse(node) => self.draw_ellipse_node(node),
+            Node::Polygon(node) => self.draw_polygon_node(node),
+            Node::RegularPolygon(node) => self.draw_regular_polygon_node(node),
+            Node::TextSpan(node) => self.draw_text_span_node(node),
+            Node::Line(node) => self.draw_line_node(node),
+            Node::Image(node) => self.draw_image_node(node),
+            Node::Path(node) => self.draw_path_node(node),
+        }
     }
 
     pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) {
@@ -247,6 +295,29 @@ impl Renderer {
                 Point::new(node.size.width, 0.0),
                 &paint,
             );
+            canvas.restore();
+        }
+    }
+
+    pub fn draw_path_node(&self, node: &PathNode) {
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+
+            let path = skia_safe::path::Path::from_svg(&node.data).expect("path is not valid");
+
+            let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
+            if node.stroke_width > 0.0 {
+                let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
+                stroke_paint.set_stroke(true);
+                stroke_paint.set_stroke_width(node.stroke_width);
+                // stroke_paint.set_blend_mode(node.blend_mode.into());
+                canvas.draw_path(&path, &stroke_paint);
+            }
+
+            canvas.draw_path(&path, &fill_paint);
             canvas.restore();
         }
     }
@@ -484,53 +555,6 @@ impl Renderer {
 
                 canvas.restore();
             }
-        }
-    }
-
-    pub fn flush(&self) {
-        if let Some(backend) = &self.backend {
-            let surface = unsafe { &mut *backend.get_surface() };
-            if let Some(mut gr_context) = surface.recording_context() {
-                if let Some(mut direct_context) = gr_context.as_direct_context() {
-                    direct_context.flush_and_submit();
-                }
-            }
-        }
-    }
-
-    pub fn free(&mut self) {
-        if let Some(backend) = self.backend.take() {
-            let surface = unsafe { Box::from_raw(backend.get_surface()) };
-            if let Some(mut gr_context) = surface.recording_context() {
-                if let Some(mut direct_context) = gr_context.as_direct_context() {
-                    direct_context.abandon();
-                }
-            }
-        }
-    }
-
-    pub fn render_scene(&self, scene: &Scene) {
-        for child_id in &scene.children {
-            self.render_node(child_id, &scene.nodes);
-        }
-    }
-
-    pub fn render_node(&self, id: &NodeId, nodemap: &NodeMap) {
-        let node = match nodemap.get(id) {
-            Some(node) => node,
-            None => return, // Skip if node not found
-        };
-
-        match node {
-            Node::Group(node) => self.draw_group_node(node, nodemap),
-            Node::Container(node) => self.draw_container_node(node, nodemap),
-            Node::Rectangle(node) => self.draw_rect_node(node),
-            Node::Ellipse(node) => self.draw_ellipse_node(node),
-            Node::Polygon(node) => self.draw_polygon_node(node),
-            Node::RegularPolygon(node) => self.draw_regular_polygon_node(node),
-            Node::TextSpan(node) => self.draw_text_span_node(node),
-            Node::Line(node) => self.draw_line_node(node),
-            Node::Image(node) => self.draw_image_node(node),
         }
     }
 

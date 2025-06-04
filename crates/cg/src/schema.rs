@@ -465,10 +465,11 @@ pub struct PolygonNode {
 pub struct PathNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
-    pub size: Size,
     pub fill: Paint,
     pub data: String,
     pub stroke: Paint,
+    pub stroke_width: f32,
+    pub opacity: f32,
 }
 
 /// A node representing a regular polygon (triangle, square, pentagon, etc.)
