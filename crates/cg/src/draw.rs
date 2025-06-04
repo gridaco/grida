@@ -1,6 +1,7 @@
+use crate::repository::NodeRepository;
 use crate::schema::{
-    Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight, GradientStop,
-    GroupNode, ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PathNode, PolygonNode,
+    BlendMode, Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight,
+    GradientStop, GroupNode, ImageNode, LineNode, Node, NodeId, Paint, PathNode, PolygonNode,
     RectangleNode, RectangularCornerRadius, RegularPolygonNode, Scene, TextAlign,
     TextAlignVertical, TextDecoration, TextNode, TextSpanNode,
 };
@@ -29,10 +30,11 @@ pub struct Renderer {
     backend: Option<Backend>,
     font_mgr: FontMgr,
     font_collection: FontCollection,
+    dpi: f32,
 }
 
 impl Renderer {
-    pub fn new() -> Self {
+    pub fn new(dpi: f32) -> Self {
         let mut font_collection = FontCollection::new();
         let font_mgr = FontMgr::new();
         font_collection.set_default_font_manager(font_mgr.clone(), None);
@@ -42,6 +44,7 @@ impl Renderer {
             backend: None,
             font_collection,
             font_mgr,
+            dpi,
         }
     }
 
@@ -86,20 +89,26 @@ impl Renderer {
     }
 
     pub fn render_scene(&self, scene: &Scene) {
-        for child_id in &scene.children {
-            self.render_node(child_id, &scene.nodes);
+        if let Some(backend) = &self.backend {
+            let surface = unsafe { &mut *backend.get_surface() };
+            let canvas = surface.canvas();
+            canvas.save();
+            canvas.scale((self.dpi, self.dpi));
+            for child_id in &scene.children {
+                self.render_node(child_id, &scene.nodes);
+            }
         }
     }
 
-    pub fn render_node(&self, id: &NodeId, nodemap: &NodeMap) {
-        let node = match nodemap.get(id) {
+    pub fn render_node(&self, id: &NodeId, repository: &NodeRepository) {
+        let node = match repository.get(id) {
             Some(node) => node,
-            None => return, // Skip if node not found
+            None => return,
         };
 
         match node {
-            Node::Group(node) => self.draw_group_node(node, nodemap),
-            Node::Container(node) => self.draw_container_node(node, nodemap),
+            Node::Group(node) => self.draw_group_node(node, repository),
+            Node::Container(node) => self.draw_container_node(node, repository),
             Node::Rectangle(node) => self.draw_rect_node(node),
             Node::Ellipse(node) => self.draw_ellipse_node(node),
             Node::Polygon(node) => self.draw_polygon_node(node),
@@ -376,15 +385,12 @@ impl Renderer {
             );
             fill_paint.set_blend_mode(node.blend_mode.into());
 
-            // font
-            let mut font_collection = FontCollection::new();
-            font_collection.set_default_font_manager(FontMgr::new(), None);
-
             // paragraph
             let mut paragraph_style = ParagraphStyle::new();
             paragraph_style.set_text_direction(skia_safe::textlayout::TextDirection::LTR);
             paragraph_style.set_text_align(node.text_align.into());
-            let mut paragraph_builder = ParagraphBuilder::new(&paragraph_style, font_collection);
+            let mut paragraph_builder =
+                ParagraphBuilder::new(&paragraph_style, &self.font_collection);
 
             // text style
             let mut ts = TextStyle::new();
@@ -420,51 +426,6 @@ impl Renderer {
             paragraph.paint(canvas, Point::new(node.transform.x(), node.transform.y()));
             canvas.restore();
             return;
-
-            // // Create paragraph style
-            // let mut paragraph_style = skia_safe::textlayout::ParagraphStyle::new();
-
-            // Create text style
-            // let mut text_style = skia_safe::textlayout::TextStyle::new();
-
-            // // Create paragraph builder
-            // let mut paragraph_builder = skia_safe::textlayout::ParagraphBuilder::new(
-            //     &paragraph_style,
-            //     skia_safe::textlayout::FontCollection::new(),
-            // );
-
-            // // Add text with style
-            // paragraph_builder.push_style(&text_style);
-            // paragraph_builder.pop();
-
-            // // Build paragraph
-            // let mut paragraph = paragraph_builder.build();
-
-            // // Calculate vertical position based on alignment
-            // let y = match node.text_align_vertical {
-            //     TextAlignVertical::Top => 0.0,
-            //     TextAlignVertical::Center => (node.size.height - paragraph.height()) / 2.0,
-            //     TextAlignVertical::Bottom => node.size.height - paragraph.height(),
-            // };
-
-            // // Draw stroke if specified
-            // if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
-            //     let mut stroke_paint =
-            //         sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
-            //     stroke_paint.set_style(skia_safe::paint::Style::Stroke);
-            //     stroke_paint.set_stroke_width(stroke_width);
-            //     stroke_paint.set_blend_mode(node.base.blend_mode.into());
-            //     paragraph.paint(canvas, skia_safe::Point::new(0.0, y));
-            // }
-
-            // // Draw fill
-            // let mut fill_paint = sk_paint(
-            //     &node.fill,
-            //     node.opacity,
-            //     (node.size.width, node.size.height),
-            // );
-            // fill_paint.set_blend_mode(node.base.blend_mode.into());
-            // paragraph.paint(canvas, skia_safe::Point::new(0.0, y));
         }
     }
 
@@ -558,7 +519,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_group_node(&self, node: &GroupNode, nodemap: &NodeMap) {
+    pub fn draw_group_node(&self, node: &GroupNode, repository: &NodeRepository) {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
@@ -576,7 +537,7 @@ impl Renderer {
 
             // Recursively render children
             for child_id in &node.children {
-                self.render_node(child_id, nodemap);
+                self.render_node(child_id, repository);
             }
 
             if needs_opacity_layer {
@@ -589,7 +550,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_container_node(&self, node: &ContainerNode, nodemap: &NodeMap) {
+    pub fn draw_container_node(&self, node: &ContainerNode, repository: &NodeRepository) {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
@@ -694,7 +655,7 @@ impl Renderer {
 
             // Recursively render children
             for child_id in &node.children {
-                self.render_node(child_id, nodemap);
+                self.render_node(child_id, repository);
             }
 
             if needs_opacity_layer {

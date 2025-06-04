@@ -1,20 +1,25 @@
 use crate::schema::*;
 use crate::transform::AffineTransform;
+use uuid::Uuid;
 
 /// Factory for creating nodes with default values
 pub struct NodeFactory;
 
 impl NodeFactory {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    fn id(&self) -> String {
+        // random id
+        let id = Uuid::new_v4();
+        id.to_string()
+    }
+
     // Internal factory defaults
     const DEFAULT_SIZE: Size = Size {
         width: 100.0,
         height: 100.0,
-    };
-
-    const DEFAULT_BASE: BaseNode = BaseNode {
-        id: String::new(),
-        name: String::new(),
-        active: true,
     };
 
     const DEFAULT_COLOR: Color = Color(255, 255, 255, 255);
@@ -22,8 +27,12 @@ impl NodeFactory {
     const DEFAULT_STROKE_WIDTH: f32 = 1.0;
     const DEFAULT_OPACITY: f32 = 1.0;
 
-    fn default_base_node() -> BaseNode {
-        Self::DEFAULT_BASE.clone()
+    fn default_base_node(&self) -> BaseNode {
+        BaseNode {
+            id: self.id(),
+            name: String::new(),
+            active: true,
+        }
     }
 
     fn default_solid_paint(color: Color) -> Paint {
@@ -31,9 +40,9 @@ impl NodeFactory {
     }
 
     /// Creates a new rectangle node with default values
-    pub fn create_rectangle_node() -> RectangleNode {
+    pub fn create_rectangle_node(&self) -> RectangleNode {
         RectangleNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -47,9 +56,9 @@ impl NodeFactory {
     }
 
     /// Creates a new ellipse node with default values
-    pub fn create_ellipse_node() -> EllipseNode {
+    pub fn create_ellipse_node(&self) -> EllipseNode {
         EllipseNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
@@ -61,9 +70,9 @@ impl NodeFactory {
     }
 
     /// Creates a new line node with default values
-    pub fn create_line_node() -> LineNode {
+    pub fn create_line_node(&self) -> LineNode {
         LineNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
@@ -77,9 +86,9 @@ impl NodeFactory {
     }
 
     /// Creates a new text span node with default values
-    pub fn create_text_span_node() -> TextSpanNode {
+    pub fn create_text_span_node(&self) -> TextSpanNode {
         TextSpanNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Size {
                 width: Self::DEFAULT_SIZE.width,
@@ -105,9 +114,9 @@ impl NodeFactory {
     }
 
     /// Creates a new group node with default values
-    pub fn create_group_node() -> GroupNode {
+    pub fn create_group_node(&self) -> GroupNode {
         GroupNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             children: Vec::new(),
             opacity: Self::DEFAULT_OPACITY,
@@ -116,9 +125,9 @@ impl NodeFactory {
     }
 
     /// Creates a new container node with default values
-    pub fn create_container_node() -> ContainerNode {
+    pub fn create_container_node(&self) -> ContainerNode {
         ContainerNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),
@@ -132,10 +141,23 @@ impl NodeFactory {
         }
     }
 
+    /// Creates a new path node with default values
+    pub fn create_path_node(&self) -> PathNode {
+        PathNode {
+            base: self.default_base_node(),
+            transform: AffineTransform::identity(),
+            fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
+            data: String::new(),
+            stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
+            stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            opacity: Self::DEFAULT_OPACITY,
+        }
+    }
+
     /// Creates a new regular polygon node with default values
-    pub fn create_regular_polygon_node() -> RegularPolygonNode {
+    pub fn create_regular_polygon_node(&self) -> RegularPolygonNode {
         RegularPolygonNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 3, // Triangle by default
@@ -147,23 +169,23 @@ impl NodeFactory {
         }
     }
 
-    /// Creates a new path node with default values
-    pub fn create_path_node() -> PathNode {
-        PathNode {
-            base: Self::default_base_node(),
+    pub fn create_polygon_node(&self) -> PolygonNode {
+        PolygonNode {
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
+            points: Vec::new(),
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
-            data: String::new(),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
+            blend_mode: BlendMode::Normal,
         }
     }
 
     /// Creates a new image node with default values
-    pub fn create_image_node() -> ImageNode {
+    pub fn create_image_node(&self) -> ImageNode {
         ImageNode {
-            base: Self::default_base_node(),
+            base: self.default_base_node(),
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             corner_radius: RectangularCornerRadius::zero(),

@@ -1,7 +1,7 @@
+use crate::repository::NodeRepository;
 use crate::transform::AffineTransform;
 use core::str;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::f32::consts::PI;
 
 pub type NodeId = String;
@@ -320,7 +320,7 @@ pub struct Scene {
     pub name: String,
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
-    pub nodes: NodeMap,
+    pub nodes: NodeRepository,
 }
 
 // endregion
@@ -597,6 +597,3 @@ pub struct TextNode {
 }
 
 // endregion
-
-// Example doc tree container
-pub type NodeMap = HashMap<NodeId, Node>;
