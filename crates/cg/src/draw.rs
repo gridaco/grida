@@ -1,36 +1,15 @@
 use crate::schema::{
-    Color as SchemaColor, EllipseNode, FilterEffect, GradientStop, GroupNode, ImageNode, LineNode,
-    Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode, RectangularCornerRadius,
-    RegularPolygonNode, TextAlign, TextAlignVertical, TextNode, TextSpanNode,
+    Color as SchemaColor, EllipseNode, FilterEffect, FontWeight, GradientStop, GroupNode,
+    ImageNode, LineNode, Node, NodeId, NodeMap, Paint, PolygonNode, RectangleNode,
+    RectangularCornerRadius, RegularPolygonNode, TextAlign, TextAlignVertical, TextDecoration,
+    TextNode, TextSpanNode,
 };
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
     Shader, Surface, TextBlob, Typeface, surfaces,
+    textlayout::{FontCollection, ParagraphBuilder, ParagraphStyle, TextStyle},
 };
-use std::cell::RefCell;
 use std::collections::HashMap;
-
-thread_local! {
-    static DEFAULT_TYPEFACE: RefCell<Option<Typeface>> = RefCell::new(None);
-}
-
-fn default_typeface() -> Typeface {
-    DEFAULT_TYPEFACE.with(|typeface| {
-        let mut typeface = typeface.borrow_mut();
-        if typeface.is_none() {
-            let font_mgr = FontMgr::new();
-            *typeface = Some(
-                font_mgr
-                    .legacy_make_typeface(None, FontStyle::default())
-                    .unwrap(),
-            );
-        }
-        typeface
-            .as_ref()
-            .expect("Failed to initialize default typeface")
-            .clone()
-    })
-}
 
 pub enum Backend {
     GL(*mut Surface),
@@ -48,13 +27,21 @@ impl Backend {
 pub struct Renderer {
     image_cache: HashMap<String, Image>,
     backend: Option<Backend>,
+    font_mgr: FontMgr,
+    font_collection: FontCollection,
 }
 
 impl Renderer {
     pub fn new() -> Self {
+        let mut font_collection = FontCollection::new();
+        let font_mgr = FontMgr::new();
+        font_collection.set_default_font_manager(font_mgr.clone(), None);
+
         Self {
             image_cache: HashMap::new(),
             backend: None,
+            font_collection,
+            font_mgr,
         }
     }
 
@@ -70,6 +57,10 @@ impl Renderer {
 
     pub fn add_image(&mut self, src: String, image: Image) {
         self.image_cache.insert(src, image);
+    }
+
+    pub fn add_font(&mut self, bytes: &[u8]) {
+        self.font_mgr.new_from_data(bytes, None);
     }
 
     pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) {
@@ -306,61 +297,103 @@ impl Renderer {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
 
-            // Create font with the specified size
-            let font = Font::from_typeface(default_typeface(), node.text_style.font_size);
-
-            // Create text blob
-            let blob = TextBlob::from_str(&node.text, &font).unwrap();
-
-            // Calculate text position based on alignment
-            let (x, y) = match (node.text_align, node.text_align_vertical) {
-                (TextAlign::Left, TextAlignVertical::Top) => (0.0, node.text_style.font_size),
-                (TextAlign::Left, TextAlignVertical::Center) => (0.0, node.size.height / 2.0),
-                (TextAlign::Left, TextAlignVertical::Bottom) => (0.0, node.size.height),
-                (TextAlign::Center, TextAlignVertical::Top) => {
-                    (node.size.width / 2.0, node.text_style.font_size)
-                }
-                (TextAlign::Center, TextAlignVertical::Center) => {
-                    (node.size.width / 2.0, node.size.height / 2.0)
-                }
-                (TextAlign::Center, TextAlignVertical::Bottom) => {
-                    (node.size.width / 2.0, node.size.height)
-                }
-                (TextAlign::Right, TextAlignVertical::Top) => {
-                    (node.size.width, node.text_style.font_size)
-                }
-                (TextAlign::Right, TextAlignVertical::Center) => {
-                    (node.size.width, node.size.height / 2.0)
-                }
-                (TextAlign::Right, TextAlignVertical::Bottom) => {
-                    (node.size.width, node.size.height)
-                }
-                (TextAlign::Justify, _) => (0.0, node.text_style.font_size), // Justify not supported yet
-            };
-
-            canvas.save();
-            canvas.concat(&sk_matrix(node.transform.matrix));
-
-            // Draw stroke if specified
-            if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
-                let mut stroke_paint =
-                    sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
-                stroke_paint.set_style(skia_safe::paint::Style::Stroke);
-                stroke_paint.set_stroke_width(stroke_width);
-                stroke_paint.set_blend_mode(node.base.blend_mode.into());
-                canvas.draw_text_blob(&blob, (x, y), &stroke_paint);
-            }
-
-            // Draw fill
+            // paints
             let mut fill_paint = sk_paint(
                 &node.fill,
                 node.opacity,
                 (node.size.width, node.size.height),
             );
             fill_paint.set_blend_mode(node.base.blend_mode.into());
-            canvas.draw_text_blob(&blob, (x, y), &fill_paint);
 
+            // font
+            let mut font_collection = FontCollection::new();
+            font_collection.set_default_font_manager(FontMgr::new(), None);
+
+            // paragraph
+            let mut paragraph_style = ParagraphStyle::new();
+            paragraph_style.set_text_direction(skia_safe::textlayout::TextDirection::LTR);
+            paragraph_style.set_text_align(node.text_align.into());
+            let mut paragraph_builder = ParagraphBuilder::new(&paragraph_style, font_collection);
+
+            // text style
+            let mut ts = TextStyle::new();
+            ts.set_foreground_paint(&fill_paint);
+            ts.set_font_size(node.text_style.font_size);
+            if let Some(letter_spacing) = node.text_style.letter_spacing {
+                ts.set_letter_spacing(letter_spacing);
+            }
+            if let Some(line_height) = node.text_style.line_height {
+                ts.set_height(line_height);
+            }
+            let mut decoration = skia_safe::textlayout::Decoration::default();
+            decoration.ty = node.text_style.text_decoration.into();
+            ts.set_decoration(&decoration);
+            ts.set_font_families(&[&node.text_style.font_family]);
+
+            let font_style = skia_safe::FontStyle::new(
+                skia_safe::font_style::Weight::from(node.text_style.font_weight.value()),
+                skia_safe::font_style::Width::NORMAL,
+                skia_safe::font_style::Slant::Upright,
+            );
+            ts.set_font_style(font_style);
+
+            // paragraph builder
+            paragraph_builder.push_style(&ts);
+            paragraph_builder.add_text(&node.text);
+            let mut paragraph = paragraph_builder.build();
+            paragraph_builder.pop();
+            paragraph.layout(node.size.width);
+
+            canvas.save();
+            canvas.concat(&sk_matrix(node.transform.matrix));
+            paragraph.paint(canvas, Point::new(node.transform.x(), node.transform.y()));
             canvas.restore();
+            return;
+
+            // // Create paragraph style
+            // let mut paragraph_style = skia_safe::textlayout::ParagraphStyle::new();
+
+            // Create text style
+            // let mut text_style = skia_safe::textlayout::TextStyle::new();
+
+            // // Create paragraph builder
+            // let mut paragraph_builder = skia_safe::textlayout::ParagraphBuilder::new(
+            //     &paragraph_style,
+            //     skia_safe::textlayout::FontCollection::new(),
+            // );
+
+            // // Add text with style
+            // paragraph_builder.push_style(&text_style);
+            // paragraph_builder.pop();
+
+            // // Build paragraph
+            // let mut paragraph = paragraph_builder.build();
+
+            // // Calculate vertical position based on alignment
+            // let y = match node.text_align_vertical {
+            //     TextAlignVertical::Top => 0.0,
+            //     TextAlignVertical::Center => (node.size.height - paragraph.height()) / 2.0,
+            //     TextAlignVertical::Bottom => node.size.height - paragraph.height(),
+            // };
+
+            // // Draw stroke if specified
+            // if let (Some(stroke), Some(stroke_width)) = (&node.stroke, node.stroke_width) {
+            //     let mut stroke_paint =
+            //         sk_paint(stroke, node.opacity, (node.size.width, node.size.height));
+            //     stroke_paint.set_style(skia_safe::paint::Style::Stroke);
+            //     stroke_paint.set_stroke_width(stroke_width);
+            //     stroke_paint.set_blend_mode(node.base.blend_mode.into());
+            //     paragraph.paint(canvas, skia_safe::Point::new(0.0, y));
+            // }
+
+            // // Draw fill
+            // let mut fill_paint = sk_paint(
+            //     &node.fill,
+            //     node.opacity,
+            //     (node.size.width, node.size.height),
+            // );
+            // fill_paint.set_blend_mode(node.base.blend_mode.into());
+            // paragraph.paint(canvas, skia_safe::Point::new(0.0, y));
         }
     }
 

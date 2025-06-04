@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let data = fs::read_to_string("canvas.json").expect("failed to read file");
+        let data = fs::read_to_string("resources/document.json").expect("failed to read file");
         let parsed: CanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
         assert_eq!(parsed.version, "0.0.1-beta.1+20250303");

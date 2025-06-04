@@ -23,6 +23,7 @@ use glutin_winit::DisplayBuilder;
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
 use skia_safe::{Image, Surface, gpu};
+use std::fs;
 use std::{
     ffi::CString,
     num::NonZeroU32,
@@ -37,8 +38,8 @@ use winit::{
 };
 
 fn init_window(
-    width: i32,
-    height: i32,
+    _width: i32,
+    _height: i32,
 ) -> (
     *mut Surface,
     EventLoop<()>,
@@ -267,6 +268,26 @@ async fn main() {
     // Get logical canvas size for background
     // let logical_size = window.inner_size();
 
+    let font_caveat_path: &str = "resources/Caveat-VariableFont_wght.ttf";
+    let font_caveat_data = fs::read(font_caveat_path).expect("failed to read file");
+    let font_caveat_family = "Caveat".to_string();
+    let font_roboto_url = "https://storage.googleapis.com/skia-cdn/misc/Roboto-Regular.ttf";
+    let font_roboto_family = "Roboto".to_string();
+
+    // load the font
+    let font_load_start = Instant::now();
+    let font_data = reqwest::get(font_roboto_url)
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+
+    renderer.add_font(&font_caveat_data);
+    renderer.add_font(&font_data);
+
+    println!("Font load time: {:?}", font_load_start.elapsed());
+
     // Add a background rectangle node
     let background_rect_node = RectangleNode {
         base: BaseNode {
@@ -466,24 +487,25 @@ async fn main() {
             active: true,
             blend_mode: BlendMode::Normal,
         },
-        transform: AffineTransform::identity(),
+        transform: AffineTransform::new(50.0, 50.0, 15.0),
         size: Size {
             width: 300.0,
             height: 200.0,
         },
         text: "Grida Canvas SKIA Bindings Backend".to_string(),
         text_style: TextStyle {
-            text_decoration: TextDecoration::None,
-            font_family: None,
+            text_decoration: TextDecoration::LineThrough,
+            // font_family: font_roboto_family.clone(),
+            font_family: font_caveat_family.clone(),
             font_size: 32.0,
-            font_weight: FontWeight::default(),
+            font_weight: FontWeight::new(900),
             letter_spacing: None,
             line_height: None,
         },
         text_align: TextAlign::Center,
         text_align_vertical: TextAlignVertical::Center,
         fill: Paint::Solid(SolidPaint {
-            color: Color(255, 255, 255, 255), // White text
+            color: Color(0, 0, 0, 255), // White text
         }),
         stroke: Some(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255), // Black stroke

@@ -128,6 +128,21 @@ pub enum TextDecoration {
     None,
     #[serde(rename = "underline")]
     Underline,
+    #[serde(rename = "overline")]
+    Overline,
+    #[serde(rename = "line-through")]
+    LineThrough,
+}
+
+impl From<TextDecoration> for skia_safe::textlayout::TextDecoration {
+    fn from(mode: TextDecoration) -> Self {
+        match mode {
+            TextDecoration::None => skia_safe::textlayout::TextDecoration::NO_DECORATION,
+            TextDecoration::Underline => skia_safe::textlayout::TextDecoration::UNDERLINE,
+            TextDecoration::Overline => skia_safe::textlayout::TextDecoration::OVERLINE,
+            TextDecoration::LineThrough => skia_safe::textlayout::TextDecoration::LINE_THROUGH,
+        }
+    }
 }
 
 /// Supported horizontal text alignment.
@@ -146,6 +161,18 @@ pub enum TextAlign {
     Center,
     #[serde(rename = "justify")]
     Justify,
+}
+
+impl From<TextAlign> for skia_safe::textlayout::TextAlign {
+    fn from(mode: TextAlign) -> Self {
+        use skia_safe::textlayout::TextAlign::*;
+        match mode {
+            TextAlign::Left => Left,
+            TextAlign::Right => Right,
+            TextAlign::Center => Center,
+            TextAlign::Justify => Justify,
+        }
+    }
 }
 
 /// Supported vertical alignment values for text.
@@ -170,7 +197,7 @@ pub enum TextAlignVertical {
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
 #[derive(Debug, Clone, Copy, Deserialize)]
-pub struct FontWeight(pub u16);
+pub struct FontWeight(pub i32);
 
 impl FontWeight {
     /// Creates a new font weight value.
@@ -182,7 +209,7 @@ impl FontWeight {
     /// # Panics
     ///
     /// Panics if the value is not between 1 and 1000.
-    pub fn new(value: u16) -> Self {
+    pub fn new(value: i32) -> Self {
         assert!(
             value >= 1 && value <= 1000,
             "Font weight must be between 1 and 1000"
@@ -191,7 +218,7 @@ impl FontWeight {
     }
 
     /// Returns the font weight value.
-    pub fn value(&self) -> u16 {
+    pub fn value(&self) -> i32 {
         self.0
     }
 
@@ -207,7 +234,7 @@ pub struct TextStyle {
     pub text_decoration: TextDecoration,
 
     /// Optional font family name (e.g. "Roboto").
-    pub font_family: Option<String>,
+    pub font_family: String,
 
     /// Font size in logical pixels.
     pub font_size: f32,

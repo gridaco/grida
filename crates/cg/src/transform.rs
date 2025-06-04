@@ -43,6 +43,13 @@ impl AffineTransform {
         Self::translate(tx, ty).compose(&Self::rotate(rotation))
     }
 
+    pub fn x(&self) -> f32 {
+        self.matrix[0][2]
+    }
+    pub fn y(&self) -> f32 {
+        self.matrix[1][2]
+    }
+
     /// Composes this transform with another.
     ///
     /// This is equivalent to applying `other` after `self`.
