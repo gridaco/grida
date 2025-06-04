@@ -412,6 +412,10 @@ pub struct ImageNode {
     pub _ref: String,
 }
 
+/// A node representing an ellipse shape.
+///
+/// Like RectangleNode, uses a top-left based coordinate system (x,y,width,height).
+/// The ellipse is drawn within the bounding box defined by these coordinates.
 #[derive(Debug, Clone)]
 pub struct EllipseNode {
     pub base: BaseNode,

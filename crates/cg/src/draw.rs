@@ -263,8 +263,8 @@ impl Renderer {
                 (node.size.width, node.size.height),
             );
             let rect = Rect::from_xywh(
-                -node.size.width / 2.0,
-                -node.size.height / 2.0,
+                0.0, // x starts at 0 (top-left)
+                0.0, // y starts at 0 (top-left)
                 node.size.width,
                 node.size.height,
             );
