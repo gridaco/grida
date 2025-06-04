@@ -9,6 +9,7 @@ use cg::schema::{
     TextDecoration, TextSpanNode, TextStyle,
 };
 use cg::transform::AffineTransform;
+use clap::{Parser, Subcommand};
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
@@ -37,6 +38,27 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Load an example scene
+    Example {
+        /// Name of the example to load
+        name: String,
+    },
+    /// Load a scene from a file
+    File {
+        /// Path to the file to load
+        path: String,
+    },
+}
 
 fn init_window(
     _width: i32,
@@ -232,11 +254,8 @@ impl ApplicationHandler for App {
     }
 }
 
-async fn demo_json() -> Scene {
-    let path = "resources/document-2.json";
-    // let path = "resources/document.json";
-    // let path = "resources/hero-main-demo.grida";
-    let file: String = fs::read_to_string(path).expect("failed to read file");
+async fn load_scene_from_file(file_path: &str) -> Scene {
+    let file: String = fs::read_to_string(file_path).expect("failed to read file");
     let canvas_file = parse(&file).expect("failed to parse file");
     let nodes = canvas_file.document.nodes;
     // entry_scene_id or scenes[0]
@@ -629,6 +648,7 @@ async fn demo_static(renderer: &mut Renderer) -> Scene {
 
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
     let width = 1080;
     let height = 1080;
 
@@ -660,11 +680,19 @@ async fn main() {
         "[DPI DEBUG] physical_size: {} x {}",
         physical_width, physical_height
     );
-    // Get logical canvas size for background
-    // let logical_size = window.inner_size();
 
-    // let scene = demo_static(&mut renderer).await;
-    let scene = demo_json().await;
+    // Load the appropriate scene based on command line arguments
+    let scene = match cli.command {
+        Commands::Example { name } => match name.as_str() {
+            "basic" => demo_static(&mut renderer).await,
+            _ => {
+                eprintln!("Unknown example: {}", name);
+                eprintln!("Available examples: basic");
+                std::process::exit(1);
+            }
+        },
+        Commands::File { path } => load_scene_from_file(&path).await,
+    };
 
     let mut app = App {
         renderer,
