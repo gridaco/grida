@@ -1,59 +1,54 @@
-use crate::schema::{
-    BaseNode, BlendMode, Color as SchemaColor, ContainerNode as SchemaContainerNode,
-    EllipseNode as SchemaEllipseNode, FontWeight, GroupNode, Node as SchemaNode, NodeId, Paint,
-    PathNode, PolygonNode, RectangleNode, RectangularCornerRadius, Size, SolidPaint, TextAlign,
-    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
-};
+use crate::schema::*;
 use crate::transform::AffineTransform;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
-pub struct CanvasFile {
+pub struct IOCanvasFile {
     pub version: String,
-    pub document: Document,
+    pub document: IODocument,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Document {
+pub struct IODocument {
     pub bitmaps: HashMap<String, serde_json::Value>,
     pub properties: HashMap<String, serde_json::Value>,
-    pub nodes: HashMap<String, Node>,
-    pub scenes: HashMap<String, Scene>,
+    pub nodes: HashMap<String, IONode>,
+    pub scenes: HashMap<String, IOScene>,
     pub entry_scene_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Scene {
+pub struct IOScene {
     pub id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub type_name: String,
     pub children: Vec<String>,
     #[serde(rename = "backgroundColor")]
-    pub background_color: Option<Color>,
+    pub background_color: Option<RGBA>,
     pub guides: Option<Vec<serde_json::Value>>,
     pub constraints: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum Node {
+pub enum IONode {
     #[serde(rename = "container")]
-    Container(ContainerNode),
+    Container(IOContainerNode),
     #[serde(rename = "text")]
-    Text(TextNode),
+    Text(IOTextNode),
     #[serde(rename = "vector")]
-    Vector(VectorNode),
+    Vector(IOVectorNode),
     #[serde(rename = "ellipse")]
-    Ellipse(EllipseNode),
+    Ellipse(IOEllipseNode),
     #[serde(other)]
     Unknown,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ContainerNode {
+pub struct IOContainerNode {
     pub id: String,
     pub name: String,
     #[serde(default = "default_active")]
@@ -131,7 +126,7 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TextNode {
+pub struct IOTextNode {
     pub id: String,
     pub name: String,
     #[serde(default = "default_active")]
@@ -173,7 +168,7 @@ pub struct TextNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct VectorNode {
+pub struct IOVectorNode {
     pub id: String,
     pub name: String,
     #[serde(default = "default_active")]
@@ -192,11 +187,11 @@ pub struct VectorNode {
     pub width: f32,
     pub height: f32,
     pub fill: Option<Fill>,
-    pub paths: Option<Vec<Path>>,
+    pub paths: Option<Vec<IOPath>>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct EllipseNode {
+pub struct IOEllipseNode {
     pub id: String,
     pub name: String,
     #[serde(default = "default_active")]
@@ -226,7 +221,7 @@ pub struct EllipseNode {
 pub struct Fill {
     #[serde(rename = "type")]
     pub kind: String,
-    pub color: Option<Color>,
+    pub color: Option<RGBA>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -234,13 +229,13 @@ pub struct Border {
     #[serde(rename = "borderWidth")]
     pub border_width: Option<f32>,
     #[serde(rename = "borderColor")]
-    pub border_color: Option<Color>,
+    pub border_color: Option<RGBA>,
     #[serde(rename = "borderStyle")]
     pub border_style: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Path {
+pub struct IOPath {
     pub d: String,
     #[serde(rename = "fillRule")]
     pub fill_rule: String,
@@ -248,7 +243,7 @@ pub struct Path {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Color {
+pub struct RGBA {
     pub r: u8,
     pub g: u8,
     pub b: u8,
@@ -284,13 +279,13 @@ fn default_font_weight() -> FontWeight {
     FontWeight::new(400)
 }
 
-pub fn parse(file: &str) -> Result<CanvasFile, serde_json::Error> {
+pub fn parse(file: &str) -> Result<IOCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
 }
 
-impl From<Color> for SchemaColor {
-    fn from(color: Color) -> Self {
-        SchemaColor(color.r, color.g, color.b, (color.a * 255.0) as u8)
+impl From<RGBA> for Color {
+    fn from(color: RGBA) -> Self {
+        Color(color.r, color.g, color.b, (color.a * 255.0) as u8)
     }
 }
 
@@ -301,27 +296,27 @@ impl From<Option<Fill>> for Paint {
                 "solid" => {
                     if let Some(color) = fill.color {
                         Paint::Solid(SolidPaint {
-                            color: SchemaColor(color.r, color.g, color.b, (color.a * 255.0) as u8),
+                            color: Color(color.r, color.g, color.b, (color.a * 255.0) as u8),
                         })
                     } else {
                         Paint::Solid(SolidPaint {
-                            color: SchemaColor(0, 0, 0, 0),
+                            color: Color(0, 0, 0, 0),
                         })
                     }
                 }
                 _ => Paint::Solid(SolidPaint {
-                    color: SchemaColor(0, 0, 0, 0),
+                    color: Color(0, 0, 0, 0),
                 }),
             },
             None => Paint::Solid(SolidPaint {
-                color: SchemaColor(0, 0, 0, 0),
+                color: Color(0, 0, 0, 0),
             }),
         }
     }
 }
 
-impl From<ContainerNode> for SchemaContainerNode {
-    fn from(node: ContainerNode) -> Self {
+impl From<IOContainerNode> for ContainerNode {
+    fn from(node: IOContainerNode) -> Self {
         let width = match node.width {
             Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
             _ => 0.0,
@@ -330,7 +325,7 @@ impl From<ContainerNode> for SchemaContainerNode {
             Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
             _ => 0.0,
         };
-        SchemaContainerNode {
+        ContainerNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -352,8 +347,8 @@ impl From<ContainerNode> for SchemaContainerNode {
     }
 }
 
-impl From<TextNode> for TextSpanNode {
-    fn from(node: TextNode) -> Self {
+impl From<IOTextNode> for TextSpanNode {
+    fn from(node: IOTextNode) -> Self {
         let width = match node.width {
             Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
             _ => 0.0,
@@ -390,11 +385,11 @@ impl From<TextNode> for TextSpanNode {
     }
 }
 
-impl From<EllipseNode> for SchemaNode {
-    fn from(node: EllipseNode) -> Self {
+impl From<IOEllipseNode> for Node {
+    fn from(node: IOEllipseNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
-        SchemaNode::Ellipse(SchemaEllipseNode {
+        Node::Ellipse(EllipseNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -408,7 +403,7 @@ impl From<EllipseNode> for SchemaNode {
             },
             fill: node.fill.into(),
             stroke: Paint::Solid(SolidPaint {
-                color: SchemaColor(0, 0, 0, 255),
+                color: Color(0, 0, 0, 255),
             }),
             stroke_width: node.stroke_width.unwrap_or(0.0),
             opacity: node.opacity,
@@ -416,12 +411,12 @@ impl From<EllipseNode> for SchemaNode {
     }
 }
 
-impl From<VectorNode> for SchemaNode {
-    fn from(node: VectorNode) -> Self {
+impl From<IOVectorNode> for Node {
+    fn from(node: IOVectorNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
         // For vector nodes, we'll create a path node with the path data
-        SchemaNode::Path(PathNode {
+        Node::Path(PathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -437,7 +432,7 @@ impl From<VectorNode> for SchemaNode {
                     .join(" ")
             }),
             stroke: Paint::Solid(SolidPaint {
-                color: SchemaColor(0, 0, 0, 255),
+                color: Color(0, 0, 0, 255),
             }),
             stroke_width: 0.0,
             opacity: node.opacity,
@@ -445,14 +440,14 @@ impl From<VectorNode> for SchemaNode {
     }
 }
 
-impl From<Node> for SchemaNode {
-    fn from(node: Node) -> Self {
+impl From<IONode> for Node {
+    fn from(node: IONode) -> Self {
         match node {
-            Node::Container(container) => SchemaNode::Container(container.into()),
-            Node::Text(text) => SchemaNode::TextSpan(text.into()),
-            Node::Vector(vector) => vector.into(),
-            Node::Ellipse(ellipse) => ellipse.into(),
-            Node::Unknown => SchemaNode::Group(GroupNode {
+            IONode::Container(container) => Node::Container(container.into()),
+            IONode::Text(text) => Node::TextSpan(text.into()),
+            IONode::Vector(vector) => vector.into(),
+            IONode::Ellipse(ellipse) => ellipse.into(),
+            IONode::Unknown => Node::Group(GroupNode {
                 base: BaseNode {
                     id: "unknown".to_string(),
                     name: "Unknown Node".to_string(),
@@ -474,8 +469,9 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let data = fs::read_to_string("resources/document.json").expect("failed to read file");
-        let parsed: CanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
+        let data =
+            fs::read_to_string("resources/local/document.json").expect("failed to read file");
+        let parsed: IOCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
         assert_eq!(parsed.version, "0.0.1-beta.1+20250303");
         assert!(
