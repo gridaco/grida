@@ -1,3 +1,4 @@
+use cg::camera::Camera;
 use cg::draw::{Backend, Renderer};
 use cg::io::parse;
 use cg::schema::*;
@@ -22,7 +23,7 @@ use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
-    event::WindowEvent,
+    event::{ElementState, MouseScrollDelta, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
@@ -213,6 +214,8 @@ struct App {
     surface_ptr: *mut Surface,
     gl_surface: GlutinSurface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
+    camera: Camera,
+    scene: Scene,
 }
 
 impl ApplicationHandler for App {
@@ -232,10 +235,53 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(_) => {
                 // Ignore resize events
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                match delta {
+                    MouseScrollDelta::LineDelta(x, y) => {
+                        // Handle pan only - inverted direction
+                        let pan_speed = 10.0;
+                        let current_x = self.camera.transform.x();
+                        let current_y = self.camera.transform.y();
+                        self.camera
+                            .set_position(current_x + x * pan_speed, current_y + y * pan_speed);
+                    }
+                    MouseScrollDelta::PixelDelta(delta) => {
+                        // Handle pan only - inverted direction
+                        let pan_speed = 0.5;
+                        let current_x = self.camera.transform.x();
+                        let current_y = self.camera.transform.y();
+                        self.camera.set_position(
+                            current_x + delta.x as f32 * pan_speed,
+                            current_y + delta.y as f32 * pan_speed,
+                        );
+                    }
+                }
+
+                // Update camera in renderer
+                self.renderer.set_camera(self.camera.clone());
+
+                // Redraw
+                self.redraw();
+            }
             WindowEvent::RedrawRequested => {
-                // Do nothing - we only render once at startup
+                self.redraw();
             }
             _ => {}
+        }
+    }
+}
+
+impl App {
+    fn redraw(&mut self) {
+        let surface = unsafe { &mut *self.surface_ptr };
+        let canvas = surface.canvas();
+        canvas.clear(skia_safe::Color::WHITE);
+
+        self.renderer.render_scene(&self.scene);
+        self.renderer.flush();
+
+        if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
+            eprintln!("Error swapping buffers: {:?}", e);
         }
     }
 }
@@ -273,23 +319,25 @@ pub async fn run_demo_window(scene: Scene) {
     let mut renderer = Renderer::new(scale_factor as f32);
     renderer.set_backend(Backend::GL(surface_ptr));
 
+    // Create and set up camera
+    let viewport_size = Size {
+        width: physical_width as f32,
+        height: physical_height as f32,
+    };
+    let camera = Camera::new(viewport_size);
+    renderer.set_camera(camera.clone());
+
     let mut app = App {
         renderer,
         surface_ptr,
         gl_surface,
         gl_context,
+        camera,
+        scene,
     };
 
-    // Render once at startup
-    let surface = unsafe { &mut *app.surface_ptr };
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::WHITE);
-
-    app.renderer.render_scene(&scene);
-    app.renderer.flush();
-    if let Err(e) = app.gl_surface.swap_buffers(&app.gl_context) {
-        eprintln!("Error swapping buffers: {:?}", e);
-    }
+    // Initial render
+    app.redraw();
 
     // Set up the event loop to wait for events
     el.set_control_flow(ControlFlow::Wait);

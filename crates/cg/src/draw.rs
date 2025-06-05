@@ -1,13 +1,12 @@
-use crate::repository::NodeRepository;
 use crate::schema::{
-    BlendMode, Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight,
-    GradientStop, GroupNode, ImageNode, LineNode, Node, NodeId, Paint, PathNode, PolygonNode,
-    RectangleNode, RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene,
-    TextAlign, TextAlignVertical, TextDecoration, TextNode, TextSpanNode,
+    Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, GradientStop, GroupNode,
+    ImageNode, LineNode, Node, NodeId, Paint, PathNode, PolygonNode, RectangleNode,
+    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, TextSpanNode,
 };
+use crate::{camera::Camera, repository::NodeRepository};
 use skia_safe::{
-    Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
-    Shader, Surface, TextBlob, Typeface, surfaces,
+    Color, FontMgr, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect, Shader, Surface,
+    surfaces,
     textlayout::{FontCollection, ParagraphBuilder, ParagraphStyle, TextStyle},
 };
 use std::collections::HashMap;
@@ -31,6 +30,7 @@ pub struct Renderer {
     font_mgr: FontMgr,
     font_collection: FontCollection,
     dpi: f32,
+    camera: Option<Camera>,
 }
 
 impl Renderer {
@@ -45,6 +45,7 @@ impl Renderer {
             font_collection,
             font_mgr,
             dpi,
+            camera: None,
         }
     }
 
@@ -88,15 +89,34 @@ impl Renderer {
         }
     }
 
+    pub fn set_camera(&mut self, camera: Camera) {
+        self.camera = Some(camera);
+    }
+
     pub fn render_scene(&self, scene: &Scene) {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             canvas.save();
+
+            // Apply DPI scaling
             canvas.scale((self.dpi, self.dpi));
+
+            // Apply camera transform if present
+            if let Some(camera) = &self.camera {
+                let view_matrix = camera.view_matrix();
+                canvas.concat(&sk_matrix(view_matrix.matrix));
+
+                // Apply zoom
+                let zoom = camera.zoom;
+                canvas.scale((zoom, zoom));
+            }
+
+            // Render scene nodes
             for child_id in &scene.children {
                 self.render_node(child_id, &scene.nodes);
             }
+
             canvas.restore();
         }
     }

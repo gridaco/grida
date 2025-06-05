@@ -1,5 +1,7 @@
 # `cg` Grida Rendering Backend
 
+## Rendering
+
 **2D Nodes**
 
 - [ ] TextSpan
@@ -7,14 +9,20 @@
 - [ ] Image
 - [ ] Bitmap (for bitmap drawing)
 - [ ] Group
-- [ ] Container
+- [ ] Container (Frame)
 - [ ] Rectangle
 - [ ] Ellipse
 - [ ] Polygon
 - [ ] RegularPolygon
 - [ ] RegularStarPolygon
-- [ ] Path
+- [ ] Path (SVG Path)
+- [ ] Vector (Vector Network)
 - [ ] Line
+
+**Meta**
+
+- [ ] Mask
+- [ ] Clip
 
 **Styles & Effects**
 
@@ -25,7 +33,17 @@
 - [ ] BoxShadow
 - [ ] BlendMode
 
+## API
+
+**Camera**
+
+- [ ] 2D Camera
+
 **Pipeline & API**
 
 - [ ] load font
 - [ ] load image
+
+## Interactivity
+
+- [ ] Hit testing

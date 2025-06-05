@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod draw;
 pub mod factory;
 pub mod io;

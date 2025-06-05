@@ -98,4 +98,26 @@ impl AffineTransform {
             matrix: [[a_inv, c_inv, tx_inv], [b_inv, d_inv, ty_inv]],
         })
     }
+
+    /// Sets the translation components of the transform.
+    /// This preserves any existing rotation.
+    pub fn set_translation(&mut self, tx: f32, ty: f32) {
+        self.matrix[0][2] = tx;
+        self.matrix[1][2] = ty;
+    }
+
+    /// Sets the rotation of the transform in radians.
+    /// This preserves any existing translation.
+    pub fn set_rotation(&mut self, angle: f32) {
+        let (sin, cos) = angle.sin_cos();
+        self.matrix[0][0] = cos;
+        self.matrix[0][1] = -sin;
+        self.matrix[1][0] = sin;
+        self.matrix[1][1] = cos;
+    }
+
+    /// Returns the rotation angle in radians.
+    pub fn rotation(&self) -> f32 {
+        self.matrix[1][0].atan2(self.matrix[0][0])
+    }
 }
