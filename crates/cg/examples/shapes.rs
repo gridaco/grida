@@ -158,6 +158,29 @@ async fn demo_shapes() -> Scene {
         repository.insert(Node::Path(path));
     }
 
+    // Star Polygon Row - demonstrating different point counts and inner radius variations
+    for i in 0..items_per_row {
+        let mut star = nf.create_regular_star_polygon_node();
+        star.base.name = format!("Star Polygon {}", i + 1);
+        star.transform = AffineTransform::new(start_x + spacing * i as f32, 600.0, 0.0);
+        star.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        star.point_count = 3 + i; // 3 to 12 points
+        star.inner_radius = 0.3 + (i as f32 * 0.05); // 0.3 to 0.75 inner radius
+        star.fill = Paint::Solid(SolidPaint {
+            color: Color(
+                200 - (i * 20) as u8,
+                200 - (i * 20) as u8,
+                200 - (i * 20) as u8,
+                255,
+            ), // Fading gray
+        });
+        all_shape_ids.push(star.base.id.clone());
+        repository.insert(Node::RegularStarPolygon(star));
+    }
+
     // Set up the root container
     root_container_node.children = vec![background_rect_id];
     root_container_node.children.extend(all_shape_ids);

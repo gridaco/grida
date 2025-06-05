@@ -12,6 +12,7 @@
 - [ ] Ellipse
 - [ ] Polygon
 - [ ] RegularPolygon
+- [ ] RegularStarPolygon
 - [ ] Path
 - [ ] Line
 

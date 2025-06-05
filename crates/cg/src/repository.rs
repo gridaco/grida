@@ -26,6 +26,7 @@ impl NodeRepository {
             Node::Ellipse(n) => n.base.id.clone(),
             Node::Polygon(n) => n.base.id.clone(),
             Node::RegularPolygon(n) => n.base.id.clone(),
+            Node::RegularStarPolygon(n) => n.base.id.clone(),
             Node::Line(n) => n.base.id.clone(),
             Node::TextSpan(n) => n.base.id.clone(),
             Node::Path(n) => n.base.id.clone(),

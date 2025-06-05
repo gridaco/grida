@@ -335,6 +335,7 @@ pub enum Node {
     Ellipse(EllipseNode),
     Polygon(PolygonNode),
     RegularPolygon(RegularPolygonNode),
+    RegularStarPolygon(RegularStarPolygonNode),
     Line(LineNode),
     TextSpan(TextSpanNode),
     Path(PathNode),
@@ -534,6 +535,84 @@ impl RegularPolygonNode {
                 (x, y)
             })
             .collect();
+
+        PolygonNode {
+            base: self.base.clone(),
+            transform: self.transform,
+            points,
+            fill: self.fill.clone(),
+            stroke: self.stroke.clone(),
+            stroke_width: self.stroke_width,
+            opacity: self.opacity,
+            blend_mode: self.blend_mode,
+        }
+    }
+}
+
+/// A regular star polygon node rendered within a bounding box.
+///
+/// This node represents a geometric star shape composed of alternating outer and inner vertices evenly spaced around a center,
+/// forming a symmetric star with `point_count` spikes. Each spike is constructed by alternating between an outer point
+/// (determined by the bounding box) and an inner point (scaled by `inner_radius`).
+///
+/// For details on star polygon mathematics, see: <https://mathworld.wolfram.com/StarPolygon.html>
+#[derive(Debug, Clone)]
+pub struct RegularStarPolygonNode {
+    /// Core identity + metadata
+    pub base: BaseNode,
+
+    /// Affine transform applied to this node
+    pub transform: AffineTransform,
+
+    /// Bounding box size the polygon is fit into
+    pub size: Size,
+
+    /// Number of equally spaced points (>= 3)
+    pub point_count: usize,
+
+    /// The `inner_radius` defines the radius of the inner vertices of the star, relative to the center.
+    ///
+    /// It controls the sharpness of the star's angles:
+    /// - A smaller value (closer to 0) results in sharper, spikier points.
+    /// - A larger value (closer to or greater than the outer radius) makes the shape closer to a regular polygon with 2 × point_count edges.
+    ///
+    /// The outer radius is defined by the bounding box (`size`), while the `inner_radius` places the inner points on a second concentric circle.
+    /// Unlike `corner_radius`, which affects the rounding of outer corners, `inner_radius` controls the depth of the inner angles between the points.
+    pub inner_radius: f32,
+
+    /// Fill paint (solid or gradient)
+    pub fill: Paint,
+
+    /// The stroke paint used to outline the polygon.
+    pub stroke: Paint,
+
+    /// The stroke width used to outline the polygon.
+    pub stroke_width: f32,
+
+    /// Overall node opacity (0.0–1.0)
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+}
+
+impl RegularStarPolygonNode {
+    pub fn to_polygon(&self) -> PolygonNode {
+        let w = self.size.width;
+        let h = self.size.height;
+        let cx = w / 2.0;
+        let cy = h / 2.0;
+        let outer_r = cx.min(cy);
+        let inner_r = outer_r * self.inner_radius;
+        let step = std::f32::consts::PI / self.point_count as f32;
+        let start_angle = -std::f32::consts::PI / 2.0;
+
+        let mut points = Vec::with_capacity(self.point_count * 2);
+        for i in 0..(self.point_count * 2) {
+            let angle = start_angle + i as f32 * step;
+            let r = if i % 2 == 0 { outer_r } else { inner_r };
+            let x = cx + r * angle.cos();
+            let y = cy + r * angle.sin();
+            points.push((x, y));
+        }
 
         PolygonNode {
             base: self.base.clone(),

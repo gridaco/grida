@@ -2,8 +2,8 @@ use crate::repository::NodeRepository;
 use crate::schema::{
     BlendMode, Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, FontWeight,
     GradientStop, GroupNode, ImageNode, LineNode, Node, NodeId, Paint, PathNode, PolygonNode,
-    RectangleNode, RectangularCornerRadius, RegularPolygonNode, Scene, TextAlign,
-    TextAlignVertical, TextDecoration, TextNode, TextSpanNode,
+    RectangleNode, RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene,
+    TextAlign, TextAlignVertical, TextDecoration, TextNode, TextSpanNode,
 };
 use skia_safe::{
     Color, Font, FontMgr, FontStyle, Image, MaskFilter, Paint as SkiaPaint, Point, RRect, Rect,
@@ -118,6 +118,7 @@ impl Renderer {
             Node::Line(node) => self.draw_line_node(node),
             Node::Image(node) => self.draw_image_node(node),
             Node::Path(node) => self.draw_path_node(node),
+            Node::RegularStarPolygon(node) => self.draw_regular_star_polygon_node(node),
         }
     }
 
@@ -667,6 +668,11 @@ impl Renderer {
             // Restore transform
             canvas.restore();
         }
+    }
+
+    pub fn draw_regular_star_polygon_node(&self, node: &RegularStarPolygonNode) {
+        let poly = node.to_polygon();
+        self.draw_polygon_node(&poly);
     }
 }
 

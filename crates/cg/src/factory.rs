@@ -169,6 +169,21 @@ impl NodeFactory {
         }
     }
 
+    pub fn create_regular_star_polygon_node(&self) -> RegularStarPolygonNode {
+        RegularStarPolygonNode {
+            base: self.default_base_node(),
+            transform: AffineTransform::identity(),
+            size: Self::DEFAULT_SIZE,
+            point_count: 5,    // 5-pointed star by default
+            inner_radius: 0.4, // Default inner radius
+            fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
+            stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
+            stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: BlendMode::Normal,
+        }
+    }
+
     pub fn create_polygon_node(&self) -> PolygonNode {
         PolygonNode {
             base: self.default_base_node(),
