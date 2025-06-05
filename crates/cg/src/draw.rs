@@ -1,5 +1,3 @@
-//
-
 use crate::cvt;
 use crate::schema::*;
 use crate::{
@@ -8,7 +6,7 @@ use crate::{
 };
 use skia_safe::{
     Image, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect, Surface,
-    canvas::SaveLayerRec, image_filters::blur, surfaces, textlayout::*,
+    canvas::SaveLayerRec, surfaces, textlayout::*,
 };
 
 /// Choice of GPU vs. raster backend
@@ -26,7 +24,7 @@ impl Backend {
 }
 
 /// A painter that handles all drawing operations for nodes,
-/// with proper effect ordering and layer-blur pipeline.
+/// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
 pub struct Painter {
     font_collection: FontCollection,
 }
@@ -56,7 +54,7 @@ impl Painter {
         canvas.restore();
     }
 
-    /// If opacity < 1.0, wrap drawing in a save_layer_alpha, else draw directly.
+    /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
     fn with_opacity_layer<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, opacity: f32, f: F) {
         if opacity < 1.0 {
             canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
@@ -69,7 +67,7 @@ impl Painter {
 
     /// Wrap a closure `f` in a layer that applies a Gaussian blur to everything drawn inside.
     fn with_layer_blur<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, radius: f32, f: F) {
-        let image_filter = blur((radius, radius), None, None, None);
+        let image_filter = skia_safe::image_filters::blur((radius, radius), None, None, None);
         let mut paint = SkPaint::default();
         paint.set_image_filter(image_filter);
         canvas.save_layer(&SaveLayerRec::default().paint(&paint));
@@ -85,20 +83,24 @@ impl Painter {
         radii: &RectangularCornerRadius,
         shadow: &FeDropShadow,
     ) {
-        let mut shadow_paint = SkPaint::default();
         let Color(r, g, b, a) = shadow.color;
-        shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
-        shadow_paint.set_anti_alias(true);
-        if shadow.blur > 0.0 {
-            shadow_paint.set_mask_filter(MaskFilter::blur(
-                skia_safe::BlurStyle::Normal,
-                shadow.blur,
-                None,
-            ));
-        }
+        let color = skia_safe::Color::from_argb(a, r, g, b);
 
-        let offset_x = shadow.dx;
-        let offset_y = shadow.dy;
+        // Create drop shadow filter
+        let image_filter = skia_safe::image_filters::drop_shadow(
+            (shadow.dx, shadow.dy),     // offset as tuple
+            (shadow.blur, shadow.blur), // sigma as tuple
+            color,                      // color
+            None,                       // color_space
+            None,                       // input
+            None,                       // crop_rect
+        );
+
+        // Create paint with the drop shadow filter
+        let mut shadow_paint = SkPaint::default();
+        shadow_paint.set_image_filter(image_filter);
+        shadow_paint.set_anti_alias(true);
+
         let RectangularCornerRadius { tl, tr, bl, br } = *radii;
 
         if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
@@ -112,18 +114,14 @@ impl Painter {
                     Point::new(bl, bl),
                 ],
             );
-            let mut shadow_rrect = rrect;
-            shadow_rrect.offset((offset_x, offset_y));
-            canvas.draw_rrect(shadow_rrect, &shadow_paint);
+            canvas.draw_rrect(rrect, &shadow_paint);
         } else {
             // Regular rect shadow
-            let mut shadow_rect = rect;
-            shadow_rect.offset((offset_x, offset_y));
-            canvas.draw_rect(shadow_rect, &shadow_paint);
+            canvas.draw_rect(rect, &shadow_paint);
         }
     }
 
-    /// Draw a backdrop blur: blur what's behind `rect`, clipped to rounded-corner area.
+    /// Draw a backdrop blur: blur what's behind `rect`, clipped to a rounded‐corner area.
     fn draw_backdrop_blur(
         &self,
         canvas: &skia_safe::Canvas,
@@ -131,16 +129,13 @@ impl Painter {
         radii: &RectangularCornerRadius,
         blur: &FeBackdropBlur,
     ) {
-        // Create a paint that blurs
-        let mut paint = SkPaint::default();
-        paint.set_mask_filter(MaskFilter::blur(
-            skia_safe::BlurStyle::Normal,
-            blur.radius,
-            None,
-        ));
+        // 1) Build a Gaussian‐blur filter for the backdrop
+        let image_filter =
+            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None).unwrap();
 
-        // Clip to the shape's rounded rectangle (or rect) so blur only inside
+        // 2) Clip to the shape (rounded rect or plain rect)
         let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+        canvas.save();
         if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
             let rrect = RRect::new_rect_radii(
                 rect,
@@ -151,21 +146,18 @@ impl Painter {
                     Point::new(bl, bl),
                 ],
             );
-            canvas.save();
             canvas.clip_rrect(rrect, None, true);
         } else {
-            canvas.save();
             canvas.clip_rect(rect, None, true);
         }
 
-        // Draw a rectangle filled with the blurred background
-        // Here, draw_rect with a blur mask filter effectively blurs everything behind the rect
-        canvas.save_layer_alpha(None, 255);
-        canvas.draw_rect(rect, &paint);
-        canvas.restore();
+        // 3) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
+        let layer_rec = SaveLayerRec::default().backdrop(&image_filter);
+        canvas.save_layer(&layer_rec);
 
-        // Restore from clipping
-        canvas.restore();
+        // We don't draw any content here—just pushing and popping the layer
+        canvas.restore(); // pop the SaveLayer
+        canvas.restore(); // pop the clip
     }
 
     /// Draw fill and stroke for a shape at `rect` with `radii`, using given paints.
@@ -264,7 +256,6 @@ impl Painter {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = node.corner_radius;
 
-            // If there's an effect, wrap draw in apply_effect
             if let Some(effect) = &node.effect {
                 self.apply_effect(canvas, effect, rect, &radii, || {
                     self.draw_fill_and_stroke(
@@ -279,7 +270,6 @@ impl Painter {
                     );
                 });
             } else {
-                // No effect: just draw fill + stroke
                 self.draw_fill_and_stroke(
                     canvas,
                     rect,
@@ -303,15 +293,12 @@ impl Painter {
         image_repository: &ImageRepository,
     ) {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
-            // Respect container opacity by wrapping in a save_layer_alpha
             self.with_opacity_layer(canvas, node.opacity, || {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
                 let radii = node.corner_radius;
 
-                // If there's an effect, wrap draw in apply_effect
                 if let Some(effect) = &node.effect {
                     self.apply_effect(canvas, effect, rect, &radii, || {
-                        // Draw fill + stroke
                         self.draw_fill_and_stroke(
                             canvas,
                             rect,
@@ -324,7 +311,6 @@ impl Painter {
                         );
                     });
                 } else {
-                    // No effect: just draw fill + stroke
                     self.draw_fill_and_stroke(
                         canvas,
                         rect,
@@ -359,10 +345,9 @@ impl Painter {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
                 let radii = node.corner_radius;
 
-                // If there's an effect, wrap draw in apply_effect
                 if let Some(effect) = &node.effect {
                     self.apply_effect(canvas, effect, rect, &radii, || {
-                        // Draw the image with rounded-rect clipping
+                        // Draw the image with rounded‐rect clipping
                         let mut paint = SkPaint::default();
                         paint.set_anti_alias(true);
                         paint.set_blend_mode(node.blend_mode.into());
@@ -466,7 +451,6 @@ impl Painter {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
 
-            // No effect on ellipse for now; you could extend similarly to rect
             let mut fill_paint = cvt::sk_paint(
                 &node.fill,
                 node.opacity,
@@ -516,7 +500,6 @@ impl Painter {
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
             let radii = RectangularCornerRadius::zero(); // no corner radii for generic path
 
-            // If there is an effect, wrap in apply_effect
             if let Some(effect) = &node.effect {
                 self.apply_effect(canvas, effect, rect, &radii, || {
                     // Draw fill
@@ -579,7 +562,6 @@ impl Painter {
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
             let radii = RectangularCornerRadius::all(node.corner_radius);
 
-            // If effect, wrap
             if let Some(effect) = &node.effect {
                 self.apply_effect(canvas, effect, rect, &radii, || {
                     // Draw fill
