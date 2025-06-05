@@ -54,7 +54,7 @@ async fn demo_texts() -> Scene {
     // Create a sentence text span
     let mut sentence_text_node = nf.create_text_span_node();
     sentence_text_node.base.name = "Sentence Text".to_string();
-    sentence_text_node.transform = AffineTransform::new(50.0, 100.0, 0.0);
+    sentence_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
     sentence_text_node.size = Size {
         width: 500.0,
         height: 100.0,
@@ -76,7 +76,7 @@ async fn demo_texts() -> Scene {
     // Create a paragraph text span
     let mut paragraph_text_node = nf.create_text_span_node();
     paragraph_text_node.base.name = "Paragraph Text".to_string();
-    paragraph_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
+    paragraph_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
     paragraph_text_node.size = Size {
         width: 800.0,
         height: 300.0,

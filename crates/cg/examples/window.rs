@@ -20,13 +20,62 @@ use reqwest;
 use skia_safe::{Surface, gpu};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
+use winit::event::{ElementState, Event, KeyEvent, MouseScrollDelta, WindowEvent};
+use winit::keyboard::Key;
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
-    event::{ElementState, MouseScrollDelta, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
+
+#[derive(Debug)]
+enum Command {
+    Close,
+    ZoomIn,
+    ZoomOut,
+    Pan { x: f32, y: f32 },
+    Redraw,
+    None,
+}
+
+fn handle_window_event(event: WindowEvent) -> Command {
+    match event {
+        WindowEvent::CloseRequested => Command::Close,
+        WindowEvent::Resized(_) => Command::None,
+        WindowEvent::KeyboardInput {
+            event:
+                KeyEvent {
+                    logical_key: key,
+                    state: ElementState::Pressed,
+                    ..
+                },
+            ..
+        } => match key {
+            Key::Character(c) if c == "=" => Command::ZoomIn,
+            Key::Character(c) if c == "-" => Command::ZoomOut,
+            _ => Command::None,
+        },
+        WindowEvent::MouseWheel { delta, .. } => match delta {
+            MouseScrollDelta::LineDelta(x, y) => {
+                let pan_speed = 10.0;
+                Command::Pan {
+                    x: x * pan_speed,
+                    y: y * pan_speed,
+                }
+            }
+            MouseScrollDelta::PixelDelta(delta) => {
+                let pan_speed = 0.5;
+                Command::Pan {
+                    x: delta.x as f32 * pan_speed,
+                    y: delta.y as f32 * pan_speed,
+                }
+            }
+        },
+        WindowEvent::RedrawRequested => Command::Redraw,
+        _ => Command::None,
+    }
+}
 
 pub async fn fetch_font_data(path: &str) -> Vec<u8> {
     // read from file or url
@@ -227,46 +276,32 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        match event {
-            WindowEvent::CloseRequested => {
+        match handle_window_event(event) {
+            Command::Close => {
                 self.renderer.free();
                 event_loop.exit();
             }
-            WindowEvent::Resized(_) => {
-                // Ignore resize events
-            }
-            WindowEvent::MouseWheel { delta, .. } => {
-                match delta {
-                    MouseScrollDelta::LineDelta(x, y) => {
-                        // Handle pan only - inverted direction
-                        let pan_speed = 10.0;
-                        let current_x = self.camera.transform.x();
-                        let current_y = self.camera.transform.y();
-                        self.camera
-                            .set_position(current_x + x * pan_speed, current_y + y * pan_speed);
-                    }
-                    MouseScrollDelta::PixelDelta(delta) => {
-                        // Handle pan only - inverted direction
-                        let pan_speed = 0.5;
-                        let current_x = self.camera.transform.x();
-                        let current_y = self.camera.transform.y();
-                        self.camera.set_position(
-                            current_x + delta.x as f32 * pan_speed,
-                            current_y + delta.y as f32 * pan_speed,
-                        );
-                    }
-                }
-
-                // Update camera in renderer
+            Command::ZoomIn => {
+                self.camera.zoom *= 1.1;
                 self.renderer.set_camera(self.camera.clone());
-
-                // Redraw
                 self.redraw();
             }
-            WindowEvent::RedrawRequested => {
+            Command::ZoomOut => {
+                self.camera.zoom *= 0.9;
+                self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
-            _ => {}
+            Command::Pan { x, y } => {
+                let current_x = self.camera.transform.x();
+                let current_y = self.camera.transform.y();
+                self.camera.set_position(current_x + x, current_y + y);
+                self.renderer.set_camera(self.camera.clone());
+                self.redraw();
+            }
+            Command::Redraw => {
+                self.redraw();
+            }
+            Command::None => {}
         }
     }
 }

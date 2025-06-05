@@ -456,7 +456,8 @@ impl Renderer {
 
             canvas.save();
             canvas.concat(&sk_matrix(node.transform.matrix));
-            paragraph.paint(canvas, Point::new(node.transform.x(), node.transform.y()));
+            // Paint at origin since transform is already applied
+            paragraph.paint(canvas, Point::new(0.0, 0.0));
             canvas.restore();
             return;
         }
