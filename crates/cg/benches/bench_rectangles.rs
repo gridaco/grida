@@ -86,7 +86,7 @@ fn bench_rectangles(c: &mut Criterion) {
     // 1K rectangles
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1.0);
+            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
@@ -110,7 +110,8 @@ fn bench_rectangles(c: &mut Criterion) {
     // 10K rectangles
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1.0);
+            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
@@ -133,7 +134,8 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1.0);
+            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
@@ -157,7 +159,8 @@ fn bench_rectangles(c: &mut Criterion) {
     // 50K rectangles
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1.0);
+            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
@@ -180,7 +183,8 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1.0);
+            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 

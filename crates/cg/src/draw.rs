@@ -471,17 +471,26 @@ pub struct Renderer {
     painter: Painter,
     backend: Option<Backend>,
     dpi: f32,
+    logical_width: f32,
+    logical_height: f32,
     camera: Option<Camera>,
 }
 
 impl Renderer {
-    pub fn new(dpi: f32) -> Self {
+    pub fn new(width: f32, height: f32, dpi: f32) -> Self {
         Self {
             painter: Painter::new(),
             backend: None,
             dpi,
+            logical_width: width,
+            logical_height: height,
             camera: None,
         }
+    }
+
+    pub fn set_logical_size(&mut self, width: f32, height: f32) {
+        self.logical_width = width;
+        self.logical_height = height;
     }
 
     pub fn init_raster(width: i32, height: i32) -> *mut Surface {
@@ -557,8 +566,15 @@ impl Renderer {
     pub fn render_scene(&self, scene: &Scene) {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
+            let width = surface.width() as f32;
+            let height = surface.height() as f32;
             let canvas = surface.canvas();
             canvas.save();
+
+            // Scale to logical size
+            let scale_x = self.logical_width / width;
+            let scale_y = self.logical_height / height;
+            canvas.scale((scale_x, scale_y));
 
             // Apply DPI scaling
             canvas.scale((self.dpi, self.dpi));

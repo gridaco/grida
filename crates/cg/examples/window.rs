@@ -36,13 +36,17 @@ enum Command {
     ZoomOut,
     Pan { x: f32, y: f32 },
     Redraw,
+    Resize { width: u32, height: u32 },
     None,
 }
 
 fn handle_window_event(event: WindowEvent) -> Command {
     match event {
         WindowEvent::CloseRequested => Command::Close,
-        WindowEvent::Resized(_) => Command::None,
+        WindowEvent::Resized(size) => Command::Resize {
+            width: size.width,
+            height: size.height,
+        },
         WindowEvent::KeyboardInput {
             event:
                 KeyEvent {
@@ -263,8 +267,12 @@ struct App {
     surface_ptr: *mut Surface,
     gl_surface: GlutinSurface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
+    gl_config: glutin::config::Config,
+    fb_info: gpu::gl::FramebufferInfo,
+    gr_context: skia_safe::gpu::DirectContext,
     camera: Camera,
     scene: Scene,
+    window: Window,
 }
 
 impl ApplicationHandler for App {
@@ -298,6 +306,9 @@ impl ApplicationHandler for App {
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
+            Command::Resize { width, height } => {
+                self.resize(width, height);
+            }
             Command::Redraw => {
                 self.redraw();
             }
@@ -319,6 +330,46 @@ impl App {
             eprintln!("Error swapping buffers: {:?}", e);
         }
     }
+
+    fn resize(&mut self, width: u32, height: u32) {
+        // Recreate GL surface
+        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+            self.window
+                .raw_window_handle()
+                .expect("Failed to get window handle"),
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+        self.gl_surface = unsafe {
+            self.gl_config
+                .display()
+                .create_window_surface(&self.gl_config, &attrs)
+                .expect("Could not create gl window surface")
+        };
+
+        // Recreate Skia surface
+        let backend_render_target = gpu::backend_render_targets::make_gl(
+            (width as i32, height as i32),
+            self.gl_config.num_samples() as usize,
+            self.gl_config.stencil_size() as usize,
+            self.fb_info,
+        );
+        let surface = gpu::surfaces::wrap_backend_render_target(
+            &mut self.gr_context,
+            &backend_render_target,
+            skia_safe::gpu::SurfaceOrigin::BottomLeft,
+            skia_safe::ColorType::RGBA8888,
+            None,
+            None,
+        )
+        .expect("Could not create skia surface");
+
+        // Update surface pointer
+        unsafe { Box::from_raw(self.surface_ptr) };
+        self.surface_ptr = Box::into_raw(Box::new(surface));
+        self.renderer.set_backend(Backend::GL(self.surface_ptr));
+        self.redraw();
+    }
 }
 
 pub async fn run_demo_window(scene: Scene) {
@@ -331,9 +382,9 @@ pub async fn run_demo_window(scene: Scene) {
         window,
         gl_surface,
         gl_context,
-        _gl_config,
-        _fb_info,
-        _gr_context,
+        gl_config,
+        fb_info,
+        gr_context,
         scale_factor,
     ) = init_window(width, height);
 
@@ -351,7 +402,11 @@ pub async fn run_demo_window(scene: Scene) {
         physical_width, physical_height
     );
 
-    let mut renderer = Renderer::new(scale_factor as f32);
+    let mut renderer = Renderer::new(
+        logical_size.width as f32,
+        logical_size.height as f32,
+        scale_factor as f32,
+    );
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Create and set up camera
@@ -367,8 +422,12 @@ pub async fn run_demo_window(scene: Scene) {
         surface_ptr,
         gl_surface,
         gl_context,
+        gl_config,
+        fb_info,
+        gr_context,
         camera,
         scene,
+        window,
     };
 
     // Initial render
