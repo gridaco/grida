@@ -1,13 +1,10 @@
 use cg::draw::{Backend, Renderer};
 use cg::repository::NodeRepository;
-use cg::schema::{
-    BaseNode, BlendMode, Color, Node, NodeId, Paint, RectangleNode, RectangularCornerRadius, Size,
-    SolidPaint,
-};
+use cg::schema::*;
 use cg::transform::AffineTransform;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-fn create_rectangles(count: usize, with_effects: bool) -> (NodeRepository, Vec<String>) {
+fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     let mut repository = NodeRepository::new();
     let mut ids = Vec::new();
 
@@ -69,7 +66,13 @@ fn create_rectangles(count: usize, with_effects: bool) -> (NodeRepository, Vec<S
 
     repository.insert(Node::Group(root_group));
 
-    (repository, ids)
+    Scene {
+        id: "scene".to_string(),
+        name: "Test Scene".to_string(),
+        transform: AffineTransform::identity(),
+        children: vec!["root".to_string()],
+        nodes: repository,
+    }
 }
 
 fn bench_rectangles(c: &mut Criterion) {
@@ -87,7 +90,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
-            let (nodemap, _) = create_rectangles(black_box(1_000), false);
+            let scene = create_rectangles(black_box(1_000), false);
 
             // Clear canvas
             let surface = unsafe { &mut *surface_ptr };
@@ -99,7 +102,7 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.render_scene(&scene);
             renderer.free();
         })
     });
@@ -111,7 +114,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
-            let (nodemap, _) = create_rectangles(black_box(10_000), false);
+            let scene = create_rectangles(black_box(10_000), false);
 
             // Clear canvas
             let surface = unsafe { &mut *surface_ptr };
@@ -123,7 +126,7 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.render_scene(&scene);
             renderer.free();
         })
     });
@@ -134,7 +137,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
-            let (nodemap, _) = create_rectangles(black_box(10_000), true);
+            let scene = create_rectangles(black_box(10_000), true);
 
             // Clear canvas
             let surface = unsafe { &mut *surface_ptr };
@@ -146,7 +149,7 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.render_scene(&scene);
             renderer.free();
         })
     });
@@ -158,7 +161,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
-            let (nodemap, _) = create_rectangles(black_box(50_000), false);
+            let scene = create_rectangles(black_box(50_000), false);
 
             // Clear canvas
             let surface = unsafe { &mut *surface_ptr };
@@ -170,7 +173,7 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.render_scene(&scene);
             renderer.free();
         })
     });
@@ -181,7 +184,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
-            let (nodemap, _) = create_rectangles(black_box(50_000), true);
+            let scene = create_rectangles(black_box(50_000), true);
 
             // Clear canvas
             let surface = unsafe { &mut *surface_ptr };
@@ -193,7 +196,7 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_node(&"root".to_string(), &nodemap);
+            renderer.render_scene(&scene);
             renderer.free();
         })
     });
