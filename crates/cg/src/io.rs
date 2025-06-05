@@ -406,6 +406,7 @@ impl From<IOEllipseNode> for Node {
                 color: Color(0, 0, 0, 255),
             }),
             stroke_width: node.stroke_width.unwrap_or(0.0),
+            effect: None,
             opacity: node.opacity,
         })
     }
@@ -422,6 +423,7 @@ impl From<IOVectorNode> for Node {
                 name: node.name,
                 active: node.active,
             },
+            blend_mode: BlendMode::Normal,
             transform,
             fill: node.fill.into(),
             data: node.paths.map_or("".to_string(), |paths| {
@@ -436,6 +438,7 @@ impl From<IOVectorNode> for Node {
             }),
             stroke_width: 0.0,
             opacity: node.opacity,
+            effect: None,
         })
     }
 }

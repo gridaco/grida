@@ -463,6 +463,7 @@ pub struct EllipseNode {
     pub stroke_width: f32,
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 ///
@@ -477,6 +478,8 @@ pub struct PathNode {
     pub stroke: Paint,
     pub stroke_width: f32,
     pub opacity: f32,
+    pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
@@ -514,6 +517,7 @@ pub struct PolygonNode {
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 impl PolygonNode {
@@ -563,6 +567,7 @@ pub struct RegularPolygonNode {
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 impl RegularPolygonNode {
@@ -598,6 +603,7 @@ impl RegularPolygonNode {
             stroke_width: self.stroke_width,
             opacity: self.opacity,
             blend_mode: self.blend_mode,
+            effect: self.effect.clone(),
         }
     }
 }
@@ -648,6 +654,7 @@ pub struct RegularStarPolygonNode {
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 impl RegularStarPolygonNode {
@@ -680,6 +687,7 @@ impl RegularStarPolygonNode {
             stroke_width: self.stroke_width,
             opacity: self.opacity,
             blend_mode: self.blend_mode,
+            effect: self.effect.clone(),
         }
     }
 }

@@ -66,6 +66,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effect: None,
         }
     }
 
@@ -151,6 +152,8 @@ impl NodeFactory {
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
+            blend_mode: BlendMode::Normal,
+            effect: None,
         }
     }
 
@@ -167,6 +170,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effect: None,
         }
     }
 
@@ -183,6 +187,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effect: None,
         }
     }
 
@@ -197,6 +202,7 @@ impl NodeFactory {
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
+            effect: None,
         }
     }
 

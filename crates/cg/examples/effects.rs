@@ -66,10 +66,31 @@ async fn demo_effects() -> Scene {
         repository.insert(Node::Rectangle(rect));
     }
 
+    // Row 2: Gaussian Blur Variations
+    for i in 0..4 {
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = format!("Gaussian Blur {}", i + 1);
+        rect.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(20.0);
+        rect.fill = Paint::Solid(SolidPaint {
+            color: Color(255, 255, 255, 255), // White
+        });
+        rect.effect = Some(FilterEffect::GaussianBlur(FeGaussianBlur {
+            radius: 5.0 * (i + 1) as f32,
+        }));
+        all_effect_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+    }
+
+    // Row 3: Backdrop Blur Variations
     // Add a vivid gradient background behind Row 2 (Backdrop Blur Variations)
     let mut vivid_gradient_rect = nf.create_rectangle_node();
     vivid_gradient_rect.base.name = "Vivid Gradient Row2".to_string();
-    vivid_gradient_rect.transform = AffineTransform::new(0.0, 330.0, 0.0); // y middle of row 2
+    vivid_gradient_rect.transform = AffineTransform::new(0.0, 530.0, 0.0); // y middle of row 2
     vivid_gradient_rect.size = Size {
         width: 1080.0,
         height: 90.0,
@@ -95,12 +116,11 @@ async fn demo_effects() -> Scene {
     let vivid_gradient_rect_id = vivid_gradient_rect.base.id.clone();
     repository.insert(Node::Rectangle(vivid_gradient_rect));
 
-    // Row 2: Backdrop Blur Variations
     for i in 0..4 {
         // Create a semi-transparent rectangle with backdrop blur
         let mut blur_rect = nf.create_rectangle_node();
         blur_rect.base.name = format!("Backdrop Blur {}", i + 1);
-        blur_rect.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
+        blur_rect.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
         blur_rect.size = Size {
             width: base_size,
             height: base_size,
@@ -114,26 +134,6 @@ async fn demo_effects() -> Scene {
         }));
         all_effect_ids.push(blur_rect.base.id.clone());
         repository.insert(Node::Rectangle(blur_rect));
-    }
-
-    // Row 3: Gaussian Blur Variations
-    for i in 0..4 {
-        let mut rect = nf.create_rectangle_node();
-        rect.base.name = format!("Gaussian Blur {}", i + 1);
-        rect.transform = AffineTransform::new(start_x + spacing * i as f32, 500.0, 0.0);
-        rect.size = Size {
-            width: base_size,
-            height: base_size,
-        };
-        rect.corner_radius = RectangularCornerRadius::all(20.0);
-        rect.fill = Paint::Solid(SolidPaint {
-            color: Color(255, 255, 255, 255), // White
-        });
-        rect.effect = Some(FilterEffect::GaussianBlur(FeGaussianBlur {
-            radius: 5.0 * (i + 1) as f32,
-        }));
-        all_effect_ids.push(rect.base.id.clone());
-        repository.insert(Node::Rectangle(rect));
     }
 
     // Set up the root container
