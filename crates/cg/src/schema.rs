@@ -1,5 +1,5 @@
+use crate::cvt;
 use crate::repository::NodeRepository;
-use crate::sk_polygon_corner_radius;
 use crate::transform::AffineTransform;
 use core::str;
 use serde::Deserialize;
@@ -489,7 +489,7 @@ pub struct PolygonNode {
 
 impl PolygonNode {
     pub fn to_path(&self) -> skia_safe::Path {
-        sk_polygon_corner_radius::rounded_polygon_path(&self.points, self.corner_radius)
+        cvt::sk_polygon_path(&self.points, self.corner_radius)
     }
 }
 

@@ -14,7 +14,7 @@ fn vector_ops(a: Point, b: Point, scale: f32) -> Point {
 //   - `r`: the corner‐radius
 //
 // Build a Path that walks each edge but rounds each "sharp" corner:
-pub fn rounded_polygon_path(pts: &[Point], r: f32) -> skia_safe::Path {
+pub fn sk_polygon_path(pts: &[Point], r: f32) -> skia_safe::Path {
     let n = pts.len();
     assert!(n >= 3);
 
