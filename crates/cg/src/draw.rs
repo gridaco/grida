@@ -2,8 +2,10 @@ use crate::cvt;
 use crate::schema::*;
 use crate::{camera::Camera, repository::NodeRepository};
 use skia_safe::{
-    FontMgr, Image, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect,
-    Surface, surfaces,
+    FontMgr, Image, ImageFilter, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point,
+    RRect, Rect, Surface,
+    canvas::SaveLayerRec,
+    surfaces,
     textlayout::{FontCollection, ParagraphBuilder, ParagraphStyle, TextStyle},
 };
 use std::collections::HashMap;
@@ -81,40 +83,116 @@ impl Painter {
         radii: &RectangularCornerRadius,
         shadow: &FilterEffect,
     ) {
-        if let FilterEffect::DropShadow(shadow) = shadow {
-            let mut shadow_paint = SkPaint::default();
-            let Color(r, g, b, a) = shadow.color;
-            shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
-            shadow_paint.set_anti_alias(true);
-            if shadow.blur > 0.0 {
-                shadow_paint.set_mask_filter(MaskFilter::blur(
+        match shadow {
+            FilterEffect::DropShadow(shadow) => {
+                let mut shadow_paint = SkPaint::default();
+                let Color(r, g, b, a) = shadow.color;
+                shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
+                shadow_paint.set_anti_alias(true);
+                if shadow.blur > 0.0 {
+                    shadow_paint.set_mask_filter(MaskFilter::blur(
+                        skia_safe::BlurStyle::Normal,
+                        shadow.blur,
+                        None,
+                    ));
+                }
+                let offset_x = shadow.dx;
+                let offset_y = shadow.dy;
+                let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl),
+                            Point::new(tr, tr),
+                            Point::new(br, br),
+                            Point::new(bl, bl),
+                        ],
+                    );
+                    let mut shadow_rrect = rrect;
+                    shadow_rrect.offset((offset_x, offset_y));
+                    canvas.draw_rrect(shadow_rrect, &shadow_paint);
+                } else {
+                    let mut shadow_rect = rect;
+                    shadow_rect.offset((offset_x, offset_y));
+                    canvas.draw_rect(shadow_rect, &shadow_paint);
+                }
+            }
+            FilterEffect::BackdropBlur(blur) => {
+                self.draw_backdrop_blur(canvas, rect, radii, blur);
+            }
+            FilterEffect::GaussianBlur(blur) => {
+                let mut paint = SkPaint::default();
+                paint.set_anti_alias(true);
+                paint.set_mask_filter(MaskFilter::blur(
                     skia_safe::BlurStyle::Normal,
-                    shadow.blur,
+                    blur.radius,
                     None,
                 ));
-            }
-            let offset_x = shadow.dx;
-            let offset_y = shadow.dy;
-            let RectangularCornerRadius { tl, tr, bl, br } = *radii;
-            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-                let rrect = RRect::new_rect_radii(
-                    rect,
-                    &[
-                        Point::new(tl, tl),
-                        Point::new(tr, tr),
-                        Point::new(br, br),
-                        Point::new(bl, bl),
-                    ],
-                );
-                let mut shadow_rrect = rrect;
-                shadow_rrect.offset((offset_x, offset_y));
-                canvas.draw_rrect(shadow_rrect, &shadow_paint);
-            } else {
-                let mut shadow_rect = rect;
-                shadow_rect.offset((offset_x, offset_y));
-                canvas.draw_rect(shadow_rect, &shadow_paint);
+
+                let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl),
+                            Point::new(tr, tr),
+                            Point::new(br, br),
+                            Point::new(bl, bl),
+                        ],
+                    );
+                    canvas.draw_rrect(rrect, &paint);
+                } else {
+                    canvas.draw_rect(rect, &paint);
+                }
             }
         }
+    }
+
+    fn draw_backdrop_blur(
+        &self,
+        canvas: &skia_safe::Canvas,
+        rect: Rect,
+        radii: &RectangularCornerRadius,
+        blur: &FeBackdropBlur,
+    ) {
+        // Create a layer for the backdrop blur effect
+        let mut paint = SkPaint::default();
+        paint.set_mask_filter(MaskFilter::blur(
+            skia_safe::BlurStyle::Normal,
+            blur.radius,
+            None,
+        ));
+
+        // Save the current canvas state
+        canvas.save();
+
+        // Apply rounded corners if needed
+        let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+        if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+            let rrect = RRect::new_rect_radii(
+                rect,
+                &[
+                    Point::new(tl, tl),
+                    Point::new(tr, tr),
+                    Point::new(br, br),
+                    Point::new(bl, bl),
+                ],
+            );
+            canvas.clip_rrect(rrect, None, true);
+        } else {
+            canvas.clip_rect(rect, None, true);
+        }
+
+        // Create a layer for the blur effect
+        canvas.save_layer_alpha(None, 255);
+
+        // Draw the blurred content
+        canvas.draw_rect(rect, &paint);
+
+        // Restore the canvas state
+        canvas.restore();
+        canvas.restore();
     }
 
     fn draw_fill_and_stroke(
@@ -172,19 +250,40 @@ impl Painter {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = node.corner_radius;
-            if let Some(effect) = &node.effect {
-                self.draw_drop_shadow(canvas, rect, &radii, effect);
+            if let Some(FilterEffect::GaussianBlur(blur)) = &node.effect {
+                // First draw the content
+                self.draw_fill_and_stroke(
+                    canvas,
+                    rect,
+                    &radii,
+                    &node.fill,
+                    Some(&node.stroke),
+                    node.stroke_width,
+                    node.blend_mode,
+                    node.opacity,
+                );
+
+                // Then apply the blur filter
+                let image_filter =
+                    skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None);
+                let mut paint = SkPaint::default();
+                paint.set_image_filter(image_filter);
+                canvas.draw_rect(rect, &paint);
+            } else {
+                if let Some(effect) = &node.effect {
+                    self.draw_drop_shadow(canvas, rect, &radii, effect);
+                }
+                self.draw_fill_and_stroke(
+                    canvas,
+                    rect,
+                    &radii,
+                    &node.fill,
+                    Some(&node.stroke),
+                    node.stroke_width,
+                    node.blend_mode,
+                    node.opacity,
+                );
             }
-            self.draw_fill_and_stroke(
-                canvas,
-                rect,
-                &radii,
-                &node.fill,
-                Some(&node.stroke),
-                node.stroke_width,
-                node.blend_mode,
-                node.opacity,
-            );
         });
     }
 

@@ -47,6 +47,16 @@ pub enum FilterEffect {
 
     /// Gaussian blur filter: blur only
     GaussianBlur(FeGaussianBlur),
+
+    /// Background blur filter: blur only
+    BackdropBlur(FeBackdropBlur),
+}
+
+/// A background blur effect, similar to CSS `backdrop-filter: blur(...)`
+#[derive(Debug, Clone, Copy)]
+pub struct FeBackdropBlur {
+    /// Blur radius in logical pixels.
+    pub radius: f32,
 }
 
 /// A drop shadow filter effect (`<feDropShadow>`)
