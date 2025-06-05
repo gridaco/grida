@@ -342,21 +342,31 @@ impl Renderer {
                 return;
             }
             let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
-            let mut path = skia_safe::Path::new();
-            let mut points_iter = node.points.iter();
-            if let Some(&point) = points_iter.next() {
-                path.move_to((point.x, point.y));
-                for point in points_iter {
-                    path.line_to((point.x, point.y));
-                }
-                path.close();
-            }
             canvas.save();
             canvas.concat(&sk_matrix(node.transform.matrix));
+
+            // If corner_radius > 0, use the rounded polygon path
+            let path = if node.corner_radius > 0.0 {
+                node.to_path()
+            } else {
+                // Otherwise create a regular polygon path
+                let mut path = skia_safe::Path::new();
+                let mut points_iter = node.points.iter();
+                if let Some(&point) = points_iter.next() {
+                    path.move_to((point.x, point.y));
+                    for point in points_iter {
+                        path.line_to((point.x, point.y));
+                    }
+                    path.close();
+                }
+                path
+            };
+
             // Draw fill
             let mut fill_paint = fill_paint.clone();
             fill_paint.set_blend_mode(node.blend_mode.into());
             canvas.draw_path(&path, &fill_paint);
+
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
                 let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
@@ -365,6 +375,7 @@ impl Renderer {
                 stroke_paint.set_blend_mode(node.blend_mode.into());
                 canvas.draw_path(&path, &stroke_paint);
             }
+
             canvas.restore();
         }
     }

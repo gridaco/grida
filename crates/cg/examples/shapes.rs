@@ -94,6 +94,7 @@ async fn demo_shapes() -> Scene {
         polygon.base.name = format!("Polygon {}", i + 1);
         polygon.transform = AffineTransform::new(start_x + spacing * i as f32, 300.0, 0.0);
         polygon.points = points;
+        polygon.corner_radius = 16.0;
         polygon.fill = Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,
