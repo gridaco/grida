@@ -86,7 +86,7 @@ async fn demo_shapes() -> Scene {
                 let radius = base_size / 2.0;
                 let x = radius * angle.cos();
                 let y = radius * angle.sin();
-                (x, y)
+                Point { x, y }
             })
             .collect::<Vec<_>>();
 
@@ -168,7 +168,7 @@ async fn demo_shapes() -> Scene {
             height: base_size,
         };
         star.point_count = 3 + i; // 3 to 12 points
-        star.inner_radius = 0.3 + (i as f32 * 0.05); // 0.3 to 0.75 inner radius
+        star.inner_radius = 0.7 - (i as f32 * 0.05); // 0.3 to 0.75 inner radius
         star.fill = Paint::Solid(SolidPaint {
             color: Color(
                 200 - (i * 20) as u8,

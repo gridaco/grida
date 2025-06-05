@@ -115,7 +115,7 @@ async fn demo_basic() -> Scene {
             let radius = 100.0;
             let x = radius * angle.cos();
             let y = radius * angle.sin();
-            (x, y)
+            Point { x, y }
         })
         .collect::<Vec<_>>();
 

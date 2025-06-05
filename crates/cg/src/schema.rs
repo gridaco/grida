@@ -1,10 +1,17 @@
 use crate::repository::NodeRepository;
+use crate::sk_polygon_corner_radius;
 use crate::transform::AffineTransform;
 use core::str;
 use serde::Deserialize;
-use std::f32::consts::PI;
 
 pub type NodeId = String;
+
+/// A 2D point with x and y coordinates.
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    pub x: f32,
+    pub y: f32,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
@@ -429,6 +436,20 @@ pub struct EllipseNode {
     pub blend_mode: BlendMode,
 }
 
+///
+/// SVG Path compatible path node.
+///
+#[derive(Debug, Clone)]
+pub struct PathNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub fill: Paint,
+    pub data: String,
+    pub stroke: Paint,
+    pub stroke_width: f32,
+    pub opacity: f32,
+}
+
 /// A polygon shape defined by a list of absolute 2D points, following the SVG `<polygon>` model.
 ///
 /// ## Characteristics
@@ -446,8 +467,11 @@ pub struct PolygonNode {
     /// 2D affine transform matrix applied to the shape.
     pub transform: AffineTransform,
 
-    /// The list of absolute coordinates (x, y) defining the polygon vertices.
-    pub points: Vec<(f32, f32)>,
+    /// The list of points defining the polygon vertices.
+    pub points: Vec<Point>,
+
+    /// The corner radius of the polygon.
+    pub corner_radius: f32,
 
     /// The paint used to fill the interior of the polygon.
     pub fill: Paint,
@@ -463,18 +487,10 @@ pub struct PolygonNode {
     pub blend_mode: BlendMode,
 }
 
-///
-/// SVG Path compatible path node.
-///
-#[derive(Debug, Clone)]
-pub struct PathNode {
-    pub base: BaseNode,
-    pub transform: AffineTransform,
-    pub fill: Paint,
-    pub data: String,
-    pub stroke: Paint,
-    pub stroke_width: f32,
-    pub opacity: f32,
+impl PolygonNode {
+    pub fn to_path(&self) -> skia_safe::Path {
+        sk_polygon_corner_radius::rounded_polygon_path(&self.points, self.corner_radius)
+    }
 }
 
 /// A node representing a regular polygon (triangle, square, pentagon, etc.)
@@ -487,6 +503,8 @@ pub struct PathNode {
 /// - Even `point_count` aligns the top edge flat.
 ///
 /// The actual rendering is derived, not stored. Rotation should be applied via `transform`.
+///
+/// For details on regular polygon mathematics, see: <https://mathworld.wolfram.com/RegularPolygon.html> (implementation varies)
 #[derive(Debug, Clone)]
 pub struct RegularPolygonNode {
     /// Core identity + metadata
@@ -500,6 +518,9 @@ pub struct RegularPolygonNode {
 
     /// Number of equally spaced points (>= 3)
     pub point_count: usize,
+
+    /// The corner radius of the polygon.
+    pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
     pub fill: Paint,
@@ -517,22 +538,24 @@ pub struct RegularPolygonNode {
 
 impl RegularPolygonNode {
     pub fn to_polygon(&self) -> PolygonNode {
-        let cx = self.size.width / 2.0;
-        let cy = self.size.height / 2.0;
-        let r = cx.min(cy); // fit within bounding box
-
+        let w = self.size.width;
+        let h = self.size.height;
+        let cx = w / 2.0;
+        let cy = h / 2.0;
+        let r = w.min(h) / 2.0;
         let angle_offset = if self.point_count % 2 == 0 {
-            PI / self.point_count as f32
+            std::f32::consts::PI / self.point_count as f32
         } else {
-            -PI / 2.0
+            -std::f32::consts::PI / 2.0
         };
 
-        let points: Vec<(f32, f32)> = (0..self.point_count)
+        let points: Vec<Point> = (0..self.point_count)
             .map(|i| {
-                let angle = (i as f32 / self.point_count as f32) * 2.0 * PI + angle_offset;
-                let x = cx + r * angle.cos();
-                let y = cy + r * angle.sin();
-                (x, y)
+                let theta = (i as f32 / self.point_count as f32) * 2.0 * std::f32::consts::PI
+                    + angle_offset;
+                let x = cx + r * theta.cos();
+                let y = cy + r * theta.sin();
+                Point { x, y }
             })
             .collect();
 
@@ -540,6 +563,7 @@ impl RegularPolygonNode {
             base: self.base.clone(),
             transform: self.transform,
             points,
+            corner_radius: self.corner_radius,
             fill: self.fill.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
@@ -580,6 +604,9 @@ pub struct RegularStarPolygonNode {
     /// Unlike `corner_radius`, which affects the rounding of outer corners, `inner_radius` controls the depth of the inner angles between the points.
     pub inner_radius: f32,
 
+    /// The corner radius of the polygon.
+    pub corner_radius: f32,
+
     /// Fill paint (solid or gradient)
     pub fill: Paint,
 
@@ -611,13 +638,14 @@ impl RegularStarPolygonNode {
             let r = if i % 2 == 0 { outer_r } else { inner_r };
             let x = cx + r * angle.cos();
             let y = cy + r * angle.sin();
-            points.push((x, y));
+            points.push(Point { x, y });
         }
 
         PolygonNode {
             base: self.base.clone(),
             transform: self.transform,
             points,
+            corner_radius: self.corner_radius,
             fill: self.fill.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,

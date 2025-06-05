@@ -161,6 +161,7 @@ impl NodeFactory {
             transform: AffineTransform::identity(),
             size: Self::DEFAULT_SIZE,
             point_count: 3, // Triangle by default
+            corner_radius: 0.0,
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
@@ -176,6 +177,7 @@ impl NodeFactory {
             size: Self::DEFAULT_SIZE,
             point_count: 5,    // 5-pointed star by default
             inner_radius: 0.4, // Default inner radius
+            corner_radius: 0.0,
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
@@ -189,6 +191,7 @@ impl NodeFactory {
             base: self.default_base_node(),
             transform: AffineTransform::identity(),
             points: Vec::new(),
+            corner_radius: 0.0,
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,

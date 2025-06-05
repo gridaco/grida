@@ -344,10 +344,10 @@ impl Renderer {
             let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
             let mut path = skia_safe::Path::new();
             let mut points_iter = node.points.iter();
-            if let Some(&(x0, y0)) = points_iter.next() {
-                path.move_to((x0, y0));
-                for &(x, y) in points_iter {
-                    path.line_to((x, y));
+            if let Some(&point) = points_iter.next() {
+                path.move_to((point.x, point.y));
+                for point in points_iter {
+                    path.line_to((point.x, point.y));
                 }
                 path.close();
             }
