@@ -24,7 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
+import { BlockTypeIcon } from "@/components/form-block-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { blocklabels } from "@/k/supported_block_types";
 import { annotations } from "@/k/supported_field_types";

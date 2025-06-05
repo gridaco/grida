@@ -181,11 +181,11 @@ type Action =
   | DeleteBlock
   | BlockZIndexAction
   | InsertBlockHere
-  | BlcokPointerEnterAction
-  | BlcokPointerLeaveAction
-  | BlcokPointerDownAction
-  | BlcokDragStartAction
-  | BlcokDragAction
+  | BlockPointerEnterAction
+  | BlockPointerLeaveAction
+  | BlockPointerDownAction
+  | BlockDragStartAction
+  | BlockDragAction
   | BlockDragEndAction
   | HandleDragStartAction
   | HandleDragAction
@@ -209,26 +209,26 @@ interface PonterUpAction {
   type: "pointerup";
 }
 
-interface BlcokPointerEnterAction {
+interface BlockPointerEnterAction {
   type: "block/pointerenter";
   id: GridBlockId;
 }
 
-interface BlcokPointerLeaveAction {
+interface BlockPointerLeaveAction {
   type: "block/pointerleave";
 }
 
-interface BlcokPointerDownAction {
+interface BlockPointerDownAction {
   type: "block/pointerdown";
   id: GridBlockId;
 }
 
-interface BlcokDragStartAction {
+interface BlockDragStartAction {
   type: "block/dragstart";
   id: GridBlockId;
 }
 
-interface BlcokDragAction {
+interface BlockDragAction {
   type: "block/drag";
   // Displacement of the current gesture
   movement: [number, number];
