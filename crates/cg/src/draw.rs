@@ -1,6 +1,9 @@
 use crate::cvt;
 use crate::schema::*;
-use crate::{camera::Camera, repository::NodeRepository};
+use crate::{
+    camera::Camera,
+    repository::{FontRepository, ImageRepository, NodeRepository},
+};
 use skia_safe::{
     FontMgr, Image, ImageFilter, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point,
     RRect, Rect, Surface,
@@ -28,29 +31,14 @@ impl Backend {
 /// while Renderer manages the high-level rendering flow.
 pub struct Painter {
     font_collection: FontCollection,
-    font_mgr: FontMgr,
-    image_cache: HashMap<String, Image>,
 }
 
 impl Painter {
-    pub fn new() -> Self {
+    pub fn new(font_repository: &FontRepository) -> Self {
         let mut font_collection = FontCollection::new();
-        let font_mgr = FontMgr::new();
-        font_collection.set_default_font_manager(font_mgr.clone(), None);
+        font_collection.set_default_font_manager(font_repository.font_mgr().clone(), None);
 
-        Self {
-            font_collection,
-            font_mgr,
-            image_cache: HashMap::new(),
-        }
-    }
-
-    pub fn add_image(&mut self, src: String, image: Image) {
-        self.image_cache.insert(src, image);
-    }
-
-    pub fn add_font(&mut self, bytes: &[u8]) {
-        self.font_mgr.new_from_data(bytes, None);
+        Self { font_collection }
     }
 
     // --- Helper methods for internal use ---
@@ -292,6 +280,7 @@ impl Painter {
         canvas: &skia_safe::Canvas,
         node: &ContainerNode,
         repository: &NodeRepository,
+        image_repository: &ImageRepository,
     ) {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             self.with_opacity_layer(canvas, node.opacity, || {
@@ -312,15 +301,20 @@ impl Painter {
                 );
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository);
+                        self.draw_node(canvas, child, repository, image_repository);
                     }
                 }
             });
         });
     }
 
-    pub fn draw_image_node(&self, canvas: &skia_safe::Canvas, node: &ImageNode) {
-        if let Some(image) = self.image_cache.get(&node._ref) {
+    pub fn draw_image_node(
+        &self,
+        canvas: &skia_safe::Canvas,
+        node: &ImageNode,
+        image_repository: &ImageRepository,
+    ) {
+        if let Some(image) = image_repository.get(&node._ref) {
             self.with_canvas_state(canvas, &node.transform.matrix, || {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
                 let radii = node.corner_radius;
@@ -371,29 +365,38 @@ impl Painter {
         canvas: &skia_safe::Canvas,
         node: &GroupNode,
         repository: &NodeRepository,
+        image_repository: &ImageRepository,
     ) {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             self.with_opacity_layer(canvas, node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository);
+                        self.draw_node(canvas, child, repository, image_repository);
                     }
                 }
             });
         });
     }
 
-    pub fn draw_node(&self, canvas: &skia_safe::Canvas, node: &Node, repository: &NodeRepository) {
+    pub fn draw_node(
+        &self,
+        canvas: &skia_safe::Canvas,
+        node: &Node,
+        repository: &NodeRepository,
+        image_repository: &ImageRepository,
+    ) {
         match node {
-            Node::Group(node) => self.draw_group_node(canvas, node, repository),
-            Node::Container(node) => self.draw_container_node(canvas, node, repository),
+            Node::Group(node) => self.draw_group_node(canvas, node, repository, image_repository),
+            Node::Container(node) => {
+                self.draw_container_node(canvas, node, repository, image_repository)
+            }
             Node::Rectangle(node) => self.draw_rect_node(canvas, node),
             Node::Ellipse(node) => self.draw_ellipse_node(canvas, node),
             Node::Polygon(node) => self.draw_polygon_node(canvas, node),
             Node::RegularPolygon(node) => self.draw_regular_polygon_node(canvas, node),
             Node::TextSpan(node) => self.draw_text_span_node(canvas, node),
             Node::Line(node) => self.draw_line_node(canvas, node),
-            Node::Image(node) => self.draw_image_node(canvas, node),
+            Node::Image(node) => self.draw_image_node(canvas, node, image_repository),
             Node::Path(node) => self.draw_path_node(canvas, node),
             Node::RegularStarPolygon(node) => self.draw_regular_star_polygon_node(canvas, node),
         }
@@ -573,17 +576,22 @@ pub struct Renderer {
     logical_width: f32,
     logical_height: f32,
     camera: Option<Camera>,
+    image_repository: ImageRepository,
+    font_repository: FontRepository,
 }
 
 impl Renderer {
     pub fn new(width: f32, height: f32, dpi: f32) -> Self {
+        let font_repository = FontRepository::new();
         Self {
-            painter: Painter::new(),
+            painter: Painter::new(&font_repository),
             backend: None,
             dpi,
             logical_width: width,
             logical_height: height,
             camera: None,
+            image_repository: ImageRepository::new(),
+            font_repository,
         }
     }
 
@@ -603,11 +611,11 @@ impl Renderer {
     }
 
     pub fn add_image(&mut self, src: String, image: Image) {
-        self.painter.add_image(src, image);
+        self.image_repository.add(src, image);
     }
 
     pub fn add_font(&mut self, bytes: &[u8]) {
-        self.painter.add_font(bytes);
+        self.font_repository.add(bytes);
     }
 
     pub fn flush(&self) {
@@ -702,7 +710,8 @@ impl Renderer {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
-                self.painter.draw_node(canvas, node, repository);
+                self.painter
+                    .draw_node(canvas, node, repository, &self.image_repository);
             }
         }
     }

@@ -1,4 +1,5 @@
 use crate::schema::{Node, NodeId};
+use skia_safe::{FontMgr, Image};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.
@@ -6,6 +7,20 @@ use std::collections::HashMap;
 pub struct NodeRepository {
     /// The map of all nodes indexed by their IDs
     nodes: HashMap<NodeId, Node>,
+}
+
+/// A repository for managing images with automatic ID indexing.
+#[derive(Debug, Clone)]
+pub struct ImageRepository {
+    /// The map of all images indexed by their source URLs
+    images: HashMap<String, Image>,
+}
+
+/// A repository for managing fonts.
+#[derive(Debug, Clone)]
+pub struct FontRepository {
+    /// The font manager for handling font data
+    font_mgr: FontMgr,
 }
 
 impl NodeRepository {
@@ -64,6 +79,49 @@ impl NodeRepository {
     /// Returns true if the repository is empty
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
+    }
+}
+
+impl ImageRepository {
+    /// Creates a new empty image repository
+    pub fn new() -> Self {
+        Self {
+            images: HashMap::new(),
+        }
+    }
+
+    /// Adds an image to the repository
+    pub fn add(&mut self, src: String, image: Image) {
+        self.images.insert(src, image);
+    }
+
+    /// Gets a reference to an image by its source URL
+    pub fn get(&self, src: &str) -> Option<&Image> {
+        self.images.get(src)
+    }
+
+    /// Removes an image from the repository by its source URL
+    pub fn remove(&mut self, src: &str) -> Option<Image> {
+        self.images.remove(src)
+    }
+}
+
+impl FontRepository {
+    /// Creates a new empty font repository
+    pub fn new() -> Self {
+        Self {
+            font_mgr: FontMgr::new(),
+        }
+    }
+
+    /// Adds a font to the repository
+    pub fn add(&mut self, bytes: &[u8]) {
+        self.font_mgr.new_from_data(bytes, None);
+    }
+
+    /// Gets a reference to the font manager
+    pub fn font_mgr(&self) -> &FontMgr {
+        &self.font_mgr
     }
 }
 
