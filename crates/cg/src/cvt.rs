@@ -1,12 +1,72 @@
-use crate::schema::Point;
+use crate::schema::*;
 use skia_safe;
 
-// Helper function to handle vector operations
-fn vector_ops(a: Point, b: Point, scale: f32) -> Point {
-    Point {
-        x: a.x - b.x * scale,
-        y: a.y - b.y * scale,
+fn cg_build_gradient_stops(
+    stops: &[GradientStop],
+    opacity: f32,
+) -> (Vec<skia_safe::Color>, Vec<f32>) {
+    let mut colors = Vec::with_capacity(stops.len());
+    let mut positions = Vec::with_capacity(stops.len());
+
+    for stop in stops {
+        let Color(r, g, b, a) = stop.color;
+        let alpha = (a as f32 * opacity).round().clamp(0.0, 255.0) as u8;
+        colors.push(skia_safe::Color::from_argb(alpha, r, g, b));
+        positions.push(stop.offset);
     }
+
+    (colors, positions)
+}
+
+pub fn sk_matrix(m: [[f32; 3]; 2]) -> skia_safe::Matrix {
+    let [[a, c, tx], [b, d, ty]] = m;
+    skia_safe::Matrix::from_affine(&[a, b, c, d, tx, ty])
+}
+
+pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Paint {
+    let mut skia_paint = skia_safe::Paint::default();
+    skia_paint.set_anti_alias(true);
+    let (width, height) = size;
+    match paint {
+        Paint::Solid(solid) => {
+            let Color(r, g, b, a) = solid.color;
+            let final_alpha = (a as f32 * opacity) as u8;
+            skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
+        }
+        Paint::LinearGradient(gradient) => {
+            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
+            let shader = skia_safe::Shader::linear_gradient(
+                (
+                    skia_safe::Point::new(0.0, 0.0),
+                    skia_safe::Point::new(width, 0.0),
+                ),
+                &colors[..],
+                Some(&positions[..]),
+                skia_safe::TileMode::Clamp,
+                None,
+                Some(&sk_matrix(gradient.transform.matrix)),
+            )
+            .unwrap();
+            skia_paint.set_shader(shader);
+        }
+        Paint::RadialGradient(gradient) => {
+            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
+            let center = skia_safe::Point::new(width / 2.0, height / 2.0);
+            let radius = width.min(height) / 2.0;
+            let shader = skia_safe::Shader::radial_gradient(
+                center,
+                radius,
+                &colors[..],
+                Some(&positions[..]),
+                skia_safe::TileMode::Clamp,
+                None,
+                Some(&sk_matrix(gradient.transform.matrix)),
+            )
+            .unwrap();
+            skia_paint.set_shader(shader);
+        }
+    }
+    skia_paint
 }
 
 // Given:
@@ -33,7 +93,7 @@ pub fn sk_polygon_path(pts: &[Point], r: f32) -> skia_safe::Path {
         x: (first.x - last.x) / ((first.x - last.x).powi(2) + (first.y - last.y).powi(2)).sqrt(),
         y: (first.y - last.y) / ((first.x - last.x).powi(2) + (first.y - last.y).powi(2)).sqrt(),
     };
-    let move_into_first = vector_ops(first, dir_a, r);
+    let move_into_first = first.subtract_scaled(dir_a, r);
 
     path.move_to(skia_safe::Point::new(move_into_first.x, move_into_first.y));
 
@@ -50,7 +110,7 @@ pub fn sk_polygon_path(pts: &[Point], r: f32) -> skia_safe::Path {
             x: (curr.x - prev.x) / ((curr.x - prev.x).powi(2) + (curr.y - prev.y).powi(2)).sqrt(),
             y: (curr.y - prev.y) / ((curr.x - prev.x).powi(2) + (curr.y - prev.y).powi(2)).sqrt(),
         };
-        let start_arc = vector_ops(curr, dir_in, r);
+        let start_arc = curr.subtract_scaled(dir_in, r);
 
         // Compute offset along outgoing edge (to where arc ends):
         let dir_out = Point {

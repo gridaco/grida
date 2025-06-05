@@ -1,12 +1,9 @@
-use crate::schema::{
-    Color as SchemaColor, ContainerNode, EllipseNode, FilterEffect, GradientStop, GroupNode,
-    ImageNode, LineNode, Node, NodeId, Paint, PathNode, PolygonNode, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, TextSpanNode,
-};
+use crate::cvt;
+use crate::schema::*;
 use crate::{camera::Camera, repository::NodeRepository};
 use skia_safe::{
-    Color, FontMgr, Image, MaskFilter, Paint as SkiaPaint, Picture, PictureRecorder, Point, RRect,
-    Rect, Shader, Surface, surfaces,
+    FontMgr, Image, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect,
+    Surface, surfaces,
     textlayout::{FontCollection, ParagraphBuilder, ParagraphStyle, TextStyle},
 };
 use std::collections::HashMap;
@@ -62,7 +59,7 @@ impl Painter {
         f: F,
     ) {
         canvas.save();
-        canvas.concat(&sk_matrix(*transform));
+        canvas.concat(&cvt::sk_matrix(*transform));
         f();
         canvas.restore();
     }
@@ -85,8 +82,8 @@ impl Painter {
         shadow: &FilterEffect,
     ) {
         if let FilterEffect::DropShadow(shadow) = shadow {
-            let mut shadow_paint = SkiaPaint::default();
-            let SchemaColor(r, g, b, a) = shadow.color;
+            let mut shadow_paint = SkPaint::default();
+            let Color(r, g, b, a) = shadow.color;
             shadow_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
             shadow_paint.set_anti_alias(true);
             if shadow.blur > 0.0 {
@@ -132,7 +129,7 @@ impl Painter {
         opacity: f32,
     ) {
         let RectangularCornerRadius { tl, tr, bl, br } = *radii;
-        let mut fill_paint = sk_paint(fill, opacity, (rect.width(), rect.height()));
+        let mut fill_paint = cvt::sk_paint(fill, opacity, (rect.width(), rect.height()));
         fill_paint.set_blend_mode(blend_mode.into());
         if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
             let rrect = RRect::new_rect_radii(
@@ -147,7 +144,8 @@ impl Painter {
             canvas.draw_rrect(rrect, &fill_paint);
             if let Some(stroke) = stroke {
                 if stroke_width > 0.0 {
-                    let mut stroke_paint = sk_paint(stroke, opacity, (rect.width(), rect.height()));
+                    let mut stroke_paint =
+                        cvt::sk_paint(stroke, opacity, (rect.width(), rect.height()));
                     stroke_paint.set_stroke(true);
                     stroke_paint.set_stroke_width(stroke_width);
                     stroke_paint.set_blend_mode(blend_mode.into());
@@ -158,7 +156,8 @@ impl Painter {
             canvas.draw_rect(rect, &fill_paint);
             if let Some(stroke) = stroke {
                 if stroke_width > 0.0 {
-                    let mut stroke_paint = sk_paint(stroke, opacity, (rect.width(), rect.height()));
+                    let mut stroke_paint =
+                        cvt::sk_paint(stroke, opacity, (rect.width(), rect.height()));
                     stroke_paint.set_stroke(true);
                     stroke_paint.set_stroke_width(stroke_width);
                     stroke_paint.set_blend_mode(blend_mode.into());
@@ -230,7 +229,7 @@ impl Painter {
                     self.draw_drop_shadow(canvas, rect, &radii, effect);
                 }
                 // Draw the image (with optional rounded corners)
-                let mut paint = SkiaPaint::default();
+                let mut paint = SkPaint::default();
                 paint.set_anti_alias(true);
                 paint.set_blend_mode(node.blend_mode.into());
                 paint.set_alpha((node.opacity * 255.0) as u8);
@@ -302,7 +301,7 @@ impl Painter {
     }
 
     pub fn draw_ellipse_node(&self, canvas: &skia_safe::Canvas, node: &EllipseNode) {
-        let fill_paint = sk_paint(
+        let fill_paint = cvt::sk_paint(
             &node.fill,
             node.opacity,
             (node.size.width, node.size.height),
@@ -320,7 +319,7 @@ impl Painter {
             canvas.draw_oval(rect, &fill_paint);
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
-                let mut stroke_paint = sk_paint(
+                let mut stroke_paint = cvt::sk_paint(
                     &node.stroke,
                     node.opacity,
                     (node.size.width, node.size.height),
@@ -334,7 +333,7 @@ impl Painter {
     }
 
     pub fn draw_line_node(&self, canvas: &skia_safe::Canvas, node: &LineNode) {
-        let mut paint = sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
+        let mut paint = cvt::sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
         paint.set_stroke(true);
         paint.set_stroke_width(node.stroke_width);
         paint.set_blend_mode(node.blend_mode.into());
@@ -351,9 +350,9 @@ impl Painter {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             let path = skia_safe::path::Path::from_svg(&node.data).expect("path is not valid");
 
-            let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
+            let fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
             if node.stroke_width > 0.0 {
-                let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
+                let mut stroke_paint = cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
                 canvas.draw_path(&path, &stroke_paint);
@@ -368,7 +367,7 @@ impl Painter {
             // Not enough points to form a polygon
             return;
         }
-        let fill_paint = sk_paint(&node.fill, node.opacity, (1.0, 1.0));
+        let fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             // If corner_radius > 0, use the rounded polygon path
             let path = if node.corner_radius > 0.0 {
@@ -394,7 +393,7 @@ impl Painter {
 
             // Draw stroke if stroke_width > 0
             if node.stroke_width > 0.0 {
-                let mut stroke_paint = sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
+                let mut stroke_paint = cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
                 stroke_paint.set_stroke(true);
                 stroke_paint.set_stroke_width(node.stroke_width);
                 stroke_paint.set_blend_mode(node.blend_mode.into());
@@ -419,7 +418,7 @@ impl Painter {
 
     pub fn draw_text_span_node(&self, canvas: &skia_safe::Canvas, node: &TextSpanNode) {
         // paints
-        let mut fill_paint = sk_paint(
+        let mut fill_paint = cvt::sk_paint(
             &node.fill,
             node.opacity,
             (node.size.width, node.size.height),
@@ -567,7 +566,7 @@ impl Renderer {
             // Apply camera transform if present
             if let Some(camera) = &self.camera {
                 let view_matrix = camera.view_matrix();
-                canvas.concat(&sk_matrix(view_matrix.matrix));
+                canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
 
                 // Apply zoom
                 let zoom = camera.zoom;
@@ -592,66 +591,4 @@ impl Renderer {
             }
         }
     }
-}
-
-fn sk_matrix(m: [[f32; 3]; 2]) -> skia_safe::Matrix {
-    let [[a, c, tx], [b, d, ty]] = m;
-    skia_safe::Matrix::from_affine(&[a, b, c, d, tx, ty])
-}
-
-fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> SkiaPaint {
-    let mut skia_paint = SkiaPaint::default();
-    skia_paint.set_anti_alias(true);
-    let (width, height) = size;
-    match paint {
-        Paint::Solid(solid) => {
-            let SchemaColor(r, g, b, a) = solid.color;
-            let final_alpha = (a as f32 * opacity) as u8;
-            skia_paint.set_color(Color::from_argb(final_alpha, r, g, b));
-        }
-        Paint::LinearGradient(gradient) => {
-            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
-            let shader = Shader::linear_gradient(
-                (Point::new(0.0, 0.0), Point::new(width, 0.0)),
-                &colors[..],
-                Some(&positions[..]),
-                skia_safe::TileMode::Clamp,
-                None,
-                Some(&sk_matrix(gradient.transform.matrix)),
-            )
-            .unwrap();
-            skia_paint.set_shader(shader);
-        }
-        Paint::RadialGradient(gradient) => {
-            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
-            let center = Point::new(width / 2.0, height / 2.0);
-            let radius = width.min(height) / 2.0;
-            let shader = Shader::radial_gradient(
-                center,
-                radius,
-                &colors[..],
-                Some(&positions[..]),
-                skia_safe::TileMode::Clamp,
-                None,
-                Some(&sk_matrix(gradient.transform.matrix)),
-            )
-            .unwrap();
-            skia_paint.set_shader(shader);
-        }
-    }
-    skia_paint
-}
-
-fn cg_build_gradient_stops(stops: &[GradientStop], opacity: f32) -> (Vec<Color>, Vec<f32>) {
-    let mut colors = Vec::with_capacity(stops.len());
-    let mut positions = Vec::with_capacity(stops.len());
-
-    for stop in stops {
-        let SchemaColor(r, g, b, a) = stop.color;
-        let alpha = (a as f32 * opacity).round().clamp(0.0, 255.0) as u8;
-        colors.push(Color::from_argb(alpha, r, g, b));
-        positions.push(stop.offset);
-    }
-
-    (colors, positions)
 }

@@ -13,6 +13,25 @@ pub struct Point {
     pub y: f32,
 }
 
+impl Point {
+    /// Subtracts a scaled vector from this point.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The point to subtract
+    /// * `scale` - The scale factor to apply to the other point
+    ///
+    /// # Returns
+    ///
+    /// A new point representing the result of the vector operation
+    pub fn subtract_scaled(&self, other: Point, scale: f32) -> Point {
+        Point {
+            x: self.x - other.x * scale,
+            y: self.y - other.y * scale,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
