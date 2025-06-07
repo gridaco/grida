@@ -170,6 +170,7 @@ async fn demo_basic() -> Scene {
         font_weight: FontWeight::new(900),
         letter_spacing: None,
         line_height: None,
+        text_transform: TextTransform::None,
     };
     text_span_node.text_align = TextAlign::Center;
     text_span_node.text_align_vertical = TextAlignVertical::Center;

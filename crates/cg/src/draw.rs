@@ -793,7 +793,10 @@ impl Painter {
         ts.set_font_style(font_style);
 
         para_builder.push_style(&ts);
-        para_builder.add_text(&node.text);
+        // Apply text transform before adding text
+        let transformed_text =
+            crate::text_transform::transform_text(&node.text, node.text_style.text_transform);
+        para_builder.add_text(&transformed_text);
         let mut paragraph = para_builder.build();
         para_builder.pop();
         paragraph.layout(node.size.width);

@@ -44,6 +44,7 @@ async fn demo_texts() -> Scene {
         font_weight: FontWeight::new(700), // Bold
         letter_spacing: None,
         line_height: None,
+        text_transform: TextTransform::Uppercase,
     };
     word_text_node.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(255, 255, 255, 255),
@@ -71,6 +72,7 @@ async fn demo_texts() -> Scene {
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: None,
+        text_transform: TextTransform::None,
     };
     sentence_text_node.text_align = TextAlign::Left;
     sentence_text_node.text_align_vertical = TextAlignVertical::Center;
@@ -91,6 +93,7 @@ async fn demo_texts() -> Scene {
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: Some(1.5), // 1.5 line height for better readability
+        text_transform: TextTransform::None,
     };
     paragraph_text_node.text_align = TextAlign::Left;
     paragraph_text_node.text_align_vertical = TextAlignVertical::Top;
@@ -98,6 +101,10 @@ async fn demo_texts() -> Scene {
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
     root_container_node.base.name = "Root Container".to_string();
+    root_container_node.size = Size {
+        width: 1080.0,
+        height: 1080.0,
+    };
 
     // Create a node repository and add all nodes
     let mut repository = NodeRepository::new();

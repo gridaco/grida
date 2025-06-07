@@ -381,6 +381,7 @@ impl From<IOTextNode> for TextSpanNode {
                 font_weight: node.font_weight,
                 letter_spacing: node.letter_spacing,
                 line_height: node.line_height,
+                text_transform: TextTransform::None,
             },
             text_align: node.text_align,
             text_align_vertical: node.text_align_vertical,

@@ -179,6 +179,20 @@ impl From<BlendMode> for skia_safe::BlendMode {
     }
 }
 
+/// Text Transform (Text Case)
+/// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform)
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub enum TextTransform {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "uppercase")]
+    Uppercase,
+    #[serde(rename = "lowercase")]
+    Lowercase,
+    #[serde(rename = "capitalize")]
+    Capitalize,
+}
+
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
@@ -311,6 +325,9 @@ pub struct TextStyle {
 
     /// Line height
     pub line_height: Option<f32>,
+
+    /// Text transform (e.g. uppercase, lowercase, capitalize)
+    pub text_transform: TextTransform,
 }
 
 #[derive(Debug, Clone, Copy)]

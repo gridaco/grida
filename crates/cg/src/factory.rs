@@ -113,6 +113,7 @@ impl NodeFactory {
                 font_weight: FontWeight::default(),
                 letter_spacing: None,
                 line_height: None,
+                text_transform: TextTransform::None,
             },
             text_align: TextAlign::Left,
             text_align_vertical: TextAlignVertical::Top,
