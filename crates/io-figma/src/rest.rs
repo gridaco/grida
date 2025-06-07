@@ -55,7 +55,7 @@ pub struct LayoutGrid {
     pub alignment: Option<String>,
     pub gutter_size: Option<f32>,
     pub offset: Option<f32>,
-    pub count: Option<u32>,
+    pub count: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,7 +68,7 @@ pub struct Hyperlink {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LayerBase {
     pub id: String,
     pub name: String,
@@ -92,9 +92,26 @@ pub struct LayerBase {
     pub explicit_variable_modes: Option<HashMap<String, String>>,
 }
 
+fn validate_document_type<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s == "DOCUMENT" {
+        Ok(s)
+    } else {
+        Err(de::Error::custom(format!(
+            "expected type to be DOCUMENT, got {}",
+            s
+        )))
+    }
+}
+
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DocumentNode {
+    #[serde(rename = "type", deserialize_with = "validate_document_type")]
+    pub r#type: String,
     #[serde(flatten)]
     pub base: LayerBase,
     pub children: Vec<Node>,
@@ -227,6 +244,7 @@ pub struct BooleanOperationNode {
 pub struct ComponentNode {
     #[serde(flatten)]
     pub base: FrameNode,
+    pub documentation_links: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -386,8 +404,10 @@ pub enum Node {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GetFileResponse {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: u32,
     pub name: String,
     pub role: Option<String>,
     #[serde(rename = "lastModified")]
@@ -397,7 +417,15 @@ pub struct GetFileResponse {
     #[serde(rename = "thumbnailUrl")]
     pub thumbnail_url: Option<String>,
     pub version: String,
+    #[serde(rename = "linkAccess")]
+    pub link_access: Option<String>,
     pub document: DocumentNode,
+    // ignored
+    pub components: Option<Value>,
+    // ignored
+    pub component_sets: Option<Value>,
+    // ignored
+    pub styles: Option<Value>,
 }
 
 // Custom deserializer for Option<Rectangle>
