@@ -32,6 +32,15 @@ impl Point {
     }
 }
 
+/// Boolean path operation.
+#[derive(Debug, Clone)]
+pub enum BooleanPathOperation {
+    Union,        // A ∪ B
+    Intersection, // A ∩ B
+    Difference,   // A - B
+    Xor,          // A ⊕ B
+}
+
 /// Supported fit modes.
 ///
 /// Only `Contain`, `Cover`, and `None` are supported in the current version.
@@ -528,6 +537,14 @@ pub struct EllipseNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+}
+
+#[derive(Debug, Clone)]
+#[deprecated(note = "Not implemented yet")]
+pub struct BooleanPathOperationNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub op: BooleanPathOperation,
 }
 
 ///
