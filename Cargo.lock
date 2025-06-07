@@ -373,6 +373,7 @@ dependencies = [
  "clap",
  "console_error_panic_hook",
  "criterion",
+ "figma",
  "gl",
  "glutin",
  "glutin-winit",

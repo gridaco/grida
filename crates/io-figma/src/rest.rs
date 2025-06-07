@@ -1,5 +1,5 @@
-use serde::de::{self, Deserializer};
 use serde::Deserialize;
+use serde::de::{self, Deserializer};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -68,6 +68,181 @@ pub struct Hyperlink {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BlendMode {
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    HardLight,
+    SoftLight,
+    Difference,
+    Exclusion,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VariableAlias {
+    pub id: String,
+    pub r#type: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseShadowEffect {
+    pub color: RGBA,
+    pub blend_mode: BlendMode,
+    pub offset: Vector,
+    pub radius: f32,
+    pub spread: Option<f32>,
+    pub visible: bool,
+    pub bound_variables: Option<ShadowBoundVariables>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShadowBoundVariables {
+    pub radius: Option<VariableAlias>,
+    pub spread: Option<VariableAlias>,
+    pub color: Option<VariableAlias>,
+    pub offset_x: Option<VariableAlias>,
+    pub offset_y: Option<VariableAlias>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropShadowEffect {
+    #[serde(flatten)]
+    pub base: BaseShadowEffect,
+    #[serde(rename = "type")]
+    pub effect_type: String,
+    pub show_shadow_behind_node: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InnerShadowEffect {
+    #[serde(flatten)]
+    pub base: BaseShadowEffect,
+    #[serde(rename = "type")]
+    pub effect_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseBlurEffect {
+    #[serde(rename = "type")]
+    pub effect_type: BlurEffectType,
+    pub visible: bool,
+    pub radius: f32,
+    pub bound_variables: Option<BlurBoundVariables>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BlurEffectType {
+    LayerBlur,
+    BackgroundBlur,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlurBoundVariables {
+    pub radius: Option<VariableAlias>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NormalBlurEffect {
+    #[serde(flatten)]
+    pub base: BaseBlurEffect,
+    pub blur_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressiveBlurEffect {
+    #[serde(flatten)]
+    pub base: BaseBlurEffect,
+    pub blur_type: String,
+    pub start_radius: f32,
+    pub start_offset: Vector,
+    pub end_offset: Vector,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextureEffect {
+    #[serde(rename = "type")]
+    pub effect_type: String,
+    pub noise_size: f32,
+    pub radius: f32,
+    pub clip_to_shape: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseNoiseEffect {
+    #[serde(rename = "type")]
+    pub effect_type: String,
+    pub blend_mode: BlendMode,
+    pub noise_size: f32,
+    pub density: f32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonotoneNoiseEffect {
+    #[serde(flatten)]
+    pub base: BaseNoiseEffect,
+    pub noise_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultitoneNoiseEffect {
+    #[serde(flatten)]
+    pub base: BaseNoiseEffect,
+    pub noise_type: String,
+    pub opacity: f32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuotoneNoiseEffect {
+    #[serde(flatten)]
+    pub base: BaseNoiseEffect,
+    pub noise_type: String,
+    pub secondary_color: RGBA,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum Effect {
+    DropShadow(DropShadowEffect),
+    InnerShadow(InnerShadowEffect),
+    LayerBlur(NormalBlurEffect),
+    BackgroundBlur(NormalBlurEffect),
+    ProgressiveBlur(ProgressiveBlurEffect),
+    Texture(TextureEffect),
+    Noise(MonotoneNoiseEffect),
+    MultitoneNoise(MultitoneNoiseEffect),
+    DuotoneNoise(DuotoneNoiseEffect),
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LayerBase {
     pub id: String,
@@ -90,6 +265,12 @@ pub struct LayerBase {
     pub bound_variables: Option<Value>,
     #[serde(default)]
     pub explicit_variable_modes: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HasEffectsTrait {
+    pub effects: Vec<Effect>,
 }
 
 fn validate_document_type<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -174,6 +355,8 @@ pub struct FrameNode {
     pub counter_axis_spacing: Option<f32>,
     pub counter_axis_align_content: Option<String>,
     pub layout_grids: Option<Vec<LayoutGrid>>,
+    #[serde(flatten)]
+    pub effects: HasEffectsTrait,
 }
 
 #[derive(Debug, Deserialize)]
@@ -228,6 +411,8 @@ pub struct ShapeNode {
     pub stroke_dashes: Option<Vec<f32>>,
     pub fills: Option<Vec<Paint>>,
     pub styles: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub effects: HasEffectsTrait,
 }
 
 #[derive(Debug, Deserialize)]

@@ -283,7 +283,7 @@ pub enum TextAlignVertical {
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
 #[derive(Debug, Clone, Copy, Deserialize)]
-pub struct FontWeight(pub i32);
+pub struct FontWeight(pub u32);
 
 impl FontWeight {
     /// Creates a new font weight value.
@@ -295,7 +295,7 @@ impl FontWeight {
     /// # Panics
     ///
     /// Panics if the value is not between 1 and 1000.
-    pub fn new(value: i32) -> Self {
+    pub fn new(value: u32) -> Self {
         assert!(
             value >= 1 && value <= 1000,
             "Font weight must be between 1 and 1000"
@@ -304,7 +304,7 @@ impl FontWeight {
     }
 
     /// Returns the font weight value.
-    pub fn value(&self) -> i32 {
+    pub fn value(&self) -> u32 {
         self.0
     }
 

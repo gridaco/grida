@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 serde = "1.0.219"
 serde_json = "1.0.140"
 uuid = { version = "1.17.0", features = ["v4"] }
+figma = { path = "../io-figma" }
 
 # WASM-specific dependencies
 wasm-bindgen = { version = "0.2.100", optional = true }

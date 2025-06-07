@@ -786,7 +786,7 @@ impl Painter {
         ts.set_decoration(&decor);
         ts.set_font_families(&[&node.text_style.font_family]);
         let font_style = skia_safe::FontStyle::new(
-            skia_safe::font_style::Weight::from(node.text_style.font_weight.value()),
+            skia_safe::font_style::Weight::from(node.text_style.font_weight.value() as i32),
             skia_safe::font_style::Width::NORMAL,
             skia_safe::font_style::Slant::Upright,
         );
