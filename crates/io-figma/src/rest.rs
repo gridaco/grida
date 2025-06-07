@@ -1,3 +1,4 @@
+use serde::de::{self, Deserializer};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ pub struct RGBA {
     pub a: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Rectangle {
     pub x: f32,
@@ -115,9 +116,15 @@ pub struct FrameNode {
     #[serde(flatten)]
     pub base: LayerBase,
     pub children: Vec<Node>,
-    #[serde(rename = "absoluteBoundingBox")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_bounding_box: Option<Rectangle>,
-    #[serde(rename = "absoluteRenderBounds")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_render_bounds: Option<Rectangle>,
     pub preserve_ratio: Option<bool>,
     pub constraints: Option<LayoutConstraint>,
@@ -160,9 +167,15 @@ pub struct SectionNode {
     pub children: Vec<Node>,
     #[serde(rename = "sectionContentsHidden")]
     pub section_contents_hidden: Option<bool>,
-    #[serde(rename = "absoluteBoundingBox")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_bounding_box: Option<Rectangle>,
-    #[serde(rename = "absoluteRenderBounds")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_render_bounds: Option<Rectangle>,
     pub preserve_ratio: Option<bool>,
     pub constraints: Option<LayoutConstraint>,
@@ -176,9 +189,15 @@ pub struct SectionNode {
 pub struct ShapeNode {
     #[serde(flatten)]
     pub base: LayerBase,
-    #[serde(rename = "absoluteBoundingBox")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_bounding_box: Option<Rectangle>,
-    #[serde(rename = "absoluteRenderBounds")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_render_bounds: Option<Rectangle>,
     pub preserve_ratio: Option<bool>,
     pub constraints: Option<LayoutConstraint>,
@@ -268,7 +287,10 @@ pub struct TextNode {
     pub characters: String,
     #[serde(rename = "style")]
     pub style: Option<TypeStyle>,
-    #[serde(rename = "absoluteBoundingBox")]
+    #[serde(
+        default,
+        deserialize_with = "crate::rest::deserialize_option_rectangle"
+    )]
     pub absolute_bounding_box: Option<Rectangle>,
     pub character_style_overrides: Option<Vec<u32>>,
     pub style_override_table: Option<HashMap<String, TypeStyle>>,
@@ -376,4 +398,34 @@ pub struct GetFileResponse {
     pub thumbnail_url: Option<String>,
     pub version: String,
     pub document: DocumentNode,
+}
+
+// Custom deserializer for Option<Rectangle>
+pub fn deserialize_option_rectangle<'de, D>(deserializer: D) -> Result<Option<Rectangle>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<Value>::deserialize(deserializer)?;
+    match opt {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Object(ref map)) => {
+            // If all fields are null, treat as None
+            let all_null = ["x", "y", "width", "height"]
+                .iter()
+                .all(|k| map.get(*k).map_or(true, |v| v.is_null()));
+            if all_null {
+                return Ok(None);
+            }
+            // Otherwise, try to deserialize as Rectangle
+            let rect: Rectangle =
+                serde_json::from_value(Value::Object(map.clone())).map_err(de::Error::custom)?;
+            Ok(Some(rect))
+        }
+        Some(other) => {
+            // If it's not an object or null, error
+            Err(de::Error::custom(format!(
+                "Unexpected value for Rectangle: {other:?}"
+            )))
+        }
+    }
 }
