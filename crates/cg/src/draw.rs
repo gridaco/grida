@@ -275,6 +275,33 @@ impl Painter {
         }
     }
 
+    /// Helper method to apply clipping to a region with optional corner radius
+    fn with_clip<F: FnOnce()>(
+        &self,
+        canvas: &skia_safe::Canvas,
+        rect: Rect,
+        radii: &RectangularCornerRadius,
+        f: F,
+    ) {
+        canvas.save();
+        if radii.tl > 0.0 || radii.tr > 0.0 || radii.bl > 0.0 || radii.br > 0.0 {
+            let rrect = RRect::new_rect_radii(
+                rect,
+                &[
+                    Point::new(radii.tl, radii.tl),
+                    Point::new(radii.tr, radii.tr),
+                    Point::new(radii.br, radii.br),
+                    Point::new(radii.bl, radii.bl),
+                ],
+            );
+            canvas.clip_rrect(rrect, None, true);
+        } else {
+            canvas.clip_rect(rect, None, true);
+        }
+        f();
+        canvas.restore();
+    }
+
     // ============================
     // === Node Drawing Methods ===
     // ============================
@@ -330,6 +357,7 @@ impl Painter {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
                 let radii = node.corner_radius;
 
+                // Draw effects first (if any) - these won't be clipped
                 if let Some(effect) = &node.effect {
                     self.apply_effect(canvas, effect, rect, &radii, || {
                         self.draw_fill_and_stroke(
@@ -360,10 +388,21 @@ impl Painter {
                     );
                 }
 
-                // Draw children on top
-                for child_id in &node.children {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository, image_repository);
+                // Draw children with clipping if enabled
+                if node.clip {
+                    self.with_clip(canvas, rect, &radii, || {
+                        for child_id in &node.children {
+                            if let Some(child) = repository.get(child_id) {
+                                self.draw_node(canvas, child, repository, image_repository);
+                            }
+                        }
+                    });
+                } else {
+                    // Draw children without clipping
+                    for child_id in &node.children {
+                        if let Some(child) = repository.get(child_id) {
+                            self.draw_node(canvas, child, repository, image_repository);
+                        }
                     }
                 }
             });

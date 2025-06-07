@@ -152,6 +152,7 @@ impl NodeFactory {
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
+            clip: true,
         }
     }
 

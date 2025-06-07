@@ -349,6 +349,7 @@ impl From<IOContainerNode> for ContainerNode {
             effect: None,
             children: node.children,
             opacity: node.opacity,
+            clip: true,
         }
     }
 }

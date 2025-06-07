@@ -445,6 +445,7 @@ pub struct ContainerNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+    pub clip: bool,
 }
 
 #[derive(Debug, Clone)]
