@@ -1,15 +1,10 @@
-use std::vec;
-
 use crate::repository::NodeRepository;
 use crate::schema::{
-    BaseNode, BlendMode, Color, ContainerNode, EllipseNode, FeBackdropBlur, FeDropShadow,
-    FeGaussianBlur, FilterEffect, FontWeight, LineNode, Node, NodeId, Paint, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
-    StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
-    TextTransform,
+    BaseNode, BlendMode, Color, ContainerNode, FeDropShadow, FeGaussianBlur, FilterEffect,
+    FontWeight, LineNode, Node, NodeId, Paint, RectangleNode, RectangularCornerRadius,
+    RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign,
+    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
 };
-use figma_api::models::frame_node::Type as FrameType;
-use figma_api::models::group_node::Type as GroupType;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
     TextAlignHorizontal as FigmaTextAlignHorizontal, TextAlignVertical as FigmaTextAlignVertical,
@@ -17,15 +12,18 @@ use figma_api::models::type_style::{
 };
 use figma_api::models::vector::Vector;
 use figma_api::models::{
-    BlurEffect, BooleanOperationNode, CanvasNode, ComponentNode, ComponentSetNode, ConnectorNode,
-    DocumentNode, Effect, EmbedNode, FrameNode, GroupNode, InstanceNode, IsLayerTrait,
-    LineNode as FigmaLineNode, LinkUnfurlNode, Node as FigmaNode, NormalBlurEffect,
+    BooleanOperationNode, CanvasNode, ComponentNode, ComponentSetNode, DocumentNode, Effect,
+    FrameNode, GroupNode, InstanceNode, LineNode as FigmaLineNode, LinkUnfurlNode,
     Paint as FigmaPaint, RectangleNode as FigmaRectangleNode,
-    RegularPolygonNode as FigmaRegularPolygonNode, Rgba, SectionNode, ShapeWithTextNode, SliceNode,
-    StarNode, StickyNode, SubcanvasNode as FigmaSubcanvasNode, TableCellNode, TableNode, TextNode,
-    TextPathNode, TransformGroupNode, VectorNode, WashiTapeNode, WidgetNode,
+    RegularPolygonNode as FigmaRegularPolygonNode, Rgba, SectionNode, SliceNode, StarNode,
+    SubcanvasNode as FigmaSubcanvasNode, TextNode, VectorNode,
 };
 use grida_cmath::transform::AffineTransform;
+
+const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
+    color: Color(0, 0, 0, 0),
+    opacity: 0.0,
+});
 
 // Map implementations
 impl From<&Rgba> for Color {
@@ -159,25 +157,25 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's fills to our Paint
-    fn convert_fills(fills: Option<&Vec<FigmaPaint>>) -> Paint {
-        fills.map_or(
-            Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
-            |paints| Self::convert_paint(&paints[0]),
-        )
+    fn convert_fills(fills: Option<&Vec<FigmaPaint>>) -> Option<Paint> {
+        fills.and_then(|paints| {
+            if paints.is_empty() {
+                None
+            } else {
+                Some(Self::convert_paint(&paints[0]))
+            }
+        })
     }
 
     /// Convert Figma's strokes to our Paint
-    fn convert_strokes(strokes: Option<&Option<Vec<FigmaPaint>>>) -> Paint {
-        strokes.and_then(|s| s.as_ref()).map_or(
-            Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
-            |paints| Self::convert_fills(Some(paints)),
-        )
+    fn convert_strokes(strokes: Option<&Option<Vec<FigmaPaint>>>) -> Option<Paint> {
+        strokes.and_then(|s| s.as_ref()).and_then(|paints| {
+            if paints.is_empty() {
+                None
+            } else {
+                Some(Self::convert_paint(&paints[0]))
+            }
+        })
     }
 
     /// Convert Figma's stroke align to our StrokeAlign
@@ -247,17 +245,12 @@ impl FigmaConverter {
                     }));
                 }
                 Effect::LayerBlur(blur) => {
-                    match blur.as_ref() {
-                        BlurEffect::NormalBlurEffect(normal_blur) => {
-                            if !normal_blur.visible {
-                                continue;
-                            }
-                            return Some(FilterEffect::GaussianBlur(FeGaussianBlur {
-                                radius: normal_blur.radius as f32,
-                            }));
-                        }
-                        BlurEffect::ProgressiveBlurEffect(_) => continue, // Progressive blur not supported
+                    if !blur.visible {
+                        continue;
                     }
+                    return Some(FilterEffect::GaussianBlur(FeGaussianBlur {
+                        radius: blur.radius as f32,
+                    }));
                 }
                 _ => continue, // Skip unsupported effects
             }
@@ -430,10 +423,7 @@ impl FigmaConverter {
             transform,
             size,
             corner_radius: RectangularCornerRadius::zero(),
-            fill: Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255),
-                opacity: 1.0,
-            }),
+            fill: Self::convert_fills(None).unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
@@ -447,7 +437,6 @@ impl FigmaConverter {
 
     fn convert_text(&mut self, text: &Box<TextNode>) -> Result<Node, String> {
         let style = text.style.as_ref();
-        let bounding_box = text.absolute_bounding_box.as_ref();
 
         Ok(Node::TextSpan(TextSpanNode {
             base: BaseNode {
@@ -457,8 +446,8 @@ impl FigmaConverter {
             },
             transform: Self::convert_transform(None),
             size: Size {
-                width: bounding_box.width as f32,
-                height: bounding_box.height as f32,
+                width: text.size.as_ref().map_or(0.0, |size| size.x as f32),
+                height: text.size.as_ref().map_or(0.0, |size| size.y as f32),
             },
             text: text.characters.clone(),
             text_style: TextStyle {
@@ -477,7 +466,7 @@ impl FigmaConverter {
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: Self::convert_fills(style.fills.as_ref()),
+            fill: Self::convert_fills(style.fills.as_ref()).unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: None,
             stroke_align: StrokeAlign::Inside,
@@ -488,12 +477,15 @@ impl FigmaConverter {
 
     fn convert_vector(&mut self, vector: &Box<VectorNode>) -> Result<Node, String> {
         // TODO: Implement vector conversion
-        Err("Not implemented".to_string())
+        // fallback
+        return self.create_fallback_node(vector.id.clone(), format!("[Vector] {}", vector.name));
     }
 
     fn convert_boolean(&mut self, boolean: &Box<BooleanOperationNode>) -> Result<Node, String> {
         // TODO: Implement boolean operation conversion
-        Err("Not implemented".to_string())
+        // fallback
+        return self
+            .create_fallback_node(boolean.id.clone(), format!("[Boolean] {}", boolean.name));
     }
 
     fn convert_star(&mut self, star: &Box<StarNode>) -> Result<Node, String> {
@@ -511,8 +503,8 @@ impl FigmaConverter {
             point_count: 5,     // Default to 5 points for a star
             inner_radius: 0.4,  // Default inner radius to 0.4 (40% of outer radius)
             corner_radius: 0.0, // Figma stars don't have corner radius
-            fill: Self::convert_fills(Some(&star.fills)),
-            stroke: Self::convert_strokes(Some(&star.strokes)),
+            fill: Self::convert_fills(Some(&star.fills)).unwrap_or(TRANSPARENT),
+            stroke: Self::convert_strokes(Some(&star.strokes)).unwrap_or(TRANSPARENT),
             stroke_width: star.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 star.stroke_align
@@ -543,7 +535,7 @@ impl FigmaConverter {
             },
             transform,
             size,
-            stroke: Self::convert_strokes(Some(&line.strokes)),
+            stroke: Self::convert_strokes(Some(&line.strokes)).unwrap_or(TRANSPARENT),
             stroke_width: line.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 line.stroke_align
@@ -576,8 +568,8 @@ impl FigmaConverter {
             },
             transform,
             size,
-            fill: Self::convert_fills(Some(&ellipse.fills)),
-            stroke: Self::convert_strokes(Some(&ellipse.strokes)),
+            fill: Self::convert_fills(Some(&ellipse.fills)).unwrap_or(TRANSPARENT),
+            stroke: Self::convert_strokes(Some(&ellipse.strokes)).unwrap_or(TRANSPARENT),
             stroke_width: ellipse.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 ellipse
@@ -613,8 +605,8 @@ impl FigmaConverter {
             // No count in api ?
             point_count: 3,
             corner_radius: polygon.corner_radius.unwrap_or(0.0) as f32,
-            fill: Self::convert_fills(Some(&polygon.fills)),
-            stroke: Self::convert_strokes(Some(&polygon.strokes)),
+            fill: Self::convert_fills(Some(&polygon.fills)).unwrap_or(TRANSPARENT),
+            stroke: Self::convert_strokes(Some(&polygon.strokes)).unwrap_or(TRANSPARENT),
             stroke_width: polygon.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 polygon
@@ -648,8 +640,8 @@ impl FigmaConverter {
             corner_radius: RectangularCornerRadius::all(
                 rectangle.corner_radius.unwrap_or(0.0) as f32
             ),
-            fill: Self::convert_fills(Some(&rectangle.fills)),
-            stroke: Self::convert_strokes(Some(&rectangle.strokes)),
+            fill: Self::convert_fills(Some(&rectangle.fills)).unwrap_or(TRANSPARENT),
+            stroke: Self::convert_strokes(Some(&rectangle.strokes)).unwrap_or(TRANSPARENT),
             stroke_width: rectangle.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 rectangle
@@ -688,10 +680,7 @@ impl FigmaConverter {
             transform,
             size,
             corner_radius: RectangularCornerRadius::zero(),
-            fill: Paint::Solid(SolidPaint {
-                color: Color(255, 255, 255, 255),
-                opacity: 1.0,
-            }),
+            fill: Self::convert_fills(None).unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,

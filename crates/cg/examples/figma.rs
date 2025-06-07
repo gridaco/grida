@@ -1,16 +1,10 @@
 mod window;
 use cg::{io_figma::FigmaConverter, schema::Scene};
 use clap::Parser;
-use figma_api::{
-    apis::{
-        configuration::{ApiKey, Configuration},
-        files_api::get_file,
-    },
-    models::InlineObject,
+use figma_api::apis::{
+    configuration::{ApiKey, Configuration},
+    files_api::get_file,
 };
-use serde::Deserialize;
-use serde_json::from_str;
-use std::fs;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -28,35 +22,29 @@ async fn load_scene_from_url(
     api_key: &str,
     scene_index: usize,
 ) -> Result<Scene, String> {
-    // let file = get_file(
-    //     &Configuration {
-    //         base_path: "https://api.figma.com".to_string(),
-    //         user_agent: None,
-    //         client: reqwest::Client::new(),
-    //         basic_auth: None,
-    //         oauth_access_token: None,
-    //         bearer_access_token: None,
-    //         api_key: Some(ApiKey {
-    //             key: api_key.to_string(),
-    //             prefix: None,
-    //         }),
-    //     },
-    //     file_key,
-    //     None,
-    //     None,
-    //     None,
-    //     None,
-    //     None,
-    //     None,
-    // )
-    // .await
-    // .expect("Failed to load file");
-
-    // figma_api::models::DocumentNode::
-    // load from local test.json
-    let file: InlineObject =
-        from_str(&fs::read_to_string("test.json").expect("Failed to read test.json"))
-            .expect("Failed to parse test.json");
+    let file = get_file(
+        &Configuration {
+            base_path: "https://api.figma.com".to_string(),
+            user_agent: None,
+            client: reqwest::Client::new(),
+            basic_auth: None,
+            oauth_access_token: None,
+            bearer_access_token: None,
+            api_key: Some(ApiKey {
+                key: api_key.to_string(),
+                prefix: None,
+            }),
+        },
+        file_key,
+        None,
+        None,
+        None,
+        Some("paths"),
+        None,
+        None,
+    )
+    .await
+    .expect("Failed to load file");
 
     let document = FigmaConverter::new()
         .convert_document(&file.document)
@@ -71,6 +59,19 @@ async fn main() {
     let scene = load_scene_from_url(&cli.file_key, &cli.api_key, cli.scene_index)
         .await
         .expect("Failed to load scene");
+
+    println!("Rendering scene: {}", scene.name);
+    println!("Scene ID: {}", scene.id);
+    println!("Number of children: {}", scene.children.len());
+    println!("Total nodes in repository: {}", scene.nodes.len());
+    println!("\nNode details:");
+    for (i, child_id) in scene.children.iter().enumerate() {
+        if let Some(node) = scene.nodes.get(child_id) {
+            println!("Node {}:", i + 1);
+            println!("  Type: {:?}", node);
+            println!();
+        }
+    }
 
     window::run_demo_window(scene).await;
 }

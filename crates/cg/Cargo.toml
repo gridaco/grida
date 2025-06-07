@@ -16,7 +16,7 @@ grida-cmath = { path = "../grida-cmath" }
 # WASM-specific dependencies
 wasm-bindgen = { version = "0.2.100", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-figma-api = "0.31.0"
+figma-api = "0.31.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Native-only dependencies
