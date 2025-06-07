@@ -34,6 +34,8 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 opacity: 1.0,
             }),
             stroke_width: 1.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             effect: if with_effects {

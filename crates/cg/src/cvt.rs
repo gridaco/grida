@@ -71,6 +71,28 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
     skia_paint
 }
 
+pub fn sk_paint_with_stroke(
+    paint: &Paint,
+    opacity: f32,
+    size: (f32, f32),
+    stroke_width: f32,
+    stroke_align: StrokeAlign,
+    stroke_dash_array: Option<&Vec<f32>>,
+) -> skia_safe::Paint {
+    let mut paint = sk_paint(paint, opacity, size);
+    paint.set_stroke(true);
+    paint.set_stroke_width(stroke_width);
+
+    // Apply dash pattern if present
+    if let Some(dash_array) = stroke_dash_array {
+        if let Some(path_effect) = skia_safe::dash_path_effect::new(dash_array, 0.0) {
+            paint.set_path_effect(path_effect);
+        }
+    }
+
+    paint
+}
+
 // Given:
 //   - `pts`: Vec<Point> with your polygon's vertices in order
 //   - `r`: the corner‐radius

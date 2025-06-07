@@ -47,6 +47,17 @@ pub enum BoxFit {
     None,
 }
 
+/// Stroke alignment.
+///
+/// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
+/// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
+#[derive(Debug, Clone, Copy)]
+pub enum StrokeAlign {
+    Inside,
+    Center,
+    Outside,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
@@ -429,6 +440,8 @@ pub struct ContainerNode {
     pub fill: Paint,
     pub stroke: Option<Paint>,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
@@ -443,6 +456,8 @@ pub struct RectangleNode {
     pub fill: Paint,
     pub stroke: Paint,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
@@ -455,6 +470,8 @@ pub struct LineNode {
     pub size: Size, // height is always 0 (ignored)
     pub stroke: Paint,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
 }
@@ -468,6 +485,8 @@ pub struct ImageNode {
     pub fill: Paint,
     pub stroke: Paint,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
@@ -486,6 +505,8 @@ pub struct EllipseNode {
     pub fill: Paint,
     pub stroke: Paint,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
@@ -502,6 +523,8 @@ pub struct PathNode {
     pub data: String,
     pub stroke: Paint,
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
@@ -538,11 +561,13 @@ pub struct PolygonNode {
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
 
     /// Opacity applied to the polygon shape (`0.0` - transparent, `1.0` - opaque).
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl PolygonNode {
@@ -588,11 +613,12 @@ pub struct RegularPolygonNode {
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
-
+    pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl RegularPolygonNode {
@@ -626,9 +652,11 @@ impl RegularPolygonNode {
             fill: self.fill.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
+            stroke_align: self.stroke_align,
             opacity: self.opacity,
             blend_mode: self.blend_mode,
             effect: self.effect.clone(),
+            stroke_dash_array: self.stroke_dash_array.clone(),
         }
     }
 }
@@ -675,11 +703,12 @@ pub struct RegularStarPolygonNode {
 
     /// The stroke width used to outline the polygon.
     pub stroke_width: f32,
-
+    pub stroke_align: StrokeAlign,
     /// Overall node opacity (0.0–1.0)
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+    pub stroke_dash_array: Option<Vec<f32>>,
 }
 
 impl RegularStarPolygonNode {
@@ -710,9 +739,11 @@ impl RegularStarPolygonNode {
             fill: self.fill.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
+            stroke_align: self.stroke_align,
             opacity: self.opacity,
             blend_mode: self.blend_mode,
             effect: self.effect.clone(),
+            stroke_dash_array: self.stroke_dash_array.clone(),
         }
     }
 }
@@ -750,7 +781,7 @@ pub struct TextSpanNode {
 
     /// Stroke width
     pub stroke_width: Option<f32>,
-
+    pub stroke_align: StrokeAlign,
     /// Overall node opacity.
     pub opacity: f32,
     pub blend_mode: BlendMode,

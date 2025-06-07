@@ -169,6 +169,8 @@ impl Painter {
         fill: &Paint,
         stroke: Option<&Paint>,
         stroke_width: f32,
+        stroke_align: StrokeAlign,
+        stroke_dash_array: Option<&Vec<f32>>,
         blend_mode: BlendMode,
         opacity: f32,
     ) {
@@ -176,10 +178,29 @@ impl Painter {
         let mut fill_paint = cvt::sk_paint(fill, opacity, (rect.width(), rect.height()));
         fill_paint.set_blend_mode(blend_mode.into());
 
+        // Calculate stroke offset based on alignment
+        let stroke_offset = match stroke_align {
+            StrokeAlign::Inside => 0.0,
+            StrokeAlign::Center => stroke_width / 2.0,
+            StrokeAlign::Outside => stroke_width,
+        };
+
+        // Adjust rect for stroke alignment
+        let adjusted_rect = if stroke_offset > 0.0 {
+            Rect::new(
+                rect.left() - stroke_offset,
+                rect.top() - stroke_offset,
+                rect.right() + stroke_offset,
+                rect.bottom() + stroke_offset,
+            )
+        } else {
+            rect
+        };
+
         if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
             // Rounded rect fill
             let rrect = RRect::new_rect_radii(
-                rect,
+                adjusted_rect,
                 &[
                     Point::new(tl, tl),
                     Point::new(tr, tr),
@@ -192,27 +213,35 @@ impl Painter {
             // Stroke if present
             if let Some(stroke) = stroke {
                 if stroke_width > 0.0 {
-                    let mut stroke_paint =
-                        cvt::sk_paint(stroke, opacity, (rect.width(), rect.height()));
-                    stroke_paint.set_stroke(true);
-                    stroke_paint.set_stroke_width(stroke_width);
+                    let mut stroke_paint = cvt::sk_paint_with_stroke(
+                        stroke,
+                        opacity,
+                        (rect.width(), rect.height()),
+                        stroke_width,
+                        stroke_align,
+                        stroke_dash_array,
+                    );
                     stroke_paint.set_blend_mode(blend_mode.into());
                     canvas.draw_rrect(rrect, &stroke_paint);
                 }
             }
         } else {
             // Regular rect fill
-            canvas.draw_rect(rect, &fill_paint);
+            canvas.draw_rect(adjusted_rect, &fill_paint);
 
             // Stroke if present
             if let Some(stroke) = stroke {
                 if stroke_width > 0.0 {
-                    let mut stroke_paint =
-                        cvt::sk_paint(stroke, opacity, (rect.width(), rect.height()));
-                    stroke_paint.set_stroke(true);
-                    stroke_paint.set_stroke_width(stroke_width);
+                    let mut stroke_paint = cvt::sk_paint_with_stroke(
+                        stroke,
+                        opacity,
+                        (rect.width(), rect.height()),
+                        stroke_width,
+                        stroke_align,
+                        stroke_dash_array,
+                    );
                     stroke_paint.set_blend_mode(blend_mode.into());
-                    canvas.draw_rect(rect, &stroke_paint);
+                    canvas.draw_rect(adjusted_rect, &stroke_paint);
                 }
             }
         }
@@ -265,6 +294,8 @@ impl Painter {
                         &node.fill,
                         Some(&node.stroke),
                         node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
                         node.blend_mode,
                         node.opacity,
                     );
@@ -277,6 +308,8 @@ impl Painter {
                     &node.fill,
                     Some(&node.stroke),
                     node.stroke_width,
+                    node.stroke_align,
+                    node.stroke_dash_array.as_ref(),
                     node.blend_mode,
                     node.opacity,
                 );
@@ -306,6 +339,8 @@ impl Painter {
                             &node.fill,
                             node.stroke.as_ref(),
                             node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
                             node.blend_mode,
                             node.opacity,
                         );
@@ -318,6 +353,8 @@ impl Painter {
                         &node.fill,
                         node.stroke.as_ref(),
                         node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
                         node.blend_mode,
                         node.opacity,
                     );
@@ -380,6 +417,8 @@ impl Painter {
                                 &node.stroke,
                                 None,
                                 node.stroke_width,
+                                node.stroke_align,
+                                node.stroke_dash_array.as_ref(),
                                 node.blend_mode,
                                 node.opacity,
                             );
@@ -418,6 +457,8 @@ impl Painter {
                             &node.stroke,
                             None,
                             node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
                             node.blend_mode,
                             node.opacity,
                         );
@@ -475,10 +516,16 @@ impl Painter {
 
     /// Draw a LineNode
     pub fn draw_line_node(&self, canvas: &skia_safe::Canvas, node: &LineNode) {
-        let mut paint = cvt::sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
-        paint.set_stroke(true);
-        paint.set_stroke_width(node.stroke_width);
+        let mut paint = cvt::sk_paint_with_stroke(
+            &node.stroke,
+            node.opacity,
+            (node.size.width, 0.0),
+            node.stroke_width,
+            node.stroke_align,
+            node.stroke_dash_array.as_ref(),
+        );
         paint.set_blend_mode(node.blend_mode.into());
+
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             canvas.draw_line(
                 Point::new(0.0, 0.0),
@@ -500,8 +547,27 @@ impl Painter {
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
             let radii = RectangularCornerRadius::zero(); // no corner radii for generic path
 
+            // Calculate stroke offset based on alignment
+            let stroke_offset = match node.stroke_align {
+                StrokeAlign::Inside => 0.0,
+                StrokeAlign::Center => node.stroke_width / 2.0,
+                StrokeAlign::Outside => node.stroke_width,
+            };
+
+            // Adjust rect for stroke alignment
+            let adjusted_rect = if stroke_offset > 0.0 {
+                Rect::new(
+                    rect.left() - stroke_offset,
+                    rect.top() - stroke_offset,
+                    rect.right() + stroke_offset,
+                    rect.bottom() + stroke_offset,
+                )
+            } else {
+                rect
+            };
+
             if let Some(effect) = &node.effect {
-                self.apply_effect(canvas, effect, rect, &radii, || {
+                self.apply_effect(canvas, effect, adjusted_rect, &radii, || {
                     // Draw fill
                     let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
                     fill_paint.set_blend_mode(node.blend_mode.into());
@@ -509,10 +575,14 @@ impl Painter {
 
                     // Draw stroke if needed
                     if node.stroke_width > 0.0 {
-                        let mut stroke_paint =
-                            cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
-                        stroke_paint.set_stroke(true);
-                        stroke_paint.set_stroke_width(node.stroke_width);
+                        let mut stroke_paint = cvt::sk_paint_with_stroke(
+                            &node.stroke,
+                            node.opacity,
+                            (1.0, 1.0),
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
                         stroke_paint.set_blend_mode(node.blend_mode.into());
                         canvas.draw_path(&path, &stroke_paint);
                     }
@@ -524,9 +594,14 @@ impl Painter {
                 canvas.draw_path(&path, &fill_paint);
 
                 if node.stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
-                    stroke_paint.set_stroke(true);
-                    stroke_paint.set_stroke_width(node.stroke_width);
+                    let mut stroke_paint = cvt::sk_paint_with_stroke(
+                        &node.stroke,
+                        node.opacity,
+                        (1.0, 1.0),
+                        node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
+                    );
                     stroke_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_path(&path, &stroke_paint);
                 }
@@ -562,8 +637,27 @@ impl Painter {
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
             let radii = RectangularCornerRadius::all(node.corner_radius);
 
+            // Calculate stroke offset based on alignment
+            let stroke_offset = match node.stroke_align {
+                StrokeAlign::Inside => 0.0,
+                StrokeAlign::Center => node.stroke_width / 2.0,
+                StrokeAlign::Outside => node.stroke_width,
+            };
+
+            // Adjust rect for stroke alignment
+            let adjusted_rect = if stroke_offset > 0.0 {
+                Rect::new(
+                    rect.left() - stroke_offset,
+                    rect.top() - stroke_offset,
+                    rect.right() + stroke_offset,
+                    rect.bottom() + stroke_offset,
+                )
+            } else {
+                rect
+            };
+
             if let Some(effect) = &node.effect {
-                self.apply_effect(canvas, effect, rect, &radii, || {
+                self.apply_effect(canvas, effect, adjusted_rect, &radii, || {
                     // Draw fill
                     let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
                     fill_paint.set_blend_mode(node.blend_mode.into());
@@ -571,10 +665,14 @@ impl Painter {
 
                     // Stroke
                     if node.stroke_width > 0.0 {
-                        let mut stroke_paint =
-                            cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
-                        stroke_paint.set_stroke(true);
-                        stroke_paint.set_stroke_width(node.stroke_width);
+                        let mut stroke_paint = cvt::sk_paint_with_stroke(
+                            &node.stroke,
+                            node.opacity,
+                            (1.0, 1.0),
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                        );
                         stroke_paint.set_blend_mode(node.blend_mode.into());
                         canvas.draw_path(&path, &stroke_paint);
                     }
@@ -586,9 +684,14 @@ impl Painter {
                 canvas.draw_path(&path, &fill_paint);
 
                 if node.stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint(&node.stroke, node.opacity, (1.0, 1.0));
-                    stroke_paint.set_stroke(true);
-                    stroke_paint.set_stroke_width(node.stroke_width);
+                    let mut stroke_paint = cvt::sk_paint_with_stroke(
+                        &node.stroke,
+                        node.opacity,
+                        (1.0, 1.0),
+                        node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
+                    );
                     stroke_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_path(&path, &stroke_paint);
                 }

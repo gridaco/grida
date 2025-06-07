@@ -25,6 +25,7 @@ impl NodeFactory {
     const DEFAULT_COLOR: Color = Color(255, 255, 255, 255);
     const DEFAULT_STROKE_COLOR: Color = Color(0, 0, 0, 255);
     const DEFAULT_STROKE_WIDTH: f32 = 1.0;
+    const DEFAULT_STROKE_ALIGN: StrokeAlign = StrokeAlign::Inside;
     const DEFAULT_OPACITY: f32 = 1.0;
 
     fn default_base_node(&self) -> BaseNode {
@@ -52,6 +53,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -67,6 +70,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -84,6 +89,8 @@ impl NodeFactory {
             },
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
         }
@@ -112,6 +119,7 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke: None,
             stroke_width: None,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
         }
@@ -139,6 +147,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: None,
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -154,6 +164,8 @@ impl NodeFactory {
             data: String::new(),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -171,6 +183,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -188,6 +202,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -203,6 +219,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
@@ -219,6 +237,8 @@ impl NodeFactory {
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
             stroke: Self::default_solid_paint(Self::DEFAULT_STROKE_COLOR),
             stroke_width: Self::DEFAULT_STROKE_WIDTH,
+            stroke_align: Self::DEFAULT_STROKE_ALIGN,
+            stroke_dash_array: None,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,

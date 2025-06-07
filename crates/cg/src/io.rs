@@ -344,6 +344,8 @@ impl From<IOContainerNode> for ContainerNode {
             fill: node.fill.into(),
             stroke: None,
             stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
             effect: None,
             children: node.children,
             opacity: node.opacity,
@@ -384,6 +386,7 @@ impl From<IOTextNode> for TextSpanNode {
             fill: node.fill.into(),
             stroke: None,
             stroke_width: None,
+            stroke_align: StrokeAlign::Inside,
             opacity: node.opacity,
         }
     }
@@ -411,6 +414,8 @@ impl From<IOEllipseNode> for Node {
                 opacity: 1.0,
             }),
             stroke_width: node.stroke_width.unwrap_or(0.0),
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
             effect: None,
             opacity: node.opacity,
         })
@@ -443,6 +448,8 @@ impl From<IOVectorNode> for Node {
                 opacity: 1.0,
             }),
             stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
             opacity: node.opacity,
             effect: None,
         })
