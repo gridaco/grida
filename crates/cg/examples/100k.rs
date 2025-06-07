@@ -49,6 +49,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
         let intensity = (i % 255) as u8;
         rect.fill = Paint::Solid(SolidPaint {
             color: Color(intensity, intensity, intensity, 255),
+            opacity: 1.0,
         });
 
         all_shape_ids.push(rect.base.id.clone());

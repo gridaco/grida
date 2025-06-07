@@ -32,6 +32,21 @@ impl Point {
     }
 }
 
+/// Supported fit modes.
+///
+/// Only `Contain`, `Cover`, and `None` are supported in the current version.
+///
+/// - `None` may have unexpected results depending on the environment.
+///
+/// @see https://api.flutter.dev/flutter/painting/BoxFit.html  
+/// @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoxFit {
+    Contain,
+    Cover,
+    None,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
@@ -299,26 +314,36 @@ pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
+    // Image(ImagePaint),
 }
 
 #[derive(Debug, Clone)]
 pub struct SolidPaint {
     pub color: Color,
+    pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
-    pub id: String,
     pub transform: super::transform::AffineTransform,
     pub stops: Vec<GradientStop>,
+    pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
-    pub id: String,
     pub transform: super::transform::AffineTransform,
     pub stops: Vec<GradientStop>,
+    pub opacity: f32,
 }
+
+// #[derive(Debug, Clone)]
+// pub struct ImagePaint {
+//     pub transform: super::transform::AffineTransform,
+//     pub _ref: String,
+//     pub fit: BoxFit,
+//     pub opacity: f32,
+// }
 
 #[derive(Debug, Clone)]
 pub struct Size {

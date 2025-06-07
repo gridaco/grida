@@ -17,6 +17,7 @@ async fn demo_shapes() -> Scene {
     };
     background_rect_node.fill = Paint::Solid(SolidPaint {
         color: Color(240, 240, 240, 255), // Light gray background
+        opacity: 1.0,
     });
 
     // Create a root container node
@@ -50,6 +51,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
@@ -71,6 +73,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(ellipse.base.id.clone());
         repository.insert(Node::Ellipse(ellipse));
@@ -102,6 +105,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(polygon.base.id.clone());
         repository.insert(Node::Polygon(polygon));
@@ -124,6 +128,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(regular_polygon.base.id.clone());
         repository.insert(Node::RegularPolygon(regular_polygon));
@@ -154,6 +159,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(path.base.id.clone());
         repository.insert(Node::Path(path));
@@ -177,6 +183,7 @@ async fn demo_shapes() -> Scene {
                 200 - (i * 20) as u8,
                 255,
             ), // Fading gray
+            opacity: 1.0,
         });
         all_shape_ids.push(star.base.id.clone());
         repository.insert(Node::RegularStarPolygon(star));

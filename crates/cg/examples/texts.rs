@@ -25,6 +25,7 @@ async fn demo_texts() -> Scene {
     };
     background_rect_node.fill = Paint::Solid(SolidPaint {
         color: Color(230, 240, 255, 255), // Light blue background
+        opacity: 1.0,
     });
 
     // Create a single word text span
@@ -46,6 +47,7 @@ async fn demo_texts() -> Scene {
     };
     word_text_node.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(255, 255, 255, 255),
+        opacity: 1.0,
     }));
     word_text_node.stroke_width = Some(1.0);
     word_text_node.text_align = TextAlign::Left;

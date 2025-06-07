@@ -30,11 +30,12 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
     match paint {
         Paint::Solid(solid) => {
             let Color(r, g, b, a) = solid.color;
-            let final_alpha = (a as f32 * opacity) as u8;
+            let final_alpha = (a as f32 * opacity * solid.opacity) as u8;
             skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
         }
         Paint::LinearGradient(gradient) => {
-            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
+            let (colors, positions) =
+                cg_build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
             let shader = skia_safe::Shader::linear_gradient(
                 (
                     skia_safe::Point::new(0.0, 0.0),
@@ -50,7 +51,8 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
             skia_paint.set_shader(shader);
         }
         Paint::RadialGradient(gradient) => {
-            let (colors, positions) = cg_build_gradient_stops(&gradient.stops, opacity);
+            let (colors, positions) =
+                cg_build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
             let center = skia_safe::Point::new(width / 2.0, height / 2.0);
             let radius = width.min(height) / 2.0;
             let shader = skia_safe::Shader::radial_gradient(

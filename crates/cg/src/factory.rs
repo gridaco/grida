@@ -36,7 +36,10 @@ impl NodeFactory {
     }
 
     fn default_solid_paint(color: Color) -> Paint {
-        Paint::Solid(SolidPaint { color })
+        Paint::Solid(SolidPaint {
+            color,
+            opacity: 1.0,
+        })
     }
 
     /// Creates a new rectangle node with default values

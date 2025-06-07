@@ -16,7 +16,6 @@ async fn demo_effects() -> Scene {
         height: 1080.0,
     };
     background_rect_node.fill = Paint::LinearGradient(LinearGradientPaint {
-        id: "bg_gradient".to_string(),
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -28,6 +27,7 @@ async fn demo_effects() -> Scene {
                 color: Color(200, 200, 200, 255), // Darker gray
             },
         ],
+        opacity: 1.0,
     });
 
     // Create a root container node
@@ -55,6 +55,7 @@ async fn demo_effects() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(20.0);
         rect.fill = Paint::Solid(SolidPaint {
             color: Color(255, 255, 255, 255), // White
+            opacity: 1.0,
         });
         rect.effect = Some(FilterEffect::DropShadow(FeDropShadow {
             dx: 5.0 * (i + 1) as f32,
@@ -78,6 +79,7 @@ async fn demo_effects() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(20.0);
         rect.fill = Paint::Solid(SolidPaint {
             color: Color(255, 255, 255, 255), // White
+            opacity: 1.0,
         });
         rect.effect = Some(FilterEffect::GaussianBlur(FeGaussianBlur {
             radius: 5.0 * (i + 1) as f32,
@@ -96,7 +98,6 @@ async fn demo_effects() -> Scene {
         height: 90.0,
     };
     vivid_gradient_rect.fill = Paint::LinearGradient(LinearGradientPaint {
-        id: "vivid_row2".to_string(),
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -112,6 +113,7 @@ async fn demo_effects() -> Scene {
                 color: Color(255, 255, 0, 255),
             }, // Yellow
         ],
+        opacity: 1.0,
     });
     let vivid_gradient_rect_id = vivid_gradient_rect.base.id.clone();
     repository.insert(Node::Rectangle(vivid_gradient_rect));
@@ -128,6 +130,7 @@ async fn demo_effects() -> Scene {
         blur_rect.corner_radius = RectangularCornerRadius::all(20.0);
         blur_rect.fill = Paint::Solid(SolidPaint {
             color: Color(255, 255, 255, 128), // Semi-transparent white
+            opacity: 1.0,
         });
         blur_rect.effect = Some(FilterEffect::BackdropBlur(FeBackdropBlur {
             radius: 16.0 * (i + 1) as f32,

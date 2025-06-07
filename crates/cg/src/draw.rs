@@ -5,7 +5,7 @@ use crate::{
     repository::{FontRepository, ImageRepository, NodeRepository},
 };
 use skia_safe::{
-    Image, MaskFilter, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect, Surface,
+    Image, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect, Surface,
     canvas::SaveLayerRec, surfaces, textlayout::*,
 };
 

@@ -297,19 +297,23 @@ impl From<Option<Fill>> for Paint {
                     if let Some(color) = fill.color {
                         Paint::Solid(SolidPaint {
                             color: Color(color.r, color.g, color.b, (color.a * 255.0) as u8),
+                            opacity: 1.0,
                         })
                     } else {
                         Paint::Solid(SolidPaint {
                             color: Color(0, 0, 0, 0),
+                            opacity: 1.0,
                         })
                     }
                 }
                 _ => Paint::Solid(SolidPaint {
                     color: Color(0, 0, 0, 0),
+                    opacity: 1.0,
                 }),
             },
             None => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 0),
+                opacity: 1.0,
             }),
         }
     }
@@ -404,6 +408,7 @@ impl From<IOEllipseNode> for Node {
             fill: node.fill.into(),
             stroke: Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
+                opacity: 1.0,
             }),
             stroke_width: node.stroke_width.unwrap_or(0.0),
             effect: None,
@@ -435,6 +440,7 @@ impl From<IOVectorNode> for Node {
             }),
             stroke: Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
+                opacity: 1.0,
             }),
             stroke_width: 0.0,
             opacity: node.opacity,

@@ -29,9 +29,11 @@ async fn demo_basic() -> Scene {
     };
     background_rect_node.fill = Paint::Solid(SolidPaint {
         color: Color(230, 240, 255, 255), // Light blue for visibility
+        opacity: 1.0,
     });
     background_rect_node.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 0), // No stroke
+        opacity: 1.0,
     });
     background_rect_node.stroke_width = 0.0;
 
@@ -70,6 +72,7 @@ async fn demo_basic() -> Scene {
     rect_node.corner_radius = RectangularCornerRadius::all(10.0);
     rect_node.fill = Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red fill
+        opacity: 1.0,
     });
     rect_node.stroke_width = 2.0;
     rect_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
@@ -89,7 +92,6 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     ellipse_node.fill = Paint::RadialGradient(RadialGradientPaint {
-        id: "gradient2".to_string(),
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -105,6 +107,7 @@ async fn demo_basic() -> Scene {
                 color: Color(255, 0, 255, 255), // Magenta
             },
         ],
+        opacity: 1.0,
     });
     ellipse_node.stroke_width = 6.0;
 
@@ -126,9 +129,11 @@ async fn demo_basic() -> Scene {
     polygon_node.points = pentagon_points;
     polygon_node.fill = Paint::Solid(SolidPaint {
         color: Color(255, 200, 0, 255), // Orange fill
+        opacity: 1.0,
     });
     polygon_node.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255), // Black stroke
+        opacity: 1.0,
     });
     polygon_node.stroke_width = 5.0;
 
@@ -144,6 +149,7 @@ async fn demo_basic() -> Scene {
     regular_polygon_node.point_count = 6; // hexagon
     regular_polygon_node.fill = Paint::Solid(SolidPaint {
         color: Color(0, 200, 255, 255), // Cyan fill
+        opacity: 1.0,
     });
     regular_polygon_node.stroke_width = 4.0;
     regular_polygon_node.opacity = 0.5;
@@ -169,6 +175,7 @@ async fn demo_basic() -> Scene {
     text_span_node.text_align_vertical = TextAlignVertical::Center;
     text_span_node.stroke = Some(Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255), // Black stroke
+        opacity: 1.0,
     }));
     text_span_node.stroke_width = Some(4.0);
 
@@ -179,6 +186,7 @@ async fn demo_basic() -> Scene {
     path_node.data = "M50 150H0v-50h50v50ZM150 150h-50v-50h50v50ZM100 100H50V50h50v50ZM50 50H0V0h50v50ZM150 50h-50V0h50v50Z".to_string();
     path_node.stroke = Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red stroke
+        opacity: 1.0,
     });
     path_node.stroke_width = 4.0;
 
@@ -193,6 +201,7 @@ async fn demo_basic() -> Scene {
     };
     line_node.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 255, 0, 255), // Green color
+        opacity: 1.0,
     });
     line_node.stroke_width = 4.0;
 
