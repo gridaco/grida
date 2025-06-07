@@ -2,7 +2,6 @@ use cg::camera::Camera;
 use cg::draw::{Backend, Renderer};
 use cg::io::parse;
 use cg::schema::*;
-use cg::transform::AffineTransform;
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
@@ -14,13 +13,14 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use grida_cmath::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
 use skia_safe::{Surface, gpu};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
-use winit::event::{ElementState, Event, KeyEvent, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
 use winit::{
     application::ApplicationHandler,
@@ -151,6 +151,7 @@ fn init_window(
         .unwrap();
     println!("Picked a config with {} samples", gl_config.num_samples());
     let window = window.expect("Could not create window with OpenGL context");
+    #[allow(deprecated)]
     let raw_window_handle = window
         .raw_window_handle()
         .expect("Failed to retrieve RawWindowHandle");
@@ -334,6 +335,7 @@ impl App {
     fn resize(&mut self, width: u32, height: u32) {
         // Recreate GL surface
         let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+            #[allow(deprecated)]
             self.window
                 .raw_window_handle()
                 .expect("Failed to get window handle"),
@@ -365,7 +367,7 @@ impl App {
         .expect("Could not create skia surface");
 
         // Update surface pointer
-        unsafe { Box::from_raw(self.surface_ptr) };
+        unsafe { _ = Box::from_raw(self.surface_ptr) };
         self.surface_ptr = Box::into_raw(Box::new(surface));
         self.renderer.set_backend(Backend::GL(self.surface_ptr));
         self.redraw();

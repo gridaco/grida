@@ -1,8 +1,8 @@
 use cg::draw::{Backend, Renderer};
 use cg::repository::NodeRepository;
 use cg::schema::*;
-use cg::transform::AffineTransform;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use grida_cmath::transform::AffineTransform;
 
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     let mut repository = NodeRepository::new();

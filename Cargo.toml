@@ -1,5 +1,5 @@
 [workspace]
 members = [
   "crates/cg",
-  "crates/io-figma",
+  "crates/grida-cmath",
 ]

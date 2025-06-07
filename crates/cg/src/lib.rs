@@ -7,4 +7,3 @@ pub mod io_figma;
 pub mod repository;
 pub mod schema;
 pub mod text_transform;
-pub mod transform;

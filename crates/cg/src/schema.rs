@@ -1,7 +1,7 @@
 use crate::cvt;
 use crate::repository::NodeRepository;
-use crate::transform::AffineTransform;
 use core::str;
+use grida_cmath::transform::AffineTransform;
 use serde::Deserialize;
 
 pub type NodeId = String;
@@ -362,21 +362,21 @@ pub struct SolidPaint {
 
 #[derive(Debug, Clone)]
 pub struct LinearGradientPaint {
-    pub transform: super::transform::AffineTransform,
+    pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct RadialGradientPaint {
-    pub transform: super::transform::AffineTransform,
+    pub transform: AffineTransform,
     pub stops: Vec<GradientStop>,
     pub opacity: f32,
 }
 
 // #[derive(Debug, Clone)]
 // pub struct ImagePaint {
-//     pub transform: super::transform::AffineTransform,
+//     pub transform: AffineTransform,
 //     pub _ref: String,
 //     pub fit: BoxFit,
 //     pub opacity: f32,
