@@ -200,11 +200,13 @@ function HostedGridaCanvasDocumentProvider({
   const debouncedSave = useDebounceCallback(save, 1000);
 
   useEffect(() => {
-    editor.subscribe(() => {
-      // FIXME: bad performance
-      // save to server (with debounce)
-      debouncedSave();
-    });
+    editor.subscribeWithSelector(
+      (state) => state.document,
+      () => {
+        // save to server (with debounce)
+        debouncedSave();
+      }
+    );
   }, []);
 
   return (

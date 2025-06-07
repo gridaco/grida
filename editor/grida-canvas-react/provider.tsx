@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
-import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import type { tokens } from "@grida/tokens";
 import type cg from "@grida/cg";
@@ -812,6 +811,11 @@ export function useEventTargetCSSCursor() {
 export function usePointerState(): editor.state.IEditorState["pointer"] {
   const editor = useCurrentEditor();
   return useEditorState(editor, (state) => state.pointer);
+}
+
+export function useMultiplayerCursorState(): editor.state.IEditorMultiplayerCursorState["cursors"] {
+  const editor = useCurrentEditor();
+  return useEditorState(editor, (state) => state.cursors);
 }
 
 interface UseToolState {
