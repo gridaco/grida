@@ -1,5 +1,6 @@
 use cg::camera::Camera;
 use cg::draw::{Backend, Renderer};
+use cg::image::ImageHandler;
 use cg::io::parse;
 use cg::schema::*;
 use console_error_panic_hook::set_once as init_panic_hook;
@@ -17,9 +18,10 @@ use grida_cmath::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
-use skia_safe::{Surface, gpu};
+use skia_safe::{Image, Surface, gpu};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
+use tokio::sync::mpsc;
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
 use winit::{
@@ -38,6 +40,11 @@ enum Command {
     Redraw,
     Resize { width: u32, height: u32 },
     None,
+}
+
+pub struct ImageMessage {
+    pub src: String,
+    pub data: Vec<u8>,
 }
 
 fn handle_window_event(event: WindowEvent) -> Command {
@@ -274,6 +281,7 @@ struct App {
     camera: Camera,
     scene: Scene,
     window: Window,
+    image_rx: mpsc::UnboundedReceiver<ImageMessage>,
 }
 
 impl ApplicationHandler for App {
@@ -316,10 +324,23 @@ impl ApplicationHandler for App {
             Command::None => {}
         }
     }
+
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, _event: ()) {
+        self.window.request_redraw();
+    }
 }
 
 impl App {
+    fn process_image_queue(&mut self) {
+        while let Ok(msg) = self.image_rx.try_recv() {
+            if let Some(image) = self.renderer.create_image(&msg.data) {
+                self.renderer.register_image(msg.src, image);
+            }
+        }
+    }
+
     fn redraw(&mut self) {
+        self.process_image_queue();
         let surface = unsafe { &mut *self.surface_ptr };
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::WHITE);
@@ -375,6 +396,17 @@ impl App {
 }
 
 pub async fn run_demo_window(scene: Scene) {
+    run_demo_window_with(scene, |_, _, _| {}).await;
+}
+
+pub async fn run_demo_window_with<F>(scene: Scene, init: F)
+where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        winit::event_loop::EventLoopProxy<()>,
+    ),
+{
     let width = 1080;
     let height = 1080;
 
@@ -389,6 +421,9 @@ pub async fn run_demo_window(scene: Scene) {
         gr_context,
         scale_factor,
     ) = init_window(width, height);
+
+    let proxy = el.create_proxy();
+    let (tx, rx) = mpsc::unbounded_channel();
 
     // Log DPI and size info
     let logical_size = window.inner_size();
@@ -419,6 +454,8 @@ pub async fn run_demo_window(scene: Scene) {
     let camera = Camera::new(viewport_size);
     renderer.set_camera(camera.clone());
 
+    init(&mut renderer, tx.clone(), proxy.clone());
+
     let mut app = App {
         renderer,
         surface_ptr,
@@ -430,6 +467,7 @@ pub async fn run_demo_window(scene: Scene) {
         camera,
         scene,
         window,
+        image_rx: rx,
     };
 
     // Initial render

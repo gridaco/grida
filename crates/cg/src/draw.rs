@@ -166,7 +166,7 @@ impl Painter {
         canvas: &skia_safe::Canvas,
         rect: Rect,
         radii: &RectangularCornerRadius,
-        fill: &Paint,
+        fill: Option<&Paint>,
         stroke: Option<&Paint>,
         stroke_width: f32,
         stroke_align: StrokeAlign,
@@ -175,73 +175,75 @@ impl Painter {
         opacity: f32,
     ) {
         let RectangularCornerRadius { tl, tr, bl, br } = *radii;
-        let mut fill_paint = cvt::sk_paint(fill, opacity, (rect.width(), rect.height()));
-        fill_paint.set_blend_mode(blend_mode.into());
 
-        // Calculate stroke offset based on alignment
-        let stroke_offset = match stroke_align {
-            StrokeAlign::Inside => 0.0,
-            StrokeAlign::Center => stroke_width / 2.0,
-            StrokeAlign::Outside => stroke_width,
-        };
+        // Draw fill if present
+        if let Some(fill) = fill {
+            let mut fill_paint = cvt::sk_paint(fill, opacity, (rect.width(), rect.height()));
+            fill_paint.set_blend_mode(blend_mode.into());
 
-        // Adjust rect for stroke alignment
-        let adjusted_rect = if stroke_offset > 0.0 {
-            Rect::new(
-                rect.left() - stroke_offset,
-                rect.top() - stroke_offset,
-                rect.right() + stroke_offset,
-                rect.bottom() + stroke_offset,
-            )
-        } else {
-            rect
-        };
+            // Calculate stroke offset based on alignment
+            let stroke_offset = match stroke_align {
+                StrokeAlign::Inside => 0.0,
+                StrokeAlign::Center => stroke_width / 2.0,
+                StrokeAlign::Outside => stroke_width,
+            };
 
-        if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-            // Rounded rect fill
-            let rrect = RRect::new_rect_radii(
-                adjusted_rect,
-                &[
-                    Point::new(tl, tl),
-                    Point::new(tr, tr),
-                    Point::new(br, br),
-                    Point::new(bl, bl),
-                ],
-            );
-            canvas.draw_rrect(rrect, &fill_paint);
+            // Adjust rect for stroke alignment
+            let adjusted_rect = if stroke_offset > 0.0 {
+                Rect::new(
+                    rect.left() - stroke_offset,
+                    rect.top() - stroke_offset,
+                    rect.right() + stroke_offset,
+                    rect.bottom() + stroke_offset,
+                )
+            } else {
+                rect
+            };
 
-            // Stroke if present
-            if let Some(stroke) = stroke {
-                if stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint_with_stroke(
-                        stroke,
-                        opacity,
-                        (rect.width(), rect.height()),
-                        stroke_width,
-                        stroke_align,
-                        stroke_dash_array,
-                    );
-                    stroke_paint.set_blend_mode(blend_mode.into());
-                    canvas.draw_rrect(rrect, &stroke_paint);
-                }
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                // Rounded rect fill
+                let rrect = RRect::new_rect_radii(
+                    adjusted_rect,
+                    &[
+                        Point::new(tl, tl),
+                        Point::new(tr, tr),
+                        Point::new(br, br),
+                        Point::new(bl, bl),
+                    ],
+                );
+                canvas.draw_rrect(rrect, &fill_paint);
+            } else {
+                // Regular rect fill
+                canvas.draw_rect(adjusted_rect, &fill_paint);
             }
-        } else {
-            // Regular rect fill
-            canvas.draw_rect(adjusted_rect, &fill_paint);
+        }
 
-            // Stroke if present
-            if let Some(stroke) = stroke {
-                if stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint_with_stroke(
-                        stroke,
-                        opacity,
-                        (rect.width(), rect.height()),
-                        stroke_width,
-                        stroke_align,
-                        stroke_dash_array,
+        // Draw stroke if present
+        if let Some(stroke) = stroke {
+            if stroke_width > 0.0 {
+                let mut stroke_paint = cvt::sk_paint_with_stroke(
+                    stroke,
+                    opacity,
+                    (rect.width(), rect.height()),
+                    stroke_width,
+                    stroke_align,
+                    stroke_dash_array,
+                );
+                stroke_paint.set_blend_mode(blend_mode.into());
+
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(tl, tl),
+                            Point::new(tr, tr),
+                            Point::new(br, br),
+                            Point::new(bl, bl),
+                        ],
                     );
-                    stroke_paint.set_blend_mode(blend_mode.into());
-                    canvas.draw_rect(adjusted_rect, &stroke_paint);
+                    canvas.draw_rrect(rrect, &stroke_paint);
+                } else {
+                    canvas.draw_rect(rect, &stroke_paint);
                 }
             }
         }
@@ -318,7 +320,7 @@ impl Painter {
                         canvas,
                         rect,
                         &radii,
-                        &node.fill,
+                        Some(&node.fill),
                         Some(&node.stroke),
                         node.stroke_width,
                         node.stroke_align,
@@ -332,7 +334,7 @@ impl Painter {
                     canvas,
                     rect,
                     &radii,
-                    &node.fill,
+                    Some(&node.fill),
                     Some(&node.stroke),
                     node.stroke_width,
                     node.stroke_align,
@@ -364,7 +366,7 @@ impl Painter {
                             canvas,
                             rect,
                             &radii,
-                            &node.fill,
+                            Some(&node.fill),
                             node.stroke.as_ref(),
                             node.stroke_width,
                             node.stroke_align,
@@ -378,7 +380,7 @@ impl Painter {
                         canvas,
                         rect,
                         &radii,
-                        &node.fill,
+                        Some(&node.fill),
                         node.stroke.as_ref(),
                         node.stroke_width,
                         node.stroke_align,
@@ -415,12 +417,13 @@ impl Painter {
         canvas: &skia_safe::Canvas,
         node: &ImageNode,
         image_repository: &ImageRepository,
-    ) {
-        if let Some(image) = image_repository.get(&node._ref) {
-            self.with_canvas_state(canvas, &node.transform.matrix, || {
-                let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
-                let radii = node.corner_radius;
+    ) -> bool {
+        self.with_canvas_state(canvas, &node.transform.matrix, || {
+            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+            let radii = node.corner_radius;
 
+            if let Some(image) = image_repository.get(&node._ref) {
+                // Image is ready - draw it
                 if let Some(effect) = &node.effect {
                     self.apply_effect(canvas, effect, rect, &radii, || {
                         // Draw the image with rounded‐rect clipping
@@ -453,8 +456,8 @@ impl Painter {
                                 canvas,
                                 rect,
                                 &radii,
-                                &node.stroke,
                                 None,
+                                Some(&node.stroke),
                                 node.stroke_width,
                                 node.stroke_align,
                                 node.stroke_dash_array.as_ref(),
@@ -493,8 +496,8 @@ impl Painter {
                             canvas,
                             rect,
                             &radii,
-                            &node.stroke,
                             None,
+                            Some(&node.stroke),
                             node.stroke_width,
                             node.stroke_align,
                             node.stroke_dash_array.as_ref(),
@@ -503,8 +506,42 @@ impl Painter {
                         );
                     }
                 }
-            });
-        }
+            } else {
+                // Image is not ready - draw only stroke and effects
+                if let Some(effect) = &node.effect {
+                    self.apply_effect(canvas, effect, rect, &radii, || {
+                        // Draw only stroke with transparent fill
+                        self.draw_fill_and_stroke(
+                            canvas,
+                            rect,
+                            &radii,
+                            None,
+                            Some(&node.stroke),
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                            node.blend_mode,
+                            node.opacity,
+                        );
+                    });
+                } else {
+                    // Draw only stroke without effects
+                    self.draw_fill_and_stroke(
+                        canvas,
+                        rect,
+                        &radii,
+                        None,
+                        Some(&node.stroke),
+                        node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
+                        node.blend_mode,
+                        node.opacity,
+                    );
+                }
+            }
+        });
+        true
     }
 
     pub fn draw_error_node(&self, canvas: &skia_safe::Canvas, node: &ErrorNode) {
@@ -526,7 +563,7 @@ impl Painter {
                 canvas,
                 rect,
                 &radii,
-                &fill,
+                Some(&fill),
                 Some(&stroke),
                 1.0, // stroke width
                 StrokeAlign::Inside,
@@ -854,7 +891,9 @@ impl Painter {
             Node::RegularPolygon(n) => self.draw_regular_polygon_node(canvas, n),
             Node::TextSpan(n) => self.draw_text_span_node(canvas, n),
             Node::Line(n) => self.draw_line_node(canvas, n),
-            Node::Image(n) => self.draw_image_node(canvas, n, image_repository),
+            Node::Image(n) => {
+                self.draw_image_node(canvas, n, image_repository);
+            }
             Node::Path(n) => self.draw_path_node(canvas, n),
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
         }
@@ -868,7 +907,7 @@ pub struct Renderer {
     logical_width: f32,
     logical_height: f32,
     camera: Option<Camera>,
-    image_repository: ImageRepository,
+    pub image_repository: ImageRepository,
     font_repository: FontRepository,
 }
 
@@ -906,12 +945,18 @@ impl Renderer {
         self.backend = Some(backend);
     }
 
-    pub fn add_image(&mut self, src: String, image: Image) {
+    pub fn register_image(&mut self, src: String, image: Image) {
         self.image_repository.add(src, image);
     }
 
     pub fn add_font(&mut self, bytes: &[u8]) {
         self.font_repository.add(bytes);
+    }
+
+    /// Create an image from raw encoded bytes.
+    pub fn create_image(&self, bytes: &[u8]) -> Option<Image> {
+        let data = skia_safe::Data::new_copy(bytes);
+        Image::from_encoded(data)
     }
 
     pub fn flush(&self) {
