@@ -1,7 +1,7 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
     BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeDropShadow, FeGaussianBlur,
-    FilterEffect, FontWeight, ImagePaint, LineNode, Node, NodeId, Paint, RectangleNode,
+    FilterEffect, FontWeight, ImagePaint, LineNode, Node, NodeId, Paint, PathNode, RectangleNode,
     RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
     StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
     TextTransform,
@@ -29,6 +29,11 @@ const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
 
 const BLACK: Paint = Paint::Solid(SolidPaint {
     color: Color(0, 0, 0, 255),
+    opacity: 1.0,
+});
+
+const RED: Paint = Paint::Solid(SolidPaint {
+    color: Color(255, 0, 0, 255),
     opacity: 1.0,
 });
 
@@ -243,22 +248,34 @@ impl FigmaConverter {
     /// Convert Figma's fills to our Paint
     fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Option<Paint> {
         fills.and_then(|paints| {
-            if paints.is_empty() {
-                None
-            } else {
-                Some(self.convert_paint(&paints[0]))
-            }
+            // Filter out invisible paints and get the first visible one
+            paints
+                .iter()
+                .filter(|paint| match paint {
+                    FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
+                    FigmaPaint::GradientPaint(gradient) => gradient.visible.unwrap_or(true),
+                    FigmaPaint::ImagePaint(image) => image.visible.unwrap_or(true),
+                    _ => true,
+                })
+                .next()
+                .map(|paint| self.convert_paint(paint))
         })
     }
 
     /// Convert Figma's strokes to our Paint
     fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Option<Paint> {
         strokes.and_then(|s| s.as_ref()).and_then(|paints| {
-            if paints.is_empty() {
-                None
-            } else {
-                Some(self.convert_paint(&paints[0]))
-            }
+            // Filter out invisible paints and get the first visible one
+            paints
+                .iter()
+                .filter(|paint| match paint {
+                    FigmaPaint::SolidPaint(solid) => solid.visible.unwrap_or(true),
+                    FigmaPaint::GradientPaint(gradient) => gradient.visible.unwrap_or(true),
+                    FigmaPaint::ImagePaint(image) => image.visible.unwrap_or(true),
+                    _ => true,
+                })
+                .next()
+                .map(|paint| self.convert_paint(paint))
         })
     }
 
@@ -363,16 +380,51 @@ impl FigmaConverter {
 
     /// Convert Figma's component to our ComponentNode
     fn convert_component(&mut self, component: &Box<ComponentNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        // Since ComponentNode inherits from FrameNode, we can reuse convert_frame
+        // by creating a FrameNode with the instance's properties (at the moment, we're mapping it manually)
+
+        let children = component
+            .children
+            .iter()
+            .map(|child| self.convert_sub_canvas_node(child))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let size = Self::convert_size(component.size.as_ref());
+        let transform = Self::convert_transform(component.relative_transform.as_ref());
+
+        Ok(Node::Container(ContainerNode {
             base: BaseNode {
                 id: component.id.clone(),
-                name: format!("[Component] {}", component.name),
+                name: component.name.clone(),
                 active: component.visible.unwrap_or(true),
             },
-            transform: Self::convert_transform(component.relative_transform.as_ref()),
-            size: Self::convert_size(component.size.as_ref()),
+            blend_mode: Self::convert_blend_mode(component.blend_mode),
+            transform,
+            size,
+            corner_radius: Self::convert_corner_radius(
+                component.corner_radius,
+                component.rectangle_corner_radii.as_ref(),
+            ),
+            fill: self
+                .convert_fills(Some(&component.fills.as_ref()))
+                .unwrap_or(TRANSPARENT),
+            stroke: self.convert_strokes(Some(&component.strokes)),
+            stroke_width: component.stroke_weight.unwrap_or(0.0) as f32,
+            stroke_align: Self::convert_stroke_align(
+                component
+                    .stroke_align
+                    .as_ref()
+                    .map(|a| serde_json::to_string(a).unwrap())
+                    .unwrap_or_else(|| "CENTER".to_string()),
+            ),
+            stroke_dash_array: component
+                .stroke_dashes
+                .clone()
+                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            effect: Self::convert_effects(Some(&component.effects)),
+            children,
             opacity: Self::convert_opacity(component.visible),
-            error: format!("Unsupported node type: Component"),
+            clip: component.clips_content,
         }))
     }
 
@@ -395,8 +447,20 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's corner radii array to our RectangularCornerRadius
-    fn convert_corner_radius(radii: Option<&Vec<f64>>) -> RectangularCornerRadius {
-        radii.map_or(RectangularCornerRadius::zero(), |radii| {
+    fn convert_corner_radius(
+        corner_radius: Option<f64>,
+        rectangle_corner_radii: Option<&Vec<f64>>,
+    ) -> RectangularCornerRadius {
+        if let Some(radius) = corner_radius {
+            // If corner_radius is present, use it for all corners
+            RectangularCornerRadius {
+                tl: radius as f32,
+                tr: radius as f32,
+                br: radius as f32,
+                bl: radius as f32,
+            }
+        } else if let Some(radii) = rectangle_corner_radii {
+            // If rectangle_corner_radii is present, use individual values
             if radii.len() == 4 {
                 RectangularCornerRadius {
                     tl: radii[0] as f32,
@@ -407,7 +471,10 @@ impl FigmaConverter {
             } else {
                 RectangularCornerRadius::zero()
             }
-        })
+        } else {
+            // If neither is present, return zero radius
+            RectangularCornerRadius::zero()
+        }
     }
 
     /// Convert Figma's instance to our InstanceNode
@@ -433,7 +500,10 @@ impl FigmaConverter {
             blend_mode: Self::convert_blend_mode(instance.blend_mode),
             transform,
             size,
-            corner_radius: Self::convert_corner_radius(instance.rectangle_corner_radii.as_ref()),
+            corner_radius: Self::convert_corner_radius(
+                instance.corner_radius,
+                instance.rectangle_corner_radii.as_ref(),
+            ),
             fill: self
                 .convert_fills(Some(&instance.fills.as_ref()))
                 .unwrap_or(TRANSPARENT),
@@ -590,7 +660,10 @@ impl FigmaConverter {
             blend_mode: Self::convert_blend_mode(frame.blend_mode),
             transform,
             size,
-            corner_radius: Self::convert_corner_radius(frame.rectangle_corner_radii.as_ref()),
+            corner_radius: Self::convert_corner_radius(
+                frame.corner_radius,
+                frame.rectangle_corner_radii.as_ref(),
+            ),
             fill: self
                 .convert_fills(Some(&frame.fills.as_ref()))
                 .unwrap_or(TRANSPARENT),
@@ -648,7 +721,7 @@ impl FigmaConverter {
                 name: text.name.clone(),
                 active: text.visible.unwrap_or(true),
             },
-            transform: Self::convert_transform(None),
+            transform: Self::convert_transform(text.relative_transform.as_ref()),
             size: Size {
                 width: text.size.as_ref().map_or(0.0, |size| size.x as f32),
                 height: text.size.as_ref().map_or(0.0, |size| size.y as f32),
@@ -695,16 +768,87 @@ impl FigmaConverter {
     }
 
     fn convert_vector(&mut self, vector: &Box<VectorNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        let mut children = Vec::new();
+        let mut path_index = 0;
+
+        // Convert fill geometries to path nodes
+        if let Some(fill_geometries) = &vector.fill_geometry {
+            for geometry in fill_geometries {
+                let path_node = Node::Path(PathNode {
+                    base: BaseNode {
+                        id: format!("{}-path-{}", vector.id, path_index),
+                        name: format!("{}-path-{}", vector.name, path_index),
+                        active: vector.visible.unwrap_or(true),
+                    },
+                    transform: AffineTransform::identity(),
+                    fill: self
+                        .convert_fills(Some(&vector.fills))
+                        .unwrap_or(TRANSPARENT),
+                    data: geometry.path.clone(),
+                    stroke: Paint::Solid(SolidPaint {
+                        color: Color(0, 0, 0, 0),
+                        opacity: 0.0,
+                    }),
+                    stroke_width: 0.0,
+                    stroke_align: StrokeAlign::Inside,
+                    stroke_dash_array: None,
+                    opacity: Self::convert_opacity(vector.visible),
+                    blend_mode: Self::convert_blend_mode(vector.blend_mode),
+                    effect: Self::convert_effects(Some(&vector.effects)),
+                });
+                children.push(self.repository.insert(path_node));
+                path_index += 1;
+            }
+        }
+
+        // Convert stroke geometries to path nodes
+        // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
+        if let Some(stroke_geometries) = &vector.stroke_geometry {
+            for geometry in stroke_geometries {
+                let path_node = Node::Path(PathNode {
+                    base: BaseNode {
+                        id: format!("{}-path-{}", vector.id, path_index),
+                        name: format!("{}-path-{}", vector.name, path_index),
+                        active: vector.visible.unwrap_or(true),
+                    },
+                    transform: AffineTransform::identity(),
+                    fill: self
+                        .convert_strokes(Some(&vector.strokes))
+                        .unwrap_or(TRANSPARENT),
+                    data: geometry.path.clone(),
+                    stroke: TRANSPARENT,
+                    stroke_width: 0.0,
+                    stroke_align: StrokeAlign::Inside,
+                    stroke_dash_array: None,
+                    opacity: Self::convert_opacity(vector.visible),
+                    blend_mode: Self::convert_blend_mode(vector.blend_mode),
+                    effect: Self::convert_effects(Some(&vector.effects)),
+                });
+                children.push(self.repository.insert(path_node));
+                path_index += 1;
+            }
+        }
+
+        // Create a group node containing all the path nodes
+        Ok(Node::Container(ContainerNode {
             base: BaseNode {
                 id: vector.id.clone(),
-                name: format!("[Vector] {}", vector.name),
+                name: vector.name.clone(),
                 active: vector.visible.unwrap_or(true),
             },
+            blend_mode: Self::convert_blend_mode(vector.blend_mode),
             transform: Self::convert_transform(vector.relative_transform.as_ref()),
             size: Self::convert_size(vector.size.as_ref()),
+            corner_radius: RectangularCornerRadius::zero(),
+            fill: TRANSPARENT,
+            stroke: None,
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            effect: None,
+            children,
             opacity: Self::convert_opacity(vector.visible),
-            error: format!("Unsupported node type: Vector"),
+            clip: false,
         }))
     }
 
@@ -883,7 +1027,10 @@ impl FigmaConverter {
             },
             transform,
             size,
-            corner_radius: Self::convert_corner_radius(rectangle.rectangle_corner_radii.as_ref()),
+            corner_radius: Self::convert_corner_radius(
+                rectangle.corner_radius,
+                rectangle.rectangle_corner_radii.as_ref(),
+            ),
             fill: self
                 .convert_fills(Some(&rectangle.fills))
                 .unwrap_or(TRANSPARENT),
@@ -927,7 +1074,10 @@ impl FigmaConverter {
             blend_mode: Self::convert_blend_mode(group.blend_mode),
             transform,
             size,
-            corner_radius: Self::convert_corner_radius(group.rectangle_corner_radii.as_ref()),
+            corner_radius: Self::convert_corner_radius(
+                group.corner_radius,
+                group.rectangle_corner_radii.as_ref(),
+            ),
             fill: self.convert_fills(None).unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: 0.0,
