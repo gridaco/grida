@@ -1,5 +1,5 @@
 use crate::schema::{Node, NodeId};
-use skia_safe::{FontMgr, Image};
+use skia_safe::{textlayout::TypefaceFontProvider, FontMgr, Image};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.
@@ -21,6 +21,7 @@ pub struct ImageRepository {
 pub struct FontRepository {
     /// The font manager for handling font data
     font_mgr: FontMgr,
+    provider: TypefaceFontProvider,
 }
 
 impl NodeRepository {
@@ -112,17 +113,25 @@ impl FontRepository {
     pub fn new() -> Self {
         Self {
             font_mgr: FontMgr::new(),
+            provider: TypefaceFontProvider::new(),
         }
     }
 
     /// Adds a font to the repository
-    pub fn add(&mut self, bytes: &[u8]) {
-        self.font_mgr.new_from_data(bytes, None);
+    pub fn add(&mut self, bytes: &[u8], family: &str) {
+        if let Some(tf) = self.font_mgr.new_from_data(bytes, None) {
+            self.provider.register_typeface(tf, Some(family));
+        }
     }
 
     /// Gets a reference to the font manager
     pub fn font_mgr(&self) -> &FontMgr {
         &self.font_mgr
+    }
+
+    /// Gets a reference to the typeface provider
+    pub fn provider(&self) -> &TypefaceFontProvider {
+        &self.provider
     }
 }
 

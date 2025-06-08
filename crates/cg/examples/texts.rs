@@ -1,4 +1,5 @@
 use cg::factory::NodeFactory;
+use cg::font_loader::FontLoader;
 use cg::repository::NodeRepository;
 use cg::schema::*;
 use grida_cmath::transform::AffineTransform;
@@ -111,7 +112,7 @@ async fn demo_texts() -> Scene {
     second_paragraph_text_node.text = LOREM_SHORT.to_string();
     second_paragraph_text_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Arial".to_string(),
+        font_family: "VT323".to_string(),
         font_size: 16.0,
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
@@ -173,5 +174,20 @@ async fn demo_texts() -> Scene {
 #[tokio::main]
 async fn main() {
     let scene = demo_texts().await;
-    window::run_demo_window(scene).await;
+    let caveat_font_path = "resources/Caveat-VariableFont_wght.ttf".to_string();
+    let vt323_font_path = "resources/VT323-Regular.ttf".to_string();
+
+    window::run_demo_window_with(scene, move |_renderer, _img_tx, font_tx, proxy| {
+        println!("📝 Loading fonts asynchronously...");
+        let caveat_path = caveat_font_path.clone();
+        let vt323_path = vt323_font_path.clone();
+        tokio::spawn(async move {
+            let mut loader = FontLoader::new_lifecycle(font_tx, proxy);
+            loader.load_font("Caveat", &caveat_path).await;
+            println!("✅ Font loaded: Caveat");
+            loader.load_font("VT323", &vt323_path).await;
+            println!("✅ Font loaded: VT323");
+        });
+    })
+    .await;
 }

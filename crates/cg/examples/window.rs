@@ -31,7 +31,9 @@ use winit::{
 };
 
 pub use cg::image_loader::ImageMessage;
-use cg::image_loader::{ImageLoader, load_scene_images};
+pub use cg::font_loader::FontMessage;
+use cg::image_loader::{load_scene_images, ImageLoader};
+use cg::font_loader::FontLoader;
 
 #[derive(Debug)]
 enum Command {
@@ -279,6 +281,7 @@ struct App {
     scene: Scene,
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+    font_rx: mpsc::UnboundedReceiver<FontMessage>,
 }
 
 impl ApplicationHandler for App {
@@ -379,9 +382,18 @@ impl App {
         }
     }
 
+    fn process_font_queue(&mut self) {
+        while let Ok(msg) = self.font_rx.try_recv() {
+            println!("📥 Received font data for family: {}", msg.family);
+            self.renderer.add_font(&msg.family, &msg.data);
+            println!("📝 Registered font with renderer: {}", msg.family);
+        }
+    }
+
     fn redraw(&mut self) {
         println!("🎨 Starting redraw...");
         self.process_image_queue();
+        self.process_font_queue();
         let surface = unsafe { &mut *self.surface_ptr };
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::WHITE);
@@ -438,7 +450,7 @@ impl App {
 }
 
 pub async fn run_demo_window(scene: Scene) {
-    run_demo_window_with(scene, |_, _, _| {}).await;
+    run_demo_window_with(scene, |_, _, _, _| {}).await;
 }
 
 pub async fn run_demo_window_with<F>(scene: Scene, init: F)
@@ -446,6 +458,7 @@ where
     F: FnOnce(
         &mut Renderer,
         mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
         winit::event_loop::EventLoopProxy<()>,
     ),
 {
@@ -463,6 +476,7 @@ where
     ) = init_window(1080, 1080);
 
     let (tx, rx) = mpsc::unbounded_channel();
+    let (font_tx, font_rx) = mpsc::unbounded_channel();
     let proxy = el.create_proxy();
 
     let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
@@ -471,6 +485,7 @@ where
     // Initialize the image loader in lifecycle mode
     println!("📸 Initializing image loader...");
     let mut image_loader = ImageLoader::new_lifecycle(tx.clone(), proxy.clone());
+    let _font_loader = FontLoader::new_lifecycle(font_tx.clone(), proxy.clone());
 
     // Load all images in the scene - non-blocking
     println!("🔄 Starting to load scene images in background...");
@@ -481,7 +496,7 @@ where
     });
 
     // Call the init function
-    init(&mut renderer, tx, proxy);
+    init(&mut renderer, tx, font_tx, proxy);
 
     // Create and set up camera
     let viewport_size = Size {
@@ -503,6 +518,7 @@ where
         scene,
         window,
         image_rx: rx,
+        font_rx,
     };
 
     println!("🎭 Starting event loop...");

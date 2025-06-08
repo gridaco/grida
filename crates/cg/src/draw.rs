@@ -34,7 +34,16 @@ impl Painter {
     pub fn new(font_repository: &FontRepository, _image_repository: &ImageRepository) -> Self {
         let mut font_collection = FontCollection::new();
         font_collection.set_default_font_manager(font_repository.font_mgr().clone(), None);
+        font_collection.set_asset_font_manager(Some(font_repository.provider().clone().into()));
         Self { font_collection }
+    }
+
+    /// Update the font collection from repository (called when new fonts are added)
+    pub fn refresh_fonts(&mut self, repository: &FontRepository) {
+        let mut font_collection = FontCollection::new();
+        font_collection.set_default_font_manager(repository.font_mgr().clone(), None);
+        font_collection.set_asset_font_manager(Some(repository.provider().clone().into()));
+        self.font_collection = font_collection;
     }
 
     // ============================
@@ -1086,8 +1095,9 @@ impl Renderer {
         self.image_repository.add(src, image);
     }
 
-    pub fn add_font(&mut self, bytes: &[u8]) {
-        self.font_repository.add(bytes);
+    pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
+        self.font_repository.add(bytes, family);
+        self.painter.refresh_fonts(&self.font_repository);
     }
 
     /// Create an image from raw encoded bytes.

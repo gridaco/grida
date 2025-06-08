@@ -89,7 +89,7 @@ async fn main() {
     let scene_for_loader = scene;
 
     // Use the window module's run_demo_window_with to handle image loading
-    window::run_demo_window_with(scene_for_window, |_renderer, tx, proxy| {
+    window::run_demo_window_with(scene_for_window, |_renderer, tx, _font_tx, proxy| {
         // Initialize the image loader in lifecycle mode
         println!("📸 Initializing image loader...");
         let mut image_loader = ImageLoader::new_lifecycle(tx, proxy);
