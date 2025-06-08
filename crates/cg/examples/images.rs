@@ -1,12 +1,13 @@
 use cg::factory::NodeFactory;
 use cg::repository::NodeRepository;
 use cg::schema::*;
-use grida_cmath::transform::AffineTransform;
+use grida_cmath::{box_fit::BoxFit, transform::AffineTransform};
 
 mod window;
 
 async fn demo_images() -> Scene {
     let nf = NodeFactory::new();
+    let image_url = "https://grida.co/images/abstract-placeholder.jpg".to_string();
 
     // Root container
     let mut root = nf.create_container_node();
@@ -16,27 +17,79 @@ async fn demo_images() -> Scene {
         height: 600.0,
     };
 
-    // First image - will be loaded lazily
-    let mut img1 = nf.create_image_node();
-    img1.base.name = "Image1".to_string();
-    img1.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    img1.size = Size {
+    // First example: Rectangle with ImagePaint fill
+    let mut rect1 = nf.create_rectangle_node();
+    rect1.base.name = "ImageFillRect".to_string();
+    rect1.transform = AffineTransform::new(50.0, 50.0, 0.0);
+    rect1.size = Size {
         width: 200.0,
         height: 200.0,
     };
-    img1.stroke = Paint::Solid(SolidPaint {
+    rect1.fill = Paint::Image(ImagePaint {
+        _ref: image_url.clone(),
+        opacity: 1.0,
+        transform: AffineTransform::identity(),
+        fit: BoxFit::Cover,
+    });
+    rect1.stroke = Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
     });
-    img1.stroke_width = 1.0;
-    img1._ref = "https://grida.co/images/abstract-placeholder.jpg".to_string();
+    rect1.stroke_width = 2.0;
+
+    // Second example: Rectangle with ImagePaint fill and stroke
+    let mut rect2 = nf.create_rectangle_node();
+    rect2.base.name = "ImageFillAndStrokeRect".to_string();
+    rect2.transform = AffineTransform::new(300.0, 50.0, 0.0);
+    rect2.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect2.fill = Paint::Image(ImagePaint {
+        _ref: image_url.clone(),
+        opacity: 1.0,
+        transform: AffineTransform::identity(),
+        fit: BoxFit::Cover,
+    });
+    rect2.stroke = Paint::Image(ImagePaint {
+        _ref: image_url.clone(),
+        opacity: 1.0,
+        transform: AffineTransform::identity(),
+        fit: BoxFit::Cover,
+    });
+    rect2.stroke_width = 10.0;
+
+    // Third example: Rectangle with ImagePaint stroke only
+    let mut rect3 = nf.create_rectangle_node();
+    rect3.base.name = "ImageStrokeRect".to_string();
+    rect3.transform = AffineTransform::new(550.0, 50.0, 0.0);
+    rect3.size = Size {
+        width: 200.0,
+        height: 200.0,
+    };
+    rect3.fill = Paint::Solid(SolidPaint {
+        color: Color(240, 240, 240, 255),
+        opacity: 1.0,
+    });
+    rect3.stroke = Paint::Image(ImagePaint {
+        _ref: image_url,
+        opacity: 1.0,
+        transform: AffineTransform::identity(),
+        fit: BoxFit::Cover,
+    });
+    rect3.stroke_width = 10.0;
 
     let mut repository = NodeRepository::new();
 
-    let img1_id = img1.base.id.clone();
-    repository.insert(Node::Image(img1));
+    let rect1_id = rect1.base.id.clone();
+    let rect2_id = rect2.base.id.clone();
+    let rect3_id = rect3.base.id.clone();
 
-    root.children = vec![img1_id];
+    repository.insert(Node::Rectangle(rect1));
+    repository.insert(Node::Rectangle(rect2));
+    repository.insert(Node::Rectangle(rect3));
+
+    root.children = vec![rect1_id, rect2_id, rect3_id];
     let root_id = root.base.id.clone();
     repository.insert(Node::Container(root));
 
@@ -57,7 +110,11 @@ async fn main() {
         .nodes
         .iter()
         .filter_map(|(_, n)| match n {
-            Node::Image(img) => Some(img._ref.clone()),
+            Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
+                (Paint::Image(img), _) => Some(img._ref.clone()),
+                (_, Paint::Image(img)) => Some(img._ref.clone()),
+                _ => None,
+            },
             _ => None,
         })
         .collect();

@@ -5,7 +5,7 @@ use crate::{
     repository::{FontRepository, ImageRepository, NodeRepository},
 };
 use skia_safe::{
-    Image, Paint as SkPaint, Picture, PictureRecorder, Point, RRect, Rect, Surface,
+    ClipOp, Image, Paint as SkPaint, Path, Picture, PictureRecorder, Point, RRect, Rect, Surface,
     canvas::SaveLayerRec, surfaces, textlayout::*,
 };
 
@@ -31,7 +31,7 @@ pub struct Painter {
 
 impl Painter {
     /// Create a new Painter, using fonts from the FontRepository
-    pub fn new(font_repository: &FontRepository) -> Self {
+    pub fn new(font_repository: &FontRepository, _image_repository: &ImageRepository) -> Self {
         let mut font_collection = FontCollection::new();
         font_collection.set_default_font_manager(font_repository.font_mgr().clone(), None);
         Self { font_collection }
@@ -173,12 +173,30 @@ impl Painter {
         stroke_dash_array: Option<&Vec<f32>>,
         blend_mode: BlendMode,
         opacity: f32,
+        image_repository: &ImageRepository,
     ) {
         let RectangularCornerRadius { tl, tr, bl, br } = *radii;
 
         // Draw fill if present
         if let Some(fill) = fill {
-            let mut fill_paint = cvt::sk_paint(fill, opacity, (rect.width(), rect.height()));
+            let (mut fill_paint, image) = match fill {
+                Paint::Image(image_paint) => {
+                    if let Some(image) = image_repository.get(&image_paint._ref) {
+                        let mut paint = SkPaint::default();
+                        paint.set_anti_alias(true);
+                        paint.set_blend_mode(blend_mode.into());
+                        paint.set_alpha((opacity * 255.0) as u8);
+                        (paint, Some(image))
+                    } else {
+                        // Image not ready - skip fill but continue to draw stroke
+                        (SkPaint::default(), None)
+                    }
+                }
+                _ => (
+                    cvt::sk_paint(fill, opacity, (rect.width(), rect.height())),
+                    None,
+                ),
+            };
             fill_paint.set_blend_mode(blend_mode.into());
 
             // Calculate stroke offset based on alignment
@@ -200,40 +218,11 @@ impl Painter {
                 rect
             };
 
-            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-                // Rounded rect fill
-                let rrect = RRect::new_rect_radii(
-                    adjusted_rect,
-                    &[
-                        Point::new(tl, tl),
-                        Point::new(tr, tr),
-                        Point::new(br, br),
-                        Point::new(bl, bl),
-                    ],
-                );
-                canvas.draw_rrect(rrect, &fill_paint);
-            } else {
-                // Regular rect fill
-                canvas.draw_rect(adjusted_rect, &fill_paint);
-            }
-        }
-
-        // Draw stroke if present
-        if let Some(stroke) = stroke {
-            if stroke_width > 0.0 {
-                let mut stroke_paint = cvt::sk_paint_with_stroke(
-                    stroke,
-                    opacity,
-                    (rect.width(), rect.height()),
-                    stroke_width,
-                    stroke_align,
-                    stroke_dash_array,
-                );
-                stroke_paint.set_blend_mode(blend_mode.into());
-
+            if let Some(image) = image {
                 if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    // Rounded rect fill
                     let rrect = RRect::new_rect_radii(
-                        rect,
+                        adjusted_rect,
                         &[
                             Point::new(tl, tl),
                             Point::new(tr, tr),
@@ -241,9 +230,126 @@ impl Painter {
                             Point::new(bl, bl),
                         ],
                     );
-                    canvas.draw_rrect(rrect, &stroke_paint);
+                    canvas.save();
+                    canvas.clip_rrect(rrect, None, true);
+                    canvas.draw_image_rect(image, None, adjusted_rect, &fill_paint);
+                    canvas.restore();
                 } else {
-                    canvas.draw_rect(rect, &stroke_paint);
+                    // Regular rect fill
+                    canvas.draw_image_rect(image, None, adjusted_rect, &fill_paint);
+                }
+            }
+        }
+
+        // Draw stroke if present
+        if let Some(stroke) = stroke {
+            if stroke_width > 0.0 {
+                let (mut stroke_paint, stroke_image) = match stroke {
+                    Paint::Image(image_paint) => {
+                        if let Some(image) = image_repository.get(&image_paint._ref) {
+                            let mut paint = SkPaint::default();
+                            paint.set_anti_alias(true);
+                            paint.set_blend_mode(blend_mode.into());
+                            paint.set_alpha((opacity * 255.0) as u8);
+                            paint.set_stroke(true);
+                            paint.set_stroke_width(stroke_width);
+                            (paint, Some(image))
+                        } else {
+                            // Image not ready - skip stroke
+                            return;
+                        }
+                    }
+                    _ => (
+                        cvt::sk_paint_with_stroke(
+                            stroke,
+                            opacity,
+                            (rect.width(), rect.height()),
+                            stroke_width,
+                            stroke_align,
+                            stroke_dash_array,
+                        ),
+                        None,
+                    ),
+                };
+                stroke_paint.set_blend_mode(blend_mode.into());
+
+                if let Some(image) = stroke_image {
+                    // --- CLIP TO STROKE BORDER ---
+                    canvas.save();
+                    if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                        // Rounded rect border
+                        let rrect_outer = RRect::new_rect_radii(
+                            rect,
+                            &[
+                                Point::new(tl, tl),
+                                Point::new(tr, tr),
+                                Point::new(br, br),
+                                Point::new(bl, bl),
+                            ],
+                        );
+                        let mut outer_path = Path::new();
+                        outer_path.add_rrect(rrect_outer, None);
+                        canvas.clip_path(&outer_path, ClipOp::Intersect, true);
+
+                        // Calculate inner radii (subtract stroke width, but clamp to 0)
+                        let inner_tl = (tl - stroke_width).max(0.0);
+                        let inner_tr = (tr - stroke_width).max(0.0);
+                        let inner_bl = (bl - stroke_width).max(0.0);
+                        let inner_br = (br - stroke_width).max(0.0);
+                        let inner_rect = Rect::new(
+                            rect.left() + stroke_width,
+                            rect.top() + stroke_width,
+                            rect.right() - stroke_width,
+                            rect.bottom() - stroke_width,
+                        );
+                        let rrect_inner = RRect::new_rect_radii(
+                            inner_rect,
+                            &[
+                                Point::new(inner_tl, inner_tl),
+                                Point::new(inner_tr, inner_tr),
+                                Point::new(inner_br, inner_br),
+                                Point::new(inner_bl, inner_bl),
+                            ],
+                        );
+                        let mut inner_path = Path::new();
+                        inner_path.add_rrect(rrect_inner, None);
+                        canvas.clip_path(&inner_path, ClipOp::Difference, true);
+                        canvas.draw_image_rect(image, None, rect, &stroke_paint);
+                    } else {
+                        // Regular rect border
+                        let outer = rect;
+                        let mut outer_path = Path::new();
+                        outer_path.add_rect(outer, None);
+                        canvas.clip_path(&outer_path, ClipOp::Intersect, true);
+
+                        let inner = Rect::new(
+                            rect.left() + stroke_width,
+                            rect.top() + stroke_width,
+                            rect.right() - stroke_width,
+                            rect.bottom() - stroke_width,
+                        );
+                        let mut inner_path = Path::new();
+                        inner_path.add_rect(inner, None);
+                        canvas.clip_path(&inner_path, ClipOp::Difference, true);
+                        canvas.draw_image_rect(image, None, rect, &stroke_paint);
+                    }
+                    canvas.restore();
+                } else {
+                    // Non-image stroke
+                    if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                        let rrect = RRect::new_rect_radii(
+                            rect,
+                            &[
+                                Point::new(tl, tl),
+                                Point::new(tr, tr),
+                                Point::new(br, br),
+                                Point::new(bl, bl),
+                            ],
+                        );
+                        canvas.draw_rrect(rrect, &stroke_paint);
+                    } else {
+                        canvas.draw_rect(rect, &stroke_paint);
+                    }
                 }
             }
         }
@@ -309,7 +415,12 @@ impl Painter {
     // ============================
 
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    fn draw_rect_node(&self, canvas: &skia_safe::Canvas, node: &RectangleNode) {
+    fn draw_rect_node(
+        &self,
+        canvas: &skia_safe::Canvas,
+        node: &RectangleNode,
+        image_repository: &ImageRepository,
+    ) {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = node.corner_radius;
@@ -327,6 +438,7 @@ impl Painter {
                         node.stroke_dash_array.as_ref(),
                         node.blend_mode,
                         node.opacity,
+                        image_repository,
                     );
                 });
             } else {
@@ -341,6 +453,7 @@ impl Painter {
                     node.stroke_dash_array.as_ref(),
                     node.blend_mode,
                     node.opacity,
+                    image_repository,
                 );
             }
         });
@@ -373,6 +486,7 @@ impl Painter {
                             node.stroke_dash_array.as_ref(),
                             node.blend_mode,
                             node.opacity,
+                            image_repository,
                         );
                     });
                 } else {
@@ -387,6 +501,7 @@ impl Painter {
                         node.stroke_dash_array.as_ref(),
                         node.blend_mode,
                         node.opacity,
+                        image_repository,
                     );
                 }
 
@@ -463,6 +578,7 @@ impl Painter {
                                 node.stroke_dash_array.as_ref(),
                                 node.blend_mode,
                                 node.opacity,
+                                image_repository,
                             );
                         }
                     });
@@ -503,6 +619,7 @@ impl Painter {
                             node.stroke_dash_array.as_ref(),
                             node.blend_mode,
                             node.opacity,
+                            image_repository,
                         );
                     }
                 }
@@ -522,6 +639,7 @@ impl Painter {
                             node.stroke_dash_array.as_ref(),
                             node.blend_mode,
                             node.opacity,
+                            image_repository,
                         );
                     });
                 } else {
@@ -537,6 +655,7 @@ impl Painter {
                         node.stroke_dash_array.as_ref(),
                         node.blend_mode,
                         node.opacity,
+                        image_repository,
                     );
                 }
             }
@@ -570,6 +689,7 @@ impl Painter {
                 None, // no dash array
                 BlendMode::Normal,
                 node.opacity,
+                &ImageRepository::new(),
             );
         });
     }
@@ -885,7 +1005,7 @@ impl Painter {
             Node::Error(n) => self.draw_error_node(canvas, n),
             Node::Group(n) => self.draw_group_node(canvas, n, repository, image_repository),
             Node::Container(n) => self.draw_container_node(canvas, n, repository, image_repository),
-            Node::Rectangle(n) => self.draw_rect_node(canvas, n),
+            Node::Rectangle(n) => self.draw_rect_node(canvas, n, image_repository),
             Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
             Node::Polygon(n) => self.draw_polygon_node(canvas, n),
             Node::RegularPolygon(n) => self.draw_regular_polygon_node(canvas, n),
@@ -918,14 +1038,15 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(width: f32, height: f32, dpi: f32) -> Self {
         let font_repository = FontRepository::new();
+        let image_repository = ImageRepository::new();
         Self {
-            painter: Painter::new(&font_repository),
+            painter: Painter::new(&font_repository, &image_repository),
             backend: None,
             dpi,
             logical_width: width,
             logical_height: height,
             camera: None,
-            image_repository: ImageRepository::new(),
+            image_repository,
             font_repository,
         }
     }
