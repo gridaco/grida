@@ -26,12 +26,12 @@ use winit::keyboard::Key;
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     window::{Window, WindowAttributes},
 };
 
 pub use cg::image_loader::ImageMessage;
-use cg::image_loader::{ImageLoader, ImageLoadingMode, load_scene_images};
+use cg::image_loader::{ImageLoader, load_scene_images};
 
 #[derive(Debug)]
 enum Command {
@@ -296,12 +296,50 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             Command::ZoomIn => {
-                self.camera.zoom *= 1.1;
+                // Get window dimensions
+                let window_size = self.window.inner_size();
+                let center_x = window_size.width as f32 / 2.0;
+                let center_y = window_size.height as f32 / 2.0;
+
+                // Convert screen center to world coordinates
+                let world_center_x = (center_x - self.camera.transform.x()) / self.camera.zoom;
+                let world_center_y = (center_y - self.camera.transform.y()) / self.camera.zoom;
+
+                // Calculate the zoom factor
+                let zoom_factor = 1.1;
+
+                // Apply zoom
+                self.camera.zoom *= zoom_factor;
+
+                // Calculate new camera position to keep the world point under screen center fixed
+                let new_x = center_x - world_center_x * self.camera.zoom;
+                let new_y = center_y - world_center_y * self.camera.zoom;
+                self.camera.set_position(new_x, new_y);
+
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
             Command::ZoomOut => {
-                self.camera.zoom *= 0.9;
+                // Get window dimensions
+                let window_size = self.window.inner_size();
+                let center_x = window_size.width as f32 / 2.0;
+                let center_y = window_size.height as f32 / 2.0;
+
+                // Convert screen center to world coordinates
+                let world_center_x = (center_x - self.camera.transform.x()) / self.camera.zoom;
+                let world_center_y = (center_y - self.camera.transform.y()) / self.camera.zoom;
+
+                // Calculate the zoom factor
+                let zoom_factor = 0.9;
+
+                // Apply zoom
+                self.camera.zoom *= zoom_factor;
+
+                // Calculate new camera position to keep the world point under screen center fixed
+                let new_x = center_x - world_center_x * self.camera.zoom;
+                let new_y = center_y - world_center_y * self.camera.zoom;
+                self.camera.set_position(new_x, new_y);
+
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
