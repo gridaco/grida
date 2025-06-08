@@ -182,10 +182,60 @@ where
     value.map(|v| U::from(v))
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FontInfo {
+    pub family: String,
+    pub postscript_names: std::collections::HashSet<String>,
+    pub styles: std::collections::HashSet<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct FontUsageStore {
+    fonts: std::collections::HashMap<String, FontInfo>,
+}
+
+impl FontUsageStore {
+    pub fn new() -> Self {
+        Self {
+            fonts: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn register_font(
+        &mut self,
+        family: String,
+        postscript_name: Option<String>,
+        style: Option<String>,
+    ) {
+        let font_info = self.fonts.entry(family.clone()).or_insert(FontInfo {
+            family,
+            postscript_names: std::collections::HashSet::new(),
+            styles: std::collections::HashSet::new(),
+        });
+
+        if let Some(postscript) = postscript_name {
+            font_info.postscript_names.insert(postscript);
+        }
+
+        if let Some(style) = style {
+            font_info.styles.insert(style);
+        }
+    }
+
+    pub fn get_discovered_fonts(&self) -> Vec<FontInfo> {
+        self.fonts.values().cloned().collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.fonts.clear();
+    }
+}
+
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
     image_urls: std::collections::HashMap<String, String>,
+    font_store: FontUsageStore,
 }
 
 impl FigmaConverter {
@@ -193,12 +243,27 @@ impl FigmaConverter {
         Self {
             repository: NodeRepository::new(),
             image_urls: std::collections::HashMap::new(),
+            font_store: FontUsageStore::new(),
         }
     }
 
     pub fn with_image_urls(mut self, urls: std::collections::HashMap<String, String>) -> Self {
         self.image_urls = urls;
         self
+    }
+
+    pub fn get_discovered_fonts(&self) -> Vec<FontInfo> {
+        self.font_store.get_discovered_fonts()
+    }
+
+    fn register_font(
+        &mut self,
+        family: String,
+        postscript_name: Option<String>,
+        style: Option<String>,
+    ) {
+        self.font_store
+            .register_font(family, postscript_name, style);
     }
 
     /// Convert Figma's relative transform matrix to AffineTransform
@@ -790,6 +855,15 @@ impl FigmaConverter {
 
     fn convert_text(&mut self, text: &Box<TextNode>) -> Result<Node, String> {
         let style = text.style.as_ref();
+
+        // Register the font family and postscript name if they exist
+        if let Some(font_family) = &style.font_family {
+            self.register_font(
+                font_family.clone(),
+                style.font_post_script_name.clone(),
+                style.font_style.clone(),
+            );
+        }
 
         Ok(Node::TextSpan(TextSpanNode {
             base: BaseNode {
