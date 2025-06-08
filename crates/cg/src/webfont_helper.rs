@@ -113,3 +113,34 @@ pub fn find_font_files(metadata: &Value, discovered_fonts: &[FontInfo]) -> Vec<F
 
     font_files
 }
+
+pub fn find_font_files_by_family(metadata: &Value, font_families: &[String]) -> Vec<FontFileInfo> {
+    let mut font_files = Vec::new();
+
+    for family in font_families {
+        // Try to find the font family in metadata (case-insensitive)
+        let font_data = metadata.as_object().and_then(|obj| {
+            obj.iter()
+                .find(|(key, _)| key.to_lowercase() == family.to_lowercase())
+                .map(|(_, value)| value)
+        });
+
+        if let Some(font_data) = font_data {
+            if let Some(files) = font_data.get("files").and_then(|v| v.as_object()) {
+                // Get all available files
+                for (style, url) in files {
+                    if let Some(url) = url.as_str() {
+                        font_files.push(FontFileInfo {
+                            family: family.clone(),
+                            postscript_name: style.clone(), // Use style as postscript name
+                            style: style.clone(),
+                            url: url.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    font_files
+}
