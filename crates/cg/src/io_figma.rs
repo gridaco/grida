@@ -1,10 +1,10 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
     BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeDropShadow, FeGaussianBlur,
-    FilterEffect, FontWeight, ImagePaint, LineNode, Node, NodeId, Paint, PathNode, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
-    StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
-    TextTransform,
+    FilterEffect, FontWeight, GradientStop, ImagePaint, LineNode, LinearGradientPaint, Node,
+    NodeId, Paint, PathNode, RadialGradientPaint, RectangleNode, RectangularCornerRadius,
+    RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign,
+    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
 };
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -94,6 +94,37 @@ impl From<&FigmaPaint> for Paint {
                 },
                 opacity: image.opacity.unwrap_or(1.0) as f32,
             }),
+            FigmaPaint::GradientPaint(gradient) => {
+                let stops = gradient
+                    .gradient_stops
+                    .iter()
+                    .map(|stop| GradientStop {
+                        offset: stop.position as f32,
+                        color: Color::from(&stop.color),
+                    })
+                    .collect();
+
+                match gradient.r#type {
+                    figma_api::models::gradient_paint::Type::GradientLinear => {
+                        Paint::LinearGradient(LinearGradientPaint {
+                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            stops,
+                            opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                        })
+                    }
+                    figma_api::models::gradient_paint::Type::GradientRadial => {
+                        Paint::RadialGradient(RadialGradientPaint {
+                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            stops,
+                            opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                        })
+                    }
+                    _ => Paint::Solid(SolidPaint {
+                        color: Color(0, 0, 0, 255),
+                        opacity: 1.0,
+                    }),
+                }
+            }
             _ => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
                 opacity: 1.0,
@@ -237,6 +268,37 @@ impl FigmaConverter {
                     },
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                 })
+            }
+            FigmaPaint::GradientPaint(gradient) => {
+                let stops = gradient
+                    .gradient_stops
+                    .iter()
+                    .map(|stop| GradientStop {
+                        offset: stop.position as f32,
+                        color: Color::from(&stop.color),
+                    })
+                    .collect();
+
+                match gradient.r#type {
+                    figma_api::models::gradient_paint::Type::GradientLinear => {
+                        Paint::LinearGradient(LinearGradientPaint {
+                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            stops,
+                            opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                        })
+                    }
+                    figma_api::models::gradient_paint::Type::GradientRadial => {
+                        Paint::RadialGradient(RadialGradientPaint {
+                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            stops,
+                            opacity: gradient.opacity.unwrap_or(1.0) as f32,
+                        })
+                    }
+                    _ => Paint::Solid(SolidPaint {
+                        color: Color(0, 0, 0, 255),
+                        opacity: 1.0,
+                    }),
+                }
             }
             _ => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
@@ -758,7 +820,7 @@ impl FigmaConverter {
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: self.convert_fills(style.fills.as_ref()).unwrap_or(BLACK),
+            fill: self.convert_fills(Some(&text.fills)).unwrap_or(BLACK),
             stroke: self.convert_strokes(Some(&text.strokes)),
             stroke_width: Some(text.stroke_weight.unwrap_or(0.0) as f32),
             stroke_align: StrokeAlign::Inside,
