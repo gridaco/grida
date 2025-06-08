@@ -1,6 +1,5 @@
 use cg::camera::Camera;
 use cg::draw::{Backend, Renderer};
-use cg::image::ImageHandler;
 use cg::io::parse;
 use cg::schema::*;
 use console_error_panic_hook::set_once as init_panic_hook;
@@ -18,7 +17,7 @@ use grida_cmath::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use reqwest;
-use skia_safe::{Image, Surface, gpu};
+use skia_safe::{Surface, gpu};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
 use tokio::sync::mpsc;
@@ -31,6 +30,9 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+pub use cg::image_loader::ImageMessage;
+use cg::image_loader::{ImageLoader, ImageLoadingMode, load_scene_images};
+
 #[derive(Debug)]
 enum Command {
     Close,
@@ -40,11 +42,6 @@ enum Command {
     Redraw,
     Resize { width: u32, height: u32 },
     None,
-}
-
-pub struct ImageMessage {
-    pub src: String,
-    pub data: Vec<u8>,
 }
 
 fn handle_window_event(event: WindowEvent) -> Command {
@@ -333,13 +330,19 @@ impl ApplicationHandler for App {
 impl App {
     fn process_image_queue(&mut self) {
         while let Ok(msg) = self.image_rx.try_recv() {
+            println!("📥 Received image data for: {}", msg.src);
             if let Some(image) = self.renderer.create_image(&msg.data) {
-                self.renderer.register_image(msg.src, image);
+                println!("✅ Successfully created image from data: {}", msg.src);
+                self.renderer.register_image(msg.src.clone(), image);
+                println!("📝 Registered image with renderer: {}", msg.src);
+            } else {
+                println!("❌ Failed to create image from data: {}", msg.src);
             }
         }
     }
 
     fn redraw(&mut self) {
+        println!("🎨 Starting redraw...");
         self.process_image_queue();
         let surface = unsafe { &mut *self.surface_ptr };
         let canvas = surface.canvas();
@@ -347,6 +350,7 @@ impl App {
 
         self.renderer.render_scene(&self.scene);
         self.renderer.flush();
+        println!("✨ Redraw complete");
 
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
@@ -407,9 +411,7 @@ where
         winit::event_loop::EventLoopProxy<()>,
     ),
 {
-    let width = 1080;
-    let height = 1080;
-
+    println!("🚀 Starting demo window...");
     let (
         surface_ptr,
         el,
@@ -420,41 +422,36 @@ where
         fb_info,
         gr_context,
         scale_factor,
-    ) = init_window(width, height);
+    ) = init_window(1080, 1080);
 
-    let proxy = el.create_proxy();
     let (tx, rx) = mpsc::unbounded_channel();
+    let proxy = el.create_proxy();
 
-    // Log DPI and size info
-    let logical_size = window.inner_size();
-    let physical_width = (logical_size.width as f64 * scale_factor).round() as u32;
-    let physical_height = (logical_size.height as f64 * scale_factor).round() as u32;
-    println!("[DPI DEBUG] scale_factor: {}", scale_factor);
-    println!(
-        "[DPI DEBUG] logical_size: {} x {}",
-        logical_size.width, logical_size.height
-    );
-    println!(
-        "[DPI DEBUG] physical_size: {} x {}",
-        physical_width, physical_height
-    );
-
-    let mut renderer = Renderer::new(
-        logical_size.width as f32,
-        logical_size.height as f32,
-        scale_factor as f32,
-    );
+    let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
     renderer.set_backend(Backend::GL(surface_ptr));
+
+    // Initialize the image loader in lifecycle mode
+    println!("📸 Initializing image loader...");
+    let mut image_loader = ImageLoader::new_lifecycle(tx.clone(), proxy.clone());
+
+    // Load all images in the scene - non-blocking
+    println!("🔄 Starting to load scene images in background...");
+    let scene_clone = scene.clone();
+    tokio::spawn(async move {
+        load_scene_images(&mut image_loader, &scene_clone).await;
+        println!("✅ Scene images loading completed in background");
+    });
+
+    // Call the init function
+    init(&mut renderer, tx, proxy);
 
     // Create and set up camera
     let viewport_size = Size {
-        width: physical_width as f32,
-        height: physical_height as f32,
+        width: 1080.0,
+        height: 1080.0,
     };
     let camera = Camera::new(viewport_size);
     renderer.set_camera(camera.clone());
-
-    init(&mut renderer, tx.clone(), proxy.clone());
 
     let mut app = App {
         renderer,
@@ -470,12 +467,8 @@ where
         image_rx: rx,
     };
 
-    // Initial render
-    app.redraw();
-
-    // Set up the event loop to wait for events
-    el.set_control_flow(ControlFlow::Wait);
-    el.run_app(&mut app).expect("Failed to run event loop");
+    println!("🎭 Starting event loop...");
+    el.run_app(&mut app).unwrap();
 }
 
 pub async fn load_scene_from_file(file_path: &str) -> Scene {

@@ -3,6 +3,7 @@ pub mod cvt;
 pub mod draw;
 pub mod factory;
 pub mod image;
+pub mod image_loader;
 pub mod io;
 pub mod io_figma;
 pub mod repository;

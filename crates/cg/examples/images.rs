@@ -105,31 +105,5 @@ async fn demo_images() -> Scene {
 #[tokio::main]
 async fn main() {
     let scene = demo_images().await;
-
-    let urls: Vec<String> = scene
-        .nodes
-        .iter()
-        .filter_map(|(_, n)| match n {
-            Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
-                (Paint::Image(img), _) => Some(img._ref.clone()),
-                (_, Paint::Image(img)) => Some(img._ref.clone()),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect();
-
-    window::run_demo_window_with(scene, move |_, tx, proxy| {
-        for url in urls {
-            let tx_clone = tx.clone();
-            let proxy_clone = proxy.clone();
-            let url = url.clone(); // Clone the String for the async block
-            tokio::spawn(async move {
-                let data = window::fetch_image_data(&url).await;
-                let _ = tx_clone.send(window::ImageMessage { src: url, data });
-                let _ = proxy_clone.send_event(());
-            });
-        }
-    })
-    .await;
+    window::run_demo_window(scene).await;
 }

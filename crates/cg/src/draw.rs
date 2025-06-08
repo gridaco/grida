@@ -220,7 +220,7 @@ impl Painter {
 
             if let Some(image) = image {
                 if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-                    // Rounded rect fill
+                    // Rounded rect fill (image)
                     let rrect = RRect::new_rect_radii(
                         adjusted_rect,
                         &[
@@ -235,8 +235,24 @@ impl Painter {
                     canvas.draw_image_rect(image, None, adjusted_rect, &fill_paint);
                     canvas.restore();
                 } else {
-                    // Regular rect fill
+                    // Regular rect fill (image)
                     canvas.draw_image_rect(image, None, adjusted_rect, &fill_paint);
+                }
+            } else {
+                // Non-image paint: draw with fill_paint
+                if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        adjusted_rect,
+                        &[
+                            Point::new(tl, tl),
+                            Point::new(tr, tr),
+                            Point::new(br, br),
+                            Point::new(bl, bl),
+                        ],
+                    );
+                    canvas.draw_rrect(rrect, &fill_paint);
+                } else {
+                    canvas.draw_rect(adjusted_rect, &fill_paint);
                 }
             }
         }
