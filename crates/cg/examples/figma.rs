@@ -1,5 +1,5 @@
 mod window;
-use cg::image_loader::{ImageLoader, ImageLoadingMode, load_scene_images};
+use cg::image_loader::{ImageLoader, load_scene_images};
 use cg::{io_figma::FigmaConverter, schema::Scene};
 use clap::Parser;
 use figma_api::apis::{
@@ -89,7 +89,7 @@ async fn main() {
     let scene_for_loader = scene;
 
     // Use the window module's run_demo_window_with to handle image loading
-    window::run_demo_window_with(scene_for_window, |renderer, tx, proxy| {
+    window::run_demo_window_with(scene_for_window, |_renderer, tx, proxy| {
         // Initialize the image loader in lifecycle mode
         println!("📸 Initializing image loader...");
         let mut image_loader = ImageLoader::new_lifecycle(tx, proxy);
