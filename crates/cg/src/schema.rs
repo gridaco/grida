@@ -427,6 +427,7 @@ pub struct Scene {
 
 #[derive(Debug, Clone)]
 pub enum Node {
+    Error(ErrorNode),
     Group(GroupNode),
     Container(ContainerNode),
     Rectangle(RectangleNode),
@@ -445,6 +446,15 @@ pub struct BaseNode {
     pub id: NodeId,
     pub name: String,
     pub active: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ErrorNode {
+    pub base: BaseNode,
+    pub transform: AffineTransform,
+    pub size: Size,
+    pub error: String,
+    pub opacity: f32,
 }
 
 #[derive(Debug, Clone)]

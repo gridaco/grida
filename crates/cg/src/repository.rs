@@ -35,6 +35,7 @@ impl NodeRepository {
     /// Returns the node's ID.
     pub fn insert(&mut self, node: Node) -> NodeId {
         let id = match &node {
+            Node::Error(n) => n.base.id.clone(),
             Node::Group(n) => n.base.id.clone(),
             Node::Container(n) => n.base.id.clone(),
             Node::Rectangle(n) => n.base.id.clone(),

@@ -1,9 +1,10 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
-    BaseNode, BlendMode, Color, ContainerNode, FeDropShadow, FeGaussianBlur, FilterEffect,
-    FontWeight, LineNode, Node, NodeId, Paint, RectangleNode, RectangularCornerRadius,
-    RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign,
-    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
+    BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeDropShadow, FeGaussianBlur,
+    FilterEffect, FontWeight, LineNode, Node, NodeId, Paint, RectangleNode,
+    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
+    StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
+    TextTransform,
 };
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -259,48 +260,37 @@ impl FigmaConverter {
         None // No valid effects found
     }
 
-    /// Create a fallback red rectangle for unsupported node types
-    fn create_fallback_node(&mut self, id: String, name: String) -> Result<Node, String> {
-        Ok(Node::Rectangle(RectangleNode {
+    /// Convert Figma's slice to our SliceNode
+    fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
+        Ok(Node::Error(ErrorNode {
             base: BaseNode {
-                id,
-                name,
-                active: true,
+                id: slice.id.clone(),
+                name: format!("[Slice] {}", slice.name),
+                active: slice.visible.unwrap_or(true),
             },
             transform: AffineTransform::identity(),
             size: Size {
                 width: 100.0,
                 height: 100.0,
             },
-            corner_radius: RectangularCornerRadius::zero(),
-            fill: Paint::Solid(SolidPaint {
-                color: Color(255, 0, 0, 255), // Red color
-                opacity: 1.0,
-            }),
-            stroke: Paint::Solid(SolidPaint {
-                color: Color(0, 0, 0, 255),
-                opacity: 1.0,
-            }),
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            opacity: 1.0,
-            blend_mode: BlendMode::Normal,
-            effect: None,
+            opacity: Self::convert_opacity(slice.visible),
+            error: format!("Unsupported node type: Slice"),
         }))
-    }
-
-    /// Convert Figma's slice to our SliceNode
-    fn convert_slice(&mut self, slice: &Box<SliceNode>) -> Result<Node, String> {
-        self.create_fallback_node(slice.id.clone(), format!("[Slice] {}", slice.name))
     }
 
     /// Convert Figma's component to our ComponentNode
     fn convert_component(&mut self, component: &Box<ComponentNode>) -> Result<Node, String> {
-        self.create_fallback_node(
-            component.id.clone(),
-            format!("[Component] {}", component.name),
-        )
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: component.id.clone(),
+                name: format!("[Component] {}", component.name),
+                active: component.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(component.relative_transform.as_ref()),
+            size: Self::convert_size(component.size.as_ref()),
+            opacity: Self::convert_opacity(component.visible),
+            error: format!("Unsupported node type: Component"),
+        }))
     }
 
     /// Convert Figma's component set to our ComponentSetNode
@@ -308,25 +298,80 @@ impl FigmaConverter {
         &mut self,
         component_set: &Box<ComponentSetNode>,
     ) -> Result<Node, String> {
-        self.create_fallback_node(
-            component_set.id.clone(),
-            format!("[ComponentSet] {}", component_set.name),
-        )
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: component_set.id.clone(),
+                name: format!("[ComponentSet] {}", component_set.name),
+                active: component_set.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(component_set.relative_transform.as_ref()),
+            size: Self::convert_size(component_set.size.as_ref()),
+            opacity: Self::convert_opacity(component_set.visible),
+            error: format!("Unsupported node type: ComponentSet"),
+        }))
     }
 
     /// Convert Figma's instance to our InstanceNode
     fn convert_instance(&mut self, instance: &Box<InstanceNode>) -> Result<Node, String> {
-        self.create_fallback_node(instance.id.clone(), format!("[Instance] {}", instance.name))
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: instance.id.clone(),
+                name: format!("[Instance] {}", instance.name),
+                active: instance.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(instance.relative_transform.as_ref()),
+            size: Self::convert_size(instance.size.as_ref()),
+            opacity: Self::convert_opacity(instance.visible),
+            error: format!("Unsupported node type: Instance"),
+        }))
     }
 
     /// Convert Figma's section to our SectionNode
     fn convert_section(&mut self, section: &Box<SectionNode>) -> Result<Node, String> {
-        self.create_fallback_node(section.id.clone(), format!("[Section] {}", section.name))
+        let children = section
+            .children
+            .iter()
+            .map(|child| self.convert_sub_canvas_node(child))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Node::Container(ContainerNode {
+            base: BaseNode {
+                id: section.id.clone(),
+                name: format!("[Section] {}", section.name),
+                active: section.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(section.relative_transform.as_ref()),
+            size: Self::convert_size(section.size.as_ref()),
+            corner_radius: RectangularCornerRadius::zero(),
+            children,
+            fill: Self::convert_fills(Some(&section.fills.as_ref())).unwrap_or(TRANSPARENT),
+            stroke: None,
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            opacity: Self::convert_opacity(section.visible),
+            blend_mode: BlendMode::Normal,
+            effect: None,
+            clip: false,
+        }))
     }
 
     /// Convert Figma's link to our LinkUnfurlNode
     fn convert_link(&mut self, link: &Box<LinkUnfurlNode>) -> Result<Node, String> {
-        self.create_fallback_node(link.id.clone(), format!("[Link] {}", link.name))
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: link.id.clone(),
+                name: format!("[Link] {}", link.name),
+                active: link.visible.unwrap_or(true),
+            },
+            transform: AffineTransform::identity(),
+            size: Size {
+                width: 100.0,
+                height: 100.0,
+            },
+            opacity: Self::convert_opacity(link.visible),
+            error: format!("Unsupported node type: Link"),
+        }))
     }
 
     /// Convert Figma's node to Grida schema
@@ -476,16 +521,31 @@ impl FigmaConverter {
     }
 
     fn convert_vector(&mut self, vector: &Box<VectorNode>) -> Result<Node, String> {
-        // TODO: Implement vector conversion
-        // fallback
-        return self.create_fallback_node(vector.id.clone(), format!("[Vector] {}", vector.name));
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: vector.id.clone(),
+                name: format!("[Vector] {}", vector.name),
+                active: vector.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(vector.relative_transform.as_ref()),
+            size: Self::convert_size(vector.size.as_ref()),
+            opacity: Self::convert_opacity(vector.visible),
+            error: format!("Unsupported node type: Vector"),
+        }))
     }
 
     fn convert_boolean(&mut self, boolean: &Box<BooleanOperationNode>) -> Result<Node, String> {
-        // TODO: Implement boolean operation conversion
-        // fallback
-        return self
-            .create_fallback_node(boolean.id.clone(), format!("[Boolean] {}", boolean.name));
+        Ok(Node::Error(ErrorNode {
+            base: BaseNode {
+                id: boolean.id.clone(),
+                name: format!("[Boolean] {}", boolean.name),
+                active: boolean.visible.unwrap_or(true),
+            },
+            transform: Self::convert_transform(boolean.relative_transform.as_ref()),
+            size: Self::convert_size(boolean.size.as_ref()),
+            opacity: Self::convert_opacity(boolean.visible),
+            error: format!("Unsupported node type: Boolean"),
+        }))
     }
 
     fn convert_star(&mut self, star: &Box<StarNode>) -> Result<Node, String> {

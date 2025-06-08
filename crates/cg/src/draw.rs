@@ -507,6 +507,36 @@ impl Painter {
         }
     }
 
+    pub fn draw_error_node(&self, canvas: &skia_safe::Canvas, node: &ErrorNode) {
+        self.with_canvas_state(canvas, &node.transform.matrix, || {
+            let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
+            let radii = RectangularCornerRadius::zero();
+
+            // Create a red fill paint
+            let fill = Paint::Solid(SolidPaint {
+                color: Color(255, 0, 0, 51), // Semi-transparent red
+                opacity: 1.0,
+            });
+            let stroke = Paint::Solid(SolidPaint {
+                color: Color(255, 0, 0, 255), // Solid red
+                opacity: 1.0,
+            });
+
+            self.draw_fill_and_stroke(
+                canvas,
+                rect,
+                &radii,
+                &fill,
+                Some(&stroke),
+                1.0, // stroke width
+                StrokeAlign::Inside,
+                None, // no dash array
+                BlendMode::Normal,
+                node.opacity,
+            );
+        });
+    }
+
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
     pub fn draw_group_node(
         &self,
@@ -815,6 +845,7 @@ impl Painter {
         image_repository: &ImageRepository,
     ) {
         match node {
+            Node::Error(n) => self.draw_error_node(canvas, n),
             Node::Group(n) => self.draw_group_node(canvas, n, repository, image_repository),
             Node::Container(n) => self.draw_container_node(canvas, n, repository, image_repository),
             Node::Rectangle(n) => self.draw_rect_node(canvas, n),
