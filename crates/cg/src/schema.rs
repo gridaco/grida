@@ -1,6 +1,7 @@
 use crate::cvt;
 use crate::repository::NodeRepository;
 use core::str;
+use grida_cmath::box_fit::BoxFit;
 use grida_cmath::transform::AffineTransform;
 use serde::Deserialize;
 
@@ -39,21 +40,6 @@ pub enum BooleanPathOperation {
     Intersection, // A ∩ B
     Difference,   // A - B
     Xor,          // A ⊕ B
-}
-
-/// Supported fit modes.
-///
-/// Only `Contain`, `Cover`, and `None` are supported in the current version.
-///
-/// - `None` may have unexpected results depending on the environment.
-///
-/// @see https://api.flutter.dev/flutter/painting/BoxFit.html  
-/// @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BoxFit {
-    Contain,
-    Cover,
-    None,
 }
 
 /// Stroke alignment.
@@ -351,7 +337,7 @@ pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
     RadialGradient(RadialGradientPaint),
-    // Image(ImagePaint),
+    Image(ImagePaint),
 }
 
 #[derive(Debug, Clone)]
@@ -374,13 +360,13 @@ pub struct RadialGradientPaint {
     pub opacity: f32,
 }
 
-// #[derive(Debug, Clone)]
-// pub struct ImagePaint {
-//     pub transform: AffineTransform,
-//     pub _ref: String,
-//     pub fit: BoxFit,
-//     pub opacity: f32,
-// }
+#[derive(Debug, Clone)]
+pub struct ImagePaint {
+    pub transform: AffineTransform,
+    pub _ref: String,
+    pub fit: BoxFit,
+    pub opacity: f32,
+}
 
 #[derive(Debug, Clone)]
 pub struct Size {

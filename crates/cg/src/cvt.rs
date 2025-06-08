@@ -67,6 +67,12 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
             .unwrap();
             skia_paint.set_shader(shader);
         }
+        Paint::Image(image_paint) => {
+            // For image paints, we just set the opacity since the actual drawing
+            // is handled by draw_image_rect in the draw_fill_and_stroke method
+            let final_alpha = (opacity * image_paint.opacity * 255.0) as u8;
+            skia_paint.set_alpha(final_alpha);
+        }
     }
     skia_paint
 }
