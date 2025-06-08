@@ -1,10 +1,11 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
-    BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeDropShadow, FeGaussianBlur,
-    FilterEffect, FontWeight, GradientStop, ImagePaint, LineNode, LinearGradientPaint, Node,
-    NodeId, Paint, PathNode, RadialGradientPaint, RectangleNode, RectangularCornerRadius,
-    RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign,
-    TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
+    BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeBackdropBlur, FeDropShadow,
+    FeGaussianBlur, FilterEffect, FontWeight, GradientStop, ImagePaint, LineNode,
+    LinearGradientPaint, Node, NodeId, Paint, PathNode, RadialGradientPaint, RectangleNode,
+    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
+    StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
+    TextTransform,
 };
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -393,13 +394,22 @@ impl FigmaConverter {
             return None;
         }
 
+        // Filter visible effects first
+        let visible_effects: Vec<&Effect> = effects
+            .iter()
+            .filter(|effect| match effect {
+                Effect::DropShadow(drop_shadow) => drop_shadow.visible,
+                Effect::LayerBlur(blur) => blur.visible,
+                Effect::BackgroundBlur(blur) => blur.visible,
+                Effect::InnerShadow(inner_shadow) => inner_shadow.visible,
+                _ => true,
+            })
+            .collect();
+
         // Find the first valid effect
-        for effect in effects {
+        for effect in visible_effects {
             match effect {
                 Effect::DropShadow(drop_shadow) => {
-                    if !drop_shadow.visible {
-                        continue;
-                    }
                     return Some(FilterEffect::DropShadow(FeDropShadow {
                         dx: drop_shadow.offset.x as f32,
                         dy: drop_shadow.offset.y as f32,
@@ -408,10 +418,12 @@ impl FigmaConverter {
                     }));
                 }
                 Effect::LayerBlur(blur) => {
-                    if !blur.visible {
-                        continue;
-                    }
                     return Some(FilterEffect::GaussianBlur(FeGaussianBlur {
+                        radius: blur.radius as f32,
+                    }));
+                }
+                Effect::BackgroundBlur(blur) => {
+                    return Some(FilterEffect::BackdropBlur(FeBackdropBlur {
                         radius: blur.radius as f32,
                     }));
                 }
@@ -645,7 +657,9 @@ impl FigmaConverter {
             FigmaSubcanvasNode::Frame(frame) => self.convert_frame(frame)?,
             FigmaSubcanvasNode::Group(group) => self.convert_group(group)?,
             FigmaSubcanvasNode::Vector(vector) => self.convert_vector(vector)?,
-            FigmaSubcanvasNode::BooleanOperation(boolean) => self.convert_boolean(boolean)?,
+            FigmaSubcanvasNode::BooleanOperation(boolean) => {
+                self.convert_boolean_operation(boolean)?
+            }
             FigmaSubcanvasNode::Star(star) => self.convert_star(star)?,
             FigmaSubcanvasNode::Line(line) => self.convert_line(line)?,
             FigmaSubcanvasNode::Ellipse(ellipse) => self.convert_ellipse(ellipse)?,
@@ -914,17 +928,49 @@ impl FigmaConverter {
         }))
     }
 
-    fn convert_boolean(&mut self, boolean: &Box<BooleanOperationNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+    fn convert_boolean_operation(
+        &mut self,
+        boolean: &Box<BooleanOperationNode>,
+    ) -> Result<Node, String> {
+        let children = boolean
+            .children
+            .iter()
+            .map(|child| self.convert_sub_canvas_node(child))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let size = Self::convert_size(boolean.size.as_ref());
+        let transform = Self::convert_transform(boolean.relative_transform.as_ref());
+
+        Ok(Node::Container(ContainerNode {
             base: BaseNode {
                 id: boolean.id.clone(),
-                name: format!("[Boolean] {}", boolean.name),
+                name: boolean.name.clone(),
                 active: boolean.visible.unwrap_or(true),
             },
-            transform: Self::convert_transform(boolean.relative_transform.as_ref()),
-            size: Self::convert_size(boolean.size.as_ref()),
+            blend_mode: Self::convert_blend_mode(boolean.blend_mode),
+            transform,
+            size,
+            corner_radius: RectangularCornerRadius::zero(),
+            fill: self
+                .convert_fills(Some(&boolean.fills))
+                .unwrap_or(TRANSPARENT),
+            stroke: self.convert_strokes(Some(&boolean.strokes)),
+            stroke_width: boolean.stroke_weight.unwrap_or(0.0) as f32,
+            stroke_align: Self::convert_stroke_align(
+                boolean
+                    .stroke_align
+                    .as_ref()
+                    .map(|a| serde_json::to_string(a).unwrap())
+                    .unwrap_or_else(|| "CENTER".to_string()),
+            ),
+            stroke_dash_array: boolean
+                .stroke_dashes
+                .clone()
+                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            effect: Self::convert_effects(Some(&boolean.effects)),
+            children,
             opacity: Self::convert_opacity(boolean.visible),
-            error: format!("Unsupported node type: Boolean"),
+            clip: false,
         }))
     }
 
