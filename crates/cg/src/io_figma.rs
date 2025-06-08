@@ -1,7 +1,7 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
     BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeDropShadow, FeGaussianBlur,
-    FilterEffect, FontWeight, LineNode, Node, NodeId, Paint, RectangleNode,
+    FilterEffect, FontWeight, ImagePaint, LineNode, Node, NodeId, Paint, RectangleNode,
     RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
     StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
     TextTransform,
@@ -19,11 +19,17 @@ use figma_api::models::{
     RegularPolygonNode as FigmaRegularPolygonNode, Rgba, SectionNode, SliceNode, StarNode,
     SubcanvasNode as FigmaSubcanvasNode, TextNode, VectorNode,
 };
+use grida_cmath::box_fit::BoxFit;
 use grida_cmath::transform::AffineTransform;
 
 const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
     color: Color(0, 0, 0, 0),
     opacity: 0.0,
+});
+
+const BLACK: Paint = Paint::Solid(SolidPaint {
+    color: Color(0, 0, 0, 255),
+    opacity: 1.0,
 });
 
 // Map implementations
@@ -55,6 +61,33 @@ impl From<&FigmaPaint> for Paint {
             FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
                 color: Color::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
+            }),
+            FigmaPaint::ImagePaint(image) => Paint::Image(ImagePaint {
+                transform: image.image_transform.as_ref().map_or(
+                    AffineTransform::identity(),
+                    |transform| AffineTransform {
+                        matrix: [
+                            [
+                                transform[0][0] as f32,
+                                transform[0][1] as f32,
+                                transform[0][2] as f32,
+                            ],
+                            [
+                                transform[1][0] as f32,
+                                transform[1][1] as f32,
+                                transform[1][2] as f32,
+                            ],
+                        ],
+                    },
+                ),
+                _ref: image.image_ref.clone(),
+                fit: match image.scale_mode {
+                    figma_api::models::image_paint::ScaleMode::Fill => BoxFit::Cover,
+                    figma_api::models::image_paint::ScaleMode::Fit => BoxFit::Contain,
+                    figma_api::models::image_paint::ScaleMode::Tile => BoxFit::None,
+                    figma_api::models::image_paint::ScaleMode::Stretch => BoxFit::None,
+                },
+                opacity: image.opacity.unwrap_or(1.0) as f32,
             }),
             _ => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
@@ -115,13 +148,20 @@ where
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
+    image_urls: std::collections::HashMap<String, String>,
 }
 
 impl FigmaConverter {
     pub fn new() -> Self {
         Self {
             repository: NodeRepository::new(),
+            image_urls: std::collections::HashMap::new(),
         }
+    }
+
+    pub fn with_image_urls(mut self, urls: std::collections::HashMap<String, String>) -> Self {
+        self.image_urls = urls;
+        self
     }
 
     /// Convert Figma's relative transform matrix to AffineTransform
@@ -153,28 +193,71 @@ impl FigmaConverter {
     }
 
     /// Convert Figma's paint to our Paint
-    fn convert_paint(paint: &FigmaPaint) -> Paint {
-        paint.into()
+    fn convert_paint(&self, paint: &FigmaPaint) -> Paint {
+        match paint {
+            FigmaPaint::SolidPaint(solid) => Paint::Solid(SolidPaint {
+                color: Color::from(&solid.color),
+                opacity: solid.opacity.unwrap_or(1.0) as f32,
+            }),
+            FigmaPaint::ImagePaint(image) => {
+                let url = self
+                    .image_urls
+                    .get(&image.image_ref)
+                    .cloned()
+                    .unwrap_or_else(|| image.image_ref.clone());
+                Paint::Image(ImagePaint {
+                    transform: image.image_transform.as_ref().map_or(
+                        AffineTransform::identity(),
+                        |transform| AffineTransform {
+                            matrix: [
+                                [
+                                    transform[0][0] as f32,
+                                    transform[0][1] as f32,
+                                    transform[0][2] as f32,
+                                ],
+                                [
+                                    transform[1][0] as f32,
+                                    transform[1][1] as f32,
+                                    transform[1][2] as f32,
+                                ],
+                            ],
+                        },
+                    ),
+                    _ref: url,
+                    fit: match image.scale_mode {
+                        figma_api::models::image_paint::ScaleMode::Fill => BoxFit::Cover,
+                        figma_api::models::image_paint::ScaleMode::Fit => BoxFit::Contain,
+                        figma_api::models::image_paint::ScaleMode::Tile => BoxFit::None,
+                        figma_api::models::image_paint::ScaleMode::Stretch => BoxFit::None,
+                    },
+                    opacity: image.opacity.unwrap_or(1.0) as f32,
+                })
+            }
+            _ => Paint::Solid(SolidPaint {
+                color: Color(0, 0, 0, 255),
+                opacity: 1.0,
+            }),
+        }
     }
 
     /// Convert Figma's fills to our Paint
-    fn convert_fills(fills: Option<&Vec<FigmaPaint>>) -> Option<Paint> {
+    fn convert_fills(&self, fills: Option<&Vec<FigmaPaint>>) -> Option<Paint> {
         fills.and_then(|paints| {
             if paints.is_empty() {
                 None
             } else {
-                Some(Self::convert_paint(&paints[0]))
+                Some(self.convert_paint(&paints[0]))
             }
         })
     }
 
     /// Convert Figma's strokes to our Paint
-    fn convert_strokes(strokes: Option<&Option<Vec<FigmaPaint>>>) -> Option<Paint> {
+    fn convert_strokes(&self, strokes: Option<&Option<Vec<FigmaPaint>>>) -> Option<Paint> {
         strokes.and_then(|s| s.as_ref()).and_then(|paints| {
             if paints.is_empty() {
                 None
             } else {
-                Some(Self::convert_paint(&paints[0]))
+                Some(self.convert_paint(&paints[0]))
             }
         })
     }
@@ -311,18 +394,66 @@ impl FigmaConverter {
         }))
     }
 
+    /// Convert Figma's corner radii array to our RectangularCornerRadius
+    fn convert_corner_radius(radii: Option<&Vec<f64>>) -> RectangularCornerRadius {
+        radii.map_or(RectangularCornerRadius::zero(), |radii| {
+            if radii.len() == 4 {
+                RectangularCornerRadius {
+                    tl: radii[0] as f32,
+                    tr: radii[1] as f32,
+                    br: radii[2] as f32,
+                    bl: radii[3] as f32,
+                }
+            } else {
+                RectangularCornerRadius::zero()
+            }
+        })
+    }
+
     /// Convert Figma's instance to our InstanceNode
     fn convert_instance(&mut self, instance: &Box<InstanceNode>) -> Result<Node, String> {
-        Ok(Node::Error(ErrorNode {
+        // Since InstanceNode inherits from FrameNode, we can reuse convert_frame
+        // by creating a FrameNode with the instance's properties (at the moment, we're mapping it manually)
+
+        let children = instance
+            .children
+            .iter()
+            .map(|child| self.convert_sub_canvas_node(child))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let size = Self::convert_size(instance.size.as_ref());
+        let transform = Self::convert_transform(instance.relative_transform.as_ref());
+
+        Ok(Node::Container(ContainerNode {
             base: BaseNode {
                 id: instance.id.clone(),
-                name: format!("[Instance] {}", instance.name),
+                name: instance.name.clone(),
                 active: instance.visible.unwrap_or(true),
             },
-            transform: Self::convert_transform(instance.relative_transform.as_ref()),
-            size: Self::convert_size(instance.size.as_ref()),
+            blend_mode: Self::convert_blend_mode(instance.blend_mode),
+            transform,
+            size,
+            corner_radius: Self::convert_corner_radius(instance.rectangle_corner_radii.as_ref()),
+            fill: self
+                .convert_fills(Some(&instance.fills.as_ref()))
+                .unwrap_or(TRANSPARENT),
+            stroke: self.convert_strokes(Some(&instance.strokes)),
+            stroke_width: instance.stroke_weight.unwrap_or(0.0) as f32,
+            stroke_align: Self::convert_stroke_align(
+                instance
+                    .stroke_align
+                    .as_ref()
+                    .map(|a| serde_json::to_string(a).unwrap())
+                    .unwrap_or_else(|| "CENTER".to_string()),
+            ),
+            stroke_dash_array: instance
+                .stroke_dashes
+                .clone()
+                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            effect: Self::convert_effects(Some(&instance.effects)),
+            children,
             opacity: Self::convert_opacity(instance.visible),
-            error: format!("Unsupported node type: Instance"),
+            clip: instance.clips_content,
         }))
     }
 
@@ -340,17 +471,19 @@ impl FigmaConverter {
                 name: format!("[Section] {}", section.name),
                 active: section.visible.unwrap_or(true),
             },
+            blend_mode: BlendMode::Normal,
             transform: Self::convert_transform(section.relative_transform.as_ref()),
             size: Self::convert_size(section.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
             children,
-            fill: Self::convert_fills(Some(&section.fills.as_ref())).unwrap_or(TRANSPARENT),
+            fill: self
+                .convert_fills(Some(&section.fills.as_ref()))
+                .unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
             stroke_dash_array: None,
             opacity: Self::convert_opacity(section.visible),
-            blend_mode: BlendMode::Normal,
             effect: None,
             clip: false,
         }))
@@ -445,17 +578,7 @@ impl FigmaConverter {
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let size = frame.size.as_ref().map_or(
-            Size {
-                width: 0.0,
-                height: 0.0,
-            },
-            |size| Size {
-                width: size.x as f32,
-                height: size.y as f32,
-            },
-        );
-
+        let size = Self::convert_size(frame.size.as_ref());
         let transform = Self::convert_transform(frame.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
@@ -464,20 +587,56 @@ impl FigmaConverter {
                 name: frame.name.clone(),
                 active: frame.visible.unwrap_or(true),
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(frame.blend_mode),
             transform,
             size,
-            corner_radius: RectangularCornerRadius::zero(),
-            fill: Self::convert_fills(None).unwrap_or(TRANSPARENT),
-            stroke: None,
-            stroke_width: 0.0,
-            stroke_align: StrokeAlign::Inside,
-            stroke_dash_array: None,
-            effect: None,
+            corner_radius: Self::convert_corner_radius(frame.rectangle_corner_radii.as_ref()),
+            fill: self
+                .convert_fills(Some(&frame.fills.as_ref()))
+                .unwrap_or(TRANSPARENT),
+            stroke: self.convert_strokes(Some(&frame.strokes)),
+            stroke_width: frame.stroke_weight.unwrap_or(0.0) as f32,
+            stroke_align: Self::convert_stroke_align(
+                frame
+                    .stroke_align
+                    .as_ref()
+                    .map(|a| serde_json::to_string(a).unwrap())
+                    .unwrap_or_else(|| "CENTER".to_string()),
+            ),
+            stroke_dash_array: frame
+                .stroke_dashes
+                .clone()
+                .map(|v| v.into_iter().map(|x| x as f32).collect()),
+            effect: Self::convert_effects(Some(&frame.effects)),
             children,
-            opacity: 1.0,
+            opacity: Self::convert_opacity(frame.visible),
             clip: frame.clips_content,
         }))
+    }
+
+    /// Convert Figma's blend mode to our BlendMode
+    fn convert_blend_mode(blend_mode: figma_api::models::BlendMode) -> BlendMode {
+        match blend_mode {
+            figma_api::models::BlendMode::Normal => BlendMode::Normal,
+            figma_api::models::BlendMode::Multiply => BlendMode::Multiply,
+            figma_api::models::BlendMode::Screen => BlendMode::Screen,
+            figma_api::models::BlendMode::Overlay => BlendMode::Overlay,
+            figma_api::models::BlendMode::Darken => BlendMode::Darken,
+            figma_api::models::BlendMode::Lighten => BlendMode::Lighten,
+            figma_api::models::BlendMode::ColorDodge => BlendMode::ColorDodge,
+            figma_api::models::BlendMode::ColorBurn => BlendMode::ColorBurn,
+            figma_api::models::BlendMode::HardLight => BlendMode::HardLight,
+            figma_api::models::BlendMode::SoftLight => BlendMode::SoftLight,
+            figma_api::models::BlendMode::Difference => BlendMode::Difference,
+            figma_api::models::BlendMode::Exclusion => BlendMode::Exclusion,
+            figma_api::models::BlendMode::Hue => BlendMode::Hue,
+            figma_api::models::BlendMode::Saturation => BlendMode::Saturation,
+            figma_api::models::BlendMode::Color => BlendMode::Color,
+            figma_api::models::BlendMode::Luminosity => BlendMode::Luminosity,
+            figma_api::models::BlendMode::PassThrough => BlendMode::Normal,
+            figma_api::models::BlendMode::LinearBurn => BlendMode::ColorBurn,
+            figma_api::models::BlendMode::LinearDodge => BlendMode::ColorDodge,
+        }
     }
 
     fn convert_text(&mut self, text: &Box<TextNode>) -> Result<Node, String> {
@@ -505,18 +664,33 @@ impl FigmaConverter {
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
                 letter_spacing: style.letter_spacing.map(|v| v as f32),
                 line_height: style.line_height_px.map(|v| v as f32),
-                text_transform: TextTransform::None,
+                text_transform: match text.style.text_case.as_ref() {
+                    Some(figma_api::models::type_style::TextCase::Upper) => {
+                        TextTransform::Uppercase
+                    }
+                    Some(figma_api::models::type_style::TextCase::Lower) => {
+                        TextTransform::Lowercase
+                    }
+                    Some(figma_api::models::type_style::TextCase::Title) => {
+                        TextTransform::Capitalize
+                    }
+                    Some(figma_api::models::type_style::TextCase::SmallCaps) => TextTransform::None,
+                    Some(figma_api::models::type_style::TextCase::SmallCapsForced) => {
+                        TextTransform::None
+                    }
+                    None => TextTransform::None,
+                },
             },
             text_align: Self::convert_text_align(style.text_align_horizontal.as_ref()),
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: Self::convert_fills(style.fills.as_ref()).unwrap_or(TRANSPARENT),
-            stroke: None,
-            stroke_width: None,
+            fill: self.convert_fills(style.fills.as_ref()).unwrap_or(BLACK),
+            stroke: self.convert_strokes(Some(&text.strokes)),
+            stroke_width: Some(text.stroke_weight.unwrap_or(0.0) as f32),
             stroke_align: StrokeAlign::Inside,
             opacity: Self::convert_opacity(text.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(text.blend_mode),
         }))
     }
 
@@ -563,8 +737,10 @@ impl FigmaConverter {
             point_count: 5,     // Default to 5 points for a star
             inner_radius: 0.4,  // Default inner radius to 0.4 (40% of outer radius)
             corner_radius: 0.0, // Figma stars don't have corner radius
-            fill: Self::convert_fills(Some(&star.fills)).unwrap_or(TRANSPARENT),
-            stroke: Self::convert_strokes(Some(&star.strokes)).unwrap_or(TRANSPARENT),
+            fill: self.convert_fills(Some(&star.fills)).unwrap_or(TRANSPARENT),
+            stroke: self
+                .convert_strokes(Some(&star.strokes))
+                .unwrap_or(TRANSPARENT),
             stroke_width: star.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 star.stroke_align
@@ -577,7 +753,7 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(star.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(star.blend_mode),
             effect: Self::convert_effects(Some(&star.effects)),
         }))
     }
@@ -595,7 +771,9 @@ impl FigmaConverter {
             },
             transform,
             size,
-            stroke: Self::convert_strokes(Some(&line.strokes)).unwrap_or(TRANSPARENT),
+            stroke: self
+                .convert_strokes(Some(&line.strokes))
+                .unwrap_or(TRANSPARENT),
             stroke_width: line.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 line.stroke_align
@@ -608,7 +786,7 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(line.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(line.blend_mode),
         }))
     }
 
@@ -628,8 +806,12 @@ impl FigmaConverter {
             },
             transform,
             size,
-            fill: Self::convert_fills(Some(&ellipse.fills)).unwrap_or(TRANSPARENT),
-            stroke: Self::convert_strokes(Some(&ellipse.strokes)).unwrap_or(TRANSPARENT),
+            fill: self
+                .convert_fills(Some(&ellipse.fills))
+                .unwrap_or(TRANSPARENT),
+            stroke: self
+                .convert_strokes(Some(&ellipse.strokes))
+                .unwrap_or(TRANSPARENT),
             stroke_width: ellipse.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 ellipse
@@ -643,7 +825,7 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(ellipse.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(ellipse.blend_mode),
             effect: Self::convert_effects(Some(&ellipse.effects)),
         }))
     }
@@ -665,8 +847,12 @@ impl FigmaConverter {
             // No count in api ?
             point_count: 3,
             corner_radius: polygon.corner_radius.unwrap_or(0.0) as f32,
-            fill: Self::convert_fills(Some(&polygon.fills)).unwrap_or(TRANSPARENT),
-            stroke: Self::convert_strokes(Some(&polygon.strokes)).unwrap_or(TRANSPARENT),
+            fill: self
+                .convert_fills(Some(&polygon.fills))
+                .unwrap_or(TRANSPARENT),
+            stroke: self
+                .convert_strokes(Some(&polygon.strokes))
+                .unwrap_or(TRANSPARENT),
             stroke_width: polygon.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 polygon
@@ -680,7 +866,7 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(polygon.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(polygon.blend_mode),
             effect: Self::convert_effects(Some(&polygon.effects)),
         }))
     }
@@ -697,11 +883,13 @@ impl FigmaConverter {
             },
             transform,
             size,
-            corner_radius: RectangularCornerRadius::all(
-                rectangle.corner_radius.unwrap_or(0.0) as f32
-            ),
-            fill: Self::convert_fills(Some(&rectangle.fills)).unwrap_or(TRANSPARENT),
-            stroke: Self::convert_strokes(Some(&rectangle.strokes)).unwrap_or(TRANSPARENT),
+            corner_radius: Self::convert_corner_radius(rectangle.rectangle_corner_radii.as_ref()),
+            fill: self
+                .convert_fills(Some(&rectangle.fills))
+                .unwrap_or(TRANSPARENT),
+            stroke: self
+                .convert_strokes(Some(&rectangle.strokes))
+                .unwrap_or(TRANSPARENT),
             stroke_width: rectangle.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
                 rectangle
@@ -715,7 +903,7 @@ impl FigmaConverter {
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
             opacity: Self::convert_opacity(rectangle.visible),
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(rectangle.blend_mode),
             effect: Self::convert_effects(Some(&rectangle.effects)),
         }))
     }
@@ -736,11 +924,11 @@ impl FigmaConverter {
                 name: group.name.clone(),
                 active: group.visible.unwrap_or(true),
             },
-            blend_mode: BlendMode::Normal,
+            blend_mode: Self::convert_blend_mode(group.blend_mode),
             transform,
             size,
-            corner_radius: RectangularCornerRadius::zero(),
-            fill: Self::convert_fills(None).unwrap_or(TRANSPARENT),
+            corner_radius: Self::convert_corner_radius(group.rectangle_corner_radii.as_ref()),
+            fill: self.convert_fills(None).unwrap_or(TRANSPARENT),
             stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
