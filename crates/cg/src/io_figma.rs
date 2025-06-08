@@ -7,6 +7,7 @@ use crate::schema::{
     StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
     TextTransform,
 };
+use crate::webfont_helper;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
     TextAlignHorizontal as FigmaTextAlignHorizontal, TextAlignVertical as FigmaTextAlignVertical,
@@ -182,60 +183,11 @@ where
     value.map(|v| U::from(v))
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct FontInfo {
-    pub family: String,
-    pub postscript_names: std::collections::HashSet<String>,
-    pub styles: std::collections::HashSet<String>,
-}
-
-#[derive(Debug, Default)]
-pub struct FontUsageStore {
-    fonts: std::collections::HashMap<String, FontInfo>,
-}
-
-impl FontUsageStore {
-    pub fn new() -> Self {
-        Self {
-            fonts: std::collections::HashMap::new(),
-        }
-    }
-
-    pub fn register_font(
-        &mut self,
-        family: String,
-        postscript_name: Option<String>,
-        style: Option<String>,
-    ) {
-        let font_info = self.fonts.entry(family.clone()).or_insert(FontInfo {
-            family,
-            postscript_names: std::collections::HashSet::new(),
-            styles: std::collections::HashSet::new(),
-        });
-
-        if let Some(postscript) = postscript_name {
-            font_info.postscript_names.insert(postscript);
-        }
-
-        if let Some(style) = style {
-            font_info.styles.insert(style);
-        }
-    }
-
-    pub fn get_discovered_fonts(&self) -> Vec<FontInfo> {
-        self.fonts.values().cloned().collect()
-    }
-
-    pub fn clear(&mut self) {
-        self.fonts.clear();
-    }
-}
-
 /// Converts Figma nodes to Grida schema
 pub struct FigmaConverter {
     repository: NodeRepository,
     image_urls: std::collections::HashMap<String, String>,
-    font_store: FontUsageStore,
+    font_store: webfont_helper::FontUsageStore,
 }
 
 impl FigmaConverter {
@@ -243,7 +195,7 @@ impl FigmaConverter {
         Self {
             repository: NodeRepository::new(),
             image_urls: std::collections::HashMap::new(),
-            font_store: FontUsageStore::new(),
+            font_store: webfont_helper::FontUsageStore::new(),
         }
     }
 
@@ -252,7 +204,7 @@ impl FigmaConverter {
         self
     }
 
-    pub fn get_discovered_fonts(&self) -> Vec<FontInfo> {
+    pub fn get_discovered_fonts(&self) -> Vec<webfont_helper::FontInfo> {
         self.font_store.get_discovered_fonts()
     }
 
