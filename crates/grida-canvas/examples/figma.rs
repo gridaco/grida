@@ -13,78 +13,99 @@ use figma_api::apis::{
 #[command(author, version, about, long_about = None)]
 struct Cli {
     #[arg(long = "file-key")]
-    file_key: String,
+    file_key: Option<String>,
     #[arg(long = "api-key")]
-    api_key: String,
+    api_key: Option<String>,
     #[arg(long = "scene-index")]
     scene_index: usize,
     #[arg(long = "no-image")]
     no_image: bool,
+    #[arg(long = "file")]
+    file: Option<String>,
 }
 
 async fn load_scene_from_url(
-    file_key: &str,
-    api_key: &str,
+    file_key: Option<&str>,
+    api_key: Option<&str>,
     scene_index: usize,
     no_image: bool,
+    file_path: Option<&str>,
 ) -> Result<(Scene, FigmaConverter), String> {
-    let configuration = Configuration {
-        base_path: "https://api.figma.com".to_string(),
-        user_agent: None,
-        client: reqwest::Client::new(),
-        basic_auth: None,
-        oauth_access_token: None,
-        bearer_access_token: None,
-        api_key: Some(ApiKey {
-            key: api_key.to_string(),
-            prefix: None,
-        }),
-    };
+    if let Some(file_path) = file_path {
+        // Load from local file
+        let file_content = std::fs::read_to_string(file_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let file: figma_api::models::InlineObject = serde_json::from_str(&file_content)
+            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-    let file = get_file(
-        &configuration,
-        file_key,
-        None,
-        None,
-        None,
-        Some("paths"),
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to load file");
+        let mut converter = FigmaConverter::new();
+        let document = converter
+            .convert_document(&file.document)
+            .expect("Failed to convert document");
 
-    let images = if no_image {
-        std::collections::HashMap::new()
+        Ok((document[scene_index].clone(), converter))
     } else {
-        let images_response = get_image_fills(&configuration, file_key)
-            .await
-            .expect("Failed to load images");
-        images_response.meta.images
-    };
+        // Load from Figma API
+        let file_key = file_key.ok_or("file-key is required when not using --file")?;
+        let api_key = api_key.ok_or("api-key is required when not using --file")?;
 
-    let mut converter = FigmaConverter::new().with_image_urls(images);
+        let configuration = Configuration {
+            base_path: "https://api.figma.com".to_string(),
+            user_agent: None,
+            client: reqwest::Client::new(),
+            basic_auth: None,
+            oauth_access_token: None,
+            bearer_access_token: None,
+            api_key: Some(ApiKey {
+                key: api_key.to_string(),
+                prefix: None,
+            }),
+        };
 
-    let document = converter
-        .convert_document(&file.document)
-        .expect("Failed to convert document");
+        let file = get_file(
+            &configuration,
+            file_key,
+            None,
+            None,
+            None,
+            Some("paths"),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to load file");
 
-    // Print discovered fonts and their available font files
-    println!(
-        "\nDiscovered fonts: {}",
-        converter.get_discovered_fonts().len()
-    );
+        let images = if no_image {
+            std::collections::HashMap::new()
+        } else {
+            let images_response = get_image_fills(&configuration, file_key)
+                .await
+                .expect("Failed to load images");
+            images_response.meta.images
+        };
 
-    Ok((document[scene_index].clone(), converter))
+        let mut converter = FigmaConverter::new().with_image_urls(images);
+
+        let document = converter
+            .convert_document(&file.document)
+            .expect("Failed to convert document");
+
+        Ok((document[scene_index].clone(), converter))
+    }
 }
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    let (scene, converter) =
-        load_scene_from_url(&cli.file_key, &cli.api_key, cli.scene_index, cli.no_image)
-            .await
-            .expect("Failed to load scene");
+    let (scene, converter) = load_scene_from_url(
+        cli.file_key.as_deref(),
+        cli.api_key.as_deref(),
+        cli.scene_index,
+        cli.no_image,
+        cli.file.as_deref(),
+    )
+    .await
+    .expect("Failed to load scene");
 
     println!("Rendering scene: {}", scene.name);
     println!("Scene ID: {}", scene.id);
