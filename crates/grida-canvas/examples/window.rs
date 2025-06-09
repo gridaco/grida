@@ -402,7 +402,7 @@ impl App {
     }
 
     fn redraw(&mut self) {
-        println!("🎨 redraw...");
+        // println!("🎨 redraw...");
         self.process_image_queue();
         self.process_font_queue();
         let surface = unsafe { &mut *self.surface_ptr };

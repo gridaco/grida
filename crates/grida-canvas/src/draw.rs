@@ -5,12 +5,13 @@ use crate::{
     geometry_cache::GeometryCache,
     rect,
     repository::{FontRepository, ImageRepository, NodeRepository},
-    visibility::{self, scale_rect, transform_rect},
+    visibility,
 };
 use skia_safe::{
     ClipOp, Image, Paint as SkPaint, Path, Picture, PictureRecorder, Point, RRect, Rect, Surface,
     canvas::SaveLayerRec, surfaces, textlayout::*,
 };
+use skia_safe::{PathOp, op};
 
 /// Choice of GPU vs. raster backend
 pub enum Backend {
@@ -436,6 +437,163 @@ impl Painter {
         }
         f();
         canvas.restore();
+    }
+
+    fn build_path_from_node(&self, node: &Node, repository: &NodeRepository) -> Option<Path> {
+        match node {
+            Node::Rectangle(n) => {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                let mut path = Path::new();
+                let r = n.corner_radius;
+                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(r.tl, r.tl),
+                            Point::new(r.tr, r.tr),
+                            Point::new(r.br, r.br),
+                            Point::new(r.bl, r.bl),
+                        ],
+                    );
+                    path.add_rrect(rrect, None);
+                } else {
+                    path.add_rect(rect, None);
+                }
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::Ellipse(n) => {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                let mut path = Path::new();
+                path.add_oval(rect, None);
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::Polygon(n) => {
+                let mut path = if n.corner_radius > 0.0 {
+                    n.to_path()
+                } else {
+                    let mut p = Path::new();
+                    let mut iter = n.points.iter();
+                    if let Some(&pt) = iter.next() {
+                        p.move_to((pt.x, pt.y));
+                        for &pt in iter {
+                            p.line_to((pt.x, pt.y));
+                        }
+                        p.close();
+                    }
+                    p
+                };
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::RegularPolygon(n) => {
+                let poly = n.to_polygon();
+                self.build_path_from_node(&Node::Polygon(poly), repository)
+            }
+            Node::RegularStarPolygon(n) => {
+                let poly = n.to_polygon();
+                self.build_path_from_node(&Node::Polygon(poly), repository)
+            }
+            Node::Line(n) => {
+                let mut path = Path::new();
+                path.move_to((0.0, 0.0));
+                path.line_to((n.size.width, 0.0));
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::Path(n) => {
+                if let Some(mut path) = Path::from_svg(&n.data) {
+                    path.transform(&cvt::sk_matrix(n.transform.matrix));
+                    Some(path)
+                } else {
+                    None
+                }
+            }
+            Node::Container(n) => {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                let mut path = Path::new();
+                let r = n.corner_radius;
+                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(r.tl, r.tl),
+                            Point::new(r.tr, r.tr),
+                            Point::new(r.br, r.br),
+                            Point::new(r.bl, r.bl),
+                        ],
+                    );
+                    path.add_rrect(rrect, None);
+                } else {
+                    path.add_rect(rect, None);
+                }
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::Group(g) => {
+                let mut result: Option<Path> = None;
+                for child_id in &g.children {
+                    if let Some(child) = repository.get(child_id) {
+                        if let Some(p) = self.build_path_from_node(child, repository) {
+                            result = Some(match result {
+                                Some(acc) => op(&acc, &p, PathOp::Union).unwrap(),
+                                None => p,
+                            });
+                        }
+                    }
+                }
+                if let Some(mut path) = result {
+                    path.transform(&cvt::sk_matrix(g.transform.matrix));
+                    Some(path)
+                } else {
+                    None
+                }
+            }
+            Node::BooleanOperation(b) => {
+                let mut result: Option<Path> = None;
+                for child_id in &b.children {
+                    if let Some(child) = repository.get(child_id) {
+                        if let Some(p) = self.build_path_from_node(child, repository) {
+                            result = Some(match result {
+                                Some(acc) => op(&acc, &p, b.op.clone().into()).unwrap(),
+                                None => p,
+                            });
+                        }
+                    }
+                }
+                result
+            }
+            Node::Image(n) => {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                let mut path = Path::new();
+                let r = n.corner_radius;
+                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+                    let rrect = RRect::new_rect_radii(
+                        rect,
+                        &[
+                            Point::new(r.tl, r.tl),
+                            Point::new(r.tr, r.tr),
+                            Point::new(r.br, r.br),
+                            Point::new(r.bl, r.bl),
+                        ],
+                    );
+                    path.add_rrect(rrect, None);
+                } else {
+                    path.add_rect(rect, None);
+                }
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::Error(n) => {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                let mut path = Path::new();
+                path.add_rect(rect, None);
+                path.transform(&cvt::sk_matrix(n.transform.matrix));
+                Some(path)
+            }
+            Node::TextSpan(_) => None,
+        }
     }
 
     // ============================
@@ -999,6 +1157,68 @@ impl Painter {
         self.draw_polygon_node(canvas, &poly);
     }
 
+    pub fn draw_boolean_operation_node<F>(
+        &self,
+        canvas: &skia_safe::Canvas,
+        node: &BooleanPathOperationNode,
+        repository: &NodeRepository,
+        image_repository: &ImageRepository,
+        should_draw: &F,
+    ) where
+        F: Fn(&NodeId) -> bool,
+    {
+        self.with_canvas_state(canvas, &node.transform.matrix, || {
+            if let Some(path) =
+                self.build_path_from_node(&Node::BooleanOperation(node.clone()), repository)
+            {
+                let bounds = path.compute_tight_bounds();
+                let rect =
+                    Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
+                let radii = RectangularCornerRadius::zero();
+
+                if let Some(effect) = &node.effect {
+                    self.apply_effect(canvas, effect, rect, &radii, || {
+                        self.draw_fill_and_stroke(
+                            canvas,
+                            rect,
+                            &radii,
+                            Some(&node.fill),
+                            node.stroke.as_ref(),
+                            node.stroke_width,
+                            node.stroke_align,
+                            node.stroke_dash_array.as_ref(),
+                            node.blend_mode,
+                            node.opacity,
+                            image_repository,
+                        );
+                    });
+                } else {
+                    self.draw_fill_and_stroke(
+                        canvas,
+                        rect,
+                        &radii,
+                        Some(&node.fill),
+                        node.stroke.as_ref(),
+                        node.stroke_width,
+                        node.stroke_align,
+                        node.stroke_dash_array.as_ref(),
+                        node.blend_mode,
+                        node.opacity,
+                        image_repository,
+                    );
+                }
+            }
+            // draw children individually if visibility check passes
+            for child_id in &node.children {
+                if should_draw(child_id) {
+                    if let Some(child) = repository.get(child_id) {
+                        self.draw_node(canvas, child, repository, image_repository, should_draw);
+                    }
+                }
+            }
+        });
+    }
+
     /// Draw a TextSpanNode (simple text block)
     pub fn draw_text_span_node(&self, canvas: &skia_safe::Canvas, node: &TextSpanNode) {
         // Prepare paint for fill
@@ -1080,6 +1300,13 @@ impl Painter {
                 self.draw_image_node(canvas, n, image_repository);
             }
             Node::Path(n) => self.draw_path_node(canvas, n),
+            Node::BooleanOperation(n) => self.draw_boolean_operation_node(
+                canvas,
+                n,
+                repository,
+                image_repository,
+                should_draw,
+            ),
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
         }
     }
@@ -1095,6 +1322,7 @@ pub struct Renderer {
     pub image_repository: ImageRepository,
     pub font_repository: FontRepository,
     geometry_cache: GeometryCache,
+    pub feature_visibility_culling_enabled: bool,
 }
 
 /// ---------------------------------------------------------------------------
@@ -1115,6 +1343,7 @@ impl Renderer {
             image_repository,
             font_repository,
             geometry_cache: GeometryCache::new(),
+            feature_visibility_culling_enabled: false,
         }
     }
 
@@ -1262,8 +1491,14 @@ impl Renderer {
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
                 let geometry_cache = &self.geometry_cache;
-                let should_draw =
-                    |id: &NodeId| visibility::is_node_visible(geometry_cache, id, &viewport);
+                let should_draw: Box<dyn Fn(&NodeId) -> bool> =
+                    if self.feature_visibility_culling_enabled {
+                        Box::new(move |id: &NodeId| {
+                            visibility::is_node_visible(geometry_cache, id, &viewport)
+                        })
+                    } else {
+                        Box::new(|_id: &NodeId| true) // Always draw when culling is disabled
+                    };
                 self.painter.draw_node(
                     canvas,
                     node,

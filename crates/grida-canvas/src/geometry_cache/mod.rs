@@ -135,6 +135,11 @@ impl GeometryCache {
                 Vec::new(),
             ),
             Node::Path(n) => (n.transform, Self::path_bounds(&n.data), Vec::new()),
+            Node::BooleanOperation(n) => (
+                n.transform,
+                Rect::new(0.0, 0.0, 0.0, 0.0),
+                n.children.clone(),
+            ),
             Node::Image(n) => (
                 n.transform,
                 Rect::new(0.0, 0.0, n.size.width, n.size.height),

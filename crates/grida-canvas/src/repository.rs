@@ -47,6 +47,7 @@ impl NodeRepository {
             Node::Line(n) => n.base.id.clone(),
             Node::TextSpan(n) => n.base.id.clone(),
             Node::Path(n) => n.base.id.clone(),
+            Node::BooleanOperation(n) => n.base.id.clone(),
             Node::Image(n) => n.base.id.clone(),
         };
         self.nodes.insert(id.clone(), node);
