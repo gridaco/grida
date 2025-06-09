@@ -1,4 +1,4 @@
-use cg::camera::Camera;
+use cg::camera::Camera2D;
 use cg::draw::{Backend, Renderer};
 use cg::io::parse;
 use cg::schema::*;
@@ -278,7 +278,7 @@ struct App {
     gl_config: glutin::config::Config,
     fb_info: gpu::gl::FramebufferInfo,
     gr_context: skia_safe::gpu::DirectContext,
-    camera: Camera,
+    camera: Camera2D,
     scene: Scene,
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
@@ -513,7 +513,7 @@ where
         width: 1080.0,
         height: 1080.0,
     };
-    let camera = Camera::new(viewport_size);
+    let camera = Camera2D::new(viewport_size);
     renderer.set_camera(camera.clone());
 
     let mut app = App {

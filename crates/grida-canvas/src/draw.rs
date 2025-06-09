@@ -1,8 +1,11 @@
 use crate::cvt;
 use crate::schema::*;
 use crate::{
-    camera::Camera,
+    camera::Camera2D,
+    geometry_cache::GeometryCache,
+    rect,
     repository::{FontRepository, ImageRepository, NodeRepository},
+    visibility::{self, scale_rect, transform_rect},
 };
 use skia_safe::{
     ClipOp, Image, Paint as SkPaint, Path, Picture, PictureRecorder, Point, RRect, Rect, Surface,
@@ -485,13 +488,16 @@ impl Painter {
     }
 
     /// Draw a ContainerNode (background + stroke + children)
-    pub fn draw_container_node(
+    pub fn draw_container_node<F>(
         &self,
         canvas: &skia_safe::Canvas,
         node: &ContainerNode,
         repository: &NodeRepository,
         image_repository: &ImageRepository,
-    ) {
+        should_draw: &F,
+    ) where
+        F: Fn(&NodeId) -> bool,
+    {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             self.with_opacity_layer(canvas, node.opacity, || {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
@@ -535,7 +541,15 @@ impl Painter {
                     self.with_clip(canvas, rect, &radii, || {
                         for child_id in &node.children {
                             if let Some(child) = repository.get(child_id) {
-                                self.draw_node(canvas, child, repository, image_repository);
+                                if should_draw(child_id) {
+                                    self.draw_node(
+                                        canvas,
+                                        child,
+                                        repository,
+                                        image_repository,
+                                        should_draw,
+                                    );
+                                }
                             }
                         }
                     });
@@ -543,7 +557,15 @@ impl Painter {
                     // Draw children without clipping
                     for child_id in &node.children {
                         if let Some(child) = repository.get(child_id) {
-                            self.draw_node(canvas, child, repository, image_repository);
+                            if should_draw(child_id) {
+                                self.draw_node(
+                                    canvas,
+                                    child,
+                                    repository,
+                                    image_repository,
+                                    should_draw,
+                                );
+                            }
                         }
                     }
                 }
@@ -720,18 +742,29 @@ impl Painter {
     }
 
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
-    pub fn draw_group_node(
+    pub fn draw_group_node<F>(
         &self,
         canvas: &skia_safe::Canvas,
         node: &GroupNode,
         repository: &NodeRepository,
         image_repository: &ImageRepository,
-    ) {
+        should_draw: &F,
+    ) where
+        F: Fn(&NodeId) -> bool,
+    {
         self.with_canvas_state(canvas, &node.transform.matrix, || {
             self.with_opacity_layer(canvas, node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository, image_repository);
+                        if should_draw(child_id) {
+                            self.draw_node(
+                                canvas,
+                                child,
+                                repository,
+                                image_repository,
+                                should_draw,
+                            );
+                        }
                     }
                 }
             });
@@ -1019,17 +1052,24 @@ impl Painter {
     }
 
     /// Dispatch to the correct node‐type draw method
-    pub fn draw_node(
+    pub fn draw_node<F>(
         &self,
         canvas: &skia_safe::Canvas,
         node: &Node,
         repository: &NodeRepository,
         image_repository: &ImageRepository,
-    ) {
+        should_draw: &F,
+    ) where
+        F: Fn(&NodeId) -> bool,
+    {
         match node {
             Node::Error(n) => self.draw_error_node(canvas, n),
-            Node::Group(n) => self.draw_group_node(canvas, n, repository, image_repository),
-            Node::Container(n) => self.draw_container_node(canvas, n, repository, image_repository),
+            Node::Group(n) => {
+                self.draw_group_node(canvas, n, repository, image_repository, should_draw)
+            }
+            Node::Container(n) => {
+                self.draw_container_node(canvas, n, repository, image_repository, should_draw)
+            }
             Node::Rectangle(n) => self.draw_rect_node(canvas, n, image_repository),
             Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
             Node::Polygon(n) => self.draw_polygon_node(canvas, n),
@@ -1051,9 +1091,10 @@ pub struct Renderer {
     dpi: f32,
     logical_width: f32,
     logical_height: f32,
-    camera: Option<Camera>,
+    camera: Option<Camera2D>,
     pub image_repository: ImageRepository,
     pub font_repository: FontRepository,
+    geometry_cache: GeometryCache,
 }
 
 /// ---------------------------------------------------------------------------
@@ -1073,6 +1114,7 @@ impl Renderer {
             camera: None,
             image_repository,
             font_repository,
+            geometry_cache: GeometryCache::new(),
         }
     }
 
@@ -1128,7 +1170,7 @@ impl Renderer {
         }
     }
 
-    pub fn set_camera(&mut self, camera: Camera) {
+    pub fn set_camera(&mut self, camera: Camera2D) {
         self.camera = Some(camera);
     }
 
@@ -1158,8 +1200,9 @@ impl Renderer {
     }
 
     // Render the scene
-    pub fn render_scene(&self, scene: &Scene) {
+    pub fn render_scene(&mut self, scene: &Scene) {
         if let Some(backend) = &self.backend {
+            self.geometry_cache = GeometryCache::from_scene(scene);
             let surface = unsafe { &mut *backend.get_surface() };
             let width = surface.width() as f32;
             let height = surface.height() as f32;
@@ -1195,11 +1238,39 @@ impl Renderer {
 
     fn render_node(&self, id: &NodeId, repository: &NodeRepository) {
         if let Some(backend) = &self.backend {
+            // Get viewport in world space from camera and apply DPI scaling
+            let viewport = self.camera.as_ref().map_or_else(
+                || rect::Rect::new(0.0, 0.0, self.logical_width, self.logical_height),
+                |camera| {
+                    let mut rect = camera.rect();
+
+                    // Add margin for debugging visibility culling
+                    rect.margin(1000.0);
+
+                    // Scale by DPI to match the rendering scale
+                    rect = rect::Rect::new(
+                        rect.min_x * self.dpi,
+                        rect.min_y * self.dpi,
+                        rect.max_x * self.dpi,
+                        rect.max_y * self.dpi,
+                    );
+                    rect
+                },
+            );
+
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
-                self.painter
-                    .draw_node(canvas, node, repository, &self.image_repository);
+                let geometry_cache = &self.geometry_cache;
+                let should_draw =
+                    |id: &NodeId| visibility::is_node_visible(geometry_cache, id, &viewport);
+                self.painter.draw_node(
+                    canvas,
+                    node,
+                    repository,
+                    &self.image_repository,
+                    &should_draw,
+                );
             }
         }
     }

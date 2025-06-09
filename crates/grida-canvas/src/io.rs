@@ -487,8 +487,11 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let data =
-            fs::read_to_string("resources/local/document.json").expect("failed to read file");
+        let path = "resources/local/document.json";
+        let Ok(data) = fs::read_to_string(path) else {
+            eprintln!("test resource not found: {}", path);
+            return;
+        };
         let parsed: IOCanvasFile = serde_json::from_str(&data).expect("failed to parse JSON");
 
         assert_eq!(parsed.version, "0.0.1-beta.1+20250303");
