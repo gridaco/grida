@@ -130,12 +130,14 @@ type UIConfig = {
 
 const CANVAS_BG_COLOR = { r: 245, g: 245, b: 245, a: 1 };
 
-function useSyncMultiplayerCursors(editor: Editor) {
+function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
   const pluginRef = useRef<EditorYSyncPlugin | null>(null);
 
   useEffect(() => {
+    if (!room_id) return;
+
     if (!pluginRef.current) {
-      pluginRef.current = new EditorYSyncPlugin(editor, "grida-canvas-demo", {
+      pluginRef.current = new EditorYSyncPlugin(editor, room_id, {
         palette: colors[randomcolorname({ exclude: neutral_colors })],
       });
     }
@@ -146,12 +148,13 @@ function useSyncMultiplayerCursors(editor: Editor) {
         pluginRef.current = null;
       }
     };
-  }, [editor]);
+  }, [editor, room_id]);
 }
 
 export type CanvasPlaygroundProps = {
   src?: string;
   document?: editor.state.IEditorStateInit;
+  room_id?: string;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -177,9 +180,10 @@ export default function CanvasPlayground({
   },
   templates,
   src,
+  room_id,
 }: CanvasPlaygroundProps) {
   const instance = useEditor(editor.state.init(document));
-  useSyncMultiplayerCursors(instance);
+  useSyncMultiplayerCursors(instance, room_id);
   const fonts = useGoogleFontsList();
 
   useEffect(() => {
