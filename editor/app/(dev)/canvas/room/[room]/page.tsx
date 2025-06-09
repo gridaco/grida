@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   description: "Grida Canvas Playground",
 };
 
+/**
+ * experimental
+ * @see https://github.com/gridaco/grida/pull/376
+ */
 export default async function CanvasPlaygroundPage({
   params,
 }: {
