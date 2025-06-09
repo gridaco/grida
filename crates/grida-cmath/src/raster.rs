@@ -59,9 +59,9 @@ pub fn bresenham(a: Vector2, b: Vector2) -> Vec<Vector2> {
     let (x1, y1) = (b[0] as i32, b[1] as i32);
     let mut pixels = Vec::new();
 
-    let mut dx = (x1 - x0).abs();
+    let dx = (x1 - x0).abs();
     let sx = if x0 < x1 { 1 } else { -1 };
-    let mut dy = -(y1 - y0).abs();
+    let dy = -(y1 - y0).abs();
     let sy = if y0 < y1 { 1 } else { -1 };
     let mut err = dx + dy;
 

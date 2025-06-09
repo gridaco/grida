@@ -108,13 +108,8 @@ pub fn a2c(
         return vec![x1, y1, x2, y2, x2, y2];
     }
 
-    let (mut f1, mut f2, mut cx, mut cy);
-
-    if let Some((rf1, rf2, rcx, rcy)) = recursive {
-        f1 = rf1;
-        f2 = rf2;
-        cx = rcx;
-        cy = rcy;
+    let (f1, mut f2, cx, cy) = if let Some((rf1, rf2, rcx, rcy)) = recursive {
+        (rf1, rf2, rcx, rcy)
     } else {
         let (rx1, ry1) = rotate(x1, y1, -rad);
         x1 = rx1; y1 = ry1;
@@ -124,7 +119,7 @@ pub fn a2c(
         let x = (x1 - x2) / 2.0;
         let y = (y1 - y2) / 2.0;
 
-        let mut h = x * x / (rx * rx) + y * y / (ry * ry);
+        let h = x * x / (rx * rx) + y * y / (ry * ry);
         if h > 1.0 {
             let h_sqrt = h.sqrt();
             rx *= h_sqrt;
@@ -139,17 +134,18 @@ pub fn a2c(
                 / (rx2s * y * y + ry2s * x * x))
                 .abs()
                 .sqrt();
-        cx = k * rx * y / ry + (x1 + x2) / 2.0;
-        cy = k * -ry * x / rx + (y1 + y2) / 2.0;
-        f1 = ((y1 - cy) / ry).clamp(-1.0, 1.0).asin();
-        f2 = ((y2 - cy) / ry).clamp(-1.0, 1.0).asin();
+        let cx = k * rx * y / ry + (x1 + x2) / 2.0;
+        let cy = k * -ry * x / rx + (y1 + y2) / 2.0;
+        let mut f1 = ((y1 - cy) / ry).clamp(-1.0, 1.0).asin();
+        let mut f2 = ((y2 - cy) / ry).clamp(-1.0, 1.0).asin();
         if x1 < cx { f1 = pi - f1; }
         if x2 < cx { f2 = pi - f2; }
         if f1 < 0.0 { f1 += pi * 2.0; }
         if f2 < 0.0 { f2 += pi * 2.0; }
         if sweep_flag && f1 > f2 { f1 -= pi * 2.0; }
         if !sweep_flag && f2 > f1 { f2 -= pi * 2.0; }
-    }
+        (f1, f2, cx, cy)
+    };
 
     let mut df = f2 - f1;
     let mut res: Vec<f32> = Vec::new();
