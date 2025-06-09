@@ -1,7 +1,25 @@
 use super::vector2::{Vector2, distance};
 
-/// Aligns a scalar to the nearest target within `threshold`.
-/// Returns `(value, distance, indices)` where distance is signed `point - value`.
+/// Aligns a scalar value to the nearest value in `targets` if it is within
+/// `threshold`.
+///
+/// Returns a tuple `(value, distance, indices)` where:
+/// - `value` is the snapped scalar or the original `point` if no target is
+///   within `threshold`.
+/// - `distance` is the signed distance `point - value` (or `Infinity` if not
+///   snapped).
+/// - `indices` contains all indices of `targets` that are equally close.
+///
+/// # Panics
+/// Panics if `threshold` is negative or `targets` is empty.
+///
+/// # Example
+/// ```
+/// let (value, dist, idx) = grida_cmath::align_scalar(22.0, &[10.0,20.0,20.0,40.0], 5.0);
+/// assert_eq!(value, 20.0);
+/// assert_eq!(dist, 2.0);
+/// assert_eq!(idx, vec![1,2]);
+/// ```
 pub fn scalar(point: f32, targets: &[f32], threshold: f32) -> (f32, f32, Vec<usize>) {
     assert!(threshold >= 0.0, "threshold must be non-negative");
     assert!(!targets.is_empty(), "at least one target is required");
@@ -32,8 +50,23 @@ pub fn scalar(point: f32, targets: &[f32], threshold: f32) -> (f32, f32, Vec<usi
     (best_value, best_signed, indices)
 }
 
-/// Aligns a 2D point to the nearest target within `threshold` using Euclidean distance.
-/// Returns `(value, distance, indices)` where distance is the Euclidean distance.
+/// Aligns a 2D point to the nearest vector within `threshold` using Euclidean
+/// distance.
+///
+/// Returns `(value, distance, indices)` where `value` is the snapped vector (or
+/// the original `point` if no target is within `threshold`), `distance` is the
+/// Euclidean distance, and `indices` lists all targets tied for the minimum
+/// distance.
+///
+/// # Panics
+/// Panics if `threshold` is negative or `targets` is empty.
+///
+/// # Example
+/// ```
+/// let (val, dist, idx) = grida_cmath::align_vector2([6.0,6.0], &[[0.0,0.0],[5.0,5.0],[5.0,5.0],[10.0,10.0]], 3.0);
+/// assert_eq!(val, [5.0,5.0]);
+/// assert_eq!(idx, vec![1,2]);
+/// ```
 pub fn vector2(point: Vector2, targets: &[Vector2], threshold: f32) -> (Vector2, f32, Vec<usize>) {
     assert!(threshold >= 0.0, "threshold must be non-negative");
     assert!(!targets.is_empty(), "at least one target is required");

@@ -1,16 +1,59 @@
 use super::{rect::Rectangle, vector2::Vector2};
 
-/// Returns the fractional part of `x`.
+/// Returns the fractional part of a number.
+///
+/// # Arguments
+/// * `x` - The input value.
+///
+/// # Example
+/// ```rust
+/// # use grida_cmath::fract;
+/// let frac = fract(3.14);
+/// assert!((frac - 0.14).abs() < 1e-2);
+/// ```
 pub fn fract(x: f32) -> f32 {
     x - x.floor()
 }
 
-/// Simple pseudo-random noise for a 2D coordinate.
+/// Computes a pseudo-random noise value for the given 2D coordinate.
+///
+/// This follows a GLSL-style hash using "magic" constants to produce a
+/// nicely distributed value. While fast for grain generation, it's not
+/// intended for high quality noise.
+///
+/// The calculation performed is:
+/// `noise(x, y) = fract(sin(x * 12.9898 + y * 78.233) * 43758.5453)`.
+///
+/// # Parameters
+/// - `x`: X coordinate.
+/// - `y`: Y coordinate.
+///
+/// # Returns
+/// A pseudo-random value in `[0, 1]`.
+///
+/// # Example
+/// ```rust
+/// # use grida_cmath::noise;
+/// let v = noise(12.34, 56.78);
+/// assert!(v >= 0.0 && v <= 1.0);
+/// ```
 pub fn noise(x: f32, y: f32) -> f32 {
     fract(((x * 12.9898 + y * 78.233).sin()) * 43758.5453)
 }
 
-/// Bresenham's line algorithm returning integer pixel coordinates.
+/// Returns all integer pixel coordinates along a straight line between
+/// `a` and `b` using Bresenham's algorithm.
+///
+/// # Parameters
+/// - `a`: Start point in pixel coordinates.
+/// - `b`: End point in pixel coordinates.
+///
+/// # Example
+/// ```rust
+/// # use grida_cmath::raster_bresenham;
+/// let pts = raster_bresenham([10.0, 10.0], [15.0, 20.0]);
+/// assert_eq!(pts.first(), Some(&[10.0, 10.0]));
+/// ```
 pub fn bresenham(a: Vector2, b: Vector2) -> Vec<Vector2> {
     let (mut x0, mut y0) = (a[0] as i32, a[1] as i32);
     let (x1, y1) = (b[0] as i32, b[1] as i32);
@@ -39,7 +82,19 @@ pub fn bresenham(a: Vector2, b: Vector2) -> Vec<Vector2> {
     pixels
 }
 
-/// Generates all pixel coordinates within the given rectangle.
+/// Generates all integer pixel coordinates contained within a rectangle.
+///
+/// The rectangle is defined by its top-left corner and dimensions, and
+/// the output includes all pixels from `x` to `x + width` and `y` to
+/// `y + height` inclusively.
+///
+/// # Example
+/// ```rust
+/// # use grida_cmath::{Rectangle, raster_rectangle};
+/// let rect = Rectangle { x: 40.0, y: 35.0, width: 20.0, height: 30.0 };
+/// let points = raster_rectangle(&rect);
+/// assert!(points.contains(&[40.0, 35.0]));
+/// ```
 pub fn rectangle(rect: &Rectangle) -> Vec<Vector2> {
     let start_x = rect.x.ceil() as i32;
     let end_x = (rect.x + rect.width).floor() as i32;

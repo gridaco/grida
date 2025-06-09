@@ -40,7 +40,19 @@ pub struct UniformGapGroup {
 
 /// Groups ranges whose gaps are uniform within `tolerance`.
 ///
-/// `k` limits the size of the subsets used (-1 for all).
+/// `k` limits the subset size examined (`None` for all combinations). The
+/// returned list contains the indices of the ranges in each group, the
+/// minimum/maximum positions and the uniform gap value.
+///
+/// This uses a power-set search and thus has exponential complexity.
+///
+/// # Example
+/// ```rust
+/// use grida_cmath::group_ranges_by_uniform_gap;
+/// let ranges = vec![[0.0,10.0],[15.0,25.0],[30.0,40.0]];
+/// let groups = group_ranges_by_uniform_gap(&ranges, None, 0.0);
+/// assert!(!groups.is_empty());
+/// ```
 pub fn group_ranges_by_uniform_gap(
     ranges: &[Range],
     k: Option<usize>,

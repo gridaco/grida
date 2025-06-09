@@ -4,9 +4,15 @@
 /// transformation matrix.
 use super::{transform::AffineTransform, vector2::Axis};
 
-/// Projects a scalar offset along `axis` through the given transform.
+/// Projects a scalar delta along a given axis through a 2D affine transform.
 ///
-/// The returned value is the transformed delta in surface space.
+/// # Parameters
+/// - `offset`: The delta along the X or Y axis.
+/// - `axis`:   Which axis the delta corresponds to.
+/// - `transform`: The 2×3 affine transform matrix.
+///
+/// # Returns
+/// The transformed scalar offset in surface space.
 pub fn transform(offset: f32, axis: Axis, transform: &AffineTransform) -> f32 {
     let i = match axis {
         Axis::X => 0,

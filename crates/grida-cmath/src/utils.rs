@@ -1,7 +1,15 @@
-/// Quantizes a value to the nearest multiple of `step`.
+/// Quantizes `value` to the nearest multiple of `step`.
+///
+/// Useful for rounding or grid alignment of continuous values.
 ///
 /// # Panics
 /// Panics if `step` is not positive.
+///
+/// # Example
+/// ```rust
+/// use grida_cmath::quantize;
+/// assert_eq!(quantize(15.0, 10.0), 20.0);
+/// ```
 pub fn quantize(value: f32, step: f32) -> f32 {
     assert!(step > 0.0, "step must be positive");
     let factor = 1.0 / step;
@@ -13,9 +21,8 @@ pub fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
 }
 
-/// Returns the value from `points` closest to `value`.
-///
-/// If `points` is empty, `f32::INFINITY` is returned.
+/// Finds the nearest value to `value` from `points`.
+/// Returns `f32::INFINITY` if `points` is empty.
 pub fn nearest(value: f32, points: &[f32]) -> f32 {
     points
         .iter()
@@ -25,12 +32,12 @@ pub fn nearest(value: f32, points: &[f32]) -> f32 {
         .unwrap_or(f32::INFINITY)
 }
 
-/// Converts an angle to its principal angle within [-180, 180).
+/// Converts an angle to its principal representation within `[-180, 180)`.
 pub fn principal_angle(angle: f32) -> f32 {
     ((angle + 180.0) % 360.0) - 180.0
 }
 
-/// Determines if an angle is closer to the X or Y axis.
+/// Determines whether an angle is closer to the X or Y axis.
 pub fn angle_to_axis(angle: f32) -> super::vector2::Axis {
     let a = ((angle % 360.0) + 360.0) % 360.0;
     let dist_horizontal = (a - 0.0).abs().min((a - 180.0).abs()).min((a - 360.0).abs());
@@ -55,7 +62,7 @@ pub fn is_uniform(arr: &[f32], tolerance: f32) -> bool {
     }
 }
 
-/// Computes the mean of the provided values.
+/// Computes the mean (average) of the provided values.
 pub fn mean(values: &[f32]) -> f32 {
     assert!(!values.is_empty(), "cannot compute mean of empty slice");
     let sum: f32 = values.iter().sum();
@@ -93,7 +100,7 @@ pub fn permutations<T: Clone>(arr: &[T], k: usize) -> Vec<Vec<T>> {
     result
 }
 
-/// Returns the power set of `arr` or subsets of size `k`.
+/// Generates the power set of `arr` or subsets of a given size.
 pub fn powerset<T: Clone>(arr: &[T], k: Option<usize>) -> Vec<Vec<T>> {
     match k {
         None => {
