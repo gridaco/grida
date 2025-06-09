@@ -1,5 +1,11 @@
 use crate::{rect, Rectangle, RectangleSide, vector2::Vector2};
 
+/// Result returned by [`measure`].
+///
+/// `a` and `b` are the input rectangles. `box_rect` is the rectangle used as
+/// the reference when computing the spacing values. `distance` contains the
+/// offsets to the nearest top, right, bottom and left edges in that order.
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Measurement {
     pub a: Rectangle,
@@ -9,6 +15,10 @@ pub struct Measurement {
     pub distance: [f32; 4],
 }
 
+/// Calculates the spacing between two rectangles along with the reference box.
+///
+/// See the module-level documentation for the exact behaviour. Returns `None`
+/// when `a` and `b` are identical.
 pub fn measure(a: Rectangle, b: Rectangle) -> Option<Measurement> {
     if a == b { return None; }
     let intersection = rect::intersection(&a, &b);
@@ -62,6 +72,11 @@ fn calculate_container_spacing(outer:&Rectangle, inner:&Rectangle) -> [f32;4] {
 
 type LineXYXYLR = [f32;6];
 
+/// Generates guide line coordinates from the center of `rect` toward a side.
+///
+/// The returned array is `[x1, y1, x2, y2, length, rotation]` scaled by
+/// `zoom` where `(x1, y1)` is the anchor on the rectangle and `(x2, y2)` the
+/// outer end.
 pub fn guide_line_xylr(rect: Rectangle, side: RectangleSide, length: f32, zoom: f32) -> LineXYXYLR {
     let Rectangle { x, y, width, height } = rect;
     let mid_x = x + width / 2.0;
@@ -93,6 +108,11 @@ pub fn guide_line_xylr(rect: Rectangle, side: RectangleSide, length: f32, zoom: 
     [x1, y1, x2, y2, scaled, rotation]
 }
 
+/// Generates an auxiliary guide line from `point` toward the closest side of
+/// `rect`.
+///
+/// Returns `[x1, y1, x2, y2, length, rotation]` scaled by `zoom`. When the
+/// point lies inside the rectangle, `x2`/`y2` are `NaN` and length is zero.
 pub fn auxiliary_line_xylr(point: Vector2, rect: Rectangle, side: RectangleSide, zoom: f32) -> LineXYXYLR {
     let [px, py] = point;
     let Rectangle { x, y, width, height } = rect;

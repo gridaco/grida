@@ -5,15 +5,19 @@ use crate::utils::mean;
 pub mod flex {
     use super::*;
 
+    /// Inferred main axis direction of a flex-like layout.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum AxisDirection { Horizontal, Vertical }
 
+    /// Alignment of items along the main axis.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum MainAxisAlignment { Start, End, Center }
 
+    /// Alignment of items along the cross axis.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum CrossAxisAlignment { Start, End, Center }
 
+    /// Result returned by [`guess`].
     #[derive(Debug, Clone, PartialEq)]
     pub struct Guessed {
         pub orders: Vec<usize>,
@@ -58,6 +62,16 @@ pub mod flex {
         }
     }
 
+    /// Guesses layout properties (direction, spacing and alignment) from a list
+    /// of bounding boxes.
+    ///
+    /// The algorithm roughly follows these steps:
+    /// 1. Sum gaps along both axes and pick the axis with the larger gap spread
+    ///    as the main axis.
+    /// 2. Compute average spacing along the chosen axis.
+    /// 3. Sort rectangles on that axis to derive their order.
+    /// 4. Estimate cross axis alignment by comparing the variance of starts,
+    ///    centers and ends.
     pub fn guess(boundingboxes: &[Rectangle]) -> Guessed {
         assert!(!boundingboxes.is_empty(), "At least one bounding box is required.");
 
