@@ -1,5 +1,5 @@
 use crate::schema::{Node, NodeId};
-use skia_safe::{textlayout::TypefaceFontProvider, FontMgr, Image};
+use skia_safe::{FontMgr, Image, textlayout::TypefaceFontProvider};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.

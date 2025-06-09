@@ -1053,7 +1053,7 @@ pub struct Renderer {
     logical_height: f32,
     camera: Option<Camera>,
     pub image_repository: ImageRepository,
-    font_repository: FontRepository,
+    pub font_repository: FontRepository,
 }
 
 /// ---------------------------------------------------------------------------

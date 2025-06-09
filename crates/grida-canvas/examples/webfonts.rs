@@ -7,8 +7,8 @@ use grida_cmath::transform::AffineTransform;
 
 mod window;
 
-const LOREM: &str = r#"
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.
+const PARAGRAPH: &str = r#"
+This demo showcases how multiple static TTF font files—each representing a different weight or style—can be loaded under the same font family name. It verifies that our system can correctly resolve and apply the appropriate font file when rendering text spans with varying font weights and styles. Each text line uses the same font family (“Albert Sans”) but specifies a different combination of weight and italic flag. If the system behaves correctly, the rendered output should match the intended visual style for each variant, demonstrating accurate font resolution and fallback handling within the shared family context.
 "#;
 
 async fn demo_webfonts() -> Scene {
@@ -22,97 +22,96 @@ async fn demo_webfonts() -> Scene {
         height: 1080.0,
     };
     background_rect_node.fill = Paint::Solid(SolidPaint {
-        color: Color(230, 240, 255, 255), // Light blue background
+        color: Color(250, 250, 250, 255),
         opacity: 1.0,
     });
 
-    // Create a text span with Playfair Display (elegant serif)
-    let mut playfair_text_node = nf.create_text_span_node();
-    playfair_text_node.base.name = "Playfair Display Text".to_string();
-    playfair_text_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    playfair_text_node.size = Size {
-        width: 400.0,
+    // Create a heading with Playfair Display
+    let mut heading_node = nf.create_text_span_node();
+    heading_node.base.name = "Heading".to_string();
+    heading_node.transform = AffineTransform::new(50.0, 50.0, 0.0);
+    heading_node.size = Size {
+        width: 800.0,
         height: 100.0,
     };
-    playfair_text_node.text = "Playfair Display".to_string();
-    playfair_text_node.text_style = TextStyle {
+    heading_node.text = "Web fonts demo".to_string();
+    heading_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
         font_family: "Playfair Display".to_string(),
-        font_size: 48.0,
+        font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
         letter_spacing: None,
         line_height: None,
         text_transform: TextTransform::None,
     };
-    playfair_text_node.text_align = TextAlign::Left;
-    playfair_text_node.text_align_vertical = TextAlignVertical::Top;
+    heading_node.text_align = TextAlign::Left;
+    heading_node.text_align_vertical = TextAlignVertical::Top;
 
-    // Create a text span with Space Mono (monospace)
-    let mut spacemono_text_node = nf.create_text_span_node();
-    spacemono_text_node.base.name = "Space Mono Text".to_string();
-    spacemono_text_node.transform = AffineTransform::new(50.0, 150.0, 0.0);
-    spacemono_text_node.size = Size {
-        width: 500.0,
-        height: 100.0,
-    };
-    spacemono_text_node.text = "Space Mono".to_string();
-    spacemono_text_node.text_style = TextStyle {
-        text_decoration: TextDecoration::Underline,
-        font_family: "Space Mono".to_string(),
-        font_size: 32.0,
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        line_height: None,
-        text_transform: TextTransform::None,
-    };
-    spacemono_text_node.text_align = TextAlign::Left;
-    spacemono_text_node.text_align_vertical = TextAlignVertical::Center;
-
-    // Create a text span with Dancing Script (handwriting)
-    let mut dancing_text_node = nf.create_text_span_node();
-    dancing_text_node.base.name = "Dancing Script Text".to_string();
-    dancing_text_node.transform = AffineTransform::new(50.0, 250.0, 0.0);
-    dancing_text_node.size = Size {
+    // Create a description paragraph with Playfair Display
+    let mut description_node = nf.create_text_span_node();
+    description_node.base.name = "Description".to_string();
+    description_node.transform = AffineTransform::new(50.0, 120.0, 0.0);
+    description_node.size = Size {
         width: 800.0,
-        height: 300.0,
+        height: 120.0,
     };
-    dancing_text_node.text = LOREM.to_string();
-    dancing_text_node.text_style = TextStyle {
+    description_node.text = PARAGRAPH.to_string();
+    description_node.text_style = TextStyle {
         text_decoration: TextDecoration::None,
-        font_family: "Dancing Script".to_string(),
-        font_size: 24.0,
+        font_family: "Playfair Display".to_string(),
+        font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: Some(1.5), // 1.5 line height for better readability
         text_transform: TextTransform::None,
     };
-    dancing_text_node.text_align = TextAlign::Left;
-    dancing_text_node.text_align_vertical = TextAlignVertical::Top;
+    description_node.text_align = TextAlign::Left;
+    description_node.text_align_vertical = TextAlignVertical::Top;
 
-    // Create a text span with Montserrat (modern sans-serif)
-    let mut montserrat_text_node = nf.create_text_span_node();
-    montserrat_text_node.base.name = "Montserrat Text".to_string();
-    montserrat_text_node.transform = AffineTransform::new(50.0, 600.0, 0.0);
-    montserrat_text_node.size = Size {
-        width: 800.0,
-        height: 300.0,
-    };
-    montserrat_text_node.text = LOREM.to_string();
-    montserrat_text_node.text_style = TextStyle {
-        text_decoration: TextDecoration::None,
-        font_family: "Montserrat".to_string(),
-        font_size: 16.0,
-        font_weight: FontWeight::new(400), // Regular
-        letter_spacing: None,
-        line_height: Some(1.5), // 1.5 line height for better readability
-        text_transform: TextTransform::None,
-    };
-    montserrat_text_node.text_align = TextAlign::Left;
-    montserrat_text_node.text_align_vertical = TextAlignVertical::Top;
-    montserrat_text_node.fill = Paint::Solid(SolidPaint {
-        color: Color(70, 130, 180, 255), // Steel blue color
-        opacity: 1.0,
-    });
+    // Create text nodes for Albert Sans variants
+    let mut albert_text_nodes = Vec::new();
+    let variants = [
+        ("Regular", 400, false),
+        ("Thin", 100, false),
+        ("ExtraLight", 200, false),
+        ("Light", 300, false),
+        ("Medium", 500, false),
+        ("SemiBold", 600, false),
+        ("Bold", 700, false),
+        ("ExtraBold", 800, false),
+        ("Black", 900, false),
+        ("ThinItalic", 100, true),
+        ("ExtraLightItalic", 200, true),
+        ("LightItalic", 300, true),
+        ("MediumItalic", 500, true),
+        ("SemiBoldItalic", 600, true),
+        ("BoldItalic", 700, true),
+        ("ExtraBoldItalic", 800, true),
+        ("BlackItalic", 900, true),
+    ];
+
+    for (i, (variant, weight, is_italic)) in variants.iter().enumerate() {
+        let mut text_node = nf.create_text_span_node();
+        text_node.base.name = format!("Albert Sans {}", variant);
+        text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
+        text_node.size = Size {
+            width: 800.0,
+            height: 40.0,
+        };
+        text_node.text = format!("AlbertSans {}", variant);
+        text_node.text_style = TextStyle {
+            text_decoration: TextDecoration::None,
+            font_family: "Albert Sans".to_string(),
+            font_size: 24.0,
+            font_weight: FontWeight::new(*weight),
+            letter_spacing: None,
+            line_height: None,
+            text_transform: TextTransform::None,
+        };
+        text_node.text_align = TextAlign::Left;
+        text_node.text_align_vertical = TextAlignVertical::Top;
+        albert_text_nodes.push(text_node);
+    }
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -127,26 +126,25 @@ async fn demo_webfonts() -> Scene {
 
     // Collect all the IDs
     let background_rect_id = background_rect_node.base.id.clone();
-    let playfair_text_id = playfair_text_node.base.id.clone();
-    let spacemono_text_id = spacemono_text_node.base.id.clone();
-    let dancing_text_id = dancing_text_node.base.id.clone();
-    let montserrat_text_id = montserrat_text_node.base.id.clone();
+    let heading_id = heading_node.base.id.clone();
+    let description_id = description_node.base.id.clone();
+    let albert_text_ids: Vec<_> = albert_text_nodes
+        .iter()
+        .map(|n| n.base.id.clone())
+        .collect();
 
     // Add all nodes to the repository
     repository.insert(Node::Rectangle(background_rect_node));
-    repository.insert(Node::TextSpan(playfair_text_node));
-    repository.insert(Node::TextSpan(spacemono_text_node));
-    repository.insert(Node::TextSpan(dancing_text_node));
-    repository.insert(Node::TextSpan(montserrat_text_node));
+    repository.insert(Node::TextSpan(heading_node));
+    repository.insert(Node::TextSpan(description_node));
+    for text_node in albert_text_nodes {
+        repository.insert(Node::TextSpan(text_node));
+    }
 
     // Set up the root container with all IDs
-    root_container_node.children = vec![
-        background_rect_id,
-        playfair_text_id,
-        spacemono_text_id,
-        dancing_text_id,
-        montserrat_text_id,
-    ];
+    let mut children = vec![background_rect_id, heading_id, description_id];
+    children.extend(albert_text_ids);
+    root_container_node.children = children;
     let root_container_id = root_container_node.base.id.clone();
     repository.insert(Node::Container(root_container_node));
 
@@ -169,15 +167,10 @@ async fn main() {
         .expect("Failed to load webfonts metadata");
 
     // Get the fonts we need for this demo
-    let required_fonts = vec![
-        "Playfair Display",
-        "Space Mono",
-        "Dancing Script",
-        "Montserrat",
-    ]
-    .into_iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<String>>();
+    let required_fonts = vec!["Playfair Display", "Albert Sans"]
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
     let font_files = find_font_files_by_family(&webfonts_metadata, &required_fonts);
 
     println!("\nFound {} matching font files:", font_files.len());

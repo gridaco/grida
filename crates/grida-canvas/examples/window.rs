@@ -385,14 +385,24 @@ impl App {
 
     fn process_font_queue(&mut self) {
         while let Ok(msg) = self.font_rx.try_recv() {
-            println!("📥 Received font data for family: {}", msg.family);
-            self.renderer.add_font(&msg.family, &msg.data);
-            println!("📝 Registered font with renderer: {}", msg.family);
+            println!("📥 Received font data for family: '{}'", msg.family);
+            // Use postscript name as alias if available, otherwise fallback to family
+            let alias = &msg.family;
+            self.renderer.add_font(alias, &msg.data);
+            println!("📝 Registered font with renderer: '{}'", alias);
+            // After all fonts are registered, print out all font families known to Skia's FontMgr
+            let font_mgr = self.renderer.font_repository.font_mgr();
+            let count = font_mgr.count_families();
+            println!(
+                "Registered font families in Skia FontMgr. was {} -> now {}",
+                count - 1,
+                count
+            );
         }
     }
 
     fn redraw(&mut self) {
-        println!("🎨 Starting redraw...");
+        println!("🎨 redraw...");
         self.process_image_queue();
         self.process_font_queue();
         let surface = unsafe { &mut *self.surface_ptr };
@@ -401,7 +411,6 @@ impl App {
 
         self.renderer.render_scene(&self.scene);
         self.renderer.flush();
-        println!("✨ Redraw complete");
 
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
