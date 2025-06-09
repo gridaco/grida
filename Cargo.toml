@@ -2,5 +2,5 @@
 members = [
   "crates/grida",
   "crates/grida-canvas",
-  "crates/grida-cmath",
+  "crates/grida-math2",
 ]
