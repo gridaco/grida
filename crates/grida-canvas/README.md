@@ -1,4 +1,6 @@
-# `cg` Grida Rendering Backend
+# grida-canvas (`cg`)
+
+<img src="./cover.png" alt="Grida Canvas Rendering Backend Example" width="100%" />
 
 ## Build
 
