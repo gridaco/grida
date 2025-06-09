@@ -23,6 +23,10 @@ async fn demo_paints() -> Scene {
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
     root_container_node.base.name = "Root Container".to_string();
+    root_container_node.size = Size {
+        width: 1080.0,
+        height: 1080.0,
+    };
 
     let mut repository = NodeRepository::new();
     let background_rect_id = background_rect_node.base.id.clone();
