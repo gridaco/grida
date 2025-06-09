@@ -1,4 +1,4 @@
-name: Test
+name: test packages
 
 on:
   push:
@@ -22,5 +22,5 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
       - name: Run Tests
-        run: pnpm turbo test
+        run: pnpm turbo test --filter='!./crates/*'
 

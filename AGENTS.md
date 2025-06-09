@@ -16,6 +16,7 @@ Currently, we have below features / modules.
 
 - [docs](./docs) - the docs directory
 - [editor](./editor) - the editor directory
+- [crates](./crates) - the rust crates directory
 - [packages](./packages) - shared packages
 - [desktop](./desktop) - the electron desktop app
 - [supabase](./supabase) - the supabase project
@@ -51,6 +52,11 @@ Grida heavily relies on Supabase (PostgreSQL).
 - Shadcn UI
 - Lucide / Radix Icons
 
+**Graphics Backend**
+
+- DOM - plain dom as canvas - for website builder canvas. (binded with react)
+- Skia - the graphics backend - for 2D graphics. (binded with skia-safe)
+
 **Desktop**
 
 - electron with electron-forge
@@ -61,6 +67,14 @@ Grida heavily relies on Supabase (PostgreSQL).
 Documentation files are located in the `./docs` directory.
 
 This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
+
+## `/crates/*`
+
+Importance: **High**
+
+monorepo rust crates.
+
+The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
 
 ## `/editor`
 
@@ -143,12 +157,6 @@ Since our project is in a rapid development, some large modules still lives unde
 
 For each individual package, refer to the README of its own.
 
-## `/crates/*`
-
-Importance: **High**
-
-The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
-
 ## Testing & Development
 
 We use turborepo (except few isolated packages).
@@ -157,16 +165,28 @@ To run test, build, and dev, use below commands.
 
 ```sh
 # run tests
-pnpm turbo test
+turbo test
+
+# run tests for packages
+turbo test --filter='./packages/*'
+
+# run tests except for rust crates
+turbo test --filter='!./crates/*'
 
 # run build
-pnpm turbo build
+turbo build
 
 # run dev
-pnpm turbo dev
+turbo dev
 
 # run typecheck
-pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+
+# for crates specific tests
+cargo test
+
+# for crates specific build
+cargo build
 ```
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
