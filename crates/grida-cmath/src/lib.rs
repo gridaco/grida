@@ -1,1 +1,24 @@
 pub mod transform;
+pub mod vector2;
+pub mod vector4;
+pub mod bezier;
+pub mod rect;
+pub mod compass;
+pub mod delta;
+pub mod range;
+pub mod raster;
+pub mod align;
+pub mod utils;
+pub mod snap;
+
+pub use rect::{Rectangle, Rect9Points, RectangleSide, CardinalDirection, from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects, intersection, union};
+pub use rect::boolean::subtract as rect_boolean_subtract;
+pub use range::{Range, UniformGapGroup, mean as range_mean, from_rectangle, length as range_length, to_3points_chunk, group_ranges_by_uniform_gap};
+pub use vector4::{Vector4, identical as vector4_identical};
+pub use delta::transform as delta_transform;
+pub use compass::{invert_direction, to_rectangle_side};
+pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle};
+pub use align::{scalar as align_scalar, vector2 as align_vector2};
+pub use bezier::{CubicBezier, CubicBezierWithTangents, get_bbox as bezier_get_bbox, a2c as bezier_a2c};
+pub use utils::{quantize, clamp, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
+pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
