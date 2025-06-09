@@ -1,0 +1,9 @@
+{
+  "name": "@crates/grida-cmath",
+  "description": "turbo ci rust wrapper",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release",
+    "test": "cargo test"
+  }
+}

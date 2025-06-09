@@ -16,6 +16,7 @@ Currently, we have below features / modules.
 
 - [docs](./docs) - the docs directory
 - [editor](./editor) - the editor directory
+- [crates](./crates) - the rust crates directory
 - [packages](./packages) - shared packages
 - [desktop](./desktop) - the electron desktop app
 - [supabase](./supabase) - the supabase project
@@ -32,10 +33,11 @@ Currently, we have below features / modules.
 - TypeScript 5 - main language for most apps
 - Python 3.12 - partially used for tasks / jobs, that are independent, e.g. `/library`
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
+- Rust (2024 edition) - used for wasm builds, mostly for graphics core.
 
 **Database**
 
-Grida heavily relies on Supabase.
+Grida heavily relies on Supabase (PostgreSQL).
 
 - Supabase
 
@@ -50,6 +52,11 @@ Grida heavily relies on Supabase.
 - Shadcn UI
 - Lucide / Radix Icons
 
+**Graphics Backend**
+
+- DOM - plain dom as canvas - for website builder canvas. (binded with react)
+- Skia - the graphics backend - for 2D graphics. (binded with skia-safe)
+
 **Desktop**
 
 - electron with electron-forge
@@ -61,11 +68,19 @@ Documentation files are located in the `./docs` directory.
 
 This directory contains the docs as-is, the deployment of the docs are handled by [apps/docs](./apps/docs). A docusaurus project that syncs the docs content to its directory. When writing docs, the root `./docs` directory is the source of truth.
 
+## `/crates/*`
+
+Importance: **High**
+
+monorepo rust crates.
+
+The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
+
 ## `/editor`
 
 Importance: **Very high**
 
-The editor is a monorepo project that contains the codebase for the editor.
+The editor is a monorepo nextjs project that contains the codebase for the editor.
 
 grida.co and \[tenant\].grida.site domains are connected.
 
@@ -128,9 +143,13 @@ Importance: **Low**
 
 Library workers are hosted on railway.com
 
-## `/packages/grida-canvas-*`
+## `/packages/*`
 
 Importance: **High**
+
+monorepo node packages
+
+**`/packages/grida-canvas-*`**
 
 Packages that powers the canvas. (some are published to npm, some are not)
 
@@ -146,16 +165,28 @@ To run test, build, and dev, use below commands.
 
 ```sh
 # run tests
-pnpm turbo test
+turbo test
+
+# run tests for packages
+turbo test --filter='./packages/*'
+
+# run tests except for rust crates
+turbo test --filter='!./crates/*'
 
 # run build
-pnpm turbo build
+turbo build
 
 # run dev
-pnpm turbo dev
+turbo dev
 
 # run typecheck
-pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+
+# for crates specific tests
+cargo test
+
+# for crates specific build
+cargo build
 ```
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.

@@ -745,9 +745,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "figma-api"
-version = "0.31.2"
+version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13d39a6e15ab97047dc064207a37d61ce42a7d6b6a58663db68e28c1b0fd2a1a"
+checksum = "23256077c8160e009f3668de3dc68c41af8a97eee423fc09fd9396471f4da090"
 dependencies = [
  "reqwest",
  "serde",
@@ -1005,6 +1005,10 @@ checksum = "2c4ee00b289aba7a9e5306d57c2d05499b2e5dc427f84ac708bd2c090212cf3e"
 dependencies = [
  "gl_generator",
 ]
+
+[[package]]
+name = "grida"
+version = "0.0.0"
 
 [[package]]
 name = "grida-cmath"

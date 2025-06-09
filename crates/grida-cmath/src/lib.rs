@@ -1,3 +1,4 @@
+pub mod box_fit;
 pub mod transform;
 pub mod vector2;
 pub mod vector4;
