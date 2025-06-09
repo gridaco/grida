@@ -13,6 +13,7 @@ pub mod snap;
 pub mod packing;
 pub mod layout;
 pub mod measurement;
+pub mod ui;
 
 pub use rect::{Rectangle, Rect9Points, RectangleSide, CardinalDirection, from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects, intersection, union};
 pub use rect::boolean::subtract as rect_boolean_subtract;
@@ -29,3 +30,4 @@ pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins 
 pub use packing::{fit as packing_fit, ext::walk_to_fit as packing_walk_to_fit};
 pub use layout::flex::{guess as layout_flex_guess, AxisDirection as FlexAxisDirection, MainAxisAlignment as FlexMainAxisAlignment, CrossAxisAlignment as FlexCrossAxisAlignment, Guessed as FlexGuessed};
 pub use measurement::{measure, guide_line_xylr, auxiliary_line_xylr, Measurement};
+pub use ui::{Rule as UiRule, Point as UiPoint, Line as UiLine, transform_point, transform_line, normalize_line, format_number};
