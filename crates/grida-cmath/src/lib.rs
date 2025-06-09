@@ -7,6 +7,7 @@ pub mod compass;
 pub mod delta;
 pub mod range;
 pub mod raster;
+pub mod color;
 pub mod align;
 pub mod utils;
 pub mod snap;
@@ -28,6 +29,10 @@ pub use rect::{
 pub use rect::boolean::subtract as rect_boolean_subtract;
 pub use range::{Range, UniformGapGroup, mean as range_mean, from_rectangle, length as range_length, to_3points_chunk, group_ranges_by_uniform_gap};
 pub use vector4::{Vector4, identical as vector4_identical};
+pub use color::{
+    TRGBA, RGBAf, RGBA8888, hex_to_rgba8888, rgba_to_unit8_chunk,
+    rgbaf_to_rgba8888, rgbaf_multiply_alpha, rgba8888_to_hex,
+};
 pub use delta::transform as delta_transform;
 pub use compass::{invert_direction, to_rectangle_side};
 pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle, Bitmap, tile as raster_tile, scale as raster_scale, resize as raster_resize, pad as raster_pad, circle as raster_circle, ellipse as raster_ellipse, floodfill as raster_floodfill, gaussian as raster_gaussian, smoothstep as raster_smoothstep, pascaltriangle as raster_pascaltriangle};
