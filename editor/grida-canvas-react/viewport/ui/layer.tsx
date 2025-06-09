@@ -9,12 +9,16 @@ export const LayerOverlay = React.forwardRef(function LayerOverlay(
     children,
     transform,
     zIndex,
+    borderColor,
+    borderWidth,
     ...props
   }: Omit<React.HTMLAttributes<HTMLDivElement>, "style"> & {
     readonly?: boolean;
     isComponentConsumer?: boolean;
     transform?: React.CSSProperties;
     zIndex?: number;
+    borderColor?: string;
+    borderWidth?: number;
   },
   ref: React.Ref<HTMLDivElement>
 ) {
@@ -35,6 +39,8 @@ export const LayerOverlay = React.forwardRef(function LayerOverlay(
         willChange: "transform",
         ...transform,
         pointerEvents: readonly ? "none" : undefined,
+        borderColor: borderColor,
+        borderWidth: borderWidth,
       }}
     >
       {children}

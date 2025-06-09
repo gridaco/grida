@@ -125,10 +125,11 @@ export default function reducer<S extends editor.state.IEditorState>(
 
         // 3. clone nodes recursively
         for (const child_id of origin.children) {
-          const prototype = grida.program.nodes.factory.createPrototypeFromSnapshot(
-            state.document,
-            child_id
-          );
+          const prototype =
+            grida.program.nodes.factory.createPrototypeFromSnapshot(
+              state.document,
+              child_id
+            );
           const sub =
             grida.program.nodes.factory.create_packed_scene_document_from_prototype(
               prototype,
@@ -151,18 +152,18 @@ export default function reducer<S extends editor.state.IEditorState>(
       });
     }
     case "transform": {
+      const { transform, sync } = action;
       return produce(state, (draft: Draft<S>) => {
-        const prev_transform = state.transform;
-        const next_transform = action.transform;
-
         // set the transform
-        draft.transform = next_transform;
+        draft.transform = transform;
 
         // TODO: need to update the pointer position (recalculate)
         // ...
 
-        // update hooked events
-        self_updateSurfaceHoverState(draft);
+        // sync hooked events
+        if (sync) {
+          self_updateSurfaceHoverState(draft);
+        }
       });
     }
     case "undo":

@@ -13,20 +13,8 @@ import { domapi } from "./backends/dom";
 import { animateTransformTo } from "./animation";
 import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
-
-function throttle<T extends (...args: any[]) => void>(
-  func: T,
-  limit: number
-): T {
-  let inThrottle: boolean;
-  return function (this: any, ...args: Parameters<T>) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  } as T;
-}
+import { io } from "@grida/io";
+import { EditorFollowPlugin } from "./plugins/follow";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -60,7 +48,8 @@ export class Editor
     editor.api.IRulerActions,
     editor.api.IGuide2DActions,
     editor.api.ICameraActions,
-    editor.api.IEventTargetActions
+    editor.api.IEventTargetActions,
+    editor.api.IFollowPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
@@ -73,14 +62,25 @@ export class Editor
     initialState: editor.state.IEditorStateInit,
     instanceConfig: {
       pointer_move_throttle_ms: number;
+      onCreate?: (editor: Editor) => void;
     } = { pointer_move_throttle_ms: 30 }
   ) {
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
+    //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
+    instanceConfig.onCreate?.(this);
   }
 
   private _locked: boolean = false;
+
+  /**
+   * @internal Transaction ID - does not clear on reset.
+   */
+  private _tid: number = 0;
+  public get tid(): number {
+    return this._tid;
+  }
 
   /**
    * If the editor is locked, no actions will be dispatched. (unless forced)
@@ -98,10 +98,10 @@ export class Editor
   }
 
   set debug(value: boolean) {
-    this.mstate = produce(this.mstate, (draft) => {
-      draft.debug = value;
+    this.reduce((state) => {
+      state.debug = value;
+      return state;
     });
-    this.listeners.forEach((l) => l(this));
   }
 
   public toggleDebug() {
@@ -113,7 +113,7 @@ export class Editor
     state: editor.state.IEditorState,
     key: string | undefined = undefined,
     force: boolean = false
-  ) {
+  ): number {
     this.dispatch(
       {
         type: "__internal/reset",
@@ -122,6 +122,20 @@ export class Editor
       },
       force
     );
+    return this._tid;
+  }
+
+  public archive(): Blob {
+    const documentData = {
+      version: "0.0.1-beta.1+20250303",
+      document: this.getSnapshot().document,
+    } satisfies io.JSONDocumentFileModel;
+
+    const blob = new Blob([io.archive.pack(documentData)], {
+      type: "application/zip",
+    });
+
+    return blob;
   }
 
   private __createNodeId(): editor.NodeID {
@@ -149,24 +163,58 @@ export class Editor
     return dq.getSiblings(this.mstate.document_ctx, node_id);
   }
 
+  public __sync_cursors(
+    cursors: editor.state.IEditorMultiplayerCursorState["cursors"]
+  ) {
+    this.reduce((state) => {
+      state.cursors = cursors;
+      return state;
+    });
+  }
+
   public reduce(
     reducer: (
       state: editor.state.IEditorState
     ) => Readonly<editor.state.IEditorState>
   ) {
     this.mstate = produce(this.mstate, reducer);
-    this.listeners.forEach((l) => l(this));
+    this._tid++;
+    this.listeners.forEach((l) => l?.(this));
   }
 
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
     this.mstate = reducer(this.mstate, action);
+    this._tid++;
     this.listeners.forEach((l) => l(this, action));
   }
 
   public subscribe(fn: (editor: this, action?: Action) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  public subscribeWithSelector<T>(
+    selector: (state: editor.state.IEditorState) => T,
+    listener: (editor: this, selected: T, previous: T, action?: Action) => void,
+    isEqual: (a: T, b: T) => boolean = Object.is
+  ): () => void {
+    let previous = selector(this.mstate);
+
+    const wrapped = (_: this, action?: Action) => {
+      const next = selector(this.mstate);
+      if (!isEqual(previous, next)) {
+        const prev = previous;
+        // previous is assigned before invoking the listener, preventing recursive dispatch loops
+        // [1]
+        previous = next;
+        // [2]
+        listener(this, next, prev, action);
+      }
+    };
+
+    this.listeners.add(wrapped);
+    return () => this.listeners.delete(wrapped);
   }
 
   public getSnapshot(): Readonly<editor.state.IEditorState> {
@@ -1285,10 +1333,11 @@ export class Editor
   // #endregion IGuide2DActions implementation
 
   // #region ICameraActions implementation
-  transform(transform: cmath.Transform) {
+  transform(transform: cmath.Transform, sync: boolean = true) {
     this.dispatch({
       type: "transform",
       transform,
+      sync,
     });
   }
 
@@ -1319,17 +1368,14 @@ export class Editor
       [transform[1][0], newscale, newy],
     ];
 
-    this.dispatch({
-      type: "transform",
-      transform: next,
-    });
+    this.transform(next, true);
   }
 
   pan(delta: [dx: number, dy: number]) {
-    this.dispatch({
-      type: "transform",
-      transform: cmath.transform.translate(this.state.transform, delta),
-    });
+    this.transform(
+      cmath.transform.translate(this.state.transform, delta),
+      true
+    );
   }
 
   scale(
@@ -1477,7 +1523,7 @@ export class Editor
     return position;
   };
 
-  private _throttled_pointer_move_with_raycast = throttle(
+  private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
       const els = domapi.get_grida_node_elements_from_point(
@@ -1691,6 +1737,17 @@ export class Editor
   }
 
   // #endregion IEventTargetActions implementation
+
+  readonly __pligin_follow: EditorFollowPlugin = new EditorFollowPlugin(this);
+  // #region IFollowPluginActions implementation
+  follow(cursor_id: string): void {
+    this.__pligin_follow.follow(cursor_id);
+  }
+
+  unfollow(): void {
+    this.__pligin_follow.unfollow();
+  }
+  // #endregion IFollowPluginActions implementation
 }
 
 export class NodeProxy<T extends grida.program.nodes.Node> {

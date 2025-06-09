@@ -5,12 +5,12 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import {
   FetchNodeResult,
   ImportFromFigmaDialog,
-} from "@/scaffolds/playground-canvas/modals/import-from-figma";
+} from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { Button } from "@/components/ui/button";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import { GridaLogo } from "@/components/grida-logo";
-import Link from "next/link";
 import { ThemedMonacoEditor } from "@/components/monaco";
+import Link from "next/link";
 
 export default function IOFigmaPage() {
   const dialog = useDialogState("io-figma-import", { defaultOpen: true });

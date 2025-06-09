@@ -9,6 +9,7 @@ import {
   useDocumentState,
   useEventTargetCSSCursor,
   useGestureState,
+  useMultiplayerCursorState,
   useMultipleSelectionOverlayClick,
   useNode,
   usePointerState,
@@ -38,6 +39,7 @@ import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import cmath from "@grida/cmath";
 import { cursors } from "../components/cursor";
+import { PointerCursor } from "@/components/multiplayer/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
@@ -57,6 +59,7 @@ import grida from "@grida/schema";
 import { EdgeScrollingEffect } from "./hooks/use-edge-scrolling";
 import { BezierCurvedLine } from "./ui/network-curve";
 import type { editor } from "@/grida-canvas";
+import { useFollowPlugin } from "../plugins/use-follow";
 
 const DRAG_THRESHOLD = 2;
 
@@ -319,6 +322,7 @@ export function EditorSurface() {
           (e.target as HTMLDivElement).scrollLeft = 0;
         }}
       >
+        <FollowingFrameOverlay />
         <NetworkOverlay transform={transform} />
         {ruler === "on" && <RulerGuideOverlay />}
         {pixelgrid === "on" && <PixelGridOverlay />}
@@ -330,9 +334,11 @@ export function EditorSurface() {
         <div
           style={{
             position: "absolute",
+            pointerEvents: "none",
           }}
         >
           {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
+          <RemoteCursorOverlay />
           <MarqueeOverlay />
         </div>
         <div
@@ -388,6 +394,91 @@ export function EditorSurface() {
         </div>
       </div>
     </SurfaceSelectionGroupProvider>
+  );
+}
+
+function FollowingFrameOverlay() {
+  const instance = useCurrentEditor();
+  const { isFollowing, cursor: cursorId } = useFollowPlugin(
+    instance.__pligin_follow
+  );
+
+  const cursor = useEditorState(instance, (state) =>
+    state.cursors.find((c) => c.id === cursorId)
+  );
+
+  const stop = React.useCallback(
+    (e: React.SyntheticEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      instance.unfollow();
+    },
+    [instance]
+  );
+
+  if (!isFollowing || !cursor) return null;
+
+  return (
+    <div
+      className="absolute inset-1.5 rounded-2xl z-50 pointer-events-auto border-2 overflow-hidden"
+      style={{ borderColor: cursor.palette["500"] }}
+      onPointerDown={stop}
+      onWheel={stop}
+    >
+      <div
+        className="absolute top-0 right-0 px-3 py-1 rounded-bl-2xl text-xs"
+        style={{
+          background: cursor.palette["500"],
+          color: cursor.palette["100"],
+        }}
+      >
+        <button onClick={stop}>Stop following</button>
+      </div>
+    </div>
+  );
+}
+
+function RemoteCursorOverlay() {
+  const cursors = useMultiplayerCursorState();
+  const { transform } = useTransformState();
+
+  if (!cursors.length) return null;
+  return (
+    <>
+      {cursors.map((c) => {
+        const pos = cmath.vector2.transform(c.position, transform);
+        return (
+          <React.Fragment key={c.id}>
+            <PointerCursor
+              key={c.id}
+              local={false}
+              x={pos[0]}
+              y={pos[1]}
+              color={{ hue: c.palette["100"], fill: c.palette["400"] }}
+            />
+            {c.marquee && (
+              <MarqueeArea
+                a={cmath.vector2.transform(c.marquee.a, transform)}
+                b={cmath.vector2.transform(c.marquee.b, transform)}
+                color={{
+                  hue: c.palette["500"],
+                  fill: `color-mix(in oklch, ${c.palette["400"]} 10%, transparent)`,
+                }}
+              />
+            )}
+            {c.selection?.map((node_id) => (
+              <NodeOverlay
+                key={node_id}
+                node_id={node_id}
+                readonly
+                borderWidth={2}
+                borderColor={c.palette["400"]}
+              />
+            ))}
+          </React.Fragment>
+        );
+      })}
+    </>
   );
 }
 
@@ -806,11 +897,15 @@ function NodeOverlay({
   readonly,
   zIndex,
   focused,
+  borderColor,
+  borderWidth,
 }: {
   node_id: string;
   readonly?: boolean;
   zIndex?: number;
   focused?: boolean;
+  borderColor?: string;
+  borderWidth?: number;
 }) {
   const { scaleX, scaleY } = useTransformState();
 
@@ -842,6 +937,8 @@ function NodeOverlay({
         transform={style}
         zIndex={zIndex}
         isComponentConsumer={is_component_consumer}
+        borderColor={borderColor}
+        borderWidth={borderWidth}
       >
         {focused && !readonly && (
           <>
