@@ -151,3 +151,97 @@ pub mod viewport {
     }
 }
 
+pub mod axis {
+    use std::collections::HashSet;
+    use crate::align;
+    use crate::vector2::Vector2;
+
+    /// A 2D point that may ignore one axis when snapping.
+    pub type AxisAlignedPoint = (Option<f32>, Option<f32>);
+
+    /// Result of 1D snapping with indices of matched agents and anchors.
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Snap1DResult {
+        pub distance: f32,
+        pub hit_agent_indices: Vec<usize>,
+        pub hit_anchor_indices: Vec<usize>,
+    }
+
+    /// Snap scalar agents to anchors within `threshold` allowing small tolerance.
+    pub fn snap1d(agents: &[f32], anchors: &[f32], threshold: f32, tolerance: f32) -> Snap1DResult {
+        if anchors.is_empty() {
+            return Snap1DResult { distance: f32::INFINITY, hit_agent_indices: vec![], hit_anchor_indices: vec![] };
+        }
+        assert!(threshold >= 0.0 && tolerance >= 0.0);
+        let mut min_delta = f32::INFINITY;
+        let mut signed_delta = 0.0;
+        let mut hit_agents = Vec::new();
+        let mut hit_anchors: HashSet<usize> = HashSet::new();
+        for (i, &a) in agents.iter().enumerate() {
+            let (_snap, delta, idxs) = align::scalar(a, anchors, threshold);
+            let signed = _snap - a;
+            if delta.abs() <= threshold {
+                if min_delta.is_infinite() || (signed - signed_delta).abs() <= tolerance {
+                    hit_agents.push(i);
+                    for idx in idxs { hit_anchors.insert(idx); }
+                    if delta.abs() < min_delta.abs() {
+                        min_delta = delta;
+                        signed_delta = signed;
+                    }
+                }
+            }
+        }
+        if min_delta.is_infinite() {
+            Snap1DResult { distance: f32::INFINITY, hit_agent_indices: vec![], hit_anchor_indices: vec![] }
+        } else {
+            Snap1DResult { distance: signed_delta, hit_agent_indices: hit_agents, hit_anchor_indices: hit_anchors.into_iter().collect() }
+        }
+    }
+
+    /// Configuration for per-axis snapping thresholds.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Snap2DAxisConfig {
+        pub x: Option<f32>,
+        pub y: Option<f32>,
+    }
+
+    /// Result from snapping on each axis independently.
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Snap2DAxisAlignedResult {
+        pub x: Option<Snap1DResult>,
+        pub y: Option<Snap1DResult>,
+    }
+
+    /// Snaps 2D points to anchors independently on each axis.
+    pub fn snap2d_axis_aligned(agents: &[Vector2], anchors: &[AxisAlignedPoint], config: Snap2DAxisConfig, tolerance: f32) -> Snap2DAxisAlignedResult {
+        if anchors.is_empty() {
+            return Snap2DAxisAlignedResult { x: None, y: None };
+        }
+        assert!(!agents.is_empty(), "agents required");
+
+        let x_agents: Vec<f32> = agents.iter().map(|v| v[0]).collect();
+        let y_agents: Vec<f32> = agents.iter().map(|v| v[1]).collect();
+        let x_anchors: Vec<f32> = anchors.iter().filter_map(|(x, _)| *x).collect();
+        let y_anchors: Vec<f32> = anchors.iter().filter_map(|(_, y)| *y).collect();
+
+        let x = config.x.and_then(|t| Some(snap1d(&x_agents, &x_anchors, t, tolerance)));
+        let y = config.y.and_then(|t| Some(snap1d(&y_agents, &y_anchors, t, tolerance)));
+        Snap2DAxisAlignedResult { x, y }
+    }
+
+    /// Movement vector that can ignore an axis using `None`.
+    pub type Movement = (Option<f32>, Option<f32>);
+
+    /// Normalizes movement treating `None` as zero.
+    pub fn normalize(m: Movement) -> Vector2 {
+        [m.0.unwrap_or(0.0), m.1.unwrap_or(0.0)]
+    }
+
+    /// Locks movement to the dominant axis returning `None` for the other.
+    pub fn axis_locked_by_dominance(m: Movement) -> Movement {
+        let abs_x = m.0.unwrap_or(0.0).abs();
+        let abs_y = m.1.unwrap_or(0.0).abs();
+        if abs_x > abs_y { (m.0, None) } else { (None, m.1) }
+    }
+}
+

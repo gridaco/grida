@@ -21,12 +21,13 @@ pub use range::{Range, UniformGapGroup, mean as range_mean, from_rectangle, leng
 pub use vector4::{Vector4, identical as vector4_identical};
 pub use delta::transform as delta_transform;
 pub use compass::{invert_direction, to_rectangle_side};
-pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle};
+pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle, Bitmap, tile as raster_tile, scale as raster_scale, resize as raster_resize, pad as raster_pad, circle as raster_circle, ellipse as raster_ellipse, floodfill as raster_floodfill, gaussian as raster_gaussian, smoothstep as raster_smoothstep, pascaltriangle as raster_pascaltriangle};
 pub use align::{scalar as align_scalar, vector2 as align_vector2};
 pub use bezier::{CubicBezier, CubicBezierWithTangents, get_bbox as bezier_get_bbox, a2c as bezier_a2c};
 pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
 pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
 pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins as ViewportMargins};
+pub use snap::axis::{AxisAlignedPoint, Snap1DResult, Snap2DAxisConfig, Snap2DAxisAlignedResult, snap1d, snap2d_axis_aligned, Movement, normalize as movement_normalize, axis_locked_by_dominance};
 pub use packing::{fit as packing_fit, ext::walk_to_fit as packing_walk_to_fit};
 pub use layout::flex::{guess as layout_flex_guess, AxisDirection as FlexAxisDirection, MainAxisAlignment as FlexMainAxisAlignment, CrossAxisAlignment as FlexCrossAxisAlignment, Guessed as FlexGuessed};
 pub use measurement::{measure, guide_line_xylr, auxiliary_line_xylr, Measurement};
