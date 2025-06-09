@@ -1,6 +1,7 @@
 use cg::camera::Camera2D;
 use cg::draw::{Backend, Renderer};
 use cg::io::parse;
+use cg::scheduler::FrameScheduler;
 use cg::schema::*;
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
@@ -283,6 +284,7 @@ struct App {
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
+    scheduler: FrameScheduler,
 }
 
 impl ApplicationHandler for App {
@@ -415,6 +417,9 @@ impl App {
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
+
+        // Apply frame pacing
+        self.scheduler.sleep_to_maintain_fps();
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -529,6 +534,7 @@ where
         window,
         image_rx: rx,
         font_rx,
+        scheduler: FrameScheduler::new(120).with_max_fps(144),
     };
 
     println!("🎭 Starting event loop...");
