@@ -3,6 +3,7 @@ pub mod cvt;
 pub mod draw;
 pub mod factory;
 pub mod font_loader;
+pub mod geometry_cache;
 pub mod image;
 pub mod image_loader;
 pub mod io;
