@@ -22,3 +22,4 @@ pub use align::{scalar as align_scalar, vector2 as align_vector2};
 pub use bezier::{CubicBezier, CubicBezierWithTangents, get_bbox as bezier_get_bbox, a2c as bezier_a2c};
 pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
 pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
+pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins as ViewportMargins};

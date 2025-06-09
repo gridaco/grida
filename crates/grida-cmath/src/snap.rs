@@ -80,3 +80,74 @@ pub mod spacing {
         }
     }
 }
+pub mod viewport {
+    use crate::{rect::Rectangle, transform::AffineTransform};
+
+    /// Margin values for top, right, bottom and left.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Margins {
+        pub top: f32,
+        pub right: f32,
+        pub bottom: f32,
+        pub left: f32,
+    }
+
+    impl From<f32> for Margins {
+        fn from(all: f32) -> Self {
+            Self { top: all, right: all, bottom: all, left: all }
+        }
+    }
+
+    impl From<[f32; 4]> for Margins {
+        fn from(arr: [f32; 4]) -> Self {
+            Self { top: arr[0], right: arr[1], bottom: arr[2], left: arr[3] }
+        }
+    }
+
+    /// Returns an affine transform that fits `target` inside `viewport` with optional margin.
+    ///
+    /// The smaller scale between width and height is used so the entire target
+    /// remains visible within the viewport.
+    ///
+    /// # Parameters
+    /// - `viewport`: The viewport rectangle.
+    /// - `target`:   The bounding box of the contents.
+    /// - `margin`:   Either a uniform margin or per-side margins `[top, right, bottom, left]`.
+    ///
+    /// # Example
+    /// ```
+    /// # use grida_cmath::{Rectangle, viewport_transform_to_fit};
+    /// let viewport = Rectangle { x: 0.0, y: 0.0, width: 800.0, height: 600.0 };
+    /// let target = Rectangle { x: 100.0, y: 50.0, width: 400.0, height: 400.0 };
+    /// let t = viewport_transform_to_fit(viewport, target, [50.0, 20.0, 50.0, 20.0]);
+    /// assert!((t.matrix[0][0] - 1.25).abs() < 0.01);
+    /// ```
+    pub fn transform_to_fit(
+        viewport: Rectangle,
+        target: Rectangle,
+        margin: impl Into<Margins>,
+    ) -> AffineTransform {
+        let m: Margins = margin.into();
+
+        let v_w = viewport.width - m.left - m.right;
+        let v_h = viewport.height - m.top - m.bottom;
+
+        if v_w <= 0.0 || v_h <= 0.0 || target.width == 0.0 || target.height == 0.0 {
+            return AffineTransform { matrix: [[1.0, 0.0, viewport.x], [0.0, 1.0, viewport.y]] };
+        }
+
+        let scale = f32::min(v_w / target.width, v_h / target.height);
+
+        let vx = viewport.x + m.left + v_w / 2.0;
+        let vy = viewport.y + m.top + v_h / 2.0;
+
+        let tx = target.x + target.width / 2.0;
+        let ty = target.y + target.height / 2.0;
+
+        let translate_x = vx - tx * scale;
+        let translate_y = vy - ty * scale;
+
+        AffineTransform { matrix: [[scale, 0.0, translate_x], [0.0, scale, translate_y]] }
+    }
+}
+
