@@ -14,7 +14,7 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
-use grida_cmath::transform::AffineTransform;
+use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{Surface, gpu};

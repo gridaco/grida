@@ -1,7 +1,0 @@
-[package]
-name = "grida-cmath"
-version = "0.0.0"
-edition = "2024"
-
-[lib]
-crate-type = ["cdylib", "rlib"]

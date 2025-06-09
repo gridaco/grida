@@ -187,6 +187,9 @@ cargo test
 
 # for crates specific build
 cargo build
+
+# format crates
+cargo fmt --all
 ```
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.

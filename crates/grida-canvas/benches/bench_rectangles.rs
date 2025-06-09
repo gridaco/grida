@@ -2,7 +2,7 @@ use cg::draw::{Backend, Renderer};
 use cg::repository::NodeRepository;
 use cg::schema::*;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use grida_cmath::transform::AffineTransform;
+use math2::transform::AffineTransform;
 
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     let mut repository = NodeRepository::new();
