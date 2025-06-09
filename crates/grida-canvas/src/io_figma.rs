@@ -724,13 +724,14 @@ impl FigmaConverter {
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
-
+        // canvas.background_color
         Ok(Scene {
             id: canvas.id.clone(),
             name: canvas.name.clone(),
             transform: AffineTransform::identity(),
             children,
             nodes: self.repository.clone(),
+            background_color: Some(Color::from(&canvas.background_color)),
         })
     }
 

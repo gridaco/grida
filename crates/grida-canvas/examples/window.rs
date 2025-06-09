@@ -562,6 +562,7 @@ pub async fn load_scene_from_file(file_path: &str) -> Scene {
         name: scene.name.clone(),
         transform: AffineTransform::identity(),
         children: scene.children.clone(),
+        background_color: Some(Color(230, 230, 230, 255)),
     }
 }
 

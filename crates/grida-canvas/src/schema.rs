@@ -416,6 +416,7 @@ pub struct Scene {
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
+    pub background_color: Option<Color>,
 }
 
 // endregion

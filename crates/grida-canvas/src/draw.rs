@@ -1438,6 +1438,16 @@ impl Renderer {
             let canvas = surface.canvas();
             canvas.save();
 
+            // Paint background color first if present
+            if let Some(bg_color) = scene.background_color {
+                let Color(r, g, b, a) = bg_color;
+                let color = skia_safe::Color::from_argb(a, r, g, b);
+                let mut paint = SkPaint::default();
+                paint.set_color(color);
+                // Paint the entire canvas with the background color
+                canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+            }
+
             // Scale to logical size
             let scale_x = self.logical_width / width;
             let scale_y = self.logical_height / height;
