@@ -15,7 +15,16 @@ pub mod layout;
 pub mod measurement;
 pub mod ui;
 
-pub use rect::{Rectangle, Rect9Points, RectangleSide, CardinalDirection, from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects, intersection, union};
+pub use rect::{
+    Rectangle, Rect9Points, RectangleSide, CardinalDirection, Sides, AlignKind, Alignment,
+    from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects,
+    intersection, union, quantize as rect_quantize, positive as rect_positive, aspect_ratio,
+    get_scale_factors, get_relative_transform, transform as rect_transform, rotate as rect_rotate,
+    get_cardinal_point, get_center, axis_projection_intersection, is_identical as rect_identical,
+    is_uniform as rect_uniform, pad as rect_pad, inset as rect_inset, align as rect_align,
+    align_a as rect_align_a, get_gaps as rect_get_gaps, get_uniform_gap as rect_get_uniform_gap,
+    distribute_evenly as rect_distribute_evenly
+};
 pub use rect::boolean::subtract as rect_boolean_subtract;
 pub use range::{Range, UniformGapGroup, mean as range_mean, from_rectangle, length as range_length, to_3points_chunk, group_ranges_by_uniform_gap};
 pub use vector4::{Vector4, identical as vector4_identical};
