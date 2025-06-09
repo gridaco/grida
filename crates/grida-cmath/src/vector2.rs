@@ -60,22 +60,32 @@ pub fn sub(vectors: &[Vector2]) -> Vector2 {
     result
 }
 
+/// Trait converting common scalar/tuple types into [`Vector2`].
+pub trait IntoVector2 {
+    /// Converts the value into a `Vector2`.
+    fn into_vector2(self) -> Vector2;
+}
+
+impl IntoVector2 for Vector2 {
+    fn into_vector2(self) -> Vector2 { self }
+}
+
+impl IntoVector2 for [f32; 2] {
+    fn into_vector2(self) -> Vector2 { self }
+}
+
+impl IntoVector2 for (f32, f32) {
+    fn into_vector2(self) -> Vector2 { [self.0, self.1] }
+}
+
+impl IntoVector2 for f32 {
+    fn into_vector2(self) -> Vector2 { [self, self] }
+}
+
 /// Quantizes a vector using the provided step or per-axis steps.
-pub fn quantize(vector: Vector2, step: impl Into<Vector2>) -> Vector2 {
-    let step = step.into();
+pub fn quantize(vector: Vector2, step: impl IntoVector2) -> Vector2 {
+    let step = step.into_vector2();
     [crate::quantize(vector[0], step[0]), crate::quantize(vector[1], step[1])]
-}
-
-impl From<f32> for Vector2 {
-    fn from(v: f32) -> Self {
-        [v, v]
-    }
-}
-
-impl From<(f32, f32)> for Vector2 {
-    fn from(v: (f32, f32)) -> Self {
-        [v.0, v.1]
-    }
 }
 
 /// Multiplies vectors component-wise.
