@@ -196,7 +196,17 @@ const nextConfig: NextConfig = {
       // #endregion
     },
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // #region canvaskit-wasm (canvaskit-wasm `requires` fs and path)
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+    // #endregion
+
     // #region handlebars https://github.com/handlebars-lang/handlebars.js/issues/1174#issuecomment-229918935
     config.resolve.alias.handlebars = "handlebars/dist/handlebars.min.js";
     // #endregion

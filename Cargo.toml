@@ -1,0 +1,5 @@
+[workspace]
+members = [
+  "crates/grida-canvas",
+  "crates/grida-cmath",
+]
