@@ -1,4 +1,4 @@
-use grida_cmath::{
+use math2::{
     RGBA8888, RGBAf, hex_to_rgba8888, rgba_to_unit8_chunk, rgba8888_to_hex, rgbaf_to_rgba8888,
 };
 

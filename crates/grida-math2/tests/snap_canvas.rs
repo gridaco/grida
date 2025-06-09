@@ -1,4 +1,4 @@
-use grida_cmath::{Rectangle, Snap2DAxisConfig, SnapGuide, snap_to_canvas_geometry};
+use math2::{Rectangle, Snap2DAxisConfig, SnapGuide, snap_to_canvas_geometry};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {
@@ -14,7 +14,7 @@ fn snap_to_canvas_by_guide() {
     let agent = rect(5.0, 5.0, 10.0, 10.0);
     let anchors = [] as [Rectangle; 0];
     let guides = [SnapGuide {
-        axis: grida_cmath::vector2::Axis::X,
+        axis: math2::vector2::Axis::X,
         offset: 20.0,
     }];
     let res = snap_to_canvas_geometry(

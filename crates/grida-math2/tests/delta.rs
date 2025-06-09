@@ -1,5 +1,5 @@
-use grida_cmath::vector2::Axis;
-use grida_cmath::{delta_transform, transform::AffineTransform};
+use math2::vector2::Axis;
+use math2::{delta_transform, transform::AffineTransform};
 
 #[test]
 fn identity() {

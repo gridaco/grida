@@ -1,4 +1,4 @@
-use grida_cmath::{align_scalar, align_vector2};
+use math2::{align_scalar, align_vector2};
 
 #[test]
 fn scalar_snaps_to_nearest_within_threshold() {

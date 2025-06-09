@@ -1,4 +1,4 @@
-use grida_cmath::{FlexAxisDirection, Rectangle, layout_flex_guess};
+use math2::{FlexAxisDirection, Rectangle, layout_flex_guess};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

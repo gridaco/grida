@@ -344,7 +344,7 @@ dependencies = [
  "gl",
  "glutin",
  "glutin-winit",
- "grida-cmath",
+ "math2",
  "raw-window-handle",
  "reqwest",
  "serde",
@@ -1011,10 +1011,6 @@ name = "grida"
 version = "0.0.0"
 
 [[package]]
-name = "grida-cmath"
-version = "0.1.0"
-
-[[package]]
 name = "h2"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1511,6 +1507,10 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+
+[[package]]
+name = "math2"
+version = "0.0.1"
 
 [[package]]
 name = "memchr"

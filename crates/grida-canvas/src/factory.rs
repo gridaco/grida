@@ -1,5 +1,5 @@
 use crate::schema::*;
-use grida_cmath::transform::AffineTransform;
+use math2::transform::AffineTransform;
 use uuid::Uuid;
 
 /// Factory for creating nodes with default values

@@ -157,7 +157,7 @@ pub mod viewport {
     ///
     /// # Example
     /// ```
-    /// # use grida_cmath::{Rectangle, viewport_transform_to_fit};
+    /// # use math2::{Rectangle, viewport_transform_to_fit};
     /// let viewport = Rectangle { x: 0.0, y: 0.0, width: 800.0, height: 600.0 };
     /// let target = Rectangle { x: 100.0, y: 50.0, width: 400.0, height: 400.0 };
     /// let t = viewport_transform_to_fit(viewport, target, [50.0, 20.0, 50.0, 20.0]);

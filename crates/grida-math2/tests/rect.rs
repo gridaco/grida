@@ -1,5 +1,5 @@
-use grida_cmath::vector2::{self, Axis};
-use grida_cmath::{
+use math2::vector2::{self, Axis};
+use math2::{
     AlignKind, Alignment, CardinalDirection, Rectangle, axis_projection_intersection, contains,
     from_points, get_cardinal_point, get_relative_transform, intersection, offset,
     rect_align as align, rect_inset as inset, rect_pad as pad, rect_rotate, to_9points_chunk,

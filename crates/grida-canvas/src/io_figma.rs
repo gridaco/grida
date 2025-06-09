@@ -21,8 +21,8 @@ use figma_api::models::{
     RegularPolygonNode as FigmaRegularPolygonNode, Rgba, SectionNode, SliceNode, StarNode,
     SubcanvasNode as FigmaSubcanvasNode, TextNode, VectorNode,
 };
-use grida_cmath::box_fit::BoxFit;
-use grida_cmath::transform::AffineTransform;
+use math2::box_fit::BoxFit;
+use math2::transform::AffineTransform;
 
 const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
     color: Color(0, 0, 0, 0),

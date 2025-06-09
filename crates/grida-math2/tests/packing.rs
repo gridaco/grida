@@ -1,4 +1,4 @@
-use grida_cmath::{Rectangle, packing_fit};
+use math2::{Rectangle, packing_fit};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

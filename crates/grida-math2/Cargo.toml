@@ -1,7 +1,7 @@
 
 [package]
-name = "grida-cmath"
-version = "0.1.0"
+name = "math2"
+version = "0.0.1"
 edition = "2024"
 description = "Unopinionated canvas math utilities"
 license = "Apache-2.0"

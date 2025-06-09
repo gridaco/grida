@@ -1,7 +1,7 @@
 use cg::factory::NodeFactory;
 use cg::repository::NodeRepository;
 use cg::schema::*;
-use grida_cmath::{box_fit::BoxFit, transform::AffineTransform};
+use math2::{box_fit::BoxFit, transform::AffineTransform};
 
 mod window;
 

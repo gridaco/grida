@@ -1,4 +1,4 @@
-use grida_cmath::{
+use math2::{
     format_number, normalize_line,
     transform::AffineTransform,
     transform_line, transform_point,

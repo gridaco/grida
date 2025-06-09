@@ -1,4 +1,4 @@
-use grida_cmath::{Rectangle, RectangleSide, auxiliary_line_xylr, guide_line_xylr, measure};
+use math2::{Rectangle, RectangleSide, auxiliary_line_xylr, guide_line_xylr, measure};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

@@ -15,7 +15,7 @@ use super::vector2::{Vector2, distance};
 ///
 /// # Example
 /// ```
-/// let (value, dist, idx) = grida_cmath::align_scalar(22.0, &[10.0,20.0,20.0,40.0], 5.0);
+/// let (value, dist, idx) = math2::align_scalar(22.0, &[10.0,20.0,20.0,40.0], 5.0);
 /// assert_eq!(value, 20.0);
 /// assert_eq!(dist, 2.0);
 /// assert_eq!(idx, vec![1,2]);
@@ -63,7 +63,7 @@ pub fn scalar(point: f32, targets: &[f32], threshold: f32) -> (f32, f32, Vec<usi
 ///
 /// # Example
 /// ```
-/// let (val, dist, idx) = grida_cmath::align_vector2([6.0,6.0], &[[0.0,0.0],[5.0,5.0],[5.0,5.0],[10.0,10.0]], 3.0);
+/// let (val, dist, idx) = math2::align_vector2([6.0,6.0], &[[0.0,0.0],[5.0,5.0],[5.0,5.0],[10.0,10.0]], 3.0);
 /// assert_eq!(val, [5.0,5.0]);
 /// assert_eq!(idx, vec![1,2]);
 /// ```

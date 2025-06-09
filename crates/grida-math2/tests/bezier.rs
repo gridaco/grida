@@ -1,4 +1,4 @@
-use grida_cmath::bezier_a2c;
+use math2::bezier_a2c;
 
 /// Converts the output of `bezier_a2c` to an SVG path string.
 fn a2c_to_svg_path(x1: f32, y1: f32, data: &[f32]) -> String {

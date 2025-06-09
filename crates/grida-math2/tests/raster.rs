@@ -1,4 +1,4 @@
-use grida_cmath::{Rectangle, raster_bresenham, raster_rectangle};
+use math2::{Rectangle, raster_bresenham, raster_rectangle};
 
 #[test]
 fn bresenham_single_point() {

@@ -39,7 +39,7 @@ pub struct RGBA8888 {
 ///
 /// # Examples
 /// ```
-/// use grida_cmath::hex_to_rgba8888;
+/// use math2::hex_to_rgba8888;
 /// let c = hex_to_rgba8888("#F80");
 /// assert_eq!(c.r, 255);
 /// assert_eq!(c.g, 136);
@@ -92,7 +92,7 @@ pub fn rgba_to_unit8_chunk(rgba: RGBA8888) -> Vector4 {
 ///
 /// # Example
 /// ```
-/// use grida_cmath::{rgbaf_to_rgba8888, RGBAf};
+/// use math2::{rgbaf_to_rgba8888, RGBAf};
 /// let c = rgbaf_to_rgba8888(RGBAf { r: 1.0, g: 0.5, b: 0.0, a: 0.75 });
 /// assert_eq!(c.r, 255);
 /// assert_eq!(c.g, 128);
@@ -120,7 +120,7 @@ pub fn rgbaf_multiply_alpha(color: TRGBA, alpha: f32) -> TRGBA {
 ///
 /// # Example
 /// ```
-/// use grida_cmath::{rgba8888_to_hex, RGBA8888};
+/// use math2::{rgba8888_to_hex, RGBA8888};
 /// let hex = rgba8888_to_hex(RGBA8888 { r: 255, g: 255, b: 255, a: 1.0 });
 /// assert_eq!(hex, "#ffffffff");
 /// ```

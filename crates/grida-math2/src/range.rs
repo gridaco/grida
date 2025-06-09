@@ -48,7 +48,7 @@ pub struct UniformGapGroup {
 ///
 /// # Example
 /// ```rust
-/// use grida_cmath::group_ranges_by_uniform_gap;
+/// use math2::group_ranges_by_uniform_gap;
 /// let ranges = vec![[0.0,10.0],[15.0,25.0],[30.0,40.0]];
 /// let groups = group_ranges_by_uniform_gap(&ranges, None, 0.0);
 /// assert!(!groups.is_empty());

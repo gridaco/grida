@@ -1,4 +1,4 @@
-use grida_cmath::{Rectangle, rect_boolean_subtract};
+use math2::{Rectangle, rect_boolean_subtract};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

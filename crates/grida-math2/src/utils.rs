@@ -7,7 +7,7 @@
 ///
 /// # Example
 /// ```rust
-/// use grida_cmath::quantize;
+/// use math2::quantize;
 /// assert_eq!(quantize(15.0, 10.0), 20.0);
 /// ```
 pub fn quantize(value: f32, step: f32) -> f32 {

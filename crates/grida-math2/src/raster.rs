@@ -7,7 +7,7 @@ use super::{rect::Rectangle, vector2::Vector2};
 ///
 /// # Example
 /// ```rust
-/// # use grida_cmath::fract;
+/// # use math2::fract;
 /// let frac = fract(3.14);
 /// assert!((frac - 0.14).abs() < 1e-2);
 /// ```
@@ -33,7 +33,7 @@ pub fn fract(x: f32) -> f32 {
 ///
 /// # Example
 /// ```rust
-/// # use grida_cmath::noise;
+/// # use math2::noise;
 /// let v = noise(12.34, 56.78);
 /// assert!(v >= 0.0 && v <= 1.0);
 /// ```
@@ -50,7 +50,7 @@ pub fn noise(x: f32, y: f32) -> f32 {
 ///
 /// # Example
 /// ```rust
-/// # use grida_cmath::raster_bresenham;
+/// # use math2::raster_bresenham;
 /// let pts = raster_bresenham([10.0, 10.0], [15.0, 20.0]);
 /// assert_eq!(pts.first(), Some(&[10.0, 10.0]));
 /// ```
@@ -92,7 +92,7 @@ pub fn bresenham(a: Vector2, b: Vector2) -> Vec<Vector2> {
 ///
 /// # Example
 /// ```rust
-/// # use grida_cmath::{Rectangle, raster_rectangle};
+/// # use math2::{Rectangle, raster_rectangle};
 /// let rect = Rectangle { x: 40.0, y: 35.0, width: 20.0, height: 30.0 };
 /// let points = raster_rectangle(&rect);
 /// assert!(points.contains(&[40.0, 35.0]));

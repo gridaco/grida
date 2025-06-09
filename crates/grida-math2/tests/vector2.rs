@@ -1,4 +1,4 @@
-use grida_cmath::vector2::{Vector2, add, angle, intersection, intersects, multiply, rotate, sub};
+use math2::vector2::{Vector2, add, angle, intersection, intersects, multiply, rotate, sub};
 
 #[test]
 fn add_multiple() {
