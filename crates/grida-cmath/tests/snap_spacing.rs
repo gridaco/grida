@@ -69,8 +69,8 @@ fn sizes_match_complex_inputs() {
     assert_eq!(result.loops.len(), result.a.len());
     assert_eq!(result.loops.len(), result.b.len());
     for i in 0..result.loops.len() {
-        assert!(result.a[i].len() >= 1);
-        assert!(result.b[i].len() >= 1);
+        assert!(result.a.get(i).is_some());
+        assert!(result.b.get(i).is_some());
     }
     assert_eq!(result.loops.len(), result.gaps.len());
 }

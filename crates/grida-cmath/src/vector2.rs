@@ -66,10 +66,6 @@ pub trait IntoVector2 {
     fn into_vector2(self) -> Vector2;
 }
 
-impl IntoVector2 for Vector2 {
-    fn into_vector2(self) -> Vector2 { self }
-}
-
 impl IntoVector2 for [f32; 2] {
     fn into_vector2(self) -> Vector2 { self }
 }
