@@ -11,6 +11,8 @@ pub mod align;
 pub mod utils;
 pub mod snap;
 pub mod packing;
+pub mod layout;
+pub mod measurement;
 
 pub use rect::{Rectangle, Rect9Points, RectangleSide, CardinalDirection, from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects, intersection, union};
 pub use rect::boolean::subtract as rect_boolean_subtract;
@@ -25,3 +27,5 @@ pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uni
 pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
 pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins as ViewportMargins};
 pub use packing::{fit as packing_fit, ext::walk_to_fit as packing_walk_to_fit};
+pub use layout::flex::{guess as layout_flex_guess, AxisDirection as FlexAxisDirection, MainAxisAlignment as FlexMainAxisAlignment, CrossAxisAlignment as FlexCrossAxisAlignment, Guessed as FlexGuessed};
+pub use measurement::{measure, guide_line_xylr, auxiliary_line_xylr, Measurement};

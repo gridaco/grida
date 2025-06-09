@@ -281,3 +281,113 @@ pub mod boolean {
         result
     }
 }
+
+/// Calculates the gaps between adjacent rectangles along an axis.
+///
+/// The rectangles are first sorted by their starting position on the
+/// given axis. The returned vector contains the spacing between the end
+/// of each rectangle and the start of the next one.
+pub fn get_gaps(rectangles: &[Rectangle], axis: super::vector2::Axis) -> Vec<f32> {
+    if rectangles.len() < 2 {
+        return Vec::new();
+    }
+
+    let mut sorted: Vec<&Rectangle> = rectangles.iter().collect();
+    sorted.sort_by(|a, b| {
+        if axis == super::vector2::Axis::X {
+            a.x.partial_cmp(&b.x).unwrap()
+        } else {
+            a.y.partial_cmp(&b.y).unwrap()
+        }
+    });
+
+    let mut gaps = Vec::new();
+    for i in 0..sorted.len() - 1 {
+        let end = if axis == super::vector2::Axis::X {
+            sorted[i].x + sorted[i].width
+        } else {
+            sorted[i].y + sorted[i].height
+        };
+        let next_start = if axis == super::vector2::Axis::X {
+            sorted[i + 1].x
+        } else {
+            sorted[i + 1].y
+        };
+        gaps.push(next_start - end);
+    }
+    gaps
+}
+
+/// Calculates the uniform gap between rectangles if present.
+/// Returns `(Some(gap), gaps)` if all gaps are equal within `tolerance`.
+pub fn get_uniform_gap(
+    rectangles: &[Rectangle],
+    axis: super::vector2::Axis,
+    tolerance: f32,
+) -> (Option<f32>, Vec<f32>) {
+    let gaps = get_gaps(rectangles, axis);
+    if gaps.is_empty() {
+        return (None, gaps);
+    }
+
+    if crate::utils::is_uniform(&gaps, tolerance) {
+        let mut best_val = gaps[0];
+        let mut best_count = 0;
+        for &g in &gaps {
+            let count = gaps.iter().filter(|&&x| x == g).count();
+            if count > best_count {
+                best_count = count;
+                best_val = g;
+            }
+        }
+        let most = best_val;
+        (Some(most), gaps)
+    } else {
+        (None, gaps)
+    }
+}
+
+/// Repositions rectangles so they are evenly distributed along the axis while
+/// preserving the original ordering.
+pub fn distribute_evenly(rectangles: &[Rectangle], axis: super::vector2::Axis) -> Vec<Rectangle> {
+    if rectangles.len() < 2 {
+        return rectangles.to_vec();
+    }
+
+    let bbox = union(rectangles);
+    let start = if axis == super::vector2::Axis::X { bbox.x } else { bbox.y };
+    let total_size = if axis == super::vector2::Axis::X { bbox.width } else { bbox.height };
+    let total_rect_size: f32 = rectangles
+        .iter()
+        .map(|r| if axis == super::vector2::Axis::X { r.width } else { r.height })
+        .sum();
+
+    let gap_size = (total_size - total_rect_size) / (rectangles.len() as f32 - 1.0);
+
+    let mut sorted_indices: Vec<usize> = (0..rectangles.len()).collect();
+    sorted_indices.sort_by(|&a, &b| {
+        if axis == super::vector2::Axis::X {
+            rectangles[a].x.partial_cmp(&rectangles[b].x).unwrap()
+        } else {
+            rectangles[a].y.partial_cmp(&rectangles[b].y).unwrap()
+        }
+    });
+
+    let mut current = start;
+    let mut distributed = vec![Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }; rectangles.len()];
+    for idx in sorted_indices {
+        let r = rectangles[idx];
+        let mut new_r = r;
+        if axis == super::vector2::Axis::X {
+            new_r.x = current;
+            current += r.width + gap_size;
+        } else {
+            new_r.y = current;
+            current += r.height + gap_size;
+        }
+        distributed[idx] = new_r;
+    }
+
+    distributed
+}
+
