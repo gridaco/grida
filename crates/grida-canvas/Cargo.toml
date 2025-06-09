@@ -35,11 +35,6 @@ clap = { version = "4.5.39", features = ["derive"] }
 default = ["wasm-bindgen", "console_error_panic_hook"]
 wasm = ["wasm-bindgen", "console_error_panic_hook"]
 
-[target.wasm32-unknown-emscripten]
-rustflags = [
-  "-s ERROR_ON_UNDEFINED_SYMBOLS=0"
-]
-
 [dev-dependencies]
 criterion = "0.5"
 

@@ -82,7 +82,7 @@ pub fn sk_paint_with_stroke(
     opacity: f32,
     size: (f32, f32),
     stroke_width: f32,
-    stroke_align: StrokeAlign,
+    _stroke_align: StrokeAlign,
     stroke_dash_array: Option<&Vec<f32>>,
 ) -> skia_safe::Paint {
     let mut paint = sk_paint(paint, opacity, size);

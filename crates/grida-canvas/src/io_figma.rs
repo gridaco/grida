@@ -34,11 +34,6 @@ const BLACK: Paint = Paint::Solid(SolidPaint {
     opacity: 1.0,
 });
 
-const RED: Paint = Paint::Solid(SolidPaint {
-    color: Color(255, 0, 0, 255),
-    opacity: 1.0,
-});
-
 // Map implementations
 impl From<&Rgba> for Color {
     fn from(color: &Rgba) -> Self {
