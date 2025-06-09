@@ -32,10 +32,11 @@ Currently, we have below features / modules.
 - TypeScript 5 - main language for most apps
 - Python 3.12 - partially used for tasks / jobs, that are independent, e.g. `/library`
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
+- Rust (2024 edition) - used for wasm builds, mostly for graphics core.
 
 **Database**
 
-Grida heavily relies on Supabase.
+Grida heavily relies on Supabase (PostgreSQL).
 
 - Supabase
 
@@ -65,7 +66,7 @@ This directory contains the docs as-is, the deployment of the docs are handled b
 
 Importance: **Very high**
 
-The editor is a monorepo project that contains the codebase for the editor.
+The editor is a monorepo nextjs project that contains the codebase for the editor.
 
 grida.co and \[tenant\].grida.site domains are connected.
 
@@ -128,15 +129,25 @@ Importance: **Low**
 
 Library workers are hosted on railway.com
 
-## `/packages/grida-canvas-*`
+## `/packages/*`
 
 Importance: **High**
+
+monorepo node packages
+
+**`/packages/grida-canvas-*`**
 
 Packages that powers the canvas. (some are published to npm, some are not)
 
 Since our project is in a rapid development, some large modules still lives under the `/editor` directory. Which will progressively move to `/packages` directory, once things are sorted out and fully defined with the good models.
 
 For each individual package, refer to the README of its own.
+
+## `/crates/*`
+
+Importance: **High**
+
+The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
 
 ## Testing & Development
 
