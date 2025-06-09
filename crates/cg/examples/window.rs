@@ -30,10 +30,10 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-pub use cg::image_loader::ImageMessage;
-pub use cg::font_loader::FontMessage;
-use cg::image_loader::{load_scene_images, ImageLoader};
 use cg::font_loader::FontLoader;
+pub use cg::font_loader::FontMessage;
+pub use cg::image_loader::ImageMessage;
+use cg::image_loader::{ImageLoader, load_scene_images};
 
 #[derive(Debug)]
 enum Command {
@@ -121,6 +121,7 @@ fn init_window(
     f64, // scale factor
 ) {
     init_panic_hook();
+    println!("🔄 Window process started with PID: {}", std::process::id());
 
     // Create event loop and window
     let el = EventLoop::new().expect("Failed to create event loop");

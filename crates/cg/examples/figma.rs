@@ -18,12 +18,15 @@ struct Cli {
     api_key: String,
     #[arg(long = "scene-index")]
     scene_index: usize,
+    #[arg(long = "no-image")]
+    no_image: bool,
 }
 
 async fn load_scene_from_url(
     file_key: &str,
     api_key: &str,
     scene_index: usize,
+    no_image: bool,
 ) -> Result<(Scene, FigmaConverter), String> {
     let configuration = Configuration {
         base_path: "https://api.figma.com".to_string(),
@@ -51,12 +54,14 @@ async fn load_scene_from_url(
     .await
     .expect("Failed to load file");
 
-    let images_response = get_image_fills(&configuration, file_key)
-        .await
-        .expect("Failed to load images");
-
-    // image ref -> url
-    let images = images_response.meta.images;
+    let images = if no_image {
+        std::collections::HashMap::new()
+    } else {
+        let images_response = get_image_fills(&configuration, file_key)
+            .await
+            .expect("Failed to load images");
+        images_response.meta.images
+    };
 
     let mut converter = FigmaConverter::new().with_image_urls(images);
 
@@ -76,9 +81,10 @@ async fn load_scene_from_url(
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    let (scene, converter) = load_scene_from_url(&cli.file_key, &cli.api_key, cli.scene_index)
-        .await
-        .expect("Failed to load scene");
+    let (scene, converter) =
+        load_scene_from_url(&cli.file_key, &cli.api_key, cli.scene_index, cli.no_image)
+            .await
+            .expect("Failed to load scene");
 
     println!("Rendering scene: {}", scene.name);
     println!("Scene ID: {}", scene.id);
@@ -113,12 +119,16 @@ async fn main() {
         let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
 
         // Load all images in the scene - non-blocking
-        println!("🔄 Starting to load scene images in background...");
-        let scene_for_images = scene_for_loader.clone();
-        tokio::spawn(async move {
-            load_scene_images(&mut image_loader, &scene_for_images).await;
-            println!("✅ Scene images loading completed in background");
-        });
+        if !cli.no_image {
+            println!("🔄 Starting to load scene images in background...");
+            let scene_for_images = scene_for_loader.clone();
+            tokio::spawn(async move {
+                load_scene_images(&mut image_loader, &scene_for_images).await;
+                println!("✅ Scene images loading completed in background");
+            });
+        } else {
+            println!("⏭️ Skipping image loading as --no-image flag is set");
+        }
 
         // Load all fonts in the scene - non-blocking
         println!("🔄 Starting to load scene fonts in background...");
