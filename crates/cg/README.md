@@ -1,5 +1,12 @@
 # `cg` Grida Rendering Backend
 
+## Build
+
+```bash
+make build
+make build_release
+```
+
 ## Rendering
 
 **2D Nodes**

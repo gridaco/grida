@@ -1,8 +1,14 @@
 use std::collections::HashMap;
+
+#[cfg(not(target_arch = "wasm32"))]
+use reqwest;
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::sync::mpsc;
+#[cfg(not(target_arch = "wasm32"))]
 use winit::event_loop::EventLoopProxy;
 
 /// Represents an image loading mode
+#[cfg(not(target_arch = "wasm32"))]
 pub enum ImageLoadingMode {
     /// Simple mode - direct loading without lifecycle management
     Simple,
@@ -11,6 +17,12 @@ pub enum ImageLoadingMode {
         tx: mpsc::UnboundedSender<ImageMessage>,
         proxy: EventLoopProxy<()>,
     },
+}
+
+#[cfg(target_arch = "wasm32")]
+pub enum ImageLoadingMode {
+    /// Simple mode - direct loading without lifecycle management
+    Simple,
 }
 
 /// Message type for image loading
@@ -40,6 +52,7 @@ impl ImageLoader {
         Self::new(ImageLoadingMode::Simple)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     /// Create a lifecycle-based image loader
     pub fn new_lifecycle(
         tx: mpsc::UnboundedSender<ImageMessage>,
@@ -68,6 +81,7 @@ impl ImageLoader {
         self.cache.insert(src.to_string(), data.clone());
 
         // If in lifecycle mode, send the image data through the channel
+        #[cfg(not(target_arch = "wasm32"))]
         if let ImageLoadingMode::Lifecycle { tx, proxy } = &self.mode {
             let _ = tx.send(ImageMessage {
                 src: src.to_string(),
@@ -81,12 +95,16 @@ impl ImageLoader {
 
     /// Fetch image data from URL or file
     async fn fetch_image_data(&self, path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        #[cfg(not(target_arch = "wasm32"))]
         if path.starts_with("http") {
             let response = reqwest::get(path).await?;
             Ok(response.bytes().await?.to_vec())
         } else {
             Ok(std::fs::read(path)?)
         }
+
+        #[cfg(target_arch = "wasm32")]
+        Err("Image loading not supported in wasm".into())
     }
 
     /// Clear the image cache
@@ -122,4 +140,17 @@ pub async fn load_scene_images(loader: &mut ImageLoader, scene: &crate::schema::
     for url in urls {
         let _ = loader.load_image(&url).await;
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn load_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let response = reqwest::get(path).await?;
+    let bytes = response.bytes().await?;
+    Ok(bytes.to_vec())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn load_image(path: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Stub for wasm
+    Err("Image loading not supported in wasm".into())
 }

@@ -1,3 +1,6 @@
+#[cfg(not(target_arch = "wasm32"))]
+use reqwest;
+
 use serde_json::Value;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -57,6 +60,7 @@ pub struct FontFileInfo {
     pub url: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn load_webfonts_metadata() -> Result<Value, String> {
     let url = "https://raw.githubusercontent.com/gridaco/google.fonts/refs/heads/main/metadata/webfonts.metadata.json";
     let response = reqwest::get(url)
@@ -69,6 +73,12 @@ pub async fn load_webfonts_metadata() -> Result<Value, String> {
         .map_err(|e| format!("Failed to read webfonts metadata response: {}", e))?;
 
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse webfonts metadata: {}", e))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn load_webfonts_metadata() -> Result<Value, String> {
+    // Stub for wasm
+    Err("Webfonts metadata fetching not supported in wasm".into())
 }
 
 pub fn find_font_files(metadata: &Value, discovered_fonts: &[FontInfo]) -> Vec<FontFileInfo> {
@@ -143,4 +153,17 @@ pub fn find_font_files_by_family(metadata: &Value, font_families: &[String]) -> 
     }
 
     font_files
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn fetch_webfont(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let response = reqwest::get(url).await?;
+    let bytes = response.bytes().await?;
+    Ok(bytes.to_vec())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn fetch_webfont(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Stub for wasm
+    Err("Webfont fetching not supported in wasm".into())
 }
