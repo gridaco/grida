@@ -1,7 +1,15 @@
+
 [package]
 name = "grida-cmath"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
+description = "Unopinionated canvas math utilities"
+license = "Apache-2.0"
+repository = "https://github.com/gridaco/grida"
+homepage = "https://grida.co"
+keywords = ["canvas", "math", "geometry"]
+categories = ["graphics", "data-structures"]
+authors = ["Grida"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

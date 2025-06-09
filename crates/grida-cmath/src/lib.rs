@@ -42,6 +42,7 @@ pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uni
 pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
 pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins as ViewportMargins};
 pub use snap::axis::{AxisAlignedPoint, Snap1DResult, Snap2DAxisConfig, Snap2DAxisAlignedResult, snap1d, snap2d_axis_aligned, Movement, normalize as movement_normalize, axis_locked_by_dominance};
+pub use snap::canvas::{snap_to_canvas_geometry, Guide as SnapGuide, SnapToCanvasResult};
 pub use packing::{fit as packing_fit, ext::walk_to_fit as packing_walk_to_fit};
 pub use layout::flex::{guess as layout_flex_guess, AxisDirection as FlexAxisDirection, MainAxisAlignment as FlexMainAxisAlignment, CrossAxisAlignment as FlexCrossAxisAlignment, Guessed as FlexGuessed};
 pub use measurement::{measure, guide_line_xylr, auxiliary_line_xylr, Measurement};

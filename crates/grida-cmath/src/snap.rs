@@ -245,3 +245,168 @@ pub mod axis {
     }
 }
 
+/// Higher level snapping helpers operating on rectangles and guides.
+pub mod canvas {
+    use super::{axis, spacing};
+    use crate::{
+        rect::{self, Rectangle},
+        range::{self, Range},
+        vector2::{self, Vector2, Axis},
+    };
+
+    /// Guide line used for snapping on a single axis.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct Guide {
+        pub axis: Axis,
+        pub offset: f32,
+    }
+
+    /// Result of snapping a rectangle against objects and guides.
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SnapToCanvasResult {
+        pub translated: Rectangle,
+        pub delta: Vector2,
+    }
+
+    fn best_distance(values: &[f32]) -> f32 {
+        values
+            .iter()
+            .fold(f32::INFINITY, |acc, &v| if v.abs() < acc.abs() { v } else { acc })
+    }
+
+    fn snap_to_guides(
+        agent: Rectangle,
+        guides: &[Guide],
+        config: axis::Snap2DAxisConfig,
+        tolerance: f32,
+    ) -> axis::Snap2DAxisAlignedResult {
+        let x_points = range::to_3points_chunk(range::from_rectangle(&agent, Axis::X));
+        let y_points = range::to_3points_chunk(range::from_rectangle(&agent, Axis::Y));
+
+        let mut x_anchors = Vec::new();
+        let mut y_anchors = Vec::new();
+        for g in guides {
+            match g.axis {
+                Axis::X => x_anchors.push(g.offset),
+                Axis::Y => y_anchors.push(g.offset),
+            }
+        }
+
+        let x = config
+            .x
+            .map(|t| axis::snap1d(&x_points, &x_anchors, t, tolerance));
+        let y = config
+            .y
+            .map(|t| axis::snap1d(&y_points, &y_anchors, t, tolerance));
+
+        axis::Snap2DAxisAlignedResult { x, y }
+    }
+
+    fn snap_to_objects_geometry(
+        agent: Rectangle,
+        anchors: &[Rectangle],
+        config: axis::Snap2DAxisConfig,
+        tolerance: f32,
+    ) -> axis::Snap2DAxisAlignedResult {
+        let agent_points = rect::to_9points_chunk(&agent);
+        let anchor_points: Vec<axis::AxisAlignedPoint> = anchors
+            .iter()
+            .flat_map(|r| rect::to_9points_chunk(r))
+            .map(|p| (Some(p[0]), Some(p[1])))
+            .collect();
+
+        axis::snap2d_axis_aligned(&agent_points, &anchor_points, config, tolerance)
+    }
+
+    fn snap_to_objects_space(
+        agent: Rectangle,
+        anchors: &[Rectangle],
+        config: axis::Snap2DAxisConfig,
+        tolerance: f32,
+    ) -> axis::Snap2DAxisAlignedResult {
+        let x_range: Range = [agent.x, agent.x + agent.width];
+        let y_range: Range = [agent.y, agent.y + agent.height];
+
+        let mut x_anchor_ranges = Vec::new();
+        let mut y_anchor_ranges = Vec::new();
+        for r in anchors {
+            x_anchor_ranges.push([r.x, r.x + r.width]);
+            y_anchor_ranges.push([r.y, r.y + r.height]);
+        }
+
+        let x_snap = config.x.map(|t| {
+            let geom = spacing::plot_distribution_geometry(&x_anchor_ranges, Some(agent.width));
+            let anchors: Vec<f32> = geom
+                .a
+                .into_iter()
+                .flat_map(|v| v.into_iter().map(|p| p.p))
+                .collect();
+            axis::snap1d(&[x_range[0]], &anchors, t, tolerance)
+        });
+
+        let y_snap = config.y.map(|t| {
+            let geom = spacing::plot_distribution_geometry(&y_anchor_ranges, Some(agent.height));
+            let anchors: Vec<f32> = geom
+                .a
+                .into_iter()
+                .flat_map(|v| v.into_iter().map(|p| p.p))
+                .collect();
+            axis::snap1d(&[y_range[0]], &anchors, t, tolerance)
+        });
+
+        axis::Snap2DAxisAlignedResult { x: x_snap, y: y_snap }
+    }
+
+    /// Snaps a rectangle to other rectangles or guide lines.
+    ///
+    /// The snapping considers geometry points, spacing between objects and
+    /// explicit guides, returning the translated rectangle and delta.
+    pub fn snap_to_canvas_geometry(
+        agent: Rectangle,
+        anchors: &[Rectangle],
+        guides: &[Guide],
+        config: axis::Snap2DAxisConfig,
+        tolerance: f32,
+    ) -> SnapToCanvasResult {
+        let g = snap_to_guides(agent, guides, config, tolerance);
+        let geo = snap_to_objects_geometry(agent, anchors, config, tolerance);
+
+        let best_x = best_distance(&[
+            g.x.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            geo.x.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+        ]);
+        let best_y = best_distance(&[
+            g.y.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            geo.y.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+        ]);
+
+        let spc = snap_to_objects_space(
+            agent.translate([best_x, best_y]),
+            anchors,
+            config,
+            tolerance,
+        );
+
+        let final_x = best_distance(&[
+            g.x.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            geo.x.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            spc.x.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+        ]);
+        let final_y = best_distance(&[
+            g.y.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            geo.y.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+            spc.y.as_ref().map(|r| r.distance).unwrap_or(f32::INFINITY),
+        ]);
+
+        let final_x = if final_x.is_infinite() { 0.0 } else { final_x };
+        let final_y = if final_y.is_infinite() { 0.0 } else { final_y };
+
+        let translated = agent.translate([final_x, final_y]);
+
+        SnapToCanvasResult {
+            translated,
+            delta: [final_x, final_y],
+        }
+    }
+}
+
