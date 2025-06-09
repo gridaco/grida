@@ -1,6 +1,6 @@
 use crate::rect::Rect;
 use crate::schema::Size;
-use grida_cmath::transform::AffineTransform;
+use math2::transform::AffineTransform;
 
 /// A camera that defines the view transformation for rendering.
 /// The camera's transform is inverse-applied to create the view matrix.

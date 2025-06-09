@@ -8,6 +8,9 @@ Resources:
 # run tests
 cargo test
 
+# run fmt
+cargo fmt
+
 # run build
 cargo build
 

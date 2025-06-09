@@ -1,8 +1,8 @@
 use crate::cvt;
 use crate::repository::NodeRepository;
 use core::str;
-use grida_cmath::box_fit::BoxFit;
-use grida_cmath::transform::AffineTransform;
+use math2::box_fit::BoxFit;
+use math2::transform::AffineTransform;
 use serde::Deserialize;
 
 pub type NodeId = String;
