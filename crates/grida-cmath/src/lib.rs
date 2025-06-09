@@ -20,5 +20,5 @@ pub use compass::{invert_direction, to_rectangle_side};
 pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle};
 pub use align::{scalar as align_scalar, vector2 as align_vector2};
 pub use bezier::{CubicBezier, CubicBezierWithTangents, get_bbox as bezier_get_bbox, a2c as bezier_a2c};
-pub use utils::{quantize, clamp, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
+pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
 pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
