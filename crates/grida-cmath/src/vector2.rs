@@ -67,21 +67,30 @@ pub trait IntoVector2 {
 }
 
 impl IntoVector2 for [f32; 2] {
-    fn into_vector2(self) -> Vector2 { self }
+    fn into_vector2(self) -> Vector2 {
+        self
+    }
 }
 
 impl IntoVector2 for (f32, f32) {
-    fn into_vector2(self) -> Vector2 { [self.0, self.1] }
+    fn into_vector2(self) -> Vector2 {
+        [self.0, self.1]
+    }
 }
 
 impl IntoVector2 for f32 {
-    fn into_vector2(self) -> Vector2 { [self, self] }
+    fn into_vector2(self) -> Vector2 {
+        [self, self]
+    }
 }
 
 /// Quantizes a vector using the provided step or per-axis steps.
 pub fn quantize(vector: Vector2, step: impl IntoVector2) -> Vector2 {
     let step = step.into_vector2();
-    [crate::quantize(vector[0], step[0]), crate::quantize(vector[1], step[1])]
+    [
+        crate::quantize(vector[0], step[0]),
+        crate::quantize(vector[1], step[1]),
+    ]
 }
 
 /// Multiplies vectors component-wise.
@@ -136,8 +145,12 @@ pub fn intersection(a: Vector2, b: Vector2) -> Option<Vector2> {
 pub fn min(vectors: &[Vector2]) -> Vector2 {
     let mut result = [f32::INFINITY, f32::INFINITY];
     for v in vectors {
-        if v[0] < result[0] { result[0] = v[0]; }
-        if v[1] < result[1] { result[1] = v[1]; }
+        if v[0] < result[0] {
+            result[0] = v[0];
+        }
+        if v[1] < result[1] {
+            result[1] = v[1];
+        }
     }
     result
 }
@@ -146,18 +159,19 @@ pub fn min(vectors: &[Vector2]) -> Vector2 {
 pub fn max(vectors: &[Vector2]) -> Vector2 {
     let mut result = [f32::NEG_INFINITY, f32::NEG_INFINITY];
     for v in vectors {
-        if v[0] > result[0] { result[0] = v[0]; }
-        if v[1] > result[1] { result[1] = v[1]; }
+        if v[0] > result[0] {
+            result[0] = v[0];
+        }
+        if v[1] > result[1] {
+            result[1] = v[1];
+        }
     }
     result
 }
 
 /// Clamps vector components between min and max.
 pub fn clamp(v: Vector2, min: Vector2, max: Vector2) -> Vector2 {
-    [
-        v[0].max(min[0]).min(max[0]),
-        v[1].max(min[1]).min(max[1]),
-    ]
+    [v[0].max(min[0]).min(max[0]), v[1].max(min[1]).min(max[1])]
 }
 
 /// Euclidean distance between two vectors.
@@ -175,4 +189,3 @@ pub fn transform(v: Vector2, t: &AffineTransform) -> Vector2 {
 pub fn identical(a: Vector2, b: Vector2) -> bool {
     a[0] == b[0] && a[1] == b[1]
 }
-

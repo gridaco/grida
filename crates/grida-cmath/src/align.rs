@@ -93,4 +93,3 @@ pub fn vector2(point: Vector2, targets: &[Vector2], threshold: f32) -> (Vector2,
 
     (best_value, min_dist, indices)
 }
-

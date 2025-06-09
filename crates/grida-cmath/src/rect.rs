@@ -39,7 +39,11 @@ impl Rectangle {
 
     /// Returns a new rectangle translated by the given vector.
     pub fn translate(&self, delta: Vector2) -> Self {
-        Self { x: self.x + delta[0], y: self.y + delta[1], ..*self }
+        Self {
+            x: self.x + delta[0],
+            y: self.y + delta[1],
+            ..*self
+        }
     }
 
     /// Scales the rectangle relative to the given origin.
@@ -126,12 +130,25 @@ pub fn from_points(points: &[Vector2]) -> Rectangle {
     let mut max_x = f32::NEG_INFINITY;
     let mut max_y = f32::NEG_INFINITY;
     for &[x, y] in points {
-        if x < min_x { min_x = x; }
-        if y < min_y { min_y = y; }
-        if x > max_x { max_x = x; }
-        if y > max_y { max_y = y; }
+        if x < min_x {
+            min_x = x;
+        }
+        if y < min_y {
+            min_y = y;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if y > max_y {
+            max_y = y;
+        }
     }
-    Rectangle { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y }
+    Rectangle {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+    }
 }
 
 /// Returns an object containing the nine control points of a rectangle.
@@ -150,7 +167,12 @@ pub struct Rect9Points {
 
 /// Computes the nine control points of the rectangle.
 pub fn to_9points(rect: &Rectangle) -> Rect9Points {
-    let Rectangle { x, y, width, height } = *rect;
+    let Rectangle {
+        x,
+        y,
+        width,
+        height,
+    } = *rect;
     let center_x = x + width / 2.0;
     let center_y = y + height / 2.0;
     Rect9Points {
@@ -217,17 +239,30 @@ pub fn union(rects: &[Rectangle]) -> Rectangle {
     let mut max_x = f32::NEG_INFINITY;
     let mut max_y = f32::NEG_INFINITY;
     for r in rects {
-        if r.x < min_x { min_x = r.x; }
-        if r.y < min_y { min_y = r.y; }
-        if r.x + r.width > max_x { max_x = r.x + r.width; }
-        if r.y + r.height > max_y { max_y = r.y + r.height; }
+        if r.x < min_x {
+            min_x = r.x;
+        }
+        if r.y < min_y {
+            min_y = r.y;
+        }
+        if r.x + r.width > max_x {
+            max_x = r.x + r.width;
+        }
+        if r.y + r.height > max_y {
+            max_y = r.y + r.height;
+        }
     }
-    Rectangle { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y }
+    Rectangle {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+    }
 }
 
 /// Boolean operations on rectangles.
 pub mod boolean {
-    use super::{intersection, Rectangle};
+    use super::{Rectangle, intersection};
 
     /// Subtracts rectangle `b` from rectangle `a`, returning the remaining subregions.
     pub fn subtract(a: Rectangle, b: Rectangle) -> Vec<Rectangle> {
@@ -355,11 +390,25 @@ pub fn distribute_evenly(rectangles: &[Rectangle], axis: super::vector2::Axis) -
     }
 
     let bbox = union(rectangles);
-    let start = if axis == super::vector2::Axis::X { bbox.x } else { bbox.y };
-    let total_size = if axis == super::vector2::Axis::X { bbox.width } else { bbox.height };
+    let start = if axis == super::vector2::Axis::X {
+        bbox.x
+    } else {
+        bbox.y
+    };
+    let total_size = if axis == super::vector2::Axis::X {
+        bbox.width
+    } else {
+        bbox.height
+    };
     let total_rect_size: f32 = rectangles
         .iter()
-        .map(|r| if axis == super::vector2::Axis::X { r.width } else { r.height })
+        .map(|r| {
+            if axis == super::vector2::Axis::X {
+                r.width
+            } else {
+                r.height
+            }
+        })
         .sum();
 
     let gap_size = (total_size - total_rect_size) / (rectangles.len() as f32 - 1.0);
@@ -374,7 +423,15 @@ pub fn distribute_evenly(rectangles: &[Rectangle], axis: super::vector2::Axis) -
     });
 
     let mut current = start;
-    let mut distributed = vec![Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }; rectangles.len()];
+    let mut distributed = vec![
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0
+        };
+        rectangles.len()
+    ];
     for idx in sorted_indices {
         let r = rectangles[idx];
         let mut new_r = r;
@@ -402,13 +459,23 @@ pub struct Sides {
 
 impl From<f32> for Sides {
     fn from(all: f32) -> Self {
-        Self { top: all, right: all, bottom: all, left: all }
+        Self {
+            top: all,
+            right: all,
+            bottom: all,
+            left: all,
+        }
     }
 }
 
 impl From<[f32; 4]> for Sides {
     fn from(v: [f32; 4]) -> Self {
-        Self { top: v[0], right: v[1], bottom: v[2], left: v[3] }
+        Self {
+            top: v[0],
+            right: v[1],
+            bottom: v[2],
+            left: v[3],
+        }
     }
 }
 
@@ -447,11 +514,21 @@ use super::transform::AffineTransform;
 
 /// Returns the transform mapping rectangle `a` onto rectangle `b`.
 pub fn get_relative_transform(a: Rectangle, b: Rectangle) -> AffineTransform {
-    let sx = if a.width == 0.0 { 1.0 } else { b.width / a.width };
-    let sy = if a.height == 0.0 { 1.0 } else { b.height / a.height };
+    let sx = if a.width == 0.0 {
+        1.0
+    } else {
+        b.width / a.width
+    };
+    let sy = if a.height == 0.0 {
+        1.0
+    } else {
+        b.height / a.height
+    };
 
     let t1 = AffineTransform::translate(-a.x, -a.y);
-    let t2 = AffineTransform { matrix: [[sx, 0.0, 0.0], [0.0, sy, 0.0]] };
+    let t2 = AffineTransform {
+        matrix: [[sx, 0.0, 0.0], [0.0, sy, 0.0]],
+    };
     let t3 = AffineTransform::translate(b.x, b.y);
 
     t3.compose(&t2.compose(&t1))
@@ -465,7 +542,10 @@ pub fn transform(rect: Rectangle, t: &AffineTransform) -> Rectangle {
         [rect.x, rect.y + rect.height],
         [rect.x + rect.width, rect.y + rect.height],
     ];
-    let transformed: Vec<Vector2> = corners.iter().map(|&p| super::vector2::transform(p, t)).collect();
+    let transformed: Vec<Vector2> = corners
+        .iter()
+        .map(|&p| super::vector2::transform(p, t))
+        .collect();
     from_points(&transformed)
 }
 
@@ -477,7 +557,10 @@ pub fn rotate(rect: Rectangle, degrees: f32) -> Rectangle {
     let rotate_point = |p: Vector2| -> Vector2 {
         let dx = p[0] - center[0];
         let dy = p[1] - center[1];
-        [center[0] + dx * cos - dy * sin, center[1] + dx * sin + dy * cos]
+        [
+            center[0] + dx * cos - dy * sin,
+            center[1] + dx * sin + dy * cos,
+        ]
     };
     let pts = [
         rotate_point([rect.x, rect.y]),
@@ -508,19 +591,28 @@ pub fn get_center(rect: Rectangle) -> Vector2 {
 }
 
 /// Returns the overlapping projection range of rectangles along the counter axis.
-pub fn axis_projection_intersection(rects: &[Rectangle], axis: super::vector2::Axis) -> Option<Vector2> {
+pub fn axis_projection_intersection(
+    rects: &[Rectangle],
+    axis: super::vector2::Axis,
+) -> Option<Vector2> {
     assert!(rects.len() >= 2, "At least two rectangles are required");
-    let projections: Vec<Vector2> = rects.iter().map(|r| {
-        if axis == super::vector2::Axis::X {
-            [r.y, r.y + r.height]
-        } else {
-            [r.x, r.x + r.width]
-        }
-    }).collect();
+    let projections: Vec<Vector2> = rects
+        .iter()
+        .map(|r| {
+            if axis == super::vector2::Axis::X {
+                [r.y, r.y + r.height]
+            } else {
+                [r.x, r.x + r.width]
+            }
+        })
+        .collect();
 
-    projections.iter().skip(1).fold(Some(projections[0]), |acc, p| {
-        acc.and_then(|cur| super::vector2::intersection(cur, *p))
-    })
+    projections
+        .iter()
+        .skip(1)
+        .fold(Some(projections[0]), |acc, p| {
+            acc.and_then(|cur| super::vector2::intersection(cur, *p))
+        })
 }
 
 /// Returns true if two rectangles are exactly equal.
@@ -540,7 +632,12 @@ pub fn pad(rect: Rectangle, padding: impl Into<Sides>) -> Rectangle {
     let cy = rect.y + rect.height / 2.0;
     let w = rect.width + p.left + p.right;
     let h = rect.height + p.top + p.bottom;
-    Rectangle { x: cx - w / 2.0, y: cy - h / 2.0, width: w, height: h }
+    Rectangle {
+        x: cx - w / 2.0,
+        y: cy - h / 2.0,
+        width: w,
+        height: h,
+    }
 }
 
 /// Insets the rectangle by the given margin while keeping its center.
@@ -550,43 +647,70 @@ pub fn inset(rect: Rectangle, margin: impl Into<Sides>) -> Rectangle {
     let cy = rect.y + rect.height / 2.0;
     let mut w = rect.width - (m.left + m.right);
     let mut h = rect.height - (m.top + m.bottom);
-    if w < 0.0 { w = 0.0; }
-    if h < 0.0 { h = 0.0; }
-    Rectangle { x: cx - w / 2.0, y: cy - h / 2.0, width: w, height: h }
+    if w < 0.0 {
+        w = 0.0;
+    }
+    if h < 0.0 {
+        h = 0.0;
+    }
+    Rectangle {
+        x: cx - w / 2.0,
+        y: cy - h / 2.0,
+        width: w,
+        height: h,
+    }
 }
 
 /// Alignment kind for rectangle positioning.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AlignKind { None, Min, Max, Center }
+pub enum AlignKind {
+    None,
+    Min,
+    Max,
+    Center,
+}
 
 /// Horizontal/vertical alignment options.
 #[derive(Clone, Copy, Debug)]
-pub struct Alignment { pub horizontal: AlignKind, pub vertical: AlignKind }
+pub struct Alignment {
+    pub horizontal: AlignKind,
+    pub vertical: AlignKind,
+}
 
 impl Default for Alignment {
-    fn default() -> Self { Self { horizontal: AlignKind::None, vertical: AlignKind::None } }
+    fn default() -> Self {
+        Self {
+            horizontal: AlignKind::None,
+            vertical: AlignKind::None,
+        }
+    }
 }
 
 /// Aligns rectangles within their bounding box.
 pub fn align(rects: &[Rectangle], options: Alignment) -> Vec<Rectangle> {
-    if rects.len() < 2 { return rects.to_vec(); }
+    if rects.len() < 2 {
+        return rects.to_vec();
+    }
     let bbox = union(rects);
-    rects.iter().map(|r| {
-        let mut n = *r;
-        match options.horizontal {
-            AlignKind::Min => n.x = bbox.x,
-            AlignKind::Max => n.x = bbox.x + bbox.width - r.width,
-            AlignKind::Center => n.x = bbox.x + (bbox.width - r.width)/2.0,
-            AlignKind::None => {}
-        }
-        match options.vertical {
-            AlignKind::Min => n.y = bbox.y,
-            AlignKind::Max => n.y = bbox.y + bbox.height - r.height,
-            AlignKind::Center => n.y = bbox.y + (bbox.height - r.height)/2.0,
-            AlignKind::None => {}
-        }
-        n
-    }).collect()
+    rects
+        .iter()
+        .map(|r| {
+            let mut n = *r;
+            match options.horizontal {
+                AlignKind::Min => n.x = bbox.x,
+                AlignKind::Max => n.x = bbox.x + bbox.width - r.width,
+                AlignKind::Center => n.x = bbox.x + (bbox.width - r.width) / 2.0,
+                AlignKind::None => {}
+            }
+            match options.vertical {
+                AlignKind::Min => n.y = bbox.y,
+                AlignKind::Max => n.y = bbox.y + bbox.height - r.height,
+                AlignKind::Center => n.y = bbox.y + (bbox.height - r.height) / 2.0,
+                AlignKind::None => {}
+            }
+            n
+        })
+        .collect()
 }
 
 /// Aligns rectangle `a` relative to rectangle `b`.
@@ -595,15 +719,14 @@ pub fn align_a(a: Rectangle, b: Rectangle, options: Alignment) -> Rectangle {
     match options.horizontal {
         AlignKind::Min => r.x = b.x,
         AlignKind::Max => r.x = b.x + b.width - a.width,
-        AlignKind::Center => r.x = b.x + (b.width - a.width)/2.0,
+        AlignKind::Center => r.x = b.x + (b.width - a.width) / 2.0,
         AlignKind::None => {}
     }
     match options.vertical {
         AlignKind::Min => r.y = b.y,
         AlignKind::Max => r.y = b.y + b.height - a.height,
-        AlignKind::Center => r.y = b.y + (b.height - a.height)/2.0,
+        AlignKind::Center => r.y = b.y + (b.height - a.height) / 2.0,
         AlignKind::None => {}
     }
     r
 }
-

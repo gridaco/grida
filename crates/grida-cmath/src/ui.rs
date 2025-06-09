@@ -1,4 +1,4 @@
-use crate::{vector2, transform::AffineTransform};
+use crate::{transform::AffineTransform, vector2};
 
 /// `['x', 100.0]` will draw a y-axis line at x=100.
 pub type Rule = (vector2::Axis, f32);
@@ -22,14 +22,24 @@ pub struct Line {
 /// Applies an affine transform to a UI point.
 pub fn transform_point(point: &Point, transform: &AffineTransform) -> Point {
     let [x, y] = vector2::transform([point.x, point.y], transform);
-    Point { label: point.label.clone(), x, y }
+    Point {
+        label: point.label.clone(),
+        x,
+        y,
+    }
 }
 
 /// Applies an affine transform to a UI line.
 pub fn transform_line(line: &Line, transform: &AffineTransform) -> Line {
     let [x1, y1] = vector2::transform([line.x1, line.y1], transform);
     let [x2, y2] = vector2::transform([line.x2, line.y2], transform);
-    Line { label: line.label.clone(), x1, y1, x2, y2 }
+    Line {
+        label: line.label.clone(),
+        x1,
+        y1,
+        x2,
+        y2,
+    }
 }
 
 /// Ensures `(x1, y1) <= (x2, y2)` lexicographically.
@@ -44,7 +54,13 @@ pub fn normalize_line(line: &Line) -> Line {
         std::mem::swap(&mut y1, &mut y2);
     }
 
-    Line { label: line.label.clone(), x1, y1, x2, y2 }
+    Line {
+        label: line.label.clone(),
+        x1,
+        y1,
+        x2,
+        y2,
+    }
 }
 
 /// Formats `num` to the given precision only when necessary.
@@ -58,5 +74,3 @@ pub fn format_number(num: f32, precision: usize) -> String {
         format!("{:.*}", precision, rounded)
     }
 }
-
-

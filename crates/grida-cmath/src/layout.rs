@@ -1,21 +1,32 @@
-use crate::{rect, Rectangle};
-use crate::vector2::Axis;
 use crate::utils::mean;
+use crate::vector2::Axis;
+use crate::{Rectangle, rect};
 
 pub mod flex {
     use super::*;
 
     /// Inferred main axis direction of a flex-like layout.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum AxisDirection { Horizontal, Vertical }
+    pub enum AxisDirection {
+        Horizontal,
+        Vertical,
+    }
 
     /// Alignment of items along the main axis.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum MainAxisAlignment { Start, End, Center }
+    pub enum MainAxisAlignment {
+        Start,
+        End,
+        Center,
+    }
 
     /// Alignment of items along the cross axis.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum CrossAxisAlignment { Start, End, Center }
+    pub enum CrossAxisAlignment {
+        Start,
+        End,
+        Center,
+    }
 
     /// Result returned by [`guess`].
     #[derive(Debug, Clone, PartialEq)]
@@ -29,14 +40,29 @@ pub mod flex {
     }
 
     fn guess_cross_alignment(rects: &[Rectangle], cross: Axis) -> CrossAxisAlignment {
-        let starts: Vec<f32> = rects.iter().map(|r| if cross == Axis::X { r.x } else { r.y }).collect();
+        let starts: Vec<f32> = rects
+            .iter()
+            .map(|r| if cross == Axis::X { r.x } else { r.y })
+            .collect();
         let centers: Vec<f32> = rects
             .iter()
-            .map(|r| if cross == Axis::X { r.x + r.width / 2.0 } else { r.y + r.height / 2.0 })
+            .map(|r| {
+                if cross == Axis::X {
+                    r.x + r.width / 2.0
+                } else {
+                    r.y + r.height / 2.0
+                }
+            })
             .collect();
         let ends: Vec<f32> = rects
             .iter()
-            .map(|r| if cross == Axis::X { r.x + r.width } else { r.y + r.height })
+            .map(|r| {
+                if cross == Axis::X {
+                    r.x + r.width
+                } else {
+                    r.y + r.height
+                }
+            })
             .collect();
 
         let stdev = |vals: &[f32]| -> f32 {
@@ -73,7 +99,10 @@ pub mod flex {
     /// 4. Estimate cross axis alignment by comparing the variance of starts,
     ///    centers and ends.
     pub fn guess(boundingboxes: &[Rectangle]) -> Guessed {
-        assert!(!boundingboxes.is_empty(), "At least one bounding box is required.");
+        assert!(
+            !boundingboxes.is_empty(),
+            "At least one bounding box is required."
+        );
 
         let unioned = rect::union(boundingboxes);
         let width = unioned.width;
@@ -85,13 +114,21 @@ pub mod flex {
         let total_y_gap: f32 = y_gaps.iter().sum();
 
         let axis = if (total_x_gap - total_y_gap).abs() > 1.0 {
-            if total_x_gap > total_y_gap { Axis::X } else { Axis::Y }
+            if total_x_gap > total_y_gap {
+                Axis::X
+            } else {
+                Axis::Y
+            }
         } else {
             if width >= height { Axis::X } else { Axis::Y }
         };
 
         let gaps = rect::get_gaps(boundingboxes, axis);
-        let spacing = if gaps.is_empty() { 0.0 } else { mean(&gaps).max(0.0) };
+        let spacing = if gaps.is_empty() {
+            0.0
+        } else {
+            mean(&gaps).max(0.0)
+        };
 
         let mut orders: Vec<(usize, f32)> = boundingboxes
             .iter()
@@ -106,7 +143,11 @@ pub mod flex {
 
         Guessed {
             union: unioned,
-            direction: if axis == Axis::X { AxisDirection::Horizontal } else { AxisDirection::Vertical },
+            direction: if axis == Axis::X {
+                AxisDirection::Horizontal
+            } else {
+                AxisDirection::Vertical
+            },
             spacing,
             main_axis_alignment: MainAxisAlignment::Start,
             cross_axis_alignment: cross_align,

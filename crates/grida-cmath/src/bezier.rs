@@ -1,4 +1,4 @@
-use super::rect::{from_points, Rectangle};
+use super::rect::{Rectangle, from_points};
 use super::vector2::Vector2;
 
 /// Represents a cubic Bézier curve segment with absolute control points.
@@ -60,8 +60,16 @@ pub fn get_bbox(segment: &CubicBezierWithTangents) -> Rectangle {
     let ty = solve_quad(dy0, dy1, dy2);
 
     let mut candidates = vec![0.0f32, 1.0f32];
-    for t in tx { if (0.0..=1.0).contains(&t) { candidates.push(t); } }
-    for t in ty { if (0.0..=1.0).contains(&t) { candidates.push(t); } }
+    for t in tx {
+        if (0.0..=1.0).contains(&t) {
+            candidates.push(t);
+        }
+    }
+    for t in ty {
+        if (0.0..=1.0).contains(&t) {
+            candidates.push(t);
+        }
+    }
 
     let mut min_x = f32::INFINITY;
     let mut min_y = f32::INFINITY;
@@ -71,13 +79,26 @@ pub fn get_bbox(segment: &CubicBezierWithTangents) -> Rectangle {
     for t in candidates {
         let x = cubic_eval(a[0], c1[0], c2[0], b[0], t);
         let y = cubic_eval(a[1], c1[1], c2[1], b[1], t);
-        if x < min_x { min_x = x; }
-        if x > max_x { max_x = x; }
-        if y < min_y { min_y = y; }
-        if y > max_y { max_y = y; }
+        if x < min_x {
+            min_x = x;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if y < min_y {
+            min_y = y;
+        }
+        if y > max_y {
+            max_y = y;
+        }
     }
 
-    Rectangle { x: min_x, y: min_y, width: max_x - min_x, height: max_y - min_y }
+    Rectangle {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+    }
 }
 
 /// Converts an SVG elliptical arc to cubic Bézier curve segments.
@@ -112,9 +133,11 @@ pub fn a2c(
         (rf1, rf2, rcx, rcy)
     } else {
         let (rx1, ry1) = rotate(x1, y1, -rad);
-        x1 = rx1; y1 = ry1;
+        x1 = rx1;
+        y1 = ry1;
         let (rx2, ry2) = rotate(x2, y2, -rad);
-        x2 = rx2; y2 = ry2;
+        x2 = rx2;
+        y2 = ry2;
 
         let x = (x1 - x2) / 2.0;
         let y = (y1 - y2) / 2.0;
@@ -128,22 +151,37 @@ pub fn a2c(
 
         let rx2s = rx * rx;
         let ry2s = ry * ry;
-        let k_sign = if large_arc_flag == sweep_flag { -1.0 } else { 1.0 };
+        let k_sign = if large_arc_flag == sweep_flag {
+            -1.0
+        } else {
+            1.0
+        };
         let k = k_sign
-            * ((rx2s * ry2s - rx2s * y * y - ry2s * x * x)
-                / (rx2s * y * y + ry2s * x * x))
+            * ((rx2s * ry2s - rx2s * y * y - ry2s * x * x) / (rx2s * y * y + ry2s * x * x))
                 .abs()
                 .sqrt();
         let cx = k * rx * y / ry + (x1 + x2) / 2.0;
         let cy = k * -ry * x / rx + (y1 + y2) / 2.0;
         let mut f1 = ((y1 - cy) / ry).clamp(-1.0, 1.0).asin();
         let mut f2 = ((y2 - cy) / ry).clamp(-1.0, 1.0).asin();
-        if x1 < cx { f1 = pi - f1; }
-        if x2 < cx { f2 = pi - f2; }
-        if f1 < 0.0 { f1 += pi * 2.0; }
-        if f2 < 0.0 { f2 += pi * 2.0; }
-        if sweep_flag && f1 > f2 { f1 -= pi * 2.0; }
-        if !sweep_flag && f2 > f1 { f2 -= pi * 2.0; }
+        if x1 < cx {
+            f1 = pi - f1;
+        }
+        if x2 < cx {
+            f2 = pi - f2;
+        }
+        if f1 < 0.0 {
+            f1 += pi * 2.0;
+        }
+        if f2 < 0.0 {
+            f2 += pi * 2.0;
+        }
+        if sweep_flag && f1 > f2 {
+            f1 -= pi * 2.0;
+        }
+        if !sweep_flag && f2 > f1 {
+            f2 -= pi * 2.0;
+        }
         (f1, f2, cx, cy)
     };
 
@@ -189,7 +227,9 @@ pub fn a2c(
 
     let mut points: Vec<[f32; 2]> = vec![m2, m3, m4];
     for chunk in res.chunks(2) {
-        if let [x, y] = chunk { points.push([*x, *y]); }
+        if let [x, y] = chunk {
+            points.push([*x, *y]);
+        }
     }
 
     let mut flat = Vec::with_capacity(points.len() * 2);
@@ -208,4 +248,3 @@ pub fn a2c(
 
     flat
 }
-

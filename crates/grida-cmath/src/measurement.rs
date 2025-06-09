@@ -1,4 +1,4 @@
-use crate::{rect, Rectangle, RectangleSide, vector2::Vector2};
+use crate::{Rectangle, RectangleSide, rect, vector2::Vector2};
 
 /// Result returned by [`measure`].
 ///
@@ -20,29 +20,51 @@ pub struct Measurement {
 /// See the module-level documentation for the exact behaviour. Returns `None`
 /// when `a` and `b` are identical.
 pub fn measure(a: Rectangle, b: Rectangle) -> Option<Measurement> {
-    if a == b { return None; }
+    if a == b {
+        return None;
+    }
     let intersection = rect::intersection(&a, &b);
 
     if intersection.is_none() {
         let spacing = calculate_non_intersecting_spacing(&a, &b);
-        return Some(Measurement { a, b, box_rect: a, distance: spacing });
+        return Some(Measurement {
+            a,
+            b,
+            box_rect: a,
+            distance: spacing,
+        });
     }
 
     let intersection = intersection.unwrap();
 
     if rect::contains(&b, &a) {
-        return Some(Measurement { a, b, box_rect: a, distance: calculate_container_spacing(&b, &a) });
+        return Some(Measurement {
+            a,
+            b,
+            box_rect: a,
+            distance: calculate_container_spacing(&b, &a),
+        });
     }
 
     if rect::contains(&a, &b) {
-        return Some(Measurement { a, b, box_rect: b, distance: calculate_container_spacing(&a, &b) });
+        return Some(Measurement {
+            a,
+            b,
+            box_rect: b,
+            distance: calculate_container_spacing(&a, &b),
+        });
     }
 
     let spacing = calculate_intersecting_spacing(&a, &b, &intersection);
-    Some(Measurement { a, b, box_rect: intersection, distance: spacing })
+    Some(Measurement {
+        a,
+        b,
+        box_rect: intersection,
+        distance: spacing,
+    })
 }
 
-fn calculate_intersecting_spacing(a: &Rectangle, b: &Rectangle, inter: &Rectangle) -> [f32;4] {
+fn calculate_intersecting_spacing(a: &Rectangle, b: &Rectangle, inter: &Rectangle) -> [f32; 4] {
     [
         (inter.y - a.y.min(b.y)).abs(),
         ((a.x + a.width).max(b.x + b.width) - (inter.x + inter.width)).abs(),
@@ -51,17 +73,25 @@ fn calculate_intersecting_spacing(a: &Rectangle, b: &Rectangle, inter: &Rectangl
     ]
 }
 
-
-fn calculate_non_intersecting_spacing(a: &Rectangle, b: &Rectangle) -> [f32;4] {
-    let mut top = 0.0; let mut right = 0.0; let mut bottom = 0.0; let mut left = 0.0;
-    if a.x + a.width <= b.x { right = b.x - (a.x + a.width); }
-    else if b.x + b.width <= a.x { left = a.x - (b.x + b.width); }
-    if a.y + a.height <= b.y { bottom = b.y - (a.y + a.height); }
-    else if b.y + b.height <= a.y { top = a.y - (b.y + b.height); }
-    [top,right,bottom,left]
+fn calculate_non_intersecting_spacing(a: &Rectangle, b: &Rectangle) -> [f32; 4] {
+    let mut top = 0.0;
+    let mut right = 0.0;
+    let mut bottom = 0.0;
+    let mut left = 0.0;
+    if a.x + a.width <= b.x {
+        right = b.x - (a.x + a.width);
+    } else if b.x + b.width <= a.x {
+        left = a.x - (b.x + b.width);
+    }
+    if a.y + a.height <= b.y {
+        bottom = b.y - (a.y + a.height);
+    } else if b.y + b.height <= a.y {
+        top = a.y - (b.y + b.height);
+    }
+    [top, right, bottom, left]
 }
 
-fn calculate_container_spacing(outer:&Rectangle, inner:&Rectangle) -> [f32;4] {
+fn calculate_container_spacing(outer: &Rectangle, inner: &Rectangle) -> [f32; 4] {
     [
         (outer.y - inner.y).abs(),
         (outer.x + outer.width - (inner.x + inner.width)).abs(),
@@ -70,7 +100,7 @@ fn calculate_container_spacing(outer:&Rectangle, inner:&Rectangle) -> [f32;4] {
     ]
 }
 
-type LineXYXYLR = [f32;6];
+type LineXYXYLR = [f32; 6];
 
 /// Generates guide line coordinates from the center of `rect` toward a side.
 ///
@@ -78,7 +108,12 @@ type LineXYXYLR = [f32;6];
 /// `zoom` where `(x1, y1)` is the anchor on the rectangle and `(x2, y2)` the
 /// outer end.
 pub fn guide_line_xylr(rect: Rectangle, side: RectangleSide, length: f32, zoom: f32) -> LineXYXYLR {
-    let Rectangle { x, y, width, height } = rect;
+    let Rectangle {
+        x,
+        y,
+        width,
+        height,
+    } = rect;
     let mid_x = x + width / 2.0;
     let mid_y = y + height / 2.0;
     let scaled = length * zoom;
@@ -113,9 +148,19 @@ pub fn guide_line_xylr(rect: Rectangle, side: RectangleSide, length: f32, zoom: 
 ///
 /// Returns `[x1, y1, x2, y2, length, rotation]` scaled by `zoom`. When the
 /// point lies inside the rectangle, `x2`/`y2` are `NaN` and length is zero.
-pub fn auxiliary_line_xylr(point: Vector2, rect: Rectangle, side: RectangleSide, zoom: f32) -> LineXYXYLR {
+pub fn auxiliary_line_xylr(
+    point: Vector2,
+    rect: Rectangle,
+    side: RectangleSide,
+    zoom: f32,
+) -> LineXYXYLR {
     let [px, py] = point;
-    let Rectangle { x, y, width, height } = rect;
+    let Rectangle {
+        x,
+        y,
+        width,
+        height,
+    } = rect;
     let rect_right = x + width;
     let rect_bottom = y + height;
 
@@ -148,5 +193,5 @@ pub fn auxiliary_line_xylr(point: Vector2, rect: Rectangle, side: RectangleSide,
         }
     }
 
-    [x1,y1,x2,y2,length,rotation]
+    [x1, y1, x2, y2, length, rotation]
 }

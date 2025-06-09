@@ -1,50 +1,77 @@
-pub mod box_fit;
-pub mod transform;
-pub mod vector2;
-pub mod vector4;
+pub mod align;
 pub mod bezier;
-pub mod rect;
+pub mod box_fit;
+pub mod color;
 pub mod compass;
 pub mod delta;
-pub mod range;
-pub mod raster;
-pub mod color;
-pub mod align;
-pub mod utils;
-pub mod snap;
-pub mod packing;
 pub mod layout;
 pub mod measurement;
+pub mod packing;
+pub mod range;
+pub mod raster;
+pub mod rect;
+pub mod snap;
+pub mod transform;
 pub mod ui;
+pub mod utils;
+pub mod vector2;
+pub mod vector4;
 
-pub use rect::{
-    Rectangle, Rect9Points, RectangleSide, CardinalDirection, Sides, AlignKind, Alignment,
-    from_points, to_9points, to_9points_chunk, contains, contains_point, offset, intersects,
-    intersection, union, quantize as rect_quantize, positive as rect_positive, aspect_ratio,
-    get_scale_factors, get_relative_transform, transform as rect_transform, rotate as rect_rotate,
-    get_cardinal_point, get_center, axis_projection_intersection, is_identical as rect_identical,
-    is_uniform as rect_uniform, pad as rect_pad, inset as rect_inset, align as rect_align,
-    align_a as rect_align_a, get_gaps as rect_get_gaps, get_uniform_gap as rect_get_uniform_gap,
-    distribute_evenly as rect_distribute_evenly
+pub use align::{scalar as align_scalar, vector2 as align_vector2};
+pub use bezier::{
+    CubicBezier, CubicBezierWithTangents, a2c as bezier_a2c, get_bbox as bezier_get_bbox,
+};
+pub use color::{
+    RGBA8888, RGBAf, TRGBA, hex_to_rgba8888, rgba_to_unit8_chunk, rgba8888_to_hex,
+    rgbaf_multiply_alpha, rgbaf_to_rgba8888,
+};
+pub use compass::{invert_direction, to_rectangle_side};
+pub use delta::transform as delta_transform;
+pub use layout::flex::{
+    AxisDirection as FlexAxisDirection, CrossAxisAlignment as FlexCrossAxisAlignment,
+    Guessed as FlexGuessed, MainAxisAlignment as FlexMainAxisAlignment, guess as layout_flex_guess,
+};
+pub use measurement::{Measurement, auxiliary_line_xylr, guide_line_xylr, measure};
+pub use packing::{ext::walk_to_fit as packing_walk_to_fit, fit as packing_fit};
+pub use range::{
+    Range, UniformGapGroup, from_rectangle, group_ranges_by_uniform_gap, length as range_length,
+    mean as range_mean, to_3points_chunk,
+};
+pub use raster::{
+    Bitmap, bresenham as raster_bresenham, circle as raster_circle, ellipse as raster_ellipse,
+    floodfill as raster_floodfill, fract, gaussian as raster_gaussian, noise, pad as raster_pad,
+    pascaltriangle as raster_pascaltriangle, rectangle as raster_rectangle,
+    resize as raster_resize, scale as raster_scale, smoothstep as raster_smoothstep,
+    tile as raster_tile,
 };
 pub use rect::boolean::subtract as rect_boolean_subtract;
-pub use range::{Range, UniformGapGroup, mean as range_mean, from_rectangle, length as range_length, to_3points_chunk, group_ranges_by_uniform_gap};
-pub use vector4::{Vector4, identical as vector4_identical};
-pub use color::{
-    TRGBA, RGBAf, RGBA8888, hex_to_rgba8888, rgba_to_unit8_chunk,
-    rgbaf_to_rgba8888, rgbaf_multiply_alpha, rgba8888_to_hex,
+pub use rect::{
+    AlignKind, Alignment, CardinalDirection, Rect9Points, Rectangle, RectangleSide, Sides,
+    align as rect_align, align_a as rect_align_a, aspect_ratio, axis_projection_intersection,
+    contains, contains_point, distribute_evenly as rect_distribute_evenly, from_points,
+    get_cardinal_point, get_center, get_gaps as rect_get_gaps, get_relative_transform,
+    get_scale_factors, get_uniform_gap as rect_get_uniform_gap, inset as rect_inset, intersection,
+    intersects, is_identical as rect_identical, is_uniform as rect_uniform, offset,
+    pad as rect_pad, positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate,
+    to_9points, to_9points_chunk, transform as rect_transform, union,
 };
-pub use delta::transform as delta_transform;
-pub use compass::{invert_direction, to_rectangle_side};
-pub use raster::{fract, noise, bresenham as raster_bresenham, rectangle as raster_rectangle, Bitmap, tile as raster_tile, scale as raster_scale, resize as raster_resize, pad as raster_pad, circle as raster_circle, ellipse as raster_ellipse, floodfill as raster_floodfill, gaussian as raster_gaussian, smoothstep as raster_smoothstep, pascaltriangle as raster_pascaltriangle};
-pub use align::{scalar as align_scalar, vector2 as align_vector2};
-pub use bezier::{CubicBezier, CubicBezierWithTangents, get_bbox as bezier_get_bbox, a2c as bezier_a2c};
-pub use utils::{quantize, clamp, nearest, principal_angle, angle_to_axis, is_uniform, mean, combinations, permutations, powerset};
-pub use snap::spacing::{ProjectionPoint as SnapProjectionPoint, DistributionGeometry1D, plot_distribution_geometry};
-pub use snap::viewport::{transform_to_fit as viewport_transform_to_fit, Margins as ViewportMargins};
-pub use snap::axis::{AxisAlignedPoint, Snap1DResult, Snap2DAxisConfig, Snap2DAxisAlignedResult, snap1d, snap2d_axis_aligned, Movement, normalize as movement_normalize, axis_locked_by_dominance};
-pub use snap::canvas::{snap_to_canvas_geometry, Guide as SnapGuide, SnapToCanvasResult};
-pub use packing::{fit as packing_fit, ext::walk_to_fit as packing_walk_to_fit};
-pub use layout::flex::{guess as layout_flex_guess, AxisDirection as FlexAxisDirection, MainAxisAlignment as FlexMainAxisAlignment, CrossAxisAlignment as FlexCrossAxisAlignment, Guessed as FlexGuessed};
-pub use measurement::{measure, guide_line_xylr, auxiliary_line_xylr, Measurement};
-pub use ui::{Rule as UiRule, Point as UiPoint, Line as UiLine, transform_point, transform_line, normalize_line, format_number};
+pub use snap::axis::{
+    AxisAlignedPoint, Movement, Snap1DResult, Snap2DAxisAlignedResult, Snap2DAxisConfig,
+    axis_locked_by_dominance, normalize as movement_normalize, snap1d, snap2d_axis_aligned,
+};
+pub use snap::canvas::{Guide as SnapGuide, SnapToCanvasResult, snap_to_canvas_geometry};
+pub use snap::spacing::{
+    DistributionGeometry1D, ProjectionPoint as SnapProjectionPoint, plot_distribution_geometry,
+};
+pub use snap::viewport::{
+    Margins as ViewportMargins, transform_to_fit as viewport_transform_to_fit,
+};
+pub use ui::{
+    Line as UiLine, Point as UiPoint, Rule as UiRule, format_number, normalize_line,
+    transform_line, transform_point,
+};
+pub use utils::{
+    angle_to_axis, clamp, combinations, is_uniform, mean, nearest, permutations, powerset,
+    principal_angle, quantize,
+};
+pub use vector4::{Vector4, identical as vector4_identical};

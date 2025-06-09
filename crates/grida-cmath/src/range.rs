@@ -1,6 +1,6 @@
 use super::rect::Rectangle;
+use super::utils::{is_uniform, mean as mean_scalar, powerset};
 use super::vector2::Axis;
-use super::utils::{is_uniform, powerset, mean as mean_scalar};
 
 /// A 1D range represented as `[start, end]` where start <= end.
 pub type Range = [f32; 2];
@@ -66,10 +66,7 @@ pub fn group_ranges_by_uniform_gap(
             continue;
         }
         if subset.len() == 1 {
-            let idx = ranges
-                .iter()
-                .position(|r| r == &subset[0])
-                .unwrap();
+            let idx = ranges.iter().position(|r| r == &subset[0]).unwrap();
             result.push(UniformGapGroup {
                 loop_indices: vec![idx],
                 min: subset[0][0],
@@ -113,4 +110,3 @@ pub fn group_ranges_by_uniform_gap(
 
     result
 }
-

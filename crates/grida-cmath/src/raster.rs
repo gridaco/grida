@@ -67,7 +67,9 @@ pub fn bresenham(a: Vector2, b: Vector2) -> Vec<Vector2> {
 
     loop {
         pixels.push([x0 as f32, y0 as f32]);
-        if x0 == x1 && y0 == y1 { break; }
+        if x0 == x1 && y0 == y1 {
+            break;
+        }
         let e2 = 2 * err;
         if e2 >= dy {
             err += dy;
@@ -129,7 +131,11 @@ pub fn tile(source: &Bitmap, width: usize, height: usize) -> Bitmap {
             out[dst..dst + 4].copy_from_slice(&source.data[src..src + 4]);
         }
     }
-    Bitmap { width, height, data: out }
+    Bitmap {
+        width,
+        height,
+        data: out,
+    }
 }
 
 /// Scales a bitmap by `[factor_x, factor_y]` using nearest neighbour sampling.
@@ -148,7 +154,11 @@ pub fn scale(bitmap: &Bitmap, factor: Vector2) -> Bitmap {
             out[dst..dst + 4].copy_from_slice(&bitmap.data[src..src + 4]);
         }
     }
-    Bitmap { width, height, data: out }
+    Bitmap {
+        width,
+        height,
+        data: out,
+    }
 }
 
 /// Resizes a bitmap to the specified `[width, height]`.
@@ -185,27 +195,55 @@ pub fn pad(bitmap: &Bitmap, dst: Vector2, bg: super::vector4::Vector4) -> Bitmap
             out[dst..dst + 4].copy_from_slice(&bitmap.data[src..src + 4]);
         }
     }
-    Bitmap { width, height, data: out }
+    Bitmap {
+        width,
+        height,
+        data: out,
+    }
 }
 
 /// Flood fills starting at `pos` with `fill` color.
 pub fn floodfill(bitmap: &mut Bitmap, pos: Vector2, fill: super::vector4::Vector4) {
-    let x = pos[0] as i32; let y = pos[1] as i32;
-    if x < 0 || y < 0 || x >= bitmap.width as i32 || y >= bitmap.height as i32 { return; }
+    let x = pos[0] as i32;
+    let y = pos[1] as i32;
+    if x < 0 || y < 0 || x >= bitmap.width as i32 || y >= bitmap.height as i32 {
+        return;
+    }
     let idx = (y as usize * bitmap.width + x as usize) * 4;
-    let target = [bitmap.data[idx], bitmap.data[idx+1], bitmap.data[idx+2], bitmap.data[idx+3]];
-    if target == [fill[0] as u8, fill[1] as u8, fill[2] as u8, fill[3] as u8] { return; }
-    let mut stack = vec![(x,y)];
-    while let Some((cx,cy)) = stack.pop() {
-        if cx < 0 || cy < 0 || cx >= bitmap.width as i32 || cy >= bitmap.height as i32 { continue; }
+    let target = [
+        bitmap.data[idx],
+        bitmap.data[idx + 1],
+        bitmap.data[idx + 2],
+        bitmap.data[idx + 3],
+    ];
+    if target == [fill[0] as u8, fill[1] as u8, fill[2] as u8, fill[3] as u8] {
+        return;
+    }
+    let mut stack = vec![(x, y)];
+    while let Some((cx, cy)) = stack.pop() {
+        if cx < 0 || cy < 0 || cx >= bitmap.width as i32 || cy >= bitmap.height as i32 {
+            continue;
+        }
         let i = (cy as usize * bitmap.width + cx as usize) * 4;
-        let cur = [bitmap.data[i], bitmap.data[i+1], bitmap.data[i+2], bitmap.data[i+3]];
-        if cur != target { continue; }
-        bitmap.data[i..i+4].copy_from_slice(&[fill[0] as u8, fill[1] as u8, fill[2] as u8, fill[3] as u8]);
-        stack.push((cx-1,cy));
-        stack.push((cx+1,cy));
-        stack.push((cx,cy-1));
-        stack.push((cx,cy+1));
+        let cur = [
+            bitmap.data[i],
+            bitmap.data[i + 1],
+            bitmap.data[i + 2],
+            bitmap.data[i + 3],
+        ];
+        if cur != target {
+            continue;
+        }
+        bitmap.data[i..i + 4].copy_from_slice(&[
+            fill[0] as u8,
+            fill[1] as u8,
+            fill[2] as u8,
+            fill[3] as u8,
+        ]);
+        stack.push((cx - 1, cy));
+        stack.push((cx + 1, cy));
+        stack.push((cx, cy - 1));
+        stack.push((cx, cy + 1));
     }
 }
 
@@ -217,19 +255,29 @@ pub fn circle(center: Vector2, radius: f32, clip: Option<Rectangle>) -> Vec<Vect
     let (min_x, min_y, max_x, max_y) = if let Some(c) = clip {
         (c.x, c.y, c.x + c.width - 1.0, c.y + c.height - 1.0)
     } else {
-        (f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY)
+        (
+            f32::NEG_INFINITY,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            f32::INFINITY,
+        )
     };
     let y_start = (cy - radius).floor() as i32;
     let y_end = (cy + radius).floor() as i32;
     for y in y_start..=y_end {
         let dy = y as f32 - cy;
         let span = (r_sq - dy * dy).sqrt();
-        if span.is_nan() { continue; }
+        if span.is_nan() {
+            continue;
+        }
         let left = (cx - span).floor() as i32;
         let right = (cx + span).floor() as i32;
         for x in left..=right {
-            let xf = x as f32; let yf = y as f32;
-            if xf < min_x || xf > max_x || yf < min_y || yf > max_y { continue; }
+            let xf = x as f32;
+            let yf = y as f32;
+            if xf < min_x || xf > max_x || yf < min_y || yf > max_y {
+                continue;
+            }
             results.push([xf, yf]);
         }
     }
@@ -249,7 +297,7 @@ pub fn ellipse(center: Vector2, radius: Vector2) -> Vec<Vector2> {
         for x in start_x..=end_x {
             let dx = x as f32 - cx;
             let dy = y as f32 - cy;
-            if (dx*dx)/(rx*rx) + (dy*dy)/(ry*ry) <= 1.0 {
+            if (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1.0 {
                 pts.push([x as f32, y as f32]);
             }
         }
@@ -271,9 +319,9 @@ pub fn smoothstep(n: i32, mut x: f32) -> f32 {
     x = clamp(x, 0.0, 1.0);
     let mut result = 0.0;
     for i in 0..=n {
-        result += pascaltriangle(-(n as f32) - 1.0, i) *
-                  pascaltriangle(2.0 * n as f32 + 1.0, n - i) *
-                  x.powf(n as f32 + i as f32 + 1.0);
+        result += pascaltriangle(-(n as f32) - 1.0, i)
+            * pascaltriangle(2.0 * n as f32 + 1.0, n - i)
+            * x.powf(n as f32 + i as f32 + 1.0);
     }
     result
 }

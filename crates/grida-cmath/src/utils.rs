@@ -40,7 +40,10 @@ pub fn principal_angle(angle: f32) -> f32 {
 /// Determines whether an angle is closer to the X or Y axis.
 pub fn angle_to_axis(angle: f32) -> super::vector2::Axis {
     let a = ((angle % 360.0) + 360.0) % 360.0;
-    let dist_horizontal = (a - 0.0).abs().min((a - 180.0).abs()).min((a - 360.0).abs());
+    let dist_horizontal = (a - 0.0)
+        .abs()
+        .min((a - 180.0).abs())
+        .min((a - 360.0).abs());
     let dist_vertical = (a - 90.0).abs().min((a - 270.0).abs());
     if dist_horizontal <= dist_vertical {
         super::vector2::Axis::X
@@ -69,15 +72,21 @@ pub fn mean(values: &[f32]) -> f32 {
     sum / values.len() as f32
 }
 
-
 /// Generates all combinations of size `k` from the slice.
 pub fn combinations<T: Clone>(arr: &[T], k: usize) -> Vec<Vec<T>> {
-    if k == 0 { return vec![vec![]]; }
-    if arr.is_empty() { return vec![]; }
+    if k == 0 {
+        return vec![vec![]];
+    }
+    if arr.is_empty() {
+        return vec![];
+    }
     let (first, rest) = arr.split_first().unwrap();
-    let mut with_first: Vec<Vec<T>> = combinations(rest, k-1)
+    let mut with_first: Vec<Vec<T>> = combinations(rest, k - 1)
         .into_iter()
-        .map(|mut combo| { combo.insert(0, first.clone()); combo })
+        .map(|mut combo| {
+            combo.insert(0, first.clone());
+            combo
+        })
         .collect();
     let mut without_first = combinations(rest, k);
     with_first.append(&mut without_first);
@@ -86,13 +95,17 @@ pub fn combinations<T: Clone>(arr: &[T], k: usize) -> Vec<Vec<T>> {
 
 /// Generates all permutations of size `k` from the slice.
 pub fn permutations<T: Clone>(arr: &[T], k: usize) -> Vec<Vec<T>> {
-    if k == 0 { return vec![vec![]]; }
-    if arr.is_empty() { return vec![]; }
+    if k == 0 {
+        return vec![vec![]];
+    }
+    if arr.is_empty() {
+        return vec![];
+    }
     let mut result = Vec::new();
     for (idx, item) in arr.iter().enumerate() {
         let mut rest = arr.to_vec();
         rest.remove(idx);
-        for mut perm in permutations(&rest, k-1) {
+        for mut perm in permutations(&rest, k - 1) {
             perm.insert(0, item.clone());
             result.push(perm);
         }
@@ -111,8 +124,11 @@ pub fn powerset<T: Clone>(arr: &[T], k: Option<usize>) -> Vec<Vec<T>> {
             result
         }
         Some(size) => {
-            if size > arr.len() { vec![] } else { combinations(arr, size) }
+            if size > arr.len() {
+                vec![]
+            } else {
+                combinations(arr, size)
+            }
         }
     }
 }
-

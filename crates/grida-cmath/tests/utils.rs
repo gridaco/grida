@@ -1,4 +1,4 @@
-use grida_cmath::{quantize, nearest};
+use grida_cmath::{nearest, quantize};
 
 #[test]
 fn quantize_basic() {

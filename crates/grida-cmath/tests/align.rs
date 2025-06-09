@@ -5,7 +5,7 @@ fn scalar_snaps_to_nearest_within_threshold() {
     let (value, dist, idx) = align_scalar(15.0, &[10.0, 20.0, 25.0], 6.0);
     assert_eq!(value, 10.0);
     assert_eq!(dist, 5.0);
-    assert_eq!(idx, vec![0,1]);
+    assert_eq!(idx, vec![0, 1]);
 }
 
 #[test]

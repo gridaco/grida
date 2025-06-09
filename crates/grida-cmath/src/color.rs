@@ -69,13 +69,23 @@ pub fn hex_to_rgba8888(hex: &str) -> RGBA8888 {
         ),
         _ => panic!("Invalid hex format. Expected #RGB, #RRGGBB or #RRGGBBAA."),
     };
-    RGBA8888 { r, g, b, a: a as f32 / 255.0 }
+    RGBA8888 {
+        r,
+        g,
+        b,
+        a: a as f32 / 255.0,
+    }
 }
 
 /// Converts an [`RGBA8888`] color to a 4-component vector `[r, g, b, a]`
 /// where the alpha is in the 0-255 range.
 pub fn rgba_to_unit8_chunk(rgba: RGBA8888) -> Vector4 {
-    [rgba.r as f32, rgba.g as f32, rgba.b as f32, (rgba.a * 255.0).round()]
+    [
+        rgba.r as f32,
+        rgba.g as f32,
+        rgba.b as f32,
+        (rgba.a * 255.0).round(),
+    ]
 }
 
 /// Converts a normalized RGBA color to an 8-bit integer RGBA color.
@@ -100,7 +110,10 @@ pub fn rgbaf_to_rgba8888(rgba: RGBAf) -> RGBA8888 {
 
 /// Multiplies the alpha channel of the color by `alpha`.
 pub fn rgbaf_multiply_alpha(color: TRGBA, alpha: f32) -> TRGBA {
-    TRGBA { a: color.a * alpha, ..color }
+    TRGBA {
+        a: color.a * alpha,
+        ..color
+    }
 }
 
 /// Returns a HEX color string (with leading `#`).
@@ -115,4 +128,3 @@ pub fn rgba8888_to_hex(color: RGBA8888) -> String {
     let a = (color.a * 255.0).round() as u8;
     format!("#{:02x}{:02x}{:02x}{:02x}", color.r, color.g, color.b, a)
 }
-

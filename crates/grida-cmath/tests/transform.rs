@@ -3,7 +3,7 @@ use grida_cmath::transform::AffineTransform;
 fn transforms_close(a: &AffineTransform, b: &AffineTransform) {
     for i in 0..2 {
         for j in 0..3 {
-            assert!((a.matrix[i][j]-b.matrix[i][j]).abs() < 1e-6);
+            assert!((a.matrix[i][j] - b.matrix[i][j]).abs() < 1e-6);
         }
     }
 }

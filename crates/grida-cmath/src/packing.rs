@@ -13,11 +13,7 @@ use crate::rect::{self, Rectangle};
 /// The algorithm iteratively subtracts each anchor from the free-space set and
 /// selects the smallest lexicographical free region that can contain the agent.
 /// Returns `None` if no placement is found.
-pub fn fit(
-    view: Rectangle,
-    agent: (f32, f32),
-    anchors: &[Rectangle],
-) -> Option<Rectangle> {
+pub fn fit(view: Rectangle, agent: (f32, f32), anchors: &[Rectangle]) -> Option<Rectangle> {
     let mut free_regions = vec![view];
     for &anchor in anchors {
         let mut updated = Vec::new();
@@ -32,9 +28,18 @@ pub fn fit(
         return None;
     }
 
-    free_regions.sort_by(|a, b| a.y.partial_cmp(&b.y).unwrap().then(a.x.partial_cmp(&b.x).unwrap()));
+    free_regions.sort_by(|a, b| {
+        a.y.partial_cmp(&b.y)
+            .unwrap()
+            .then(a.x.partial_cmp(&b.x).unwrap())
+    });
     let chosen = free_regions[0];
-    Some(Rectangle { x: chosen.x, y: chosen.y, width: agent.0, height: agent.1 })
+    Some(Rectangle {
+        x: chosen.x,
+        y: chosen.y,
+        width: agent.0,
+        height: agent.1,
+    })
 }
 
 pub mod ext {
@@ -72,4 +77,3 @@ pub mod ext {
         }
     }
 }
-

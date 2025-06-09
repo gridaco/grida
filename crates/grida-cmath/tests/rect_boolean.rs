@@ -1,7 +1,12 @@
 use grida_cmath::{Rectangle, rect_boolean_subtract};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
-    Rectangle { x, y, width: w, height: h }
+    Rectangle {
+        x,
+        y,
+        width: w,
+        height: h,
+    }
 }
 
 #[test]
@@ -36,10 +41,7 @@ fn subtract_full_inner_intersection() {
 fn subtract_partial_overlap() {
     let a = rect(10.0, 10.0, 30.0, 30.0);
     let b = rect(25.0, 5.0, 20.0, 20.0);
-    let expected = vec![
-        rect(10.0, 25.0, 30.0, 15.0),
-        rect(10.0, 10.0, 15.0, 15.0),
-    ];
+    let expected = vec![rect(10.0, 25.0, 30.0, 15.0), rect(10.0, 10.0, 15.0, 15.0)];
     assert_eq!(rect_boolean_subtract(a, b), expected);
 }
 

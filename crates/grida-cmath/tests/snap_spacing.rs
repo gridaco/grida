@@ -1,4 +1,4 @@
-use grida_cmath::{Range, plot_distribution_geometry, SnapProjectionPoint, DistributionGeometry1D};
+use grida_cmath::{DistributionGeometry1D, Range, SnapProjectionPoint, plot_distribution_geometry};
 
 fn range(a: f32, b: f32) -> Range {
     [a, b]
@@ -18,15 +18,29 @@ fn empty_loops_when_no_gap() {
 fn single_gap_non_overlapping() {
     let ranges = vec![range(0.0, 10.0), range(20.0, 30.0)];
     let result = plot_distribution_geometry(&ranges, None);
-    assert_eq!(result.loops, vec![[0,1]]);
+    assert_eq!(result.loops, vec![[0, 1]]);
     assert_eq!(result.gaps, vec![10.0]);
-    assert_eq!(result.a[0], vec![SnapProjectionPoint{ p: 40.0, o: 30.0, fwd: 0 }]);
-    assert_eq!(result.b[0], vec![SnapProjectionPoint{ p: -10.0, o: 0.0, fwd: 0 }]);
+    assert_eq!(
+        result.a[0],
+        vec![SnapProjectionPoint {
+            p: 40.0,
+            o: 30.0,
+            fwd: 0
+        }]
+    );
+    assert_eq!(
+        result.b[0],
+        vec![SnapProjectionPoint {
+            p: -10.0,
+            o: 0.0,
+            fwd: 0
+        }]
+    );
 }
 
 #[test]
 fn multiple_loops_more_ranges() {
-    let ranges = vec![range(0.0,10.0), range(20.0,30.0), range(40.0,50.0)];
+    let ranges = vec![range(0.0, 10.0), range(20.0, 30.0), range(40.0, 50.0)];
     let result = plot_distribution_geometry(&ranges, None);
     assert_eq!(result.loops.len(), 3);
     assert_eq!(result.gaps.len(), 3);
@@ -36,7 +50,7 @@ fn multiple_loops_more_ranges() {
 
 #[test]
 fn center_based_when_agent_smaller_than_gap() {
-    let ranges = vec![range(0.0,10.0), range(20.0,30.0)];
+    let ranges = vec![range(0.0, 10.0), range(20.0, 30.0)];
     let result = plot_distribution_geometry(&ranges, Some(5.0));
     assert_eq!(result.a[0].len(), 2);
     assert_eq!(result.b[0].len(), 2);
@@ -48,7 +62,7 @@ fn center_based_when_agent_smaller_than_gap() {
 
 #[test]
 fn skip_center_based_when_agent_ge_gap() {
-    let ranges = vec![range(0.0,10.0), range(20.0,30.0)];
+    let ranges = vec![range(0.0, 10.0), range(20.0, 30.0)];
     let result = plot_distribution_geometry(&ranges, Some(10.0));
     assert_eq!(result.a[0].len(), 1);
     assert_eq!(result.b[0].len(), 1);

@@ -1,5 +1,5 @@
-use grida_cmath::{delta_transform, transform::AffineTransform};
 use grida_cmath::vector2::Axis;
+use grida_cmath::{delta_transform, transform::AffineTransform};
 
 #[test]
 fn identity() {
@@ -17,7 +17,9 @@ fn translation() {
 
 #[test]
 fn scaling() {
-    let t = AffineTransform { matrix: [[2.0, 0.0, 0.0],[0.0, 3.0, 0.0]] };
+    let t = AffineTransform {
+        matrix: [[2.0, 0.0, 0.0], [0.0, 3.0, 0.0]],
+    };
     assert_eq!(delta_transform(4.0, Axis::X, &t), 8.0);
     assert_eq!(delta_transform(4.0, Axis::Y, &t), 12.0);
 }
