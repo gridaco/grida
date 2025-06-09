@@ -14,18 +14,6 @@ This demo showcases how multiple static TTF font files—each representing a dif
 async fn demo_webfonts() -> Scene {
     let nf = NodeFactory::new();
 
-    // Create a background rectangle node
-    let mut background_rect_node = nf.create_rectangle_node();
-    background_rect_node.base.name = "Background Rect".to_string();
-    background_rect_node.size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    background_rect_node.fill = Paint::Solid(SolidPaint {
-        color: Color(250, 250, 250, 255),
-        opacity: 1.0,
-    });
-
     // Create a heading with Playfair Display
     let mut heading_node = nf.create_text_span_node();
     heading_node.base.name = "Heading".to_string();
@@ -125,7 +113,6 @@ async fn demo_webfonts() -> Scene {
     let mut repository = NodeRepository::new();
 
     // Collect all the IDs
-    let background_rect_id = background_rect_node.base.id.clone();
     let heading_id = heading_node.base.id.clone();
     let description_id = description_node.base.id.clone();
     let albert_text_ids: Vec<_> = albert_text_nodes
@@ -134,7 +121,6 @@ async fn demo_webfonts() -> Scene {
         .collect();
 
     // Add all nodes to the repository
-    repository.insert(Node::Rectangle(background_rect_node));
     repository.insert(Node::TextSpan(heading_node));
     repository.insert(Node::TextSpan(description_node));
     for text_node in albert_text_nodes {
@@ -142,7 +128,7 @@ async fn demo_webfonts() -> Scene {
     }
 
     // Set up the root container with all IDs
-    let mut children = vec![background_rect_id, heading_id, description_id];
+    let mut children = vec![heading_id, description_id];
     children.extend(albert_text_ids);
     root_container_node.children = children;
     let root_container_id = root_container_node.base.id.clone();
@@ -154,6 +140,7 @@ async fn demo_webfonts() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 

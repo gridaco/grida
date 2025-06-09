@@ -76,6 +76,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
         transform: AffineTransform::identity(),
         children: vec!["root".to_string()],
         nodes: repository,
+        background_color: None,
     }
 }
 

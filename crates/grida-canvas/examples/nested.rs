@@ -89,6 +89,7 @@ async fn demo_nested() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![current_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 

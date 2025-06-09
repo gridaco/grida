@@ -7,28 +7,7 @@ mod window;
 
 async fn demo_effects() -> Scene {
     let nf = NodeFactory::new();
-
-    // Add a background rectangle node with a gradient
-    let mut background_rect_node = nf.create_rectangle_node();
-    background_rect_node.base.name = "Background Rect".to_string();
-    background_rect_node.size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    background_rect_node.fill = Paint::LinearGradient(LinearGradientPaint {
-        transform: AffineTransform::identity(),
-        stops: vec![
-            GradientStop {
-                offset: 0.0,
-                color: Color(240, 240, 240, 255), // Light gray
-            },
-            GradientStop {
-                offset: 1.0,
-                color: Color(200, 200, 200, 255), // Darker gray
-            },
-        ],
-        opacity: 1.0,
-    });
+    let mut repository = NodeRepository::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -37,10 +16,6 @@ async fn demo_effects() -> Scene {
         height: 1080.0,
     };
     root_container_node.base.name = "Root Container".to_string();
-
-    let mut repository = NodeRepository::new();
-    let background_rect_id = background_rect_node.base.id.clone();
-    repository.insert(Node::Rectangle(background_rect_node));
 
     let mut all_effect_ids = Vec::new();
     let spacing = 200.0;
@@ -144,7 +119,7 @@ async fn demo_effects() -> Scene {
     }
 
     // Set up the root container
-    root_container_node.children = vec![background_rect_id, vivid_gradient_rect_id];
+    root_container_node.children = vec![vivid_gradient_rect_id];
     root_container_node.children.extend(all_effect_ids);
     let root_container_id = root_container_node.base.id.clone();
     repository.insert(Node::Container(root_container_node));
@@ -155,6 +130,7 @@ async fn demo_effects() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 
