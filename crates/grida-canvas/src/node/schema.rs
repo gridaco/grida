@@ -1,4 +1,4 @@
-use crate::cvt;
+use crate::painter::cvt;
 use crate::repository::NodeRepository;
 use core::str;
 use math2::box_fit::BoxFit;

@@ -1,4 +1,4 @@
-use cg::scheduler::FrameScheduler;
+use cg::window::scheduler::FrameScheduler;
 use gl_rs as gl;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
@@ -14,13 +14,10 @@ use std::{ffi::CString, num::NonZeroU32, time::Instant};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::EventLoop,
-    window::{Window, WindowAttributes},
 };
 
 struct CachedScene {
     picture: Picture,
-    width: f32,
-    height: f32,
 }
 
 impl CachedScene {
@@ -36,11 +33,7 @@ impl CachedScene {
         // End recording and create the picture
         let picture = recorder.finish_recording_as_picture(None).unwrap();
 
-        Self {
-            picture,
-            width,
-            height,
-        }
+        Self { picture }
     }
 
     fn draw_static_content(canvas: &Canvas) {

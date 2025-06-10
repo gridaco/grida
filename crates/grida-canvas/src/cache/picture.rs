@@ -1,4 +1,4 @@
-use crate::schema::NodeId;
+use crate::node::schema::NodeId;
 use skia_safe::Picture;
 use std::collections::HashMap;
 
@@ -8,24 +8,24 @@ use std::collections::HashMap;
 /// - `0` caches the entire scene as a single picture.
 /// - `1` caches each top-level node separately.
 #[derive(Debug, Clone)]
-pub struct SceneCacheStrategy {
+pub struct PictureCacheStrategy {
     pub depth: usize,
 }
 
-impl Default for SceneCacheStrategy {
+impl Default for PictureCacheStrategy {
     fn default() -> Self {
         Self { depth: 1 }
     }
 }
 
-pub struct SceneCache {
-    strategy: SceneCacheStrategy,
+pub struct PictureCache {
+    strategy: PictureCacheStrategy,
     picture: Option<Picture>,
     node_pictures: HashMap<NodeId, Picture>,
 }
 
-impl SceneCache {
-    pub fn new(strategy: SceneCacheStrategy) -> Self {
+impl PictureCache {
+    pub fn new(strategy: PictureCacheStrategy) -> Self {
         Self {
             strategy,
             picture: None,
@@ -33,11 +33,11 @@ impl SceneCache {
         }
     }
 
-    pub fn strategy(&self) -> &SceneCacheStrategy {
+    pub fn strategy(&self) -> &PictureCacheStrategy {
         &self.strategy
     }
 
-    pub fn set_strategy(&mut self, strategy: SceneCacheStrategy) {
+    pub fn set_strategy(&mut self, strategy: PictureCacheStrategy) {
         self.strategy = strategy;
         self.invalidate();
     }

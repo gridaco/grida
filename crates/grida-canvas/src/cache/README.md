@@ -1,19 +1,21 @@
-# Geometry Cache
+# Cache
 
 A high-performance runtime store for managing per-node spatial data in a scene graph.
+
+## Geometry Cache
 
 ## Purpose
 
 The Geometry Cache exists to store and maintain computed geometric properties of nodes in a scene, independent from the user-authored structure. It enables fast rendering, culling, and future hit-testing by treating transform and bounds as first-class cached data.
 
-## Responsibilities
+### Responsibilities
 
 - Maintain **relative (local)** and **absolute (world)** transforms.
 - Cache **local** and **world-space bounding boxes**.
 - Propagate **dirty flags** on transform or geometry change.
 - Support optional future features like path-based hit-testing.
 
-## Philosophy
+### Philosophy
 
 1. **Authoring is relative. Rendering is absolute.**
 
@@ -36,7 +38,7 @@ The Geometry Cache exists to store and maintain computed geometric properties of
 
    - Updates are done top-down, in pre-sorted order or with explicit parent tracking.
 
-## Core Data Structure
+### Core Data Structure
 
 ```rust
 struct GeometryEntry {
@@ -55,14 +57,14 @@ struct GeometryCache {
 }
 ```
 
-## Operations
+### Operations
 
 - `mark_dirty(node_id)` — recursively mark transform + bounds dirty.
 - `update(node_id)` — resolve world transform + world bounds.
 - `get_world_transform(node_id)` — O(1) after update.
 - `get_world_bounds(node_id)` — O(1) after update.
 
-## Why Not a BVH?
+### Why Not a BVH?
 
 This cache stores per-node spatial data. A BVH is a secondary structure built _from_ this cache — optimized for queries like ray intersections, pointer picking, and region invalidation.
 

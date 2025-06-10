@@ -1,9 +1,8 @@
-use cg::factory::NodeFactory;
+use cg::node::factory::NodeFactory;
+use cg::node::schema::*;
 use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 async fn demo_booleans() -> Scene {
     let nf = NodeFactory::new();

@@ -1,4 +1,4 @@
-use crate::schema::*;
+use crate::node::schema::*;
 use skia_safe;
 
 fn cg_build_gradient_stops(

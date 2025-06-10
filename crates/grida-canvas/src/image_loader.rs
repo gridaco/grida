@@ -1,3 +1,4 @@
+use crate::node::schema::*;
 use std::collections::HashMap;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -119,14 +120,14 @@ impl ImageLoader {
 }
 
 /// Helper function to extract image URLs from a scene
-pub fn extract_image_urls(scene: &crate::schema::Scene) -> Vec<String> {
+pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
     scene
         .nodes
         .iter()
         .filter_map(|(_, n)| match n {
-            crate::schema::Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
-                (crate::schema::Paint::Image(img), _) => Some(img._ref.clone()),
-                (_, crate::schema::Paint::Image(img)) => Some(img._ref.clone()),
+            Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
+                (Paint::Image(img), _) => Some(img._ref.clone()),
+                (_, Paint::Image(img)) => Some(img._ref.clone()),
                 _ => None,
             },
             _ => None,
@@ -135,7 +136,7 @@ pub fn extract_image_urls(scene: &crate::schema::Scene) -> Vec<String> {
 }
 
 /// Helper function to load all images in a scene
-pub async fn load_scene_images(loader: &mut ImageLoader, scene: &crate::schema::Scene) {
+pub async fn load_scene_images(loader: &mut ImageLoader, scene: &Scene) {
     let urls = extract_image_urls(scene);
     for url in urls {
         let _ = loader.load_image(&url).await;

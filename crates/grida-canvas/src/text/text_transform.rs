@@ -1,4 +1,4 @@
-use crate::schema::TextTransform;
+use crate::node::schema::TextTransform;
 
 /// Applies text transformation according to CSS text-transform property.
 ///

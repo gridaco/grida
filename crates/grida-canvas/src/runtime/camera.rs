@@ -1,5 +1,5 @@
+use crate::node::schema::Size;
 use crate::rect::Rect;
-use crate::schema::Size;
 use math2::transform::AffineTransform;
 
 /// A camera that defines the view transformation for rendering.

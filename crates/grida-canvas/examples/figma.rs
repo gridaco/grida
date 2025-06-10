@@ -1,8 +1,8 @@
-mod window;
 use cg::font_loader::FontLoader;
-use cg::image_loader::{load_scene_images, ImageLoader};
+use cg::image_loader::{ImageLoader, load_scene_images};
 use cg::webfont_helper::{find_font_files, load_webfonts_metadata};
-use cg::{io_figma::FigmaConverter, schema::Scene};
+use cg::window;
+use cg::{io::io_figma::FigmaConverter, node::schema::Scene};
 use clap::Parser;
 use figma_api::apis::{
     configuration::{ApiKey, Configuration},

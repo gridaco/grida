@@ -1,8 +1,12 @@
-use cg::camera::Camera2D;
-use cg::draw::{Backend, Renderer};
-use cg::io::parse;
-use cg::scheduler::FrameScheduler;
-use cg::schema::*;
+pub mod scheduler;
+
+use crate::font_loader::FontLoader;
+use crate::font_loader::FontMessage;
+use crate::image_loader::ImageMessage;
+use crate::image_loader::{ImageLoader, load_scene_images};
+use crate::node::schema::*;
+use crate::runtime::camera::Camera2D;
+use crate::runtime::scene::{Backend, Renderer};
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
@@ -14,11 +18,9 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
-use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{gpu, Surface};
-use std::fs;
+use skia_safe::{Surface, gpu};
 use std::{ffi::CString, num::NonZeroU32};
 use tokio::sync::mpsc;
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
@@ -29,11 +31,6 @@ use winit::{
     event_loop::EventLoop,
     window::{Window, WindowAttributes},
 };
-
-use cg::font_loader::FontLoader;
-pub use cg::font_loader::FontMessage;
-pub use cg::image_loader::ImageMessage;
-use cg::image_loader::{load_scene_images, ImageLoader};
 
 #[derive(Debug)]
 enum Command {
@@ -264,7 +261,7 @@ struct App {
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
-    scheduler: FrameScheduler,
+    scheduler: scheduler::FrameScheduler,
 }
 
 impl ApplicationHandler for App {
@@ -490,7 +487,7 @@ where
 
     let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
     renderer.set_backend(Backend::GL(surface_ptr));
-    renderer.set_cache_strategy(cg::scene_cache::SceneCacheStrategy { depth: 1 });
+    renderer.set_cache_strategy(crate::cache::picture::PictureCacheStrategy { depth: 1 });
 
     // Initialize the image loader in lifecycle mode
     println!("📸 Initializing image loader...");
@@ -530,41 +527,9 @@ where
         window,
         image_rx: rx,
         font_rx,
-        scheduler: FrameScheduler::new(120).with_max_fps(144),
+        scheduler: scheduler::FrameScheduler::new(120).with_max_fps(144),
     };
 
     println!("🎭 Starting event loop...");
     el.run_app(&mut app).unwrap();
-}
-
-#[allow(dead_code)]
-pub async fn load_scene_from_file(file_path: &str) -> Scene {
-    let file: String = fs::read_to_string(file_path).expect("failed to read file");
-    let canvas_file = parse(&file).expect("failed to parse file");
-    let nodes = canvas_file.document.nodes;
-    // entry_scene_id or scenes[0]
-    let scene_id = canvas_file.document.entry_scene_id.unwrap_or(
-        canvas_file
-            .document
-            .scenes
-            .keys()
-            .next()
-            .unwrap()
-            .to_string(),
-    );
-    let scene = canvas_file.document.scenes.get(&scene_id).unwrap();
-    Scene {
-        nodes: nodes.into_iter().map(|(k, v)| (k, v.into())).collect(),
-        id: scene_id,
-        name: scene.name.clone(),
-        transform: AffineTransform::identity(),
-        children: scene.children.clone(),
-        background_color: Some(Color(230, 230, 230, 255)),
-    }
-}
-
-#[allow(dead_code)]
-fn main() {
-    println!("No-op");
-    // no-op
 }

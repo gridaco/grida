@@ -1,7 +1,7 @@
-use cg::draw::{Backend, Renderer};
+use cg::node::schema::*;
 use cg::repository::NodeRepository;
-use cg::schema::*;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use cg::runtime::scene::{Backend, Renderer};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use math2::transform::AffineTransform;
 
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {
@@ -39,14 +39,12 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             effect: if with_effects {
-                Some(cg::schema::FilterEffect::DropShadow(
-                    cg::schema::FeDropShadow {
-                        dx: 2.0,
-                        dy: 2.0,
-                        blur: 4.0,
-                        color: Color(0, 0, 0, 128),
-                    },
-                ))
+                Some(FilterEffect::DropShadow(FeDropShadow {
+                    dx: 2.0,
+                    dy: 2.0,
+                    blur: 4.0,
+                    color: Color(0, 0, 0, 128),
+                }))
             } else {
                 None
             },
@@ -56,7 +54,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     }
 
     // Create root group
-    let root_group = cg::schema::GroupNode {
+    let root_group = GroupNode {
         base: BaseNode {
             id: "root".to_string(),
             name: "Root Group".to_string(),
