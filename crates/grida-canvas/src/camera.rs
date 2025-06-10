@@ -27,9 +27,10 @@ impl Camera2D {
 
     /// Creates a view matrix by inverse-applying the camera's transform
     pub fn view_matrix(&self) -> AffineTransform {
-        let view = self.transform;
-        view.inverse();
-        view
+        self
+            .transform
+            .inverse()
+            .unwrap_or_else(AffineTransform::identity)
     }
 
     /// Sets the camera's position
