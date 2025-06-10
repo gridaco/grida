@@ -69,6 +69,7 @@ async fn demo_clip() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![container_id],
         nodes: repository,
+        background_color: None,
     }
 }
 

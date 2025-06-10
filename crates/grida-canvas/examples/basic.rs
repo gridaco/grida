@@ -6,42 +6,12 @@ use math2::transform::AffineTransform;
 mod window;
 
 async fn demo_basic() -> Scene {
-    let font_caveat_path: &str = "resources/Caveat-VariableFont_wght.ttf";
-    let font_caveat_data = window::fetch_font_data(font_caveat_path).await;
     let font_caveat_family = "Caveat".to_string();
-    let font_roboto_url = "https://storage.googleapis.com/skia-cdn/misc/Roboto-Regular.ttf";
-    let font_roboto_family = "Roboto".to_string();
-
-    // load the font
-    let font_data = window::fetch_font_data(font_roboto_url).await;
-
-    // renderer.add_font(&font_caveat_data);
-    // renderer.add_font(&font_data);
 
     let nf = NodeFactory::new();
 
-    // Add a background rectangle node
-    let mut background_rect_node = nf.create_rectangle_node();
-    background_rect_node.base.name = "Background Rect".to_string();
-    background_rect_node.size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    background_rect_node.fill = Paint::Solid(SolidPaint {
-        color: Color(230, 240, 255, 255), // Light blue for visibility
-        opacity: 1.0,
-    });
-    background_rect_node.stroke = Paint::Solid(SolidPaint {
-        color: Color(0, 0, 0, 0), // No stroke
-        opacity: 1.0,
-    });
-    background_rect_node.stroke_width = 0.0;
-
     // Preload image before timing
     let demo_image_id = "demo_image";
-    let demo_image_url = "https://grida.co/images/abstract-placeholder.jpg".to_string();
-    let demo_image_data = window::fetch_image_data(&demo_image_url).await;
-    let image = skia_safe::Image::from_encoded(skia_safe::Data::new_copy(&demo_image_data));
 
     // Create a test image node with URL
     let mut image_node = nf.create_image_node();
@@ -223,7 +193,6 @@ async fn demo_basic() -> Scene {
     let mut repository = NodeRepository::new();
 
     // First, collect all the IDs we'll need
-    let background_rect_id = background_rect_node.base.id.clone();
     let rect_id = rect_node.base.id.clone();
     let ellipse_id = ellipse_node.base.id.clone();
     let polygon_id = polygon_node.base.id.clone();
@@ -234,7 +203,6 @@ async fn demo_basic() -> Scene {
     let path_id = path_node.base.id.clone();
 
     // Now add all nodes to the map
-    repository.insert(Node::Rectangle(background_rect_node));
     repository.insert(Node::Rectangle(rect_node));
     repository.insert(Node::Ellipse(ellipse_node));
     repository.insert(Node::Polygon(polygon_node));
@@ -250,14 +218,7 @@ async fn demo_basic() -> Scene {
     repository.insert(Node::Group(shapes_group_node));
 
     // Finally set up the root container with all IDs
-    root_container_node.children = vec![
-        background_rect_id,
-        shapes_group_id,
-        text_span_id,
-        line_id,
-        path_id,
-        image_id,
-    ];
+    root_container_node.children = vec![shapes_group_id, text_span_id, line_id, path_id, image_id];
     let root_container_id = root_container_node.base.id.clone();
     repository.insert(Node::Container(root_container_node));
 
@@ -267,6 +228,7 @@ async fn demo_basic() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 

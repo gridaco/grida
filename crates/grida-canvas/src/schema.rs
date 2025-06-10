@@ -34,12 +34,23 @@ impl Point {
 }
 
 /// Boolean path operation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BooleanPathOperation {
     Union,        // A ∪ B
     Intersection, // A ∩ B
     Difference,   // A - B
     Xor,          // A ⊕ B
+}
+
+impl From<BooleanPathOperation> for skia_safe::PathOp {
+    fn from(op: BooleanPathOperation) -> Self {
+        match op {
+            BooleanPathOperation::Union => skia_safe::PathOp::Union,
+            BooleanPathOperation::Intersection => skia_safe::PathOp::Intersect,
+            BooleanPathOperation::Difference => skia_safe::PathOp::Difference,
+            BooleanPathOperation::Xor => skia_safe::PathOp::XOR,
+        }
+    }
 }
 
 /// Stroke alignment.
@@ -405,6 +416,7 @@ pub struct Scene {
     pub transform: AffineTransform,
     pub children: Vec<NodeId>,
     pub nodes: NodeRepository,
+    pub background_color: Option<Color>,
 }
 
 // endregion
@@ -424,6 +436,7 @@ pub enum Node {
     Line(LineNode),
     TextSpan(TextSpanNode),
     Path(PathNode),
+    BooleanOperation(BooleanPathOperationNode),
     Image(ImageNode),
 }
 
@@ -536,11 +549,19 @@ pub struct EllipseNode {
 }
 
 #[derive(Debug, Clone)]
-#[deprecated(note = "Not implemented yet")]
 pub struct BooleanPathOperationNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub op: BooleanPathOperation,
+    pub children: Vec<NodeId>,
+    pub fill: Paint,
+    pub stroke: Option<Paint>,
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+    pub stroke_dash_array: Option<Vec<f32>>,
+    pub opacity: f32,
+    pub blend_mode: BlendMode,
+    pub effect: Option<FilterEffect>,
 }
 
 ///

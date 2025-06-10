@@ -19,18 +19,6 @@ const LOREM_SHORT: &str = r#"Lorem ipsum dolor sit amet, consectetur adipiscing 
 async fn demo_texts() -> Scene {
     let nf = NodeFactory::new();
 
-    // Create a background rectangle node
-    let mut background_rect_node = nf.create_rectangle_node();
-    background_rect_node.base.name = "Background Rect".to_string();
-    background_rect_node.size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    background_rect_node.fill = Paint::Solid(SolidPaint {
-        color: Color(230, 240, 255, 255), // Light blue background
-        opacity: 1.0,
-    });
-
     // Create a single word text span
     let mut word_text_node = nf.create_text_span_node();
     word_text_node.base.name = "Word Text".to_string();
@@ -138,14 +126,12 @@ async fn demo_texts() -> Scene {
     let mut repository = NodeRepository::new();
 
     // Collect all the IDs
-    let background_rect_id = background_rect_node.base.id.clone();
     let word_text_id = word_text_node.base.id.clone();
     let sentence_text_id = sentence_text_node.base.id.clone();
     let paragraph_text_id = paragraph_text_node.base.id.clone();
     let second_paragraph_text_id = second_paragraph_text_node.base.id.clone();
 
     // Add all nodes to the repository
-    repository.insert(Node::Rectangle(background_rect_node));
     repository.insert(Node::TextSpan(word_text_node));
     repository.insert(Node::TextSpan(sentence_text_node));
     repository.insert(Node::TextSpan(paragraph_text_node));
@@ -153,7 +139,6 @@ async fn demo_texts() -> Scene {
 
     // Set up the root container with all IDs
     root_container_node.children = vec![
-        background_rect_id,
         word_text_id,
         sentence_text_id,
         paragraph_text_id,
@@ -168,6 +153,7 @@ async fn demo_texts() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 

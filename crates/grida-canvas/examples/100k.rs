@@ -67,6 +67,7 @@ async fn demo_n_shapes(n: usize) -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: None,
     }
 }
 

@@ -7,18 +7,7 @@ mod window;
 
 async fn demo_paints() -> Scene {
     let nf = NodeFactory::new();
-
-    // Add a background rectangle node
-    let mut background_rect_node = nf.create_rectangle_node();
-    background_rect_node.base.name = "Background Rect".to_string();
-    background_rect_node.size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    background_rect_node.fill = Paint::Solid(SolidPaint {
-        color: Color(240, 240, 240, 255), // Light gray background
-        opacity: 1.0,
-    });
+    let mut repository = NodeRepository::new();
 
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
@@ -27,10 +16,6 @@ async fn demo_paints() -> Scene {
         width: 1080.0,
         height: 1080.0,
     };
-
-    let mut repository = NodeRepository::new();
-    let background_rect_id = background_rect_node.base.id.clone();
-    repository.insert(Node::Rectangle(background_rect_node));
 
     let mut all_shape_ids = Vec::new();
     let spacing = 100.0;
@@ -245,7 +230,6 @@ async fn demo_paints() -> Scene {
     }
 
     // Set up the root container
-    root_container_node.children = vec![background_rect_id];
     root_container_node.children.extend(all_shape_ids);
     let root_container_id = root_container_node.base.id.clone();
     repository.insert(Node::Container(root_container_node));
@@ -256,6 +240,7 @@ async fn demo_paints() -> Scene {
         transform: AffineTransform::identity(),
         children: vec![root_container_id],
         nodes: repository,
+        background_color: Some(Color(250, 250, 250, 255)),
     }
 }
 

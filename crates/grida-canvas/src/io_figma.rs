@@ -1,11 +1,11 @@
 use crate::repository::NodeRepository;
 use crate::schema::{
-    BaseNode, BlendMode, Color, ContainerNode, ErrorNode, FeBackdropBlur, FeDropShadow,
-    FeGaussianBlur, FilterEffect, FontWeight, GradientStop, ImagePaint, LineNode,
-    LinearGradientPaint, Node, NodeId, Paint, PathNode, RadialGradientPaint, RectangleNode,
-    RectangularCornerRadius, RegularPolygonNode, RegularStarPolygonNode, Scene, Size, SolidPaint,
-    StrokeAlign, TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle,
-    TextTransform,
+    BaseNode, BlendMode, BooleanPathOperation, BooleanPathOperationNode, Color, ContainerNode,
+    ErrorNode, FeBackdropBlur, FeDropShadow, FeGaussianBlur, FilterEffect, FontWeight,
+    GradientStop, ImagePaint, LineNode, LinearGradientPaint, Node, NodeId, Paint, PathNode,
+    RadialGradientPaint, RectangleNode, RectangularCornerRadius, RegularPolygonNode,
+    RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign, TextAlignVertical,
+    TextDecoration, TextSpanNode, TextStyle, TextTransform,
 };
 use crate::webfont_helper;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
@@ -15,9 +15,9 @@ use figma_api::models::type_style::{
 };
 use figma_api::models::vector::Vector;
 use figma_api::models::{
-    BooleanOperationNode, CanvasNode, ComponentNode, ComponentSetNode, DocumentNode, Effect,
-    FrameNode, GroupNode, InstanceNode, LineNode as FigmaLineNode, LinkUnfurlNode,
-    Paint as FigmaPaint, RectangleNode as FigmaRectangleNode,
+    BooleanOperationNode as FigmaBooleanOperationNode, CanvasNode, ComponentNode, ComponentSetNode,
+    DocumentNode, Effect, FrameNode, GroupNode, InstanceNode, LineNode as FigmaLineNode,
+    LinkUnfurlNode, Paint as FigmaPaint, RectangleNode as FigmaRectangleNode,
     RegularPolygonNode as FigmaRegularPolygonNode, Rgba, SectionNode, SliceNode, StarNode,
     SubcanvasNode as FigmaSubcanvasNode, TextNode, VectorNode,
 };
@@ -31,11 +31,6 @@ const TRANSPARENT: Paint = Paint::Solid(SolidPaint {
 
 const BLACK: Paint = Paint::Solid(SolidPaint {
     color: Color(0, 0, 0, 255),
-    opacity: 1.0,
-});
-
-const RED: Paint = Paint::Solid(SolidPaint {
-    color: Color(255, 0, 0, 255),
     opacity: 1.0,
 });
 
@@ -724,59 +719,60 @@ impl FigmaConverter {
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
-
+        // canvas.background_color
         Ok(Scene {
             id: canvas.id.clone(),
             name: canvas.name.clone(),
             transform: AffineTransform::identity(),
             children,
             nodes: self.repository.clone(),
+            background_color: Some(Color::from(&canvas.background_color)),
         })
     }
 
-    fn convert_frame(&mut self, frame: &Box<FrameNode>) -> Result<Node, String> {
-        let children = frame
+    fn convert_frame(&mut self, origin: &Box<FrameNode>) -> Result<Node, String> {
+        let children = origin
             .children
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let size = Self::convert_size(frame.size.as_ref());
-        let transform = Self::convert_transform(frame.relative_transform.as_ref());
+        let size = Self::convert_size(origin.size.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
             base: BaseNode {
-                id: frame.id.clone(),
-                name: frame.name.clone(),
-                active: frame.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
-            blend_mode: Self::convert_blend_mode(frame.blend_mode),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
-                frame.corner_radius,
-                frame.rectangle_corner_radii.as_ref(),
+                origin.corner_radius,
+                origin.rectangle_corner_radii.as_ref(),
             ),
             fill: self
-                .convert_fills(Some(&frame.fills.as_ref()))
+                .convert_fills(Some(&origin.fills.as_ref()))
                 .unwrap_or(TRANSPARENT),
-            stroke: self.convert_strokes(Some(&frame.strokes)),
-            stroke_width: frame.stroke_weight.unwrap_or(0.0) as f32,
+            stroke: self.convert_strokes(Some(&origin.strokes)),
+            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                frame
+                origin
                     .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: frame
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&frame.effects)),
+            effect: Self::convert_effects(Some(&origin.effects)),
             children,
-            opacity: Self::convert_opacity(frame.visible),
-            clip: frame.clips_content,
+            opacity: Self::convert_opacity(origin.visible),
+            clip: origin.clips_content,
         }))
     }
 
@@ -805,8 +801,8 @@ impl FigmaConverter {
         }
     }
 
-    fn convert_text(&mut self, text: &Box<TextNode>) -> Result<Node, String> {
-        let style = text.style.as_ref();
+    fn convert_text(&mut self, origin: &Box<TextNode>) -> Result<Node, String> {
+        let style = origin.style.as_ref();
 
         // Register the font family and postscript name if they exist
         if let Some(font_family) = &style.font_family {
@@ -819,16 +815,16 @@ impl FigmaConverter {
 
         Ok(Node::TextSpan(TextSpanNode {
             base: BaseNode {
-                id: text.id.clone(),
-                name: text.name.clone(),
-                active: text.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
-            transform: Self::convert_transform(text.relative_transform.as_ref()),
+            transform: Self::convert_transform(origin.relative_transform.as_ref()),
             size: Size {
-                width: text.size.as_ref().map_or(0.0, |size| size.x as f32),
-                height: text.size.as_ref().map_or(0.0, |size| size.y as f32),
+                width: origin.size.as_ref().map_or(0.0, |size| size.x as f32),
+                height: origin.size.as_ref().map_or(0.0, |size| size.y as f32),
             },
-            text: text.characters.clone(),
+            text: origin.characters.clone(),
             text_style: TextStyle {
                 text_decoration: Self::convert_text_decoration(style.text_decoration.as_ref()),
                 font_family: style
@@ -839,7 +835,7 @@ impl FigmaConverter {
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
                 letter_spacing: style.letter_spacing.map(|v| v as f32),
                 line_height: style.line_height_px.map(|v| v as f32),
-                text_transform: match text.style.text_case.as_ref() {
+                text_transform: match origin.style.text_case.as_ref() {
                     Some(figma_api::models::type_style::TextCase::Upper) => {
                         TextTransform::Uppercase
                     }
@@ -860,31 +856,31 @@ impl FigmaConverter {
             text_align_vertical: Self::convert_text_align_vertical(
                 style.text_align_vertical.as_ref(),
             ),
-            fill: self.convert_fills(Some(&text.fills)).unwrap_or(BLACK),
-            stroke: self.convert_strokes(Some(&text.strokes)),
-            stroke_width: Some(text.stroke_weight.unwrap_or(0.0) as f32),
+            fill: self.convert_fills(Some(&origin.fills)).unwrap_or(BLACK),
+            stroke: self.convert_strokes(Some(&origin.strokes)),
+            stroke_width: Some(origin.stroke_weight.unwrap_or(0.0) as f32),
             stroke_align: StrokeAlign::Inside,
-            opacity: Self::convert_opacity(text.visible),
-            blend_mode: Self::convert_blend_mode(text.blend_mode),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
     }
 
-    fn convert_vector(&mut self, vector: &Box<VectorNode>) -> Result<Node, String> {
+    fn convert_vector(&mut self, origin: &Box<VectorNode>) -> Result<Node, String> {
         let mut children = Vec::new();
         let mut path_index = 0;
 
         // Convert fill geometries to path nodes
-        if let Some(fill_geometries) = &vector.fill_geometry {
+        if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
                 let path_node = Node::Path(PathNode {
                     base: BaseNode {
-                        id: format!("{}-path-{}", vector.id, path_index),
-                        name: format!("{}-path-{}", vector.name, path_index),
-                        active: vector.visible.unwrap_or(true),
+                        id: format!("{}-path-{}", origin.id, path_index),
+                        name: format!("{}-path-{}", origin.name, path_index),
+                        active: origin.visible.unwrap_or(true),
                     },
                     transform: AffineTransform::identity(),
                     fill: self
-                        .convert_fills(Some(&vector.fills))
+                        .convert_fills(Some(&origin.fills))
                         .unwrap_or(TRANSPARENT),
                     data: geometry.path.clone(),
                     stroke: Paint::Solid(SolidPaint {
@@ -894,9 +890,9 @@ impl FigmaConverter {
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
-                    opacity: Self::convert_opacity(vector.visible),
-                    blend_mode: Self::convert_blend_mode(vector.blend_mode),
-                    effect: Self::convert_effects(Some(&vector.effects)),
+                    opacity: Self::convert_opacity(origin.visible),
+                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
+                    effect: Self::convert_effects(Some(&origin.effects)),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -905,26 +901,26 @@ impl FigmaConverter {
 
         // Convert stroke geometries to path nodes
         // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
-        if let Some(stroke_geometries) = &vector.stroke_geometry {
+        if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
                 let path_node = Node::Path(PathNode {
                     base: BaseNode {
-                        id: format!("{}-path-{}", vector.id, path_index),
-                        name: format!("{}-path-{}", vector.name, path_index),
-                        active: vector.visible.unwrap_or(true),
+                        id: format!("{}-path-{}", origin.id, path_index),
+                        name: format!("{}-path-{}", origin.name, path_index),
+                        active: origin.visible.unwrap_or(true),
                     },
                     transform: AffineTransform::identity(),
                     fill: self
-                        .convert_strokes(Some(&vector.strokes))
+                        .convert_strokes(Some(&origin.strokes))
                         .unwrap_or(TRANSPARENT),
                     data: geometry.path.clone(),
                     stroke: TRANSPARENT,
                     stroke_width: 0.0,
                     stroke_align: StrokeAlign::Inside,
                     stroke_dash_array: None,
-                    opacity: Self::convert_opacity(vector.visible),
-                    blend_mode: Self::convert_blend_mode(vector.blend_mode),
-                    effect: Self::convert_effects(Some(&vector.effects)),
+                    opacity: Self::convert_opacity(origin.visible),
+                    blend_mode: Self::convert_blend_mode(origin.blend_mode),
+                    effect: Self::convert_effects(Some(&origin.effects)),
                 });
                 children.push(self.repository.insert(path_node));
                 path_index += 1;
@@ -934,13 +930,13 @@ impl FigmaConverter {
         // Create a group node containing all the path nodes
         Ok(Node::Container(ContainerNode {
             base: BaseNode {
-                id: vector.id.clone(),
-                name: vector.name.clone(),
-                active: vector.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
-            blend_mode: Self::convert_blend_mode(vector.blend_mode),
-            transform: Self::convert_transform(vector.relative_transform.as_ref()),
-            size: Self::convert_size(vector.size.as_ref()),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            transform: Self::convert_transform(origin.relative_transform.as_ref()),
+            size: Self::convert_size(origin.size.as_ref()),
             corner_radius: RectangularCornerRadius::zero(),
             fill: TRANSPARENT,
             stroke: None,
@@ -949,268 +945,286 @@ impl FigmaConverter {
             stroke_dash_array: None,
             effect: None,
             children,
-            opacity: Self::convert_opacity(vector.visible),
+            opacity: Self::convert_opacity(origin.visible),
             clip: false,
         }))
     }
 
     fn convert_boolean_operation(
         &mut self,
-        boolean: &Box<BooleanOperationNode>,
+        origin: &Box<FigmaBooleanOperationNode>,
     ) -> Result<Node, String> {
-        let children = boolean
+        let children = origin
             .children
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let size = Self::convert_size(boolean.size.as_ref());
-        let transform = Self::convert_transform(boolean.relative_transform.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
-        Ok(Node::Container(ContainerNode {
+        let op = match origin.boolean_operation {
+            figma_api::models::boolean_operation_node::BooleanOperation::Union => {
+                BooleanPathOperation::Union
+            }
+            figma_api::models::boolean_operation_node::BooleanOperation::Intersect => {
+                BooleanPathOperation::Intersection
+            }
+            figma_api::models::boolean_operation_node::BooleanOperation::Subtract => {
+                BooleanPathOperation::Difference
+            }
+            figma_api::models::boolean_operation_node::BooleanOperation::Exclude => {
+                BooleanPathOperation::Xor
+            }
+        };
+
+        Ok(Node::BooleanOperation(BooleanPathOperationNode {
             base: BaseNode {
-                id: boolean.id.clone(),
-                name: boolean.name.clone(),
-                active: boolean.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
-            blend_mode: Self::convert_blend_mode(boolean.blend_mode),
             transform,
-            size,
-            corner_radius: RectangularCornerRadius::zero(),
+            op: op,
+            children,
+            // corner_radius: RectangularCornerRadius::zero(),
             fill: self
-                .convert_fills(Some(&boolean.fills))
+                .convert_fills(Some(&origin.fills))
                 .unwrap_or(TRANSPARENT),
-            stroke: self.convert_strokes(Some(&boolean.strokes)),
-            stroke_width: boolean.stroke_weight.unwrap_or(0.0) as f32,
+            stroke: self.convert_strokes(Some(&origin.strokes)),
+            stroke_width: origin.stroke_weight.unwrap_or(0.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                boolean
+                origin
                     .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: boolean
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            effect: Self::convert_effects(Some(&boolean.effects)),
-            children,
-            opacity: Self::convert_opacity(boolean.visible),
-            clip: false,
+            effect: Self::convert_effects(Some(&origin.effects)),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
     }
 
-    fn convert_star(&mut self, star: &Box<StarNode>) -> Result<Node, String> {
-        let size = Self::convert_size(star.size.as_ref());
-        let transform = Self::convert_transform(star.relative_transform.as_ref());
+    fn convert_star(&mut self, origin: &Box<StarNode>) -> Result<Node, String> {
+        let size = Self::convert_size(origin.size.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::RegularStarPolygon(RegularStarPolygonNode {
             base: BaseNode {
-                id: star.id.clone(),
-                name: star.name.clone(),
-                active: star.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
             transform,
             size,
+            // not available in api?
             point_count: 5,     // Default to 5 points for a star
             inner_radius: 0.4,  // Default inner radius to 0.4 (40% of outer radius)
             corner_radius: 0.0, // Figma stars don't have corner radius
-            fill: self.convert_fills(Some(&star.fills)).unwrap_or(TRANSPARENT),
-            stroke: self
-                .convert_strokes(Some(&star.strokes))
+            fill: self
+                .convert_fills(Some(&origin.fills))
                 .unwrap_or(TRANSPARENT),
-            stroke_width: star.stroke_weight.unwrap_or(1.0) as f32,
+            stroke: self
+                .convert_strokes(Some(&origin.strokes))
+                .unwrap_or(TRANSPARENT),
+            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                star.stroke_align
+                origin
+                    .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: star
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(star.visible),
-            blend_mode: Self::convert_blend_mode(star.blend_mode),
-            effect: Self::convert_effects(Some(&star.effects)),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effect: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
-    fn convert_line(&mut self, line: &Box<FigmaLineNode>) -> Result<Node, String> {
-        let mut size = Self::convert_size(line.size.as_ref());
+    fn convert_line(&mut self, origin: &Box<FigmaLineNode>) -> Result<Node, String> {
+        let mut size = Self::convert_size(origin.size.as_ref());
         size.height = 0.0; // Lines have no height in our schema
-        let transform = Self::convert_transform(line.relative_transform.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Line(LineNode {
             base: BaseNode {
-                id: line.id.clone(),
-                name: line.name.clone(),
-                active: line.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
             transform,
             size,
             stroke: self
-                .convert_strokes(Some(&line.strokes))
+                .convert_strokes(Some(&origin.strokes))
                 .unwrap_or(TRANSPARENT),
-            stroke_width: line.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                line.stroke_align
+                origin
+                    .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: line
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(line.visible),
-            blend_mode: Self::convert_blend_mode(line.blend_mode),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
         }))
     }
 
     fn convert_ellipse(
         &mut self,
-        ellipse: &Box<figma_api::models::EllipseNode>,
+        origin: &Box<figma_api::models::EllipseNode>,
     ) -> Result<Node, String> {
-        let size = Self::convert_size(ellipse.size.as_ref());
+        let size = Self::convert_size(origin.size.as_ref());
         let transform =
-            Self::convert_transform(ellipse.relative_transform.as_ref().map(|v| v.as_ref()));
+            Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
         Ok(Node::Ellipse(crate::schema::EllipseNode {
             base: BaseNode {
-                id: ellipse.id.clone(),
-                name: ellipse.name.clone(),
-                active: ellipse.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
             transform,
             size,
             fill: self
-                .convert_fills(Some(&ellipse.fills))
+                .convert_fills(Some(&origin.fills))
                 .unwrap_or(TRANSPARENT),
             stroke: self
-                .convert_strokes(Some(&ellipse.strokes))
+                .convert_strokes(Some(&origin.strokes))
                 .unwrap_or(TRANSPARENT),
-            stroke_width: ellipse.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                ellipse
+                origin
                     .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: ellipse
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(ellipse.visible),
-            blend_mode: Self::convert_blend_mode(ellipse.blend_mode),
-            effect: Self::convert_effects(Some(&ellipse.effects)),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effect: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
     fn convert_regular_polygon(
         &mut self,
-        polygon: &Box<FigmaRegularPolygonNode>,
+        origin: &Box<FigmaRegularPolygonNode>,
     ) -> Result<Node, String> {
-        let size = Self::convert_size(polygon.size.as_ref());
-        let transform = Self::convert_transform(polygon.relative_transform.as_ref());
+        let size = Self::convert_size(origin.size.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
         Ok(Node::RegularPolygon(RegularPolygonNode {
             base: BaseNode {
-                id: polygon.id.clone(),
-                name: polygon.name.clone(),
-                active: polygon.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
             transform,
             size,
             // No count in api ?
             point_count: 3,
-            corner_radius: polygon.corner_radius.unwrap_or(0.0) as f32,
+            corner_radius: origin.corner_radius.unwrap_or(0.0) as f32,
             fill: self
-                .convert_fills(Some(&polygon.fills))
+                .convert_fills(Some(&origin.fills))
                 .unwrap_or(TRANSPARENT),
             stroke: self
-                .convert_strokes(Some(&polygon.strokes))
+                .convert_strokes(Some(&origin.strokes))
                 .unwrap_or(TRANSPARENT),
-            stroke_width: polygon.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                polygon
+                origin
                     .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: polygon
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(polygon.visible),
-            blend_mode: Self::convert_blend_mode(polygon.blend_mode),
-            effect: Self::convert_effects(Some(&polygon.effects)),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effect: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
-    fn convert_rectangle(&mut self, rectangle: &Box<FigmaRectangleNode>) -> Result<Node, String> {
-        let size = Self::convert_size(rectangle.size.as_ref());
-        let transform = Self::convert_transform(rectangle.relative_transform.as_ref());
+    fn convert_rectangle(&mut self, origin: &Box<FigmaRectangleNode>) -> Result<Node, String> {
+        let size = Self::convert_size(origin.size.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Rectangle(RectangleNode {
             base: BaseNode {
-                id: rectangle.id.clone(),
-                name: rectangle.name.clone(),
-                active: rectangle.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
-                rectangle.corner_radius,
-                rectangle.rectangle_corner_radii.as_ref(),
+                origin.corner_radius,
+                origin.rectangle_corner_radii.as_ref(),
             ),
             fill: self
-                .convert_fills(Some(&rectangle.fills))
+                .convert_fills(Some(&origin.fills))
                 .unwrap_or(TRANSPARENT),
             stroke: self
-                .convert_strokes(Some(&rectangle.strokes))
+                .convert_strokes(Some(&origin.strokes))
                 .unwrap_or(TRANSPARENT),
-            stroke_width: rectangle.stroke_weight.unwrap_or(1.0) as f32,
+            stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
             stroke_align: Self::convert_stroke_align(
-                rectangle
+                origin
                     .stroke_align
                     .as_ref()
                     .map(|a| serde_json::to_string(a).unwrap())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
-            stroke_dash_array: rectangle
+            stroke_dash_array: origin
                 .stroke_dashes
                 .clone()
                 .map(|v| v.into_iter().map(|x| x as f32).collect()),
-            opacity: Self::convert_opacity(rectangle.visible),
-            blend_mode: Self::convert_blend_mode(rectangle.blend_mode),
-            effect: Self::convert_effects(Some(&rectangle.effects)),
+            opacity: Self::convert_opacity(origin.visible),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
+            effect: Self::convert_effects(Some(&origin.effects)),
         }))
     }
 
-    fn convert_group(&mut self, group: &Box<GroupNode>) -> Result<Node, String> {
-        let children = group
+    fn convert_group(&mut self, origin: &Box<GroupNode>) -> Result<Node, String> {
+        let children = origin
             .children
             .iter()
             .map(|child| self.convert_sub_canvas_node(child))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let size = Self::convert_size(group.size.as_ref());
-        let transform = Self::convert_transform(group.relative_transform.as_ref());
+        let size = Self::convert_size(origin.size.as_ref());
+        let transform = Self::convert_transform(origin.relative_transform.as_ref());
 
         Ok(Node::Container(ContainerNode {
             base: BaseNode {
-                id: group.id.clone(),
-                name: group.name.clone(),
-                active: group.visible.unwrap_or(true),
+                id: origin.id.clone(),
+                name: origin.name.clone(),
+                active: origin.visible.unwrap_or(true),
             },
-            blend_mode: Self::convert_blend_mode(group.blend_mode),
+            blend_mode: Self::convert_blend_mode(origin.blend_mode),
             transform,
             size,
             corner_radius: Self::convert_corner_radius(
-                group.corner_radius,
-                group.rectangle_corner_radii.as_ref(),
+                origin.corner_radius,
+                origin.rectangle_corner_radii.as_ref(),
             ),
             fill: self.convert_fills(None).unwrap_or(TRANSPARENT),
             stroke: None,
@@ -1220,7 +1234,7 @@ impl FigmaConverter {
             effect: None,
             children,
             opacity: 1.0,
-            clip: group.clips_content,
+            clip: origin.clips_content,
         }))
     }
 }

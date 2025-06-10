@@ -1,6 +1,7 @@
 use cg::camera::Camera2D;
 use cg::draw::{Backend, Renderer};
 use cg::io::parse;
+use cg::scheduler::FrameScheduler;
 use cg::schema::*;
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
@@ -16,7 +17,6 @@ use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
-use reqwest;
 use skia_safe::{Surface, gpu};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
@@ -87,25 +87,6 @@ fn handle_window_event(event: WindowEvent) -> Command {
     }
 }
 
-pub async fn fetch_font_data(path: &str) -> Vec<u8> {
-    // read from file or url
-    if path.starts_with("http") {
-        let response = reqwest::get(path).await.unwrap();
-        response.bytes().await.unwrap().to_vec()
-    } else {
-        fs::read(path).expect("failed to read file")
-    }
-}
-
-pub async fn fetch_image_data(path: &str) -> Vec<u8> {
-    if path.starts_with("http") {
-        let response = reqwest::get(path).await.unwrap();
-        response.bytes().await.unwrap().to_vec()
-    } else {
-        fs::read(path).expect("failed to read file")
-    }
-}
-
 fn init_window(
     _width: i32,
     _height: i32,
@@ -126,7 +107,7 @@ fn init_window(
     // Create event loop and window
     let el = EventLoop::new().expect("Failed to create event loop");
     let window_attributes = WindowAttributes::default()
-        .with_title("Grida Canvas")
+        .with_title("Grida - grida-canvas / glutin / skia-safe::gpu::gl")
         .with_inner_size(LogicalSize::new(1080, 1080));
 
     // Create GL config template
@@ -283,6 +264,7 @@ struct App {
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
+    scheduler: FrameScheduler,
 }
 
 impl ApplicationHandler for App {
@@ -402,7 +384,7 @@ impl App {
     }
 
     fn redraw(&mut self) {
-        println!("🎨 redraw...");
+        // println!("🎨 redraw...");
         self.process_image_queue();
         self.process_font_queue();
         let surface = unsafe { &mut *self.surface_ptr };
@@ -415,6 +397,9 @@ impl App {
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
+
+        // Apply frame pacing
+        self.scheduler.sleep_to_maintain_fps();
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -459,6 +444,7 @@ impl App {
     }
 }
 
+#[allow(dead_code)]
 pub async fn run_demo_window(scene: Scene) {
     run_demo_window_with(scene, |_, _, _, _| {}).await;
 }
@@ -529,12 +515,14 @@ where
         window,
         image_rx: rx,
         font_rx,
+        scheduler: FrameScheduler::new(120).with_max_fps(144),
     };
 
     println!("🎭 Starting event loop...");
     el.run_app(&mut app).unwrap();
 }
 
+#[allow(dead_code)]
 pub async fn load_scene_from_file(file_path: &str) -> Scene {
     let file: String = fs::read_to_string(file_path).expect("failed to read file");
     let canvas_file = parse(&file).expect("failed to parse file");
@@ -556,9 +544,11 @@ pub async fn load_scene_from_file(file_path: &str) -> Scene {
         name: scene.name.clone(),
         transform: AffineTransform::identity(),
         children: scene.children.clone(),
+        background_color: Some(Color(230, 230, 230, 255)),
     }
 }
 
+#[allow(dead_code)]
 fn main() {
     println!("No-op");
     // no-op
