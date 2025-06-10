@@ -19,7 +19,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-math2 = "0.0.1"
+math2 = {}
 ```
 
 ## Example

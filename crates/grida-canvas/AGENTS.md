@@ -1,6 +1,7 @@
-Resources:
+safe, high-performance, 2D real-time rendering engine.
 
-- `skia-safe` docs: https://rust-skia.github.io/doc/skia_safe/
+- uses [`skia-safe`](https://rust-skia.github.io/doc/skia_safe/) for painting
+- uses [`math2`](../grida-math2/README.md) for geometry & common math operations
 
 ## Testing & Development
 
