@@ -34,7 +34,7 @@ impl Painter {
     // ============================
 
     /// Save/restore transform state and apply a 2×3 matrix
-    fn with_canvas_state<F: FnOnce()>(
+    fn with_transform<F: FnOnce()>(
         &self,
         canvas: &skia_safe::Canvas,
         transform: &[[f32; 3]; 2],
@@ -47,7 +47,7 @@ impl Painter {
     }
 
     /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
-    fn with_opacity_layer<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, opacity: f32, f: F) {
+    fn with_opacity<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, opacity: f32, f: F) {
         if opacity < 1.0 {
             canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
             f();
@@ -67,12 +67,13 @@ impl Painter {
         canvas.restore();
     }
 
-    /// Draw a drop shadow behind the content at `rect` with corner radii.
+    /// Draw a drop shadow behind the content at `rect` with corner radii or a custom path.
     fn draw_shadow(
         &self,
         canvas: &skia_safe::Canvas,
         rect: Rect,
         radii: &RectangularCornerRadius,
+        path: Option<&Path>,
         shadow: &FeDropShadow,
     ) {
         let Color(r, g, b, a) = shadow.color;
@@ -93,54 +94,63 @@ impl Painter {
         shadow_paint.set_image_filter(image_filter);
         shadow_paint.set_anti_alias(true);
 
-        let RectangularCornerRadius { tl, tr, bl, br } = *radii;
-
-        if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-            // Rounded rect shadow
-            let rrect = RRect::new_rect_radii(
-                rect,
-                &[
-                    Point::new(tl, tl),
-                    Point::new(tr, tr),
-                    Point::new(br, br),
-                    Point::new(bl, bl),
-                ],
-            );
-            canvas.draw_rrect(rrect, &shadow_paint);
+        if let Some(path) = path {
+            // Arbitrary path shadow
+            canvas.draw_path(path, &shadow_paint);
         } else {
-            // Regular rect shadow
-            canvas.draw_rect(rect, &shadow_paint);
+            let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                // Rounded rect shadow
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(tl, tl),
+                        Point::new(tr, tr),
+                        Point::new(br, br),
+                        Point::new(bl, bl),
+                    ],
+                );
+                canvas.draw_rrect(rrect, &shadow_paint);
+            } else {
+                // Regular rect shadow
+                canvas.draw_rect(rect, &shadow_paint);
+            }
         }
     }
 
-    /// Draw a backdrop blur: blur what's behind `rect`, clipped to a rounded‐corner area.
+    /// Draw a backdrop blur: blur what's behind `rect`, clipped to a rounded‐corner area or a custom path.
     fn draw_backdrop_blur(
         &self,
         canvas: &skia_safe::Canvas,
         rect: Rect,
         radii: &RectangularCornerRadius,
+        path: Option<&Path>,
         blur: &FeBackdropBlur,
     ) {
         // 1) Build a Gaussian‐blur filter for the backdrop
         let image_filter =
             skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None).unwrap();
 
-        // 2) Clip to the shape (rounded rect or plain rect)
-        let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+        // 2) Clip to the shape (path, rounded rect, or plain rect)
         canvas.save();
-        if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
-            let rrect = RRect::new_rect_radii(
-                rect,
-                &[
-                    Point::new(tl, tl),
-                    Point::new(tr, tr),
-                    Point::new(br, br),
-                    Point::new(bl, bl),
-                ],
-            );
-            canvas.clip_rrect(rrect, None, true);
+        if let Some(path) = path {
+            canvas.clip_path(path, None, true);
         } else {
-            canvas.clip_rect(rect, None, true);
+            let RectangularCornerRadius { tl, tr, bl, br } = *radii;
+            if tl > 0.0 || tr > 0.0 || bl > 0.0 || br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(tl, tl),
+                        Point::new(tr, tr),
+                        Point::new(br, br),
+                        Point::new(bl, bl),
+                    ],
+                );
+                canvas.clip_rrect(rrect, None, true);
+            } else {
+                canvas.clip_rect(rect, None, true);
+            }
         }
 
         // 3) Use a SaveLayerRec with a backdrop filter so that everything behind is blurred
@@ -363,29 +373,29 @@ impl Painter {
         }
     }
 
-    /// Central dispatcher that applies the effect (drop‐shadow, layer‐blur, backdrop‐blur)
-    /// around drawing the content (closure `draw_content`).
-    fn apply_effect<F: FnOnce()>(
+    /// Shared utility to handle effect drawing for shapes
+    fn draw_shape_with_effect<F: Fn()>(
         &self,
         canvas: &skia_safe::Canvas,
-        effect: &FilterEffect,
+        effect: Option<&FilterEffect>,
         rect: Rect,
         radii: &RectangularCornerRadius,
+        path: Option<&Path>,
         draw_content: F,
     ) {
         match effect {
-            FilterEffect::GaussianBlur(blur) => {
-                // Layer‐blur: blur everything drawn inside the closure
-                self.with_layer_blur(canvas, blur.radius, draw_content);
-            }
-            FilterEffect::DropShadow(shadow) => {
-                // Drop shadow behind content, then draw content normally
-                self.draw_shadow(canvas, rect, radii, shadow);
+            Some(FilterEffect::DropShadow(shadow)) => {
+                self.draw_shadow(canvas, rect, radii, path, shadow);
                 draw_content();
             }
-            FilterEffect::BackdropBlur(blur) => {
-                // Backdrop blur behind content, then draw content normally
-                self.draw_backdrop_blur(canvas, rect, radii, blur);
+            Some(FilterEffect::BackdropBlur(blur)) => {
+                self.draw_backdrop_blur(canvas, rect, radii, path, blur);
+                draw_content();
+            }
+            Some(FilterEffect::GaussianBlur(blur)) => {
+                self.with_layer_blur(canvas, blur.radius, draw_content);
+            }
+            None => {
                 draw_content();
             }
         }
@@ -586,27 +596,10 @@ impl Painter {
         node: &RectangleNode,
         image_repository: &ImageRepository,
     ) {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = node.corner_radius;
-
-            if let Some(effect) = &node.effect {
-                self.apply_effect(canvas, effect, rect, &radii, || {
-                    self.draw_fill_and_stroke(
-                        canvas,
-                        rect,
-                        &radii,
-                        Some(&node.fill),
-                        Some(&node.stroke),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                        node.blend_mode,
-                        node.opacity,
-                        image_repository,
-                    );
-                });
-            } else {
+            self.draw_shape_with_effect(canvas, node.effect.as_ref(), rect, &radii, None, || {
                 self.draw_fill_and_stroke(
                     canvas,
                     rect,
@@ -620,7 +613,7 @@ impl Painter {
                     node.opacity,
                     image_repository,
                 );
-            }
+            });
         });
     }
 
@@ -635,14 +628,19 @@ impl Painter {
     ) where
         F: Fn(&NodeId) -> bool,
     {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
-            self.with_opacity_layer(canvas, node.opacity, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
+            self.with_opacity(canvas, node.opacity, || {
                 let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
                 let radii = node.corner_radius;
 
                 // Draw effects first (if any) - these won't be clipped
-                if let Some(effect) = &node.effect {
-                    self.apply_effect(canvas, effect, rect, &radii, || {
+                self.draw_shape_with_effect(
+                    canvas,
+                    node.effect.as_ref(),
+                    rect,
+                    &radii,
+                    None,
+                    || {
                         self.draw_fill_and_stroke(
                             canvas,
                             rect,
@@ -656,22 +654,8 @@ impl Painter {
                             node.opacity,
                             image_repository,
                         );
-                    });
-                } else {
-                    self.draw_fill_and_stroke(
-                        canvas,
-                        rect,
-                        &radii,
-                        Some(&node.fill),
-                        node.stroke.as_ref(),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                        node.blend_mode,
-                        node.opacity,
-                        image_repository,
-                    );
-                }
+                    },
+                );
 
                 // Draw children with clipping if enabled
                 if node.clip {
@@ -717,14 +701,19 @@ impl Painter {
         node: &ImageNode,
         image_repository: &ImageRepository,
     ) -> bool {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = node.corner_radius;
 
             if let Some(image) = image_repository.get(&node._ref) {
                 // Image is ready - draw it
-                if let Some(effect) = &node.effect {
-                    self.apply_effect(canvas, effect, rect, &radii, || {
+                self.draw_shape_with_effect(
+                    canvas,
+                    node.effect.as_ref(),
+                    rect,
+                    &radii,
+                    None,
+                    || {
                         // Draw the image with rounded‐rect clipping
                         let mut paint = SkPaint::default();
                         paint.set_anti_alias(true);
@@ -765,52 +754,17 @@ impl Painter {
                                 image_repository,
                             );
                         }
-                    });
-                } else {
-                    // No effect: draw image + stroke directly
-                    let mut paint = SkPaint::default();
-                    paint.set_anti_alias(true);
-                    paint.set_blend_mode(node.blend_mode.into());
-                    paint.set_alpha((node.opacity * 255.0) as u8);
-
-                    if radii.tl > 0.0 || radii.tr > 0.0 || radii.bl > 0.0 || radii.br > 0.0 {
-                        let rrect = RRect::new_rect_radii(
-                            rect,
-                            &[
-                                Point::new(radii.tl, radii.tl),
-                                Point::new(radii.tr, radii.tr),
-                                Point::new(radii.br, radii.br),
-                                Point::new(radii.bl, radii.bl),
-                            ],
-                        );
-                        canvas.save();
-                        canvas.clip_rrect(rrect, None, true);
-                        canvas.draw_image_rect(image, None, rect, &paint);
-                        canvas.restore();
-                    } else {
-                        canvas.draw_image_rect(image, None, rect, &paint);
-                    }
-
-                    if node.stroke_width > 0.0 {
-                        self.draw_fill_and_stroke(
-                            canvas,
-                            rect,
-                            &radii,
-                            None,
-                            Some(&node.stroke),
-                            node.stroke_width,
-                            node.stroke_align,
-                            node.stroke_dash_array.as_ref(),
-                            node.blend_mode,
-                            node.opacity,
-                            image_repository,
-                        );
-                    }
-                }
+                    },
+                );
             } else {
                 // Image is not ready - draw only stroke and effects
-                if let Some(effect) = &node.effect {
-                    self.apply_effect(canvas, effect, rect, &radii, || {
+                self.draw_shape_with_effect(
+                    canvas,
+                    node.effect.as_ref(),
+                    rect,
+                    &radii,
+                    None,
+                    || {
                         // Draw only stroke with transparent fill
                         self.draw_fill_and_stroke(
                             canvas,
@@ -825,30 +779,15 @@ impl Painter {
                             node.opacity,
                             image_repository,
                         );
-                    });
-                } else {
-                    // Draw only stroke without effects
-                    self.draw_fill_and_stroke(
-                        canvas,
-                        rect,
-                        &radii,
-                        None,
-                        Some(&node.stroke),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                        node.blend_mode,
-                        node.opacity,
-                        image_repository,
-                    );
-                }
+                    },
+                );
             }
         });
         true
     }
 
     pub fn draw_error_node(&self, canvas: &skia_safe::Canvas, node: &ErrorNode) {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
             let radii = RectangularCornerRadius::zero();
 
@@ -889,8 +828,8 @@ impl Painter {
     ) where
         F: Fn(&NodeId) -> bool,
     {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
-            self.with_opacity_layer(canvas, node.opacity, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
+            self.with_opacity(canvas, node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
                         if should_draw(child_id) {
@@ -910,7 +849,7 @@ impl Painter {
 
     /// Draw an EllipseNode
     pub fn draw_ellipse_node(&self, canvas: &skia_safe::Canvas, node: &EllipseNode) {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             let rect = Rect::from_xywh(0.0, 0.0, node.size.width, node.size.height);
 
             let mut fill_paint = cvt::sk_paint(
@@ -947,7 +886,7 @@ impl Painter {
         );
         paint.set_blend_mode(node.blend_mode.into());
 
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             canvas.draw_line(
                 Point::new(0.0, 0.0),
                 Point::new(node.size.width, 0.0),
@@ -958,24 +897,17 @@ impl Painter {
 
     /// Draw a PathNode (SVG path data)
     pub fn draw_path_node(&self, canvas: &skia_safe::Canvas, node: &PathNode) {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
-            // Build the Skia path from SVG data
+        self.with_transform(canvas, &node.transform.matrix, || {
             let path = skia_safe::path::Path::from_svg(&node.data).expect("invalid SVG path");
-
-            // Compute bounding rect of path
             let bounds = path.compute_tight_bounds();
             let rect =
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
-            let radii = RectangularCornerRadius::zero(); // no corner radii for generic path
-
-            // Calculate stroke offset based on alignment
+            let radii = RectangularCornerRadius::zero();
             let stroke_offset = match node.stroke_align {
                 StrokeAlign::Inside => 0.0,
                 StrokeAlign::Center => node.stroke_width / 2.0,
                 StrokeAlign::Outside => node.stroke_width,
             };
-
-            // Adjust rect for stroke alignment
             let adjusted_rect = if stroke_offset > 0.0 {
                 Rect::new(
                     rect.left() - stroke_offset,
@@ -986,15 +918,16 @@ impl Painter {
             } else {
                 rect
             };
-
-            if let Some(effect) = &node.effect {
-                self.apply_effect(canvas, effect, adjusted_rect, &radii, || {
-                    // Draw fill
+            self.draw_shape_with_effect(
+                canvas,
+                node.effect.as_ref(),
+                adjusted_rect,
+                &radii,
+                Some(&path),
+                || {
                     let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
                     fill_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_path(&path, &fill_paint);
-
-                    // Draw stroke if needed
                     if node.stroke_width > 0.0 {
                         let mut stroke_paint = cvt::sk_paint_with_stroke(
                             &node.stroke,
@@ -1007,36 +940,22 @@ impl Painter {
                         stroke_paint.set_blend_mode(node.blend_mode.into());
                         canvas.draw_path(&path, &stroke_paint);
                     }
-                });
-            } else {
-                // No effect: draw fill + stroke directly
-                let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
-                fill_paint.set_blend_mode(node.blend_mode.into());
-                canvas.draw_path(&path, &fill_paint);
-
-                if node.stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint_with_stroke(
-                        &node.stroke,
-                        node.opacity,
-                        (1.0, 1.0),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                    );
-                    stroke_paint.set_blend_mode(node.blend_mode.into());
-                    canvas.draw_path(&path, &stroke_paint);
-                }
-            }
+                },
+            );
         });
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, canvas: &skia_safe::Canvas, node: &PolygonNode) {
+    pub fn draw_polygon_node(
+        &self,
+        canvas: &skia_safe::Canvas,
+        node: &PolygonNode,
+        repository: &NodeRepository,
+    ) {
         if node.points.len() < 3 {
             return;
         }
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
-            // Build path
+        self.with_transform(canvas, &node.transform.matrix, || {
             let path = if node.corner_radius > 0.0 {
                 node.to_path()
             } else {
@@ -1051,21 +970,15 @@ impl Painter {
                 }
                 p
             };
-
-            // Compute bounds + radii
             let bounds = path.compute_tight_bounds();
             let rect =
                 Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
             let radii = RectangularCornerRadius::all(node.corner_radius);
-
-            // Calculate stroke offset based on alignment
             let stroke_offset = match node.stroke_align {
                 StrokeAlign::Inside => 0.0,
                 StrokeAlign::Center => node.stroke_width / 2.0,
                 StrokeAlign::Outside => node.stroke_width,
             };
-
-            // Adjust rect for stroke alignment
             let adjusted_rect = if stroke_offset > 0.0 {
                 Rect::new(
                     rect.left() - stroke_offset,
@@ -1076,15 +989,16 @@ impl Painter {
             } else {
                 rect
             };
-
-            if let Some(effect) = &node.effect {
-                self.apply_effect(canvas, effect, adjusted_rect, &radii, || {
-                    // Draw fill
+            self.draw_shape_with_effect(
+                canvas,
+                node.effect.as_ref(),
+                adjusted_rect,
+                &radii,
+                Some(&path),
+                || {
                     let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
                     fill_paint.set_blend_mode(node.blend_mode.into());
                     canvas.draw_path(&path, &fill_paint);
-
-                    // Stroke
                     if node.stroke_width > 0.0 {
                         let mut stroke_paint = cvt::sk_paint_with_stroke(
                             &node.stroke,
@@ -1097,33 +1011,15 @@ impl Painter {
                         stroke_paint.set_blend_mode(node.blend_mode.into());
                         canvas.draw_path(&path, &stroke_paint);
                     }
-                });
-            } else {
-                // No effect
-                let mut fill_paint = cvt::sk_paint(&node.fill, node.opacity, (1.0, 1.0));
-                fill_paint.set_blend_mode(node.blend_mode.into());
-                canvas.draw_path(&path, &fill_paint);
-
-                if node.stroke_width > 0.0 {
-                    let mut stroke_paint = cvt::sk_paint_with_stroke(
-                        &node.stroke,
-                        node.opacity,
-                        (1.0, 1.0),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                    );
-                    stroke_paint.set_blend_mode(node.blend_mode.into());
-                    canvas.draw_path(&path, &stroke_paint);
-                }
-            }
+                },
+            );
         });
     }
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
     pub fn draw_regular_polygon_node(&self, canvas: &skia_safe::Canvas, node: &RegularPolygonNode) {
         let poly = node.to_polygon();
-        self.draw_polygon_node(canvas, &poly);
+        self.draw_polygon_node(canvas, &poly, &NodeRepository::new());
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
@@ -1133,7 +1029,7 @@ impl Painter {
         node: &RegularStarPolygonNode,
     ) {
         let poly = node.to_polygon();
-        self.draw_polygon_node(canvas, &poly);
+        self.draw_polygon_node(canvas, &poly, &NodeRepository::new());
     }
 
     pub fn draw_boolean_operation_node<F>(
@@ -1146,7 +1042,7 @@ impl Painter {
     ) where
         F: Fn(&NodeId) -> bool,
     {
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             if let Some(path) =
                 self.build_path_from_node(&Node::BooleanOperation(node.clone()), repository)
             {
@@ -1154,9 +1050,13 @@ impl Painter {
                 let rect =
                     Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
                 let radii = RectangularCornerRadius::zero();
-
-                if let Some(effect) = &node.effect {
-                    self.apply_effect(canvas, effect, rect, &radii, || {
+                self.draw_shape_with_effect(
+                    canvas,
+                    node.effect.as_ref(),
+                    rect,
+                    &radii,
+                    Some(&path),
+                    || {
                         self.draw_fill_and_stroke(
                             canvas,
                             rect,
@@ -1170,24 +1070,9 @@ impl Painter {
                             node.opacity,
                             image_repository,
                         );
-                    });
-                } else {
-                    self.draw_fill_and_stroke(
-                        canvas,
-                        rect,
-                        &radii,
-                        Some(&node.fill),
-                        node.stroke.as_ref(),
-                        node.stroke_width,
-                        node.stroke_align,
-                        node.stroke_dash_array.as_ref(),
-                        node.blend_mode,
-                        node.opacity,
-                        image_repository,
-                    );
-                }
+                    },
+                );
             }
-            // draw children individually if visibility check passes
             for child_id in &node.children {
                 if should_draw(child_id) {
                     if let Some(child) = repository.get(child_id) {
@@ -1245,7 +1130,7 @@ impl Painter {
         para_builder.pop();
         paragraph.layout(node.size.width);
 
-        self.with_canvas_state(canvas, &node.transform.matrix, || {
+        self.with_transform(canvas, &node.transform.matrix, || {
             paragraph.paint(canvas, Point::new(0.0, 0.0));
         });
     }
@@ -1271,7 +1156,7 @@ impl Painter {
             }
             Node::Rectangle(n) => self.draw_rect_node(canvas, n, image_repository),
             Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
-            Node::Polygon(n) => self.draw_polygon_node(canvas, n),
+            Node::Polygon(n) => self.draw_polygon_node(canvas, n, repository),
             Node::RegularPolygon(n) => self.draw_regular_polygon_node(canvas, n),
             Node::TextSpan(n) => self.draw_text_span_node(canvas, n),
             Node::Line(n) => self.draw_line_node(canvas, n),
@@ -1288,5 +1173,10 @@ impl Painter {
             ),
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
         }
+    }
+
+    /// Public helper to extract the path for a node (rect, rrect, polygon, path, etc.)
+    pub fn extract_node_path(&self, node: &Node, repository: &NodeRepository) -> Option<Path> {
+        self.build_path_from_node(node, repository)
     }
 }
