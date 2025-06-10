@@ -1318,7 +1318,7 @@ pub struct Renderer {
     dpi: f32,
     logical_width: f32,
     logical_height: f32,
-    camera: Option<Camera2D>,
+    pub camera: Option<Camera2D>,
     pub image_repository: ImageRepository,
     pub font_repository: FontRepository,
     geometry_cache: GeometryCache,
