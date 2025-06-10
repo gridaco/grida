@@ -48,22 +48,96 @@ A summary of all discussed optimization techniques for achieving high-performanc
    - Fallback to raster tiles for zoomed-out or complex views.
    - Tile invalidation/redraw is driven by zoom level, camera transform, or frame budget.
 
-8. **Dirty-Region Culling**
+8. **Dirty & Re-Cache Strategy**
 
-   - Use camera’s `visible_rect` to cull `world_bounds`.
-   - Optional: accelerate with quadtree or BVH.
+   - Nodes marked dirty will trigger re-recording of affected picture regions or tiles.
+   - Use change tracking to only re-record minimum needed areas.
+   - Recording large subtrees is expensive—optimize granularity based on tree structure.
 
-9. **Minimize Canvas State Changes**
+9. **Scene Cache Config / Strategy**
 
-   - Reuse transforms and paints.
-   - Precompute common values like DPI × Zoom × ViewMatrix.
+   - Defines how scene caching is organized.
+   - Properties include:
 
-10. **Text & Path Caching**
+     - `depth`:
+
+       - `0` → Entire scene is one cache.
+       - `1` → Cache per top-level container.
+       - `n` → Cache at depth `n`, chunking deeper layers.
+
+     - `mode`: `AlwaysPicture`, `Hybrid`, `AlwaysTile`
+
+     - `tile_size`, `tile_padding`
+
+     - `zoom_threshold_for_tiles`
+
+     - `frame_budget_threshold_ms`
+
+     - `use_bbh`, `enable_lod`, etc.
+
+   - Cache accessors like `get_picture_cache_by_id()` support scoped re-rendering.
+
+10. **Will-Change Optimization**
+
+    - Nodes marked with "will-change" are expected to become dirty soon.
+    - Examples:
+
+      - Image node waiting on async src resolution
+      - Text node waiting on font availability
+
+    - Tree holders of such nodes are chunked for localized re-recording.
+    - Prevents re-recording full subtrees—minimizes recording cost.
+
+11. **Flattened Render Command List**
+
+    - Scene is compiled into a flat list of `RenderCommand` structs with resolved:
+
+      - Transform
+      - Clip bounds
+      - Opacity
+      - Z-order
+
+    - Enables non-recursive rendering and independent layer recording.
+    - Required for tiling at arbitrary depths and for caching subtrees.
+
+    **Example:**
+
+    ```text
+    Logical Tree:
+    Frame
+      └── Group
+           ├── Rect1
+           ├── Rect2
+           └── Rect3
+
+    Flattened:
+    [
+      RenderCommand { node_id: Rect1, transform: ..., clip: ..., z: ... },
+      RenderCommand { node_id: Rect2, transform: ..., clip: ..., z: ... },
+      RenderCommand { node_id: Rect3, transform: ..., clip: ..., z: ... },
+    ]
+    ```
+
+    - Each command can be grouped and recorded separately into its own `SkPicture`.
+    - Nesting is preserved logically via sort order, but rendering is flat.
+    - This model is essential for dynamic caching, parallel planning, and GPU-aware scheduling.
+
+12. **Dirty-Region Culling**
+
+    - Use camera’s `visible_rect` to cull `world_bounds`.
+    - Optional: accelerate with quadtree or BVH.
+
+13. **Minimize Canvas State Changes**
+
+    - Reuse transforms and paints.
+    - Precompute common values like DPI × Zoom × ViewMatrix.
+
+14. **Text & Path Caching**
 
     - Cache laid-out paragraphs and SkPaths.
     - Avoid layout recomputation every frame.
 
-11. **Render Pass Flattening**
+15. **Render Pass Flattening**
 
     - Group nodes with same blend/composite states.
     - Sort draw calls for fewer GPU flushes.
@@ -72,12 +146,12 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 ## Image Optimization
 
-12. **LoD / Mipmapped Image Swapping**
+16. **LoD / Mipmapped Image Swapping**
 
     - Use lower-res versions of images at low zoom.
     - Prevents high GPU bandwidth use at low visibility.
 
-13. **ImageRepository with Transform-Aware Access**
+17. **ImageRepository with Transform-Aware Access**
 
     - Pick image resolution based on projected screen size.
 
@@ -85,7 +159,7 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 ## Text & Glyph Optimization
 
-14. **Glyph Cache (Atlas or Paragraph Caching)**
+18. **Glyph Cache (Atlas or Paragraph Caching)**
 
     - Cache rasterized or vector glyphs used across the document.
     - Prevents redundant layout or rendering of text.
@@ -95,38 +169,42 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 ## Engine-Level
 
-15. **Precomputed World Transforms**
+19. **Precomputed World Transforms**
 
     - Avoid recalculating transforms per draw call.
     - Essential for random-access rendering.
 
-16. **Flat Table Architecture**
+20. **Flat Table Architecture**
 
     - All node data (transforms, bounds, styles) stored in flat maps.
     - Enables fast diffing, syncing, and concurrent access.
 
-17. **Callback-Based Traversal with Fn/FnMut**
+21. **Callback-Based Traversal with Fn/FnMut**
 
     - Owner controls child behavior via inlined, zero-cost closures.
+
+22. **Scene Planner & Scheduler**
+
+    - A dynamic system that builds the flat render list per frame.
+    - Reacts to scene changes, memory pressure, or frame budget changes.
+    - Drives the decision to re-record, cache, evict, or downgrade fidelity.
 
 ---
 
 ## Optional Advanced
 
-18. **Multithreaded Scene Update**
+23. **Multithreaded Scene Update**
 
     - Parallelize transform/bounds resolution.
 
-19. **CRDT-Ready Data Stores**
+24. **CRDT-Ready Data Stores**
 
     - Flat table model enables future collaboration support.
 
-20. **BVH or Quadtree Spatial Index**
+25. **BVH or Quadtree Spatial Index**
 
     - Build dynamic index from `world_bounds` for fast spatial queries.
 
 ---
 
 This list is designed to help evolve a renderer from minimal single-threaded mode to scalable, GPU-friendly real-time performance.
-
-> Geometry is data. The renderer is a database. Speed is structure.
