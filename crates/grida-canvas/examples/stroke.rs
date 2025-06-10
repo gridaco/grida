@@ -10,6 +10,10 @@ async fn demo_strokes() -> Scene {
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
     root_container_node.base.name = "Root Container".to_string();
+    root_container_node.size = Size {
+        width: 1000.0,
+        height: 1000.0,
+    };
 
     let mut repository = NodeRepository::new();
 

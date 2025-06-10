@@ -66,6 +66,7 @@ async fn demo_images() -> Scene {
         width: 200.0,
         height: 200.0,
     };
+    rect3.corner_radius = RectangularCornerRadius::all(40.0);
     rect3.fill = Paint::Solid(SolidPaint {
         color: Color(240, 240, 240, 255),
         opacity: 1.0,
