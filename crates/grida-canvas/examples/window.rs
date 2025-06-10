@@ -353,19 +353,26 @@ impl ApplicationHandler for App {
 
 impl App {
     fn process_image_queue(&mut self) {
+        let mut updated = false;
         while let Ok(msg) = self.image_rx.try_recv() {
             println!("📥 Received image data for: {}", msg.src);
             if let Some(image) = self.renderer.create_image(&msg.data) {
                 println!("✅ Successfully created image from data: {}", msg.src);
                 self.renderer.register_image(msg.src.clone(), image);
                 println!("📝 Registered image with renderer: {}", msg.src);
+                updated = true;
             } else {
                 println!("❌ Failed to create image from data: {}", msg.src);
             }
         }
+        if updated {
+            self.renderer.invalidate_cache();
+            self.renderer.cache_scene(&self.scene);
+        }
     }
 
     fn process_font_queue(&mut self) {
+        let mut updated = false;
         while let Ok(msg) = self.font_rx.try_recv() {
             println!("📥 Received font data for family: '{}'", msg.family);
             // Use postscript name as alias if available, otherwise fallback to family
@@ -380,6 +387,11 @@ impl App {
                 count - 1,
                 count
             );
+            updated = true;
+        }
+        if updated {
+            self.renderer.invalidate_cache();
+            self.renderer.cache_scene(&self.scene);
         }
     }
 

@@ -1418,25 +1418,37 @@ impl Renderer {
         self.scene_cache.invalidate();
     }
 
-    // Record the scene content without any camera transforms
+    /// Record the entire scene into a [`Picture`].
+    ///
+    /// This skips camera transforms and visibility culling so the picture can
+    /// be reused while the camera moves.
     pub fn record_scene(&self, scene: &Scene) -> Option<Picture> {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             let mut recorder = PictureRecorder::new();
 
-            // Use the surface dimensions for the recording bounds
+            // Use surface dimensions for the recording bounds
             let bounds = Rect::new(0.0, 0.0, surface.width() as f32, surface.height() as f32);
             let canvas = recorder.begin_recording(bounds, None);
 
-            // Apply DPI scaling only
+            // Apply DPI scaling only; no camera transform
             canvas.scale((self.dpi, self.dpi));
 
-            // Render scene nodes directly (without camera transform)
+            // Draw each root node without visibility checks
+            let draw_all = |_: &NodeId| true;
             for child_id in &scene.children {
-                self.render_node(child_id, &scene.nodes);
+                if let Some(node) = scene.nodes.get(child_id) {
+                    self.painter.draw_node(
+                        &canvas,
+                        node,
+                        &scene.nodes,
+                        &self.image_repository,
+                        &draw_all,
+                    );
+                }
             }
 
-            // End recording and return the picture
+            // Finish recording and return the picture
             recorder.finish_recording_as_picture(None)
         } else {
             None

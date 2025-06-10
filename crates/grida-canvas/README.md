@@ -11,7 +11,7 @@ make build_release
 
 ### Scene Cache
 
-`Renderer` can record a scene into an off‑screen [`Picture`](https://rust-skia.github.io/doc/skia_safe/struct.Picture.html) and reuse it while the camera moves. This dramatically reduces draw calls when the scene is static.
+`Renderer` can record a scene into an off‑screen [`Picture`](https://rust-skia.github.io/doc/skia_safe/struct.Picture.html) and reuse it while the camera moves. This dramatically reduces draw calls when the scene is static. Caching is opt‑in; call `cache_scene` whenever the scene content changes.
 
 ```rust
 // Cache the scene after loading resources
