@@ -1424,32 +1424,40 @@ impl Renderer {
     /// be reused while the camera moves.
     pub fn record_scene(&self, scene: &Scene) -> Option<Picture> {
         if let Some(backend) = &self.backend {
-            let surface = unsafe { &mut *backend.get_surface() };
-            let mut recorder = PictureRecorder::new();
-
-            // Use surface dimensions for the recording bounds
-            let bounds = Rect::new(0.0, 0.0, surface.width() as f32, surface.height() as f32);
-            let canvas = recorder.begin_recording(bounds, None);
-
-            // Apply DPI scaling only; no camera transform
-            canvas.scale((self.dpi, self.dpi));
-
-            // Draw each root node without visibility checks
-            let draw_all = |_: &NodeId| true;
+            let geometry_cache = GeometryCache::from_scene(scene);
+            let mut union_bounds: Option<rect::Rect> = None;
             for child_id in &scene.children {
-                if let Some(node) = scene.nodes.get(child_id) {
-                    self.painter.draw_node(
-                        &canvas,
-                        node,
-                        &scene.nodes,
-                        &self.image_repository,
-                        &draw_all,
-                    );
+                if let Some(b) = geometry_cache.get_world_bounds(child_id) {
+                    union_bounds = Some(match union_bounds {
+                        Some(u) => u.union(&b),
+                        None => b,
+                    });
                 }
             }
 
-            // Finish recording and return the picture
-            recorder.finish_recording_as_picture(None)
+            if let Some(bounds) = union_bounds {
+                let mut recorder = PictureRecorder::new();
+                let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+                let canvas = recorder.begin_recording(sk_bounds, None);
+
+                // Draw each root node without visibility checks
+                let draw_all = |_: &NodeId| true;
+                for child_id in &scene.children {
+                    if let Some(node) = scene.nodes.get(child_id) {
+                        self.painter.draw_node(
+                            &canvas,
+                            node,
+                            &scene.nodes,
+                            &self.image_repository,
+                            &draw_all,
+                        );
+                    }
+                }
+
+                recorder.finish_recording_as_picture(None)
+            } else {
+                None
+            }
         } else {
             None
         }
