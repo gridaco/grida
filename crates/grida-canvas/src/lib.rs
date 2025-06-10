@@ -10,6 +10,7 @@ pub mod io;
 pub mod io_figma;
 pub mod rect;
 pub mod repository;
+pub mod scene_cache;
 pub mod scheduler;
 pub mod schema;
 pub mod text_transform;

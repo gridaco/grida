@@ -17,7 +17,7 @@ use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu};
+use skia_safe::{gpu, Surface};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ use winit::{
 use cg::font_loader::FontLoader;
 pub use cg::font_loader::FontMessage;
 pub use cg::image_loader::ImageMessage;
-use cg::image_loader::{ImageLoader, load_scene_images};
+use cg::image_loader::{load_scene_images, ImageLoader};
 
 #[derive(Debug)]
 enum Command {
@@ -440,6 +440,7 @@ impl App {
         unsafe { _ = Box::from_raw(self.surface_ptr) };
         self.surface_ptr = Box::into_raw(Box::new(surface));
         self.renderer.set_backend(Backend::GL(self.surface_ptr));
+        self.renderer.invalidate_cache();
         self.redraw();
     }
 }
@@ -501,6 +502,7 @@ where
     };
     let camera = Camera2D::new(viewport_size);
     renderer.set_camera(camera.clone());
+    renderer.cache_scene(&scene);
 
     let mut app = App {
         renderer,

@@ -5,13 +5,13 @@ use crate::{
     geometry_cache::GeometryCache,
     rect,
     repository::{FontRepository, ImageRepository, NodeRepository},
-    visibility,
+    scene_cache, visibility,
 };
 use skia_safe::{
-    ClipOp, Image, Paint as SkPaint, Path, Picture, PictureRecorder, Point, RRect, Rect, Surface,
-    canvas::SaveLayerRec, surfaces, textlayout::*,
+    canvas::SaveLayerRec, surfaces, textlayout::*, ClipOp, Image, Paint as SkPaint, Path, Picture,
+    PictureRecorder, Point, RRect, Rect, Surface,
 };
-use skia_safe::{PathOp, op};
+use skia_safe::{op, PathOp};
 
 /// Choice of GPU vs. raster backend
 pub enum Backend {
@@ -1322,6 +1322,7 @@ pub struct Renderer {
     pub image_repository: ImageRepository,
     pub font_repository: FontRepository,
     geometry_cache: GeometryCache,
+    scene_cache: scene_cache::SceneCache,
     pub feature_visibility_culling_enabled: bool,
 }
 
@@ -1343,6 +1344,7 @@ impl Renderer {
             image_repository,
             font_repository,
             geometry_cache: GeometryCache::new(),
+            scene_cache: scene_cache::SceneCache::new(),
             feature_visibility_culling_enabled: false,
         }
     }
@@ -1403,6 +1405,19 @@ impl Renderer {
         self.camera = Some(camera);
     }
 
+    /// Record and store the entire scene into the internal cache.
+    /// This assumes the scene is static and only the camera transforms at runtime.
+    pub fn cache_scene(&mut self, scene: &Scene) {
+        if let Some(picture) = self.record_scene(scene) {
+            self.scene_cache.set_picture(picture);
+        }
+    }
+
+    /// Clear the cached scene picture.
+    pub fn invalidate_cache(&mut self) {
+        self.scene_cache.invalidate();
+    }
+
     // Record the scene content without any camera transforms
     pub fn record_scene(&self, scene: &Scene) -> Option<Picture> {
         if let Some(backend) = &self.backend {
@@ -1431,6 +1446,39 @@ impl Renderer {
     // Render the scene
     pub fn render_scene(&mut self, scene: &Scene) {
         if let Some(backend) = &self.backend {
+            // Fast path: use cached picture when available
+            if let Some(picture) = self.scene_cache.get_picture() {
+                let surface = unsafe { &mut *backend.get_surface() };
+                let width = surface.width() as f32;
+                let height = surface.height() as f32;
+                let canvas = surface.canvas();
+                canvas.save();
+
+                if let Some(bg_color) = scene.background_color {
+                    let Color(r, g, b, a) = bg_color;
+                    let color = skia_safe::Color::from_argb(a, r, g, b);
+                    let mut paint = SkPaint::default();
+                    paint.set_color(color);
+                    canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+                }
+
+                let scale_x = self.logical_width / width;
+                let scale_y = self.logical_height / height;
+                canvas.scale((scale_x, scale_y));
+                canvas.scale((self.dpi, self.dpi));
+
+                if let Some(camera) = &self.camera {
+                    let view_matrix = camera.view_matrix();
+                    canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
+                    let zoom = camera.zoom;
+                    canvas.scale((zoom, zoom));
+                }
+
+                canvas.draw_picture(picture, None, None);
+                canvas.restore();
+                return;
+            }
+
             self.geometry_cache = GeometryCache::from_scene(scene);
             let surface = unsafe { &mut *backend.get_surface() };
             let width = surface.width() as f32;
