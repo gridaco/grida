@@ -70,15 +70,15 @@ fn handle_window_event(event: WindowEvent) -> Command {
             MouseScrollDelta::LineDelta(x, y) => {
                 let pan_speed = 10.0;
                 Command::Pan {
-                    x: x * pan_speed,
-                    y: y * pan_speed,
+                    x: -x * pan_speed,
+                    y: -y * pan_speed,
                 }
             }
             MouseScrollDelta::PixelDelta(delta) => {
                 let pan_speed = 0.5;
                 Command::Pan {
-                    x: delta.x as f32 * pan_speed,
-                    y: delta.y as f32 * pan_speed,
+                    x: -(delta.x as f32) * pan_speed,
+                    y: -(delta.y as f32) * pan_speed,
                 }
             }
         },
