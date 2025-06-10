@@ -6,6 +6,188 @@ use skia_safe::{
 };
 use skia_safe::{PathOp, op};
 
+/// Internal universal Painter's shape abstraction for optimized drawing
+/// Virtual nodes like Group, BooleanOperation are not Painter's shapes, they use different methods.
+pub struct PainterShape {
+    pub rect: Rect,
+    pub rect_shape: Option<Rect>,
+    pub rrect: Option<RRect>,
+    pub oval: Option<Rect>,
+    pub path: Option<Path>,
+}
+
+impl PainterShape {
+    /// Construct a plain rectangle shape
+    pub fn from_rect(rect: Rect) -> Self {
+        Self {
+            rect,
+            rect_shape: Some(rect),
+            rrect: None,
+            oval: None,
+            path: None,
+        }
+    }
+    /// Construct a rounded rectangle shape
+    pub fn from_rrect(rrect: RRect) -> Self {
+        Self {
+            rect: rrect.rect().clone(),
+            rect_shape: None,
+            rrect: Some(rrect),
+            oval: None,
+            path: None,
+        }
+    }
+    /// Construct an oval/ellipse shape
+    pub fn from_oval(rect: Rect) -> Self {
+        Self {
+            rect,
+            rect_shape: None,
+            rrect: None,
+            oval: Some(rect),
+            path: None,
+        }
+    }
+    /// Construct a path-based shape (bounding rect must be provided)
+    pub fn from_path(path: Path) -> Self {
+        Self {
+            rect: path.bounds().clone(),
+            rect_shape: None,
+            rrect: None,
+            oval: None,
+            path: Some(path),
+        }
+    }
+
+    pub fn to_path(&self) -> Path {
+        let mut path = Path::new();
+
+        if let Some(rect) = self.rect_shape {
+            path.add_rect(rect, None);
+        } else if let Some(rrect) = &self.rrect {
+            path.add_rrect(rrect, None);
+        } else if let Some(oval) = &self.oval {
+            path.add_oval(oval, None);
+        } else if let Some(existing_path) = &self.path {
+            path = existing_path.clone();
+        } else {
+            // Fallback to rect if no specific shape is set
+            path.add_rect(self.rect, None);
+        }
+
+        path
+    }
+}
+
+fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
+    match node {
+        IntrinsicSizeNode::Rectangle(n) => {
+            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+            let r = n.corner_radius;
+            if !r.is_zero() {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(r.tl, r.tl),
+                        Point::new(r.tr, r.tr),
+                        Point::new(r.br, r.br),
+                        Point::new(r.bl, r.bl),
+                    ],
+                );
+                PainterShape::from_rrect(rrect)
+            } else {
+                PainterShape::from_rect(rect)
+            }
+        }
+        IntrinsicSizeNode::Ellipse(n) => {
+            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+            PainterShape::from_oval(rect)
+        }
+        IntrinsicSizeNode::Polygon(n) => {
+            let path = if n.corner_radius > 0.0 {
+                n.to_path()
+            } else {
+                let mut p = Path::new();
+                let mut iter = n.points.iter();
+                if let Some(&pt) = iter.next() {
+                    p.move_to((pt.x, pt.y));
+                    for &pt in iter {
+                        p.line_to((pt.x, pt.y));
+                    }
+                    p.close();
+                }
+                p
+            };
+            PainterShape::from_path(path)
+        }
+        IntrinsicSizeNode::RegularPolygon(n) => {
+            let poly = n.to_polygon();
+            build_shape(&IntrinsicSizeNode::Polygon(poly))
+        }
+        IntrinsicSizeNode::RegularStarPolygon(n) => {
+            let poly = n.to_polygon();
+            build_shape(&IntrinsicSizeNode::Polygon(poly))
+        }
+        IntrinsicSizeNode::Line(n) => {
+            let mut path = Path::new();
+            path.move_to((0.0, 0.0));
+            path.line_to((n.size.width, 0.0));
+            PainterShape::from_path(path)
+        }
+        IntrinsicSizeNode::Path(n) => {
+            if let Some(path) = Path::from_svg(&n.data) {
+                PainterShape::from_path(path)
+            } else {
+                // Fallback to empty rect if path is invalid
+                PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
+            }
+        }
+        IntrinsicSizeNode::Container(n) => {
+            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+            let r = n.corner_radius;
+            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(r.tl, r.tl),
+                        Point::new(r.tr, r.tr),
+                        Point::new(r.br, r.br),
+                        Point::new(r.bl, r.bl),
+                    ],
+                );
+                PainterShape::from_rrect(rrect)
+            } else {
+                PainterShape::from_rect(rect)
+            }
+        }
+        IntrinsicSizeNode::Image(n) => {
+            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+            let r = n.corner_radius;
+            if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
+                let rrect = RRect::new_rect_radii(
+                    rect,
+                    &[
+                        Point::new(r.tl, r.tl),
+                        Point::new(r.tr, r.tr),
+                        Point::new(r.br, r.br),
+                        Point::new(r.bl, r.bl),
+                    ],
+                );
+                PainterShape::from_rrect(rrect)
+            } else {
+                PainterShape::from_rect(rect)
+            }
+        }
+        IntrinsicSizeNode::Error(n) => {
+            let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+            PainterShape::from_rect(rect)
+        }
+        IntrinsicSizeNode::TextSpan(_) => {
+            // Text spans don't have a shape
+            PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
+        }
+    }
+}
+
 /// A painter that handles all drawing operations for nodes,
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
 pub struct Painter {
@@ -55,6 +237,33 @@ impl Painter {
         } else {
             f();
         }
+    }
+
+    /// Helper method to apply clipping to a region with optional corner radius
+    fn with_clip<F: FnOnce()>(
+        &self,
+        canvas: &skia_safe::Canvas,
+        rect: Rect,
+        radii: &RectangularCornerRadius,
+        f: F,
+    ) {
+        canvas.save();
+        if radii.tl > 0.0 || radii.tr > 0.0 || radii.bl > 0.0 || radii.br > 0.0 {
+            let rrect = RRect::new_rect_radii(
+                rect,
+                &[
+                    Point::new(radii.tl, radii.tl),
+                    Point::new(radii.tr, radii.tr),
+                    Point::new(radii.br, radii.br),
+                    Point::new(radii.bl, radii.bl),
+                ],
+            );
+            canvas.clip_rrect(rrect, None, true);
+        } else {
+            canvas.clip_rect(rect, None, true);
+        }
+        f();
+        canvas.restore();
     }
 
     /// Wrap a closure `f` in a layer that applies a Gaussian blur to everything drawn inside.
@@ -398,190 +607,6 @@ impl Painter {
             None => {
                 draw_content();
             }
-        }
-    }
-
-    /// Helper method to apply clipping to a region with optional corner radius
-    fn with_clip<F: FnOnce()>(
-        &self,
-        canvas: &skia_safe::Canvas,
-        rect: Rect,
-        radii: &RectangularCornerRadius,
-        f: F,
-    ) {
-        canvas.save();
-        if radii.tl > 0.0 || radii.tr > 0.0 || radii.bl > 0.0 || radii.br > 0.0 {
-            let rrect = RRect::new_rect_radii(
-                rect,
-                &[
-                    Point::new(radii.tl, radii.tl),
-                    Point::new(radii.tr, radii.tr),
-                    Point::new(radii.br, radii.br),
-                    Point::new(radii.bl, radii.bl),
-                ],
-            );
-            canvas.clip_rrect(rrect, None, true);
-        } else {
-            canvas.clip_rect(rect, None, true);
-        }
-        f();
-        canvas.restore();
-    }
-
-    fn build_path_from_node(&self, node: &Node, repository: &NodeRepository) -> Option<Path> {
-        match node {
-            Node::Rectangle(n) => {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                let mut path = Path::new();
-                let r = n.corner_radius;
-                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
-                    let rrect = RRect::new_rect_radii(
-                        rect,
-                        &[
-                            Point::new(r.tl, r.tl),
-                            Point::new(r.tr, r.tr),
-                            Point::new(r.br, r.br),
-                            Point::new(r.bl, r.bl),
-                        ],
-                    );
-                    path.add_rrect(rrect, None);
-                } else {
-                    path.add_rect(rect, None);
-                }
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::Ellipse(n) => {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                let mut path = Path::new();
-                path.add_oval(rect, None);
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::Polygon(n) => {
-                let mut path = if n.corner_radius > 0.0 {
-                    n.to_path()
-                } else {
-                    let mut p = Path::new();
-                    let mut iter = n.points.iter();
-                    if let Some(&pt) = iter.next() {
-                        p.move_to((pt.x, pt.y));
-                        for &pt in iter {
-                            p.line_to((pt.x, pt.y));
-                        }
-                        p.close();
-                    }
-                    p
-                };
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::RegularPolygon(n) => {
-                let poly = n.to_polygon();
-                self.build_path_from_node(&Node::Polygon(poly), repository)
-            }
-            Node::RegularStarPolygon(n) => {
-                let poly = n.to_polygon();
-                self.build_path_from_node(&Node::Polygon(poly), repository)
-            }
-            Node::Line(n) => {
-                let mut path = Path::new();
-                path.move_to((0.0, 0.0));
-                path.line_to((n.size.width, 0.0));
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::Path(n) => {
-                if let Some(mut path) = Path::from_svg(&n.data) {
-                    path.transform(&cvt::sk_matrix(n.transform.matrix));
-                    Some(path)
-                } else {
-                    None
-                }
-            }
-            Node::Container(n) => {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                let mut path = Path::new();
-                let r = n.corner_radius;
-                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
-                    let rrect = RRect::new_rect_radii(
-                        rect,
-                        &[
-                            Point::new(r.tl, r.tl),
-                            Point::new(r.tr, r.tr),
-                            Point::new(r.br, r.br),
-                            Point::new(r.bl, r.bl),
-                        ],
-                    );
-                    path.add_rrect(rrect, None);
-                } else {
-                    path.add_rect(rect, None);
-                }
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::Group(g) => {
-                let mut result: Option<Path> = None;
-                for child_id in &g.children {
-                    if let Some(child) = repository.get(child_id) {
-                        if let Some(p) = self.build_path_from_node(child, repository) {
-                            result = Some(match result {
-                                Some(acc) => op(&acc, &p, PathOp::Union).unwrap(),
-                                None => p,
-                            });
-                        }
-                    }
-                }
-                if let Some(mut path) = result {
-                    path.transform(&cvt::sk_matrix(g.transform.matrix));
-                    Some(path)
-                } else {
-                    None
-                }
-            }
-            Node::BooleanOperation(b) => {
-                let mut result: Option<Path> = None;
-                for child_id in &b.children {
-                    if let Some(child) = repository.get(child_id) {
-                        if let Some(p) = self.build_path_from_node(child, repository) {
-                            result = Some(match result {
-                                Some(acc) => op(&acc, &p, b.op.clone().into()).unwrap(),
-                                None => p,
-                            });
-                        }
-                    }
-                }
-                result
-            }
-            Node::Image(n) => {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                let mut path = Path::new();
-                let r = n.corner_radius;
-                if r.tl > 0.0 || r.tr > 0.0 || r.bl > 0.0 || r.br > 0.0 {
-                    let rrect = RRect::new_rect_radii(
-                        rect,
-                        &[
-                            Point::new(r.tl, r.tl),
-                            Point::new(r.tr, r.tr),
-                            Point::new(r.br, r.br),
-                            Point::new(r.bl, r.bl),
-                        ],
-                    );
-                    path.add_rrect(rrect, None);
-                } else {
-                    path.add_rect(rect, None);
-                }
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::Error(n) => {
-                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
-                let mut path = Path::new();
-                path.add_rect(rect, None);
-                path.transform(&cvt::sk_matrix(n.transform.matrix));
-                Some(path)
-            }
-            Node::TextSpan(_) => None,
         }
     }
 
@@ -946,12 +971,7 @@ impl Painter {
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(
-        &self,
-        canvas: &skia_safe::Canvas,
-        node: &PolygonNode,
-        repository: &NodeRepository,
-    ) {
+    pub fn draw_polygon_node(&self, canvas: &skia_safe::Canvas, node: &PolygonNode) {
         if node.points.len() < 3 {
             return;
         }
@@ -1019,7 +1039,7 @@ impl Painter {
     /// Draw a RegularPolygonNode by converting to a PolygonNode
     pub fn draw_regular_polygon_node(&self, canvas: &skia_safe::Canvas, node: &RegularPolygonNode) {
         let poly = node.to_polygon();
-        self.draw_polygon_node(canvas, &poly, &NodeRepository::new());
+        self.draw_polygon_node(canvas, &poly);
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
@@ -1029,9 +1049,10 @@ impl Painter {
         node: &RegularStarPolygonNode,
     ) {
         let poly = node.to_polygon();
-        self.draw_polygon_node(canvas, &poly, &NodeRepository::new());
+        self.draw_polygon_node(canvas, &poly);
     }
 
+    #[deprecated(note = "Boolean operations are not implemented properly")]
     pub fn draw_boolean_operation_node<F>(
         &self,
         canvas: &skia_safe::Canvas,
@@ -1043,36 +1064,6 @@ impl Painter {
         F: Fn(&NodeId) -> bool,
     {
         self.with_transform(canvas, &node.transform.matrix, || {
-            if let Some(path) =
-                self.build_path_from_node(&Node::BooleanOperation(node.clone()), repository)
-            {
-                let bounds = path.compute_tight_bounds();
-                let rect =
-                    Rect::from_xywh(bounds.left(), bounds.top(), bounds.width(), bounds.height());
-                let radii = RectangularCornerRadius::zero();
-                self.draw_shape_with_effect(
-                    canvas,
-                    node.effect.as_ref(),
-                    rect,
-                    &radii,
-                    Some(&path),
-                    || {
-                        self.draw_fill_and_stroke(
-                            canvas,
-                            rect,
-                            &radii,
-                            Some(&node.fill),
-                            node.stroke.as_ref(),
-                            node.stroke_width,
-                            node.stroke_align,
-                            node.stroke_dash_array.as_ref(),
-                            node.blend_mode,
-                            node.opacity,
-                            image_repository,
-                        );
-                    },
-                );
-            }
             for child_id in &node.children {
                 if should_draw(child_id) {
                     if let Some(child) = repository.get(child_id) {
@@ -1156,7 +1147,7 @@ impl Painter {
             }
             Node::Rectangle(n) => self.draw_rect_node(canvas, n, image_repository),
             Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
-            Node::Polygon(n) => self.draw_polygon_node(canvas, n, repository),
+            Node::Polygon(n) => self.draw_polygon_node(canvas, n),
             Node::RegularPolygon(n) => self.draw_regular_polygon_node(canvas, n),
             Node::TextSpan(n) => self.draw_text_span_node(canvas, n),
             Node::Line(n) => self.draw_line_node(canvas, n),
@@ -1173,10 +1164,5 @@ impl Painter {
             ),
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
         }
-    }
-
-    /// Public helper to extract the path for a node (rect, rrect, polygon, path, etc.)
-    pub fn extract_node_path(&self, node: &Node, repository: &NodeRepository) -> Option<Path> {
-        self.build_path_from_node(node, repository)
     }
 }

@@ -406,6 +406,14 @@ impl RectangularCornerRadius {
             br: value,
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.tl == 0.0 && self.tr == 0.0 && self.bl == 0.0 && self.br == 0.0
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.tl == self.tr && self.tl == self.bl && self.tl == self.br
+    }
 }
 
 // region: Scene
@@ -437,6 +445,24 @@ pub enum Node {
     TextSpan(TextSpanNode),
     Path(PathNode),
     BooleanOperation(BooleanPathOperationNode),
+    Image(ImageNode),
+}
+
+/// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
+#[derive(Debug, Clone)]
+pub enum IntrinsicSizeNode {
+    // Group(GroupNode),
+    // BooleanOperation(BooleanPathOperationNode),
+    Error(ErrorNode),
+    Container(ContainerNode),
+    Rectangle(RectangleNode),
+    Ellipse(EllipseNode),
+    Polygon(PolygonNode),
+    RegularPolygon(RegularPolygonNode),
+    RegularStarPolygon(RegularStarPolygonNode),
+    Line(LineNode),
+    TextSpan(TextSpanNode),
+    Path(PathNode),
     Image(ImageNode),
 }
 
