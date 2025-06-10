@@ -27,8 +27,7 @@ impl Camera2D {
 
     /// Creates a view matrix by inverse-applying the camera's transform
     pub fn view_matrix(&self) -> AffineTransform {
-        self
-            .transform
+        self.transform
             .inverse()
             .unwrap_or_else(AffineTransform::identity)
     }

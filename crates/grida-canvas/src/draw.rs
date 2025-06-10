@@ -1344,7 +1344,7 @@ impl Renderer {
             image_repository,
             font_repository,
             geometry_cache: GeometryCache::new(),
-            scene_cache: scene_cache::SceneCache::new(),
+            scene_cache: scene_cache::SceneCache::new(scene_cache::SceneCacheStrategy::default()),
             feature_visibility_culling_enabled: false,
         }
     }
@@ -1405,11 +1405,54 @@ impl Renderer {
         self.camera = Some(camera);
     }
 
+    pub fn set_cache_strategy(&mut self, strategy: scene_cache::SceneCacheStrategy) {
+        self.scene_cache.set_strategy(strategy);
+    }
+
     /// Record and store the entire scene into the internal cache.
     /// This assumes the scene is static and only the camera transforms at runtime.
     pub fn cache_scene(&mut self, scene: &Scene) {
-        if let Some(picture) = self.record_scene(scene) {
-            self.scene_cache.set_picture(picture);
+        match self.scene_cache.strategy().depth {
+            0 => {
+                if let Some(picture) = self.record_scene(scene) {
+                    self.scene_cache.set_picture(picture);
+                }
+            }
+            1 => {
+                self.scene_cache.clear_node_pictures();
+                if let Some(backend) = &self.backend {
+                    let _surface = unsafe { &mut *backend.get_surface() };
+                    let geometry_cache = GeometryCache::from_scene(scene);
+                    for child_id in &scene.children {
+                        if let (Some(node), Some(bounds)) = (
+                            scene.nodes.get(child_id),
+                            geometry_cache.get_world_bounds(child_id),
+                        ) {
+                            if let Some(picture) = self.record_node(node, &bounds, &scene.nodes) {
+                                self.scene_cache.set_node_picture(child_id.clone(), picture);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // For depths >1 we currently fall back to depth 1 behaviour
+                self.scene_cache.clear_node_pictures();
+                if let Some(backend) = &self.backend {
+                    let _surface = unsafe { &mut *backend.get_surface() };
+                    let geometry_cache = GeometryCache::from_scene(scene);
+                    for child_id in &scene.children {
+                        if let (Some(node), Some(bounds)) = (
+                            scene.nodes.get(child_id),
+                            geometry_cache.get_world_bounds(child_id),
+                        ) {
+                            if let Some(picture) = self.record_node(node, &bounds, &scene.nodes) {
+                                self.scene_cache.set_node_picture(child_id.clone(), picture);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1463,40 +1506,61 @@ impl Renderer {
         }
     }
 
+    fn record_node(
+        &self,
+        node: &Node,
+        bounds: &rect::Rect,
+        repository: &NodeRepository,
+    ) -> Option<Picture> {
+        if self.backend.is_some() {
+            let mut recorder = PictureRecorder::new();
+            let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+            let canvas = recorder.begin_recording(sk_bounds, None);
+            let draw_all = |_id: &NodeId| true;
+            self.painter
+                .draw_node(&canvas, node, repository, &self.image_repository, &draw_all);
+            recorder.finish_recording_as_picture(None)
+        } else {
+            None
+        }
+    }
+
     // Render the scene
     pub fn render_scene(&mut self, scene: &Scene) {
         if let Some(backend) = &self.backend {
-            // Fast path: use cached picture when available
-            if let Some(picture) = self.scene_cache.get_picture() {
-                let surface = unsafe { &mut *backend.get_surface() };
-                let width = surface.width() as f32;
-                let height = surface.height() as f32;
-                let canvas = surface.canvas();
-                canvas.save();
+            // Fast path when the whole scene is cached
+            if self.scene_cache.strategy().depth == 0 {
+                if let Some(picture) = self.scene_cache.get_picture() {
+                    let surface = unsafe { &mut *backend.get_surface() };
+                    let width = surface.width() as f32;
+                    let height = surface.height() as f32;
+                    let canvas = surface.canvas();
+                    canvas.save();
 
-                if let Some(bg_color) = scene.background_color {
-                    let Color(r, g, b, a) = bg_color;
-                    let color = skia_safe::Color::from_argb(a, r, g, b);
-                    let mut paint = SkPaint::default();
-                    paint.set_color(color);
-                    canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+                    if let Some(bg_color) = scene.background_color {
+                        let Color(r, g, b, a) = bg_color;
+                        let color = skia_safe::Color::from_argb(a, r, g, b);
+                        let mut paint = SkPaint::default();
+                        paint.set_color(color);
+                        canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+                    }
+
+                    let scale_x = self.logical_width / width;
+                    let scale_y = self.logical_height / height;
+                    canvas.scale((scale_x, scale_y));
+                    canvas.scale((self.dpi, self.dpi));
+
+                    if let Some(camera) = &self.camera {
+                        let view_matrix = camera.view_matrix();
+                        canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
+                        let zoom = camera.zoom;
+                        canvas.scale((zoom, zoom));
+                    }
+
+                    canvas.draw_picture(picture, None, None);
+                    canvas.restore();
+                    return;
                 }
-
-                let scale_x = self.logical_width / width;
-                let scale_y = self.logical_height / height;
-                canvas.scale((scale_x, scale_y));
-                canvas.scale((self.dpi, self.dpi));
-
-                if let Some(camera) = &self.camera {
-                    let view_matrix = camera.view_matrix();
-                    canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
-                    let zoom = camera.zoom;
-                    canvas.scale((zoom, zoom));
-                }
-
-                canvas.draw_picture(picture, None, None);
-                canvas.restore();
-                return;
             }
 
             self.geometry_cache = GeometryCache::from_scene(scene);
@@ -1535,8 +1599,18 @@ impl Renderer {
             }
 
             // Render scene nodes
-            for child_id in &scene.children {
-                self.render_node(child_id, &scene.nodes);
+            if self.scene_cache.strategy().depth == 1 {
+                for child_id in &scene.children {
+                    if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
+                        canvas.draw_picture(pic, None, None);
+                    } else {
+                        self.render_node(child_id, &scene.nodes);
+                    }
+                }
+            } else {
+                for child_id in &scene.children {
+                    self.render_node(child_id, &scene.nodes);
+                }
             }
 
             canvas.restore();
