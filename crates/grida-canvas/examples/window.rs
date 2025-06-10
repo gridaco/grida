@@ -17,7 +17,7 @@ use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu};
+use skia_safe::{gpu, Surface};
 use std::fs;
 use std::{ffi::CString, num::NonZeroU32};
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ use winit::{
 use cg::font_loader::FontLoader;
 pub use cg::font_loader::FontMessage;
 pub use cg::image_loader::ImageMessage;
-use cg::image_loader::{ImageLoader, load_scene_images};
+use cg::image_loader::{load_scene_images, ImageLoader};
 
 #[derive(Debug)]
 enum Command {
@@ -70,15 +70,15 @@ fn handle_window_event(event: WindowEvent) -> Command {
             MouseScrollDelta::LineDelta(x, y) => {
                 let pan_speed = 10.0;
                 Command::Pan {
-                    x: x * pan_speed,
-                    y: y * pan_speed,
+                    x: -x * pan_speed,
+                    y: -y * pan_speed,
                 }
             }
             MouseScrollDelta::PixelDelta(delta) => {
                 let pan_speed = 0.5;
                 Command::Pan {
-                    x: delta.x as f32 * pan_speed,
-                    y: delta.y as f32 * pan_speed,
+                    x: -(delta.x as f32) * pan_speed,
+                    y: -(delta.y as f32) * pan_speed,
                 }
             }
         },
@@ -353,19 +353,26 @@ impl ApplicationHandler for App {
 
 impl App {
     fn process_image_queue(&mut self) {
+        let mut updated = false;
         while let Ok(msg) = self.image_rx.try_recv() {
             println!("📥 Received image data for: {}", msg.src);
             if let Some(image) = self.renderer.create_image(&msg.data) {
                 println!("✅ Successfully created image from data: {}", msg.src);
                 self.renderer.register_image(msg.src.clone(), image);
                 println!("📝 Registered image with renderer: {}", msg.src);
+                updated = true;
             } else {
                 println!("❌ Failed to create image from data: {}", msg.src);
             }
         }
+        if updated {
+            self.renderer.invalidate_cache();
+            self.renderer.cache_scene(&self.scene);
+        }
     }
 
     fn process_font_queue(&mut self) {
+        let mut updated = false;
         while let Ok(msg) = self.font_rx.try_recv() {
             println!("📥 Received font data for family: '{}'", msg.family);
             // Use postscript name as alias if available, otherwise fallback to family
@@ -380,6 +387,11 @@ impl App {
                 count - 1,
                 count
             );
+            updated = true;
+        }
+        if updated {
+            self.renderer.invalidate_cache();
+            self.renderer.cache_scene(&self.scene);
         }
     }
 
@@ -440,6 +452,7 @@ impl App {
         unsafe { _ = Box::from_raw(self.surface_ptr) };
         self.surface_ptr = Box::into_raw(Box::new(surface));
         self.renderer.set_backend(Backend::GL(self.surface_ptr));
+        self.renderer.invalidate_cache();
         self.redraw();
     }
 }
@@ -477,6 +490,7 @@ where
 
     let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
     renderer.set_backend(Backend::GL(surface_ptr));
+    renderer.set_cache_strategy(cg::scene_cache::SceneCacheStrategy { depth: 1 });
 
     // Initialize the image loader in lifecycle mode
     println!("📸 Initializing image loader...");
@@ -501,6 +515,7 @@ where
     };
     let camera = Camera2D::new(viewport_size);
     renderer.set_camera(camera.clone());
+    renderer.cache_scene(&scene);
 
     let mut app = App {
         renderer,
