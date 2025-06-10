@@ -1,0 +1,9 @@
+[package]
+name = "grida"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "reserved for future use by grida"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

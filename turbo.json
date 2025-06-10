@@ -6,7 +6,13 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "build/**", "dist/**"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "build/**",
+        "dist/**",
+        "target/release/**"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]

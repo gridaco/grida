@@ -1,0 +1,15 @@
+
+[package]
+name = "math2"
+version = "0.0.2"
+edition = "2024"
+description = "Geometry, layout and rasterization utilities powering the Grida canvas"
+license = "MIT"
+repository = "https://github.com/gridaco/grida"
+homepage = "https://grida.co"
+keywords = ["canvas", "geometry", "layout", "rasterization", "bezier"]
+categories = ["algorithms", "graphics", "mathematics", "data-structures"]
+authors = ["Grida"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]

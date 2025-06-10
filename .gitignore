@@ -1,7 +1,3 @@
-
-# Created by https://www.toptal.com/developers/gitignore/api/node,react,macos,windows,visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=node,react,macos,windows,visualstudiocode
-
 ### macOS ###
 # General
 .DS_Store
@@ -197,7 +193,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/node,react,macos,windows,visualstudiocode
 .vercel
 
 # Turborepo
@@ -205,3 +200,6 @@ $RECYCLE.BIN/
 
 # node-compile-cache
 node-compile-cache/
+
+# rust
+/target

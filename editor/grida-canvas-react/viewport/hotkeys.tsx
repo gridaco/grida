@@ -927,3 +927,9 @@ export function useEditorHotKeys() {
     toast.error("[eject component] is not implemented yet");
   });
 }
+
+export function Hotkeys() {
+  useEditorHotKeys();
+
+  return null;
+}
