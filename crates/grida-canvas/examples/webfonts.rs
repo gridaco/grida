@@ -1,11 +1,10 @@
-use cg::factory::NodeFactory;
 use cg::font_loader::FontLoader;
+use cg::node::factory::NodeFactory;
+use cg::node::schema::*;
 use cg::repository::NodeRepository;
-use cg::schema::*;
 use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 const PARAGRAPH: &str = r#"
 This demo showcases how multiple static TTF font files—each representing a different weight or style—can be loaded under the same font family name. It verifies that our system can correctly resolve and apply the appropriate font file when rendering text spans with varying font weights and styles. Each text line uses the same font family (“Albert Sans”) but specifies a different combination of weight and italic flag. If the system behaves correctly, the rendered output should match the intended visual style for each variant, demonstrating accurate font resolution and fallback handling within the shared family context.

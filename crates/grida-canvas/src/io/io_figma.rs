@@ -1,12 +1,12 @@
-use crate::repository::NodeRepository;
-use crate::schema::{
+use crate::node::schema::{
     BaseNode, BlendMode, BooleanPathOperation, BooleanPathOperationNode, Color, ContainerNode,
-    ErrorNode, FeBackdropBlur, FeDropShadow, FeGaussianBlur, FilterEffect, FontWeight,
+    EllipseNode, ErrorNode, FeBackdropBlur, FeDropShadow, FeGaussianBlur, FilterEffect, FontWeight,
     GradientStop, ImagePaint, LineNode, LinearGradientPaint, Node, NodeId, Paint, PathNode,
     RadialGradientPaint, RectangleNode, RectangularCornerRadius, RegularPolygonNode,
     RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign, TextAlignVertical,
     TextDecoration, TextSpanNode, TextStyle, TextTransform,
 };
+use crate::repository::NodeRepository;
 use crate::webfont_helper;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -1090,7 +1090,7 @@ impl FigmaConverter {
         let transform =
             Self::convert_transform(origin.relative_transform.as_ref().map(|v| v.as_ref()));
 
-        Ok(Node::Ellipse(crate::schema::EllipseNode {
+        Ok(Node::Ellipse(EllipseNode {
             base: BaseNode {
                 id: origin.id.clone(),
                 name: origin.name.clone(),

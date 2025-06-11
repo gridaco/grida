@@ -1,10 +1,9 @@
-use cg::factory::NodeFactory;
 use cg::font_loader::FontLoader;
+use cg::node::factory::NodeFactory;
+use cg::node::schema::*;
 use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 const LOREM: &str = r#"
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.

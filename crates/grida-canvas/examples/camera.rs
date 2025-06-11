@@ -1,7 +1,8 @@
+use cg::node::factory::NodeFactory;
 use cg::{
-    camera::Camera2D,
-    draw::{Backend, Renderer},
-    schema::{BaseNode, Color, GroupNode, Node, Scene, Size},
+    node::schema::*,
+    runtime::camera::Camera2D,
+    runtime::scene::{Backend, Renderer},
 };
 use gl_rs as gl;
 use glutin::{
@@ -14,7 +15,7 @@ use glutin::{
 use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu, picture_recorder};
+use skia_safe::{Surface, gpu};
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -24,7 +25,7 @@ use winit::{
 
 fn create_static_scene() -> Scene {
     let mut repository = cg::repository::NodeRepository::new();
-    let nf = cg::factory::NodeFactory::new();
+    let nf = NodeFactory::new();
 
     // Create a grid of rectangles
     let mut ids = Vec::new();
@@ -53,7 +54,7 @@ fn create_static_scene() -> Scene {
         transform: AffineTransform::identity(),
         children: ids,
         opacity: 1.0,
-        blend_mode: cg::schema::BlendMode::Normal,
+        blend_mode: BlendMode::Normal,
     };
 
     repository.insert(Node::Group(root_group));

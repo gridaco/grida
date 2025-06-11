@@ -1,4 +1,4 @@
-use crate::schema::*;
+use crate::node::schema::*;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
 use serde_json::Value;

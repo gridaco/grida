@@ -1,9 +1,8 @@
-use cg::factory::NodeFactory;
+use cg::node::factory::NodeFactory;
+use cg::node::schema::*;
 use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::window;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-
-mod window;
 
 async fn demo_images() -> Scene {
     let nf = NodeFactory::new();
@@ -67,6 +66,7 @@ async fn demo_images() -> Scene {
         width: 200.0,
         height: 200.0,
     };
+    rect3.corner_radius = RectangularCornerRadius::all(40.0);
     rect3.fill = Paint::Solid(SolidPaint {
         color: Color(240, 240, 240, 255),
         opacity: 1.0,

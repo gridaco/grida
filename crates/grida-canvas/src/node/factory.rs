@@ -1,4 +1,4 @@
-use crate::schema::*;
+use super::schema::*;
 use math2::transform::AffineTransform;
 use uuid::Uuid;
 
