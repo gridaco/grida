@@ -1,15 +1,30 @@
-use crate::node::schema::{Node, NodeId, Scene};
+use crate::node::schema::{IntrinsicSizeNode, Node, NodeId, Scene, Size};
 use crate::rect::Rect;
 use crate::repository::NodeRepository;
 use math2::transform::AffineTransform;
 use std::collections::HashMap;
 
+/// Geometry data used for layout, culling, and rendering.
+///
+/// `local_bounds` and `world_bounds` represent the tight geometry bounds of the shape.
+/// `render_bounds` includes visual overflow from effects such as blur, stroke, or shadows,
+/// and is used for visibility culling and picture recording regions.
+///
+/// All bounds are updated during geometry cache construction and reused throughout the pipeline.
 #[derive(Debug, Clone)]
 pub struct GeometryEntry {
-    pub local_transform: AffineTransform,
-    pub world_transform: AffineTransform,
-    pub local_bounds: Rect,
-    pub world_bounds: Rect,
+    /// relative transform
+    pub transform: AffineTransform,
+    /// absolute (world) transform
+    pub absolute_transform: AffineTransform,
+    /// relative AABB (after the transform is applied)
+    pub bounding_box: Rect,
+    /// absolute (world) AABB (after the transform is applied)
+    pub absolute_bounding_box: Rect,
+    /// Expanded bounds that include visual effects like blur, shadow, stroke, etc.
+    /// Used for render-time culling and picture recording.
+    #[deprecated(note = "TODO: Not ready")]
+    pub absolute_render_bounds: Rect,
     pub parent: Option<NodeId>,
     pub dirty_transform: bool,
     pub dirty_bounds: bool,
@@ -44,158 +59,149 @@ impl GeometryCache {
         cache: &mut GeometryCache,
     ) -> Rect {
         let node = repo.get(id).expect("node not found");
-        let (local_transform, local_bounds, children) = Self::node_data(node);
-        let world_transform = parent_world.compose(&local_transform);
-        let world_bounds = Self::transform_rect(&local_bounds, &world_transform);
 
-        let mut entry = GeometryEntry {
-            local_transform,
-            world_transform,
-            local_bounds,
-            world_bounds,
-            parent: parent_id.clone(),
-            dirty_transform: false,
-            dirty_bounds: false,
-        };
-
-        let mut union_bounds = if world_bounds.width() > 0.0 || world_bounds.height() > 0.0 {
-            Some(world_bounds)
-        } else {
-            None
-        };
-
-        for child_id in children {
-            let child_bounds = Self::build_recursive(
-                &child_id,
-                repo,
-                &entry.world_transform,
-                Some(id.clone()),
-                cache,
-            );
-            union_bounds = match union_bounds {
-                Some(b) => Some(b.union(&child_bounds)),
-                None => Some(child_bounds),
-            };
-        }
-
-        if let Some(b) = union_bounds {
-            entry.world_bounds = b;
-        }
-
-        cache.entries.insert(id.clone(), entry.clone());
-        entry.world_bounds
-    }
-
-    fn node_data(node: &Node) -> (AffineTransform, Rect, Vec<NodeId>) {
+        // only IntrinsicSizeNode is supported for now
         match node {
-            Node::Error(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::Group(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, 0.0, 0.0),
-                n.children.clone(),
-            ),
-            Node::Container(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                n.children.clone(),
-            ),
-            Node::Rectangle(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::Ellipse(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::Polygon(n) => (n.transform, Self::polygon_bounds(&n.points), Vec::new()),
-            Node::RegularPolygon(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::RegularStarPolygon(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::Line(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::TextSpan(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-            Node::Path(n) => (n.transform, Self::path_bounds(&n.data), Vec::new()),
-            Node::BooleanOperation(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, 0.0, 0.0),
-                n.children.clone(),
-            ),
-            Node::Image(n) => (
-                n.transform,
-                Rect::new(0.0, 0.0, n.size.width, n.size.height),
-                Vec::new(),
-            ),
-        }
-    }
+            Node::Group(n) => {
+                let mut union_bounds: Option<Rect> = None;
+                for child_id in &n.children {
+                    let child_bounds = Self::build_recursive(
+                        child_id,
+                        repo,
+                        parent_world,
+                        Some(id.clone()),
+                        cache,
+                    );
+                    union_bounds = match union_bounds {
+                        Some(b) => Some(b.union(&child_bounds)),
+                        None => Some(child_bounds),
+                    };
+                }
+                union_bounds.unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0))
+            }
+            Node::BooleanOperation(n) => {
+                let mut union_bounds: Option<Rect> = None;
+                for child_id in &n.children {
+                    let child_bounds = Self::build_recursive(
+                        child_id,
+                        repo,
+                        parent_world,
+                        Some(id.clone()),
+                        cache,
+                    );
+                    union_bounds = match union_bounds {
+                        Some(b) => Some(b.union(&child_bounds)),
+                        None => Some(child_bounds),
+                    };
+                }
+                union_bounds.unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0))
+            }
+            _ => {
+                let intrinsic_node = Box::new(match node {
+                    Node::Path(n) => IntrinsicSizeNode::Path(n.clone()),
+                    Node::Rectangle(n) => IntrinsicSizeNode::Rectangle(n.clone()),
+                    Node::Ellipse(n) => IntrinsicSizeNode::Ellipse(n.clone()),
+                    Node::Polygon(n) => IntrinsicSizeNode::Polygon(n.clone()),
+                    Node::RegularPolygon(n) => IntrinsicSizeNode::RegularPolygon(n.clone()),
+                    Node::RegularStarPolygon(n) => IntrinsicSizeNode::RegularStarPolygon(n.clone()),
+                    Node::Line(n) => IntrinsicSizeNode::Line(n.clone()),
+                    Node::TextSpan(n) => IntrinsicSizeNode::TextSpan(n.clone()),
+                    Node::Image(n) => IntrinsicSizeNode::Image(n.clone()),
+                    Node::Container(n) => IntrinsicSizeNode::Container(n.clone()),
+                    Node::Error(n) => IntrinsicSizeNode::Error(n.clone()),
+                    Node::Group(_) | Node::BooleanOperation(_) => panic!("Unsupported node type"),
+                });
+                let node = intrinsic_node.as_ref();
 
-    fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rect {
-        let mut min_x = f32::INFINITY;
-        let mut min_y = f32::INFINITY;
-        let mut max_x = f32::NEG_INFINITY;
-        let mut max_y = f32::NEG_INFINITY;
-        for p in points {
-            min_x = min_x.min(p.x);
-            min_y = min_y.min(p.y);
-            max_x = max_x.max(p.x);
-            max_y = max_y.max(p.y);
-        }
-        if points.is_empty() {
-            Rect::new(0.0, 0.0, 0.0, 0.0)
-        } else {
-            Rect {
-                min_x,
-                min_y,
-                max_x,
-                max_y,
+                let (local_transform, local_bounds) = node_geometry(node);
+                let world_transform = parent_world.compose(&local_transform);
+                let world_bounds = transform_rect(&local_bounds, &world_transform);
+                // For now, render_bounds is just world_bounds (placeholder)
+                let render_bounds = world_bounds;
+
+                let entry = GeometryEntry {
+                    transform: local_transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: render_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+
+                cache.entries.insert(id.clone(), entry.clone());
+                entry.absolute_bounding_box
             }
         }
     }
 
-    fn path_bounds(data: &str) -> Rect {
-        if let Some(path) = skia_safe::path::Path::from_svg(data) {
-            let b = path.compute_tight_bounds();
-            Rect::new(b.left(), b.top(), b.width(), b.height())
-        } else {
-            Rect::new(0.0, 0.0, 0.0, 0.0)
-        }
+    pub fn get_world_transform(&self, id: &NodeId) -> Option<AffineTransform> {
+        self.entries.get(id).map(|e| e.absolute_transform)
     }
 
-    fn transform_point(t: &AffineTransform, x: f32, y: f32) -> (f32, f32) {
-        let [[a, c, tx], [b, d, ty]] = t.matrix;
-        let nx = a * x + c * y + tx;
-        let ny = b * x + d * y + ty;
-        (nx, ny)
+    pub fn get_world_bounds(&self, id: &NodeId) -> Option<Rect> {
+        self.entries.get(id).map(|e| e.absolute_bounding_box)
     }
+}
 
-    fn transform_rect(rect: &Rect, t: &AffineTransform) -> Rect {
-        let (x0, y0) = Self::transform_point(t, rect.min_x, rect.min_y);
-        let (x1, y1) = Self::transform_point(t, rect.max_x, rect.min_y);
-        let (x2, y2) = Self::transform_point(t, rect.min_x, rect.max_y);
-        let (x3, y3) = Self::transform_point(t, rect.max_x, rect.max_y);
-        let min_x = x0.min(x1.min(x2.min(x3)));
-        let min_y = y0.min(y1.min(y2.min(y3)));
-        let max_x = x0.max(x1.max(x2.max(x3)));
-        let max_y = y0.max(y1.max(y2.max(y3)));
+fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rect) {
+    match node {
+        IntrinsicSizeNode::Error(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Container(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Rectangle(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Ellipse(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Polygon(n) => (n.transform, polygon_bounds(&n.points)),
+        IntrinsicSizeNode::RegularPolygon(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::RegularStarPolygon(n) => (n.transform, n.rect()),
+        IntrinsicSizeNode::Line(n) => (n.transform, Rect::new(0.0, 0.0, n.size.width, 0.0)),
+        IntrinsicSizeNode::TextSpan(n) => (
+            n.transform,
+            Rect::new(0.0, 0.0, n.size.width, n.size.height),
+        ),
+        IntrinsicSizeNode::Path(n) => (n.transform, path_bounds(&n.data)),
+        IntrinsicSizeNode::Image(n) => (n.transform, n.rect()),
+    }
+}
+
+fn transform_point(t: &AffineTransform, x: f32, y: f32) -> (f32, f32) {
+    let [[a, c, tx], [b, d, ty]] = t.matrix;
+    let nx = a * x + c * y + tx;
+    let ny = b * x + d * y + ty;
+    (nx, ny)
+}
+
+fn transform_rect(rect: &Rect, t: &AffineTransform) -> Rect {
+    let (x0, y0) = transform_point(t, rect.min_x, rect.min_y);
+    let (x1, y1) = transform_point(t, rect.max_x, rect.min_y);
+    let (x2, y2) = transform_point(t, rect.min_x, rect.max_y);
+    let (x3, y3) = transform_point(t, rect.max_x, rect.max_y);
+    let min_x = x0.min(x1.min(x2.min(x3)));
+    let min_y = y0.min(y1.min(y2.min(y3)));
+    let max_x = x0.max(x1.max(x2.max(x3)));
+    let max_y = y0.max(y1.max(y2.max(y3)));
+    Rect {
+        min_x,
+        min_y,
+        max_x,
+        max_y,
+    }
+}
+
+fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rect {
+    let mut min_x = f32::INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    for p in points {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    if points.is_empty() {
+        Rect::new(0.0, 0.0, 0.0, 0.0)
+    } else {
         Rect {
             min_x,
             min_y,
@@ -203,12 +209,13 @@ impl GeometryCache {
             max_y,
         }
     }
+}
 
-    pub fn get_world_transform(&self, id: &NodeId) -> Option<AffineTransform> {
-        self.entries.get(id).map(|e| e.world_transform)
-    }
-
-    pub fn get_world_bounds(&self, id: &NodeId) -> Option<Rect> {
-        self.entries.get(id).map(|e| e.world_bounds)
+fn path_bounds(data: &str) -> Rect {
+    if let Some(path) = skia_safe::path::Path::from_svg(data) {
+        let b = path.compute_tight_bounds();
+        Rect::new(b.left(), b.top(), b.width(), b.height())
+    } else {
+        Rect::new(0.0, 0.0, 0.0, 0.0)
     }
 }

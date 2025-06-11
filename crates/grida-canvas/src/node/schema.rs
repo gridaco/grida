@@ -1,4 +1,5 @@
 use crate::painter::cvt;
+use crate::rect::Rect;
 use crate::repository::NodeRepository;
 use core::str;
 use math2::box_fit::BoxFit;
@@ -482,6 +483,12 @@ pub struct ErrorNode {
     pub opacity: f32,
 }
 
+impl ErrorNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GroupNode {
     pub base: BaseNode,
@@ -509,6 +516,12 @@ pub struct ContainerNode {
     pub clip: bool,
 }
 
+impl ContainerNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RectangleNode {
     pub base: BaseNode,
@@ -523,6 +536,12 @@ pub struct RectangleNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+}
+
+impl RectangleNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -555,6 +574,12 @@ pub struct ImageNode {
     pub _ref: String,
 }
 
+impl ImageNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
+}
+
 /// A node representing an ellipse shape.
 ///
 /// Like RectangleNode, uses a top-left based coordinate system (x,y,width,height).
@@ -572,6 +597,12 @@ pub struct EllipseNode {
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
+}
+
+impl EllipseNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -700,6 +731,10 @@ pub struct RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
+
     pub fn to_polygon(&self) -> PolygonNode {
         let w = self.size.width;
         let h = self.size.height;
@@ -790,6 +825,10 @@ pub struct RegularStarPolygonNode {
 }
 
 impl RegularStarPolygonNode {
+    pub fn rect(&self) -> Rect {
+        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+    }
+
     pub fn to_polygon(&self) -> PolygonNode {
         let w = self.size.width;
         let h = self.size.height;
