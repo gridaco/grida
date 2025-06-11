@@ -376,14 +376,7 @@ impl App {
             let alias = &msg.family;
             self.renderer.add_font(alias, &msg.data);
             println!("📝 Registered font with renderer: '{}'", alias);
-            // After all fonts are registered, print out all font families known to Skia's FontMgr
-            let font_mgr = self.renderer.font_repository.font_mgr();
-            let count = font_mgr.count_families();
-            println!(
-                "Registered font families in Skia FontMgr. was {} -> now {}",
-                count - 1,
-                count
-            );
+
             updated = true;
         }
         if updated {

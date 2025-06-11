@@ -7,10 +7,6 @@ use math2::transform::AffineTransform;
 async fn demo_n_shapes(n: usize) -> Scene {
     let nf = NodeFactory::new();
 
-    // Create a root container node
-    let mut root_container_node = nf.create_container_node();
-    root_container_node.base.name = "Root Container".to_string();
-
     let mut repository = NodeRepository::new();
     let mut all_shape_ids = Vec::new();
 
@@ -55,16 +51,11 @@ async fn demo_n_shapes(n: usize) -> Scene {
         repository.insert(Node::Rectangle(rect));
     }
 
-    // Set up the root container
-    root_container_node.children = all_shape_ids;
-    let root_container_id = root_container_node.base.id.clone();
-    repository.insert(Node::Container(root_container_node));
-
     Scene {
         id: "scene".to_string(),
         name: format!("{} Shapes Performance Test", n),
         transform: AffineTransform::identity(),
-        children: vec![root_container_id],
+        children: all_shape_ids,
         nodes: repository,
         background_color: None,
     }
@@ -72,6 +63,6 @@ async fn demo_n_shapes(n: usize) -> Scene {
 
 #[tokio::main]
 async fn main() {
-    let scene = demo_n_shapes(100_000).await;
+    let scene = demo_n_shapes(10000).await;
     window::run_demo_window(scene).await;
 }

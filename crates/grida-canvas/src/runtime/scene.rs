@@ -6,6 +6,8 @@ use crate::{
     runtime::camera::Camera2D,
 };
 use skia_safe::{Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Choice of GPU vs. raster backend
 pub enum Backend {
@@ -28,8 +30,8 @@ pub struct Renderer {
     logical_width: f32,
     logical_height: f32,
     pub camera: Option<Camera2D>,
-    pub image_repository: ImageRepository,
-    pub font_repository: FontRepository,
+    pub image_repository: Rc<RefCell<ImageRepository>>,
+    pub font_repository: Rc<RefCell<FontRepository>>,
     geometry_cache: cache::geometry::GeometryCache,
     scene_cache: cache::picture::PictureCache,
     pub feature_visibility_culling_enabled: bool,
@@ -42,9 +44,11 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(width: f32, height: f32, dpi: f32) -> Self {
         let font_repository = FontRepository::new();
+        let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
+        let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
-            painter: Painter::new(&font_repository, &image_repository),
+            painter: Painter::new(font_repository.clone(), image_repository.clone()),
             backend: None,
             dpi,
             logical_width: width,
@@ -76,12 +80,11 @@ impl Renderer {
     }
 
     pub fn register_image(&mut self, src: String, image: Image) {
-        self.image_repository.add(src, image);
+        self.image_repository.borrow_mut().add(src, image);
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
-        self.font_repository.add(bytes, family);
-        self.painter.refresh_fonts(&self.font_repository);
+        self.font_repository.borrow_mut().add(bytes, family);
     }
 
     /// Create an image from raw encoded bytes.
@@ -198,13 +201,8 @@ impl Renderer {
                 let draw_all = |_: &NodeId| true;
                 for child_id in &scene.children {
                     if let Some(node) = scene.nodes.get(child_id) {
-                        self.painter.draw_node(
-                            &canvas,
-                            node,
-                            &scene.nodes,
-                            &self.image_repository,
-                            &draw_all,
-                        );
+                        self.painter
+                            .draw_node(&canvas, node, &scene.nodes, &draw_all);
                     }
                 }
 
@@ -228,8 +226,7 @@ impl Renderer {
             let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
             let canvas = recorder.begin_recording(sk_bounds, None);
             let draw_all = |_id: &NodeId| true;
-            self.painter
-                .draw_node(&canvas, node, repository, &self.image_repository, &draw_all);
+            self.painter.draw_node(&canvas, node, repository, &draw_all);
             recorder.finish_recording_as_picture(None)
         } else {
             None
@@ -360,13 +357,8 @@ impl Renderer {
                     } else {
                         Box::new(|_id: &NodeId| true) // Always draw when culling is disabled
                     };
-                self.painter.draw_node(
-                    canvas,
-                    node,
-                    repository,
-                    &self.image_repository,
-                    &should_draw,
-                );
+                self.painter
+                    .draw_node(canvas, node, repository, &should_draw);
             }
         }
     }

@@ -1,5 +1,8 @@
 use crate::node::schema::{Node, NodeId};
-use skia_safe::{FontMgr, Image, textlayout::TypefaceFontProvider};
+use skia_safe::{
+    FontMgr, Image,
+    textlayout::{FontCollection, TypefaceFontProvider},
+};
 use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.
@@ -7,21 +10,6 @@ use std::collections::HashMap;
 pub struct NodeRepository {
     /// The map of all nodes indexed by their IDs
     nodes: HashMap<NodeId, Node>,
-}
-
-/// A repository for managing images with automatic ID indexing.
-#[derive(Debug, Clone)]
-pub struct ImageRepository {
-    /// The map of all images indexed by their source URLs
-    images: HashMap<String, Image>,
-}
-
-/// A repository for managing fonts.
-#[derive(Debug, Clone)]
-pub struct FontRepository {
-    /// The font manager for handling font data
-    font_mgr: FontMgr,
-    provider: TypefaceFontProvider,
 }
 
 impl NodeRepository {
@@ -85,6 +73,29 @@ impl NodeRepository {
     }
 }
 
+impl Default for NodeRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FromIterator<(NodeId, Node)> for NodeRepository {
+    fn from_iter<T: IntoIterator<Item = (NodeId, Node)>>(iter: T) -> Self {
+        let mut repo = Self::new();
+        for (_, node) in iter {
+            repo.insert(node);
+        }
+        repo
+    }
+}
+
+/// A repository for managing images with automatic ID indexing.
+#[derive(Debug, Clone)]
+pub struct ImageRepository {
+    /// The map of all images indexed by their source URLs
+    images: HashMap<String, Image>,
+}
+
 impl ImageRepository {
     /// Creates a new empty image repository
     pub fn new() -> Self {
@@ -109,45 +120,27 @@ impl ImageRepository {
     }
 }
 
+/// A repository for managing fonts.
+pub struct FontRepository {
+    provider: TypefaceFontProvider,
+}
+
 impl FontRepository {
-    /// Creates a new empty font repository
     pub fn new() -> Self {
         Self {
-            font_mgr: FontMgr::new(),
             provider: TypefaceFontProvider::new(),
         }
     }
 
-    /// Adds a font to the repository
     pub fn add(&mut self, bytes: &[u8], family: &str) {
-        if let Some(tf) = self.font_mgr.new_from_data(bytes, None) {
+        if let Some(tf) = FontMgr::new().new_from_data(bytes, None) {
             self.provider.register_typeface(tf, Some(family));
         }
     }
 
-    /// Gets a reference to the font manager
-    pub fn font_mgr(&self) -> &FontMgr {
-        &self.font_mgr
-    }
-
-    /// Gets a reference to the typeface provider
-    pub fn provider(&self) -> &TypefaceFontProvider {
-        &self.provider
-    }
-}
-
-impl Default for NodeRepository {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl FromIterator<(NodeId, Node)> for NodeRepository {
-    fn from_iter<T: IntoIterator<Item = (NodeId, Node)>>(iter: T) -> Self {
-        let mut repo = Self::new();
-        for (_, node) in iter {
-            repo.insert(node);
-        }
-        repo
+    pub fn font_collection(&self) -> FontCollection {
+        let mut collection = FontCollection::new();
+        collection.set_asset_font_manager(Some(self.provider.clone().into()));
+        collection
     }
 }
