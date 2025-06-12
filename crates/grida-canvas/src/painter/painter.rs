@@ -614,15 +614,12 @@ impl Painter {
     }
 
     /// Draw a ContainerNode (background + stroke + children)
-    pub fn draw_container_node<F>(
+    pub fn draw_container_node(
         &self,
         canvas: &skia_safe::Canvas,
         node: &ContainerNode,
         repository: &NodeRepository,
-        should_draw: &F,
-    ) where
-        F: Fn(&NodeId) -> bool,
-    {
+    ) {
         self.with_transform(canvas, &node.transform.matrix, || {
             self.with_opacity(canvas, node.opacity, || {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
@@ -647,9 +644,7 @@ impl Painter {
                     self.with_clip(canvas, &shape, || {
                         for child_id in &node.children {
                             if let Some(child) = repository.get(child_id) {
-                                if should_draw(child_id) {
-                                    self.draw_node(canvas, child, repository, should_draw);
-                                }
+                                self.draw_node(canvas, child, repository);
                             }
                         }
                     });
@@ -657,9 +652,7 @@ impl Painter {
                     // Draw children without clipping
                     for child_id in &node.children {
                         if let Some(child) = repository.get(child_id) {
-                            if should_draw(child_id) {
-                                self.draw_node(canvas, child, repository, should_draw);
-                            }
+                            self.draw_node(canvas, child, repository);
                         }
                     }
                 }
@@ -696,22 +689,17 @@ impl Painter {
     }
 
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
-    pub fn draw_group_node<F>(
+    pub fn draw_group_node(
         &self,
         canvas: &skia_safe::Canvas,
         node: &GroupNode,
         repository: &NodeRepository,
-        should_draw: &F,
-    ) where
-        F: Fn(&NodeId) -> bool,
-    {
+    ) {
         self.with_transform(canvas, &node.transform.matrix, || {
             self.with_opacity(canvas, node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        if should_draw(child_id) {
-                            self.draw_node(canvas, child, repository, should_draw);
-                        }
+                        self.draw_node(canvas, child, repository);
                     }
                 }
             });
@@ -719,40 +707,27 @@ impl Painter {
     }
 
     #[deprecated(note = "Boolean operations are not implemented properly")]
-    pub fn draw_boolean_operation_node<F>(
+    pub fn draw_boolean_operation_node(
         &self,
         canvas: &skia_safe::Canvas,
         node: &BooleanPathOperationNode,
         repository: &NodeRepository,
-        should_draw: &F,
-    ) where
-        F: Fn(&NodeId) -> bool,
-    {
+    ) {
         self.with_transform(canvas, &node.transform.matrix, || {
             for child_id in &node.children {
-                if should_draw(child_id) {
-                    if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository, should_draw);
-                    }
+                if let Some(child) = repository.get(child_id) {
+                    self.draw_node(canvas, child, repository);
                 }
             }
         });
     }
 
     /// Dispatch to the correct node‐type draw method
-    pub fn draw_node<F>(
-        &self,
-        canvas: &skia_safe::Canvas,
-        node: &Node,
-        repository: &NodeRepository,
-        should_draw: &F,
-    ) where
-        F: Fn(&NodeId) -> bool,
-    {
+    pub fn draw_node(&self, canvas: &skia_safe::Canvas, node: &Node, repository: &NodeRepository) {
         match node {
             Node::Error(n) => self.draw_error_node(canvas, n),
-            Node::Group(n) => self.draw_group_node(canvas, n, repository, should_draw),
-            Node::Container(n) => self.draw_container_node(canvas, n, repository, should_draw),
+            Node::Group(n) => self.draw_group_node(canvas, n, repository),
+            Node::Container(n) => self.draw_container_node(canvas, n, repository),
             Node::Rectangle(n) => self.draw_rect_node(canvas, n),
             Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
             Node::Polygon(n) => self.draw_polygon_node(canvas, n),
@@ -763,9 +738,7 @@ impl Painter {
                 self.draw_image_node(canvas, n);
             }
             Node::Path(n) => self.draw_path_node(canvas, n),
-            Node::BooleanOperation(n) => {
-                self.draw_boolean_operation_node(canvas, n, repository, should_draw)
-            }
+            Node::BooleanOperation(n) => self.draw_boolean_operation_node(canvas, n, repository),
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
         }
     }

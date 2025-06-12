@@ -36,7 +36,6 @@ pub struct Renderer {
     pub font_repository: Rc<RefCell<FontRepository>>,
     geometry_cache: cache::geometry::GeometryCache,
     scene_cache: cache::picture::PictureCache,
-    pub feature_visibility_culling_enabled: bool,
 }
 
 /// ---------------------------------------------------------------------------
@@ -63,7 +62,6 @@ impl Renderer {
             scene_cache: cache::picture::PictureCache::new(
                 cache::picture::PictureCacheStrategy::default(),
             ),
-            feature_visibility_culling_enabled: false,
         }
     }
 
@@ -210,12 +208,9 @@ impl Renderer {
                 let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
                 let canvas = recorder.begin_recording(sk_bounds, None);
 
-                // Draw each root node without visibility checks
-                let draw_all = |_: &NodeId| true;
                 for child_id in &scene.children {
                     if let Some(node) = scene.nodes.get(child_id) {
-                        self.painter
-                            .draw_node(&canvas, node, &scene.nodes, &draw_all);
+                        self.painter.draw_node(&canvas, node, &scene.nodes);
                     }
                 }
 
@@ -238,8 +233,7 @@ impl Renderer {
             let mut recorder = PictureRecorder::new();
             let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
             let canvas = recorder.begin_recording(sk_bounds, None);
-            let draw_all = |_id: &NodeId| true;
-            self.painter.draw_node(&canvas, node, repository, &draw_all);
+            self.painter.draw_node(&canvas, node, repository);
             recorder.finish_recording_as_picture(None)
         } else {
             None
@@ -334,51 +328,11 @@ impl Renderer {
 
     fn render_node(&self, id: &NodeId, repository: &NodeRepository) {
         if let Some(backend) = &self.backend {
-            // Get viewport in world space from camera and apply DPI scaling
-            let viewport = self.camera.as_ref().map_or_else(
-                || rect::Rect::new(0.0, 0.0, self.logical_width, self.logical_height),
-                |camera| {
-                    let mut rect = camera.rect();
-
-                    // Add margin for debugging visibility culling
-                    rect.margin(1000.0);
-
-                    // Scale by DPI to match the rendering scale
-                    rect = rect::Rect::new(
-                        rect.min_x * self.dpi,
-                        rect.min_y * self.dpi,
-                        rect.max_x * self.dpi,
-                        rect.max_y * self.dpi,
-                    );
-                    rect
-                },
-            );
-
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
-                let geometry_cache = &self.geometry_cache;
-                let should_draw: Box<dyn Fn(&NodeId) -> bool> =
-                    if self.feature_visibility_culling_enabled {
-                        Box::new(move |id: &NodeId| is_node_visible(geometry_cache, id, &viewport))
-                    } else {
-                        Box::new(|_id: &NodeId| true) // Always draw when culling is disabled
-                    };
-                self.painter
-                    .draw_node(canvas, node, repository, &should_draw);
+                self.painter.draw_node(canvas, node, repository);
             }
         }
-    }
-}
-
-pub fn is_node_visible(
-    cache: &cache::geometry::GeometryCache,
-    id: &NodeId,
-    viewport: &rect::Rect,
-) -> bool {
-    if let Some(bounds) = cache.get_world_bounds(id) {
-        bounds.intersects(viewport)
-    } else {
-        false
     }
 }
