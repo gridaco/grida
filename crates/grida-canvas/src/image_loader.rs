@@ -1,6 +1,10 @@
 use crate::node::schema::*;
 use std::collections::HashMap;
 
+use async_trait::async_trait;
+
+use crate::resource_loader::ResourceLoader;
+
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest;
 #[cfg(not(target_arch = "wasm32"))]
@@ -119,6 +123,21 @@ impl ImageLoader {
     }
 }
 
+#[async_trait]
+impl ResourceLoader for ImageLoader {
+    type Output = Vec<u8>;
+
+    async fn load(&mut self, key: &str, src: &str) -> Option<Self::Output> {
+        // For images, the key and src are generally the same
+        let path = if src.is_empty() { key } else { src };
+        self.load_image(path).await
+    }
+
+    async fn unload(&mut self, key: &str) {
+        self.remove_from_cache(key);
+    }
+}
+
 /// Helper function to extract image URLs from a scene
 pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
     scene
@@ -136,10 +155,13 @@ pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
 }
 
 /// Helper function to load all images in a scene
-pub async fn load_scene_images(loader: &mut ImageLoader, scene: &Scene) {
+pub async fn load_scene_images<L>(loader: &mut L, scene: &Scene)
+where
+    L: ResourceLoader<Output = Vec<u8>> + Send,
+{
     let urls = extract_image_urls(scene);
     for url in urls {
-        let _ = loader.load_image(&url).await;
+        let _ = loader.load(&url, &url).await;
     }
 }
 

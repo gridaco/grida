@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use async_trait::async_trait;
+
+use crate::resource_loader::ResourceLoader;
+
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest;
 #[cfg(not(target_arch = "wasm32"))]
@@ -115,6 +119,19 @@ impl FontLoader {
     /// Remove a specific font from the cache
     pub fn remove_from_cache(&mut self, family: &str) {
         self.cache.remove(family);
+    }
+}
+
+#[async_trait]
+impl ResourceLoader for FontLoader {
+    type Output = Vec<u8>;
+
+    async fn load(&mut self, key: &str, src: &str) -> Option<Self::Output> {
+        self.load_font(key, src).await
+    }
+
+    async fn unload(&mut self, key: &str) {
+        self.remove_from_cache(key);
     }
 }
 
