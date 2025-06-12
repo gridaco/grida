@@ -261,8 +261,6 @@ impl Renderer {
                     if let Some(camera) = &self.camera {
                         let view_matrix = camera.view_matrix();
                         canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
-                        let zoom = camera.zoom;
-                        canvas.scale((zoom, zoom));
                     }
 
                     canvas.draw_picture(picture, None, None);
@@ -300,10 +298,6 @@ impl Renderer {
             if let Some(camera) = &self.camera {
                 let view_matrix = camera.view_matrix();
                 canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
-
-                // Apply zoom
-                let zoom = camera.zoom;
-                canvas.scale((zoom, zoom));
             }
 
             // Render scene nodes

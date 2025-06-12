@@ -37,13 +37,13 @@ enum Command {
     Close,
     ZoomIn,
     ZoomOut,
-    Pan { x: f32, y: f32 },
+    Pan { x: f32, y: f32, zoom: f32 },
     Redraw,
     Resize { width: u32, height: u32 },
     None,
 }
 
-fn handle_window_event(event: WindowEvent) -> Command {
+fn handle_window_event(event: WindowEvent, current_zoom: f32) -> Command {
     match event {
         WindowEvent::CloseRequested => Command::Close,
         WindowEvent::Resized(size) => Command::Resize {
@@ -69,6 +69,7 @@ fn handle_window_event(event: WindowEvent) -> Command {
                 Command::Pan {
                     x: -x * pan_speed,
                     y: -y * pan_speed,
+                    zoom: current_zoom,
                 }
             }
             MouseScrollDelta::PixelDelta(delta) => {
@@ -76,6 +77,7 @@ fn handle_window_event(event: WindowEvent) -> Command {
                 Command::Pan {
                     x: -(delta.x as f32) * pan_speed,
                     y: -(delta.y as f32) * pan_speed,
+                    zoom: current_zoom,
                 }
             }
         },
@@ -273,63 +275,28 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        match handle_window_event(event) {
+        match handle_window_event(event, self.camera.get_zoom()) {
             Command::Close => {
                 self.renderer.free();
                 event_loop.exit();
             }
             Command::ZoomIn => {
-                // Get window dimensions
-                let window_size = self.window.inner_size();
-                let center_x = window_size.width as f32 / 2.0;
-                let center_y = window_size.height as f32 / 2.0;
-
-                // Convert screen center to world coordinates
-                let world_center_x = (center_x - self.camera.transform.x()) / self.camera.zoom;
-                let world_center_y = (center_y - self.camera.transform.y()) / self.camera.zoom;
-
-                // Calculate the zoom factor
-                let zoom_factor = 1.1;
-
-                // Apply zoom
-                self.camera.zoom *= zoom_factor;
-
-                // Calculate new camera position to keep the world point under screen center fixed
-                let new_x = center_x - world_center_x * self.camera.zoom;
-                let new_y = center_y - world_center_y * self.camera.zoom;
-                self.camera.set_position(new_x, new_y);
-
+                let current_zoom = self.camera.get_zoom();
+                self.camera.set_zoom(current_zoom / 1.2);
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
             Command::ZoomOut => {
-                // Get window dimensions
-                let window_size = self.window.inner_size();
-                let center_x = window_size.width as f32 / 2.0;
-                let center_y = window_size.height as f32 / 2.0;
-
-                // Convert screen center to world coordinates
-                let world_center_x = (center_x - self.camera.transform.x()) / self.camera.zoom;
-                let world_center_y = (center_y - self.camera.transform.y()) / self.camera.zoom;
-
-                // Calculate the zoom factor
-                let zoom_factor = 0.9;
-
-                // Apply zoom
-                self.camera.zoom *= zoom_factor;
-
-                // Calculate new camera position to keep the world point under screen center fixed
-                let new_x = center_x - world_center_x * self.camera.zoom;
-                let new_y = center_y - world_center_y * self.camera.zoom;
-                self.camera.set_position(new_x, new_y);
-
+                let current_zoom = self.camera.get_zoom();
+                self.camera.set_zoom(current_zoom * 1.2);
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }
-            Command::Pan { x, y } => {
+            Command::Pan { x, y, zoom } => {
                 let current_x = self.camera.transform.x();
                 let current_y = self.camera.transform.y();
-                self.camera.set_position(current_x + x, current_y + y);
+                self.camera
+                    .set_position(current_x + x * zoom, current_y + y * zoom);
                 self.renderer.set_camera(self.camera.clone());
                 self.redraw();
             }

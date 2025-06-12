@@ -11,18 +11,16 @@ pub struct Camera2D {
 
     /// The viewport size
     pub size: Size,
-
-    /// The zoom level (1.0 = 100%)
-    pub zoom: f32,
 }
 
 impl Camera2D {
     pub fn new(viewport_size: Size) -> Self {
-        Self {
+        let mut camera = Self {
             transform: AffineTransform::identity(),
             size: viewport_size,
-            zoom: 1.0,
-        }
+        };
+        camera.set_zoom(1.0);
+        camera
     }
 
     /// Creates a view matrix by inverse-applying the camera's transform
@@ -39,12 +37,36 @@ impl Camera2D {
 
     /// Sets the camera's rotation in radians
     pub fn set_rotation(&mut self, angle: f32) {
-        self.transform.set_rotation(angle);
+        let zoom = self.get_zoom();
+        let tx = self.transform.x();
+        let ty = self.transform.y();
+        let (sin, cos) = angle.sin_cos();
+        self.transform.matrix[0][0] = cos * zoom;
+        self.transform.matrix[0][1] = -sin * zoom;
+        self.transform.matrix[1][0] = sin * zoom;
+        self.transform.matrix[1][1] = cos * zoom;
+        self.transform.matrix[0][2] = tx;
+        self.transform.matrix[1][2] = ty;
     }
 
     /// Sets the camera's zoom level
     pub fn set_zoom(&mut self, zoom: f32) {
-        self.zoom = zoom;
+        let angle = self.transform.rotation();
+        let tx = self.transform.x();
+        let ty = self.transform.y();
+        let (sin, cos) = angle.sin_cos();
+        self.transform.matrix[0][0] = cos * zoom;
+        self.transform.matrix[0][1] = -sin * zoom;
+        self.transform.matrix[1][0] = sin * zoom;
+        self.transform.matrix[1][1] = cos * zoom;
+        self.transform.matrix[0][2] = tx;
+        self.transform.matrix[1][2] = ty;
+    }
+
+    pub fn get_zoom(&self) -> f32 {
+        let a = self.transform.matrix[0][0];
+        let b = self.transform.matrix[1][0];
+        (a.powi(2) + b.powi(2)).sqrt()
     }
 
     /// Returns the visible area in world space
@@ -52,13 +74,7 @@ impl Camera2D {
         // Start with viewport in screen space
         let mut viewport = Rect::new(0.0, 0.0, self.size.width, self.size.height);
 
-        // Apply inverse zoom
-        viewport = Rect::new(
-            viewport.min_x / self.zoom,
-            viewport.min_y / self.zoom,
-            viewport.max_x / self.zoom,
-            viewport.max_y / self.zoom,
-        );
+        // Apply inverse zoom encoded in transform
 
         // Apply inverse transform to get world space rect
         if let Some(inv) = self.transform.inverse() {
