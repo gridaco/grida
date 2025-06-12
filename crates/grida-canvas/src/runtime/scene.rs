@@ -199,7 +199,7 @@ impl Renderer {
             for child_id in &scene.children {
                 if let Some(b) = geometry_cache.get_world_bounds(child_id) {
                     union_bounds = Some(match union_bounds {
-                        Some(u) => u.union(&b),
+                        Some(u) => rect::union(&[u, b]),
                         None => b,
                     });
                 }
@@ -207,7 +207,7 @@ impl Renderer {
 
             if let Some(bounds) = union_bounds {
                 let mut recorder = PictureRecorder::new();
-                let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+                let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
                 let canvas = recorder.begin_recording(sk_bounds, None);
 
                 for child_id in &scene.children {
@@ -233,7 +233,7 @@ impl Renderer {
     ) -> Option<Picture> {
         if self.backend.is_some() {
             let mut recorder = PictureRecorder::new();
-            let sk_bounds = Rect::new(bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
+            let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
             let canvas = recorder.begin_recording(sk_bounds, None);
             self.painter.draw_node(&canvas, node, repository);
             recorder.finish_recording_as_picture(None)

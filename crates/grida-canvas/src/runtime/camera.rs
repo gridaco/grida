@@ -1,5 +1,5 @@
 use crate::node::schema::Size;
-use crate::rect::Rect;
+use crate::rect::{self, Rect};
 use math2::{quantize, transform::AffineTransform};
 
 /// A camera that defines the view transformation for rendering.
@@ -95,30 +95,18 @@ impl Camera2D {
     /// Returns the visible area in world space
     pub fn rect(&self) -> Rect {
         // Start with viewport in screen space
-        let mut viewport = Rect::new(0.0, 0.0, self.size.width, self.size.height);
+        let viewport = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        };
 
         // Apply inverse zoom encoded in transform
 
         // Apply inverse transform to get world space rect
         if let Some(inv) = self.transform.inverse() {
-            let [[a, c, tx], [b, d, ty]] = inv.matrix;
-            let transform_point = |x: f32, y: f32| -> (f32, f32) {
-                let nx = a * x + c * y + tx;
-                let ny = b * x + d * y + ty;
-                (nx, ny)
-            };
-
-            let (x0, y0) = transform_point(viewport.min_x, viewport.min_y);
-            let (x1, y1) = transform_point(viewport.max_x, viewport.min_y);
-            let (x2, y2) = transform_point(viewport.min_x, viewport.max_y);
-            let (x3, y3) = transform_point(viewport.max_x, viewport.max_y);
-
-            Rect {
-                min_x: x0.min(x1.min(x2.min(x3))),
-                min_y: y0.min(y1.min(y2.min(y3))),
-                max_x: x0.max(x1.max(x2.max(x3))),
-                max_y: y0.max(y1.max(y2.max(y3))),
-            }
+            rect::transform(viewport, &inv)
         } else {
             viewport
         }

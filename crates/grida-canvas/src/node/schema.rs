@@ -485,7 +485,12 @@ pub struct ErrorNode {
 
 impl ErrorNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 }
 
@@ -518,7 +523,12 @@ pub struct ContainerNode {
 
 impl ContainerNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 }
 
@@ -540,7 +550,12 @@ pub struct RectangleNode {
 
 impl RectangleNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 }
 
@@ -576,7 +591,12 @@ pub struct ImageNode {
 
 impl ImageNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 }
 
@@ -601,7 +621,12 @@ pub struct EllipseNode {
 
 impl EllipseNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 }
 
@@ -732,7 +757,12 @@ pub struct RegularPolygonNode {
 
 impl RegularPolygonNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 
     pub fn to_polygon(&self) -> PolygonNode {
@@ -826,7 +856,12 @@ pub struct RegularStarPolygonNode {
 
 impl RegularStarPolygonNode {
     pub fn rect(&self) -> Rect {
-        Rect::new(0.0, 0.0, self.size.width, self.size.height)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
     }
 
     pub fn to_polygon(&self) -> PolygonNode {

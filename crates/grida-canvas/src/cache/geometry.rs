@@ -1,5 +1,5 @@
 use crate::node::schema::{IntrinsicSizeNode, Node, NodeId, Scene};
-use crate::rect::Rect;
+use crate::rect::{self, Rect};
 use crate::repository::NodeRepository;
 use math2::transform::AffineTransform;
 use std::collections::HashMap;
@@ -73,11 +73,11 @@ impl GeometryCache {
                         cache,
                     );
                     union_bounds = match union_bounds {
-                        Some(b) => Some(b.union(&child_bounds)),
+                        Some(b) => Some(rect::union(&[b, child_bounds])),
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0))
+                union_bounds.unwrap_or_else(|| Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 })
             }
             Node::BooleanOperation(n) => {
                 let mut union_bounds: Option<Rect> = None;
@@ -90,11 +90,11 @@ impl GeometryCache {
                         cache,
                     );
                     union_bounds = match union_bounds {
-                        Some(b) => Some(b.union(&child_bounds)),
+                        Some(b) => Some(rect::union(&[b, child_bounds])),
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rect::new(0.0, 0.0, 0.0, 0.0))
+                union_bounds.unwrap_or_else(|| Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 })
             }
             _ => {
                 let intrinsic_node = Box::new(match node {
@@ -154,38 +154,31 @@ fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rect) {
         IntrinsicSizeNode::Polygon(n) => (n.transform, polygon_bounds(&n.points)),
         IntrinsicSizeNode::RegularPolygon(n) => (n.transform, n.rect()),
         IntrinsicSizeNode::RegularStarPolygon(n) => (n.transform, n.rect()),
-        IntrinsicSizeNode::Line(n) => (n.transform, Rect::new(0.0, 0.0, n.size.width, 0.0)),
+        IntrinsicSizeNode::Line(n) => (
+            n.transform,
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width: n.size.width,
+                height: 0.0,
+            },
+        ),
         IntrinsicSizeNode::TextSpan(n) => (
             n.transform,
-            Rect::new(0.0, 0.0, n.size.width, n.size.height),
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width: n.size.width,
+                height: n.size.height,
+            },
         ),
         IntrinsicSizeNode::Path(n) => (n.transform, path_bounds(&n.data)),
         IntrinsicSizeNode::Image(n) => (n.transform, n.rect()),
     }
 }
 
-fn transform_point(t: &AffineTransform, x: f32, y: f32) -> (f32, f32) {
-    let [[a, c, tx], [b, d, ty]] = t.matrix;
-    let nx = a * x + c * y + tx;
-    let ny = b * x + d * y + ty;
-    (nx, ny)
-}
-
 fn transform_rect(rect: &Rect, t: &AffineTransform) -> Rect {
-    let (x0, y0) = transform_point(t, rect.min_x, rect.min_y);
-    let (x1, y1) = transform_point(t, rect.max_x, rect.min_y);
-    let (x2, y2) = transform_point(t, rect.min_x, rect.max_y);
-    let (x3, y3) = transform_point(t, rect.max_x, rect.max_y);
-    let min_x = x0.min(x1.min(x2.min(x3)));
-    let min_y = y0.min(y1.min(y2.min(y3)));
-    let max_x = x0.max(x1.max(x2.max(x3)));
-    let max_y = y0.max(y1.max(y2.max(y3)));
-    Rect {
-        min_x,
-        min_y,
-        max_x,
-        max_y,
-    }
+    rect::transform(*rect, t)
 }
 
 fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rect {
@@ -200,13 +193,18 @@ fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rect {
         max_y = max_y.max(p.y);
     }
     if points.is_empty() {
-        Rect::new(0.0, 0.0, 0.0, 0.0)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
     } else {
         Rect {
-            min_x,
-            min_y,
-            max_x,
-            max_y,
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
         }
     }
 }
@@ -214,8 +212,18 @@ fn polygon_bounds(points: &[crate::node::schema::Point]) -> Rect {
 fn path_bounds(data: &str) -> Rect {
     if let Some(path) = skia_safe::path::Path::from_svg(data) {
         let b = path.compute_tight_bounds();
-        Rect::new(b.left(), b.top(), b.width(), b.height())
+        Rect {
+            x: b.left(),
+            y: b.top(),
+            width: b.width(),
+            height: b.height(),
+        }
     } else {
-        Rect::new(0.0, 0.0, 0.0, 0.0)
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
     }
 }
