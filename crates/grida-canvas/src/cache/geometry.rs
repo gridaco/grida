@@ -1,4 +1,4 @@
-use crate::node::schema::{IntrinsicSizeNode, Node, NodeId, Scene, Size};
+use crate::node::schema::{IntrinsicSizeNode, Node, NodeId, Scene};
 use crate::rect::Rect;
 use crate::repository::NodeRepository;
 use math2::transform::AffineTransform;

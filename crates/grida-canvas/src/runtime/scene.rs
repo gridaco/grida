@@ -81,11 +81,13 @@ impl Renderer {
     }
 
     pub fn register_image(&mut self, src: String, image: Image) {
-        self.image_repository.borrow_mut().add(src, image);
+        self.image_repository.borrow_mut().insert(src, image);
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
-        self.font_repository.borrow_mut().add(bytes, family);
+        self.font_repository
+            .borrow_mut()
+            .insert(family.to_string(), bytes.to_vec());
     }
 
     /// Create an image from raw encoded bytes.
