@@ -5,7 +5,6 @@ use crate::{
     repository::{FontRepository, ImageRepository, NodeRepository},
     runtime::camera::Camera2D,
 };
-use math2::transform::AffineTransform;
 use skia_safe::{Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,8 +33,7 @@ pub struct Renderer {
     prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
-    geometry_cache: cache::geometry::GeometryCache,
-    scene_cache: cache::picture::PictureCache,
+    scene_cache: cache::scene::SceneCache,
 }
 
 /// ---------------------------------------------------------------------------
@@ -58,8 +56,7 @@ impl Renderer {
             prev_quantized_camera_transform: None,
             image_repository,
             font_repository,
-            geometry_cache: cache::geometry::GeometryCache::new(),
-            scene_cache: cache::picture::PictureCache::new(
+            scene_cache: cache::scene::SceneCache::new(
                 cache::picture::PictureCacheStrategy::default(),
             ),
         }
@@ -149,12 +146,13 @@ impl Renderer {
                 self.scene_cache.clear_node_pictures();
                 if let Some(backend) = &self.backend {
                     let _surface = unsafe { &mut *backend.get_surface() };
-                    let geometry_cache = cache::geometry::GeometryCache::from_scene(scene);
+                    self.scene_cache.update_geometry(scene);
                     for child_id in &scene.children {
-                        if let (Some(node), Some(bounds)) = (
-                            scene.nodes.get(child_id),
-                            geometry_cache.get_world_bounds(child_id),
-                        ) {
+                        let bounds = {
+                            let cache = self.scene_cache.geometry();
+                            cache.get_world_bounds(child_id)
+                        };
+                        if let (Some(node), Some(bounds)) = (scene.nodes.get(child_id), bounds) {
                             if let Some(picture) = self.record_node(node, &bounds, &scene.nodes) {
                                 self.scene_cache.set_node_picture(child_id.clone(), picture);
                             }
@@ -167,12 +165,13 @@ impl Renderer {
                 self.scene_cache.clear_node_pictures();
                 if let Some(backend) = &self.backend {
                     let _surface = unsafe { &mut *backend.get_surface() };
-                    let geometry_cache = cache::geometry::GeometryCache::from_scene(scene);
+                    self.scene_cache.update_geometry(scene);
                     for child_id in &scene.children {
-                        if let (Some(node), Some(bounds)) = (
-                            scene.nodes.get(child_id),
-                            geometry_cache.get_world_bounds(child_id),
-                        ) {
+                        let bounds = {
+                            let cache = self.scene_cache.geometry();
+                            cache.get_world_bounds(child_id)
+                        };
+                        if let (Some(node), Some(bounds)) = (scene.nodes.get(child_id), bounds) {
                             if let Some(picture) = self.record_node(node, &bounds, &scene.nodes) {
                                 self.scene_cache.set_node_picture(child_id.clone(), picture);
                             }
@@ -192,9 +191,10 @@ impl Renderer {
     ///
     /// This skips camera transforms and visibility culling so the picture can
     /// be reused while the camera moves.
-    pub fn record_scene(&self, scene: &Scene) -> Option<Picture> {
+    pub fn record_scene(&mut self, scene: &Scene) -> Option<Picture> {
         if let Some(_backend) = &self.backend {
-            let geometry_cache = cache::geometry::GeometryCache::from_scene(scene);
+            self.scene_cache.update_geometry(scene);
+            let geometry_cache = self.scene_cache.geometry();
             let mut union_bounds: Option<rect::Rect> = None;
             for child_id in &scene.children {
                 if let Some(b) = geometry_cache.get_world_bounds(child_id) {
@@ -278,7 +278,7 @@ impl Renderer {
                 }
             }
 
-            self.geometry_cache = cache::geometry::GeometryCache::from_scene(scene);
+            self.scene_cache.update_geometry(scene);
             let surface = unsafe { &mut *backend.get_surface() };
             let width = surface.width() as f32;
             let height = surface.height() as f32;

@@ -18,6 +18,7 @@ impl Default for PictureCacheStrategy {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PictureCache {
     strategy: PictureCacheStrategy,
     picture: Option<Picture>,
