@@ -259,7 +259,6 @@ struct App {
     fb_info: gpu::gl::FramebufferInfo,
     gr_context: skia_safe::gpu::DirectContext,
     camera: Camera2D,
-    prev_quantized_transform: math2::transform::AffineTransform,
     scene: Scene,
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
@@ -282,37 +281,25 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             Command::ZoomIn => {
-                let prev_q = self.camera.quantized_transform();
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom / 1.2);
-                let new_q = self.camera.quantized_transform();
-                if prev_q != new_q {
-                    self.renderer.set_camera(self.camera.clone());
-                    self.prev_quantized_transform = new_q;
+                if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
             Command::ZoomOut => {
-                let prev_q = self.camera.quantized_transform();
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom * 1.2);
-                let new_q = self.camera.quantized_transform();
-                if prev_q != new_q {
-                    self.renderer.set_camera(self.camera.clone());
-                    self.prev_quantized_transform = new_q;
+                if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
             Command::Pan { x, y, zoom } => {
-                let prev_q = self.camera.quantized_transform();
                 let current_x = self.camera.transform.x();
                 let current_y = self.camera.transform.y();
                 self.camera
                     .set_position(current_x + x * zoom, current_y + y * zoom);
-                let new_q = self.camera.quantized_transform();
-                if prev_q != new_q {
-                    self.renderer.set_camera(self.camera.clone());
-                    self.prev_quantized_transform = new_q;
+                if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
@@ -489,7 +476,6 @@ where
     let camera = Camera2D::new(viewport_size);
     renderer.set_camera(camera.clone());
     renderer.cache_scene(&scene);
-    let prev_quantized_transform = camera.quantized_transform();
 
     let mut app = App {
         renderer,
@@ -500,7 +486,6 @@ where
         fb_info,
         gr_context,
         camera,
-        prev_quantized_transform,
         scene,
         window,
         image_rx: rx,

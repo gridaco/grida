@@ -5,6 +5,7 @@ use crate::{
     repository::{FontRepository, ImageRepository, NodeRepository},
     runtime::camera::Camera2D,
 };
+use math2::transform::AffineTransform;
 use skia_safe::{Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,6 +31,7 @@ pub struct Renderer {
     logical_width: f32,
     logical_height: f32,
     pub camera: Option<Camera2D>,
+    prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     geometry_cache: cache::geometry::GeometryCache,
@@ -54,6 +56,7 @@ impl Renderer {
             logical_width: width,
             logical_height: height,
             camera: None,
+            prev_quantized_camera_transform: None,
             image_repository,
             font_repository,
             geometry_cache: cache::geometry::GeometryCache::new(),
@@ -115,8 +118,18 @@ impl Renderer {
         }
     }
 
-    pub fn set_camera(&mut self, camera: Camera2D) {
+    /// Set the active camera. Returns `true` if the quantized transform changed.
+    pub fn set_camera(&mut self, camera: Camera2D) -> bool {
+        let quantized = camera.quantized_transform();
+        let changed = match self.prev_quantized_camera_transform {
+            Some(prev) => prev != quantized,
+            None => true,
+        };
+        if changed {
+            self.prev_quantized_camera_transform = Some(quantized);
+        }
         self.camera = Some(camera);
+        changed
     }
 
     pub fn set_cache_strategy(&mut self, strategy: cache::picture::PictureCacheStrategy) {
