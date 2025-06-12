@@ -207,4 +207,16 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 ---
 
+## With Compromises
+
+> Practical, UX-safe tradeoffs that simplify implementation and improve performance, especially under load. These techniques sacrifice exactness for speed — but in ways users won’t notice.
+
+---
+
+- **Quantize Camera Transform**
+
+  Instead of using fully continuous float precision for the camera position and zoom, round them to the nearest N units (e.g., 0.1 for position, 0.01 for zoom):
+
+---
+
 This list is designed to help evolve a renderer from minimal single-threaded mode to scalable, GPU-friendly real-time performance.
