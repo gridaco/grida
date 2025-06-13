@@ -143,6 +143,11 @@ impl GeometryCache {
     pub fn get_world_bounds(&self, id: &NodeId) -> Option<Rect> {
         self.entries.get(id).map(|e| e.absolute_bounding_box)
     }
+
+    /// Return expanded render bounds for a node if available.
+    pub fn get_render_bounds(&self, id: &NodeId) -> Option<Rect> {
+        self.entries.get(id).map(|e| e.absolute_render_bounds)
+    }
 }
 
 fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rect) {
