@@ -37,6 +37,7 @@ enum Command {
     Close,
     ZoomIn,
     ZoomOut,
+    PinchZoom { factor: f32 },
     Pan { x: f32, y: f32, zoom: f32 },
     Redraw,
     Resize { width: u32, height: u32 },
@@ -63,6 +64,18 @@ fn handle_window_event(event: WindowEvent, current_zoom: f32) -> Command {
             Key::Character(c) if c == "-" => Command::ZoomOut,
             _ => Command::None,
         },
+        WindowEvent::PinchGesture {
+            device_id: _,
+            delta,
+            phase: _,
+        } => {
+            // delta is typically between -1 and 1, where positive means zoom in
+            // We'll use a similar zoom factor as the keyboard controls (1.2)
+            let zoom_factor = if delta > 0.0 { 1.0 / 1.2 } else { 1.2 };
+            Command::PinchZoom {
+                factor: zoom_factor,
+            }
+        }
         WindowEvent::MouseWheel { delta, .. } => match delta {
             MouseScrollDelta::LineDelta(x, y) => {
                 let pan_speed = 10.0;
@@ -290,6 +303,13 @@ impl ApplicationHandler for App {
             Command::ZoomOut => {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom * 1.2);
+                if self.renderer.set_camera(self.camera.clone()) {
+                    self.redraw();
+                }
+            }
+            Command::PinchZoom { factor } => {
+                let current_zoom = self.camera.get_zoom();
+                self.camera.set_zoom(current_zoom * factor);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
