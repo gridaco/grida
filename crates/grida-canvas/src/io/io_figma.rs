@@ -104,14 +104,18 @@ impl From<&FigmaPaint> for Paint {
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            transform: convert_gradient_transform(
+                                &gradient.gradient_handle_positions,
+                            ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
                         Paint::RadialGradient(RadialGradientPaint {
-                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            transform: convert_gradient_transform(
+                                &gradient.gradient_handle_positions,
+                            ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                         })
@@ -176,6 +180,37 @@ where
     U: From<&'a T>,
 {
     value.map(|v| U::from(v))
+}
+
+/// Convert Figma gradient handle positions into an AffineTransform.
+///
+/// Figma provides three handle positions in normalized coordinates. The first
+/// handle represents the start of the gradient, the second the end, and the
+/// third defines the width of the gradient. We convert these into a 2x3 affine
+/// transform matrix.
+fn convert_gradient_transform(handles: &Vec<Vector>) -> AffineTransform {
+    if handles.len() == 3 {
+        let start = &handles[0];
+        let end = &handles[1];
+        let width = &handles[2];
+
+        AffineTransform {
+            matrix: [
+                [
+                    (end.x - start.x) as f32,
+                    (width.x - start.x) as f32,
+                    start.x as f32,
+                ],
+                [
+                    (end.y - start.y) as f32,
+                    (width.y - start.y) as f32,
+                    start.y as f32,
+                ],
+            ],
+        }
+    } else {
+        AffineTransform::identity()
+    }
 }
 
 /// Converts Figma nodes to Grida schema
@@ -295,14 +330,18 @@ impl FigmaConverter {
                 match gradient.r#type {
                     figma_api::models::gradient_paint::Type::GradientLinear => {
                         Paint::LinearGradient(LinearGradientPaint {
-                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            transform: convert_gradient_transform(
+                                &gradient.gradient_handle_positions,
+                            ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                         })
                     }
                     figma_api::models::gradient_paint::Type::GradientRadial => {
                         Paint::RadialGradient(RadialGradientPaint {
-                            transform: AffineTransform::identity(), // TODO: Convert gradient transform
+                            transform: convert_gradient_transform(
+                                &gradient.gradient_handle_positions,
+                            ),
                             stops,
                             opacity: gradient.opacity.unwrap_or(1.0) as f32,
                         })
