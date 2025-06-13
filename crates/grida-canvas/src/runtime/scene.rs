@@ -137,13 +137,28 @@ impl Renderer {
     /// Render the currently loaded scene if any. and report the time it took.
     pub fn render(&mut self) -> (Duration, Duration, Duration) {
         let start = Instant::now();
-        if let Some(scene) = self.scene.as_ref() {
-            let scene_clone = scene.clone();
-            self.render_scene(&scene_clone);
+
+        if self.scene.is_none() {
+            return (
+                Duration::from_secs(0),
+                Duration::from_secs(0),
+                Duration::from_secs(0),
+            );
+        }
+
+        if let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) {
+            // SAFETY: the pointer is only used for the duration of this call
+            // and the scene is not mutated while borrowed.
+            let surface = unsafe { &mut *self.backend.as_ref().unwrap().get_surface() };
+            let scene = unsafe { &*scene_ptr };
+            self.encode_scene(surface, scene);
         }
         let encode_duration = start.elapsed();
+
         self.flush();
+
         let duration = start.elapsed();
+
         (duration, encode_duration, duration - encode_duration)
     }
 
@@ -179,70 +194,75 @@ impl Renderer {
         }
     }
 
-    // Render the scene
-    fn render_scene(&mut self, scene: &Scene) {
-        if self.backend.is_some() {
-            self.scene_cache.update_geometry(scene);
-            let surface = unsafe { &mut *self.backend.as_ref().unwrap().get_surface() };
-            let width = surface.width() as f32;
-            let height = surface.height() as f32;
-            let canvas = surface.canvas();
-            canvas.save();
+    // Encode the scene for flushing.
+    fn encode_scene(&mut self, surface: &mut Surface, scene: &Scene) {
+        self.scene_cache.update_geometry(scene);
 
-            // Paint background color first if present
-            if let Some(bg_color) = scene.background_color {
-                let Color(r, g, b, a) = bg_color;
-                let color = skia_safe::Color::from_argb(a, r, g, b);
-                let mut paint = SkPaint::default();
-                paint.set_color(color);
-                // Paint the entire canvas with the background color
-                canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
-            }
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
+        let canvas = surface.canvas();
+        canvas.save();
 
-            // Scale to logical size
-            let scale_x = self.logical_width / width;
-            let scale_y = self.logical_height / height;
-            canvas.scale((scale_x, scale_y));
+        // Paint background color first if present
+        if let Some(bg_color) = scene.background_color {
+            let Color(r, g, b, a) = bg_color;
+            let color = skia_safe::Color::from_argb(a, r, g, b);
+            let mut paint = SkPaint::default();
+            paint.set_color(color);
+            // Paint the entire canvas with the background color
+            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+        }
 
-            // Apply DPI scaling
-            canvas.scale((self.dpi, self.dpi));
+        // Scale to logical size
+        let scale_x = self.logical_width / width;
+        let scale_y = self.logical_height / height;
+        canvas.scale((scale_x, scale_y));
 
-            // Apply camera transform if present
-            if let Some(camera) = &self.camera {
-                let view_matrix = camera.view_matrix();
-                canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
-            }
+        // Apply DPI scaling
+        canvas.scale((self.dpi, self.dpi));
 
-            let painter = Painter::new(
-                canvas,
-                self.font_repository.clone(),
-                self.image_repository.clone(),
-            );
+        // Apply camera transform if present
+        if let Some(camera) = &self.camera {
+            let view_matrix = camera.view_matrix();
+            canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
+        }
 
-            // Render scene nodes
-            if self.scene_cache.strategy().depth > 0 {
-                for child_id in &scene.children {
-                    if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
-                        canvas.draw_picture(pic, None, None);
-                    } else {
-                        let bounds = {
-                            let cache = self.scene_cache.geometry();
-                            cache.get_world_bounds(child_id)
-                        };
-                        let node = scene.nodes.get(child_id).unwrap();
-                        if let Some(b) = bounds {
-                            if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
-                                canvas.draw_picture(&pic, None, None);
-                                self.scene_cache.set_node_picture(child_id.clone(), pic);
-                                continue;
-                            }
-                        }
-                        painter.draw_node_recursively(node, &scene.nodes);
+        // if let Some(image) = self.scene_cache.image() {
+        //     canvas.draw_image(image, (0.0, 0.0), None);
+        //     canvas.restore();
+        //     return;
+        // }
+
+        let painter = Painter::new(
+            canvas,
+            self.font_repository.clone(),
+            self.image_repository.clone(),
+        );
+
+        // Render scene nodes
+        for child_id in &scene.children {
+            if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
+                canvas.draw_picture(pic, None, None);
+            } else {
+                let bounds = {
+                    let cache = self.scene_cache.geometry();
+                    cache.get_world_bounds(child_id)
+                };
+                let node = scene.nodes.get(child_id).unwrap();
+                if let Some(b) = bounds {
+                    if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
+                        canvas.draw_picture(&pic, None, None);
+                        self.scene_cache.set_node_picture(child_id.clone(), pic);
+                        continue;
                     }
                 }
+                painter.draw_node_recursively(node, &scene.nodes);
             }
-
-            canvas.restore();
         }
+
+        canvas.restore();
+
+        let image = surface.image_snapshot();
+        self.scene_cache.set_image(image);
     }
 }

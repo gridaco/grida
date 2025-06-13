@@ -1,12 +1,16 @@
-use crate::cache::{geometry::GeometryCache, picture::{PictureCache, PictureCacheStrategy}};
-use crate::node::schema::{Scene, NodeId};
-use skia_safe::Picture;
+use crate::cache::{
+    geometry::GeometryCache,
+    picture::{PictureCache, PictureCacheStrategy},
+};
+use crate::node::schema::{NodeId, Scene};
+use skia_safe::{Image, Picture};
 
 /// A unified cache storing geometry information and recorded pictures for a scene.
 #[derive(Debug, Clone)]
 pub struct SceneCache {
     geometry: GeometryCache,
     picture: PictureCache,
+    image: Option<Image>,
 }
 
 impl SceneCache {
@@ -15,6 +19,7 @@ impl SceneCache {
         Self {
             geometry: GeometryCache::new(),
             picture: PictureCache::new(strategy),
+            image: None,
         }
     }
 
@@ -33,6 +38,15 @@ impl SceneCache {
         &mut self.geometry
     }
 
+    /// Access the image cache.
+    pub fn image(&self) -> Option<&Image> {
+        self.image.as_ref()
+    }
+
+    pub fn set_image(&mut self, image: Image) {
+        self.image = Some(image);
+    }
+
     /// Access the picture cache.
     pub fn picture(&self) -> &PictureCache {
         &self.picture
@@ -44,24 +58,15 @@ impl SceneCache {
     }
 
     /// Retrieve the current picture cache strategy.
-    pub fn strategy(&self) -> &PictureCacheStrategy {
+    pub fn picture_strategy(&self) -> &PictureCacheStrategy {
         self.picture.strategy()
-    }
-
-    /// Set the picture cache strategy and invalidate existing pictures.
-    pub fn set_strategy(&mut self, strategy: PictureCacheStrategy) {
-        self.picture.set_strategy(strategy);
     }
 
     /// Invalidate all cached data.
     pub fn invalidate(&mut self) {
         self.geometry = GeometryCache::new();
         self.picture.invalidate();
-    }
-
-    /// Return a picture for the entire scene if cached.
-    pub fn get_picture(&self) -> Option<&Picture> {
-        self.picture.get_picture()
+        self.image = None;
     }
 
     /// Return a picture for a specific node if cached.
@@ -69,18 +74,8 @@ impl SceneCache {
         self.picture.get_node_picture(id)
     }
 
-    /// Store a picture for the whole scene.
-    pub fn set_picture(&mut self, picture: Picture) {
-        self.picture.set_picture(picture);
-    }
-
     /// Store a picture for a node.
     pub fn set_node_picture(&mut self, id: NodeId, picture: Picture) {
         self.picture.set_node_picture(id, picture);
-    }
-
-    /// Remove all node pictures.
-    pub fn clear_node_pictures(&mut self) {
-        self.picture.clear_node_pictures();
     }
 }
