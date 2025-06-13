@@ -136,68 +136,25 @@ impl Renderer {
 
     /// Render the currently loaded scene if any.
     pub fn render(&mut self) {
+        let start = Instant::now();
+        // log time + number of cached nodes
         if let Some(scene) = self.scene.as_ref() {
             let scene_clone = scene.clone();
             self.render_scene(&scene_clone);
         }
+        let duration = start.elapsed();
+        println!(
+            "render for {} cached nodes with depth {} took: {:?}",
+            self.scene_cache.picture().len(),
+            self.scene_cache.picture().depth(),
+            duration,
+        );
     }
 
     /// Clear the cached scene picture.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
     }
-
-    // /// Record the entire scene into a [`Picture`].
-    // ///
-    // /// This skips camera transforms and visibility culling so the picture can
-    // /// be reused while the camera moves.
-    // fn capture_scene_picture(&mut self, scene: &Scene) -> Option<Picture> {
-    //     let start = Instant::now();
-    //     let result = if let Some(_backend) = &self.backend {
-    //         self.scene_cache.update_geometry(scene);
-    //         let geometry_cache = self.scene_cache.geometry();
-    //         let mut union_bounds: Option<rect::Rect> = None;
-    //         for child_id in &scene.children {
-    //             if let Some(b) = geometry_cache.get_world_bounds(child_id) {
-    //                 union_bounds = Some(match union_bounds {
-    //                     Some(u) => rect::union(&[u, b]),
-    //                     None => b,
-    //                 });
-    //             }
-    //         }
-
-    //         if let Some(bounds) = union_bounds {
-    //             let mut recorder = PictureRecorder::new();
-    //             let sk_bounds = Rect::new(
-    //                 bounds.x,
-    //                 bounds.y,
-    //                 bounds.x + bounds.width,
-    //                 bounds.y + bounds.height,
-    //             );
-    //             let canvas = recorder.begin_recording(sk_bounds, None);
-    //             let painter = Painter::new(
-    //                 canvas,
-    //                 self.font_repository.clone(),
-    //                 self.image_repository.clone(),
-    //             );
-
-    //             for child_id in &scene.children {
-    //                 if let Some(node) = scene.nodes.get(child_id) {
-    //                     painter.draw_node_recursively(node, &scene.nodes);
-    //                 }
-    //             }
-
-    //             recorder.finish_recording_as_picture(None)
-    //         } else {
-    //             None
-    //         }
-    //     } else {
-    //         None
-    //     };
-    //     let duration = start.elapsed();
-    //     println!("capture_scene_picture took: {:?}", duration);
-    //     result
-    // }
 
     fn capture_node_picture(
         &self,
@@ -229,8 +186,6 @@ impl Renderer {
     // Render the scene
     fn render_scene(&mut self, scene: &Scene) {
         if self.backend.is_some() {
-            let start = Instant::now();
-
             self.scene_cache.update_geometry(scene);
             let surface = unsafe { &mut *self.backend.as_ref().unwrap().get_surface() };
             let width = surface.width() as f32;
@@ -290,15 +245,6 @@ impl Renderer {
                     }
                 }
             }
-
-            let duration = start.elapsed();
-            // log time + number of cached nodes
-            println!(
-                "caching strategy render for {} cached nodes with depth {} took: {:?}",
-                self.scene_cache.picture().len(),
-                self.scene_cache.picture().depth(),
-                duration,
-            );
 
             canvas.restore();
         }

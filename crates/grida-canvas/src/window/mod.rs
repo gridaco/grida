@@ -367,12 +367,8 @@ impl App {
     }
 
     fn redraw(&mut self) {
-        // println!("🎨 redraw...");
         self.process_image_queue();
         self.process_font_queue();
-        let surface = unsafe { &mut *self.surface_ptr };
-        let canvas = surface.canvas();
-        canvas.clear(skia_safe::Color::WHITE);
 
         self.renderer.render();
         self.renderer.flush();
