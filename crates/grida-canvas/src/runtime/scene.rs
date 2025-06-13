@@ -216,7 +216,7 @@ impl Renderer {
 
                 for child_id in &scene.children {
                     if let Some(node) = scene.nodes.get(child_id) {
-                        painter.draw_node(node, &scene.nodes);
+                        painter.draw_node_recursively(node, &scene.nodes);
                     }
                 }
 
@@ -249,7 +249,7 @@ impl Renderer {
                 self.font_repository.clone(),
                 self.image_repository.clone(),
             );
-            painter.draw_node(node, repository);
+            painter.draw_node_recursively(node, repository);
             recorder.finish_recording_as_picture(None)
         } else {
             None
@@ -335,12 +335,15 @@ impl Renderer {
                     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
                         canvas.draw_picture(pic, None, None);
                     } else {
-                        painter.draw_node(scene.nodes.get(child_id).unwrap(), &scene.nodes);
+                        painter.draw_node_recursively(
+                            scene.nodes.get(child_id).unwrap(),
+                            &scene.nodes,
+                        );
                     }
                 }
             } else {
                 for child_id in &scene.children {
-                    painter.draw_node(scene.nodes.get(child_id).unwrap(), &scene.nodes);
+                    painter.draw_node_recursively(scene.nodes.get(child_id).unwrap(), &scene.nodes);
                 }
             }
 

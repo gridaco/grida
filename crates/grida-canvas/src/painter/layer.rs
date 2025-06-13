@@ -1,4 +1,4 @@
-use super::geometry::{build_shape, PainterShape};
+use super::geometry::{PainterShape, build_shape};
 use crate::cache::geometry::GeometryCache;
 use crate::node::schema::*;
 use crate::repository::NodeRepository;

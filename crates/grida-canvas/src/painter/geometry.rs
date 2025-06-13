@@ -94,6 +94,7 @@ pub fn stroke_geometry(
 
 /// Internal universal Painter's shape abstraction for optimized drawing
 /// Virtual nodes like Group, BooleanOperation are not Painter's shapes, they use different methods.
+#[derive(Debug, Clone)]
 pub struct PainterShape {
     pub rect: Rect,
     pub rect_shape: Option<Rect>,
