@@ -450,7 +450,6 @@ where
 
     let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
     renderer.set_backend(Backend::GL(surface_ptr));
-    renderer.set_cache_strategy(crate::cache::picture::PictureCacheStrategy { depth: 1 });
 
     // Initialize the image loader in lifecycle mode
     println!("📸 Initializing image loader...");

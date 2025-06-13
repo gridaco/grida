@@ -127,10 +127,6 @@ impl Renderer {
         changed
     }
 
-    pub fn set_cache_strategy(&mut self, strategy: cache::picture::PictureCacheStrategy) {
-        self.scene_cache.set_strategy(strategy);
-    }
-
     /// Record and store the entire scene into the internal cache.
     /// This assumes the scene is static and only the camera transforms at runtime.
     pub fn cache_scene(&mut self, scene: &Scene) {
@@ -205,9 +201,18 @@ impl Renderer {
 
             if let Some(bounds) = union_bounds {
                 let mut recorder = PictureRecorder::new();
-                let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
+                let sk_bounds = Rect::new(
+                    bounds.x,
+                    bounds.y,
+                    bounds.x + bounds.width,
+                    bounds.y + bounds.height,
+                );
                 let canvas = recorder.begin_recording(sk_bounds, None);
-                let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
+                let painter = Painter::new(
+                    canvas,
+                    self.font_repository.clone(),
+                    self.image_repository.clone(),
+                );
 
                 for child_id in &scene.children {
                     if let Some(node) = scene.nodes.get(child_id) {
@@ -232,9 +237,18 @@ impl Renderer {
     ) -> Option<Picture> {
         if self.backend.is_some() {
             let mut recorder = PictureRecorder::new();
-            let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
+            let sk_bounds = Rect::new(
+                bounds.x,
+                bounds.y,
+                bounds.x + bounds.width,
+                bounds.y + bounds.height,
+            );
             let canvas = recorder.begin_recording(sk_bounds, None);
-            let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
+            let painter = Painter::new(
+                canvas,
+                self.font_repository.clone(),
+                self.image_repository.clone(),
+            );
             painter.draw_node(node, repository);
             recorder.finish_recording_as_picture(None)
         } else {
@@ -333,7 +347,11 @@ impl Renderer {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
-                let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
+                let painter = Painter::new(
+                    canvas,
+                    self.font_repository.clone(),
+                    self.image_repository.clone(),
+                );
                 painter.draw_node(node, repository);
             }
         }
