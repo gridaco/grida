@@ -21,7 +21,6 @@ impl Default for PictureCacheStrategy {
 #[derive(Debug, Clone)]
 pub struct PictureCache {
     strategy: PictureCacheStrategy,
-    picture: Option<Picture>,
     node_pictures: HashMap<NodeId, Picture>,
 }
 
@@ -29,7 +28,6 @@ impl PictureCache {
     pub fn new(strategy: PictureCacheStrategy) -> Self {
         Self {
             strategy,
-            picture: None,
             node_pictures: HashMap::new(),
         }
     }
@@ -44,19 +42,7 @@ impl PictureCache {
     }
 
     pub fn is_valid(&self) -> bool {
-        if self.strategy.depth == 0 {
-            self.picture.is_some()
-        } else {
-            !self.node_pictures.is_empty()
-        }
-    }
-
-    pub fn get_picture(&self) -> Option<&Picture> {
-        self.picture.as_ref()
-    }
-
-    pub fn set_picture(&mut self, picture: Picture) {
-        self.picture = Some(picture);
+        !self.node_pictures.is_empty()
     }
 
     pub fn get_node_picture(&self, id: &NodeId) -> Option<&Picture> {
@@ -80,7 +66,6 @@ impl PictureCache {
     }
 
     pub fn invalidate(&mut self) {
-        self.picture = None;
         self.node_pictures.clear();
     }
 }
