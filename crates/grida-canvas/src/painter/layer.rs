@@ -1,5 +1,7 @@
-use super::geometry::PainterShape;
+use super::geometry::{build_shape, PainterShape};
+use crate::cache::geometry::GeometryCache;
 use crate::node::schema::*;
+use crate::repository::NodeRepository;
 use math2::transform::AffineTransform;
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
@@ -60,6 +62,7 @@ use math2::transform::AffineTransform;
 /// - [`LayerUsage`] — carries per-frame composite state (transform, opacity)
 /// - [`RenderCommand`] — full rendering instruction with resolved state
 /// - [`PainterShape`] — resolved shape geometry abstraction
+#[derive(Debug, Clone)]
 pub struct PainterPictureLayer {
     pub id: NodeId,
     pub z_index: usize,
@@ -69,4 +72,177 @@ pub struct PainterPictureLayer {
     pub effects: Vec<FilterEffect>,
     pub strokes: Vec<Paint>,
     pub fills: Vec<Paint>,
+}
+
+/// Flat list of [`PainterPictureLayer`] entries.
+#[derive(Debug, Default, Clone)]
+pub struct LayerList {
+    pub layers: Vec<PainterPictureLayer>,
+}
+
+impl LayerList {
+    /// Flatten an entire scene into a layer list using the provided geometry cache.
+    pub fn from_scene(scene: &Scene, cache: &GeometryCache) -> Self {
+        let mut list = LayerList::default();
+        for id in &scene.children {
+            Self::flatten_node(id, &scene.nodes, cache, 1.0, &mut list.layers);
+        }
+        list
+    }
+
+    /// Build a layer list starting from a node subtree using a geometry cache.
+    pub fn from_node(
+        id: &NodeId,
+        repo: &NodeRepository,
+        cache: &GeometryCache,
+        opacity: f32,
+    ) -> Self {
+        let mut list = LayerList::default();
+        Self::flatten_node(id, repo, cache, opacity, &mut list.layers);
+        list
+    }
+
+    fn flatten_node(
+        id: &NodeId,
+        repo: &NodeRepository,
+        cache: &GeometryCache,
+        parent_opacity: f32,
+        out: &mut Vec<PainterPictureLayer>,
+    ) {
+        if let Some(node) = repo.get(id) {
+            let transform = cache
+                .get_world_transform(id)
+                .unwrap_or_else(AffineTransform::identity);
+            match node {
+                Node::Group(n) => {
+                    let opacity = parent_opacity * n.opacity;
+                    for child in &n.children {
+                        Self::flatten_node(child, repo, cache, opacity, out);
+                    }
+                }
+                Node::Container(n) => {
+                    let opacity = parent_opacity * n.opacity;
+                    out.push(PainterPictureLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::Container(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: n.stroke.clone().into_iter().collect(),
+                        fills: vec![n.fill.clone()],
+                    });
+                    for child in &n.children {
+                        Self::flatten_node(child, repo, cache, opacity, out);
+                    }
+                }
+                Node::BooleanOperation(n) => {
+                    let opacity = parent_opacity * n.opacity;
+                    for child in &n.children {
+                        Self::flatten_node(child, repo, cache, opacity, out);
+                    }
+                }
+                Node::Rectangle(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Rectangle(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Ellipse(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Ellipse(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Polygon(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Polygon(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::RegularPolygon(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::RegularStarPolygon(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Line(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Line(n.clone())),
+                    effects: vec![],
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![],
+                }),
+                Node::TextSpan(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::TextSpan(n.clone())),
+                    effects: vec![],
+                    strokes: n.stroke.clone().into_iter().collect(),
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Path(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Path(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Image(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Image(n.clone())),
+                    effects: n.effect.clone().into_iter().collect(),
+                    strokes: vec![n.stroke.clone()],
+                    fills: vec![n.fill.clone()],
+                }),
+                Node::Error(n) => out.push(PainterPictureLayer {
+                    id: n.base.id.clone(),
+                    z_index: out.len(),
+                    opacity: parent_opacity * n.opacity,
+                    transform,
+                    shape: build_shape(&IntrinsicSizeNode::Error(n.clone())),
+                    effects: vec![],
+                    strokes: vec![],
+                    fills: vec![],
+                }),
+            }
+        }
+    }
 }
