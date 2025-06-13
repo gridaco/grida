@@ -323,37 +323,28 @@ impl Renderer {
                 canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
             }
 
+            let painter = Painter::new(
+                canvas,
+                self.font_repository.clone(),
+                self.image_repository.clone(),
+            );
+
             // Render scene nodes
             if self.scene_cache.strategy().depth == 1 {
                 for child_id in &scene.children {
                     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
                         canvas.draw_picture(pic, None, None);
                     } else {
-                        self.render_node(child_id, &scene.nodes);
+                        painter.draw_node(scene.nodes.get(child_id).unwrap(), &scene.nodes);
                     }
                 }
             } else {
                 for child_id in &scene.children {
-                    self.render_node(child_id, &scene.nodes);
+                    painter.draw_node(scene.nodes.get(child_id).unwrap(), &scene.nodes);
                 }
             }
 
             canvas.restore();
-        }
-    }
-
-    fn render_node(&self, id: &NodeId, repository: &NodeRepository) {
-        if let Some(backend) = &self.backend {
-            let surface = unsafe { &mut *backend.get_surface() };
-            let canvas = surface.canvas();
-            if let Some(node) = repository.get(id) {
-                let painter = Painter::new(
-                    canvas,
-                    self.font_repository.clone(),
-                    self.image_repository.clone(),
-                );
-                painter.draw_node(node, repository);
-            }
         }
     }
 }
