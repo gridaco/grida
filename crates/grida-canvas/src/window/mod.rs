@@ -277,6 +277,7 @@ struct App {
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
     scheduler: scheduler::FrameScheduler,
+    last_frame_time: std::time::Instant,
 }
 
 impl ApplicationHandler for App {
@@ -367,18 +368,40 @@ impl App {
     }
 
     fn redraw(&mut self) {
+        let frame_start = std::time::Instant::now();
+        let frame_delta = frame_start.saturating_duration_since(self.last_frame_time);
+
+        let queue_start = std::time::Instant::now();
         self.process_image_queue();
         self.process_font_queue();
+        let queue_time = queue_start.elapsed();
 
-        self.renderer.render();
-        self.renderer.flush();
+        let (render_time, encode_time, flush_time) = self.renderer.render();
 
+        let swap_start = std::time::Instant::now();
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
+        let swap_time = swap_start.elapsed();
 
         // Apply frame pacing
+        let sleep_start = std::time::Instant::now();
         self.scheduler.sleep_to_maintain_fps();
+        let sleep_time = sleep_start.elapsed();
+
+        let total_frame_time = frame_start.elapsed();
+        println!(
+            "FRAME: t: {:.2}ms | Render: {:.2}ms | Encode: {:.2}ms | Flush: {:.2}ms | Queue: {:?} | Swap: {:?} | Sleep: {:?}",
+            total_frame_time.as_secs_f64() * 1000.0,
+            render_time.as_secs_f64() * 1000.0,
+            encode_time.as_secs_f64() * 1000.0,
+            flush_time.as_secs_f64() * 1000.0,
+            queue_time,
+            swap_time,
+            sleep_time
+        );
+
+        self.last_frame_time = frame_start;
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -497,6 +520,7 @@ where
         image_rx: rx,
         font_rx,
         scheduler: scheduler::FrameScheduler::new(120).with_max_fps(144),
+        last_frame_time: std::time::Instant::now(),
     };
 
     println!("🎭 Starting event loop...");

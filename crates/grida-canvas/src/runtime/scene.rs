@@ -8,7 +8,7 @@ use crate::{
 use skia_safe::{Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Choice of GPU vs. raster backend
 pub enum Backend {
@@ -92,7 +92,7 @@ impl Renderer {
         }
     }
 
-    pub fn flush(&self) {
+    fn flush(&self) {
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             if let Some(mut gr_context) = surface.recording_context() {
@@ -134,21 +134,17 @@ impl Renderer {
         self.scene = Some(scene);
     }
 
-    /// Render the currently loaded scene if any.
-    pub fn render(&mut self) {
+    /// Render the currently loaded scene if any. and report the time it took.
+    pub fn render(&mut self) -> (Duration, Duration, Duration) {
         let start = Instant::now();
-        // log time + number of cached nodes
         if let Some(scene) = self.scene.as_ref() {
             let scene_clone = scene.clone();
             self.render_scene(&scene_clone);
         }
+        let encode_duration = start.elapsed();
+        self.flush();
         let duration = start.elapsed();
-        println!(
-            "render for {} cached nodes with depth {} took: {:?}",
-            self.scene_cache.picture().len(),
-            self.scene_cache.picture().depth(),
-            duration,
-        );
+        (duration, encode_duration, duration - encode_duration)
     }
 
     /// Clear the cached scene picture.

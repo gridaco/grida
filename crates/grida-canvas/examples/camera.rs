@@ -250,7 +250,6 @@ fn main() {
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
     renderer.render();
-    renderer.flush();
 
     // Benchmark rendering with camera transformations
     let mut frame_count = 0;
@@ -318,7 +317,6 @@ fn main() {
 
                 // Render the scene
                 renderer.render();
-                renderer.flush();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {
                     eprintln!("Error swapping buffers: {:?}", e);
