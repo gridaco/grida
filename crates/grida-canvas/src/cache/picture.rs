@@ -71,6 +71,14 @@ impl PictureCache {
         self.node_pictures.clear();
     }
 
+    pub fn len(&self) -> usize {
+        self.node_pictures.len()
+    }
+
+    pub fn depth(&self) -> usize {
+        self.strategy.depth
+    }
+
     pub fn invalidate(&mut self) {
         self.picture = None;
         self.node_pictures.clear();
