@@ -102,15 +102,24 @@ pub fn stroke_geometry(
 
 /// A painter that handles all drawing operations for nodes,
 /// with proper effect ordering and a layer‐blur/backdrop‐blur pipeline.
-pub struct Painter {
+pub struct Painter<'a> {
+    canvas: &'a skia_safe::Canvas,
     fonts: Rc<RefCell<FontRepository>>,
     images: Rc<RefCell<ImageRepository>>,
 }
 
-impl Painter {
-    /// Create a new Painter, using fonts from the FontRepository
-    pub fn new(fonts: Rc<RefCell<FontRepository>>, images: Rc<RefCell<ImageRepository>>) -> Self {
-        Self { fonts, images }
+impl<'a> Painter<'a> {
+    /// Create a new Painter for the given canvas
+    pub fn new(
+        canvas: &'a skia_safe::Canvas,
+        fonts: Rc<RefCell<FontRepository>>,
+        images: Rc<RefCell<ImageRepository>>,
+    ) -> Self {
+        Self {
+            canvas,
+            fonts,
+            images,
+        }
     }
 
     // ============================
@@ -118,12 +127,8 @@ impl Painter {
     // ============================
 
     /// Save/restore transform state and apply a 2×3 matrix
-    fn with_transform<F: FnOnce()>(
-        &self,
-        canvas: &skia_safe::Canvas,
-        transform: &[[f32; 3]; 2],
-        f: F,
-    ) {
+    fn with_transform<F: FnOnce()>(&self, transform: &[[f32; 3]; 2], f: F) {
+        let canvas = self.canvas;
         canvas.save();
         canvas.concat(&cvt::sk_matrix(*transform));
         f();
@@ -131,7 +136,8 @@ impl Painter {
     }
 
     /// If opacity < 1.0, wrap drawing in a save_layer_alpha; else draw directly.
-    fn with_opacity<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, opacity: f32, f: F) {
+    fn with_opacity<F: FnOnce()>(&self, opacity: f32, f: F) {
+        let canvas = self.canvas;
         if opacity < 1.0 {
             canvas.save_layer_alpha(None, (opacity * 255.0) as u32);
             f();
@@ -142,7 +148,8 @@ impl Painter {
     }
 
     /// If blend mode is not Normal, wrap drawing in a save_layer with blend mode; else draw directly.
-    fn with_blendmode<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, blend_mode: BlendMode, f: F) {
+    fn with_blendmode<F: FnOnce()>(&self, blend_mode: BlendMode, f: F) {
+        let canvas = self.canvas;
         if blend_mode != BlendMode::Normal {
             let mut paint = SkPaint::default();
             paint.set_blend_mode(blend_mode.into());
@@ -155,7 +162,8 @@ impl Painter {
     }
 
     /// Helper method to apply clipping to a region with optional corner radius
-    fn with_clip<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, shape: &PainterShape, f: F) {
+    fn with_clip<F: FnOnce()>(&self, shape: &PainterShape, f: F) {
+        let canvas = self.canvas;
         canvas.save();
 
         // Try to use the most efficient clipping method based on shape type
@@ -175,7 +183,8 @@ impl Painter {
     }
 
     /// Wrap a closure `f` in a layer that applies a Gaussian blur to everything drawn inside.
-    fn with_layer_blur<F: FnOnce()>(&self, canvas: &skia_safe::Canvas, radius: f32, f: F) {
+    fn with_layer_blur<F: FnOnce()>(&self, radius: f32, f: F) {
+        let canvas = self.canvas;
         let image_filter = skia_safe::image_filters::blur((radius, radius), None, None, None);
         let mut paint = SkPaint::default();
         paint.set_image_filter(image_filter);
@@ -185,7 +194,8 @@ impl Painter {
     }
 
     /// Draw a drop shadow behind the content using a shape.
-    fn draw_shadow(&self, canvas: &skia_safe::Canvas, shape: &PainterShape, shadow: &FeDropShadow) {
+    fn draw_shadow(&self, shape: &PainterShape, shadow: &FeDropShadow) {
+        let canvas = self.canvas;
         let Color(r, g, b, a) = shadow.color;
         let color = skia_safe::Color::from_argb(a, r, g, b);
 
@@ -209,12 +219,8 @@ impl Painter {
     }
 
     /// Draw a backdrop blur: blur what's behind the shape.
-    fn draw_backdrop_blur(
-        &self,
-        canvas: &skia_safe::Canvas,
-        shape: &PainterShape,
-        blur: &FeBackdropBlur,
-    ) {
+    fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBackdropBlur) {
+        let canvas = self.canvas;
         // 1) Build a Gaussian‐blur filter for the backdrop
         let image_filter =
             skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None).unwrap();
@@ -233,7 +239,8 @@ impl Painter {
     }
 
     /// Draw fill for a shape using given paint.
-    fn draw_fill(&self, canvas: &skia_safe::Canvas, shape: &PainterShape, fill: &Paint) {
+    fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
+        let canvas = self.canvas;
         let (mut fill_paint, image) = match fill {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
@@ -267,13 +274,13 @@ impl Painter {
     /// Draw stroke for a shape using given paint.
     fn draw_stroke(
         &self,
-        canvas: &skia_safe::Canvas,
         shape: &PainterShape,
         stroke: &Paint,
         stroke_width: f32,
         stroke_align: StrokeAlign,
         stroke_dash_array: Option<&Vec<f32>>,
     ) {
+        let canvas = self.canvas;
         if stroke_width <= 0.0 {
             return;
         }
@@ -320,7 +327,6 @@ impl Painter {
     /// Draw fill and stroke for a shape using given paints.
     fn draw_fill_and_stroke(
         &self,
-        canvas: &skia_safe::Canvas,
         shape: &PainterShape,
         fill: Option<&Paint>,
         stroke: Option<&Paint>,
@@ -330,13 +336,12 @@ impl Painter {
     ) {
         // Draw fill if present
         if let Some(fill) = fill {
-            self.draw_fill(canvas, shape, fill);
+            self.draw_fill(shape, fill);
         }
 
         // Draw stroke if present
         if let Some(stroke) = stroke {
             self.draw_stroke(
-                canvas,
                 shape,
                 stroke,
                 stroke_width,
@@ -349,22 +354,22 @@ impl Painter {
     /// Shared utility to handle effect drawing for shapes
     fn draw_shape_with_effect<F: Fn()>(
         &self,
-        canvas: &skia_safe::Canvas,
         effect: Option<&FilterEffect>,
         shape: &PainterShape,
         draw_content: F,
     ) {
+        let canvas = self.canvas;
         match effect {
             Some(FilterEffect::DropShadow(shadow)) => {
-                self.draw_shadow(canvas, shape, shadow);
+                self.draw_shadow(shape, shadow);
                 draw_content();
             }
             Some(FilterEffect::BackdropBlur(blur)) => {
-                self.draw_backdrop_blur(canvas, shape, blur);
+                self.draw_backdrop_blur(shape, blur);
                 draw_content();
             }
             Some(FilterEffect::GaussianBlur(blur)) => {
-                self.with_layer_blur(canvas, blur.radius, draw_content);
+                self.with_layer_blur(blur.radius, draw_content);
             }
             None => {
                 draw_content();
@@ -377,14 +382,13 @@ impl Painter {
     // ============================
 
     /// Draw a RectangleNode, respecting its transform, effect, fill, stroke, blend mode, opacity
-    fn draw_rect_node(&self, canvas: &skia_safe::Canvas, node: &RectangleNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    fn draw_rect_node(&self, node: &RectangleNode) {
+        self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Rectangle(node.clone()));
-            self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                self.with_opacity(canvas, node.opacity, || {
-                    self.with_blendmode(canvas, node.blend_mode, || {
+            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
                         self.draw_fill_and_stroke(
-                            canvas,
                             &shape,
                             Some(&node.fill),
                             Some(&node.stroke),
@@ -399,28 +403,27 @@ impl Painter {
     }
 
     /// Draw an ImageNode, respecting transform, effect, rounded corners, blend mode, opacity
-    pub fn draw_image_node(&self, canvas: &skia_safe::Canvas, node: &ImageNode) -> bool {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_image_node(&self, node: &ImageNode) -> bool {
+        self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Image(node.clone()));
             let images = self.images.borrow();
 
             if let Some(image) = images.get(&node._ref) {
                 // Image is ready - draw it
-                self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                    self.with_opacity(canvas, node.opacity, || {
-                        self.with_blendmode(canvas, node.blend_mode, || {
+                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                    self.with_opacity(node.opacity, || {
+                        self.with_blendmode(node.blend_mode, || {
                             let mut paint = SkPaint::default();
                             paint.set_anti_alias(true);
 
                             // Use with_clip for rounded corners
-                            self.with_clip(canvas, &shape, || {
-                                canvas.draw_image_rect(image, None, shape.rect, &paint);
+                            self.with_clip(&shape, || {
+                                self.canvas.draw_image_rect(image, None, shape.rect, &paint);
                             });
 
                             // Draw stroke if needed
                             if node.stroke_width > 0.0 {
                                 self.draw_fill_and_stroke(
-                                    canvas,
                                     &shape,
                                     None,
                                     Some(&node.stroke),
@@ -434,12 +437,11 @@ impl Painter {
                 });
             } else {
                 // Image is not ready - draw only stroke and effects
-                self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                    self.with_opacity(canvas, node.opacity, || {
-                        self.with_blendmode(canvas, node.blend_mode, || {
+                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                    self.with_opacity(node.opacity, || {
+                        self.with_blendmode(node.blend_mode, || {
                             // Draw only stroke with transparent fill
                             self.draw_fill_and_stroke(
-                                canvas,
                                 &shape,
                                 None,
                                 Some(&node.stroke),
@@ -456,14 +458,13 @@ impl Painter {
     }
 
     /// Draw an EllipseNode
-    pub fn draw_ellipse_node(&self, canvas: &skia_safe::Canvas, node: &EllipseNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_ellipse_node(&self, node: &EllipseNode) {
+        self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Ellipse(node.clone()));
-            self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                self.with_opacity(canvas, node.opacity, || {
-                    self.with_blendmode(canvas, node.blend_mode, || {
+            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
                         self.draw_fill_and_stroke(
-                            canvas,
                             &shape,
                             Some(&node.fill),
                             Some(&node.stroke),
@@ -478,12 +479,12 @@ impl Painter {
     }
 
     /// Draw a LineNode
-    pub fn draw_line_node(&self, canvas: &skia_safe::Canvas, node: &LineNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_line_node(&self, node: &LineNode) {
+        self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Line(node.clone()));
 
-            self.with_opacity(canvas, node.opacity, || {
-                self.with_blendmode(canvas, node.blend_mode, || {
+            self.with_opacity(node.opacity, || {
+                self.with_blendmode(node.blend_mode, || {
                     let mut paint =
                         cvt::sk_paint(&node.stroke, node.opacity, (node.size.width, 0.0));
                     let stroke_path = stroke_geometry(
@@ -492,22 +493,21 @@ impl Painter {
                         node.stroke_align,
                         node.stroke_dash_array.as_ref(),
                     );
-                    canvas.draw_path(&stroke_path, &paint);
+                    self.canvas.draw_path(&stroke_path, &paint);
                 });
             });
         });
     }
 
     /// Draw a PathNode (SVG path data)
-    pub fn draw_path_node(&self, canvas: &skia_safe::Canvas, node: &PathNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_path_node(&self, node: &PathNode) {
+        self.with_transform(&node.transform.matrix, || {
             let path = skia_safe::path::Path::from_svg(&node.data).expect("invalid SVG path");
             let shape = PainterShape::from_path(path.clone());
-            self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                self.with_opacity(canvas, node.opacity, || {
-                    self.with_blendmode(canvas, node.blend_mode, || {
+            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
                         self.draw_fill_and_stroke(
-                            canvas,
                             &shape,
                             Some(&node.fill),
                             Some(&node.stroke),
@@ -522,15 +522,14 @@ impl Painter {
     }
 
     /// Draw a PolygonNode (arbitrary polygon with optional corner radius)
-    pub fn draw_polygon_node(&self, canvas: &skia_safe::Canvas, node: &PolygonNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_polygon_node(&self, node: &PolygonNode) {
+        self.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
             let shape = PainterShape::from_path(path.clone());
-            self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                self.with_opacity(canvas, node.opacity, || {
-                    self.with_blendmode(canvas, node.blend_mode, || {
+            self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                self.with_opacity(node.opacity, || {
+                    self.with_blendmode(node.blend_mode, || {
                         self.draw_fill_and_stroke(
-                            canvas,
                             &shape,
                             Some(&node.fill),
                             Some(&node.stroke),
@@ -545,23 +544,22 @@ impl Painter {
     }
 
     /// Draw a RegularPolygonNode by converting to a PolygonNode
-    pub fn draw_regular_polygon_node(&self, canvas: &skia_safe::Canvas, node: &RegularPolygonNode) {
+    pub fn draw_regular_polygon_node(&self, node: &RegularPolygonNode) {
         let polygon = node.to_polygon();
-        self.draw_polygon_node(canvas, &polygon);
+        self.draw_polygon_node(&polygon);
     }
 
     /// Draw a RegularStarPolygonNode by converting to a PolygonNode
     pub fn draw_regular_star_polygon_node(
         &self,
-        canvas: &skia_safe::Canvas,
         node: &RegularStarPolygonNode,
     ) {
         let polygon = node.to_polygon();
-        self.draw_polygon_node(canvas, &polygon);
+        self.draw_polygon_node(&polygon);
     }
 
     /// Draw a TextSpanNode (simple text block)
-    pub fn draw_text_span_node(&self, canvas: &skia_safe::Canvas, node: &TextSpanNode) {
+    pub fn draw_text_span_node(&self, node: &TextSpanNode) {
         // Prepare paint for fill
         let mut fill_paint = cvt::sk_paint(
             &node.fill,
@@ -608,27 +606,25 @@ impl Painter {
         para_builder.pop();
         paragraph.layout(node.size.width);
 
-        self.with_transform(canvas, &node.transform.matrix, || {
-            paragraph.paint(canvas, Point::new(0.0, 0.0));
+        self.with_transform(&node.transform.matrix, || {
+            paragraph.paint(self.canvas, Point::new(0.0, 0.0));
         });
     }
 
     /// Draw a ContainerNode (background + stroke + children)
     pub fn draw_container_node(
         &self,
-        canvas: &skia_safe::Canvas,
         node: &ContainerNode,
         repository: &NodeRepository,
     ) {
-        self.with_transform(canvas, &node.transform.matrix, || {
-            self.with_opacity(canvas, node.opacity, || {
+        self.with_transform(&node.transform.matrix, || {
+            self.with_opacity(node.opacity, || {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
 
                 // Draw effects first (if any) - these won't be clipped
-                self.draw_shape_with_effect(canvas, node.effect.as_ref(), &shape, || {
-                    self.with_blendmode(canvas, node.blend_mode, || {
+                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                    self.with_blendmode(node.blend_mode, || {
                         self.draw_fill_and_stroke(
-                            canvas,
                             &shape,
                             Some(&node.fill),
                             node.stroke.as_ref(),
@@ -641,10 +637,10 @@ impl Painter {
 
                 // Draw children with clipping if enabled
                 if node.clip {
-                    self.with_clip(canvas, &shape, || {
+                    self.with_clip(&shape, || {
                         for child_id in &node.children {
                             if let Some(child) = repository.get(child_id) {
-                                self.draw_node(canvas, child, repository);
+                                self.draw_node(child, repository);
                             }
                         }
                     });
@@ -652,7 +648,7 @@ impl Painter {
                     // Draw children without clipping
                     for child_id in &node.children {
                         if let Some(child) = repository.get(child_id) {
-                            self.draw_node(canvas, child, repository);
+                            self.draw_node(child, repository);
                         }
                     }
                 }
@@ -660,8 +656,8 @@ impl Painter {
         });
     }
 
-    pub fn draw_error_node(&self, canvas: &skia_safe::Canvas, node: &ErrorNode) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+    pub fn draw_error_node(&self, node: &ErrorNode) {
+        self.with_transform(&node.transform.matrix, || {
             let shape = build_shape(&IntrinsicSizeNode::Error(node.clone()));
 
             // Create a red fill paint
@@ -674,9 +670,8 @@ impl Painter {
                 opacity: 1.0,
             });
 
-            self.with_opacity(canvas, node.opacity, || {
+            self.with_opacity(node.opacity, || {
                 self.draw_fill_and_stroke(
-                    canvas,
                     &shape,
                     Some(&fill),
                     Some(&stroke),
@@ -691,15 +686,14 @@ impl Painter {
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
     pub fn draw_group_node(
         &self,
-        canvas: &skia_safe::Canvas,
         node: &GroupNode,
         repository: &NodeRepository,
     ) {
-        self.with_transform(canvas, &node.transform.matrix, || {
-            self.with_opacity(canvas, node.opacity, || {
+        self.with_transform(&node.transform.matrix, || {
+            self.with_opacity(node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        self.draw_node(canvas, child, repository);
+                        self.draw_node(child, repository);
                     }
                 }
             });
@@ -709,37 +703,36 @@ impl Painter {
     #[deprecated(note = "Boolean operations are not implemented properly")]
     pub fn draw_boolean_operation_node(
         &self,
-        canvas: &skia_safe::Canvas,
         node: &BooleanPathOperationNode,
         repository: &NodeRepository,
     ) {
-        self.with_transform(canvas, &node.transform.matrix, || {
+        self.with_transform(&node.transform.matrix, || {
             for child_id in &node.children {
                 if let Some(child) = repository.get(child_id) {
-                    self.draw_node(canvas, child, repository);
+                    self.draw_node(child, repository);
                 }
             }
         });
     }
 
     /// Dispatch to the correct node‐type draw method
-    pub fn draw_node(&self, canvas: &skia_safe::Canvas, node: &Node, repository: &NodeRepository) {
+    pub fn draw_node(&self, node: &Node, repository: &NodeRepository) {
         match node {
-            Node::Error(n) => self.draw_error_node(canvas, n),
-            Node::Group(n) => self.draw_group_node(canvas, n, repository),
-            Node::Container(n) => self.draw_container_node(canvas, n, repository),
-            Node::Rectangle(n) => self.draw_rect_node(canvas, n),
-            Node::Ellipse(n) => self.draw_ellipse_node(canvas, n),
-            Node::Polygon(n) => self.draw_polygon_node(canvas, n),
-            Node::RegularPolygon(n) => self.draw_regular_polygon_node(canvas, n),
-            Node::TextSpan(n) => self.draw_text_span_node(canvas, n),
-            Node::Line(n) => self.draw_line_node(canvas, n),
+            Node::Error(n) => self.draw_error_node(n),
+            Node::Group(n) => self.draw_group_node(n, repository),
+            Node::Container(n) => self.draw_container_node(n, repository),
+            Node::Rectangle(n) => self.draw_rect_node(n),
+            Node::Ellipse(n) => self.draw_ellipse_node(n),
+            Node::Polygon(n) => self.draw_polygon_node(n),
+            Node::RegularPolygon(n) => self.draw_regular_polygon_node(n),
+            Node::TextSpan(n) => self.draw_text_span_node(n),
+            Node::Line(n) => self.draw_line_node(n),
             Node::Image(n) => {
-                self.draw_image_node(canvas, n);
+                self.draw_image_node(n);
             }
-            Node::Path(n) => self.draw_path_node(canvas, n),
-            Node::BooleanOperation(n) => self.draw_boolean_operation_node(canvas, n, repository),
-            Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(canvas, n),
+            Node::Path(n) => self.draw_path_node(n),
+            Node::BooleanOperation(n) => self.draw_boolean_operation_node(n, repository),
+            Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
     }
 }

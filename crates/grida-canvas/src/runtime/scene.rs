@@ -24,7 +24,6 @@ impl Backend {
 }
 
 pub struct Renderer {
-    painter: Painter,
     backend: Option<Backend>,
     dpi: f32,
     logical_width: f32,
@@ -47,7 +46,6 @@ impl Renderer {
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
-            painter: Painter::new(font_repository.clone(), image_repository.clone()),
             backend: None,
             dpi,
             logical_width: width,
@@ -209,10 +207,11 @@ impl Renderer {
                 let mut recorder = PictureRecorder::new();
                 let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
                 let canvas = recorder.begin_recording(sk_bounds, None);
+                let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
 
                 for child_id in &scene.children {
                     if let Some(node) = scene.nodes.get(child_id) {
-                        self.painter.draw_node(&canvas, node, &scene.nodes);
+                        painter.draw_node(node, &scene.nodes);
                     }
                 }
 
@@ -235,7 +234,8 @@ impl Renderer {
             let mut recorder = PictureRecorder::new();
             let sk_bounds = Rect::new(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height);
             let canvas = recorder.begin_recording(sk_bounds, None);
-            self.painter.draw_node(&canvas, node, repository);
+            let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
+            painter.draw_node(node, repository);
             recorder.finish_recording_as_picture(None)
         } else {
             None
@@ -333,7 +333,8 @@ impl Renderer {
             let surface = unsafe { &mut *backend.get_surface() };
             let canvas = surface.canvas();
             if let Some(node) = repository.get(id) {
-                self.painter.draw_node(canvas, node, repository);
+                let painter = Painter::new(canvas, self.font_repository.clone(), self.image_repository.clone());
+                painter.draw_node(node, repository);
             }
         }
     }
