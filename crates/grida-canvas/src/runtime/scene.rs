@@ -28,6 +28,7 @@ pub struct Renderer {
     dpi: f32,
     logical_width: f32,
     logical_height: f32,
+    scene: Option<Scene>,
     pub camera: Option<Camera2D>,
     prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
     pub image_repository: Rc<RefCell<ImageRepository>>,
@@ -50,6 +51,7 @@ impl Renderer {
             dpi,
             logical_width: width,
             logical_height: height,
+            scene: None,
             camera: None,
             prev_quantized_camera_transform: None,
             image_repository,
@@ -125,6 +127,21 @@ impl Renderer {
         }
         self.camera = Some(camera);
         changed
+    }
+
+    /// Load a scene into the renderer and cache it according to the current
+    /// caching strategy.
+    pub fn load_scene(&mut self, scene: Scene) {
+        self.cache_scene(&scene);
+        self.scene = Some(scene);
+    }
+
+    /// Render the currently loaded scene if any.
+    pub fn render(&mut self) {
+        if let Some(scene) = self.scene.as_ref() {
+            let scene_clone = scene.clone();
+            self.render_scene(&scene_clone);
+        }
     }
 
     /// Record and store the entire scene into the internal cache.
@@ -257,7 +274,7 @@ impl Renderer {
     }
 
     // Render the scene
-    pub fn render_scene(&mut self, scene: &Scene) {
+    fn render_scene(&mut self, scene: &Scene) {
         if let Some(backend) = &self.backend {
             // Fast path when the whole scene is cached
             if self.scene_cache.strategy().depth == 0 {

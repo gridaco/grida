@@ -247,8 +247,9 @@ fn main() {
     camera.set_zoom(1.0);
     renderer.set_camera(camera);
 
-    // First render to warm up the cache
-    renderer.render_scene(&scene);
+    // Load and warm up the scene cache
+    renderer.load_scene(scene.clone());
+    renderer.render();
     renderer.flush();
 
     // Benchmark rendering with camera transformations
@@ -316,7 +317,7 @@ fn main() {
                 renderer.camera.as_mut().unwrap().set_position(x, y);
 
                 // Render the scene
-                renderer.render_scene(&scene);
+                renderer.render();
                 renderer.flush();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {

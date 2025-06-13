@@ -363,7 +363,7 @@ impl App {
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::WHITE);
 
-        self.renderer.render_scene(&self.scene);
+        self.renderer.render();
         self.renderer.flush();
 
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
@@ -474,7 +474,7 @@ where
     };
     let camera = Camera2D::new(viewport_size);
     renderer.set_camera(camera.clone());
-    renderer.cache_scene(&scene);
+    renderer.load_scene(scene.clone());
 
     let mut app = App {
         renderer,
