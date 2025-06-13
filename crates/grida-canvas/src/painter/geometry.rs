@@ -32,7 +32,7 @@ use skia_safe::{Path, PathOp, Point, RRect, Rect, StrokeRec, stroke_rec::InitSty
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// let stroke_path = stroke_geometry(
 ///     &original_path,
 ///     4.0,

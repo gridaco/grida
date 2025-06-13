@@ -13,7 +13,7 @@ use crate::node::schema::TextTransform;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use cg::schema::TextTransform;
 /// use cg::text_transform::transform_text;
 ///

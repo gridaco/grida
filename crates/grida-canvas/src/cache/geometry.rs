@@ -77,7 +77,12 @@ impl GeometryCache {
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 })
+                union_bounds.unwrap_or_else(|| Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
+                })
             }
             Node::BooleanOperation(n) => {
                 let mut union_bounds: Option<Rect> = None;
@@ -94,7 +99,12 @@ impl GeometryCache {
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 })
+                union_bounds.unwrap_or_else(|| Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
+                })
             }
             _ => {
                 let intrinsic_node = Box::new(match node {

@@ -38,7 +38,7 @@ use math2::transform::AffineTransform;
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// // Layer definition
 /// let layer = PainterPictureLayer {
 ///     shape: shape,

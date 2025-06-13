@@ -11,4 +11,3 @@ pub trait ResourceLoader {
     /// Unload or remove a cached resource identified by `key`.
     async fn unload(&mut self, key: &str);
 }
-

@@ -120,7 +120,6 @@ impl FromIterator<(NodeId, Node)> for NodeRepository {
     }
 }
 
-
 /// A repository for managing images with automatic ID indexing.
 #[derive(Debug, Clone)]
 pub struct ImageRepository {
@@ -259,7 +258,7 @@ impl ResourceRepository<Vec<u8>> for FontRepository {
 mod tests {
     use super::*;
     use crate::node::schema::{BaseNode, ErrorNode, Size};
-    use skia_safe::{surfaces, Surface};
+    use skia_safe::surfaces;
 
     #[test]
     fn node_repository_basic() {
