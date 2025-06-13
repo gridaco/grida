@@ -37,9 +37,10 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 6. **Tile-Based Raster Cache (Hybrid Rendering)**
 
-   - Divide the scene into fixed-size tiles (e.g., 512×512).
-   - Each tile stores a rasterized `SkImage` generated from the scene-level `SkPicture`.
-   - Blit tiles during zoomed-out views or under frame budget pressure.
+   - Render the full viewport, take snapshot. debounced (after no more changes. e.g. 150ms)
+   - Divide the snapshot into fixed-size tiles (e.g., 512×512).
+   - When new area discovered, render the cached, non-overlapping parts with tile cache. only render newly discovered area.
+   - Repeat step 1.
    - Optional padding per tile to account for effects (blur, shadows).
 
 7. **Dynamic Mode Switching (Picture vs Tile)**
