@@ -1,5 +1,6 @@
 use super::cvt;
 use super::geometry::*;
+use super::layer::{LayerList, PainterPictureLayer};
 use crate::node::schema::*;
 use crate::repository::{FontRepository, ImageRepository, NodeRepository};
 use math2::transform::AffineTransform;
@@ -539,7 +540,7 @@ impl<'a> Painter<'a> {
     }
 
     #[deprecated(note = "Boolean operations are not implemented properly")]
-    pub fn draw_boolean_operation_node_recursively(
+    fn draw_boolean_operation_node_recursively(
         &self,
         node: &BooleanPathOperationNode,
         repository: &NodeRepository,
@@ -573,6 +574,31 @@ impl<'a> Painter<'a> {
                 self.draw_boolean_operation_node_recursively(n, repository)
             }
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
+        }
+    }
+
+    /// Draw a single [`PainterPictureLayer`].
+    pub fn draw_layer(&self, layer: &PainterPictureLayer) {
+        self.with_transform(&layer.transform.matrix, || {
+            let shape = &layer.shape;
+            let effect = layer.effects.first();
+            self.draw_shape_with_effect(effect, shape, || {
+                self.with_opacity(layer.opacity, || {
+                    for fill in &layer.fills {
+                        self.draw_fill(shape, fill);
+                    }
+                    for stroke in &layer.strokes {
+                        self.draw_stroke(shape, stroke, 1.0, StrokeAlign::Center, None);
+                    }
+                });
+            });
+        });
+    }
+
+    /// Draw all layers in a [`LayerList`].
+    pub fn draw_layer_list(&self, list: &LayerList) {
+        for layer in &list.layers {
+            self.draw_layer(layer);
         }
     }
 }
