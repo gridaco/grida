@@ -12,7 +12,7 @@ fn transform_point_translation() {
         x: 1.0,
         y: 2.0,
     };
-    let t = AffineTransform::translate(3.0, 4.0);
+    let t = AffineTransform::new(3.0, 4.0, 0.0);
     let res = transform_point(&p, &t);
     assert_eq!(res.x, 4.0);
     assert_eq!(res.y, 6.0);
@@ -27,7 +27,7 @@ fn transform_line_translation() {
         x2: 1.0,
         y2: 1.0,
     };
-    let t = AffineTransform::translate(1.0, 2.0);
+    let t = AffineTransform::new(1.0, 2.0, 0.0);
     let res = transform_line(&line, &t);
     assert_eq!((res.x1, res.y1, res.x2, res.y2), (1.0, 2.0, 2.0, 3.0));
 }

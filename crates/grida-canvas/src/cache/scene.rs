@@ -1,6 +1,7 @@
 use crate::cache::{
     geometry::GeometryCache,
     picture::{PictureCache, PictureCacheStrategy},
+    tile::ImageTileCache,
 };
 use crate::node::schema::{NodeId, Scene};
 use skia_safe::{Image, Picture};
@@ -8,18 +9,18 @@ use skia_safe::{Image, Picture};
 /// A unified cache storing geometry information and recorded pictures for a scene.
 #[derive(Debug, Clone)]
 pub struct SceneCache {
-    geometry: GeometryCache,
-    picture: PictureCache,
-    image: Option<Image>,
+    pub geometry: GeometryCache,
+    pub picture: PictureCache,
+    pub tile: ImageTileCache,
 }
 
 impl SceneCache {
     /// Create a new empty cache with the given picture cache strategy.
-    pub fn new(strategy: PictureCacheStrategy) -> Self {
+    pub fn new() -> Self {
         Self {
             geometry: GeometryCache::new(),
-            picture: PictureCache::new(strategy),
-            image: None,
+            picture: PictureCache::new(),
+            tile: ImageTileCache::new(),
         }
     }
 
@@ -36,15 +37,6 @@ impl SceneCache {
     /// Mutable access to the geometry cache.
     pub fn geometry_mut(&mut self) -> &mut GeometryCache {
         &mut self.geometry
-    }
-
-    /// Access the image cache.
-    pub fn image(&self) -> Option<&Image> {
-        self.image.as_ref()
-    }
-
-    pub fn set_image(&mut self, image: Image) {
-        self.image = Some(image);
     }
 
     /// Access the picture cache.
@@ -66,7 +58,6 @@ impl SceneCache {
     pub fn invalidate(&mut self) {
         self.geometry = GeometryCache::new();
         self.picture.invalidate();
-        self.image = None;
     }
 
     /// Return a picture for a specific node if cached.

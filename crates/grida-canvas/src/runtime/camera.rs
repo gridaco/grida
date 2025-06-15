@@ -2,75 +2,64 @@ use crate::node::schema::Size;
 use crate::rect::{self, Rect};
 use math2::{quantize, transform::AffineTransform};
 
-/// A camera that defines the view transformation for rendering.
-/// The camera's transform is inverse-applied to create the view matrix.
+/// A 2D camera that defines how world-space content is projected onto the screen.
+///
+/// The camera is defined by a transform and a logical viewport size. The transform represents
+/// the camera's position, rotation, and zoom **in world space**, where the translation component
+/// specifies the world-space point that should appear at the **center of the viewport**.
+///
+/// This model is commonly used in design tools and 2D canvas systems where zooming and panning
+/// behavior is centered on the screen.
+///
+/// # Fields
+/// - `transform`: The camera's transform in world space. Its translation corresponds to the
+///    world coordinate that appears at the center of the screen.
+/// - `size`: The logical size of the viewport in pixels (not affected by zoom).
+///
+/// This shifts the camera's center to the screen center and transforms the scene accordingly.
 #[derive(Debug, Clone)]
 pub struct Camera2D {
-    /// The camera's transform in world space
     pub transform: AffineTransform,
-
-    /// The viewport size
     pub size: Size,
 }
 
 impl Camera2D {
-    /// Quantization step for camera position in physical pixels.
     const POSITION_STEP_PX: f32 = 5.0;
-    /// Quantization step for zoom factor.
     const ZOOM_STEP: f32 = 0.01;
+
+    /// Create with identity transform + no zoom (1:1).
     pub fn new(viewport_size: Size) -> Self {
-        let mut camera = Self {
+        let mut c = Self {
             transform: AffineTransform::identity(),
             size: viewport_size,
         };
-        camera.set_zoom(1.0);
-        camera
+        c.set_zoom(1.0);
+        c
     }
 
-    /// Creates a view matrix by inverse-applying the camera's transform
-    pub fn view_matrix(&self) -> AffineTransform {
-        self.transform
-            .inverse()
-            .unwrap_or_else(AffineTransform::identity)
+    /// Pan camera by (tx, ty) in world units.
+    pub fn translate(&mut self, tx: f32, ty: f32) {
+        self.transform.translate(tx, ty);
     }
 
-    /// Sets the camera's position
+    /// Jump camera center to (x, y) in world units.
     pub fn set_position(&mut self, x: f32, y: f32) {
         self.transform.set_translation(x, y);
     }
 
-    /// Sets the camera's rotation in radians
-    pub fn set_rotation(&mut self, angle: f32) {
-        let zoom = self.get_zoom();
-        let tx = self.transform.x();
-        let ty = self.transform.y();
-        let (sin, cos) = angle.sin_cos();
-        self.transform.matrix[0][0] = cos * zoom;
-        self.transform.matrix[0][1] = -sin * zoom;
-        self.transform.matrix[1][0] = sin * zoom;
-        self.transform.matrix[1][1] = cos * zoom;
-        self.transform.matrix[0][2] = tx;
-        self.transform.matrix[1][2] = ty;
-    }
-
-    /// Sets the camera's zoom level
+    /// Set zoom factor (1 = 100%). Preserves rotation & translation.
     pub fn set_zoom(&mut self, zoom: f32) {
-        let angle = self.transform.rotation();
+        let θ = self.transform.rotation();
         let tx = self.transform.x();
         let ty = self.transform.y();
-        let (sin, cos) = angle.sin_cos();
-        self.transform.matrix[0][0] = cos * zoom;
-        self.transform.matrix[0][1] = -sin * zoom;
-        self.transform.matrix[1][0] = sin * zoom;
-        self.transform.matrix[1][1] = cos * zoom;
-        self.transform.matrix[0][2] = tx;
-        self.transform.matrix[1][2] = ty;
+        let (s, c) = θ.sin_cos();
+        let scale = 1.0 / zoom;
+        self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
     }
 
+    /// Get current zoom (1/scale).
     pub fn get_zoom(&self) -> f32 {
-        let a = self.transform.matrix[0][0];
-        let b = self.transform.matrix[1][0];
-        (a.powi(2) + b.powi(2)).sqrt()
+        1.0 / self.transform.get_scale_x()
     }
 
     /// Returns the camera transform quantized to the nearest visible pixel.
@@ -92,23 +81,30 @@ impl Camera2D {
         }
     }
 
-    /// Returns the visible area in world space
+    /// View matrix = center-screen translation × inverse(world→camera).
+    pub fn view_matrix(&self) -> AffineTransform {
+        let inv = self
+            .transform
+            .clone()
+            .inverse()
+            .unwrap_or_else(AffineTransform::identity);
+        let mut t = AffineTransform::identity();
+        t.translate(self.size.width * 0.5, self.size.height * 0.5);
+        t.compose(&inv)
+    }
+
+    /// World‐space rect currently visible.
     pub fn rect(&self) -> Rect {
-        // Start with viewport in screen space
-        let viewport = Rect {
+        let vp = Rect {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
             height: self.size.height,
         };
-
-        // Apply inverse zoom encoded in transform
-
-        // Apply inverse transform to get world space rect
-        if let Some(inv) = self.transform.inverse() {
-            rect::transform(viewport, &inv)
-        } else {
-            viewport
-        }
+        let inv = self
+            .view_matrix()
+            .inverse()
+            .unwrap_or_else(AffineTransform::identity);
+        rect::transform(vp, &inv)
     }
 }

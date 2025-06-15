@@ -37,14 +37,14 @@ enum Command {
     Close,
     ZoomIn,
     ZoomOut,
-    PinchZoom { factor: f32 },
-    Pan { x: f32, y: f32, zoom: f32 },
+    ZoomDelta { factor: f32 },
+    Pan { tx: f32, ty: f32 },
     Redraw,
     Resize { width: u32, height: u32 },
     None,
 }
 
-fn handle_window_event(event: WindowEvent, current_zoom: f32) -> Command {
+fn handle_window_event(event: WindowEvent) -> Command {
     match event {
         WindowEvent::CloseRequested => Command::Close,
         WindowEvent::Resized(size) => Command::Resize {
@@ -71,28 +71,17 @@ fn handle_window_event(event: WindowEvent, current_zoom: f32) -> Command {
         } => {
             // delta is typically between -1 and 1, where positive means zoom in
             // We'll use a similar zoom factor as the keyboard controls (1.2)
-            let zoom_factor = if delta > 0.0 { 1.0 / 1.2 } else { 1.2 };
-            Command::PinchZoom {
+            let zoom_factor = if delta > 0.0 { 1.2 } else { 1.0 / 1.2 };
+            Command::ZoomDelta {
                 factor: zoom_factor,
             }
         }
         WindowEvent::MouseWheel { delta, .. } => match delta {
-            MouseScrollDelta::LineDelta(x, y) => {
-                let pan_speed = 10.0;
-                Command::Pan {
-                    x: -x * pan_speed,
-                    y: -y * pan_speed,
-                    zoom: current_zoom,
-                }
-            }
-            MouseScrollDelta::PixelDelta(delta) => {
-                let pan_speed = 0.5;
-                Command::Pan {
-                    x: -(delta.x as f32) * pan_speed,
-                    y: -(delta.y as f32) * pan_speed,
-                    zoom: current_zoom,
-                }
-            }
+            MouseScrollDelta::PixelDelta(delta) => Command::Pan {
+                tx: -(delta.x as f32),
+                ty: -(delta.y as f32),
+            },
+            _ => Command::None,
         },
         WindowEvent::RedrawRequested => Command::Redraw,
         _ => Command::None,
@@ -100,8 +89,8 @@ fn handle_window_event(event: WindowEvent, current_zoom: f32) -> Command {
 }
 
 fn init_window(
-    _width: i32,
-    _height: i32,
+    width: i32,
+    height: i32,
 ) -> (
     *mut Surface,
     EventLoop<()>,
@@ -120,7 +109,7 @@ fn init_window(
     let el = EventLoop::new().expect("Failed to create event loop");
     let window_attributes = WindowAttributes::default()
         .with_title("Grida - grida-canvas / glutin / skia-safe::gpu::gl")
-        .with_inner_size(LogicalSize::new(1080, 1080));
+        .with_inner_size(LogicalSize::new(width, height));
 
     // Create GL config template
     let template = ConfigTemplateBuilder::new()
@@ -272,7 +261,6 @@ struct App {
     fb_info: gpu::gl::FramebufferInfo,
     gr_context: skia_safe::gpu::DirectContext,
     camera: Camera2D,
-    scene: Scene,
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
@@ -289,37 +277,35 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        match handle_window_event(event, self.camera.get_zoom()) {
+        match handle_window_event(event) {
             Command::Close => {
                 self.renderer.free();
                 event_loop.exit();
             }
             Command::ZoomIn => {
                 let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom / 1.2);
+                self.camera.set_zoom(current_zoom * 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
             Command::ZoomOut => {
                 let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom * 1.2);
+                self.camera.set_zoom(current_zoom / 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
-            Command::PinchZoom { factor } => {
+            Command::ZoomDelta { factor } => {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom * factor);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
             }
-            Command::Pan { x, y, zoom } => {
-                let current_x = self.camera.transform.x();
-                let current_y = self.camera.transform.y();
-                self.camera
-                    .set_position(current_x + x * zoom, current_y + y * zoom);
+            Command::Pan { tx, ty } => {
+                let zoom = self.camera.get_zoom();
+                self.camera.translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
@@ -376,7 +362,10 @@ impl App {
         self.process_font_queue();
         let queue_time = queue_start.elapsed();
 
-        let (render_time, encode_time, flush_time) = self.renderer.render();
+        let (render_time, encode_time, flush_time) = match self.renderer.render() {
+            Some(t) => t,
+            None => return,
+        };
 
         let swap_start = std::time::Instant::now();
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
@@ -390,16 +379,16 @@ impl App {
         let sleep_time = sleep_start.elapsed();
 
         let total_frame_time = frame_start.elapsed();
-        println!(
-            "FRAME: t: {:.2}ms | Render: {:.2}ms | Encode: {:.2}ms | Flush: {:.2}ms | Queue: {:?} | Swap: {:?} | Sleep: {:?}",
-            total_frame_time.as_secs_f64() * 1000.0,
-            render_time.as_secs_f64() * 1000.0,
-            encode_time.as_secs_f64() * 1000.0,
-            flush_time.as_secs_f64() * 1000.0,
-            queue_time,
-            swap_time,
-            sleep_time
-        );
+        // println!(
+        //     "FRAME: t: {:.2}ms | Render: {:.2}ms | Encode: {:.2}ms | Flush: {:.2}ms | Queue: {:?} | Swap: {:?} | Sleep: {:?}",
+        //     total_frame_time.as_secs_f64() * 1000.0,
+        //     render_time.as_secs_f64() * 1000.0,
+        //     encode_time.as_secs_f64() * 1000.0,
+        //     flush_time.as_secs_f64() * 1000.0,
+        //     queue_time,
+        //     swap_time,
+        //     sleep_time
+        // );
 
         self.last_frame_time = frame_start;
     }
@@ -461,6 +450,9 @@ where
         winit::event_loop::EventLoopProxy<()>,
     ),
 {
+    let width = 1080;
+    let height = 1080;
+
     println!("🚀 Starting demo window...");
     let (
         surface_ptr,
@@ -472,13 +464,16 @@ where
         fb_info,
         gr_context,
         scale_factor,
-    ) = init_window(1080, 1080);
+    ) = init_window(width, height);
 
     let (tx, rx) = mpsc::unbounded_channel();
     let (font_tx, font_rx) = mpsc::unbounded_channel();
     let proxy = el.create_proxy();
 
-    let mut renderer = Renderer::new(1080.0, 1080.0, scale_factor as f32);
+    let mut renderer = Renderer::new(
+        width as f32 * scale_factor as f32,
+        height as f32 * scale_factor as f32,
+    );
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Initialize the image loader in lifecycle mode
@@ -498,11 +493,10 @@ where
     init(&mut renderer, tx, font_tx, proxy);
 
     // Create and set up camera
-    let viewport_size = Size {
-        width: 1080.0,
-        height: 1080.0,
-    };
-    let camera = Camera2D::new(viewport_size);
+    let camera = Camera2D::new(Size {
+        width: width as f32 * scale_factor as f32,
+        height: height as f32 * scale_factor as f32,
+    });
     renderer.set_camera(camera.clone());
     renderer.load_scene(scene.clone());
 
@@ -515,7 +509,6 @@ where
         fb_info,
         gr_context,
         camera,
-        scene,
         window,
         image_rx: rx,
         font_rx,

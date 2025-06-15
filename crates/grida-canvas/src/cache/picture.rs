@@ -25,9 +25,9 @@ pub struct PictureCache {
 }
 
 impl PictureCache {
-    pub fn new(strategy: PictureCacheStrategy) -> Self {
+    pub fn new() -> Self {
         Self {
-            strategy,
+            strategy: PictureCacheStrategy::default(),
             node_pictures: HashMap::new(),
         }
     }

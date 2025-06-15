@@ -10,7 +10,7 @@ fn transforms_close(a: &AffineTransform, b: &AffineTransform) {
 
 #[test]
 fn invert_translation() {
-    let t = AffineTransform::translate(5.0, -3.0);
+    let t = AffineTransform::new(5.0, -3.0, 0.0);
     let inv = t.inverse().unwrap();
     let res = inv.compose(&t);
     transforms_close(&res, &AffineTransform::identity());
@@ -18,7 +18,7 @@ fn invert_translation() {
 
 #[test]
 fn invert_rotation() {
-    let t = AffineTransform::rotate(45.0);
+    let t = AffineTransform::from_rotatation(45.0);
     let inv = t.inverse().unwrap();
     let res = inv.compose(&t);
     transforms_close(&res, &AffineTransform::identity());

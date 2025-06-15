@@ -525,11 +525,11 @@ pub fn get_relative_transform(a: Rectangle, b: Rectangle) -> AffineTransform {
         b.height / a.height
     };
 
-    let t1 = AffineTransform::translate(-a.x, -a.y);
+    let t1 = AffineTransform::new(-a.x, -a.y, 0.0);
     let t2 = AffineTransform {
         matrix: [[sx, 0.0, 0.0], [0.0, sy, 0.0]],
     };
-    let t3 = AffineTransform::translate(b.x, b.y);
+    let t3 = AffineTransform::new(b.x, b.y, 0.0);
 
     t3.compose(&t2.compose(&t1))
 }

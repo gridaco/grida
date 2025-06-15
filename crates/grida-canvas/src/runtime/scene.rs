@@ -1,3 +1,4 @@
+use crate::cache::tile::TileCache;
 use crate::node::schema::*;
 use crate::painter::{Painter, cvt};
 use crate::{
@@ -29,7 +30,6 @@ impl Backend {
 /// ---------------------------------------------------------------------------
 pub struct Renderer {
     backend: Option<Backend>,
-    dpi: f32,
     logical_width: f32,
     logical_height: f32,
     scene: Option<Scene>,
@@ -41,14 +41,13 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(width: f32, height: f32, dpi: f32) -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
             backend: None,
-            dpi,
             logical_width: width,
             logical_height: height,
             scene: None,
@@ -56,9 +55,7 @@ impl Renderer {
             prev_quantized_camera_transform: None,
             image_repository,
             font_repository,
-            scene_cache: cache::scene::SceneCache::new(
-                cache::picture::PictureCacheStrategy::default(),
-            ),
+            scene_cache: cache::scene::SceneCache::new(),
         }
     }
 
@@ -135,15 +132,11 @@ impl Renderer {
     }
 
     /// Render the currently loaded scene if any. and report the time it took.
-    pub fn render(&mut self) -> (Duration, Duration, Duration) {
+    pub fn render(&mut self) -> Option<(Duration, Duration, Duration)> {
         let start = Instant::now();
 
         if self.scene.is_none() {
-            return (
-                Duration::from_secs(0),
-                Duration::from_secs(0),
-                Duration::from_secs(0),
-            );
+            return None;
         }
 
         if let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) {
@@ -159,7 +152,7 @@ impl Renderer {
 
         let duration = start.elapsed();
 
-        (duration, encode_duration, duration - encode_duration)
+        Some((duration, encode_duration, duration - encode_duration))
     }
 
     /// Clear the cached scene picture.
@@ -201,7 +194,8 @@ impl Renderer {
         let width = surface.width() as f32;
         let height = surface.height() as f32;
         let canvas = surface.canvas();
-        canvas.save();
+
+        canvas.clear(skia_safe::Color::TRANSPARENT);
 
         // Paint background color first if present
         if let Some(bg_color) = scene.background_color {
@@ -213,25 +207,12 @@ impl Renderer {
             canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
         }
 
-        // Scale to logical size
-        let scale_x = self.logical_width / width;
-        let scale_y = self.logical_height / height;
-        canvas.scale((scale_x, scale_y));
-
-        // Apply DPI scaling
-        canvas.scale((self.dpi, self.dpi));
+        canvas.save();
 
         // Apply camera transform if present
         if let Some(camera) = &self.camera {
-            let view_matrix = camera.view_matrix();
-            canvas.concat(&cvt::sk_matrix(view_matrix.matrix));
+            canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
-
-        // if let Some(image) = self.scene_cache.image() {
-        //     canvas.draw_image(image, (0.0, 0.0), None);
-        //     canvas.restore();
-        //     return;
-        // }
 
         let painter = Painter::new(
             canvas,
@@ -262,7 +243,54 @@ impl Renderer {
 
         canvas.restore();
 
-        let image = surface.image_snapshot();
-        self.scene_cache.set_image(image);
+        if let Some(camera) = &self.camera {
+            let tc = &mut self.scene_cache.tile;
+            let raw_zoom = camera.get_zoom();
+            let rect = camera.rect();
+
+            // 1. get the quantized bounds / aligned to the tile size
+            let (level, zoom) = tc.quantize_zoom(raw_zoom);
+            println!("raw_zoom: {}, quantized_zoom: {}", raw_zoom, zoom);
+            let size = tc.tile_world_size(zoom);
+            let start_col = (rect.x / size).floor() as i32;
+            let end_col = ((rect.x + rect.width) / size).ceil() as i32;
+            let start_row = (rect.y / size).floor() as i32;
+            let end_row = ((rect.y + rect.height) / size).ceil() as i32;
+
+            // println!(
+            //     "zoom: {}, rect: {:?} col: {}..{} row: {}..{} cells: {}",
+            //     zoom,
+            //     rect,
+            //     start_col,
+            //     end_col,
+            //     start_row,
+            //     end_row,
+            //     (end_col - start_col) * (end_row - start_row)
+            // );
+
+            // for col in start_col..end_col {
+            //     for row in start_row..end_row {
+            //         let key: (u8, i32, i32) = (level, col, row);
+            //         let subset = skia_safe::IRect::from_xywh(
+            //             col as i32 * size as i32,
+            //             row as i32 * size as i32,
+            //             size as i32,
+            //             size as i32,
+            //         );
+
+            //         if !tc.has(key) {
+            //             let image = surface.image_snapshot_with_bounds(subset);
+            //             // let image = image.make_subset(surface.direct_context().as_mut(), subset);
+            //             if let Some(image) = image {
+            //                 tc.insert_tile(key, image, (size, size), rect);
+            //             }
+
+            //             // println!("key: {:?}", key);
+            //         }
+            //     }
+            // }
+            // print the number of tiles
+            // println!("number of tiles: {}", tc.len());
+        }
     }
 }
