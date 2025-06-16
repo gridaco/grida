@@ -3,7 +3,6 @@ use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use math2::transform::AffineTransform;
-use skia_safe::Path;
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
 ///

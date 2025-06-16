@@ -1,19 +1,11 @@
 use super::cvt;
 use super::geometry::*;
-use super::layer::{
-    LayerList, PainterPictureLayer, PainterPictureShapeLayer, PainterPictureTextLayer,
-};
+use super::layer::{LayerList, PainterPictureLayer};
 use crate::node::repository::NodeRepository;
-use crate::node::schema::{
-    self, BaseNode, BlendMode, BooleanPathOperationNode, Color, ContainerNode, EllipseNode,
-    ErrorNode, FeBackdropBlur, FeDropShadow, FilterEffect, FontWeight, GroupNode, ImageNode,
-    ImagePaint, IntrinsicSizeNode, LeafNode, LineNode, Node, Paint, PathNode, PolygonNode,
-    RectangleNode, RegularPolygonNode, RegularStarPolygonNode, Size, SolidPaint, StrokeAlign,
-    TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
-};
+use crate::node::schema::*;
 use crate::repository::{FontRepository, ImageRepository};
 use math2::transform::AffineTransform;
-use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout::*};
+use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -434,12 +426,13 @@ impl<'a> Painter<'a> {
         let fill_paint = cvt::sk_paint(&fill, 1.0, (size.width, size.height));
 
         // Build paragraph style
-        let mut paragraph_style = ParagraphStyle::new();
-        paragraph_style.set_text_direction(TextDirection::LTR);
+        let mut paragraph_style = textlayout::ParagraphStyle::new();
+        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
         paragraph_style.set_text_align(text_align.clone().into());
 
         let fonts = self.fonts.borrow();
-        let mut para_builder = ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
+        let mut para_builder =
+            textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
 
         // Build text style
         let mut ts = make_textstyle(&text_style);

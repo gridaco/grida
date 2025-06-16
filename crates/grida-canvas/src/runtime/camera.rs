@@ -48,10 +48,9 @@ impl Camera2D {
 
     /// Set zoom factor (1 = 100%). Preserves rotation & translation.
     pub fn set_zoom(&mut self, zoom: f32) {
-        let θ = self.transform.rotation();
         let tx = self.transform.x();
         let ty = self.transform.y();
-        let (s, c) = θ.sin_cos();
+        let (s, c) = self.transform.rotation().sin_cos();
         let scale = 1.0 / zoom;
         self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
     }

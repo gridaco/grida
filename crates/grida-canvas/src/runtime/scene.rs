@@ -1,5 +1,5 @@
 use crate::node::schema::*;
-use crate::painter::layer::{Layer, PainterPictureLayer};
+use crate::painter::layer::Layer;
 use crate::painter::{Painter, cvt};
 use crate::{
     cache,

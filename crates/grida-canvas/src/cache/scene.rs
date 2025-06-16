@@ -5,7 +5,7 @@ use crate::{
         picture::{PictureCache, PictureCacheStrategy},
         tile::ImageTileCache,
     },
-    painter::layer::{Layer, LayerList, PainterPictureLayer},
+    painter::layer::{Layer, LayerList},
 };
 use math2::rect::Rectangle;
 use rstar::{AABB, RTree, RTreeObject};
