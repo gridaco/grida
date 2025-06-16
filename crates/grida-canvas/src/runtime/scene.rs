@@ -1,6 +1,6 @@
 use crate::cache::tile::TileCache;
 use crate::node::schema::*;
-use crate::painter::layer::LayerList;
+use crate::painter::layer::{Layer, LayerList};
 use crate::painter::{Painter, cvt};
 use crate::{
     cache,
@@ -277,7 +277,7 @@ impl Renderer {
 
         let ll = self.scene_cache.layers.filter(|layer| {
             if let Some(rect) = rect {
-                let rb = __geo.get_render_bounds(&layer.id);
+                let rb = __geo.get_render_bounds(&layer.id());
                 if let Some(rb) = rb {
                     math2::rect::intersects(&rb, &rect)
                 } else {
@@ -294,7 +294,7 @@ impl Renderer {
         let __before_paint = Instant::now();
 
         for layer in ll.layers {
-            let picture = self.with_recording_cached(&layer.id, &rect.unwrap(), |painter| {
+            let picture = self.with_recording_cached(&layer.id(), &rect.unwrap(), |painter| {
                 painter.draw_layer(&layer);
             });
 

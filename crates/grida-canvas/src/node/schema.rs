@@ -452,6 +452,7 @@ pub enum Node {
 // node trait
 pub trait NodeTrait {
     fn id(&self) -> NodeId;
+    fn name(&self) -> String;
 }
 
 impl NodeTrait for Node {
@@ -470,6 +471,24 @@ impl NodeTrait for Node {
             Node::Path(n) => n.base.id.clone(),
             Node::BooleanOperation(n) => n.base.id.clone(),
             Node::Image(n) => n.base.id.clone(),
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            Node::Error(n) => n.base.name.clone(),
+            Node::Group(n) => n.base.name.clone(),
+            Node::Container(n) => n.base.name.clone(),
+            Node::Rectangle(n) => n.base.name.clone(),
+            Node::Ellipse(n) => n.base.name.clone(),
+            Node::Polygon(n) => n.base.name.clone(),
+            Node::RegularPolygon(n) => n.base.name.clone(),
+            Node::RegularStarPolygon(n) => n.base.name.clone(),
+            Node::Line(n) => n.base.name.clone(),
+            Node::TextSpan(n) => n.base.name.clone(),
+            Node::Path(n) => n.base.name.clone(),
+            Node::BooleanOperation(n) => n.base.name.clone(),
+            Node::Image(n) => n.base.name.clone(),
         }
     }
 }

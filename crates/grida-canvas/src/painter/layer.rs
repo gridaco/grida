@@ -2,7 +2,7 @@ use super::geometry::{PainterShape, build_shape};
 use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use math2::{rect, rect::Rectangle, transform::AffineTransform};
+use math2::transform::AffineTransform;
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
 ///
@@ -63,7 +63,26 @@ use math2::{rect, rect::Rectangle, transform::AffineTransform};
 /// - [`RenderCommand`] — full rendering instruction with resolved state
 /// - [`PainterShape`] — resolved shape geometry abstraction
 #[derive(Debug, Clone)]
-pub struct PainterPictureLayer {
+pub enum PainterPictureLayer {
+    Shape(PainterPictureShapeLayer),
+    Text(PainterPictureTextLayer),
+}
+
+pub trait Layer {
+    fn id(&self) -> &NodeId;
+}
+
+impl Layer for PainterPictureLayer {
+    fn id(&self) -> &NodeId {
+        match self {
+            PainterPictureLayer::Shape(layer) => &layer.id,
+            PainterPictureLayer::Text(layer) => &layer.id,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PainterPictureShapeLayer {
     pub id: NodeId,
     pub z_index: usize,
     pub opacity: f32,
@@ -72,6 +91,22 @@ pub struct PainterPictureLayer {
     pub effects: Vec<FilterEffect>,
     pub strokes: Vec<Paint>,
     pub fills: Vec<Paint>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PainterPictureTextLayer {
+    pub id: NodeId,
+    pub z_index: usize,
+    pub opacity: f32,
+    pub transform: AffineTransform,
+    pub text: String,
+    pub shape: PainterShape,
+    pub effects: Vec<FilterEffect>,
+    pub strokes: Vec<Paint>,
+    pub fills: Vec<Paint>,
+    pub text_style: TextStyle,
+    pub text_align: TextAlign,
+    pub text_align_vertical: TextAlignVertical,
 }
 
 /// Flat list of [`PainterPictureLayer`] entries.
@@ -126,7 +161,7 @@ impl LayerList {
                 }
                 Node::Container(n) => {
                     let opacity = parent_opacity * n.opacity;
-                    out.push(PainterPictureLayer {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity,
@@ -135,7 +170,7 @@ impl LayerList {
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: n.stroke.clone().into_iter().collect(),
                         fills: vec![n.fill.clone()],
-                    });
+                    }));
                     for child in &n.children {
                         Self::flatten_node(child, repo, cache, opacity, out);
                     }
@@ -146,57 +181,67 @@ impl LayerList {
                         Self::flatten_node(child, repo, cache, opacity, out);
                     }
                 }
-                Node::Rectangle(n) => out.push(PainterPictureLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Rectangle(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                }),
-                Node::Ellipse(n) => out.push(PainterPictureLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Ellipse(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                }),
-                Node::Polygon(n) => out.push(PainterPictureLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Polygon(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                }),
-                Node::RegularPolygon(n) => out.push(PainterPictureLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                }),
-                Node::RegularStarPolygon(n) => out.push(PainterPictureLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                }),
-                Node::Line(n) => out.push(PainterPictureLayer {
+                Node::Rectangle(n) => {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::Rectangle(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                    }))
+                }
+                Node::Ellipse(n) => {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::Ellipse(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                    }))
+                }
+                Node::Polygon(n) => {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::Polygon(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                    }))
+                }
+                Node::RegularPolygon(n) => {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                    }))
+                }
+                Node::RegularStarPolygon(n) => {
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape: build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone())),
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                    }))
+                }
+                Node::Line(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
                     opacity: parent_opacity * n.opacity,
@@ -205,18 +250,22 @@ impl LayerList {
                     effects: vec![],
                     strokes: vec![n.stroke.clone()],
                     fills: vec![],
-                }),
-                Node::TextSpan(n) => out.push(PainterPictureLayer {
+                })),
+                Node::TextSpan(n) => out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
                     opacity: parent_opacity * n.opacity,
                     transform,
+                    text: n.text.clone(),
                     shape: build_shape(&IntrinsicSizeNode::TextSpan(n.clone())),
                     effects: vec![],
                     strokes: n.stroke.clone().into_iter().collect(),
                     fills: vec![n.fill.clone()],
-                }),
-                Node::Path(n) => out.push(PainterPictureLayer {
+                    text_style: n.text_style.clone(),
+                    text_align: n.text_align,
+                    text_align_vertical: n.text_align_vertical,
+                })),
+                Node::Path(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
                     opacity: parent_opacity * n.opacity,
@@ -225,8 +274,8 @@ impl LayerList {
                     effects: n.effect.clone().into_iter().collect(),
                     strokes: vec![n.stroke.clone()],
                     fills: vec![n.fill.clone()],
-                }),
-                Node::Image(n) => out.push(PainterPictureLayer {
+                })),
+                Node::Image(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
                     opacity: parent_opacity * n.opacity,
@@ -235,8 +284,8 @@ impl LayerList {
                     effects: n.effect.clone().into_iter().collect(),
                     strokes: vec![n.stroke.clone()],
                     fills: vec![n.fill.clone()],
-                }),
-                Node::Error(n) => out.push(PainterPictureLayer {
+                })),
+                Node::Error(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
                     opacity: parent_opacity * n.opacity,
@@ -245,7 +294,7 @@ impl LayerList {
                     effects: vec![],
                     strokes: vec![],
                     fills: vec![],
-                }),
+                })),
             }
         }
     }

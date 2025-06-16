@@ -268,9 +268,9 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)
         }
-        IntrinsicSizeNode::TextSpan(_) => {
+        IntrinsicSizeNode::TextSpan(n) => {
             // Text spans don't have a shape
-            PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0))
+            PainterShape::from_rect(Rect::new(0.0, 0.0, n.size.width, n.size.height))
         }
     }
 }

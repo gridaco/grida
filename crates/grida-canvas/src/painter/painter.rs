@@ -1,8 +1,16 @@
 use super::cvt;
 use super::geometry::*;
-use super::layer::{LayerList, PainterPictureLayer};
+use super::layer::{
+    LayerList, PainterPictureLayer, PainterPictureShapeLayer, PainterPictureTextLayer,
+};
 use crate::node::repository::NodeRepository;
-use crate::node::schema::*;
+use crate::node::schema::{
+    self, BaseNode, BlendMode, BooleanPathOperationNode, Color, ContainerNode, EllipseNode,
+    ErrorNode, FeBackdropBlur, FeDropShadow, FilterEffect, FontWeight, GroupNode, ImageNode,
+    ImagePaint, IntrinsicSizeNode, LeafNode, LineNode, Node, Paint, PathNode, PolygonNode,
+    RectangleNode, RegularPolygonNode, RegularStarPolygonNode, Size, SolidPaint, StrokeAlign,
+    TextAlign, TextAlignVertical, TextDecoration, TextSpanNode, TextStyle, TextTransform,
+};
 use crate::repository::{FontRepository, ImageRepository};
 use math2::transform::AffineTransform;
 use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout::*};
@@ -410,57 +418,91 @@ impl<'a> Painter<'a> {
         self.draw_polygon_node(&polygon);
     }
 
-    /// Draw a TextSpanNode (simple text block)
-    fn draw_text_span_node(&self, node: &TextSpanNode) {
+    fn draw_text_span(
+        &self,
+        text: &str,
+        size: &Size,
+        fill: &Paint,
+        text_align: &TextAlign,
+        _text_align_vertical: &TextAlignVertical,
+        text_style: &TextStyle,
+    ) {
         // Prepare paint for fill
-        let mut fill_paint = cvt::sk_paint(
-            &node.fill,
-            node.opacity,
-            (node.size.width, node.size.height),
-        );
-        fill_paint.set_blend_mode(node.blend_mode.into());
+        let fill_paint = cvt::sk_paint(&fill, 1.0, (size.width, size.height));
 
         // Build paragraph style
         let mut paragraph_style = ParagraphStyle::new();
         paragraph_style.set_text_direction(TextDirection::LTR);
-        paragraph_style.set_text_align(node.text_align.into());
+        paragraph_style.set_text_align(text_align.clone().into());
 
         let fonts = self.fonts.borrow();
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
 
         // Build text style
-        let mut ts = skia_safe::textlayout::TextStyle::new();
+        let mut ts = make_textstyle(&text_style);
         ts.set_foreground_paint(&fill_paint);
-        ts.set_font_size(node.text_style.font_size);
-        if let Some(letter_spacing) = node.text_style.letter_spacing {
-            ts.set_letter_spacing(letter_spacing);
-        }
-        if let Some(line_height) = node.text_style.line_height {
-            ts.set_height(line_height);
-        }
-        let mut decor = skia_safe::textlayout::Decoration::default();
-        decor.ty = node.text_style.text_decoration.into();
-        ts.set_decoration(&decor);
-        ts.set_font_families(&[&node.text_style.font_family]);
-        let font_style = skia_safe::FontStyle::new(
-            skia_safe::font_style::Weight::from(node.text_style.font_weight.value() as i32),
-            skia_safe::font_style::Width::NORMAL,
-            skia_safe::font_style::Slant::Upright,
-        );
-        ts.set_font_style(font_style);
 
         para_builder.push_style(&ts);
         // Apply text transform before adding text
         let transformed_text =
-            crate::text::text_transform::transform_text(&node.text, node.text_style.text_transform);
+            crate::text::text_transform::transform_text(&text, text_style.text_transform);
         para_builder.add_text(&transformed_text);
         let mut paragraph = para_builder.build();
         para_builder.pop();
-        paragraph.layout(node.size.width);
+        paragraph.layout(size.width);
 
+        paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+    }
+
+    /// Draw a TextSpanNode (simple text block)
+    fn draw_text_span_node(&self, node: &TextSpanNode) {
         self.with_transform(&node.transform.matrix, || {
-            paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+            self.with_opacity(node.opacity, || {
+                self.with_blendmode(node.blend_mode, || {
+                    self.draw_text_span(
+                        &node.text,
+                        &node.size,
+                        &node.fill,
+                        &node.text_align,
+                        &node.text_align_vertical,
+                        &node.text_style,
+                    );
+                });
+            });
         });
+
+        // // Prepare paint for fill
+        // let mut fill_paint = cvt::sk_paint(
+        //     &node.fill,
+        //     node.opacity,
+        //     (node.size.width, node.size.height),
+        // );
+        // fill_paint.set_blend_mode(node.blend_mode.into());
+
+        // // Build paragraph style
+        // let mut paragraph_style = ParagraphStyle::new();
+        // paragraph_style.set_text_direction(TextDirection::LTR);
+        // paragraph_style.set_text_align(node.text_align.into());
+
+        // let fonts = self.fonts.borrow();
+        // let mut para_builder = ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
+
+        // // Build text style
+        // let mut ts = make_textstyle(&node.text_style);
+        // ts.set_foreground_paint(&fill_paint);
+
+        // para_builder.push_style(&ts);
+        // // Apply text transform before adding text
+        // let transformed_text =
+        //     crate::text::text_transform::transform_text(&node.text, node.text_style.text_transform);
+        // para_builder.add_text(&transformed_text);
+        // let mut paragraph = para_builder.build();
+        // para_builder.pop();
+        // paragraph.layout(node.size.width);
+
+        // self.with_transform(&node.transform.matrix, || {
+        //     paragraph.paint(self.canvas, Point::new(0.0, 0.0));
+        // });
     }
 
     /// Draw a ContainerNode (background + stroke + children)
@@ -597,20 +639,45 @@ impl<'a> Painter<'a> {
 
     /// Draw a single [`PainterPictureLayer`].
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
-        self.with_transform(&layer.transform.matrix, || {
-            let shape = &layer.shape;
-            let effect = layer.effects.first();
-            self.draw_shape_with_effect(effect, shape, || {
-                self.with_opacity(layer.opacity, || {
-                    for fill in &layer.fills {
-                        self.draw_fill(shape, fill);
-                    }
-                    for stroke in &layer.strokes {
-                        self.draw_stroke(shape, stroke, 1.0, StrokeAlign::Center, None);
-                    }
+        match layer {
+            PainterPictureLayer::Shape(shape_layer) => {
+                self.with_transform(&shape_layer.transform.matrix, || {
+                    let shape = &shape_layer.shape;
+                    let effect = shape_layer.effects.first();
+                    self.draw_shape_with_effect(effect, shape, || {
+                        self.with_opacity(shape_layer.opacity, || {
+                            for fill in &shape_layer.fills {
+                                self.draw_fill(shape, fill);
+                            }
+                            for stroke in &shape_layer.strokes {
+                                self.draw_stroke(shape, stroke, 1.0, StrokeAlign::Center, None);
+                            }
+                        });
+                    });
                 });
-            });
-        });
+            }
+            PainterPictureLayer::Text(text_layer) => {
+                self.with_transform(&text_layer.transform.matrix, || {
+                    let shape = &text_layer.shape;
+                    let effect = text_layer.effects.first();
+                    self.draw_shape_with_effect(effect, shape, || {
+                        self.with_opacity(text_layer.opacity, || {
+                            self.draw_text_span(
+                                &text_layer.text,
+                                &Size {
+                                    width: shape.rect.width(),
+                                    height: shape.rect.height(),
+                                },
+                                &text_layer.fills.first().unwrap(),
+                                &text_layer.text_align,
+                                &text_layer.text_align_vertical,
+                                &text_layer.text_style,
+                            );
+                        });
+                    });
+                });
+            }
+        }
     }
 
     /// Draw all layers in a [`LayerList`].
@@ -619,4 +686,26 @@ impl<'a> Painter<'a> {
             self.draw_layer(layer);
         }
     }
+}
+
+fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
+    let mut ts = skia_safe::textlayout::TextStyle::new();
+    ts.set_font_size(text_style.font_size);
+    if let Some(letter_spacing) = text_style.letter_spacing {
+        ts.set_letter_spacing(letter_spacing);
+    }
+    if let Some(line_height) = text_style.line_height {
+        ts.set_height(line_height);
+    }
+    let mut decor = skia_safe::textlayout::Decoration::default();
+    decor.ty = text_style.text_decoration.into();
+    ts.set_decoration(&decor);
+    ts.set_font_families(&[&text_style.font_family]);
+    let font_style = skia_safe::FontStyle::new(
+        skia_safe::font_style::Weight::from(text_style.font_weight.value() as i32),
+        skia_safe::font_style::Width::NORMAL,
+        skia_safe::font_style::Slant::Upright,
+    );
+    ts.set_font_style(font_style);
+    ts
 }
