@@ -1,5 +1,5 @@
 use crate::node::schema::*;
-use crate::painter::layer::Layer;
+use crate::painter::layer::{Layer, PainterPictureLayer};
 use crate::painter::{Painter, cvt};
 use crate::{
     cache,
@@ -240,15 +240,7 @@ impl Renderer {
         height: f32,
         rect: Option<rect::Rectangle>,
     ) -> SceneEncodeStats {
-        // let geo = self.scene_cache.geometry().filter(|_id, entry| {
-        //     let bounds = entry.absolute_render_bounds;
-        //     if let Some(rect) = rect {
-        //         math2::rect::intersects(&bounds, &rect)
-        //     } else {
-        //         true
-        //     }
-        // });
-        // println!("geo: {}", geo.len());
+        // Geometry cache currently unused here but kept for future optimizations
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -271,31 +263,20 @@ impl Renderer {
 
         let __before_ll = Instant::now();
 
-        let ll = self.scene_cache.layers.filter(|layer| {
-            if let Some(rect) = rect {
-                let rb = self.scene_cache.geometry().get_render_bounds(&layer.id());
-                if let Some(rb) = rb {
-                    math2::rect::intersects(&rb, &rect)
-                } else {
-                    false
-                }
-            } else {
-                true
-            }
-        });
-
+        let layer_refs: Vec<&PainterPictureLayer> = if let Some(rect) = rect {
+            self.scene_cache.layers_in_rect(rect)
+        } else {
+            self.scene_cache.layers.layers.iter().collect()
+        };
         let __ll_duration = __before_ll.elapsed();
-        let ll_len = ll.len();
+        let ll_len = layer_refs.len();
+        let mut layers: Vec<PainterPictureLayer> = layer_refs.into_iter().cloned().collect();
+        layers.sort_by_key(|l| l.z_index());
 
         let __before_paint = Instant::now();
 
-        for layer in ll.layers {
-            let id = layer.id();
-            let bounds = match self.scene_cache.geometry().get_render_bounds(&id) {
-                Some(b) => b,
-                None => continue,
-            };
-            let picture = self.with_recording_cached(&id, &bounds, |painter| {
+        for layer in layers {
+            let picture = self.with_recording_cached(&layer.id(), &rect.unwrap(), |painter| {
                 painter.draw_layer(&layer);
             });
 
@@ -408,7 +389,7 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+    use crate::node::{factory::NodeFactory, repository::NodeRepository};
     use math2::transform::AffineTransform;
 
     #[test]

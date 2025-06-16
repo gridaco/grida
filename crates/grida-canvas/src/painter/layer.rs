@@ -70,6 +70,7 @@ pub enum PainterPictureLayer {
 
 pub trait Layer {
     fn id(&self) -> &NodeId;
+    fn z_index(&self) -> usize;
 }
 
 impl Layer for PainterPictureLayer {
@@ -77,6 +78,13 @@ impl Layer for PainterPictureLayer {
         match self {
             PainterPictureLayer::Shape(layer) => &layer.id,
             PainterPictureLayer::Text(layer) => &layer.id,
+        }
+    }
+
+    fn z_index(&self) -> usize {
+        match self {
+            PainterPictureLayer::Shape(layer) => layer.z_index,
+            PainterPictureLayer::Text(layer) => layer.z_index,
         }
     }
 }
