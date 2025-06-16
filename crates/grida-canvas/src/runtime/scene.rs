@@ -1,10 +1,8 @@
-use crate::cache::tile::TileCache;
 use crate::node::schema::*;
-use crate::painter::layer::{Layer, LayerList};
+use crate::painter::layer::Layer;
 use crate::painter::{Painter, cvt};
 use crate::{
     cache,
-    node::repository::NodeRepository,
     repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
 };
@@ -242,9 +240,7 @@ impl Renderer {
         height: f32,
         rect: Option<rect::Rectangle>,
     ) -> SceneEncodeStats {
-        let __geo = self.scene_cache.geometry();
-
-        // let geo = __geo.filter(|_id, entry| {
+        // let geo = self.scene_cache.geometry().filter(|_id, entry| {
         //     let bounds = entry.absolute_render_bounds;
         //     if let Some(rect) = rect {
         //         math2::rect::intersects(&bounds, &rect)
@@ -277,7 +273,7 @@ impl Renderer {
 
         let ll = self.scene_cache.layers.filter(|layer| {
             if let Some(rect) = rect {
-                let rb = __geo.get_render_bounds(&layer.id());
+                let rb = self.scene_cache.geometry().get_render_bounds(&layer.id());
                 if let Some(rb) = rb {
                     math2::rect::intersects(&rb, &rect)
                 } else {
@@ -294,7 +290,12 @@ impl Renderer {
         let __before_paint = Instant::now();
 
         for layer in ll.layers {
-            let picture = self.with_recording_cached(&layer.id(), &rect.unwrap(), |painter| {
+            let id = layer.id();
+            let bounds = match self.scene_cache.geometry().get_render_bounds(&id) {
+                Some(b) => b,
+                None => continue,
+            };
+            let picture = self.with_recording_cached(&id, &bounds, |painter| {
                 painter.draw_layer(&layer);
             });
 
@@ -325,7 +326,8 @@ impl Renderer {
         // // Render scene nodes
         // for child_id in &scene.children {
         //     let node = scene.nodes.get(child_id).unwrap();
-        //     let picture = self.with_recording_cached(child_id, &rect.unwrap(), |painter| {
+        //     let bounds = self.scene_cache.geometry().get_render_bounds(child_id).unwrap();
+        //     let picture = self.with_recording_cached(child_id, &bounds, |painter| {
         //         painter.draw_node_recursively(node, &scene.nodes);
         //     });
 
@@ -401,4 +403,59 @@ impl Renderer {
     //     // print the number of tiles
     //     // println!("number of tiles: {}", tc.len());
     // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
+    use math2::transform::AffineTransform;
+
+    #[test]
+    fn picture_recorded_with_layer_bounds() {
+        let nf = NodeFactory::new();
+        let mut repo = NodeRepository::new();
+
+        let mut rect = nf.create_rectangle_node();
+        rect.size = Size {
+            width: 50.0,
+            height: 40.0,
+        };
+        let rect_id = rect.base.id.clone();
+        repo.insert(Node::Rectangle(rect));
+
+        let scene = Scene {
+            id: "scene".into(),
+            name: "test".into(),
+            transform: AffineTransform::identity(),
+            children: vec![rect_id.clone()],
+            nodes: repo,
+            background_color: None,
+        };
+
+        let mut renderer = Renderer::new();
+        let surface_ptr = Renderer::init_raster(100, 100);
+        renderer.set_backend(Backend::Raster(surface_ptr));
+        renderer.load_scene(scene);
+        renderer.render();
+
+        let bounds = renderer
+            .scene_cache
+            .geometry
+            .get_render_bounds(&rect_id)
+            .unwrap();
+        let pic = renderer
+            .scene_cache
+            .picture
+            .get_node_picture(&rect_id)
+            .expect("picture not cached");
+
+        let cull = pic.cull_rect();
+        assert_eq!(cull.left(), bounds.x);
+        assert_eq!(cull.top(), bounds.y);
+        assert_eq!(cull.width(), bounds.width);
+        assert_eq!(cull.height(), bounds.height);
+
+        renderer.free();
+    }
 }
