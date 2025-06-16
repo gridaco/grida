@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-pub struct SceneEncodeStats {
+pub struct FramePlanStats {
     pub display_list_duration: Duration,
     pub display_list_size: usize,
     pub painter_duration: Duration,
@@ -23,7 +23,7 @@ pub struct SceneEncodeStats {
 }
 
 pub struct RenderStats {
-    pub plan: SceneEncodeStats,
+    pub plan: FramePlanStats,
     pub encode_duration: Duration,
     pub flush_duration: Duration,
     pub total_duration: Duration,
@@ -160,7 +160,7 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            let plan = self.encode_scene(scene, &mut canvas, width, height, rect);
+            let plan = self.plan_frame(scene, &mut canvas, width, height, rect);
 
             let encode_duration = start.elapsed();
 
@@ -225,21 +225,21 @@ impl Renderer {
         pic
     }
 
-    /// Encode the scene for flushing.
+    /// Plan the frame for rendering.
     /// Arguments:
-    /// - scene: the scene to encode
-    /// - canvas: the canvas to encode to
+    /// - scene: the scene to render
+    /// - canvas: the canvas to render to
     /// - width: the width of the canvas
     /// - height: the height of the canvas
-    /// - rect: the bounding rect to be encoded (in world space)
-    fn encode_scene(
+    /// - rect: the bounding rect to be rendered (in world space)
+    fn plan_frame(
         &mut self,
         scene: &Scene,
         canvas: &Canvas,
         width: f32,
         height: f32,
         rect: Option<rect::Rectangle>,
-    ) -> SceneEncodeStats {
+    ) -> FramePlanStats {
         // Geometry cache currently unused here but kept for future optimizations
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
@@ -294,16 +294,6 @@ impl Renderer {
         // );
 
         // -
-        // let nodes_inbound = scene.nodes.filter(|node| geo.has(&node.id()));
-
-        // println!("nodes_inbound: {}", nodes_inbound.len());
-        // for child_id in &scene.children {
-        //     if let Some(node) = nodes_inbound.get(child_id) {
-        //         painter.draw_node_recursively(node, &nodes_inbound);
-        //     }
-        // }
-
-        // -
         // // Render scene nodes
         // for child_id in &scene.children {
         //     let node = scene.nodes.get(child_id).unwrap();
@@ -319,7 +309,7 @@ impl Renderer {
 
         canvas.restore();
 
-        SceneEncodeStats {
+        FramePlanStats {
             display_list_duration: __ll_duration,
             display_list_size: ll_len,
             painter_duration: __painter_duration,
