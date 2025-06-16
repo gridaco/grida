@@ -61,15 +61,15 @@ impl GeometryCache {
     ) -> Rectangle {
         let node = repo.get(id).expect("node not found");
 
-        // only IntrinsicSizeNode is supported for now
         match node {
             Node::Group(n) => {
+                let world_transform = parent_world.compose(&n.transform);
                 let mut union_bounds: Option<Rectangle> = None;
                 for child_id in &n.children {
                     let child_bounds = Self::build_recursive(
                         child_id,
                         repo,
-                        parent_world,
+                        &world_transform,
                         Some(id.clone()),
                         cache,
                     );
@@ -78,20 +78,47 @@ impl GeometryCache {
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rectangle {
+
+                let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
                     x: 0.0,
                     y: 0.0,
                     width: 0.0,
                     height: 0.0,
-                })
+                });
+
+                let local_bounds = if let Some(inv) = world_transform.inverse() {
+                    transform_rect(&world_bounds, &inv)
+                } else {
+                    Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    }
+                };
+
+                let entry = GeometryEntry {
+                    transform: n.transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: world_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+
+                cache.entries.insert(id.clone(), entry.clone());
+                entry.absolute_bounding_box
             }
             Node::BooleanOperation(n) => {
+                let world_transform = parent_world.compose(&n.transform);
                 let mut union_bounds: Option<Rectangle> = None;
                 for child_id in &n.children {
                     let child_bounds = Self::build_recursive(
                         child_id,
                         repo,
-                        parent_world,
+                        &world_transform,
                         Some(id.clone()),
                         cache,
                     );
@@ -100,12 +127,68 @@ impl GeometryCache {
                         None => Some(child_bounds),
                     };
                 }
-                union_bounds.unwrap_or_else(|| Rectangle {
+
+                let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
                     x: 0.0,
                     y: 0.0,
                     width: 0.0,
                     height: 0.0,
-                })
+                });
+
+                let local_bounds = if let Some(inv) = world_transform.inverse() {
+                    transform_rect(&world_bounds, &inv)
+                } else {
+                    Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    }
+                };
+
+                let entry = GeometryEntry {
+                    transform: n.transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: world_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+
+                cache.entries.insert(id.clone(), entry.clone());
+                entry.absolute_bounding_box
+            }
+            Node::Container(n) => {
+                let local_transform = n.transform;
+                let world_transform = parent_world.compose(&local_transform);
+                let local_bounds = n.rect();
+                let mut world_bounds = transform_rect(&local_bounds, &world_transform);
+                let entry = GeometryEntry {
+                    transform: local_transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: world_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+                cache.entries.insert(id.clone(), entry.clone());
+
+                for child_id in &n.children {
+                    let child_bounds = Self::build_recursive(
+                        child_id,
+                        repo,
+                        &world_transform,
+                        Some(id.clone()),
+                        cache,
+                    );
+                    world_bounds = rect::union(&[world_bounds, child_bounds]);
+                }
+
+                world_bounds
             }
             _ => {
                 let intrinsic_node = Box::new(match node {
