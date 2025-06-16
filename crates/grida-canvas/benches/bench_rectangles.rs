@@ -1,5 +1,5 @@
+use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
-use cg::repository::NodeRepository;
 use cg::runtime::scene::{Backend, Renderer};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use math2::transform::AffineTransform;

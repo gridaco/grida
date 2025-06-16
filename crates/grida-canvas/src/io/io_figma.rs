@@ -1,3 +1,4 @@
+use crate::node::repository::NodeRepository;
 use crate::node::schema::{
     BaseNode, BlendMode, BooleanPathOperation, BooleanPathOperationNode, Color, ContainerNode,
     EllipseNode, ErrorNode, FeBackdropBlur, FeDropShadow, FeGaussianBlur, FilterEffect, FontWeight,
@@ -6,7 +7,6 @@ use crate::node::schema::{
     RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign, TextAlignVertical,
     TextDecoration, TextSpanNode, TextStyle, TextTransform,
 };
-use crate::repository::NodeRepository;
 use crate::webfont_helper;
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{

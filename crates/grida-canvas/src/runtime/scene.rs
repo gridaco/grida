@@ -4,7 +4,8 @@ use crate::painter::layer::LayerList;
 use crate::painter::{Painter, cvt};
 use crate::{
     cache,
-    repository::{FontRepository, ImageRepository, NodeRepository},
+    node::repository::NodeRepository,
+    repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
 };
 use math2::rect;
@@ -224,35 +225,26 @@ impl Renderer {
             self.image_repository.clone(),
         );
 
-        // flatten the scene
-        let ll = LayerList::from_scene(scene, &self.scene_cache.geometry, rect);
-        println!("number of layers: {}", ll.len());
-
-        for layer in ll.layers {
-            // println!("drawing layer: {:?} ", layer);
-            painter.draw_layer(&layer);
+        // Render scene nodes
+        for child_id in &scene.children {
+            if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
+                canvas.draw_picture(pic, None, None);
+            } else {
+                let bounds = {
+                    let cache = self.scene_cache.geometry();
+                    cache.get_world_bounds(child_id)
+                };
+                let node = scene.nodes.get(child_id).unwrap();
+                if let Some(b) = bounds {
+                    if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
+                        canvas.draw_picture(&pic, None, None);
+                        self.scene_cache.set_node_picture(child_id.clone(), pic);
+                        continue;
+                    }
+                }
+                painter.draw_node_recursively(node, &scene.nodes);
+            }
         }
-
-        // // Render scene nodes
-        // for child_id in &scene.children {
-        //     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
-        //         canvas.draw_picture(pic, None, None);
-        //     } else {
-        //         let bounds = {
-        //             let cache = self.scene_cache.geometry();
-        //             cache.get_world_bounds(child_id)
-        //         };
-        //         let node = scene.nodes.get(child_id).unwrap();
-        //         if let Some(b) = bounds {
-        //             if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
-        //                 canvas.draw_picture(&pic, None, None);
-        //                 self.scene_cache.set_node_picture(child_id.clone(), pic);
-        //                 continue;
-        //             }
-        //         }
-        //         painter.draw_node_recursively(node, &scene.nodes);
-        //     }
-        // }
 
         canvas.restore();
     }

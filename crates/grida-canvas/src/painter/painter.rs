@@ -1,8 +1,9 @@
 use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
+use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::repository::{FontRepository, ImageRepository, NodeRepository};
+use crate::repository::{FontRepository, ImageRepository};
 use math2::transform::AffineTransform;
 use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout::*};
 use std::cell::RefCell;

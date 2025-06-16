@@ -24,7 +24,7 @@ use winit::{
 };
 
 fn create_static_scene() -> Scene {
-    let mut repository = cg::repository::NodeRepository::new();
+    let mut repository = cg::node::repository::NodeRepository::new();
     let nf = NodeFactory::new();
 
     // Create a grid of rectangles

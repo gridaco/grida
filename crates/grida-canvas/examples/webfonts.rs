@@ -1,7 +1,7 @@
 use cg::font_loader::FontLoader;
 use cg::node::factory::NodeFactory;
 use cg::node::schema::*;
-use cg::repository::NodeRepository;
+use cg::node::repository::NodeRepository;
 use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::window;
 use math2::transform::AffineTransform;

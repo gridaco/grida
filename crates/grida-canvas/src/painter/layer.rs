@@ -1,7 +1,7 @@
 use super::geometry::{PainterShape, build_shape};
 use crate::cache::geometry::GeometryCache;
+use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::repository::NodeRepository;
 use math2::{rect, rect::Rectangle, transform::AffineTransform};
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
