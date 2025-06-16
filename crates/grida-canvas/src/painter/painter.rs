@@ -555,6 +555,23 @@ impl<'a> Painter<'a> {
         });
     }
 
+    pub fn draw_node(&self, node: &LeafNode) {
+        match node {
+            LeafNode::Error(n) => self.draw_error_node(n),
+            LeafNode::Rectangle(n) => self.draw_rect_node(n),
+            LeafNode::Ellipse(n) => self.draw_ellipse_node(n),
+            LeafNode::Polygon(n) => self.draw_polygon_node(n),
+            LeafNode::RegularPolygon(n) => self.draw_regular_polygon_node(n),
+            LeafNode::TextSpan(n) => self.draw_text_span_node(n),
+            LeafNode::Line(n) => self.draw_line_node(n),
+            LeafNode::Image(n) => {
+                self.draw_image_node(n);
+            }
+            LeafNode::Path(n) => self.draw_path_node(n),
+            LeafNode::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
+        }
+    }
+
     /// Dispatch to the correct node‐type draw method
     pub fn draw_node_recursively(&self, node: &Node, repository: &NodeRepository) {
         match node {

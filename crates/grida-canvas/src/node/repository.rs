@@ -67,6 +67,17 @@ impl NodeRepository {
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
+
+    pub fn filter(&self, filter: impl Fn(&Node) -> bool) -> Self {
+        NodeRepository {
+            nodes: self
+                .nodes
+                .iter()
+                .filter(|(_, node)| filter(node))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        }
+    }
 }
 
 impl Default for NodeRepository {

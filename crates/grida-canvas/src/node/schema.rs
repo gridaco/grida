@@ -449,13 +449,50 @@ pub enum Node {
     Image(ImageNode),
 }
 
+// node trait
+pub trait NodeTrait {
+    fn id(&self) -> NodeId;
+}
+
+impl NodeTrait for Node {
+    fn id(&self) -> NodeId {
+        match self {
+            Node::Error(n) => n.base.id.clone(),
+            Node::Group(n) => n.base.id.clone(),
+            Node::Container(n) => n.base.id.clone(),
+            Node::Rectangle(n) => n.base.id.clone(),
+            Node::Ellipse(n) => n.base.id.clone(),
+            Node::Polygon(n) => n.base.id.clone(),
+            Node::RegularPolygon(n) => n.base.id.clone(),
+            Node::RegularStarPolygon(n) => n.base.id.clone(),
+            Node::Line(n) => n.base.id.clone(),
+            Node::TextSpan(n) => n.base.id.clone(),
+            Node::Path(n) => n.base.id.clone(),
+            Node::BooleanOperation(n) => n.base.id.clone(),
+            Node::Image(n) => n.base.id.clone(),
+        }
+    }
+}
+
 /// Intrinsic size node is a node that has a fixed size, and can be rendered soley on its own.
 #[derive(Debug, Clone)]
 pub enum IntrinsicSizeNode {
-    // Group(GroupNode),
-    // BooleanOperation(BooleanPathOperationNode),
     Error(ErrorNode),
     Container(ContainerNode),
+    Rectangle(RectangleNode),
+    Ellipse(EllipseNode),
+    Polygon(PolygonNode),
+    RegularPolygon(RegularPolygonNode),
+    RegularStarPolygon(RegularStarPolygonNode),
+    Line(LineNode),
+    TextSpan(TextSpanNode),
+    Path(PathNode),
+    Image(ImageNode),
+}
+
+#[derive(Debug, Clone)]
+pub enum LeafNode {
+    Error(ErrorNode),
     Rectangle(RectangleNode),
     Ellipse(EllipseNode),
     Polygon(PolygonNode),

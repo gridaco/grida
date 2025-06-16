@@ -4,7 +4,7 @@ use crate::cache::{
     tile::ImageTileCache,
 };
 use crate::node::schema::{NodeId, Scene};
-use skia_safe::{Image, Picture};
+use skia_safe::Picture;
 
 /// A unified cache storing geometry information and recorded pictures for a scene.
 #[derive(Debug, Clone)]

@@ -159,6 +159,26 @@ impl GeometryCache {
     pub fn get_render_bounds(&self, id: &NodeId) -> Option<Rectangle> {
         self.entries.get(id).map(|e| e.absolute_render_bounds)
     }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn has(&self, id: &NodeId) -> bool {
+        self.entries.contains_key(id)
+    }
+
+    /// filter by node id and its entry data
+    pub fn filter(&self, filter: impl Fn(&NodeId, &GeometryEntry) -> bool) -> Self {
+        Self {
+            entries: self
+                .entries
+                .iter()
+                .filter(|(id, entry)| filter(id, entry))
+                .map(|(id, entry)| (id.clone(), entry.clone()))
+                .collect(),
+        }
+    }
 }
 
 fn node_geometry(node: &IntrinsicSizeNode) -> (AffineTransform, Rectangle) {
