@@ -54,6 +54,7 @@ impl SceneCache {
 
     pub fn update_layers(&mut self, scene: &Scene) {
         self.layers = LayerList::from_scene(scene, &self.geometry);
+        self.layers.layers.sort_by_key(|l| l.z_index());
         self.layer_index = RTree::new();
         for (i, layer) in self.layers.layers.iter().enumerate() {
             if let Some(rb) = self.geometry.get_render_bounds(&layer.id()) {
@@ -103,15 +104,15 @@ impl SceneCache {
         self.picture.set_node_picture(id, picture);
     }
 
-    /// Query painter layers whose bounds intersect the given rectangle.
-    pub fn layers_in_rect(&self, rect: Rectangle) -> Vec<&PainterPictureLayer> {
+    /// Query painter layer indices whose bounds intersect the given rectangle.
+    pub fn layers_in_rect(&self, rect: Rectangle) -> Vec<usize> {
         let env = AABB::from_corners(
             [rect.x, rect.y],
             [rect.x + rect.width, rect.y + rect.height],
         );
         self.layer_index
             .locate_in_envelope_intersecting(&env)
-            .map(|il| &self.layers.layers[il.index])
+            .map(|il| il.index)
             .collect()
     }
 }

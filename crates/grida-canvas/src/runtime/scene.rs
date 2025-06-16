@@ -263,20 +263,29 @@ impl Renderer {
 
         let __before_ll = Instant::now();
 
-        let layer_refs: Vec<&PainterPictureLayer> = if let Some(rect) = rect {
+        let mut indices: Vec<usize> = if let Some(rect) = rect {
             self.scene_cache.layers_in_rect(rect)
         } else {
-            self.scene_cache.layers.layers.iter().collect()
+            (0..self.scene_cache.layers.layers.len()).collect()
         };
+
         let __ll_duration = __before_ll.elapsed();
-        let ll_len = layer_refs.len();
-        let mut layers: Vec<PainterPictureLayer> = layer_refs.into_iter().cloned().collect();
-        layers.sort_by_key(|l| l.z_index());
+        let ll_len = indices.len();
+
+        if rect.is_some() {
+            indices.sort();
+        }
 
         let __before_paint = Instant::now();
 
-        for layer in layers {
-            let picture = self.with_recording_cached(&layer.id(), &rect.unwrap(), |painter| {
+        for idx in indices {
+            let layer = self.scene_cache.layers.layers[idx].clone();
+            let bounds = self
+                .scene_cache
+                .geometry
+                .get_render_bounds(&layer.id())
+                .unwrap();
+            let picture = self.with_recording_cached(&layer.id(), &bounds, |painter| {
                 painter.draw_layer(&layer);
             });
 
