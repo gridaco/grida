@@ -197,7 +197,6 @@ impl<'a> Painter<'a> {
         stroke_align: StrokeAlign,
         stroke_dash_array: Option<&Vec<f32>>,
     ) {
-        let canvas = self.canvas;
         if stroke_width <= 0.0 {
             return;
         }
@@ -210,6 +209,18 @@ impl<'a> Painter<'a> {
             stroke_dash_array,
         );
 
+        self.draw_stroke_path(shape, stroke, &stroke_path);
+    }
+
+    /// Draw stroke for a shape using a precomputed stroke path.
+    fn draw_stroke_path(
+        &self,
+        shape: &PainterShape,
+        stroke: &Paint,
+        stroke_path: &skia_safe::Path,
+    ) {
+        let canvas = self.canvas;
+
         // Draw the stroke using the generated geometry
         match stroke {
             Paint::Image(image_paint) => {
@@ -217,8 +228,6 @@ impl<'a> Painter<'a> {
                 if let Some(image) = images.get(&image_paint._ref) {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
-                    paint.set_stroke(true);
-                    paint.set_stroke_width(stroke_width);
 
                     // For image strokes, we need to clip to the stroke geometry
                     canvas.save();
@@ -229,12 +238,6 @@ impl<'a> Painter<'a> {
             }
             _ => {
                 let paint = cvt::sk_paint(stroke, 1.0, (shape.rect.width(), shape.rect.height()));
-                let stroke_path = stroke_geometry(
-                    &shape.to_path(),
-                    stroke_width,
-                    stroke_align,
-                    stroke_dash_array,
-                );
                 canvas.draw_path(&stroke_path, &paint);
             }
         }
@@ -650,7 +653,9 @@ impl<'a> Painter<'a> {
                                 self.draw_fill(shape, fill);
                             }
                             for stroke in &shape_layer.strokes {
-                                self.draw_stroke(shape, stroke, 1.0, StrokeAlign::Center, None);
+                                if let Some(path) = &shape_layer.stroke_path {
+                                    self.draw_stroke_path(shape, stroke, path);
+                                }
                             }
                         });
                     });

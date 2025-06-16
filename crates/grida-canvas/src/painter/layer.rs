@@ -1,8 +1,9 @@
-use super::geometry::{PainterShape, build_shape};
+use super::geometry::{PainterShape, build_shape, stroke_geometry};
 use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use math2::transform::AffineTransform;
+use skia_safe::Path;
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
 ///
@@ -99,6 +100,7 @@ pub struct PainterPictureShapeLayer {
     pub effects: Vec<FilterEffect>,
     pub strokes: Vec<Paint>,
     pub fills: Vec<Paint>,
+    pub stroke_path: Option<skia_safe::Path>,
 }
 
 #[derive(Debug, Clone)]
@@ -169,15 +171,27 @@ impl LayerList {
                 }
                 Node::Container(n) => {
                     let opacity = parent_opacity * n.opacity;
+                    let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
+                    let stroke_path = if n.stroke.is_some() && n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::Container(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: n.stroke.clone().into_iter().collect(),
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }));
                     for child in &n.children {
                         Self::flatten_node(child, repo, cache, opacity, out);
@@ -190,75 +204,149 @@ impl LayerList {
                     }
                 }
                 Node::Rectangle(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Rectangle(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::Rectangle(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: vec![n.stroke.clone()],
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
                 Node::Ellipse(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Ellipse(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::Ellipse(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: vec![n.stroke.clone()],
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
                 Node::Polygon(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Polygon(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::Polygon(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: vec![n.stroke.clone()],
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
                 Node::RegularPolygon(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: vec![n.stroke.clone()],
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
                 Node::RegularStarPolygon(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
                     out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         id: n.base.id.clone(),
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         transform,
-                        shape: build_shape(&IntrinsicSizeNode::RegularStarPolygon(n.clone())),
+                        shape,
                         effects: n.effect.clone().into_iter().collect(),
                         strokes: vec![n.stroke.clone()],
                         fills: vec![n.fill.clone()],
+                        stroke_path,
                     }))
                 }
-                Node::Line(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Line(n.clone())),
-                    effects: vec![],
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![],
-                })),
+                Node::Line(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Line(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape,
+                        effects: vec![],
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![],
+                        stroke_path,
+                    }))
+                }
                 Node::TextSpan(n) => out.push(PainterPictureLayer::Text(PainterPictureTextLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
@@ -273,26 +361,54 @@ impl LayerList {
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
                 })),
-                Node::Path(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Path(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                })),
-                Node::Image(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
-                    id: n.base.id.clone(),
-                    z_index: out.len(),
-                    opacity: parent_opacity * n.opacity,
-                    transform,
-                    shape: build_shape(&IntrinsicSizeNode::Image(n.clone())),
-                    effects: n.effect.clone().into_iter().collect(),
-                    strokes: vec![n.stroke.clone()],
-                    fills: vec![n.fill.clone()],
-                })),
+                Node::Path(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Path(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape,
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                        stroke_path,
+                    }))
+                }
+                Node::Image(n) => {
+                    let shape = build_shape(&IntrinsicSizeNode::Image(n.clone()));
+                    let stroke_path = if n.stroke_width > 0.0 {
+                        Some(stroke_geometry(
+                            &shape.to_path(),
+                            n.stroke_width,
+                            n.stroke_align,
+                            n.stroke_dash_array.as_ref(),
+                        ))
+                    } else {
+                        None
+                    };
+                    out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                        id: n.base.id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        transform,
+                        shape,
+                        effects: n.effect.clone().into_iter().collect(),
+                        strokes: vec![n.stroke.clone()],
+                        fills: vec![n.fill.clone()],
+                        stroke_path,
+                    }))
+                }
                 Node::Error(n) => out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     id: n.base.id.clone(),
                     z_index: out.len(),
@@ -302,6 +418,7 @@ impl LayerList {
                     effects: vec![],
                     strokes: vec![],
                     fills: vec![],
+                    stroke_path: None,
                 })),
             }
         }
