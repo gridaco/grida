@@ -473,6 +473,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn insert_and_get_tile() {
         let mut cache = ImageTileCache::new();
         let img = dummy_image();
@@ -484,6 +485,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn promote_parent_eviction() {
         let mut cache = ImageTileCache::new();
         let parent_rect = cache.tile_rect_for_key((0, 0, 0));

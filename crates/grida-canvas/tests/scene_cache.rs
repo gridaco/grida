@@ -42,22 +42,25 @@ fn layers_in_rect_include_partially_visible_nested() {
 
     // Query area partially overlapping the rectangle only
 
-    let layers = cache.layers_in_rect(Rectangle {
+    let layer_indices = cache.layers_in_rect(Rectangle {
         x: 140.0,
         y: 40.0,
         width: 20.0,
         height: 20.0,
     });
-    assert_eq!(layers.len(), 1);
-    assert_eq!(layers[0].id(), &rect_id);
+    assert_eq!(layer_indices.len(), 1);
+    let layer = &cache.layers.layers[layer_indices[0]];
+    assert_eq!(layer.id(), &rect_id);
 
-    let layers = cache.layers_in_rect(Rectangle {
+    let layer_indices = cache.layers_in_rect(Rectangle {
         x: 50.0,
         y: 0.0,
         width: 100.0,
         height: 100.0,
     });
-    assert_eq!(layers.len(), 2);
-    assert_eq!(layers[0].id(), &rect_id);
-    assert_eq!(layers[1].id(), &container_id);
+    assert_eq!(layer_indices.len(), 2);
+    let layer0 = &cache.layers.layers[layer_indices[0]];
+    let layer1 = &cache.layers.layers[layer_indices[1]];
+    assert_eq!(layer0.id(), &rect_id);
+    assert_eq!(layer1.id(), &container_id);
 }

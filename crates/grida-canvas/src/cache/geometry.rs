@@ -1,5 +1,5 @@
 use crate::node::repository::NodeRepository;
-use crate::node::schema::{IntrinsicSizeNode, Node, NodeId, Scene};
+use crate::node::schema::{FilterEffect, IntrinsicSizeNode, Node, NodeId, Scene, StrokeAlign};
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
@@ -24,7 +24,6 @@ pub struct GeometryEntry {
     pub absolute_bounding_box: Rectangle,
     /// Expanded bounds that include visual effects like blur, shadow, stroke, etc.
     /// Used for render-time culling and picture recording.
-    #[deprecated(note = "TODO: Not ready")]
     pub absolute_render_bounds: Rectangle,
     pub parent: Option<NodeId>,
     pub dirty_transform: bool,
@@ -65,6 +64,7 @@ impl GeometryCache {
             Node::Group(n) => {
                 let world_transform = parent_world.compose(&n.transform);
                 let mut union_bounds: Option<Rectangle> = None;
+                let mut union_render_bounds: Option<Rectangle> = None;
                 for child_id in &n.children {
                     let child_bounds = Self::build_recursive(
                         child_id,
@@ -77,6 +77,12 @@ impl GeometryCache {
                         Some(b) => Some(rect::union(&[b, child_bounds])),
                         None => Some(child_bounds),
                     };
+                    if let Some(rb) = cache.get_render_bounds(child_id) {
+                        union_render_bounds = match union_render_bounds {
+                            Some(b) => Some(rect::union(&[b, rb])),
+                            None => Some(rb),
+                        };
+                    }
                 }
 
                 let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
@@ -97,12 +103,14 @@ impl GeometryCache {
                     }
                 };
 
+                let render_bounds = union_render_bounds.unwrap_or(world_bounds);
+
                 let entry = GeometryEntry {
                     transform: n.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
-                    absolute_render_bounds: world_bounds,
+                    absolute_render_bounds: render_bounds,
                     parent: parent_id.clone(),
                     dirty_transform: false,
                     dirty_bounds: false,
@@ -146,12 +154,23 @@ impl GeometryCache {
                     }
                 };
 
+                let render_bounds = compute_render_bounds_from_style(
+                    world_bounds,
+                    if n.stroke.is_some() {
+                        n.stroke_width
+                    } else {
+                        0.0
+                    },
+                    n.stroke_align,
+                    n.effect.as_ref(),
+                );
+
                 let entry = GeometryEntry {
                     transform: n.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
-                    absolute_render_bounds: world_bounds,
+                    absolute_render_bounds: render_bounds,
                     parent: parent_id.clone(),
                     dirty_transform: false,
                     dirty_bounds: false,
@@ -164,18 +183,18 @@ impl GeometryCache {
                 let local_transform = n.transform;
                 let world_transform = parent_world.compose(&local_transform);
                 let local_bounds = n.rect();
-                let mut world_bounds = transform_rect(&local_bounds, &world_transform);
-                let entry = GeometryEntry {
-                    transform: local_transform,
-                    absolute_transform: world_transform,
-                    bounding_box: local_bounds,
-                    absolute_bounding_box: world_bounds,
-                    absolute_render_bounds: world_bounds,
-                    parent: parent_id.clone(),
-                    dirty_transform: false,
-                    dirty_bounds: false,
-                };
-                cache.entries.insert(id.clone(), entry.clone());
+                let world_bounds = transform_rect(&local_bounds, &world_transform);
+                let mut union_world_bounds = world_bounds;
+                let render_bounds = compute_render_bounds_from_style(
+                    world_bounds,
+                    if n.stroke.is_some() {
+                        n.stroke_width
+                    } else {
+                        0.0
+                    },
+                    n.stroke_align,
+                    n.effect.as_ref(),
+                );
 
                 for child_id in &n.children {
                     let child_bounds = Self::build_recursive(
@@ -185,10 +204,22 @@ impl GeometryCache {
                         Some(id.clone()),
                         cache,
                     );
-                    world_bounds = rect::union(&[world_bounds, child_bounds]);
+                    union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                 }
 
-                world_bounds
+                let entry = GeometryEntry {
+                    transform: local_transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: render_bounds,
+                    parent: parent_id.clone(),
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+                cache.entries.insert(id.clone(), entry.clone());
+
+                union_world_bounds
             }
             _ => {
                 let intrinsic_node = Box::new(match node {
@@ -205,13 +236,12 @@ impl GeometryCache {
                     Node::Error(n) => IntrinsicSizeNode::Error(n.clone()),
                     Node::Group(_) | Node::BooleanOperation(_) => panic!("Unsupported node type"),
                 });
-                let node = intrinsic_node.as_ref();
+                let intrinsic = intrinsic_node.as_ref();
 
-                let (local_transform, local_bounds) = node_geometry(node);
+                let (local_transform, local_bounds) = node_geometry(intrinsic);
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
-                // For now, render_bounds is just world_bounds (placeholder)
-                let render_bounds = world_bounds;
+                let render_bounds = compute_render_bounds(node, world_bounds);
 
                 let entry = GeometryEntry {
                     transform: local_transform,
@@ -344,5 +374,127 @@ fn path_bounds(data: &str) -> Rectangle {
             width: 0.0,
             height: 0.0,
         }
+    }
+}
+
+fn inflate_rect(rect: Rectangle, delta: f32) -> Rectangle {
+    if delta <= 0.0 {
+        return rect;
+    }
+    Rectangle {
+        x: rect.x - delta,
+        y: rect.y - delta,
+        width: rect.width + 2.0 * delta,
+        height: rect.height + 2.0 * delta,
+    }
+}
+
+fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
+    match align {
+        StrokeAlign::Inside => 0.0,
+        StrokeAlign::Center => width / 2.0,
+        StrokeAlign::Outside => width,
+    }
+}
+
+fn compute_render_bounds_from_style(
+    world_bounds: Rectangle,
+    stroke_width: f32,
+    stroke_align: StrokeAlign,
+    effect: Option<&FilterEffect>,
+) -> Rectangle {
+    let mut bounds = inflate_rect(world_bounds, stroke_outset(stroke_align, stroke_width));
+
+    if let Some(effect) = effect {
+        match effect {
+            FilterEffect::GaussianBlur(blur) => {
+                bounds = inflate_rect(bounds, blur.radius);
+            }
+            FilterEffect::BackdropBlur(blur) => {
+                bounds = inflate_rect(bounds, blur.radius);
+            }
+            FilterEffect::DropShadow(shadow) => {
+                let shadow_rect = inflate_rect(
+                    Rectangle {
+                        x: world_bounds.x + shadow.dx,
+                        y: world_bounds.y + shadow.dy,
+                        width: world_bounds.width,
+                        height: world_bounds.height,
+                    },
+                    shadow.blur,
+                );
+                bounds = rect::union(&[bounds, shadow_rect]);
+            }
+        }
+    }
+
+    bounds
+}
+
+fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
+    match node {
+        Node::Rectangle(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Ellipse(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Polygon(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::RegularPolygon(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Path(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Image(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width,
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Line(n) => {
+            compute_render_bounds_from_style(world_bounds, n.stroke_width, n.stroke_align, None)
+        }
+        Node::TextSpan(n) => compute_render_bounds_from_style(
+            world_bounds,
+            n.stroke_width.unwrap_or(0.0),
+            n.stroke_align,
+            None,
+        ),
+        Node::Container(n) => compute_render_bounds_from_style(
+            world_bounds,
+            if n.stroke.is_some() {
+                n.stroke_width
+            } else {
+                0.0
+            },
+            n.stroke_align,
+            n.effect.as_ref(),
+        ),
+        Node::Error(_) => world_bounds,
+        Node::Group(_) | Node::BooleanOperation(_) => world_bounds,
     }
 }
