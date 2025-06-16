@@ -232,7 +232,7 @@ fn main() {
     ) = init_window(800, 600);
 
     // Create renderer
-    let mut renderer = Renderer::new(800.0 * scale_factor as f32, 600.0 * scale_factor as f32);
+    let mut renderer = Renderer::new();
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Create static scene

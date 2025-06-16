@@ -465,10 +465,7 @@ where
     let (font_tx, font_rx) = mpsc::unbounded_channel();
     let proxy = el.create_proxy();
 
-    let mut renderer = Renderer::new(
-        width as f32 * scale_factor as f32,
-        height as f32 * scale_factor as f32,
-    );
+    let mut renderer = Renderer::new();
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Initialize the image loader in lifecycle mode

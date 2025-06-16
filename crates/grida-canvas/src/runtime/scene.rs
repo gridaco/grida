@@ -34,8 +34,6 @@ impl Backend {
 /// ---------------------------------------------------------------------------
 pub struct Renderer {
     backend: Option<Backend>,
-    logical_width: f32,
-    logical_height: f32,
     scene: Option<Scene>,
     pub camera: Option<Camera2D>,
     prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
@@ -45,15 +43,13 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(width: f32, height: f32) -> Self {
+    pub fn new() -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
             backend: None,
-            logical_width: width,
-            logical_height: height,
             scene: None,
             camera: None,
             prev_quantized_camera_transform: None,
@@ -61,11 +57,6 @@ impl Renderer {
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
         }
-    }
-
-    pub fn set_logical_size(&mut self, width: f32, height: f32) {
-        self.logical_width = width;
-        self.logical_height = height;
     }
 
     pub fn init_raster(width: i32, height: i32) -> *mut Surface {
