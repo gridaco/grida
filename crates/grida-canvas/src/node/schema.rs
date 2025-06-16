@@ -1,8 +1,8 @@
 use crate::painter::cvt;
-use crate::rect::Rect;
 use crate::repository::NodeRepository;
 use core::str;
 use math2::box_fit::BoxFit;
+use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
 
@@ -484,8 +484,8 @@ pub struct ErrorNode {
 }
 
 impl ErrorNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -522,8 +522,8 @@ pub struct ContainerNode {
 }
 
 impl ContainerNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -549,8 +549,8 @@ pub struct RectangleNode {
 }
 
 impl RectangleNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -590,8 +590,8 @@ pub struct ImageNode {
 }
 
 impl ImageNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -620,8 +620,8 @@ pub struct EllipseNode {
 }
 
 impl EllipseNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -756,8 +756,8 @@ pub struct RegularPolygonNode {
 }
 
 impl RegularPolygonNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,
@@ -855,8 +855,8 @@ pub struct RegularStarPolygonNode {
 }
 
 impl RegularStarPolygonNode {
-    pub fn rect(&self) -> Rect {
-        Rect {
+    pub fn rect(&self) -> Rectangle {
+        Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,

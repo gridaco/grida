@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::vector2::Vector2;
 
 /// Represents a side of a rectangle.
@@ -148,6 +150,16 @@ pub fn from_points(points: &[Vector2]) -> Rectangle {
         y: min_y,
         width: max_x - min_x,
         height: max_y - min_y,
+    }
+}
+
+impl fmt::Display for Rectangle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "x: {}, y: {}, width: {}, height: {}",
+            self.x, self.y, self.width, self.height
+        )
     }
 }
 

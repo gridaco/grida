@@ -1,6 +1,5 @@
 use crate::node::schema::Size;
-use crate::rect::{self, Rect};
-use math2::{quantize, transform::AffineTransform};
+use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform};
 
 /// A 2D camera that defines how world-space content is projected onto the screen.
 ///
@@ -94,8 +93,8 @@ impl Camera2D {
     }
 
     /// World‐space rect currently visible.
-    pub fn rect(&self) -> Rect {
-        let vp = Rect {
+    pub fn rect(&self) -> Rectangle {
+        let vp = Rectangle {
             x: 0.0,
             y: 0.0,
             width: self.size.width,

@@ -5,16 +5,16 @@ use std::collections::HashMap;
 /// Configuration for how the scene should be cached.
 ///
 /// Currently only the `depth` parameter is used:
-/// - `0` caches the entire scene as a single picture.
-/// - `1` caches each top-level node separately.
+/// - `None` caches the entire scene as a single picture.
+/// - `Some(depth)` caches up to `depth` levels of nodes separately.
 #[derive(Debug, Clone)]
 pub struct PictureCacheStrategy {
-    pub depth: usize,
+    pub depth: Option<usize>,
 }
 
 impl Default for PictureCacheStrategy {
     fn default() -> Self {
-        Self { depth: 1 }
+        Self { depth: None }
     }
 }
 
@@ -41,10 +41,6 @@ impl PictureCache {
         self.invalidate();
     }
 
-    pub fn is_valid(&self) -> bool {
-        !self.node_pictures.is_empty()
-    }
-
     pub fn get_node_picture(&self, id: &NodeId) -> Option<&Picture> {
         self.node_pictures.get(id)
     }
@@ -53,15 +49,11 @@ impl PictureCache {
         self.node_pictures.insert(id, picture);
     }
 
-    pub fn clear_node_pictures(&mut self) {
-        self.node_pictures.clear();
-    }
-
     pub fn len(&self) -> usize {
         self.node_pictures.len()
     }
 
-    pub fn depth(&self) -> usize {
+    pub fn depth(&self) -> Option<usize> {
         self.strategy.depth
     }
 

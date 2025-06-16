@@ -37,7 +37,7 @@ enum Command {
     Close,
     ZoomIn,
     ZoomOut,
-    ZoomDelta { factor: f32 },
+    ZoomDelta { delta: f32 },
     Pan { tx: f32, ty: f32 },
     Redraw,
     Resize { width: u32, height: u32 },
@@ -68,14 +68,9 @@ fn handle_window_event(event: WindowEvent) -> Command {
             device_id: _,
             delta,
             phase: _,
-        } => {
-            // delta is typically between -1 and 1, where positive means zoom in
-            // We'll use a similar zoom factor as the keyboard controls (1.2)
-            let zoom_factor = if delta > 0.0 { 1.2 } else { 1.0 / 1.2 };
-            Command::ZoomDelta {
-                factor: zoom_factor,
-            }
-        }
+        } => Command::ZoomDelta {
+            delta: delta as f32,
+        },
         WindowEvent::MouseWheel { delta, .. } => match delta {
             MouseScrollDelta::PixelDelta(delta) => Command::Pan {
                 tx: -(delta.x as f32),
@@ -296,9 +291,9 @@ impl ApplicationHandler for App {
                     self.redraw();
                 }
             }
-            Command::ZoomDelta { factor } => {
+            Command::ZoomDelta { delta } => {
                 let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom * factor);
+                self.camera.set_zoom(current_zoom + (delta));
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }

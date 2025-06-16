@@ -1,9 +1,8 @@
 use super::geometry::{PainterShape, build_shape};
 use crate::cache::geometry::GeometryCache;
 use crate::node::schema::*;
-use crate::rect::{self, Rect};
 use crate::repository::NodeRepository;
-use math2::transform::AffineTransform;
+use math2::{rect, rect::Rectangle, transform::AffineTransform};
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
 ///
@@ -83,7 +82,7 @@ pub struct LayerList {
 
 impl LayerList {
     /// Flatten an entire scene into a layer list using the provided geometry cache.
-    pub fn from_scene(scene: &Scene, cache: &GeometryCache, bounding: Option<Rect>) -> Self {
+    pub fn from_scene(scene: &Scene, cache: &GeometryCache, bounding: Option<Rectangle>) -> Self {
         let mut list = LayerList::default();
         for id in &scene.children {
             Self::flatten_node(
@@ -104,7 +103,7 @@ impl LayerList {
         repo: &NodeRepository,
         cache: &GeometryCache,
         opacity: f32,
-        bounding: Option<Rect>,
+        bounding: Option<Rectangle>,
     ) -> Self {
         let mut list = LayerList::default();
         Self::flatten_node(
@@ -118,12 +117,16 @@ impl LayerList {
         list
     }
 
+    pub fn len(&self) -> usize {
+        self.layers.len()
+    }
+
     fn flatten_node(
         id: &NodeId,
         repo: &NodeRepository,
         cache: &GeometryCache,
         parent_opacity: f32,
-        bounding: Option<&Rect>,
+        bounding: Option<&Rectangle>,
         out: &mut Vec<PainterPictureLayer>,
     ) {
         if let Some(node) = repo.get(id) {

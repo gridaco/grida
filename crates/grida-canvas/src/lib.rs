@@ -4,7 +4,6 @@ pub mod image_loader;
 pub mod io;
 pub mod node;
 pub mod painter;
-pub mod rect;
 pub mod repository;
 pub mod resource_loader;
 pub mod runtime;

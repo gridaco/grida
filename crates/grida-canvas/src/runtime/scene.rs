@@ -1,12 +1,16 @@
 use crate::cache::tile::TileCache;
 use crate::node::schema::*;
+use crate::painter::layer::LayerList;
 use crate::painter::{Painter, cvt};
 use crate::{
-    cache, rect,
+    cache,
     repository::{FontRepository, ImageRepository, NodeRepository},
     runtime::camera::Camera2D,
 };
-use skia_safe::{Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces};
+use math2::rect;
+use skia_safe::{
+    Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -144,7 +148,11 @@ impl Renderer {
             // and the scene is not mutated while borrowed.
             let surface = unsafe { &mut *self.backend.as_ref().unwrap().get_surface() };
             let scene = unsafe { &*scene_ptr };
-            self.encode_scene(surface, scene);
+            let width = surface.width() as f32;
+            let height = surface.height() as f32;
+            let mut canvas = surface.canvas();
+            let rect = self.camera.as_ref().map(|c| c.rect());
+            self.encode_scene(scene, &mut canvas, width, height, rect);
         }
         let encode_duration = start.elapsed();
 
@@ -163,37 +171,42 @@ impl Renderer {
     fn capture_node_picture(
         &self,
         node: &Node,
-        bounds: &rect::Rect,
+        bounds: &rect::Rectangle,
         repository: &NodeRepository,
     ) -> Option<Picture> {
-        if self.backend.is_some() {
-            let mut recorder = PictureRecorder::new();
-            let sk_bounds = Rect::new(
-                bounds.x,
-                bounds.y,
-                bounds.x + bounds.width,
-                bounds.y + bounds.height,
-            );
-            let canvas = recorder.begin_recording(sk_bounds, None);
-            let painter = Painter::new(
-                canvas,
-                self.font_repository.clone(),
-                self.image_repository.clone(),
-            );
-            painter.draw_node_recursively(node, repository);
-            recorder.finish_recording_as_picture(None)
-        } else {
-            None
-        }
+        let mut recorder = PictureRecorder::new();
+        let sk_bounds = Rect::new(
+            bounds.x,
+            bounds.y,
+            bounds.x + bounds.width,
+            bounds.y + bounds.height,
+        );
+        let canvas = recorder.begin_recording(sk_bounds, None);
+        let painter = Painter::new(
+            canvas,
+            self.font_repository.clone(),
+            self.image_repository.clone(),
+        );
+        painter.draw_node_recursively(node, repository);
+        recorder.finish_recording_as_picture(None)
     }
 
-    // Encode the scene for flushing.
-    fn encode_scene(&mut self, surface: &mut Surface, scene: &Scene) {
+    /// Encode the scene for flushing.
+    /// Arguments:
+    /// - scene: the scene to encode
+    /// - canvas: the canvas to encode to
+    /// - width: the width of the canvas
+    /// - height: the height of the canvas
+    /// - rect: the bounding rect to be encoded (in world space)
+    fn encode_scene(
+        &mut self,
+        scene: &Scene,
+        canvas: &Canvas,
+        width: f32,
+        height: f32,
+        rect: Option<rect::Rectangle>,
+    ) {
         self.scene_cache.update_geometry(scene);
-
-        let width = surface.width() as f32;
-        let height = surface.height() as f32;
-        let canvas = surface.canvas();
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -220,77 +233,93 @@ impl Renderer {
             self.image_repository.clone(),
         );
 
-        // Render scene nodes
-        for child_id in &scene.children {
-            if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
-                canvas.draw_picture(pic, None, None);
-            } else {
-                let bounds = {
-                    let cache = self.scene_cache.geometry();
-                    cache.get_world_bounds(child_id)
-                };
-                let node = scene.nodes.get(child_id).unwrap();
-                if let Some(b) = bounds {
-                    if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
-                        canvas.draw_picture(&pic, None, None);
-                        self.scene_cache.set_node_picture(child_id.clone(), pic);
-                        continue;
-                    }
-                }
-                painter.draw_node_recursively(node, &scene.nodes);
-            }
+        // flatten the scene
+        let ll = LayerList::from_scene(scene, &self.scene_cache.geometry, rect);
+        println!("number of layers: {}", ll.len());
+
+        for layer in ll.layers {
+            // println!("drawing layer: {:?} ", layer);
+            painter.draw_layer(&layer);
         }
+
+        // // Render scene nodes
+        // for child_id in &scene.children {
+        //     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
+        //         canvas.draw_picture(pic, None, None);
+        //     } else {
+        //         let bounds = {
+        //             let cache = self.scene_cache.geometry();
+        //             cache.get_world_bounds(child_id)
+        //         };
+        //         let node = scene.nodes.get(child_id).unwrap();
+        //         if let Some(b) = bounds {
+        //             if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
+        //                 canvas.draw_picture(&pic, None, None);
+        //                 self.scene_cache.set_node_picture(child_id.clone(), pic);
+        //                 continue;
+        //             }
+        //         }
+        //         painter.draw_node_recursively(node, &scene.nodes);
+        //     }
+        // }
 
         canvas.restore();
-
-        if let Some(camera) = &self.camera {
-            let tc = &mut self.scene_cache.tile;
-            let raw_zoom = camera.get_zoom();
-            let rect = camera.rect();
-
-            // 1. get the quantized bounds / aligned to the tile size
-            let (level, zoom) = tc.quantize_zoom(raw_zoom);
-            println!("raw_zoom: {}, quantized_zoom: {}", raw_zoom, zoom);
-            let size = tc.tile_world_size(zoom);
-            let start_col = (rect.x / size).floor() as i32;
-            let end_col = ((rect.x + rect.width) / size).ceil() as i32;
-            let start_row = (rect.y / size).floor() as i32;
-            let end_row = ((rect.y + rect.height) / size).ceil() as i32;
-
-            // println!(
-            //     "zoom: {}, rect: {:?} col: {}..{} row: {}..{} cells: {}",
-            //     zoom,
-            //     rect,
-            //     start_col,
-            //     end_col,
-            //     start_row,
-            //     end_row,
-            //     (end_col - start_col) * (end_row - start_row)
-            // );
-
-            // for col in start_col..end_col {
-            //     for row in start_row..end_row {
-            //         let key: (u8, i32, i32) = (level, col, row);
-            //         let subset = skia_safe::IRect::from_xywh(
-            //             col as i32 * size as i32,
-            //             row as i32 * size as i32,
-            //             size as i32,
-            //             size as i32,
-            //         );
-
-            //         if !tc.has(key) {
-            //             let image = surface.image_snapshot_with_bounds(subset);
-            //             // let image = image.make_subset(surface.direct_context().as_mut(), subset);
-            //             if let Some(image) = image {
-            //                 tc.insert_tile(key, image, (size, size), rect);
-            //             }
-
-            //             // println!("key: {:?}", key);
-            //         }
-            //     }
-            // }
-            // print the number of tiles
-            // println!("number of tiles: {}", tc.len());
-        }
     }
+
+    // if let Some(camera) = &self.camera {
+    //     let tc = &mut self.scene_cache.tile;
+    //     let raw_zoom = camera.get_zoom();
+    //     let rect = camera.rect();
+
+    //     // 1. get the quantized bounds / aligned to the tile size
+    //     let (level, zoom) = tc.quantize_zoom(raw_zoom);
+    //     // println!(
+    //     //     "raw_zoom: {}, level: {}, quantized_zoom: {}",
+    //     //     raw_zoom, level, zoom
+    //     // );
+
+    //     let q = math2::rect::quantize(rect, 512.0);
+    //     println!("rect: {:?}", q);
+
+    //     let size = tc.tile_world_size(zoom);
+    //     let start_col = (rect.x / size).floor() as i32;
+    //     let end_col = ((rect.x + rect.width) / size).ceil() as i32;
+    //     let start_row = (rect.y / size).floor() as i32;
+    //     let end_row = ((rect.y + rect.height) / size).ceil() as i32;
+
+    //     // println!(
+    //     //     "zoom: {}, rect: {:?} col: {}..{} row: {}..{} cells: {}",
+    //     //     zoom,
+    //     //     rect,
+    //     //     start_col,
+    //     //     end_col,
+    //     //     start_row,
+    //     //     end_row,
+    //     //     (end_col - start_col) * (end_row - start_row)
+    //     // );
+
+    //     // for col in start_col..end_col {
+    //     //     for row in start_row..end_row {
+    //     //         let key: (u8, i32, i32) = (level, col, row);
+    //     //         let subset = skia_safe::IRect::from_xywh(
+    //     //             col as i32 * size as i32,
+    //     //             row as i32 * size as i32,
+    //     //             size as i32,
+    //     //             size as i32,
+    //     //         );
+
+    //     //         if !tc.has(key) {
+    //     //             let image = surface.image_snapshot_with_bounds(subset);
+    //     //             // let image = image.make_subset(surface.direct_context().as_mut(), subset);
+    //     //             if let Some(image) = image {
+    //     //                 tc.insert_tile(key, image, (size, size), rect);
+    //     //             }
+
+    //     //             // println!("key: {:?}", key);
+    //     //         }
+    //     //     }
+    //     // }
+    //     // print the number of tiles
+    //     // println!("number of tiles: {}", tc.len());
+    // }
 }
