@@ -199,6 +199,17 @@ impl Renderer {
         rect: Option<rect::Rectangle>,
     ) {
         self.scene_cache.update_geometry(scene);
+        println!("scene nodes: {:?}", scene.nodes.len());
+        let __geo = self.scene_cache.geometry();
+        println!("__geo: {}", __geo.len());
+        let geo = __geo.filter(|_id, entry| {
+            let bounds = entry.absolute_render_bounds;
+            if let Some(rect) = rect {
+                math2::rect::intersects(&bounds, &rect)
+            } else {
+                true
+            }
+        });
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -225,26 +236,35 @@ impl Renderer {
             self.image_repository.clone(),
         );
 
-        // Render scene nodes
+        let nodes_inbound = scene.nodes.filter(|node| geo.has(&node.id()));
+
+        println!("nodes_inbound: {}", nodes_inbound.len());
         for child_id in &scene.children {
-            if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
-                canvas.draw_picture(pic, None, None);
-            } else {
-                let bounds = {
-                    let cache = self.scene_cache.geometry();
-                    cache.get_world_bounds(child_id)
-                };
-                let node = scene.nodes.get(child_id).unwrap();
-                if let Some(b) = bounds {
-                    if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
-                        canvas.draw_picture(&pic, None, None);
-                        self.scene_cache.set_node_picture(child_id.clone(), pic);
-                        continue;
-                    }
-                }
-                painter.draw_node_recursively(node, &scene.nodes);
+            if let Some(node) = nodes_inbound.get(child_id) {
+                painter.draw_node_recursively(node, &nodes_inbound);
             }
         }
+
+        // // Render scene nodes
+        // for child_id in &scene.children {
+        //     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
+        //         canvas.draw_picture(pic, None, None);
+        //     } else {
+        //         let bounds = {
+        //             let cache = self.scene_cache.geometry();
+        //             cache.get_world_bounds(child_id)
+        //         };
+        //         let node = scene.nodes.get(child_id).unwrap();
+        //         if let Some(b) = bounds {
+        //             if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
+        //                 canvas.draw_picture(&pic, None, None);
+        //                 self.scene_cache.set_node_picture(child_id.clone(), pic);
+        //                 continue;
+        //             }
+        //         }
+        //         painter.draw_node_recursively(node, &scene.nodes);
+        //     }
+        // }
 
         canvas.restore();
     }
