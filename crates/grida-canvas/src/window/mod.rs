@@ -375,7 +375,7 @@ impl App {
 
         let __total_frame_time = __frame_start.elapsed();
         println!(
-            "FRAME: fps*: {:.0} | t: {:.2}ms | Render: {:.2}ms | Flush: {:.2}ms | plan: {:.2}ms | plan:list: {:.2}ms ({:?}) | plan:painter: {:.2}ms | cache:pic: {:?} | cache:geo: {:?} | Queue: {:?} | Sleep: {:?}",
+            "fps*: {:.0} | t: {:.2}ms | Render: {:.2}ms | Flush: {:.2}ms | plan: {:.2}ms | plan:list: {:.2}ms ({:?}) | plan:painter: {:.2}ms | cache:pic: {:?} | cache:geo: {:?} | Queue: {:?} | Sleep: {:?}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
