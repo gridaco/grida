@@ -349,43 +349,47 @@ impl App {
     }
 
     fn redraw(&mut self) {
-        let frame_start = std::time::Instant::now();
-        let frame_delta = frame_start.saturating_duration_since(self.last_frame_time);
+        let __frame_start = std::time::Instant::now();
+        let __frame_delta = __frame_start.saturating_duration_since(self.last_frame_time);
 
-        let queue_start = std::time::Instant::now();
+        let __queue_start = std::time::Instant::now();
         self.process_image_queue();
         self.process_font_queue();
-        let queue_time = queue_start.elapsed();
+        let __queue_time = __queue_start.elapsed();
 
-        let (render_time, encode_time, flush_time) = match self.renderer.render() {
+        let stats = match self.renderer.render() {
             Some(t) => t,
             None => return,
         };
 
-        let swap_start = std::time::Instant::now();
+        let __swap_start = std::time::Instant::now();
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
-        let swap_time = swap_start.elapsed();
+        let __swap_time = __swap_start.elapsed();
 
         // Apply frame pacing
-        let sleep_start = std::time::Instant::now();
+        let __sleep_start = std::time::Instant::now();
         self.scheduler.sleep_to_maintain_fps();
-        let sleep_time = sleep_start.elapsed();
+        let __sleep_time = __sleep_start.elapsed();
 
-        let total_frame_time = frame_start.elapsed();
-        // println!(
-        //     "FRAME: t: {:.2}ms | Render: {:.2}ms | Encode: {:.2}ms | Flush: {:.2}ms | Queue: {:?} | Swap: {:?} | Sleep: {:?}",
-        //     total_frame_time.as_secs_f64() * 1000.0,
-        //     render_time.as_secs_f64() * 1000.0,
-        //     encode_time.as_secs_f64() * 1000.0,
-        //     flush_time.as_secs_f64() * 1000.0,
-        //     queue_time,
-        //     swap_time,
-        //     sleep_time
-        // );
+        let __total_frame_time = __frame_start.elapsed();
+        println!(
+            "FRAME: fps*: {:.0} | t: {:.2}ms | Render: {:.2}ms | Flush: {:.2}ms | plan: {:.2}ms | plan:list: {:.2}ms | plan:painter: {:.2}ms | cache:pic: {:?} | cache:geo: {:?} | Queue: {:?} | Sleep: {:?}",
+            1.0 / __total_frame_time.as_secs_f64(),
+            __total_frame_time.as_secs_f64() * 1000.0,
+            stats.total_duration.as_secs_f64() * 1000.0,
+            stats.encode_duration.as_secs_f64() * 1000.0,
+            stats.flush_duration.as_secs_f64() * 1000.0,
+            stats.plan.display_list_duration.as_secs_f64() * 1000.0,
+            stats.plan.painter_duration.as_secs_f64() * 1000.0,
+            stats.plan.scene_cache_picture_size,
+            stats.plan.scene_cache_geometry_size,
+            __queue_time,
+            __sleep_time
+        );
 
-        self.last_frame_time = frame_start;
+        self.last_frame_time = __frame_start;
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -489,6 +493,10 @@ where
         width: width as f32 * scale_factor as f32,
         height: height as f32 * scale_factor as f32,
     });
+    // let camera = Camera2D::new(Size {
+    //     width: width as f32,
+    //     height: height as f32,
+    // });
     renderer.set_camera(camera.clone());
     renderer.load_scene(scene.clone());
 
@@ -504,7 +512,7 @@ where
         window,
         image_rx: rx,
         font_rx,
-        scheduler: scheduler::FrameScheduler::new(120).with_max_fps(144),
+        scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),
         last_frame_time: std::time::Instant::now(),
     };
 

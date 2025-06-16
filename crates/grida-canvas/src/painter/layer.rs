@@ -82,17 +82,10 @@ pub struct LayerList {
 
 impl LayerList {
     /// Flatten an entire scene into a layer list using the provided geometry cache.
-    pub fn from_scene(scene: &Scene, cache: &GeometryCache, bounding: Option<Rectangle>) -> Self {
+    pub fn from_scene(scene: &Scene, cache: &GeometryCache) -> Self {
         let mut list = LayerList::default();
         for id in &scene.children {
-            Self::flatten_node(
-                id,
-                &scene.nodes,
-                cache,
-                1.0,
-                bounding.as_ref(),
-                &mut list.layers,
-            );
+            Self::flatten_node(id, &scene.nodes, cache, 1.0, &mut list.layers);
         }
         list
     }
@@ -103,17 +96,9 @@ impl LayerList {
         repo: &NodeRepository,
         cache: &GeometryCache,
         opacity: f32,
-        bounding: Option<Rectangle>,
     ) -> Self {
         let mut list = LayerList::default();
-        Self::flatten_node(
-            id,
-            repo,
-            cache,
-            opacity,
-            bounding.as_ref(),
-            &mut list.layers,
-        );
+        Self::flatten_node(id, repo, cache, opacity, &mut list.layers);
         list
     }
 
@@ -126,17 +111,9 @@ impl LayerList {
         repo: &NodeRepository,
         cache: &GeometryCache,
         parent_opacity: f32,
-        bounding: Option<&Rectangle>,
         out: &mut Vec<PainterPictureLayer>,
     ) {
         if let Some(node) = repo.get(id) {
-            if let Some(view) = bounding {
-                if let Some(bounds) = cache.get_render_bounds(id) {
-                    if !rect::intersects(&bounds, view) {
-                        return;
-                    }
-                }
-            }
             let transform = cache
                 .get_world_transform(id)
                 .unwrap_or_else(AffineTransform::identity);
@@ -144,7 +121,7 @@ impl LayerList {
                 Node::Group(n) => {
                     let opacity = parent_opacity * n.opacity;
                     for child in &n.children {
-                        Self::flatten_node(child, repo, cache, opacity, bounding, out);
+                        Self::flatten_node(child, repo, cache, opacity, out);
                     }
                 }
                 Node::Container(n) => {
@@ -160,13 +137,13 @@ impl LayerList {
                         fills: vec![n.fill.clone()],
                     });
                     for child in &n.children {
-                        Self::flatten_node(child, repo, cache, opacity, bounding, out);
+                        Self::flatten_node(child, repo, cache, opacity, out);
                     }
                 }
                 Node::BooleanOperation(n) => {
                     let opacity = parent_opacity * n.opacity;
                     for child in &n.children {
-                        Self::flatten_node(child, repo, cache, opacity, bounding, out);
+                        Self::flatten_node(child, repo, cache, opacity, out);
                     }
                 }
                 Node::Rectangle(n) => out.push(PainterPictureLayer {
@@ -271,5 +248,15 @@ impl LayerList {
                 }),
             }
         }
+    }
+
+    pub fn filter(&self, filter: impl Fn(&PainterPictureLayer) -> bool) -> Self {
+        let mut list = LayerList::default();
+        for layer in &self.layers {
+            if filter(layer) {
+                list.layers.push(layer.clone());
+            }
+        }
+        list
     }
 }

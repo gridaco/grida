@@ -16,6 +16,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+pub struct SceneEncodeStats {
+    pub display_list_duration: Duration,
+    pub display_list_size: usize,
+    pub painter_duration: Duration,
+    pub scene_cache_picture_size: usize,
+    pub scene_cache_geometry_size: usize,
+}
+
+pub struct RenderStats {
+    pub plan: SceneEncodeStats,
+    pub encode_duration: Duration,
+    pub flush_duration: Duration,
+    pub total_duration: Duration,
+}
+
 /// Choice of GPU vs. raster backend
 pub enum Backend {
     GL(*mut Surface),
@@ -124,11 +139,14 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
+        println!("load_scene: {:?}", scene.nodes.len());
+        self.scene_cache.update_geometry(&scene);
+        self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
     }
 
     /// Render the currently loaded scene if any. and report the time it took.
-    pub fn render(&mut self) -> Option<(Duration, Duration, Duration)> {
+    pub fn render(&mut self) -> Option<RenderStats> {
         let start = Instant::now();
 
         if self.scene.is_none() {
@@ -144,15 +162,23 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            self.encode_scene(scene, &mut canvas, width, height, rect);
+            let plan = self.encode_scene(scene, &mut canvas, width, height, rect);
+
+            let encode_duration = start.elapsed();
+
+            self.flush();
+
+            let duration = start.elapsed();
+
+            return Some(RenderStats {
+                plan,
+                encode_duration,
+                flush_duration: duration - encode_duration,
+                total_duration: duration,
+            });
         }
-        let encode_duration = start.elapsed();
 
-        self.flush();
-
-        let duration = start.elapsed();
-
-        Some((duration, encode_duration, duration - encode_duration))
+        return None;
     }
 
     /// Clear the cached scene picture.
@@ -160,11 +186,10 @@ impl Renderer {
         self.scene_cache.invalidate();
     }
 
-    fn capture_node_picture(
+    fn with_recording(
         &self,
-        node: &Node,
         bounds: &rect::Rectangle,
-        repository: &NodeRepository,
+        draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         let mut recorder = PictureRecorder::new();
         let sk_bounds = Rect::new(
@@ -179,8 +204,27 @@ impl Renderer {
             self.font_repository.clone(),
             self.image_repository.clone(),
         );
-        painter.draw_node_recursively(node, repository);
+        draw(&painter);
         recorder.finish_recording_as_picture(None)
+    }
+
+    fn with_recording_cached(
+        &mut self,
+        id: &NodeId,
+        bounds: &rect::Rectangle,
+        draw: impl FnOnce(&Painter),
+    ) -> Option<Picture> {
+        if let Some(pic) = self.scene_cache.picture.get_node_picture(id) {
+            return Some(pic.clone());
+        }
+        let pic = self.with_recording(bounds, draw);
+
+        if let Some(pic) = &pic {
+            self.scene_cache
+                .picture
+                .set_node_picture(id.clone(), pic.clone());
+        }
+        pic
     }
 
     /// Encode the scene for flushing.
@@ -197,19 +241,18 @@ impl Renderer {
         width: f32,
         height: f32,
         rect: Option<rect::Rectangle>,
-    ) {
-        self.scene_cache.update_geometry(scene);
-        println!("scene nodes: {:?}", scene.nodes.len());
+    ) -> SceneEncodeStats {
         let __geo = self.scene_cache.geometry();
-        println!("__geo: {}", __geo.len());
-        let geo = __geo.filter(|_id, entry| {
-            let bounds = entry.absolute_render_bounds;
-            if let Some(rect) = rect {
-                math2::rect::intersects(&bounds, &rect)
-            } else {
-                true
-            }
-        });
+
+        // let geo = __geo.filter(|_id, entry| {
+        //     let bounds = entry.absolute_render_bounds;
+        //     if let Some(rect) = rect {
+        //         math2::rect::intersects(&bounds, &rect)
+        //     } else {
+        //         true
+        //     }
+        // });
+        // println!("geo: {}", geo.len());
 
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
@@ -230,43 +273,76 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        let painter = Painter::new(
-            canvas,
-            self.font_repository.clone(),
-            self.image_repository.clone(),
-        );
+        let __before_ll = Instant::now();
 
-        let nodes_inbound = scene.nodes.filter(|node| geo.has(&node.id()));
+        let ll = self.scene_cache.layers.filter(|layer| {
+            if let Some(rect) = rect {
+                let rb = __geo.get_render_bounds(&layer.id);
+                if let Some(rb) = rb {
+                    math2::rect::intersects(&rb, &rect)
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        });
 
-        println!("nodes_inbound: {}", nodes_inbound.len());
-        for child_id in &scene.children {
-            if let Some(node) = nodes_inbound.get(child_id) {
-                painter.draw_node_recursively(node, &nodes_inbound);
+        let __ll_duration = __before_ll.elapsed();
+        let ll_len = ll.len();
+
+        let __before_paint = Instant::now();
+
+        for layer in ll.layers {
+            let picture = self.with_recording_cached(&layer.id, &rect.unwrap(), |painter| {
+                painter.draw_layer(&layer);
+            });
+
+            if let Some(pic) = picture {
+                canvas.draw_picture(pic, None, None);
             }
         }
 
+        let __painter_duration = __before_paint.elapsed();
+
+        // let painter = Painter::new(
+        //     canvas,
+        //     self.font_repository.clone(),
+        //     self.image_repository.clone(),
+        // );
+
+        // -
+        // let nodes_inbound = scene.nodes.filter(|node| geo.has(&node.id()));
+
+        // println!("nodes_inbound: {}", nodes_inbound.len());
+        // for child_id in &scene.children {
+        //     if let Some(node) = nodes_inbound.get(child_id) {
+        //         painter.draw_node_recursively(node, &nodes_inbound);
+        //     }
+        // }
+
+        // -
         // // Render scene nodes
         // for child_id in &scene.children {
-        //     if let Some(pic) = self.scene_cache.get_node_picture(child_id) {
-        //         canvas.draw_picture(pic, None, None);
-        //     } else {
-        //         let bounds = {
-        //             let cache = self.scene_cache.geometry();
-        //             cache.get_world_bounds(child_id)
-        //         };
-        //         let node = scene.nodes.get(child_id).unwrap();
-        //         if let Some(b) = bounds {
-        //             if let Some(pic) = self.capture_node_picture(node, &b, &scene.nodes) {
-        //                 canvas.draw_picture(&pic, None, None);
-        //                 self.scene_cache.set_node_picture(child_id.clone(), pic);
-        //                 continue;
-        //             }
-        //         }
+        //     let node = scene.nodes.get(child_id).unwrap();
+        //     let picture = self.with_recording_cached(child_id, &rect.unwrap(), |painter| {
         //         painter.draw_node_recursively(node, &scene.nodes);
+        //     });
+
+        //     if let Some(pic) = picture {
+        //         canvas.draw_picture(pic, None, None);
         //     }
         // }
 
         canvas.restore();
+
+        SceneEncodeStats {
+            display_list_duration: __ll_duration,
+            display_list_size: ll_len,
+            painter_duration: __painter_duration,
+            scene_cache_picture_size: self.scene_cache.picture.len(),
+            scene_cache_geometry_size: self.scene_cache.geometry.len(),
+        }
     }
 
     // if let Some(camera) = &self.camera {

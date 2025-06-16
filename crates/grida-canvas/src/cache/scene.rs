@@ -1,14 +1,18 @@
-use crate::cache::{
-    geometry::GeometryCache,
-    picture::{PictureCache, PictureCacheStrategy},
-    tile::ImageTileCache,
-};
 use crate::node::schema::{NodeId, Scene};
+use crate::{
+    cache::{
+        geometry::GeometryCache,
+        picture::{PictureCache, PictureCacheStrategy},
+        tile::ImageTileCache,
+    },
+    painter::layer::LayerList,
+};
 use skia_safe::Picture;
 
 /// A unified cache storing geometry information and recorded pictures for a scene.
 #[derive(Debug, Clone)]
 pub struct SceneCache {
+    pub layers: LayerList,
     pub geometry: GeometryCache,
     pub picture: PictureCache,
     pub tile: ImageTileCache,
@@ -18,6 +22,7 @@ impl SceneCache {
     /// Create a new empty cache with the given picture cache strategy.
     pub fn new() -> Self {
         Self {
+            layers: LayerList::default(),
             geometry: GeometryCache::new(),
             picture: PictureCache::new(),
             tile: ImageTileCache::new(),
@@ -27,6 +32,10 @@ impl SceneCache {
     /// Rebuild the geometry cache from the provided scene.
     pub fn update_geometry(&mut self, scene: &Scene) {
         self.geometry = GeometryCache::from_scene(scene);
+    }
+
+    pub fn update_layers(&mut self, scene: &Scene) {
+        self.layers = LayerList::from_scene(scene, &self.geometry);
     }
 
     /// Access the geometry cache.
@@ -56,7 +65,6 @@ impl SceneCache {
 
     /// Invalidate all cached data.
     pub fn invalidate(&mut self) {
-        self.geometry = GeometryCache::new();
         self.picture.invalidate();
     }
 
