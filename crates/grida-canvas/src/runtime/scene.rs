@@ -6,11 +6,12 @@ use crate::{
     repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
 };
-use math2::rect;
+use math2::{Rectangle, rect};
 use skia_safe::{
-    Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
+    Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -49,6 +50,14 @@ impl Backend {
     }
 }
 
+/// test rect in canvas space
+static TEST_RECT: math2::Rectangle = Rectangle {
+    x: 5500.0,
+    y: -4000.0,
+    width: 14279.0,
+    height: 17458.0,
+};
+
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
 /// ---------------------------------------------------------------------------
@@ -60,6 +69,7 @@ pub struct Renderer {
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
+    test_tile: Option<Image>,
 }
 
 impl Renderer {
@@ -76,6 +86,7 @@ impl Renderer {
             image_repository,
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
+            test_tile: None,
         }
     }
 
@@ -176,6 +187,36 @@ impl Renderer {
             );
 
             let encode_duration = start.elapsed();
+
+            if rect.is_some() && self.test_tile.is_none() {
+                // if the test rect fully within the rect
+                let is_within = rect.unwrap().contains(&TEST_RECT);
+                // let is_within = math2::rect::contains(&rect.unwrap(), &TEST_RECT);
+                println!(
+                    "contains: {}, rect: {:?}, test_rect: {:?}",
+                    is_within,
+                    rect.unwrap(),
+                    TEST_RECT
+                );
+                if is_within {
+                    // convert the test rect to screen (surface) space
+                    let surface_rect = math2::rect::transform(
+                        TEST_RECT,
+                        &self.camera.as_ref().unwrap().view_matrix(),
+                    );
+
+                    println!("surface_rect: {:?}", surface_rect);
+                    //
+                    let image = surface.image_snapshot_with_bounds(IRect::from_xywh(
+                        surface_rect.x as i32,
+                        surface_rect.y as i32,
+                        surface_rect.width as i32,
+                        surface_rect.height as i32,
+                    ));
+                    self.test_tile = image;
+                }
+                //
+            }
 
             self.flush();
 
@@ -280,6 +321,9 @@ impl Renderer {
         width: f32,
         height: f32,
     ) -> DrawResult {
+        let __before_paint = Instant::now();
+        let mut cache_picture_used = 0;
+
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
         // Paint background color first if present
@@ -299,18 +343,33 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        let __before_paint = Instant::now();
+        // Draw test tile in screen space (before camera transform)
+        if let Some(test_tile) = &self.test_tile {
+            let src = Rect::new(
+                0.0,
+                0.0,
+                test_tile.width() as f32,
+                test_tile.height() as f32,
+            );
+            let dst = Rect::from_xywh(TEST_RECT.x, TEST_RECT.y, TEST_RECT.width, TEST_RECT.height);
+            let paint = SkPaint::default();
+            canvas.draw_image_rect(
+                test_tile,
+                Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                dst,
+                &paint,
+            );
+        } else {
+            for idx in indices {
+                let layer = self.scene_cache.layers.layers[*idx].clone();
+                let picture = self.with_recording_cached(&layer.id(), |painter| {
+                    painter.draw_layer(&layer);
+                });
 
-        let mut cache_picture_used = 0;
-        for idx in indices {
-            let layer = self.scene_cache.layers.layers[*idx].clone();
-            let picture = self.with_recording_cached(&layer.id(), |painter| {
-                painter.draw_layer(&layer);
-            });
-
-            if let Some(pic) = picture {
-                canvas.draw_picture(pic, None, None);
-                cache_picture_used += 1;
+                if let Some(pic) = picture {
+                    canvas.draw_picture(pic, None, None);
+                    cache_picture_used += 1;
+                }
             }
         }
 
