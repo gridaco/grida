@@ -22,8 +22,9 @@ pub struct FramePlan {
 
 pub struct DrawResult {
     pub painter_duration: Duration,
-    pub scene_cache_picture_size: usize,
-    pub scene_cache_geometry_size: usize,
+    pub cache_picture_used: usize,
+    pub cache_picture_size: usize,
+    pub cache_geometry_size: usize,
 }
 
 pub struct RenderStats {
@@ -300,6 +301,7 @@ impl Renderer {
 
         let __before_paint = Instant::now();
 
+        let mut cache_picture_used = 0;
         for idx in indices {
             let layer = self.scene_cache.layers.layers[*idx].clone();
             let picture = self.with_recording_cached(&layer.id(), |painter| {
@@ -308,6 +310,7 @@ impl Renderer {
 
             if let Some(pic) = picture {
                 canvas.draw_picture(pic, None, None);
+                cache_picture_used += 1;
             }
         }
 
@@ -317,8 +320,9 @@ impl Renderer {
 
         DrawResult {
             painter_duration: __painter_duration,
-            scene_cache_picture_size: self.scene_cache.picture.len(),
-            scene_cache_geometry_size: self.scene_cache.geometry.len(),
+            cache_picture_used,
+            cache_picture_size: self.scene_cache.picture.len(),
+            cache_geometry_size: self.scene_cache.geometry.len(),
         }
         //
     }
