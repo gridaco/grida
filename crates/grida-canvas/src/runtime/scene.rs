@@ -14,17 +14,22 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-pub struct FramePlanStats {
+pub struct FramePlan {
+    pub indices: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size: usize,
+}
+
+pub struct DrawResult {
     pub painter_duration: Duration,
     pub scene_cache_picture_size: usize,
     pub scene_cache_geometry_size: usize,
 }
 
 pub struct RenderStats {
-    pub plan: FramePlanStats,
-    pub encode_duration: Duration,
+    pub frame: FramePlan,
+    pub draw: DrawResult,
+    pub frame_duration: Duration,
     pub flush_duration: Duration,
     pub total_duration: Duration,
 }
@@ -160,7 +165,14 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            let plan = self.frame(scene, &mut canvas, width, height, rect);
+            let frame = self.frame(rect);
+            let paint = self.draw(
+                &mut canvas,
+                &frame.indices,
+                scene.background_color,
+                width,
+                height,
+            );
 
             let encode_duration = start.elapsed();
 
@@ -169,8 +181,9 @@ impl Renderer {
             let duration = start.elapsed();
 
             return Some(RenderStats {
-                plan,
-                encode_duration,
+                frame,
+                draw: paint,
+                frame_duration: encode_duration,
                 flush_duration: duration - encode_duration,
                 total_duration: duration,
             });
@@ -209,13 +222,15 @@ impl Renderer {
     fn with_recording_cached(
         &mut self,
         id: &NodeId,
-        bounds: &rect::Rectangle,
+        // bounds: &rect::Rectangle,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         if let Some(pic) = self.scene_cache.picture.get_node_picture(id) {
             return Some(pic.clone());
         }
-        let pic = self.with_recording(bounds, draw);
+
+        let bounds = self.scene_cache.geometry.get_render_bounds(&id).unwrap();
+        let pic = self.with_recording(&bounds, draw);
 
         if let Some(pic) = &pic {
             self.scene_cache
@@ -227,38 +242,8 @@ impl Renderer {
 
     /// Plan the frame for rendering.
     /// Arguments:
-    /// - scene: the scene to render
-    /// - canvas: the canvas to render to
-    /// - width: the width of the canvas
-    /// - height: the height of the canvas
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(
-        &mut self,
-        scene: &Scene,
-        canvas: &Canvas,
-        width: f32,
-        height: f32,
-        rect: Option<rect::Rectangle>,
-    ) -> FramePlanStats {
-        canvas.clear(skia_safe::Color::TRANSPARENT);
-
-        // Paint background color first if present
-        if let Some(bg_color) = scene.background_color {
-            let Color(r, g, b, a) = bg_color;
-            let color = skia_safe::Color::from_argb(a, r, g, b);
-            let mut paint = SkPaint::default();
-            paint.set_color(color);
-            // Paint the entire canvas with the background color
-            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
-        }
-
-        canvas.save();
-
-        // Apply camera transform if present
-        if let Some(camera) = &self.camera {
-            canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
-        }
-
+    fn frame(&mut self, rect: Option<rect::Rectangle>) -> FramePlan {
         let __before_ll = Instant::now();
 
         let mut indices: Vec<usize> = if let Some(rect) = rect {
@@ -274,16 +259,50 @@ impl Renderer {
         let __ll_duration = __before_ll.elapsed();
         let ll_len = indices.len();
 
+        FramePlan {
+            indices: indices.clone(),
+            display_list_duration: __ll_duration,
+            display_list_size: ll_len,
+        }
+    }
+
+    /// Draw the scene to the canvas.
+    /// - canvas: the canvas to render to
+    /// - indices: the indices of the layers to draw
+    /// - width: the width of the canvas
+    /// - height: the height of the canvas
+    fn draw(
+        &mut self,
+        canvas: &Canvas,
+        indices: &Vec<usize>,
+        background_color: Option<Color>,
+        width: f32,
+        height: f32,
+    ) -> DrawResult {
+        canvas.clear(skia_safe::Color::TRANSPARENT);
+
+        // Paint background color first if present
+        if let Some(bg_color) = background_color {
+            let Color(r, g, b, a) = bg_color;
+            let color = skia_safe::Color::from_argb(a, r, g, b);
+            let mut paint = SkPaint::default();
+            paint.set_color(color);
+            // Paint the entire canvas with the background color
+            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+        }
+
+        canvas.save();
+
+        // Apply camera transform if present
+        if let Some(camera) = &self.camera {
+            canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
+        }
+
         let __before_paint = Instant::now();
 
         for idx in indices {
-            let layer = self.scene_cache.layers.layers[idx].clone();
-            let bounds = self
-                .scene_cache
-                .geometry
-                .get_render_bounds(&layer.id())
-                .unwrap();
-            let picture = self.with_recording_cached(&layer.id(), &bounds, |painter| {
+            let layer = self.scene_cache.layers.layers[*idx].clone();
+            let picture = self.with_recording_cached(&layer.id(), |painter| {
                 painter.draw_layer(&layer);
             });
 
@@ -296,13 +315,12 @@ impl Renderer {
 
         canvas.restore();
 
-        FramePlanStats {
-            display_list_duration: __ll_duration,
-            display_list_size: ll_len,
+        DrawResult {
             painter_duration: __painter_duration,
             scene_cache_picture_size: self.scene_cache.picture.len(),
             scene_cache_geometry_size: self.scene_cache.geometry.len(),
         }
+        //
     }
 
     // if let Some(camera) = &self.camera {

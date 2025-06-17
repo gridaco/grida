@@ -375,17 +375,17 @@ impl App {
 
         let __total_frame_time = __frame_start.elapsed();
         println!(
-            "fps*: {:.0} | t: {:.2}ms | Render: {:.2}ms | Flush: {:.2}ms | plan: {:.2}ms | plan:list: {:.2}ms ({:?}) | plan:painter: {:.2}ms | cache:pic: {:?} | cache:geo: {:?} | Queue: {:?} | Sleep: {:?}",
+            "fps*: {:.0} | t: {:.2}ms | Render: {:.2}ms | Flush: {:.2}ms | frame: {:.2}ms | frame:list: {:.2}ms ({:?}) | paint:painter: {:.2}ms | cache:pic: {:?} | cache:geo: {:?} | Queue: {:?} | Sleep: {:?}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
-            stats.encode_duration.as_secs_f64() * 1000.0,
+            stats.frame_duration.as_secs_f64() * 1000.0,
             stats.flush_duration.as_secs_f64() * 1000.0,
-            stats.plan.display_list_duration.as_secs_f64() * 1000.0,
-            stats.plan.display_list_size,
-            stats.plan.painter_duration.as_secs_f64() * 1000.0,
-            stats.plan.scene_cache_picture_size,
-            stats.plan.scene_cache_geometry_size,
+            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_size,
+            stats.draw.painter_duration.as_secs_f64() * 1000.0,
+            stats.draw.scene_cache_picture_size,
+            stats.draw.scene_cache_geometry_size,
             __queue_time,
             __sleep_time
         );
