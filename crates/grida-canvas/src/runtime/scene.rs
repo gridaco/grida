@@ -160,7 +160,7 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            let plan = self.plan_frame(scene, &mut canvas, width, height, rect);
+            let plan = self.frame(scene, &mut canvas, width, height, rect);
 
             let encode_duration = start.elapsed();
 
@@ -232,7 +232,7 @@ impl Renderer {
     /// - width: the width of the canvas
     /// - height: the height of the canvas
     /// - rect: the bounding rect to be rendered (in world space)
-    fn plan_frame(
+    fn frame(
         &mut self,
         scene: &Scene,
         canvas: &Canvas,
@@ -240,8 +240,6 @@ impl Renderer {
         height: f32,
         rect: Option<rect::Rectangle>,
     ) -> FramePlanStats {
-        // Geometry cache currently unused here but kept for future optimizations
-
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
         // Paint background color first if present
@@ -269,12 +267,12 @@ impl Renderer {
             (0..self.scene_cache.layers.layers.len()).collect()
         };
 
-        let __ll_duration = __before_ll.elapsed();
-        let ll_len = indices.len();
-
         if rect.is_some() {
             indices.sort();
         }
+
+        let __ll_duration = __before_ll.elapsed();
+        let ll_len = indices.len();
 
         let __before_paint = Instant::now();
 
@@ -295,26 +293,6 @@ impl Renderer {
         }
 
         let __painter_duration = __before_paint.elapsed();
-
-        // let painter = Painter::new(
-        //     canvas,
-        //     self.font_repository.clone(),
-        //     self.image_repository.clone(),
-        // );
-
-        // -
-        // // Render scene nodes
-        // for child_id in &scene.children {
-        //     let node = scene.nodes.get(child_id).unwrap();
-        //     let bounds = self.scene_cache.geometry().get_render_bounds(child_id).unwrap();
-        //     let picture = self.with_recording_cached(child_id, &bounds, |painter| {
-        //         painter.draw_node_recursively(node, &scene.nodes);
-        //     });
-
-        //     if let Some(pic) = picture {
-        //         canvas.draw_picture(pic, None, None);
-        //     }
-        // }
 
         canvas.restore();
 
