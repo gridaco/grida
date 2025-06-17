@@ -37,7 +37,7 @@ pub fn measure(a: Rectangle, b: Rectangle) -> Option<Measurement> {
 
     let intersection = intersection.unwrap();
 
-    if rect::contains(&b, &a) {
+    if b.contains(&a) {
         return Some(Measurement {
             a,
             b,
@@ -46,7 +46,7 @@ pub fn measure(a: Rectangle, b: Rectangle) -> Option<Measurement> {
         });
     }
 
-    if rect::contains(&a, &b) {
+    if a.contains(&b) {
         return Some(Measurement {
             a,
             b,

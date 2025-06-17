@@ -208,7 +208,7 @@ pub fn to_9points_chunk(rect: &Rectangle) -> [Vector2; 9] {
 
 /// Returns true if rectangle `a` fully contains rectangle `b`.
 pub fn contains(a: &Rectangle, b: &Rectangle) -> bool {
-    b.contains(a)
+    a.contains(b)
 }
 
 /// Returns true if the point is inside the rectangle (inclusive).
