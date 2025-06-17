@@ -34,6 +34,15 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
+    pub fn empty() -> Self {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
+    }
+
     /// Returns the center point of the rectangle.
     pub fn center(&self) -> Vector2 {
         [self.x + self.width / 2.0, self.y + self.height / 2.0]

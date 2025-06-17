@@ -11,12 +11,19 @@ use skia_safe::{
     Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 pub struct FramePlan {
+    /// tile rects
+    pub tiles: Vec<rect::Rectangle>,
+    /// all layers that intersects with the bounds
     pub indices: Vec<usize>,
+    /// indicies to be skipped from painting
+    pub indices_skip_paint: Vec<usize>,
+    /// indicies to be painted
+    pub indices_should_paint: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size: usize,
 }
@@ -177,14 +184,15 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            let frame = self.frame(rect);
-            let paint = self.draw(
-                &mut canvas,
-                &frame.indices,
-                scene.background_color,
-                width,
-                height,
-            );
+
+            let tile_rects: &[math2::Rectangle] = if self.test_tile.is_none() {
+                &[]
+            } else {
+                &[TEST_RECT]
+            };
+
+            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()), tile_rects);
+            let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
 
@@ -285,24 +293,35 @@ impl Renderer {
     /// Plan the frame for rendering.
     /// Arguments:
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(&mut self, rect: Option<rect::Rectangle>) -> FramePlan {
+    fn frame(&mut self, bounds: rect::Rectangle, tiles: &[rect::Rectangle]) -> FramePlan {
         let __before_ll = Instant::now();
 
-        let mut indices: Vec<usize> = if let Some(rect) = rect {
-            self.scene_cache.layers_in_rect(rect)
-        } else {
-            (0..self.scene_cache.layers.layers.len()).collect()
-        };
+        // all layers intersects with the bounds
+        let mut intersects = self.scene_cache.intersects(bounds);
+        intersects.sort();
+        let ll_len = intersects.len();
 
-        if rect.is_some() {
-            indices.sort();
+        // all layers that are fully contained within the tiles (holes)
+        let mut subtractions: HashSet<usize> = HashSet::new();
+        for hole in tiles {
+            subtractions.extend(self.scene_cache.contains(&hole));
+        }
+
+        // all layers that should be painted
+        let mut indices = Vec::new();
+        for idx in &intersects {
+            if !subtractions.contains(&idx) {
+                indices.push(*idx);
+            }
         }
 
         let __ll_duration = __before_ll.elapsed();
-        let ll_len = indices.len();
 
         FramePlan {
-            indices: indices.clone(),
+            indices: intersects.clone(),
+            tiles: tiles.to_vec(),
+            indices_skip_paint: subtractions.into_iter().collect(),
+            indices_should_paint: indices.clone(),
             display_list_duration: __ll_duration,
             display_list_size: ll_len,
         }
@@ -316,7 +335,7 @@ impl Renderer {
     fn draw(
         &mut self,
         canvas: &Canvas,
-        indices: &Vec<usize>,
+        plan: &FramePlan,
         background_color: Option<Color>,
         width: f32,
         height: f32,
@@ -343,33 +362,28 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        // Draw test tile in screen space (before camera transform)
-        if let Some(test_tile) = &self.test_tile {
-            let src = Rect::new(
-                0.0,
-                0.0,
-                test_tile.width() as f32,
-                test_tile.height() as f32,
-            );
-            let dst = Rect::from_xywh(TEST_RECT.x, TEST_RECT.y, TEST_RECT.width, TEST_RECT.height);
+        for tile in &plan.tiles {
+            let image = self.test_tile.as_ref().unwrap();
+            let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
+            let dst = Rect::from_xywh(tile.x, tile.y, tile.width, tile.height);
             let paint = SkPaint::default();
             canvas.draw_image_rect(
-                test_tile,
+                image,
                 Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
                 dst,
                 &paint,
             );
-        } else {
-            for idx in indices {
-                let layer = self.scene_cache.layers.layers[*idx].clone();
-                let picture = self.with_recording_cached(&layer.id(), |painter| {
-                    painter.draw_layer(&layer);
-                });
+        }
 
-                if let Some(pic) = picture {
-                    canvas.draw_picture(pic, None, None);
-                    cache_picture_used += 1;
-                }
+        for idx in &plan.indices_should_paint {
+            let layer = self.scene_cache.layers.layers[*idx].clone();
+            let picture = self.with_recording_cached(&layer.id(), |painter| {
+                painter.draw_layer(&layer);
+            });
+
+            if let Some(pic) = picture {
+                canvas.draw_picture(pic, None, None);
+                cache_picture_used += 1;
             }
         }
 

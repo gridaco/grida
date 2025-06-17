@@ -104,14 +104,32 @@ impl SceneCache {
         self.picture.set_node_picture(id, picture);
     }
 
-    /// Query painter layer indices whose bounds intersect the given rectangle.
-    pub fn layers_in_rect(&self, rect: Rectangle) -> Vec<usize> {
+    /// Query painter layer indices whose bounds intersect with the given rectangle.
+    /// This includes layers that are:
+    /// - Fully contained within the rectangle
+    /// - Partially overlapping with the rectangle
+    /// - Touching the rectangle's edges
+    pub fn intersects(&self, rect: Rectangle) -> Vec<usize> {
         let env = AABB::from_corners(
             [rect.x, rect.y],
             [rect.x + rect.width, rect.y + rect.height],
         );
         self.layer_index
             .locate_in_envelope_intersecting(&env)
+            .map(|il| il.index)
+            .collect()
+    }
+
+    /// Query painter layer indices whose bounds are fully contained within the given rectangle.
+    /// This only includes layers that are completely inside the rectangle, not touching its edges.
+    pub fn contains(&self, rect: &Rectangle) -> Vec<usize> {
+        // Get layers that are fully contained
+        let env = AABB::from_corners(
+            [rect.x, rect.y],
+            [rect.x + rect.width, rect.y + rect.height],
+        );
+        self.layer_index
+            .locate_in_envelope(&env)
             .map(|il| il.index)
             .collect()
     }
