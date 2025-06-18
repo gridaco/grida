@@ -10,6 +10,7 @@ pub mod packing;
 pub mod range;
 pub mod raster;
 pub mod rect;
+pub mod region;
 pub mod snap;
 pub mod transform;
 pub mod ui;
@@ -54,6 +55,10 @@ pub use rect::{
     intersects, is_identical as rect_identical, is_uniform as rect_uniform, offset,
     pad as rect_pad, positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate,
     to_9points, to_9points_chunk, transform as rect_transform, union,
+};
+pub use region::{
+    Region, contains as region_contains, difference as region_difference,
+    intersects as region_intersects, subtract as region_subtract,
 };
 pub use snap::axis::{
     AxisAlignedPoint, Movement, Snap1DResult, Snap2DAxisAlignedResult, Snap2DAxisConfig,
