@@ -53,7 +53,7 @@ pub use rect::{
     get_scale_factors, get_uniform_gap as rect_get_uniform_gap, inset as rect_inset, intersection,
     intersects, is_identical as rect_identical, is_uniform as rect_uniform, offset,
     pad as rect_pad, positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate,
-    to_9points, to_9points_chunk, transform as rect_transform, union,
+    tile as rect_tile, to_9points, to_9points_chunk, transform as rect_transform, union,
 };
 pub use snap::axis::{
     AxisAlignedPoint, Movement, Snap1DResult, Snap2DAxisAlignedResult, Snap2DAxisConfig,
