@@ -22,7 +22,7 @@ const TILE_SIZE_PX: f32 = 512.0;
 /// Minimum zoom level to enable image caching
 const MIN_ZOOM_FOR_CACHE: f32 = 0.5;
 /// Debounce duration after zooming before capturing tiles
-const ZOOM_DEBOUNCE: Duration = Duration::from_millis(150);
+const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
 pub struct FramePlan {
     /// tile keys
@@ -181,6 +181,12 @@ impl Renderer {
         self.scene = Some(scene);
     }
 
+    pub fn should_cache_tiles(&self) -> bool {
+        self.zoom_changed_at
+            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
+            .unwrap_or(true)
+    }
+
     /// Render the currently loaded scene if any. and report the time it took.
     pub fn render(&mut self) -> Option<RenderStats> {
         let start = Instant::now();
@@ -208,11 +214,7 @@ impl Renderer {
             let encode_duration = start.elapsed();
 
             // update tile cache when zoom is stable
-            if self
-                .zoom_changed_at
-                .map(|t| t.elapsed() >= ZOOM_DEBOUNCE)
-                .unwrap_or(true)
-            {
+            if self.should_cache_tiles() {
                 self.update_tiles(surface, width, height);
             }
 
