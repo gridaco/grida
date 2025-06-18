@@ -18,14 +18,10 @@ use std::time::{Duration, Instant};
 pub struct FramePlan {
     /// tile rects
     pub tiles: Vec<rect::Rectangle>,
-    /// all layers that intersects with the bounds
-    pub indices: Vec<usize>,
-    /// indicies to be skipped from painting
-    pub indices_skip_paint: Vec<usize>,
-    /// indicies to be painted
-    pub indices_should_paint: Vec<usize>,
+    /// regions with their intersecting indices
+    pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
-    pub display_list_size: usize,
+    pub display_list_size_estimated: usize,
 }
 
 pub struct DrawResult {
@@ -57,11 +53,14 @@ impl Backend {
     }
 }
 
+type RectangleKey = (i32, i32, u32, u32);
+
 /// test rect in canvas space
 static TEST_RECT: math2::Rectangle = Rectangle {
     x: 5500.0,
     y: -4000.0,
-    width: 14279.0,
+    // width: 14279.0,
+    width: 9500.0,
     height: 17458.0,
 };
 
@@ -185,10 +184,11 @@ impl Renderer {
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
 
-            let tile_rects: &[math2::Rectangle] = if self.test_tile.is_none() {
-                &[]
+            let test_rects = [TEST_RECT];
+            let tile_rects: Option<&[math2::Rectangle]> = if self.test_tile.is_none() {
+                None
             } else {
-                &[TEST_RECT]
+                Some(&test_rects)
             };
 
             let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()), tile_rects);
@@ -199,13 +199,7 @@ impl Renderer {
             if rect.is_some() && self.test_tile.is_none() {
                 // if the test rect fully within the rect
                 let is_within = rect.unwrap().contains(&TEST_RECT);
-                // let is_within = math2::rect::contains(&rect.unwrap(), &TEST_RECT);
-                println!(
-                    "contains: {}, rect: {:?}, test_rect: {:?}",
-                    is_within,
-                    rect.unwrap(),
-                    TEST_RECT
-                );
+
                 if is_within {
                     // convert the test rect to screen (surface) space
                     let surface_rect = math2::rect::transform(
@@ -272,7 +266,6 @@ impl Renderer {
     fn with_recording_cached(
         &mut self,
         id: &NodeId,
-        // bounds: &rect::Rectangle,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         if let Some(pic) = self.scene_cache.picture.get_node_picture(id) {
@@ -293,43 +286,51 @@ impl Renderer {
     /// Plan the frame for rendering.
     /// Arguments:
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(&mut self, bounds: rect::Rectangle, tiles: &[rect::Rectangle]) -> FramePlan {
+    fn frame(&mut self, bounds: rect::Rectangle, tiles: Option<&[rect::Rectangle]>) -> FramePlan {
         let __before_ll = Instant::now();
 
-        // all layers intersects with the bounds
-        let mut intersects = self.scene_cache.intersects(bounds);
-        intersects.sort();
-        let ll_len = intersects.len();
+        let region = if let Some(tiles) = tiles {
+            // math2::rect::boolean::subtract(bounds, tiles[0])
+            vec![bounds]
+        } else {
+            vec![bounds]
+        };
 
-        // all layers that are fully contained within the tiles (holes)
-        let mut subtractions: HashSet<usize> = HashSet::new();
-        for hole in tiles {
-            subtractions.extend(self.scene_cache.contains(&hole));
+        println!("region: {:?}", region);
+
+        let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
+
+        // let mut intersections: std::collections::BTreeSet<usize> =
+        //     std::collections::BTreeSet::new();
+
+        for rect in region {
+            let mut indices = self.scene_cache.intersects(rect);
+
+            // TODO: sort is expensive
+            indices.sort();
+
+            regions.push((rect, indices));
         }
 
-        // all layers that should be painted
-        let mut indices = Vec::new();
-        for idx in &intersects {
-            if !subtractions.contains(&idx) {
-                indices.push(*idx);
-            }
-        }
+        // BTreeSet is already sorted, so we can just collect it
+        // let intersections: Vec<usize> = intersections.into_iter().collect();
+
+        let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
 
         let __ll_duration = __before_ll.elapsed();
 
         FramePlan {
-            indices: intersects.clone(),
-            tiles: tiles.to_vec(),
-            indices_skip_paint: subtractions.into_iter().collect(),
-            indices_should_paint: indices.clone(),
+            tiles: tiles.map(|t| t.to_vec()).unwrap_or_default(),
+            regions,
+            // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
-            display_list_size: ll_len,
+            display_list_size_estimated: ll_len,
         }
     }
 
     /// Draw the scene to the canvas.
     /// - canvas: the canvas to render to
-    /// - indices: the indices of the layers to draw
+    /// - plan: the frame plan
     /// - width: the width of the canvas
     /// - height: the height of the canvas
     fn draw(
@@ -362,7 +363,7 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        for tile in &plan.tiles {
+        for tile in plan.tiles.iter() {
             let image = self.test_tile.as_ref().unwrap();
             let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
             let dst = Rect::from_xywh(tile.x, tile.y, tile.width, tile.height);
@@ -375,15 +376,26 @@ impl Renderer {
             );
         }
 
-        for idx in &plan.indices_should_paint {
-            let layer = self.scene_cache.layers.layers[*idx].clone();
-            let picture = self.with_recording_cached(&layer.id(), |painter| {
-                painter.draw_layer(&layer);
-            });
+        for (region, indices) in &plan.regions {
+            for idx in indices {
+                let layer = self.scene_cache.layers.layers[*idx].clone();
+                let picture = self.with_recording_cached(&layer.id(), |painter| {
+                    painter.draw_layer(&layer);
+                });
 
-            if let Some(pic) = picture {
-                canvas.draw_picture(pic, None, None);
-                cache_picture_used += 1;
+                if let Some(pic) = picture {
+                    println!("clip rect {:?}", region);
+                    // clip to region
+                    canvas.save();
+                    canvas.clip_rect(
+                        Rect::new(region.x, region.y, region.width, region.height),
+                        None,
+                        true,
+                    );
+                    canvas.draw_picture(pic, None, None);
+                    canvas.restore();
+                    cache_picture_used += 1;
+                }
             }
         }
 

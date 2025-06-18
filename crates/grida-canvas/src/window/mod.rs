@@ -374,22 +374,22 @@ impl App {
         let __sleep_time = __sleep_start.elapsed();
 
         let __total_frame_time = __frame_start.elapsed();
-        println!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | q: {:?} | z: {:?}",
-            1.0 / __total_frame_time.as_secs_f64(),
-            __total_frame_time.as_secs_f64() * 1000.0,
-            stats.total_duration.as_secs_f64() * 1000.0,
-            stats.frame_duration.as_secs_f64() * 1000.0,
-            stats.flush_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_size,
-            stats.draw.painter_duration.as_secs_f64() * 1000.0,
-            stats.draw.cache_picture_size,
-            stats.draw.cache_picture_used,
-            stats.draw.cache_geometry_size,
-            __queue_time,
-            __sleep_time
-        );
+        // println!(
+        //     "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | q: {:?} | z: {:?}",
+        //     1.0 / __total_frame_time.as_secs_f64(),
+        //     __total_frame_time.as_secs_f64() * 1000.0,
+        //     stats.total_duration.as_secs_f64() * 1000.0,
+        //     stats.frame_duration.as_secs_f64() * 1000.0,
+        //     stats.flush_duration.as_secs_f64() * 1000.0,
+        //     stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+        //     stats.frame.display_list_size_estimated,
+        //     stats.draw.painter_duration.as_secs_f64() * 1000.0,
+        //     stats.draw.cache_picture_size,
+        //     stats.draw.cache_picture_used,
+        //     stats.draw.cache_geometry_size,
+        //     __queue_time,
+        //     __sleep_time
+        // );
 
         self.last_frame_time = __frame_start;
     }
