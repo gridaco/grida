@@ -456,63 +456,6 @@ impl Renderer {
             }
         }
     }
-
-    // if let Some(camera) = &self.camera {
-    //     let tc = &mut self.scene_cache.tile;
-    //     let raw_zoom = camera.get_zoom();
-    //     let rect = camera.rect();
-
-    //     // 1. get the quantized bounds / aligned to the tile size
-    //     let (level, zoom) = tc.quantize_zoom(raw_zoom);
-    //     // println!(
-    //     //     "raw_zoom: {}, level: {}, quantized_zoom: {}",
-    //     //     raw_zoom, level, zoom
-    //     // );
-
-    //     let q = math2::rect::quantize(rect, 512.0);
-    //     println!("rect: {:?}", q);
-
-    //     let size = tc.tile_world_size(zoom);
-    //     let start_col = (rect.x / size).floor() as i32;
-    //     let end_col = ((rect.x + rect.width) / size).ceil() as i32;
-    //     let start_row = (rect.y / size).floor() as i32;
-    //     let end_row = ((rect.y + rect.height) / size).ceil() as i32;
-
-    //     // println!(
-    //     //     "zoom: {}, rect: {:?} col: {}..{} row: {}..{} cells: {}",
-    //     //     zoom,
-    //     //     rect,
-    //     //     start_col,
-    //     //     end_col,
-    //     //     start_row,
-    //     //     end_row,
-    //     //     (end_col - start_col) * (end_row - start_row)
-    //     // );
-
-    //     // for col in start_col..end_col {
-    //     //     for row in start_row..end_row {
-    //     //         let key: (u8, i32, i32) = (level, col, row);
-    //     //         let subset = skia_safe::IRect::from_xywh(
-    //     //             col as i32 * size as i32,
-    //     //             row as i32 * size as i32,
-    //     //             size as i32,
-    //     //             size as i32,
-    //     //         );
-
-    //     //         if !tc.has(key) {
-    //     //             let image = surface.image_snapshot_with_bounds(subset);
-    //     //             // let image = image.make_subset(surface.direct_context().as_mut(), subset);
-    //     //             if let Some(image) = image {
-    //     //                 tc.insert_tile(key, image, (size, size), rect);
-    //     //             }
-
-    //     //             // println!("key: {:?}", key);
-    //     //         }
-    //     //     }
-    //     // }
-    //     // print the number of tiles
-    //     // println!("number of tiles: {}", tc.len());
-    // }
 }
 
 #[cfg(test)]
