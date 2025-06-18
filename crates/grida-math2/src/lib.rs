@@ -56,10 +56,7 @@ pub use rect::{
     pad as rect_pad, positive as rect_positive, quantize as rect_quantize, rotate as rect_rotate,
     to_9points, to_9points_chunk, transform as rect_transform, union,
 };
-pub use region::{
-    Region, contains as region_contains, difference as region_difference,
-    intersects as region_intersects, subtract as region_subtract,
-};
+pub use region::{Region, difference as region_difference, subtract as region_subtract};
 pub use snap::axis::{
     AxisAlignedPoint, Movement, Snap1DResult, Snap2DAxisAlignedResult, Snap2DAxisConfig,
     axis_locked_by_dominance, normalize as movement_normalize, snap1d, snap2d_axis_aligned,

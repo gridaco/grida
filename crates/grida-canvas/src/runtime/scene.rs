@@ -6,7 +6,9 @@ use crate::{
     repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
 };
-use math2::{Rectangle, rect};
+
+use math2;
+use math2::{Rectangle, rect, region};
 use skia_safe::{
     Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
@@ -289,19 +291,11 @@ impl Renderer {
     fn frame(&mut self, bounds: rect::Rectangle, tiles: Option<&[rect::Rectangle]>) -> FramePlan {
         let __before_ll = Instant::now();
 
-        let region = if let Some(tiles) = tiles {
-            // math2::rect::boolean::subtract(bounds, tiles[0])
-            vec![bounds]
-        } else {
-            vec![bounds]
-        };
+        let region = math2::region::difference(bounds, tiles.unwrap_or(&[]));
 
         println!("region: {:?}", region);
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
-
-        // let mut intersections: std::collections::BTreeSet<usize> =
-        //     std::collections::BTreeSet::new();
 
         for rect in region {
             let mut indices = self.scene_cache.intersects(rect);
@@ -311,9 +305,6 @@ impl Renderer {
 
             regions.push((rect, indices));
         }
-
-        // BTreeSet is already sorted, so we can just collect it
-        // let intersections: Vec<usize> = intersections.into_iter().collect();
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
 
@@ -388,9 +379,9 @@ impl Renderer {
                     // clip to region
                     canvas.save();
                     canvas.clip_rect(
-                        Rect::new(region.x, region.y, region.width, region.height),
+                        Rect::from_xywh(region.x, region.y, region.width, region.height),
                         None,
-                        true,
+                        false,
                     );
                     canvas.draw_picture(pic, None, None);
                     canvas.restore();

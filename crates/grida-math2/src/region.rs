@@ -51,16 +51,6 @@ impl Region {
     }
 }
 
-/// Returns `true` if two rectangles intersect or touch at the edges.
-pub fn intersects(a: &Rectangle, b: &Rectangle) -> bool {
-    rect::intersects(a, b)
-}
-
-/// Returns `true` if rectangle `a` fully contains rectangle `b`.
-pub fn contains(a: &Rectangle, b: &Rectangle) -> bool {
-    rect::contains(a, b)
-}
-
 /// Subtracts region `b` from region `a`, returning the remaining region.
 pub fn subtract(a: Region, b: Region) -> Region {
     let mut current = a.rectangles;
