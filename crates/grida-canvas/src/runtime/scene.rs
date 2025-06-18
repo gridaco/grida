@@ -8,8 +8,7 @@ use crate::{
     runtime::camera::Camera2D,
 };
 
-use math2;
-use math2::{Rectangle, rect, region};
+use math2::{self, rect, region};
 use skia_safe::{
     Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
@@ -17,6 +16,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+
+/// Screen space tile size in pixels
+const TILE_SIZE_PX: f32 = 512.0;
+/// Minimum zoom level to enable image caching
+const MIN_ZOOM_FOR_CACHE: f32 = 0.5;
+/// Debounce duration after zooming before capturing tiles
+const ZOOM_DEBOUNCE: Duration = Duration::from_millis(150);
 
 pub struct FramePlan {
     /// tile keys
@@ -32,6 +38,8 @@ pub struct DrawResult {
     pub cache_picture_used: usize,
     pub cache_picture_size: usize,
     pub cache_geometry_size: usize,
+    pub tiles_total: usize,
+    pub tiles_used: usize,
 }
 
 pub struct RenderStats {
@@ -57,13 +65,6 @@ impl Backend {
 }
 
 /// test rect in canvas space
-static TEST_RECT: math2::Rectangle = Rectangle {
-    x: 5500.0,
-    y: -4000.0,
-    // width: 14279.0,
-    width: 9500.0,
-    height: 17458.0,
-};
 
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
@@ -77,6 +78,8 @@ pub struct Renderer {
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
     tiles: HashMap<TileRectKey, Rc<Image>>,
+    prev_zoom: Option<f32>,
+    zoom_changed_at: Option<Instant>,
 }
 
 impl Renderer {
@@ -94,6 +97,8 @@ impl Renderer {
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
             tiles: HashMap::new(),
+            prev_zoom: None,
+            zoom_changed_at: None,
         }
     }
 
@@ -154,6 +159,15 @@ impl Renderer {
         if changed {
             self.prev_quantized_camera_transform = Some(quantized);
         }
+        let zoom = camera.get_zoom();
+        if self
+            .prev_zoom
+            .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
+        {
+            self.tiles.clear();
+            self.zoom_changed_at = Some(Instant::now());
+            self.prev_zoom = Some(zoom);
+        }
         self.camera = Some(camera);
         changed
     }
@@ -193,38 +207,13 @@ impl Renderer {
 
             let encode_duration = start.elapsed();
 
-            if rect.is_some() && self.tiles.is_empty() {
-                // if the test rect fully within the rect
-                let is_within = rect.unwrap().contains(&TEST_RECT);
-
-                if is_within {
-                    // convert the test rect to screen (surface) space
-                    let surface_rect = math2::rect::transform(
-                        TEST_RECT,
-                        &self.camera.as_ref().unwrap().view_matrix(),
-                    );
-
-                    println!("surface_rect: {:?}", surface_rect);
-                    //
-                    let image = surface.image_snapshot_with_bounds(IRect::from_xywh(
-                        surface_rect.x as i32,
-                        surface_rect.y as i32,
-                        surface_rect.width as i32,
-                        surface_rect.height as i32,
-                    ));
-                    if let Some(image) = image {
-                        self.tiles.insert(
-                            TileRectKey(
-                                TEST_RECT.x as i32,
-                                TEST_RECT.y as i32,
-                                TEST_RECT.width as u32,
-                                TEST_RECT.height as u32,
-                            ),
-                            Rc::new(image),
-                        );
-                    }
-                }
-                //
+            // update tile cache when zoom is stable
+            if self
+                .zoom_changed_at
+                .map(|t| t.elapsed() >= ZOOM_DEBOUNCE)
+                .unwrap_or(true)
+            {
+                self.update_tiles(surface, width, height);
             }
 
             self.flush();
@@ -407,8 +396,65 @@ impl Renderer {
             cache_picture_used,
             cache_picture_size: self.scene_cache.picture.len(),
             cache_geometry_size: self.scene_cache.geometry.len(),
+            tiles_total: self.tiles.len(),
+            tiles_used: plan.tiles.len(),
         }
         //
+    }
+
+    fn update_tiles(&mut self, surface: &mut Surface, width: f32, height: f32) {
+        let camera = match &self.camera {
+            Some(c) => c,
+            None => return,
+        };
+
+        let zoom = camera.get_zoom();
+        if zoom > MIN_ZOOM_FOR_CACHE {
+            return;
+        }
+
+        let world_size = TILE_SIZE_PX / zoom;
+        let rect = camera.rect();
+
+        let start_col = (rect.x / world_size).floor() as i32;
+        let end_col = ((rect.x + rect.width) / world_size).ceil() as i32;
+        let start_row = (rect.y / world_size).floor() as i32;
+        let end_row = ((rect.y + rect.height) / world_size).ceil() as i32;
+
+        for col in start_col..end_col {
+            for row in start_row..end_row {
+                let world_rect = rect::Rectangle {
+                    x: col as f32 * world_size,
+                    y: row as f32 * world_size,
+                    width: world_size,
+                    height: world_size,
+                };
+                let screen_rect = rect::transform(world_rect, &camera.view_matrix());
+
+                if screen_rect.x >= 0.0
+                    && screen_rect.y >= 0.0
+                    && screen_rect.x + screen_rect.width <= width
+                    && screen_rect.y + screen_rect.height <= height
+                {
+                    let key = TileRectKey(
+                        world_rect.x.round() as i32,
+                        world_rect.y.round() as i32,
+                        world_rect.width.round() as u32,
+                        world_rect.height.round() as u32,
+                    );
+                    if !self.tiles.contains_key(&key) {
+                        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
+                            screen_rect.x as i32,
+                            screen_rect.y as i32,
+                            TILE_SIZE_PX as i32,
+                            TILE_SIZE_PX as i32,
+                        )) {
+                            self.tiles.insert(key, Rc::new(image));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // if let Some(camera) = &self.camera {

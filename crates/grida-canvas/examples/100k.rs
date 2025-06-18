@@ -63,6 +63,6 @@ async fn demo_n_shapes(n: usize) -> Scene {
 
 #[tokio::main]
 async fn main() {
-    let scene = demo_n_shapes(10000).await;
+    let scene = demo_n_shapes(100000).await;
     window::run_demo_window(scene).await;
 }

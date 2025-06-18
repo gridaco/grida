@@ -375,7 +375,7 @@ impl App {
 
         let __total_frame_time = __frame_start.elapsed();
         println!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | q: {:?} | z: {:?}",
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
@@ -387,6 +387,8 @@ impl App {
             stats.draw.cache_picture_size,
             stats.draw.cache_picture_used,
             stats.draw.cache_geometry_size,
+            stats.draw.tiles_total,
+            stats.draw.tiles_used,
             __queue_time,
             __sleep_time
         );
