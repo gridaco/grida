@@ -281,6 +281,39 @@ pub fn union(rects: &[Rectangle]) -> Rectangle {
     }
 }
 
+/// Tiles the rectangle into a grid of equally sized rectangles.
+///
+/// The `size` parameter specifies the number of `(columns, rows)`.
+/// Each must evenly divide the rectangle's width and height respectively.
+///
+/// # Panics
+///
+/// Panics if the provided column or row count is zero or does not
+/// evenly divide the rectangle dimensions.
+pub fn tile(rect: Rectangle, size: (usize, usize)) -> Vec<Rectangle> {
+    let (cols, rows) = size;
+    assert!(cols > 0 && rows > 0, "size must be greater than zero");
+
+    let tile_w = rect.width / cols as f32;
+    let tile_h = rect.height / rows as f32;
+
+    assert!(tile_w.fract() == 0.0, "columns must evenly divide width");
+    assert!(tile_h.fract() == 0.0, "rows must evenly divide height");
+
+    let mut out = Vec::with_capacity(cols * rows);
+    for r in 0..rows {
+        for c in 0..cols {
+            out.push(Rectangle {
+                x: rect.x + c as f32 * tile_w,
+                y: rect.y + r as f32 * tile_h,
+                width: tile_w,
+                height: tile_h,
+            });
+        }
+    }
+    out
+}
+
 /// Boolean operations on rectangles.
 pub mod boolean {
     use super::{Rectangle, intersection};

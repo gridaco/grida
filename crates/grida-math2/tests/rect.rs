@@ -111,3 +111,19 @@ fn axis_projection_intersection_overlaps() {
     let inter = axis_projection_intersection(&rects, Axis::X);
     assert_eq!(inter, Some([15.0, 25.0]));
 }
+
+#[test]
+fn tile_basic() {
+    let r = rect(0.0, 0.0, 100.0, 40.0);
+    let out = math2::rect_tile(r, (2, 2));
+    assert_eq!(out.len(), 4);
+    assert_eq!(out[0], rect(0.0, 0.0, 50.0, 20.0));
+    assert_eq!(out[3], rect(50.0, 20.0, 50.0, 20.0));
+}
+
+#[test]
+#[should_panic]
+fn tile_invalid_divisor() {
+    let r = rect(0.0, 0.0, 100.0, 40.0);
+    let _ = math2::rect_tile(r, (3, 2));
+}
