@@ -63,6 +63,21 @@ use skia_safe::Image;
 use std::collections::HashMap;
 use std::time::Instant;
 
+/// x, y, w, h
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+pub struct TileRectKey(pub i32, pub i32, pub u32, pub u32);
+
+impl TileRectKey {
+    pub fn to_rect(&self) -> math2::Rectangle {
+        math2::Rectangle {
+            x: self.0 as f32,
+            y: self.1 as f32,
+            width: self.2 as f32,
+            height: self.3 as f32,
+        }
+    }
+}
+
 /// Tile key is a tuple of (zoom, col, row)
 type TileKey = (u8, i32, i32);
 

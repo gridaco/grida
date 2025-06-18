@@ -1,3 +1,4 @@
+use crate::cache::tile::TileRectKey;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{Painter, cvt};
@@ -13,13 +14,13 @@ use skia_safe::{
     Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 pub struct FramePlan {
-    /// tile rects
-    pub tiles: Vec<rect::Rectangle>,
+    /// tile keys
+    pub tiles: Vec<TileRectKey>,
     /// regions with their intersecting indices
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
@@ -55,8 +56,6 @@ impl Backend {
     }
 }
 
-type RectangleKey = (i32, i32, u32, u32);
-
 /// test rect in canvas space
 static TEST_RECT: math2::Rectangle = Rectangle {
     x: 5500.0,
@@ -77,7 +76,7 @@ pub struct Renderer {
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
-    test_tile: Option<Image>,
+    tiles: HashMap<TileRectKey, Rc<Image>>,
 }
 
 impl Renderer {
@@ -94,7 +93,7 @@ impl Renderer {
             image_repository,
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
-            test_tile: None,
+            tiles: HashMap::new(),
         }
     }
 
@@ -186,19 +185,15 @@ impl Renderer {
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
 
-            let test_rects = [TEST_RECT];
-            let tile_rects: Option<&[math2::Rectangle]> = if self.test_tile.is_none() {
-                None
-            } else {
-                Some(&test_rects)
-            };
-
-            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()), tile_rects);
+            let frame = self.frame(
+                rect.unwrap_or(rect::Rectangle::empty()),
+                &self.tiles.clone(),
+            );
             let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
 
-            if rect.is_some() && self.test_tile.is_none() {
+            if rect.is_some() && self.tiles.is_empty() {
                 // if the test rect fully within the rect
                 let is_within = rect.unwrap().contains(&TEST_RECT);
 
@@ -217,7 +212,17 @@ impl Renderer {
                         surface_rect.width as i32,
                         surface_rect.height as i32,
                     ));
-                    self.test_tile = image;
+                    if let Some(image) = image {
+                        self.tiles.insert(
+                            TileRectKey(
+                                TEST_RECT.x as i32,
+                                TEST_RECT.y as i32,
+                                TEST_RECT.width as u32,
+                                TEST_RECT.height as u32,
+                            ),
+                            Rc::new(image),
+                        );
+                    }
                 }
                 //
             }
@@ -288,12 +293,15 @@ impl Renderer {
     /// Plan the frame for rendering.
     /// Arguments:
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(&mut self, bounds: rect::Rectangle, tiles: Option<&[rect::Rectangle]>) -> FramePlan {
+    fn frame(
+        &mut self,
+        bounds: rect::Rectangle,
+        tiles: &HashMap<TileRectKey, Rc<Image>>,
+    ) -> FramePlan {
         let __before_ll = Instant::now();
 
-        let region = math2::region::difference(bounds, tiles.unwrap_or(&[]));
-
-        println!("region: {:?}", region);
+        let tile_rects: Vec<_> = tiles.keys().map(|k| k.to_rect()).collect();
+        let region = region::difference(bounds, &tile_rects);
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
@@ -311,7 +319,7 @@ impl Renderer {
         let __ll_duration = __before_ll.elapsed();
 
         FramePlan {
-            tiles: tiles.map(|t| t.to_vec()).unwrap_or_default(),
+            tiles: tiles.keys().cloned().collect(),
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
@@ -354,10 +362,11 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        for tile in plan.tiles.iter() {
-            let image = self.test_tile.as_ref().unwrap();
+        for tk in plan.tiles.iter() {
+            let image = self.tiles.get(tk);
+            let image = image.unwrap();
             let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-            let dst = Rect::from_xywh(tile.x, tile.y, tile.width, tile.height);
+            let dst = Rect::from_xywh(tk.0 as f32, tk.1 as f32, tk.2 as f32, tk.3 as f32);
             let paint = SkPaint::default();
             canvas.draw_image_rect(
                 image,
@@ -375,7 +384,6 @@ impl Renderer {
                 });
 
                 if let Some(pic) = picture {
-                    println!("clip rect {:?}", region);
                     // clip to region
                     canvas.save();
                     canvas.clip_rect(
