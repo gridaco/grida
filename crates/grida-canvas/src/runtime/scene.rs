@@ -429,6 +429,12 @@ impl Renderer {
                     width: world_size,
                     height: world_size,
                 };
+
+                // skip if no nodes intersect with the tile
+                if self.scene_cache.intersects(world_rect).is_empty() {
+                    continue;
+                }
+
                 let screen_rect = rect::transform(world_rect, &camera.view_matrix());
 
                 if screen_rect.x >= 0.0
