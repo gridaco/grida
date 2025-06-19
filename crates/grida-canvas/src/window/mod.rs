@@ -1,4 +1,5 @@
 pub mod fps;
+pub mod hit_overlay;
 pub mod scheduler;
 
 use crate::font_loader::FontLoader;
@@ -20,9 +21,10 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use math2::rect;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu};
+use skia_safe::{Rect, Surface, gpu};
 use std::{ffi::CString, num::NonZeroU32};
 use tokio::sync::mpsc;
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
@@ -438,6 +440,22 @@ impl App {
         unsafe {
             let surface = &mut *self.surface_ptr;
             fps::FpsMeter::draw(surface, fps);
+            let hit_rect = if let Some(id) = self.hit_result.as_ref() {
+                if let Some(bounds) = self.renderer.scene_cache().geometry.get_render_bounds(id) {
+                    let screen_rect = rect::transform(bounds, &self.camera.view_matrix());
+                    Some(Rect::from_xywh(
+                        screen_rect.x,
+                        screen_rect.y,
+                        screen_rect.width,
+                        screen_rect.height,
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            hit_overlay::HitOverlay::draw(surface, self.hit_result.as_deref().zip(hit_rect));
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {
                     direct.flush_and_submit();
