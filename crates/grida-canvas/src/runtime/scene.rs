@@ -182,6 +182,11 @@ impl Renderer {
         self.debug_tiles = debug;
     }
 
+    /// Returns `true` if tile debug rendering is enabled.
+    pub fn debug_tiles(&self) -> bool {
+        self.debug_tiles
+    }
+
     /// Request the next animation frame if one has not already been queued.
     pub fn request_animation_frame(&mut self) {
         if !self.raf_requested {
@@ -427,23 +432,6 @@ impl Renderer {
                 dst,
                 &paint,
             );
-            if self.debug_tiles {
-                let zoom = self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0);
-                let stroke_width = 1.0 / zoom;
-                let mut stroke = SkPaint::default();
-                stroke.set_style(skia_safe::paint::Style::Stroke);
-                stroke.set_color(skia_safe::Color::from_argb(0xFF, 0x00, 0xFF, 0x00));
-                stroke.set_stroke_width(stroke_width);
-                // shrink the rect so the full stroke is visible within the tile
-                let half = stroke_width * 0.5;
-                let rect = Rect::from_xywh(
-                    dst.left() + half,
-                    dst.top() + half,
-                    dst.width() - stroke_width,
-                    dst.height() - stroke_width,
-                );
-                canvas.draw_rect(rect, &stroke);
-            }
         }
 
         for (region, indices) in &plan.regions {

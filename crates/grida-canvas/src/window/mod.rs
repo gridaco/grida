@@ -2,6 +2,7 @@ pub mod fps;
 pub mod hit_overlay;
 pub mod ruler;
 pub mod scheduler;
+pub mod tile_overlay;
 
 use crate::font_loader::FontLoader;
 use crate::font_loader::FontMessage;
@@ -466,6 +467,13 @@ impl App {
                 None
             };
             hit_overlay::HitOverlay::draw(surface, self.hit_result.as_deref().zip(hit_rect));
+            if self.renderer.debug_tiles() {
+                tile_overlay::TileOverlay::draw(
+                    surface,
+                    &self.camera,
+                    self.renderer.scene_cache().tile.tiles(),
+                );
+            }
             ruler::Ruler::draw(surface, &self.camera);
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {
