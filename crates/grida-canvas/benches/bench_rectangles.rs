@@ -106,7 +106,7 @@ fn bench_rectangles(c: &mut Criterion) {
             );
 
             renderer.load_scene(scene);
-            renderer.render();
+            renderer.queue();
             renderer.free();
         })
     });
@@ -132,7 +132,7 @@ fn bench_rectangles(c: &mut Criterion) {
             );
 
             renderer.load_scene(scene);
-            renderer.render();
+            renderer.queue();
             renderer.free();
         })
     });
@@ -157,7 +157,7 @@ fn bench_rectangles(c: &mut Criterion) {
             );
 
             renderer.load_scene(scene);
-            renderer.render();
+            renderer.queue();
             renderer.free();
         })
     });
@@ -183,7 +183,7 @@ fn bench_rectangles(c: &mut Criterion) {
             );
 
             renderer.load_scene(scene);
-            renderer.render();
+            renderer.queue();
             renderer.free();
         })
     });
@@ -208,7 +208,7 @@ fn bench_rectangles(c: &mut Criterion) {
             );
 
             renderer.load_scene(scene);
-            renderer.render();
+            renderer.queue();
             renderer.free();
         })
     });

@@ -360,7 +360,7 @@ impl App {
         self.process_font_queue();
         let __queue_time = __queue_start.elapsed();
 
-        let stats = match self.renderer.render() {
+        let stats = match self.renderer.queue() {
             Some(t) => t,
             None => return,
         };
@@ -477,6 +477,12 @@ where
     let proxy = el.create_proxy();
 
     let mut renderer = Renderer::new();
+    renderer.set_raf_callback({
+        let proxy = proxy.clone();
+        move || {
+            let _ = proxy.send_event(());
+        }
+    });
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Initialize the image loader in lifecycle mode

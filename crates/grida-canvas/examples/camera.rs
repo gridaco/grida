@@ -249,7 +249,7 @@ fn main() {
 
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
-    renderer.render();
+    renderer.queue();
 
     // Benchmark rendering with camera transformations
     let mut frame_count = 0;
@@ -316,7 +316,7 @@ fn main() {
                 renderer.camera.as_mut().unwrap().set_position(x, y);
 
                 // Render the scene
-                renderer.render();
+                renderer.queue();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {
                     eprintln!("Error swapping buffers: {:?}", e);

@@ -17,6 +17,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+/// Callback type used to request a new frame.
+pub type RafCallback = Box<dyn Fn()>;
+
 pub struct FramePlan {
     /// tile keys
     pub tiles: Vec<TileRectKey>,
@@ -70,6 +73,8 @@ pub struct Renderer {
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
+    raf_callback: Option<RafCallback>,
+    raf_requested: bool,
 }
 
 impl Renderer {
@@ -86,6 +91,8 @@ impl Renderer {
             image_repository,
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
+            raf_callback: None,
+            raf_requested: false,
         }
     }
 
@@ -121,6 +128,25 @@ impl Renderer {
                 if let Some(mut direct_context) = gr_context.as_direct_context() {
                     direct_context.flush_and_submit();
                 }
+            }
+        }
+    }
+
+    /// Set a callback that will be invoked whenever the renderer wants to
+    /// schedule another frame.
+    pub fn set_raf_callback<F>(&mut self, cb: F)
+    where
+        F: Fn() + 'static,
+    {
+        self.raf_callback = Some(Box::new(cb));
+    }
+
+    /// Request the next animation frame if one has not already been queued.
+    pub fn request_animation_frame(&mut self) {
+        if !self.raf_requested {
+            if let Some(cb) = &self.raf_callback {
+                cb();
+                self.raf_requested = true;
             }
         }
     }
@@ -166,7 +192,7 @@ impl Renderer {
     }
 
     /// Render the currently loaded scene if any. and report the time it took.
-    pub fn render(&mut self) -> Option<RenderStats> {
+    pub fn queue(&mut self) -> Option<RenderStats> {
         let start = Instant::now();
 
         if self.scene.is_none() {
@@ -203,13 +229,15 @@ impl Renderer {
 
             let duration = start.elapsed();
 
-            return Some(RenderStats {
+            let stats = Some(RenderStats {
                 frame,
                 draw: paint,
                 frame_duration: encode_duration,
                 flush_duration: duration - encode_duration,
                 total_duration: duration,
             });
+            self.raf_requested = false;
+            return stats;
         }
 
         return None;
@@ -424,7 +452,7 @@ mod tests {
         let surface_ptr = Renderer::init_raster(100, 100);
         renderer.set_backend(Backend::Raster(surface_ptr));
         renderer.load_scene(scene);
-        renderer.render();
+        renderer.queue();
 
         let bounds = renderer
             .scene_cache
