@@ -188,7 +188,11 @@ async fn main() {
                         font_file.family, font_file.postscript_name
                     );
                     font_loader
-                        .load_font(&font_file.family, &font_file.url)
+                        .load_font_with_alias(
+                            &font_file.family,
+                            &font_file.postscript_name,
+                            &font_file.url,
+                        )
                         .await;
                     println!(
                         "✅ Font loaded: {} ({})",

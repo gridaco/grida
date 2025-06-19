@@ -102,7 +102,9 @@ impl ResourceRepository<Image> for ImageRepository {
 /// A repository for managing fonts.
 pub struct FontRepository {
     provider: TypefaceFontProvider,
-    fonts: HashMap<String, Vec<u8>>,
+    // Store multiple font data blobs under the same alias. Each alias typically
+    // represents a font family and may contain several style variants.
+    fonts: HashMap<String, Vec<Vec<u8>>>,
 }
 
 impl FontRepository {
@@ -113,17 +115,21 @@ impl FontRepository {
         }
     }
 
-    pub fn insert(&mut self, family: String, bytes: Vec<u8>) {
+    pub fn insert(&mut self, alias: String, bytes: Vec<u8>) {
         if let Some(tf) = FontMgr::new().new_from_data(&bytes, None) {
-            self.provider.register_typeface(tf, Some(family.as_str()));
+            self.provider.register_typeface(tf, Some(alias.as_str()));
         }
-        self.fonts.insert(family, bytes);
+        self.fonts.entry(alias).or_default().push(bytes);
     }
 
-    pub fn add(&mut self, bytes: &[u8], family: &str) {
+    pub fn add(&mut self, bytes: &[u8], alias: &str) {
         if let Some(tf) = FontMgr::new().new_from_data(bytes, None) {
-            self.provider.register_typeface(tf, Some(family));
+            self.provider.register_typeface(tf, Some(alias));
         }
+        self.fonts
+            .entry(alias.to_string())
+            .or_default()
+            .push(bytes.to_vec());
     }
 
     pub fn font_collection(&self) -> FontCollection {
@@ -133,26 +139,28 @@ impl FontRepository {
     }
 }
 
-impl ResourceRepository<Vec<u8>> for FontRepository {
+impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
     type Id = String;
-    type Iter<'a> = std::collections::hash_map::Iter<'a, String, Vec<u8>>;
+    type Iter<'a> = std::collections::hash_map::Iter<'a, String, Vec<Vec<u8>>>;
 
-    fn insert(&mut self, id: Self::Id, item: Vec<u8>) {
-        if let Some(tf) = FontMgr::new().new_from_data(&item, None) {
-            self.provider.register_typeface(tf, Some(id.as_str()));
+    fn insert(&mut self, id: Self::Id, item: Vec<Vec<u8>>) {
+        for bytes in item {
+            if let Some(tf) = FontMgr::new().new_from_data(&bytes, None) {
+                self.provider.register_typeface(tf, Some(id.as_str()));
+            }
+            self.fonts.entry(id.clone()).or_default().push(bytes);
         }
-        self.fonts.insert(id, item);
     }
 
-    fn get(&self, id: &Self::Id) -> Option<&Vec<u8>> {
+    fn get(&self, id: &Self::Id) -> Option<&Vec<Vec<u8>>> {
         self.fonts.get(id)
     }
 
-    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut Vec<u8>> {
+    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut Vec<Vec<u8>>> {
         self.fonts.get_mut(id)
     }
 
-    fn remove(&mut self, id: &Self::Id) -> Option<Vec<u8>> {
+    fn remove(&mut self, id: &Self::Id) -> Option<Vec<Vec<u8>>> {
         self.fonts.remove(id)
     }
 
@@ -161,7 +169,7 @@ impl ResourceRepository<Vec<u8>> for FontRepository {
     }
 
     fn len(&self) -> usize {
-        self.fonts.len()
+        self.fonts.values().map(|v| v.len()).sum()
     }
 
     fn is_empty(&self) -> bool {
@@ -190,9 +198,11 @@ mod tests {
     fn font_repository_basic() {
         let mut repo = FontRepository::new();
         repo.insert("f1".to_string(), vec![0u8; 4]);
+        repo.insert("f1".to_string(), vec![1u8; 4]);
         assert!(repo.get(&"f1".to_string()).is_some());
-        assert_eq!(repo.len(), 1);
+        assert_eq!(repo.len(), 2);
         repo.remove(&"f1".to_string());
-        assert!(repo.is_empty());
+        assert_eq!(repo.len(), 0);
+        assert!(repo.get(&"f1".to_string()).is_none());
     }
 }

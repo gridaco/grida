@@ -106,10 +106,10 @@ impl Renderer {
         self.backend = Some(backend);
     }
 
-    pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
+    pub fn add_font(&mut self, alias: &str, bytes: &[u8]) {
         self.font_repository
             .borrow_mut()
-            .insert(family.to_string(), bytes.to_vec());
+            .insert(alias.to_string(), bytes.to_vec());
     }
 
     /// Create an image from raw encoded bytes.
