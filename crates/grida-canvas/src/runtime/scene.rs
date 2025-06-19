@@ -101,6 +101,11 @@ impl Renderer {
         }
     }
 
+    /// Access the cached scene data.
+    pub fn scene_cache(&self) -> &cache::scene::SceneCache {
+        &self.scene_cache
+    }
+
     pub fn init_raster(width: i32, height: i32) -> *mut Surface {
         let surface =
             surfaces::raster_n32_premul((width, height)).expect("Failed to create raster surface");

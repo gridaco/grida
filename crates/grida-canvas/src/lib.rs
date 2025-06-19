@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod font_loader;
+pub mod hit_test;
 pub mod image_loader;
 pub mod io;
 pub mod node;

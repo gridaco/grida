@@ -1,5 +1,5 @@
 use crate::node::schema::Size;
-use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform};
+use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform, vector2};
 
 /// A 2D camera that defines how world-space content is projected onto the screen.
 ///
@@ -113,5 +113,14 @@ impl Camera2D {
             .inverse()
             .unwrap_or_else(AffineTransform::identity);
         rect::transform(vp, &inv)
+    }
+
+    /// Converts a screen-space point to canvas coordinates using the inverse view matrix.
+    pub fn screen_to_canvas_point(&self, screen: vector2::Vector2) -> vector2::Vector2 {
+        let inv = self
+            .view_matrix()
+            .inverse()
+            .unwrap_or_else(AffineTransform::identity);
+        vector2::transform(screen, &inv)
     }
 }
