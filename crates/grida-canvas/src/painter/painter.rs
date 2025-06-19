@@ -720,7 +720,11 @@ fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     let font_style = skia_safe::FontStyle::new(
         skia_safe::font_style::Weight::from(text_style.font_weight.value() as i32),
         skia_safe::font_style::Width::NORMAL,
-        skia_safe::font_style::Slant::Upright,
+        if text_style.italic {
+            skia_safe::font_style::Slant::Italic
+        } else {
+            skia_safe::font_style::Slant::Upright
+        },
     );
     ts.set_font_style(font_style);
     ts

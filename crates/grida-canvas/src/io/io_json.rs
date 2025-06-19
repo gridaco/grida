@@ -379,6 +379,7 @@ impl From<IOTextNode> for TextSpanNode {
                 font_family: node.font_family.unwrap_or_else(|| "Inter".to_string()),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
+                italic: false,
                 letter_spacing: node.letter_spacing,
                 line_height: node.line_height,
                 text_transform: TextTransform::None,

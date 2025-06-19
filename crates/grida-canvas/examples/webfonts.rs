@@ -29,6 +29,7 @@ async fn demo_webfonts() -> Scene {
         font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
         letter_spacing: None,
+        italic: false,
         line_height: None,
         text_transform: TextTransform::None,
     };
@@ -50,6 +51,7 @@ async fn demo_webfonts() -> Scene {
         font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
+        italic: false,
         line_height: Some(1.5), // 1.5 line height for better readability
         text_transform: TextTransform::None,
     };
@@ -78,7 +80,7 @@ async fn demo_webfonts() -> Scene {
         ("BlackItalic", 900, true),
     ];
 
-    for (i, (variant, weight, _is_italic)) in variants.iter().enumerate() {
+    for (i, (variant, weight, is_italic)) in variants.iter().enumerate() {
         let mut text_node = nf.create_text_span_node();
         text_node.base.name = format!("Albert Sans {}", variant);
         text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
@@ -93,6 +95,7 @@ async fn demo_webfonts() -> Scene {
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),
             letter_spacing: None,
+            italic: *is_italic,
             line_height: None,
             text_transform: TextTransform::None,
         };

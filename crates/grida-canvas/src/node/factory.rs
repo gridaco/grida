@@ -111,6 +111,7 @@ impl NodeFactory {
                 font_family: String::from("Arial"),
                 font_size: 16.0,
                 font_weight: FontWeight::default(),
+                italic: false,
                 letter_spacing: None,
                 line_height: None,
                 text_transform: TextTransform::None,

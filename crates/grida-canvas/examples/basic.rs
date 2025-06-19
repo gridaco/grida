@@ -1,6 +1,6 @@
 use cg::node::factory::NodeFactory;
-use cg::node::schema::*;
 use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
 use cg::window;
 use math2::transform::AffineTransform;
 
@@ -137,6 +137,7 @@ async fn demo_basic() -> Scene {
         font_family: font_caveat_family.clone(),
         font_size: 32.0,
         font_weight: FontWeight::new(900),
+        italic: false,
         letter_spacing: None,
         line_height: None,
         text_transform: TextTransform::None,

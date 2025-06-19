@@ -873,6 +873,7 @@ impl FigmaConverter {
                 font_size: style.font_size.unwrap_or(14.0) as f32,
                 font_weight: FontWeight::new(style.font_weight.unwrap_or(400.0) as u32),
                 letter_spacing: style.letter_spacing.map(|v| v as f32),
+                italic: style.italic.unwrap_or(false),
                 line_height: style.line_height_px.map(|v| v as f32),
                 text_transform: match origin.style.text_case.as_ref() {
                     Some(figma_api::models::type_style::TextCase::Upper) => {

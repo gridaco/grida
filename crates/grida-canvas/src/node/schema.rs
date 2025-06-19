@@ -326,6 +326,9 @@ pub struct TextStyle {
     /// Font weight (100–900).
     pub font_weight: FontWeight,
 
+    /// Font italic style.
+    pub italic: bool,
+
     /// Additional spacing between characters, in logical pixels.  
     /// Default is `0.0`.
     pub letter_spacing: Option<f32>,
