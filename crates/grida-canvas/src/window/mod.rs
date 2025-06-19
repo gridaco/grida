@@ -408,7 +408,7 @@ impl App {
 
     /// Hit test the current cursor position and store the result.
     fn perform_hit_test(&mut self) {
-        const HIT_TEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+        const HIT_TEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
         if self.last_hit_test.elapsed() < HIT_TEST_INTERVAL {
             return;
         }
@@ -417,7 +417,12 @@ impl App {
         let camera = &self.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
         let tester = crate::hit_test::HitTester::new(self.renderer.scene_cache());
-        self.hit_result = tester.hit_first(point);
+
+        let new_hit_result = tester.hit_first(point);
+        if self.hit_result != new_hit_result {
+            self.renderer.queue();
+        }
+        self.hit_result = new_hit_result;
     }
 
     fn redraw(&mut self) {
