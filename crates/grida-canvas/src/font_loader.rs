@@ -32,7 +32,13 @@ pub enum FontLoadingMode {
 /// Message type for font loading
 #[derive(Debug, Clone)]
 pub struct FontMessage {
+    /// Alias used to register the font inside the renderer's repository.
+    pub alias: String,
+    /// The actual font family name. This is passed to Skia when registering the
+    /// typeface so that multiple weights or styles can be grouped under the same
+    /// family.
     pub family: String,
+    /// Raw font bytes.
     pub data: Vec<u8>,
 }
 
@@ -65,10 +71,18 @@ impl FontLoader {
         Self::new(FontLoadingMode::Lifecycle { tx, proxy })
     }
 
-    /// Load a font from a URL or file path
-    pub async fn load_font(&mut self, family: &str, src: &str) -> Option<Vec<u8>> {
-        // Check cache first
-        if let Some(data) = self.cache.get(family) {
+    /// Load a font from a URL or file path using an alias and the actual family
+    /// name. The alias is used as the identifier within the cache and the
+    /// renderer's font repository. `family` is passed to Skia so that multiple
+    /// aliases can belong to the same font family.
+    pub async fn load_font_with_alias(
+        &mut self,
+        alias: &str,
+        family: &str,
+        src: &str,
+    ) -> Option<Vec<u8>> {
+        // Check cache first using the alias
+        if let Some(data) = self.cache.get(alias) {
             return Some(data.clone());
         }
 
@@ -82,12 +96,13 @@ impl FontLoader {
         };
 
         // Cache the data
-        self.cache.insert(family.to_string(), data.clone());
+        self.cache.insert(alias.to_string(), data.clone());
 
         // If in lifecycle mode, send the font data through the channel
         #[cfg(not(target_arch = "wasm32"))]
         if let FontLoadingMode::Lifecycle { tx, proxy } = &self.mode {
             let _ = tx.send(FontMessage {
+                alias: alias.to_string(),
                 family: family.to_string(),
                 data: data.clone(),
             });
@@ -95,6 +110,11 @@ impl FontLoader {
         }
 
         Some(data)
+    }
+
+    /// Convenience method where the alias and family are identical.
+    pub async fn load_font(&mut self, family: &str, src: &str) -> Option<Vec<u8>> {
+        self.load_font_with_alias(family, family, src).await
     }
 
     /// Fetch font data from URL or file

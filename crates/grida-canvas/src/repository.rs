@@ -102,7 +102,10 @@ impl ResourceRepository<Image> for ImageRepository {
 /// A repository for managing fonts.
 pub struct FontRepository {
     provider: TypefaceFontProvider,
+    // alias -> font bytes
     fonts: HashMap<String, Vec<u8>>,
+    // alias -> family mapping
+    families: HashMap<String, String>,
 }
 
 impl FontRepository {
@@ -110,20 +113,33 @@ impl FontRepository {
         Self {
             provider: TypefaceFontProvider::new(),
             fonts: HashMap::new(),
+            families: HashMap::new(),
         }
     }
 
-    pub fn insert(&mut self, family: String, bytes: Vec<u8>) {
+    /// Insert a font with a custom alias and family name.
+    pub fn insert_with_alias(&mut self, alias: String, family: String, bytes: Vec<u8>) {
         if let Some(tf) = FontMgr::new().new_from_data(&bytes, None) {
             self.provider.register_typeface(tf, Some(family.as_str()));
         }
-        self.fonts.insert(family, bytes);
+        self.families.insert(alias.clone(), family);
+        self.fonts.insert(alias, bytes);
+    }
+
+    /// Insert a font where the alias and family are the same.
+    pub fn insert(&mut self, family: String, bytes: Vec<u8>) {
+        self.insert_with_alias(family.clone(), family, bytes);
     }
 
     pub fn add(&mut self, bytes: &[u8], family: &str) {
         if let Some(tf) = FontMgr::new().new_from_data(bytes, None) {
             self.provider.register_typeface(tf, Some(family));
         }
+    }
+
+    /// Get the family name associated with a given alias.
+    pub fn family_of(&self, alias: &str) -> Option<&String> {
+        self.families.get(alias)
     }
 
     pub fn font_collection(&self) -> FontCollection {
@@ -141,6 +157,7 @@ impl ResourceRepository<Vec<u8>> for FontRepository {
         if let Some(tf) = FontMgr::new().new_from_data(&item, None) {
             self.provider.register_typeface(tf, Some(id.as_str()));
         }
+        self.families.insert(id.clone(), id.clone());
         self.fonts.insert(id, item);
     }
 
@@ -153,6 +170,7 @@ impl ResourceRepository<Vec<u8>> for FontRepository {
     }
 
     fn remove(&mut self, id: &Self::Id) -> Option<Vec<u8>> {
+        self.families.remove(id);
         self.fonts.remove(id)
     }
 
@@ -193,6 +211,19 @@ mod tests {
         assert!(repo.get(&"f1".to_string()).is_some());
         assert_eq!(repo.len(), 1);
         repo.remove(&"f1".to_string());
+        assert!(repo.is_empty());
+    }
+
+    #[test]
+    fn font_repository_aliases() {
+        let mut repo = FontRepository::new();
+        repo.insert_with_alias("a1".to_string(), "fam".to_string(), vec![0u8; 2]);
+        repo.insert_with_alias("a2".to_string(), "fam".to_string(), vec![1u8; 2]);
+        assert_eq!(repo.len(), 2);
+        assert_eq!(repo.family_of("a1"), Some(&"fam".to_string()));
+        assert_eq!(repo.family_of("a2"), Some(&"fam".to_string()));
+        repo.remove(&"a1".to_string());
+        repo.remove(&"a2".to_string());
         assert!(repo.is_empty());
     }
 }

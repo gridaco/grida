@@ -341,10 +341,12 @@ impl App {
         let mut updated = false;
         let mut font_count = 0;
         while let Ok(msg) = self.font_rx.try_recv() {
-            // Use postscript name as alias if available, otherwise fallback to family
-            let alias = &msg.family;
-            self.renderer.add_font(alias, &msg.data);
-            println!("📝 Registered font with renderer: '{}'", alias);
+            self.renderer
+                .add_font_with_alias(&msg.alias, &msg.family, &msg.data);
+            println!(
+                "📝 Registered font with renderer: '{}' (family '{}')",
+                msg.alias, msg.family
+            );
             font_count += 1;
             updated = true;
         }
@@ -369,8 +371,18 @@ impl App {
         if total_fonts > 0 {
             println!("\n📋 Registered fonts:");
             println!("-------------------");
-            for (i, (family_name, font_data)) in font_repo.iter().enumerate() {
-                println!("  {}. {} ({} bytes)", i + 1, family_name, font_data.len());
+            for (i, (alias, font_data)) in font_repo.iter().enumerate() {
+                let family = font_repo
+                    .family_of(alias)
+                    .cloned()
+                    .unwrap_or_else(|| alias.to_string());
+                println!(
+                    "  {}. {} -> '{}' ({} bytes)",
+                    i + 1,
+                    alias,
+                    family,
+                    font_data.len()
+                );
             }
         }
         println!("✅ Font repository information printed");

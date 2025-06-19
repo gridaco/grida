@@ -106,10 +106,16 @@ impl Renderer {
         self.backend = Some(backend);
     }
 
+    pub fn add_font_with_alias(&mut self, alias: &str, family: &str, bytes: &[u8]) {
+        self.font_repository.borrow_mut().insert_with_alias(
+            alias.to_string(),
+            family.to_string(),
+            bytes.to_vec(),
+        );
+    }
+
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
-        self.font_repository
-            .borrow_mut()
-            .insert(family.to_string(), bytes.to_vec());
+        self.add_font_with_alias(family, family, bytes);
     }
 
     /// Create an image from raw encoded bytes.
