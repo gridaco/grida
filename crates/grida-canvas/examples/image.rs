@@ -6,26 +6,29 @@ use math2::{box_fit::BoxFit, transform::AffineTransform};
 
 async fn demo_image() -> Scene {
     let nf = NodeFactory::new();
-    let image4k = "resources/4k.jpg".to_string();
+    // let image4k = "resources/4k.jpg".to_string();
+    // let image4ksize = Size {
+    //     width: 4000.0,
+    //     height: 6000.0,
+    // };
+    let image8k = "resources/8k.jpg".to_string();
+    let image8ksize = Size {
+        width: 8070.0,
+        height: 5196.0,
+    };
 
     // Root container
     let mut root = nf.create_container_node();
     root.base.name = "Root".to_string();
-    root.size = Size {
-        width: 4000.0,
-        height: 6000.0,
-    };
+    root.size = image8ksize.clone();
 
     // First example: Rectangle with ImagePaint fill
     let mut rect1 = nf.create_rectangle_node();
     rect1.base.name = "ImageFillRect".to_string();
     rect1.transform = AffineTransform::identity();
-    rect1.size = Size {
-        width: 4000.0,
-        height: 6000.0,
-    };
+    rect1.size = image8ksize.clone();
     rect1.fill = Paint::Image(ImagePaint {
-        _ref: image4k.clone(),
+        _ref: image8k.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
