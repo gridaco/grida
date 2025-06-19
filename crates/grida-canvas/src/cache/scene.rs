@@ -1,4 +1,5 @@
 use crate::node::schema::{NodeId, Scene};
+use crate::runtime::camera::Camera2D;
 use crate::{
     cache::{
         geometry::GeometryCache,
@@ -9,7 +10,7 @@ use crate::{
 };
 use math2::rect::Rectangle;
 use rstar::{AABB, RTree, RTreeObject};
-use skia_safe::Picture;
+use skia_safe::{Picture, Surface};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexedLayer {
@@ -132,5 +133,25 @@ impl SceneCache {
             .locate_in_envelope(&env)
             .map(|il| il.index)
             .collect()
+    }
+
+    /// Update raster tile cache using the given camera and surface.
+    pub fn update_tiles(
+        &mut self,
+        camera: &Camera2D,
+        surface: &mut Surface,
+        width: f32,
+        height: f32,
+    ) {
+        let index = &self.layer_index;
+        let intersects = |rect: Rectangle| {
+            let env = AABB::from_corners(
+                [rect.x, rect.y],
+                [rect.x + rect.width, rect.y + rect.height],
+            );
+            index.locate_in_envelope_intersecting(&env).next().is_some()
+        };
+        self.tile
+            .update_tiles(camera, width, height, surface, intersects);
     }
 }

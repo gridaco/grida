@@ -10,19 +10,12 @@ use crate::{
 
 use math2::{self, rect, region};
 use skia_safe::{
-    Canvas, IRect, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
+    Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-
-/// Screen space tile size in pixels
-const TILE_SIZE_PX: f32 = 512.0;
-/// Minimum zoom level to enable image caching
-const MIN_ZOOM_FOR_CACHE: f32 = 0.5;
-/// Debounce duration after zooming before capturing tiles
-const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
 pub struct FramePlan {
     /// tile keys
@@ -77,9 +70,6 @@ pub struct Renderer {
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
-    tiles: HashMap<TileRectKey, Rc<Image>>,
-    prev_zoom: Option<f32>,
-    zoom_changed_at: Option<Instant>,
 }
 
 impl Renderer {
@@ -96,9 +86,6 @@ impl Renderer {
             image_repository,
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
-            tiles: HashMap::new(),
-            prev_zoom: None,
-            zoom_changed_at: None,
         }
     }
 
@@ -160,14 +147,7 @@ impl Renderer {
             self.prev_quantized_camera_transform = Some(quantized);
         }
         let zoom = camera.get_zoom();
-        if self
-            .prev_zoom
-            .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
-        {
-            self.tiles.clear();
-            self.zoom_changed_at = Some(Instant::now());
-            self.prev_zoom = Some(zoom);
-        }
+        self.scene_cache.tile.update_zoom(zoom);
         self.camera = Some(camera);
         changed
     }
@@ -182,9 +162,7 @@ impl Renderer {
     }
 
     pub fn should_cache_tiles(&self) -> bool {
-        self.zoom_changed_at
-            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
-            .unwrap_or(true)
+        self.scene_cache.tile.should_cache_tiles()
     }
 
     /// Render the currently loaded scene if any. and report the time it took.
@@ -207,7 +185,7 @@ impl Renderer {
 
             let frame = self.frame(
                 rect.unwrap_or(rect::Rectangle::empty()),
-                &self.tiles.clone(),
+                &self.scene_cache.tile.tiles().clone(),
             );
             let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
@@ -215,7 +193,10 @@ impl Renderer {
 
             // update tile cache when zoom is stable
             if self.should_cache_tiles() {
-                self.update_tiles(surface, width, height);
+                if let Some(camera) = &self.camera {
+                    self.scene_cache
+                        .update_tiles(camera, surface, width, height);
+                }
             }
 
             self.flush();
@@ -354,7 +335,7 @@ impl Renderer {
         }
 
         for tk in plan.tiles.iter() {
-            let image = self.tiles.get(tk);
+            let image = self.scene_cache.tile.tiles().get(tk);
             let image = image.unwrap();
             let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
             let dst = Rect::from_xywh(tk.0 as f32, tk.1 as f32, tk.2 as f32, tk.3 as f32);
@@ -398,71 +379,10 @@ impl Renderer {
             cache_picture_used,
             cache_picture_size: self.scene_cache.picture.len(),
             cache_geometry_size: self.scene_cache.geometry.len(),
-            tiles_total: self.tiles.len(),
+            tiles_total: self.scene_cache.tile.tiles().len(),
             tiles_used: plan.tiles.len(),
         }
         //
-    }
-
-    fn update_tiles(&mut self, surface: &mut Surface, width: f32, height: f32) {
-        let camera = match &self.camera {
-            Some(c) => c,
-            None => return,
-        };
-
-        let zoom = camera.get_zoom();
-        if zoom > MIN_ZOOM_FOR_CACHE {
-            return;
-        }
-
-        let world_size = TILE_SIZE_PX / zoom;
-        let rect = camera.rect();
-
-        let start_col = (rect.x / world_size).floor() as i32;
-        let end_col = ((rect.x + rect.width) / world_size).ceil() as i32;
-        let start_row = (rect.y / world_size).floor() as i32;
-        let end_row = ((rect.y + rect.height) / world_size).ceil() as i32;
-
-        for col in start_col..end_col {
-            for row in start_row..end_row {
-                let world_rect = rect::Rectangle {
-                    x: col as f32 * world_size,
-                    y: row as f32 * world_size,
-                    width: world_size,
-                    height: world_size,
-                };
-
-                // skip if no nodes intersect with the tile
-                if self.scene_cache.intersects(world_rect).is_empty() {
-                    continue;
-                }
-
-                let screen_rect = rect::transform(world_rect, &camera.view_matrix());
-
-                if screen_rect.x >= 0.0
-                    && screen_rect.y >= 0.0
-                    && screen_rect.x + screen_rect.width <= width
-                    && screen_rect.y + screen_rect.height <= height
-                {
-                    let key = TileRectKey(
-                        world_rect.x.round() as i32,
-                        world_rect.y.round() as i32,
-                        world_rect.width.round() as u32,
-                        world_rect.height.round() as u32,
-                    );
-                    if !self.tiles.contains_key(&key) {
-                        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
-                            screen_rect.x as i32,
-                            screen_rect.y as i32,
-                            TILE_SIZE_PX as i32,
-                            TILE_SIZE_PX as i32,
-                        )) {
-                            self.tiles.insert(key, Rc::new(image));
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
