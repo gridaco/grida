@@ -1,5 +1,6 @@
 pub mod fps;
 pub mod hit_overlay;
+pub mod ruler;
 pub mod scheduler;
 
 use crate::font_loader::FontLoader;
@@ -439,9 +440,13 @@ impl App {
             None => return,
         };
 
+        let mut overlay_flush_time = std::time::Duration::ZERO;
+        let mut overlay_draw_time = std::time::Duration::ZERO;
+
         // fps meter
         let fps = self.scheduler.average_fps();
         unsafe {
+            let __overlay_start = std::time::Instant::now();
             let surface = &mut *self.surface_ptr;
             fps::FpsMeter::draw(surface, fps);
             let hit_rect = if let Some(id) = self.hit_result.as_ref() {
@@ -460,11 +465,15 @@ impl App {
                 None
             };
             hit_overlay::HitOverlay::draw(surface, self.hit_result.as_deref().zip(hit_rect));
+            ruler::Ruler::draw(surface, &self.camera);
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {
+                    let __overlay_flush_start = std::time::Instant::now();
                     direct.flush_and_submit();
+                    overlay_flush_time = __overlay_flush_start.elapsed();
                 }
             }
+            overlay_draw_time = __overlay_start.elapsed();
         }
 
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
@@ -478,11 +487,12 @@ impl App {
 
         let __total_frame_time = __frame_start.elapsed();
         println!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
             stats.flush_duration.as_secs_f64() * 1000.0,
+            (overlay_flush_time.as_secs_f64() + overlay_draw_time.as_secs_f64()) * 1000.0,
             stats.frame_duration.as_secs_f64() * 1000.0,
             stats.frame.display_list_duration.as_secs_f64() * 1000.0,
             stats.frame.display_list_size_estimated,
