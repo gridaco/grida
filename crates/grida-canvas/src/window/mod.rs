@@ -5,6 +5,7 @@ use crate::font_loader::FontMessage;
 use crate::image_loader::ImageMessage;
 use crate::image_loader::{ImageLoader, load_scene_images};
 use crate::node::schema::*;
+use crate::repository::ResourceRepository;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
 use console_error_panic_hook::set_once as init_panic_hook;
@@ -338,17 +339,41 @@ impl App {
 
     fn process_font_queue(&mut self) {
         let mut updated = false;
+        let mut font_count = 0;
         while let Ok(msg) = self.font_rx.try_recv() {
             // Use postscript name as alias if available, otherwise fallback to family
             let alias = &msg.family;
             self.renderer.add_font(alias, &msg.data);
             println!("📝 Registered font with renderer: '{}'", alias);
-
+            font_count += 1;
             updated = true;
         }
         if updated {
             self.renderer.invalidate_cache();
+
+            // Print font repository information after processing fonts
+            if font_count > 0 {
+                self.print_font_repository_info();
+            }
         }
+    }
+
+    fn print_font_repository_info(&self) {
+        let font_repo = self.renderer.font_repository.borrow();
+        let total_fonts = font_repo.len();
+
+        println!("\n🔍 Font Repository Status:");
+        println!("===========================");
+        println!("Total fonts in repository: {}", total_fonts);
+
+        if total_fonts > 0 {
+            println!("\n📋 Registered fonts:");
+            println!("-------------------");
+            for (i, (family_name, font_data)) in font_repo.iter().enumerate() {
+                println!("  {}. {} ({} bytes)", i + 1, family_name, font_data.len());
+            }
+        }
+        println!("✅ Font repository information printed");
     }
 
     fn redraw(&mut self) {

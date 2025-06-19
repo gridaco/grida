@@ -1,7 +1,8 @@
 use cg::font_loader::FontLoader;
 use cg::node::factory::NodeFactory;
-use cg::node::schema::*;
 use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::repository::ResourceRepository;
 use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::window;
 use math2::transform::AffineTransform;
@@ -77,7 +78,7 @@ async fn demo_webfonts() -> Scene {
         ("BlackItalic", 900, true),
     ];
 
-    for (i, (variant, weight, is_italic)) in variants.iter().enumerate() {
+    for (i, (variant, weight, _is_italic)) in variants.iter().enumerate() {
         let mut text_node = nf.create_text_span_node();
         text_node.base.name = format!("Albert Sans {}", variant);
         text_node.transform = AffineTransform::new(50.0, 280.0 + (i as f32 * 40.0), 0.0);
@@ -195,6 +196,11 @@ async fn main() {
                     );
                 }
                 println!("✅ Scene fonts loading completed in background");
+                println!("\n🔍 Font Repository Information:");
+                println!("================================");
+                println!("All fonts have been loaded and sent to the renderer.");
+                println!("Check the console output above for registration messages.");
+                println!("The renderer's font repository now contains the loaded fonts.");
             });
         },
     )
