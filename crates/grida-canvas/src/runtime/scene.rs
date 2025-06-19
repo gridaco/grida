@@ -300,7 +300,16 @@ impl Renderer {
     ) -> FramePlan {
         let __before_ll = Instant::now();
 
-        let tile_rects: Vec<_> = tiles.keys().map(|k| k.to_rect()).collect();
+        // filter tiles that intersect with the current viewport bounds
+        let mut visible_tiles: Vec<TileRectKey> = Vec::new();
+        let mut tile_rects: Vec<_> = Vec::new();
+        for k in tiles.keys() {
+            let rect = k.to_rect();
+            if rect::intersects(&rect, &bounds) {
+                visible_tiles.push(*k);
+                tile_rects.push(rect);
+            }
+        }
         let region = region::difference(bounds, &tile_rects);
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
@@ -319,7 +328,7 @@ impl Renderer {
         let __ll_duration = __before_ll.elapsed();
 
         FramePlan {
-            tiles: tiles.keys().cloned().collect(),
+            tiles: visible_tiles,
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
@@ -466,5 +475,32 @@ mod tests {
         assert_eq!(cull.height(), bounds.height);
 
         renderer.free();
+    }
+
+    #[test]
+    fn frame_filters_tiles_outside_viewport() {
+        let mut renderer = Renderer::new();
+
+        // create a dummy tile image
+        let mut surface = skia_safe::surfaces::raster_n32_premul((10, 10)).unwrap();
+        let image = surface.image_snapshot();
+
+        let mut tiles: HashMap<TileRectKey, Rc<Image>> = HashMap::new();
+        // tile intersecting the viewport
+        tiles.insert(TileRectKey(0, 0, 512, 512), Rc::new(image.clone()));
+        // tile completely outside the viewport
+        tiles.insert(TileRectKey(600, 600, 512, 512), Rc::new(image));
+
+        let bounds = rect::Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+
+        let plan = renderer.frame(bounds, &tiles);
+
+        assert_eq!(plan.tiles.len(), 1);
+        assert_eq!(plan.tiles[0], TileRectKey(0, 0, 512, 512));
     }
 }
