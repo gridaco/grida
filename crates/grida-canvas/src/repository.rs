@@ -102,7 +102,7 @@ impl ResourceRepository<Image> for ImageRepository {
 /// A repository for managing fonts.
 pub struct FontRepository {
     provider: TypefaceFontProvider,
-    fonts: HashMap<String, Vec<u8>>,
+    fonts: HashMap<String, Vec<Vec<u8>>>,
 }
 
 impl FontRepository {
@@ -114,16 +114,26 @@ impl FontRepository {
     }
 
     pub fn insert(&mut self, family: String, bytes: Vec<u8>) {
+        let family_fonts = self.fonts.entry(family.clone()).or_insert_with(Vec::new);
+
         if let Some(tf) = FontMgr::new().new_from_data(&bytes, None) {
             self.provider.register_typeface(tf, Some(family.as_str()));
         }
-        self.fonts.insert(family, bytes);
+
+        family_fonts.push(bytes);
     }
 
     pub fn add(&mut self, bytes: &[u8], family: &str) {
+        let family_fonts = self
+            .fonts
+            .entry(family.to_string())
+            .or_insert_with(Vec::new);
+
         if let Some(tf) = FontMgr::new().new_from_data(bytes, None) {
             self.provider.register_typeface(tf, Some(family));
         }
+
+        family_fonts.push(bytes.to_vec());
     }
 
     pub fn font_collection(&self) -> FontCollection {
@@ -131,28 +141,42 @@ impl FontRepository {
         collection.set_asset_font_manager(Some(self.provider.clone().into()));
         collection
     }
+
+    pub fn family_count(&self) -> usize {
+        self.fonts.len()
+    }
+
+    pub fn total_font_count(&self) -> usize {
+        self.fonts.values().map(|fonts| fonts.len()).sum()
+    }
+
+    pub fn get_family_fonts(&self, family: &str) -> Option<&Vec<Vec<u8>>> {
+        self.fonts.get(family)
+    }
 }
 
-impl ResourceRepository<Vec<u8>> for FontRepository {
+impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
     type Id = String;
-    type Iter<'a> = std::collections::hash_map::Iter<'a, String, Vec<u8>>;
+    type Iter<'a> = std::collections::hash_map::Iter<'a, String, Vec<Vec<u8>>>;
 
-    fn insert(&mut self, id: Self::Id, item: Vec<u8>) {
-        if let Some(tf) = FontMgr::new().new_from_data(&item, None) {
-            self.provider.register_typeface(tf, Some(id.as_str()));
+    fn insert(&mut self, id: Self::Id, item: Vec<Vec<u8>>) {
+        for font_data in &item {
+            if let Some(tf) = FontMgr::new().new_from_data(font_data, None) {
+                self.provider.register_typeface(tf, Some(id.as_str()));
+            }
         }
         self.fonts.insert(id, item);
     }
 
-    fn get(&self, id: &Self::Id) -> Option<&Vec<u8>> {
+    fn get(&self, id: &Self::Id) -> Option<&Vec<Vec<u8>>> {
         self.fonts.get(id)
     }
 
-    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut Vec<u8>> {
+    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut Vec<Vec<u8>>> {
         self.fonts.get_mut(id)
     }
 
-    fn remove(&mut self, id: &Self::Id) -> Option<Vec<u8>> {
+    fn remove(&mut self, id: &Self::Id) -> Option<Vec<Vec<u8>>> {
         self.fonts.remove(id)
     }
 

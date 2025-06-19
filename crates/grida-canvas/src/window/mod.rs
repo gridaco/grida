@@ -341,10 +341,19 @@ impl App {
         let mut updated = false;
         let mut font_count = 0;
         while let Ok(msg) = self.font_rx.try_recv() {
-            // Use postscript name as alias if available, otherwise fallback to family
-            let alias = &msg.family;
-            self.renderer.add_font(alias, &msg.data);
-            println!("📝 Registered font with renderer: '{}'", alias);
+            // Always use the base family name for registration
+            let family_name = &msg.family;
+            self.renderer.add_font(family_name, &msg.data);
+
+            // Log the registration with style information if available
+            if let Some(style) = &msg.style {
+                println!(
+                    "📝 Registered font with renderer: '{}' (style: {})",
+                    family_name, style
+                );
+            } else {
+                println!("📝 Registered font with renderer: '{}'", family_name);
+            }
             font_count += 1;
             updated = true;
         }
@@ -360,17 +369,27 @@ impl App {
 
     fn print_font_repository_info(&self) {
         let font_repo = self.renderer.font_repository.borrow();
-        let total_fonts = font_repo.len();
+        let family_count = font_repo.family_count();
+        let total_font_count = font_repo.total_font_count();
 
         println!("\n🔍 Font Repository Status:");
         println!("===========================");
-        println!("Total fonts in repository: {}", total_fonts);
+        println!("Font families: {}", family_count);
+        println!("Total fonts: {}", total_font_count);
 
-        if total_fonts > 0 {
-            println!("\n📋 Registered fonts:");
-            println!("-------------------");
-            for (i, (family_name, font_data)) in font_repo.iter().enumerate() {
-                println!("  {}. {} ({} bytes)", i + 1, family_name, font_data.len());
+        if family_count > 0 {
+            println!("\n📋 Registered font families:");
+            println!("---------------------------");
+            for (i, (family_name, font_variants)) in font_repo.iter().enumerate() {
+                println!(
+                    "  {}. {} ({} variants)",
+                    i + 1,
+                    family_name,
+                    font_variants.len()
+                );
+                for (j, font_data) in font_variants.iter().enumerate() {
+                    println!("     - Variant {}: {} bytes", j + 1, font_data.len());
+                }
             }
         }
         println!("✅ Font repository information printed");
