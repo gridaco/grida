@@ -8,6 +8,7 @@ use figma_api::apis::{
     configuration::{ApiKey, Configuration},
     files_api::{get_file, get_image_fills},
 };
+use futures::future::join_all;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -178,6 +179,8 @@ async fn main() {
 
         // Initialize the font loader in lifecycle mode
         println!("📝 Initializing font loader...");
+        let font_tx_clone = font_tx.clone();
+        let proxy_clone = proxy.clone();
         let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
 
         // Load all images in the scene - non-blocking
@@ -202,20 +205,27 @@ async fn main() {
         // Load all fonts in the scene - non-blocking
         println!("🔄 Starting to load scene fonts in background...");
         let font_files_clone = font_files.clone();
+        let font_tx = font_tx_clone;
+        let proxy = proxy_clone;
         tokio::spawn(async move {
-            for font_file in font_files_clone {
-                println!(
-                    "Loading font: {} ({})",
-                    font_file.family, font_file.postscript_name
-                );
-                font_loader
-                    .load_font(&font_file.family, &font_file.url)
-                    .await;
-                println!(
-                    "✅ Font loaded: {} ({})",
-                    font_file.family, font_file.postscript_name
-                );
-            }
+            let font_loading_futures: Vec<_> = font_files_clone
+                .into_iter()
+                .map(|font_file| {
+                    let font_tx = font_tx.clone();
+                    let proxy = proxy.clone();
+                    async move {
+                        let family = font_file.family;
+                        let url = font_file.url;
+                        let postscript_name = font_file.postscript_name;
+                        println!("Loading font: {} ({})", family, postscript_name);
+                        let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
+                        font_loader.load_font(&family, &url).await;
+                        println!("✅ Font loaded: {} ({})", family, postscript_name);
+                    }
+                })
+                .collect();
+
+            join_all(font_loading_futures).await;
             println!("✅ Scene fonts loading completed in background");
         });
     })

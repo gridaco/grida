@@ -2,9 +2,9 @@ use cg::font_loader::FontLoader;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
-use cg::repository::ResourceRepository;
 use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::window;
+use futures::future::join_all;
 use math2::transform::AffineTransform;
 
 const PARAGRAPH: &str = r#"
@@ -179,29 +179,34 @@ async fn main() {
         scene_for_window,
         move |_renderer, _img_tx, font_tx, proxy| {
             println!("📝 Initializing font loader...");
-            let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
+            // No need to create a FontLoader here
 
             // Load all fonts in the scene - non-blocking
             println!("🔄 Starting to load scene fonts in background...");
             let font_files = font_files_clone.clone();
+            let font_tx = font_tx.clone();
+            let proxy = proxy.clone();
             tokio::spawn(async move {
-                for font_file in font_files {
-                    println!(
-                        "Loading font: {} ({})",
-                        font_file.family, font_file.postscript_name
-                    );
-                    font_loader
-                        .load_font_with_style(
-                            &font_file.family,
-                            Some(&font_file.style),
-                            &font_file.url,
-                        )
-                        .await;
-                    println!(
-                        "✅ Font loaded: {} ({})",
-                        font_file.family, font_file.postscript_name
-                    );
-                }
+                let font_loading_futures: Vec<_> = font_files
+                    .into_iter()
+                    .map(|font_file| {
+                        let font_tx = font_tx.clone();
+                        let proxy = proxy.clone();
+                        async move {
+                            let family = font_file.family;
+                            let style = font_file.style;
+                            let url = font_file.url;
+                            let postscript_name = font_file.postscript_name;
+                            println!("Loading font: {} ({})", family, postscript_name);
+                            let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
+                            font_loader
+                                .load_font_with_style(&family, Some(&style), &url)
+                                .await;
+                            println!("✅ Font loaded: {} ({})", family, postscript_name);
+                        }
+                    })
+                    .collect();
+                join_all(font_loading_futures).await;
                 println!("✅ Scene fonts loading completed in background");
                 println!("\n🔍 Font Repository Information:");
                 println!("================================");
