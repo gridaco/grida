@@ -22,8 +22,10 @@ pub type RafCallback = Box<dyn Fn()>;
 
 #[derive(Clone)]
 pub struct FramePlan {
-    /// tile keys
+    /// cached tile keys
     pub tiles: Vec<TileRectKey>,
+    /// when true, the renderer should schedule another frame to recache tiles
+    pub should_repaint_all: bool,
     /// regions with their intersecting indices
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
@@ -79,6 +81,7 @@ pub struct Renderer {
     raf_callback: Option<RafCallback>,
     raf_requested: bool,
     pending_stats: Option<RenderStats>,
+    debug_tiles: bool,
 }
 
 impl Renderer {
@@ -98,6 +101,7 @@ impl Renderer {
             raf_callback: None,
             raf_requested: false,
             pending_stats: None,
+            debug_tiles: false,
         }
     }
 
@@ -173,6 +177,11 @@ impl Renderer {
         self.raf_callback = Some(Box::new(cb));
     }
 
+    /// Enable or disable tile debug rendering.
+    pub fn set_debug_tiles(&mut self, debug: bool) {
+        self.debug_tiles = debug;
+    }
+
     /// Request the next animation frame if one has not already been queued.
     pub fn request_animation_frame(&mut self) {
         if !self.raf_requested {
@@ -241,10 +250,12 @@ impl Renderer {
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
 
-            let frame = self.frame(
-                rect.unwrap_or(rect::Rectangle::empty()),
-                &self.scene_cache.tile.tiles().clone(),
-            );
+            if self.scene_cache.tile.should_repaint_all() {
+                self.scene_cache.tile.clear();
+            }
+
+            let tiles = self.scene_cache.tile.tiles().clone();
+            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()), &tiles);
             let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
@@ -361,6 +372,7 @@ impl Renderer {
 
         FramePlan {
             tiles: visible_tiles,
+            should_repaint_all: self.scene_cache.tile.should_repaint_all(),
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
@@ -415,6 +427,13 @@ impl Renderer {
                 dst,
                 &paint,
             );
+            if self.debug_tiles {
+                let mut stroke = SkPaint::default();
+                stroke.set_style(skia_safe::paint::Style::Stroke);
+                stroke.set_color(skia_safe::Color::from_argb(0xFF, 0x00, 0xFF, 0x00));
+                stroke.set_stroke_width(1.0);
+                canvas.draw_rect(dst, &stroke);
+            }
         }
 
         for (region, indices) in &plan.regions {

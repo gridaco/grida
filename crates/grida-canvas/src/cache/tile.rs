@@ -7,8 +7,10 @@ use std::time::{Duration, Instant};
 
 /// Screen space tile size in pixels
 const TILE_SIZE_PX: f32 = 512.0;
-/// Minimum zoom level to enable image caching
-const MIN_ZOOM_FOR_CACHE: f32 = 0.5;
+/// Caching is enabled while the camera zoom is at or below this level.
+/// When zooming in beyond this value the cache is cleared and disabled
+/// as the picture based rendering is fast enough.
+const MAX_ZOOM_FOR_CACHE: f32 = 0.5;
 /// Debounce duration after zooming before capturing tiles
 const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
@@ -28,11 +30,21 @@ impl TileRectKey {
 }
 
 /// Simple raster tile cache used by the renderer.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ImageTileCache {
-    raster_tiles: HashMap<TileRectKey, Rc<Image>>,
+    tiles: HashMap<TileRectKey, Rc<Image>>,
     prev_zoom: Option<f32>,
     zoom_changed_at: Option<Instant>,
+}
+
+impl Default for ImageTileCache {
+    fn default() -> Self {
+        Self {
+            tiles: HashMap::new(),
+            prev_zoom: None,
+            zoom_changed_at: None,
+        }
+    }
 }
 
 impl ImageTileCache {
@@ -42,7 +54,20 @@ impl ImageTileCache {
 
     /// Access currently cached raster tiles.
     pub fn tiles(&self) -> &HashMap<TileRectKey, Rc<Image>> {
-        &self.raster_tiles
+        &self.tiles
+    }
+
+    /// Remove all cached tiles.
+    pub fn clear(&mut self) {
+        self.tiles.clear();
+    }
+
+    /// Returns true if the cache should repaint all tiles due to a zoom change
+    /// that has settled for the debounce duration.
+    pub fn should_repaint_all(&self) -> bool {
+        self.zoom_changed_at
+            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
+            .unwrap_or(false)
     }
 
     /// Whether tiles should be cached based on zoom change debounce.
@@ -58,8 +83,15 @@ impl ImageTileCache {
             .prev_zoom
             .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
         {
-            self.raster_tiles.clear();
-            self.zoom_changed_at = Some(Instant::now());
+            if zoom > MAX_ZOOM_FOR_CACHE {
+                // Disable caching when sufficiently zoomed in - picture mode
+                // is fast enough at this scale.
+                self.tiles.clear();
+                self.zoom_changed_at = None;
+            } else {
+                // Mark tiles as outdated so they are refreshed after debounce.
+                self.zoom_changed_at = Some(Instant::now());
+            }
             self.prev_zoom = Some(zoom);
         }
     }
@@ -76,7 +108,10 @@ impl ImageTileCache {
         F: FnMut(Rectangle) -> bool,
     {
         let zoom = camera.get_zoom();
-        if zoom > MIN_ZOOM_FOR_CACHE {
+        if zoom > MAX_ZOOM_FOR_CACHE {
+            // Caching disabled when zoomed in beyond the threshold
+            self.tiles.clear();
+            self.zoom_changed_at = None;
             return;
         }
 
@@ -114,18 +149,19 @@ impl ImageTileCache {
                         world_rect.width.round() as u32,
                         world_rect.height.round() as u32,
                     );
-                    if !self.raster_tiles.contains_key(&key) {
+                    if !self.tiles.contains_key(&key) {
                         if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
                             screen_rect.x as i32,
                             screen_rect.y as i32,
                             TILE_SIZE_PX as i32,
                             TILE_SIZE_PX as i32,
                         )) {
-                            self.raster_tiles.insert(key, Rc::new(image));
+                            self.tiles.insert(key, Rc::new(image));
                         }
                     }
                 }
             }
         }
+        self.zoom_changed_at = None;
     }
 }

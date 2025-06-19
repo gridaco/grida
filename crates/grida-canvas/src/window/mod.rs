@@ -418,7 +418,6 @@ impl App {
         let point = camera.screen_to_canvas_point(self.input.cursor);
         let tester = crate::hit_test::HitTester::new(self.renderer.scene_cache());
         self.hit_result = tester.hit_first(point);
-        println!("hit result: {:?}", self.hit_result);
     }
 
     fn redraw(&mut self) {
@@ -493,6 +492,10 @@ impl App {
         );
 
         self.last_frame_time = __frame_start;
+
+        if stats.frame.should_repaint_all {
+            self.renderer.queue();
+        }
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -579,6 +582,8 @@ where
             let _ = proxy.send_event(());
         }
     });
+
+    renderer.set_debug_tiles(true);
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Initialize the image loader in lifecycle mode
