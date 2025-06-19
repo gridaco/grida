@@ -7,7 +7,7 @@ use crate::image_loader::{ImageLoader, load_scene_images};
 use crate::node::schema::*;
 use crate::repository::ResourceRepository;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::{Backend, RenderStats, Renderer};
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
@@ -282,14 +282,14 @@ impl ApplicationHandler for App {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom * 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
-                    self.redraw();
+                    self.renderer.queue();
                 }
             }
             Command::ZoomOut => {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom / 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
-                    self.redraw();
+                    self.renderer.queue();
                 }
             }
             Command::ZoomDelta { delta } => {
@@ -299,14 +299,14 @@ impl ApplicationHandler for App {
                     self.camera.set_zoom(current_zoom * zoom_factor);
                 }
                 if self.renderer.set_camera(self.camera.clone()) {
-                    self.redraw();
+                    self.renderer.queue();
                 }
             }
             Command::Pan { tx, ty } => {
                 let zoom = self.camera.get_zoom();
                 self.camera.translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 if self.renderer.set_camera(self.camera.clone()) {
-                    self.redraw();
+                    self.renderer.queue();
                 }
             }
             Command::Resize { width, height } => {
@@ -404,16 +404,16 @@ impl App {
         self.process_font_queue();
         let __queue_time = __queue_start.elapsed();
 
-        let stats = match self.renderer.queue() {
-            Some(t) => t,
+        let stats = match self.renderer.flush() {
+            Some(stats) => stats,
             None => return,
         };
 
-        let __swap_start = std::time::Instant::now();
+        // flush duration measured inside renderer
+        let __flush_time = stats.flush_duration;
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
-        let __swap_time = __swap_start.elapsed();
 
         // Apply frame pacing
         let __sleep_start = std::time::Instant::now();
@@ -482,7 +482,7 @@ impl App {
         self.surface_ptr = Box::into_raw(Box::new(surface));
         self.renderer.set_backend(Backend::GL(self.surface_ptr));
         self.renderer.invalidate_cache();
-        self.redraw();
+        self.renderer.queue();
     }
 }
 

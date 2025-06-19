@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 /// Callback type used to request a new frame.
 pub type RafCallback = Box<dyn Fn()>;
 
+#[derive(Clone)]
 pub struct FramePlan {
     /// tile keys
     pub tiles: Vec<TileRectKey>,
@@ -29,6 +30,7 @@ pub struct FramePlan {
     pub display_list_size_estimated: usize,
 }
 
+#[derive(Clone)]
 pub struct DrawResult {
     pub painter_duration: Duration,
     pub cache_picture_used: usize,
@@ -38,6 +40,7 @@ pub struct DrawResult {
     pub tiles_used: usize,
 }
 
+#[derive(Clone)]
 pub struct RenderStats {
     pub frame: FramePlan,
     pub draw: DrawResult,
@@ -75,6 +78,7 @@ pub struct Renderer {
     scene_cache: cache::scene::SceneCache,
     raf_callback: Option<RafCallback>,
     raf_requested: bool,
+    pending_stats: Option<RenderStats>,
 }
 
 impl Renderer {
@@ -93,6 +97,7 @@ impl Renderer {
             scene_cache: cache::scene::SceneCache::new(),
             raf_callback: None,
             raf_requested: false,
+            pending_stats: None,
         }
     }
 
@@ -121,7 +126,14 @@ impl Renderer {
         }
     }
 
-    fn flush(&self) {
+    /// Flush the queued frame if any and return the completed statistics.
+    pub fn flush(&mut self) -> Option<RenderStats> {
+        // early exit when there is nothing queued to render
+        if self.pending_stats.is_none() {
+            return None;
+        }
+
+        let start = Instant::now();
         if let Some(backend) = &self.backend {
             let surface = unsafe { &mut *backend.get_surface() };
             if let Some(mut gr_context) = surface.recording_context() {
@@ -130,6 +142,21 @@ impl Renderer {
                 }
             }
         }
+        self.raf_requested = false;
+
+        let flush_duration = start.elapsed();
+        if let Some(mut stats) = self.pending_stats.take() {
+            stats.flush_duration = flush_duration;
+            stats.total_duration = stats.frame_duration + flush_duration;
+            Some(stats)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` if a frame has been queued but not yet flushed.
+    pub fn has_pending_frame(&self) -> bool {
+        self.pending_stats.is_some()
     }
 
     /// Set a callback that will be invoked whenever the renderer wants to
@@ -225,19 +252,19 @@ impl Renderer {
                 }
             }
 
-            self.flush();
-
             let duration = start.elapsed();
 
-            let stats = Some(RenderStats {
+            let stats = RenderStats {
                 frame,
                 draw: paint,
                 frame_duration: encode_duration,
-                flush_duration: duration - encode_duration,
+                flush_duration: Duration::default(),
                 total_duration: duration,
-            });
-            self.raf_requested = false;
-            return stats;
+            };
+
+            self.pending_stats = Some(stats.clone());
+            self.request_animation_frame();
+            return Some(stats);
         }
 
         return None;
