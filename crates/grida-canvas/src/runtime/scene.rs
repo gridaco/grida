@@ -1,3 +1,4 @@
+use crate::cache::tile::TileRectKey;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{Painter, cvt};
@@ -6,18 +7,23 @@ use crate::{
     repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
 };
-use math2::rect;
+
+use math2::{self, rect, region};
 use skia_safe::{
     Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 pub struct FramePlan {
-    pub indices: Vec<usize>,
+    /// tile keys
+    pub tiles: Vec<TileRectKey>,
+    /// regions with their intersecting indices
+    pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
-    pub display_list_size: usize,
+    pub display_list_size_estimated: usize,
 }
 
 pub struct DrawResult {
@@ -25,6 +31,8 @@ pub struct DrawResult {
     pub cache_picture_used: usize,
     pub cache_picture_size: usize,
     pub cache_geometry_size: usize,
+    pub tiles_total: usize,
+    pub tiles_used: usize,
 }
 
 pub struct RenderStats {
@@ -48,6 +56,8 @@ impl Backend {
         }
     }
 }
+
+/// test rect in canvas space
 
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
@@ -136,6 +146,8 @@ impl Renderer {
         if changed {
             self.prev_quantized_camera_transform = Some(quantized);
         }
+        let zoom = camera.get_zoom();
+        self.scene_cache.tile.update_zoom(zoom);
         self.camera = Some(camera);
         changed
     }
@@ -147,6 +159,10 @@ impl Renderer {
         self.scene_cache.update_geometry(&scene);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
+    }
+
+    pub fn should_cache_tiles(&self) -> bool {
+        self.scene_cache.tile.should_cache_tiles()
     }
 
     /// Render the currently loaded scene if any. and report the time it took.
@@ -166,16 +182,22 @@ impl Renderer {
             let height = surface.height() as f32;
             let mut canvas = surface.canvas();
             let rect = self.camera.as_ref().map(|c| c.rect());
-            let frame = self.frame(rect);
-            let paint = self.draw(
-                &mut canvas,
-                &frame.indices,
-                scene.background_color,
-                width,
-                height,
+
+            let frame = self.frame(
+                rect.unwrap_or(rect::Rectangle::empty()),
+                &self.scene_cache.tile.tiles().clone(),
             );
+            let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
+
+            // update tile cache when zoom is stable
+            if self.should_cache_tiles() {
+                if let Some(camera) = &self.camera {
+                    self.scene_cache
+                        .update_tiles(camera, surface, width, height);
+                }
+            }
 
             self.flush();
 
@@ -223,7 +245,6 @@ impl Renderer {
     fn with_recording_cached(
         &mut self,
         id: &NodeId,
-        // bounds: &rect::Rectangle,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
         if let Some(pic) = self.scene_cache.picture.get_node_picture(id) {
@@ -244,42 +265,56 @@ impl Renderer {
     /// Plan the frame for rendering.
     /// Arguments:
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(&mut self, rect: Option<rect::Rectangle>) -> FramePlan {
+    fn frame(
+        &mut self,
+        bounds: rect::Rectangle,
+        tiles: &HashMap<TileRectKey, Rc<Image>>,
+    ) -> FramePlan {
         let __before_ll = Instant::now();
 
-        let mut indices: Vec<usize> = if let Some(rect) = rect {
-            self.scene_cache.layers_in_rect(rect)
-        } else {
-            (0..self.scene_cache.layers.layers.len()).collect()
-        };
+        let tile_rects: Vec<_> = tiles.keys().map(|k| k.to_rect()).collect();
+        let region = region::difference(bounds, &tile_rects);
 
-        if rect.is_some() {
+        let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
+
+        for rect in region {
+            let mut indices = self.scene_cache.intersects(rect);
+
+            // TODO: sort is expensive
             indices.sort();
+
+            regions.push((rect, indices));
         }
 
+        let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
+
         let __ll_duration = __before_ll.elapsed();
-        let ll_len = indices.len();
 
         FramePlan {
-            indices: indices.clone(),
+            tiles: tiles.keys().cloned().collect(),
+            regions,
+            // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
-            display_list_size: ll_len,
+            display_list_size_estimated: ll_len,
         }
     }
 
     /// Draw the scene to the canvas.
     /// - canvas: the canvas to render to
-    /// - indices: the indices of the layers to draw
+    /// - plan: the frame plan
     /// - width: the width of the canvas
     /// - height: the height of the canvas
     fn draw(
         &mut self,
         canvas: &Canvas,
-        indices: &Vec<usize>,
+        plan: &FramePlan,
         background_color: Option<Color>,
         width: f32,
         height: f32,
     ) -> DrawResult {
+        let __before_paint = Instant::now();
+        let mut cache_picture_used = 0;
+
         canvas.clear(skia_safe::Color::TRANSPARENT);
 
         // Paint background color first if present
@@ -299,18 +334,39 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
-        let __before_paint = Instant::now();
+        for tk in plan.tiles.iter() {
+            let image = self.scene_cache.tile.tiles().get(tk);
+            let image = image.unwrap();
+            let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
+            let dst = Rect::from_xywh(tk.0 as f32, tk.1 as f32, tk.2 as f32, tk.3 as f32);
+            let paint = SkPaint::default();
+            canvas.draw_image_rect(
+                image,
+                Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                dst,
+                &paint,
+            );
+        }
 
-        let mut cache_picture_used = 0;
-        for idx in indices {
-            let layer = self.scene_cache.layers.layers[*idx].clone();
-            let picture = self.with_recording_cached(&layer.id(), |painter| {
-                painter.draw_layer(&layer);
-            });
+        for (region, indices) in &plan.regions {
+            for idx in indices {
+                let layer = self.scene_cache.layers.layers[*idx].clone();
+                let picture = self.with_recording_cached(&layer.id(), |painter| {
+                    painter.draw_layer(&layer);
+                });
 
-            if let Some(pic) = picture {
-                canvas.draw_picture(pic, None, None);
-                cache_picture_used += 1;
+                if let Some(pic) = picture {
+                    // clip to region
+                    canvas.save();
+                    canvas.clip_rect(
+                        Rect::from_xywh(region.x, region.y, region.width, region.height),
+                        None,
+                        false,
+                    );
+                    canvas.draw_picture(pic, None, None);
+                    canvas.restore();
+                    cache_picture_used += 1;
+                }
             }
         }
 
@@ -323,66 +379,11 @@ impl Renderer {
             cache_picture_used,
             cache_picture_size: self.scene_cache.picture.len(),
             cache_geometry_size: self.scene_cache.geometry.len(),
+            tiles_total: self.scene_cache.tile.tiles().len(),
+            tiles_used: plan.tiles.len(),
         }
         //
     }
-
-    // if let Some(camera) = &self.camera {
-    //     let tc = &mut self.scene_cache.tile;
-    //     let raw_zoom = camera.get_zoom();
-    //     let rect = camera.rect();
-
-    //     // 1. get the quantized bounds / aligned to the tile size
-    //     let (level, zoom) = tc.quantize_zoom(raw_zoom);
-    //     // println!(
-    //     //     "raw_zoom: {}, level: {}, quantized_zoom: {}",
-    //     //     raw_zoom, level, zoom
-    //     // );
-
-    //     let q = math2::rect::quantize(rect, 512.0);
-    //     println!("rect: {:?}", q);
-
-    //     let size = tc.tile_world_size(zoom);
-    //     let start_col = (rect.x / size).floor() as i32;
-    //     let end_col = ((rect.x + rect.width) / size).ceil() as i32;
-    //     let start_row = (rect.y / size).floor() as i32;
-    //     let end_row = ((rect.y + rect.height) / size).ceil() as i32;
-
-    //     // println!(
-    //     //     "zoom: {}, rect: {:?} col: {}..{} row: {}..{} cells: {}",
-    //     //     zoom,
-    //     //     rect,
-    //     //     start_col,
-    //     //     end_col,
-    //     //     start_row,
-    //     //     end_row,
-    //     //     (end_col - start_col) * (end_row - start_row)
-    //     // );
-
-    //     // for col in start_col..end_col {
-    //     //     for row in start_row..end_row {
-    //     //         let key: (u8, i32, i32) = (level, col, row);
-    //     //         let subset = skia_safe::IRect::from_xywh(
-    //     //             col as i32 * size as i32,
-    //     //             row as i32 * size as i32,
-    //     //             size as i32,
-    //     //             size as i32,
-    //     //         );
-
-    //     //         if !tc.has(key) {
-    //     //             let image = surface.image_snapshot_with_bounds(subset);
-    //     //             // let image = image.make_subset(surface.direct_context().as_mut(), subset);
-    //     //             if let Some(image) = image {
-    //     //                 tc.insert_tile(key, image, (size, size), rect);
-    //     //             }
-
-    //     //             // println!("key: {:?}", key);
-    //     //         }
-    //     //     }
-    //     // }
-    //     // print the number of tiles
-    //     // println!("number of tiles: {}", tc.len());
-    // }
 }
 
 #[cfg(test)]

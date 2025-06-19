@@ -274,3 +274,46 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         }
     }
 }
+
+/// Merges multiple shapes into a single path using boolean operations.
+///
+/// This function takes a list of shapes and their corresponding boolean operations,
+/// and merges them into a single path. The first shape is used as the base,
+/// and subsequent shapes are combined using the specified operations.
+///
+/// # Parameters
+///
+/// - `shapes`: A slice of tuples containing (PainterShape, BooleanPathOperation)
+///   The first shape is used as the base, subsequent shapes are combined with the base
+///   using their respective operations.
+///
+/// # Returns
+///
+/// A merged `Path` representing the result of all boolean operations.
+/// If no shapes are provided, returns an empty path.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let shapes = vec![
+///     (shape1, BooleanPathOperation::Union),
+///     (shape2, BooleanPathOperation::Intersection),
+/// ];
+/// let merged_path = merge_shapes(&shapes);
+/// ```
+pub fn merge_shapes(shapes: &[(PainterShape, BooleanPathOperation)]) -> Path {
+    if shapes.is_empty() {
+        return Path::new();
+    }
+
+    let mut result = shapes[0].0.to_path();
+
+    for (shape, operation) in shapes.iter().skip(1) {
+        let shape_path = shape.to_path();
+        if let Some(merged) = Path::op(&result, &shape_path, (*operation).into()) {
+            result = merged;
+        }
+    }
+
+    result
+}

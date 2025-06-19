@@ -22,6 +22,8 @@ struct Cli {
     no_image: bool,
     #[arg(long = "file")]
     file: Option<String>,
+    #[arg(long = "images")]
+    images_dir: Option<String>,
 }
 
 async fn load_scene_from_url(
@@ -30,20 +32,13 @@ async fn load_scene_from_url(
     scene_index: usize,
     no_image: bool,
     file_path: Option<&str>,
+    images_dir: Option<&str>,
 ) -> Result<(Scene, FigmaConverter), String> {
-    if let Some(file_path) = file_path {
+    let file = if let Some(file_path) = file_path {
         // Load from local file
         let file_content = std::fs::read_to_string(file_path)
             .map_err(|e| format!("Failed to read file: {}", e))?;
-        let file: figma_api::models::InlineObject = serde_json::from_str(&file_content)
-            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
-
-        let mut converter = FigmaConverter::new();
-        let document = converter
-            .convert_document(&file.document)
-            .expect("Failed to convert document");
-
-        Ok((document[scene_index].clone(), converter))
+        serde_json::from_str(&file_content).map_err(|e| format!("Failed to parse JSON: {}", e))?
     } else {
         // Load from Figma API
         let file_key = file_key.ok_or("file-key is required when not using --file")?;
@@ -62,7 +57,7 @@ async fn load_scene_from_url(
             }),
         };
 
-        let file = get_file(
+        get_file(
             &configuration,
             file_key,
             None,
@@ -73,25 +68,65 @@ async fn load_scene_from_url(
             None,
         )
         .await
-        .expect("Failed to load file");
+        .expect("Failed to load file")
+    };
 
-        let images = if no_image {
-            std::collections::HashMap::new()
-        } else {
-            let images_response = get_image_fills(&configuration, file_key)
-                .await
-                .expect("Failed to load images");
-            images_response.meta.images
+    let images = if no_image {
+        println!("Skipping image loading (--no-image flag)");
+        std::collections::HashMap::new()
+    } else if let Some(images_dir) = images_dir {
+        // Load images from local directory
+        let mut images = std::collections::HashMap::new();
+        let dir = std::fs::read_dir(images_dir)
+            .map_err(|e| format!("Failed to read images directory: {}", e))?;
+
+        for entry in dir {
+            let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+            let path = entry.path();
+            if path.is_file() {
+                let key = path
+                    .file_stem()
+                    .ok_or_else(|| format!("Invalid filename: {:?}", path))?
+                    .to_string_lossy()
+                    .to_string();
+                let url = path.to_string_lossy().to_string();
+                images.insert(key, url);
+            }
+        }
+
+        println!("Loaded {} images from directory", images.len());
+        images
+    } else {
+        println!("Loading images from Figma API");
+        let file_key = file_key.ok_or("file-key is required when not using --file")?;
+        let api_key = api_key.ok_or("api-key is required when not using --file")?;
+
+        let configuration = Configuration {
+            base_path: "https://api.figma.com".to_string(),
+            user_agent: None,
+            client: reqwest::Client::new(),
+            basic_auth: None,
+            oauth_access_token: None,
+            bearer_access_token: None,
+            api_key: Some(ApiKey {
+                key: api_key.to_string(),
+                prefix: None,
+            }),
         };
 
-        let mut converter = FigmaConverter::new().with_image_urls(images);
+        let images_response = get_image_fills(&configuration, file_key)
+            .await
+            .expect("Failed to load images");
+        images_response.meta.images
+    };
 
-        let document = converter
-            .convert_document(&file.document)
-            .expect("Failed to convert document");
+    let mut converter = FigmaConverter::new().with_image_urls(images);
 
-        Ok((document[scene_index].clone(), converter))
-    }
+    let document = converter
+        .convert_document(&file.document)
+        .expect("Failed to convert document");
+
+    Ok((document[scene_index].clone(), converter))
 }
 
 #[tokio::main]
@@ -103,6 +138,7 @@ async fn main() {
         cli.scene_index,
         cli.no_image,
         cli.file.as_deref(),
+        cli.images_dir.as_deref(),
     )
     .await
     .expect("Failed to load scene");

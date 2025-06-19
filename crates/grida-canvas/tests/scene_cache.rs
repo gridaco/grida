@@ -42,7 +42,7 @@ fn layers_in_rect_include_partially_visible_nested() {
 
     // Query area partially overlapping the rectangle only
 
-    let layer_indices = cache.layers_in_rect(Rectangle {
+    let layer_indices = cache.intersects(Rectangle {
         x: 140.0,
         y: 40.0,
         width: 20.0,
@@ -52,7 +52,7 @@ fn layers_in_rect_include_partially_visible_nested() {
     let layer = &cache.layers.layers[layer_indices[0]];
     assert_eq!(layer.id(), &rect_id);
 
-    let layer_indices = cache.layers_in_rect(Rectangle {
+    let layer_indices = cache.intersects(Rectangle {
         x: 50.0,
         y: 0.0,
         width: 100.0,

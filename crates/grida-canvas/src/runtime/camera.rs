@@ -63,18 +63,27 @@ impl Camera2D {
     /// Returns the camera transform quantized to the nearest visible pixel.
     pub fn quantized_transform(&self) -> AffineTransform {
         let zoom = self.get_zoom();
-        let pos_step = Self::POSITION_STEP_PX * zoom;
-        let tx = quantize(self.transform.x(), pos_step);
-        let ty = quantize(self.transform.y(), pos_step);
-
         let quant_zoom = quantize(zoom, Self::ZOOM_STEP);
+
+        // translate world-space camera position into screen space using
+        // the quantized zoom factor. This ensures snapping occurs in
+        // pixel space regardless of the zoom level or rotation.
         let angle = self.transform.rotation();
         let (sin, cos) = angle.sin_cos();
 
+        let tx = self.transform.x();
+        let ty = self.transform.y();
+
+        let screen_tx = self.size.width * 0.5 - quant_zoom * (cos * tx + sin * ty);
+        let screen_ty = self.size.height * 0.5 + quant_zoom * (sin * tx - cos * ty);
+
+        let quant_tx = quantize(screen_tx, Self::POSITION_STEP_PX);
+        let quant_ty = quantize(screen_ty, Self::POSITION_STEP_PX);
+
         AffineTransform {
             matrix: [
-                [cos * quant_zoom, -sin * quant_zoom, tx],
-                [sin * quant_zoom, cos * quant_zoom, ty],
+                [cos * quant_zoom, -sin * quant_zoom, quant_tx],
+                [sin * quant_zoom, cos * quant_zoom, quant_ty],
             ],
         }
     }

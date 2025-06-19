@@ -273,6 +273,11 @@ impl GeometryCache {
         self.entries.get(id).map(|e| e.absolute_render_bounds)
     }
 
+    /// Return the parent NodeId for a given node if available.
+    pub fn get_parent(&self, id: &NodeId) -> Option<NodeId> {
+        self.entries.get(id).and_then(|e| e.parent.clone())
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }

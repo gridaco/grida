@@ -637,42 +637,60 @@ impl<'a> Painter<'a> {
     pub fn draw_layer(&self, layer: &PainterPictureLayer) {
         match layer {
             PainterPictureLayer::Shape(shape_layer) => {
-                self.with_transform(&shape_layer.transform.matrix, || {
-                    let shape = &shape_layer.shape;
-                    let effect = shape_layer.effects.first();
-                    self.draw_shape_with_effect(effect, shape, || {
-                        self.with_opacity(shape_layer.opacity, || {
-                            for fill in &shape_layer.fills {
+                self.with_transform(&shape_layer.base.transform.matrix, || {
+                    let shape = &shape_layer.base.shape;
+                    let effect = shape_layer.base.effects.first();
+                    let clip_path = &shape_layer.base.clip_path;
+                    let draw_content = || {
+                        self.with_opacity(shape_layer.base.opacity, || {
+                            for fill in &shape_layer.base.fills {
                                 self.draw_fill(shape, fill);
                             }
-                            for stroke in &shape_layer.strokes {
-                                if let Some(path) = &shape_layer.stroke_path {
+                            for stroke in &shape_layer.base.strokes {
+                                if let Some(path) = &shape_layer.base.stroke_path {
                                     self.draw_stroke_path(shape, stroke, path);
                                 }
                             }
                         });
-                    });
+                    };
+                    if let Some(clip) = clip_path {
+                        self.canvas.save();
+                        self.canvas.clip_path(clip, None, true);
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.canvas.restore();
+                    } else {
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                    }
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
-                self.with_transform(&text_layer.transform.matrix, || {
-                    let shape = &text_layer.shape;
-                    let effect = text_layer.effects.first();
-                    self.draw_shape_with_effect(effect, shape, || {
-                        self.with_opacity(text_layer.opacity, || {
+                self.with_transform(&text_layer.base.transform.matrix, || {
+                    let shape = &text_layer.base.shape;
+                    let effect = text_layer.base.effects.first();
+                    let clip_path = &text_layer.base.clip_path;
+                    let draw_content = || {
+                        self.with_opacity(text_layer.base.opacity, || {
                             self.draw_text_span(
                                 &text_layer.text,
                                 &Size {
                                     width: shape.rect.width(),
                                     height: shape.rect.height(),
                                 },
-                                &text_layer.fills.first().unwrap(),
+                                &text_layer.base.fills.first().unwrap(),
                                 &text_layer.text_align,
                                 &text_layer.text_align_vertical,
                                 &text_layer.text_style,
                             );
                         });
-                    });
+                    };
+                    if let Some(clip) = clip_path {
+                        self.canvas.save();
+                        self.canvas.clip_path(clip, None, true);
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.canvas.restore();
+                    } else {
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                    }
                 });
             }
         }
