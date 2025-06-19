@@ -1,8 +1,9 @@
-use super::geometry::{PainterShape, build_shape, stroke_geometry};
+use super::geometry::{PainterShape, build_shape, merge_shapes, stroke_geometry};
 use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use math2::transform::AffineTransform;
+use skia_safe::Path;
 
 /// A Skia-friendly, cacheable picture layer for vector rendering.
 ///
@@ -100,6 +101,7 @@ pub struct PainterPictureLayerBase {
     pub strokes: Vec<Paint>,
     pub fills: Vec<Paint>,
     pub stroke_path: Option<skia_safe::Path>,
+    pub clip_path: Option<skia_safe::Path>,
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +192,7 @@ impl LayerList {
                             strokes: n.stroke.clone().into_iter().collect(),
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }));
                     for child in &n.children {
@@ -225,6 +228,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -251,6 +255,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -277,6 +282,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -303,6 +309,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -329,6 +336,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -355,6 +363,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -369,6 +378,7 @@ impl LayerList {
                         strokes: n.stroke.clone().into_iter().collect(),
                         fills: vec![n.fill.clone()],
                         stroke_path: None,
+                        clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                     },
                     text: n.text.clone(),
                     text_style: n.text_style.clone(),
@@ -398,6 +408,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -424,6 +435,7 @@ impl LayerList {
                             strokes: vec![n.stroke.clone()],
                             fills: vec![n.fill.clone()],
                             stroke_path,
+                            clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                         },
                     }))
                 }
@@ -438,6 +450,7 @@ impl LayerList {
                         strokes: vec![],
                         fills: vec![],
                         stroke_path: None,
+                        clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
                     },
                 })),
             }
@@ -452,5 +465,157 @@ impl LayerList {
             }
         }
         list
+    }
+
+    /// Computes the clip path for a node by traversing up the hierarchy
+    /// and collecting all clip shapes from parent nodes.
+    ///
+    /// This function walks up the node tree starting from the given node ID,
+    /// collecting shapes from parent nodes that have `clip = true`.
+    /// The shapes are merged using boolean operations to create a single clip path.
+    ///
+    /// # Parameters
+    ///
+    /// - `node_id`: The ID of the node to compute the clip path for
+    /// - `repo`: The node repository containing all nodes
+    /// - `cache`: The geometry cache for transforms
+    ///
+    /// # Returns
+    ///
+    /// An `Option<Path>` representing the merged clip path, or `None` if no clipping is needed.
+    pub fn compute_clip_path(
+        node_id: &NodeId,
+        repo: &NodeRepository,
+        cache: &GeometryCache,
+    ) -> Option<Path> {
+        let mut clip_shapes = Vec::new();
+        let mut current_id = Some(node_id.clone());
+
+        // Walk up the hierarchy to collect clip shapes
+        while let Some(id) = current_id {
+            if let Some(node) = repo.get(&id) {
+                match node {
+                    Node::Container(n) => {
+                        if n.clip {
+                            // Get the world transform for this node
+                            let world_transform = cache
+                                .get_world_transform(&id)
+                                .unwrap_or_else(AffineTransform::identity);
+
+                            // Build the shape and transform it to world coordinates
+                            let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
+                            let mut path = shape.to_path();
+
+                            // Apply the world transform to the path
+                            path.transform(&crate::painter::cvt::sk_matrix(world_transform.matrix));
+
+                            clip_shapes.push((shape, BooleanPathOperation::Intersection));
+                        }
+                    }
+                    Node::BooleanOperation(n) => {
+                        // For boolean operations, we need to compute the result shape
+                        let world_transform = cache
+                            .get_world_transform(&id)
+                            .unwrap_or_else(AffineTransform::identity);
+
+                        // Collect shapes from children and apply boolean operation
+                        let mut child_shapes = Vec::new();
+                        for child_id in &n.children {
+                            if let Some(child_node) = repo.get(child_id) {
+                                match child_node {
+                                    Node::Container(child_n) => {
+                                        let child_shape = build_shape(
+                                            &IntrinsicSizeNode::Container(child_n.clone()),
+                                        );
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Rectangle(child_n) => {
+                                        let child_shape = build_shape(
+                                            &IntrinsicSizeNode::Rectangle(child_n.clone()),
+                                        );
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Ellipse(child_n) => {
+                                        let child_shape = build_shape(&IntrinsicSizeNode::Ellipse(
+                                            child_n.clone(),
+                                        ));
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Polygon(child_n) => {
+                                        let child_shape = build_shape(&IntrinsicSizeNode::Polygon(
+                                            child_n.clone(),
+                                        ));
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::RegularPolygon(child_n) => {
+                                        let child_shape = build_shape(
+                                            &IntrinsicSizeNode::RegularPolygon(child_n.clone()),
+                                        );
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::RegularStarPolygon(child_n) => {
+                                        let child_shape = build_shape(
+                                            &IntrinsicSizeNode::RegularStarPolygon(child_n.clone()),
+                                        );
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Line(child_n) => {
+                                        let child_shape =
+                                            build_shape(&IntrinsicSizeNode::Line(child_n.clone()));
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Path(child_n) => {
+                                        let child_shape =
+                                            build_shape(&IntrinsicSizeNode::Path(child_n.clone()));
+                                        child_shapes.push(child_shape);
+                                    }
+                                    Node::Image(child_n) => {
+                                        let child_shape =
+                                            build_shape(&IntrinsicSizeNode::Image(child_n.clone()));
+                                        child_shapes.push(child_shape);
+                                    }
+                                    _ => {} // Skip other node types
+                                }
+                            }
+                        }
+
+                        if !child_shapes.is_empty() {
+                            // Create shapes with boolean operations
+                            let mut shapes_with_ops = Vec::new();
+                            for (i, shape) in child_shapes.into_iter().enumerate() {
+                                let op = if i == 0 {
+                                    BooleanPathOperation::Union
+                                } else {
+                                    n.op
+                                };
+                                shapes_with_ops.push((shape, op));
+                            }
+
+                            let merged_path = merge_shapes(&shapes_with_ops);
+                            let mut path = merged_path.clone();
+                            path.transform(&crate::painter::cvt::sk_matrix(world_transform.matrix));
+
+                            clip_shapes.push((
+                                PainterShape::from_path(merged_path),
+                                BooleanPathOperation::Intersection,
+                            ));
+                        }
+                    }
+                    _ => {} // Skip other node types
+                }
+
+                // Move up to parent
+                current_id = cache.get_parent(&id);
+            } else {
+                break;
+            }
+        }
+
+        // If we have clip shapes, merge them
+        if !clip_shapes.is_empty() {
+            Some(merge_shapes(&clip_shapes))
+        } else {
+            None
+        }
     }
 }

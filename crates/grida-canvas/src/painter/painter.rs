@@ -640,7 +640,8 @@ impl<'a> Painter<'a> {
                 self.with_transform(&shape_layer.base.transform.matrix, || {
                     let shape = &shape_layer.base.shape;
                     let effect = shape_layer.base.effects.first();
-                    self.draw_shape_with_effect(effect, shape, || {
+                    let clip_path = &shape_layer.base.clip_path;
+                    let draw_content = || {
                         self.with_opacity(shape_layer.base.opacity, || {
                             for fill in &shape_layer.base.fills {
                                 self.draw_fill(shape, fill);
@@ -651,14 +652,23 @@ impl<'a> Painter<'a> {
                                 }
                             }
                         });
-                    });
+                    };
+                    if let Some(clip) = clip_path {
+                        self.canvas.save();
+                        self.canvas.clip_path(clip, None, true);
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.canvas.restore();
+                    } else {
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                    }
                 });
             }
             PainterPictureLayer::Text(text_layer) => {
                 self.with_transform(&text_layer.base.transform.matrix, || {
                     let shape = &text_layer.base.shape;
                     let effect = text_layer.base.effects.first();
-                    self.draw_shape_with_effect(effect, shape, || {
+                    let clip_path = &text_layer.base.clip_path;
+                    let draw_content = || {
                         self.with_opacity(text_layer.base.opacity, || {
                             self.draw_text_span(
                                 &text_layer.text,
@@ -672,7 +682,15 @@ impl<'a> Painter<'a> {
                                 &text_layer.text_style,
                             );
                         });
-                    });
+                    };
+                    if let Some(clip) = clip_path {
+                        self.canvas.save();
+                        self.canvas.clip_path(clip, None, true);
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                        self.canvas.restore();
+                    } else {
+                        self.draw_shape_with_effect(effect, shape, draw_content);
+                    }
                 });
             }
         }
