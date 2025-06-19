@@ -20,17 +20,37 @@ use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform, vector2
 pub struct Camera2D {
     pub transform: AffineTransform,
     pub size: Size,
+    /// Minimum allowed zoom value
+    pub min_zoom: f32,
+    /// Maximum allowed zoom value
+    pub max_zoom: f32,
 }
 
 impl Camera2D {
     const POSITION_STEP_PX: f32 = 5.0;
     const ZOOM_STEP: f32 = 0.01;
+    /// Default maximum zoom level
+    pub const DEFAULT_MAX_ZOOM: f32 = 256.0;
+    /// Default minimum zoom level
+    pub const DEFAULT_MIN_ZOOM: f32 = 0.02;
 
     /// Create with identity transform + no zoom (1:1).
+    /// Create with identity transform + no zoom (1:1) using default zoom limits.
     pub fn new(viewport_size: Size) -> Self {
+        Self::with_zoom_limits(
+            viewport_size,
+            Self::DEFAULT_MIN_ZOOM,
+            Self::DEFAULT_MAX_ZOOM,
+        )
+    }
+
+    /// Create a camera specifying custom zoom limits.
+    pub fn with_zoom_limits(viewport_size: Size, min_zoom: f32, max_zoom: f32) -> Self {
         let mut c = Self {
             transform: AffineTransform::identity(),
             size: viewport_size,
+            min_zoom,
+            max_zoom,
         };
         c.set_zoom(1.0);
         c
@@ -48,6 +68,7 @@ impl Camera2D {
 
     /// Set zoom factor (1 = 100%). Preserves rotation & translation.
     pub fn set_zoom(&mut self, zoom: f32) {
+        let zoom = zoom.clamp(self.min_zoom, self.max_zoom);
         let tx = self.transform.x();
         let ty = self.transform.y();
         let (s, c) = self.transform.rotation().sin_cos();
