@@ -96,7 +96,12 @@ async fn load_scene_from_url(
 
         println!("Loaded {} images from directory", images.len());
         images
+    } else if file_path.is_some() {
+        // When loading from local file without --images, skip image loading
+        println!("Skipping image loading (loading from local file without --images directory)");
+        std::collections::HashMap::new()
     } else {
+        // Load from Figma API (only when not loading from local file)
         println!("Loading images from Figma API");
         let file_key = file_key.ok_or("file-key is required when not using --file")?;
         let api_key = api_key.ok_or("api-key is required when not using --file")?;
@@ -176,7 +181,8 @@ async fn main() {
         let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
 
         // Load all images in the scene - non-blocking
-        if !cli.no_image {
+        let should_load_images = !cli.no_image && (cli.file.is_none() || cli.images_dir.is_some());
+        if should_load_images {
             println!("🔄 Starting to load scene images in background...");
             let scene_for_images = scene_for_loader.clone();
             tokio::spawn(async move {
@@ -184,7 +190,13 @@ async fn main() {
                 println!("✅ Scene images loading completed in background");
             });
         } else {
-            println!("⏭️ Skipping image loading as --no-image flag is set");
+            if cli.no_image {
+                println!("⏭️ Skipping image loading as --no-image flag is set");
+            } else if cli.file.is_some() && cli.images_dir.is_none() {
+                println!(
+                    "⏭️ Skipping image loading (loading from local file without --images directory)"
+                );
+            }
         }
 
         // Load all fonts in the scene - non-blocking
