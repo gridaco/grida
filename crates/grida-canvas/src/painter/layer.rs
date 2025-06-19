@@ -1,4 +1,7 @@
-use super::geometry::{PainterShape, build_shape, merge_shapes, stroke_geometry};
+use super::geometry::{
+    PainterShape, boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes,
+    stroke_geometry,
+};
 use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
@@ -201,8 +204,35 @@ impl LayerList {
                 }
                 Node::BooleanOperation(n) => {
                     let opacity = parent_opacity * n.opacity;
-                    for child in &n.children {
-                        Self::flatten_node(child, repo, cache, opacity, out);
+                    if let Some(shape) = boolean_operation_shape(n, repo, cache) {
+                        let stroke_path = if n.stroke.is_some() && n.stroke_width > 0.0 {
+                            Some(stroke_geometry(
+                                &shape.to_path(),
+                                n.stroke_width,
+                                n.stroke_align,
+                                n.stroke_dash_array.as_ref(),
+                            ))
+                        } else {
+                            None
+                        };
+                        out.push(PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                            base: PainterPictureLayerBase {
+                                id: n.base.id.clone(),
+                                z_index: out.len(),
+                                opacity,
+                                transform,
+                                shape,
+                                effects: n.effect.clone().into_iter().collect(),
+                                strokes: n.stroke.clone().into_iter().collect(),
+                                fills: vec![n.fill.clone()],
+                                stroke_path,
+                                clip_path: Self::compute_clip_path(&n.base.id, repo, cache),
+                            },
+                        }));
+                    } else {
+                        for child in &n.children {
+                            Self::flatten_node(child, repo, cache, opacity, out);
+                        }
                     }
                 }
                 Node::Rectangle(n) => {
@@ -524,86 +554,10 @@ impl LayerList {
                         }
                     }
                     Node::BooleanOperation(n) => {
-                        // For boolean operations, we need to compute the result shape
-                        let world_transform = cache
-                            .get_world_transform(&id)
-                            .unwrap_or_else(AffineTransform::identity);
-
-                        // Collect shapes from children and apply boolean operation
-                        let mut child_shapes = Vec::new();
-                        for child_id in &n.children {
-                            if let Some(child_node) = repo.get(child_id) {
-                                match child_node {
-                                    Node::Container(child_n) => {
-                                        let child_shape = build_shape(
-                                            &IntrinsicSizeNode::Container(child_n.clone()),
-                                        );
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Rectangle(child_n) => {
-                                        let child_shape = build_shape(
-                                            &IntrinsicSizeNode::Rectangle(child_n.clone()),
-                                        );
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Ellipse(child_n) => {
-                                        let child_shape = build_shape(&IntrinsicSizeNode::Ellipse(
-                                            child_n.clone(),
-                                        ));
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Polygon(child_n) => {
-                                        let child_shape = build_shape(&IntrinsicSizeNode::Polygon(
-                                            child_n.clone(),
-                                        ));
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::RegularPolygon(child_n) => {
-                                        let child_shape = build_shape(
-                                            &IntrinsicSizeNode::RegularPolygon(child_n.clone()),
-                                        );
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::RegularStarPolygon(child_n) => {
-                                        let child_shape = build_shape(
-                                            &IntrinsicSizeNode::RegularStarPolygon(child_n.clone()),
-                                        );
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Line(child_n) => {
-                                        let child_shape =
-                                            build_shape(&IntrinsicSizeNode::Line(child_n.clone()));
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Path(child_n) => {
-                                        let child_shape =
-                                            build_shape(&IntrinsicSizeNode::Path(child_n.clone()));
-                                        child_shapes.push(child_shape);
-                                    }
-                                    Node::Image(child_n) => {
-                                        let child_shape =
-                                            build_shape(&IntrinsicSizeNode::Image(child_n.clone()));
-                                        child_shapes.push(child_shape);
-                                    }
-                                    _ => {} // Skip other node types
-                                }
-                            }
-                        }
-
-                        if !child_shapes.is_empty() {
-                            // Create shapes with boolean operations
-                            let mut shapes_with_ops = Vec::new();
-                            for (i, shape) in child_shapes.into_iter().enumerate() {
-                                let op = if i == 0 {
-                                    BooleanPathOperation::Union
-                                } else {
-                                    n.op
-                                };
-                                shapes_with_ops.push((shape, op));
-                            }
-
-                            let merged_path = merge_shapes(&shapes_with_ops);
-                            let mut path = merged_path.clone();
+                        if let Some(mut path) = boolean_operation_path(n, repo, cache) {
+                            let world_transform = cache
+                                .get_world_transform(&id)
+                                .unwrap_or_else(AffineTransform::identity);
                             let relative_transform = current_inv.compose(&world_transform);
                             path.transform(&crate::painter::cvt::sk_matrix(
                                 relative_transform.matrix,

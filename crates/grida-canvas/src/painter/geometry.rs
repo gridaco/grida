@@ -1,4 +1,8 @@
+use crate::cache::geometry::GeometryCache;
+use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
+use crate::painter::cvt;
+use math2::transform::AffineTransform;
 use skia_safe::{Path, PathOp, Point, RRect, Rect, StrokeRec, stroke_rec::InitStyle};
 
 /// Computes the stroke geometry path for a given input `Path`, enabling rich stroke
@@ -316,4 +320,75 @@ pub fn merge_shapes(shapes: &[(PainterShape, BooleanPathOperation)]) -> Path {
     }
 
     result
+}
+
+/// Build a [`PainterShape`] for a node if it has intrinsic geometry.
+pub fn build_shape_from_node(node: &Node) -> Option<PainterShape> {
+    match node {
+        Node::Rectangle(n) => Some(build_shape(&IntrinsicSizeNode::Rectangle(n.clone()))),
+        Node::Ellipse(n) => Some(build_shape(&IntrinsicSizeNode::Ellipse(n.clone()))),
+        Node::Polygon(n) => Some(build_shape(&IntrinsicSizeNode::Polygon(n.clone()))),
+        Node::RegularPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularPolygon(n.clone()))),
+        Node::RegularStarPolygon(n) => Some(build_shape(&IntrinsicSizeNode::RegularStarPolygon(
+            n.clone(),
+        ))),
+        Node::Line(n) => Some(build_shape(&IntrinsicSizeNode::Line(n.clone()))),
+        Node::Path(n) => Some(build_shape(&IntrinsicSizeNode::Path(n.clone()))),
+        Node::Image(n) => Some(build_shape(&IntrinsicSizeNode::Image(n.clone()))),
+        Node::Error(n) => Some(build_shape(&IntrinsicSizeNode::Error(n.clone()))),
+        _ => None,
+    }
+}
+
+/// Compute the resulting path for a [`BooleanPathOperationNode`] in its local coordinate space.
+pub fn boolean_operation_path(
+    node: &BooleanPathOperationNode,
+    repo: &NodeRepository,
+    cache: &GeometryCache,
+) -> Option<Path> {
+    let world = cache
+        .get_world_transform(&node.base.id)
+        .unwrap_or_else(AffineTransform::identity);
+    let inv = world.inverse().unwrap_or_else(AffineTransform::identity);
+
+    let mut shapes_with_ops = Vec::new();
+
+    for (i, child_id) in node.children.iter().enumerate() {
+        if let Some(child_node) = repo.get(child_id) {
+            let mut path = match child_node {
+                Node::BooleanOperation(child_bool) => {
+                    boolean_operation_path(child_bool, repo, cache)?
+                }
+                _ => build_shape_from_node(child_node)?.to_path(),
+            };
+
+            let child_world = cache
+                .get_world_transform(child_id)
+                .unwrap_or_else(AffineTransform::identity);
+            let relative = inv.compose(&child_world);
+            path.transform(&cvt::sk_matrix(relative.matrix));
+
+            let op = if i == 0 {
+                BooleanPathOperation::Union
+            } else {
+                node.op
+            };
+            shapes_with_ops.push((PainterShape::from_path(path), op));
+        }
+    }
+
+    if shapes_with_ops.is_empty() {
+        return None;
+    }
+
+    Some(merge_shapes(&shapes_with_ops))
+}
+
+/// Convenience wrapper around [`boolean_operation_path`] returning a [`PainterShape`].
+pub fn boolean_operation_shape(
+    node: &BooleanPathOperationNode,
+    repo: &NodeRepository,
+    cache: &GeometryCache,
+) -> Option<PainterShape> {
+    boolean_operation_path(node, repo, cache).map(PainterShape::from_path)
 }
