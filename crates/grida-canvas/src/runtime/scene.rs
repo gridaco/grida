@@ -129,8 +129,7 @@ impl Renderer {
     /// Create an image from raw encoded bytes.
     pub fn add_image(&self, src: String, bytes: &[u8]) {
         let data = skia_safe::Data::new_copy(bytes);
-        let image = Image::from_encoded(data);
-        if let Some(image) = image {
+        if let Some(image) = Image::from_encoded(data) {
             self.image_repository.borrow_mut().insert(src, image);
         }
     }

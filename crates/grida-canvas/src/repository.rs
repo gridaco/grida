@@ -2,6 +2,8 @@ use skia_safe::{
     FontMgr, Image,
     textlayout::{FontCollection, TypefaceFontProvider},
 };
+
+use crate::mipmap::{ImageMipmaps, MipmapConfig};
 use std::collections::HashMap;
 
 /// Generic repository trait for storing resources keyed by an identifier.
@@ -39,7 +41,8 @@ pub trait ResourceRepository<T> {
 #[derive(Debug, Clone)]
 pub struct ImageRepository {
     /// The map of all images indexed by their source URLs
-    images: HashMap<String, Image>,
+    images: HashMap<String, ImageMipmaps>,
+    config: MipmapConfig,
 }
 
 impl ImageRepository {
@@ -47,42 +50,54 @@ impl ImageRepository {
     pub fn new() -> Self {
         Self {
             images: HashMap::new(),
+            config: MipmapConfig::default(),
+        }
+    }
+
+    /// Creates a repository with custom mipmap configuration
+    pub fn with_config(config: MipmapConfig) -> Self {
+        Self {
+            images: HashMap::new(),
+            config,
         }
     }
 
     /// Adds an image to the repository
     pub fn insert(&mut self, src: String, image: Image) {
-        self.images.insert(src, image);
+        let set = ImageMipmaps::from_image(image, &self.config);
+        self.images.insert(src, set);
     }
 
-    /// Gets a reference to an image by its source URL
-    pub fn get(&self, src: &str) -> Option<&Image> {
-        self.images.get(src)
+    /// Gets a reference to an image by its source URL and desired size
+    pub fn get_by_size(&self, src: &str, width: f32, height: f32) -> Option<&Image> {
+        self.images
+            .get(src)
+            .and_then(|set| set.best_for_size(width, height))
     }
 
     /// Removes an image from the repository by its source URL
-    pub fn remove(&mut self, src: &str) -> Option<Image> {
+    pub fn remove(&mut self, src: &str) -> Option<ImageMipmaps> {
         self.images.remove(src)
     }
 }
 
-impl ResourceRepository<Image> for ImageRepository {
+impl ResourceRepository<ImageMipmaps> for ImageRepository {
     type Id = String;
-    type Iter<'a> = std::collections::hash_map::Iter<'a, String, Image>;
+    type Iter<'a> = std::collections::hash_map::Iter<'a, String, ImageMipmaps>;
 
-    fn insert(&mut self, id: Self::Id, item: Image) {
+    fn insert(&mut self, id: Self::Id, item: ImageMipmaps) {
         self.images.insert(id, item);
     }
 
-    fn get(&self, id: &Self::Id) -> Option<&Image> {
+    fn get(&self, id: &Self::Id) -> Option<&ImageMipmaps> {
         self.images.get(id)
     }
 
-    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut Image> {
+    fn get_mut(&mut self, id: &Self::Id) -> Option<&mut ImageMipmaps> {
         self.images.get_mut(id)
     }
 
-    fn remove(&mut self, id: &Self::Id) -> Option<Image> {
+    fn remove(&mut self, id: &Self::Id) -> Option<ImageMipmaps> {
         self.images.remove(id)
     }
 
@@ -204,7 +219,7 @@ mod tests {
         let mut surface = surfaces::raster_n32_premul((1, 1)).unwrap();
         let image = surface.image_snapshot();
         repo.insert("img".to_string(), image.clone());
-        assert!(repo.get("img").is_some());
+        assert!(repo.get_by_size("img", 1.0, 1.0).is_some());
         assert_eq!(repo.len(), 1);
         repo.remove("img");
         assert!(repo.is_empty());

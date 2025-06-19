@@ -155,6 +155,9 @@ A summary of all discussed optimization techniques for achieving high-performanc
 17. **ImageRepository with Transform-Aware Access**
 
     - Pick image resolution based on projected screen size.
+    - _TODO_: currently we select mipmap levels solely by the size of the
+      drawing rectangle. This is a temporary strategy until a proper cache
+      invalidation mechanism based on zoom is introduced.
 
 ---
 

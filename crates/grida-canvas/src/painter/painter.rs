@@ -153,7 +153,9 @@ impl<'a> Painter<'a> {
         let (fill_paint, image) = match fill {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
-                if let Some(image) = images.get(&image_paint._ref) {
+                if let Some(image) =
+                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
                     (paint, Some(image.clone()))
@@ -217,7 +219,9 @@ impl<'a> Painter<'a> {
         match stroke {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
-                if let Some(image) = images.get(&image_paint._ref) {
+                if let Some(image) =
+                    images.get_by_size(&image_paint._ref, shape.rect.width(), shape.rect.height())
+                {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
 
