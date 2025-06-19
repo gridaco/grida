@@ -55,6 +55,14 @@ impl Camera2D {
         self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
     }
 
+    /// Sets the zoom while keeping the given screen-space point fixed.
+    pub fn set_zoom_at(&mut self, zoom: f32, screen_point: vector2::Vector2) {
+        let before = self.screen_to_canvas_point(screen_point);
+        self.set_zoom(zoom);
+        let after = self.screen_to_canvas_point(screen_point);
+        self.translate(before[0] - after[0], before[1] - after[1]);
+    }
+
     /// Get current zoom (1/scale).
     pub fn get_zoom(&self) -> f32 {
         1.0 / self.transform.get_scale_x()

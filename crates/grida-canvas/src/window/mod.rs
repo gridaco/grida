@@ -308,7 +308,8 @@ impl ApplicationHandler for App {
                 let current_zoom = self.camera.get_zoom();
                 let zoom_factor = 1.0 + delta;
                 if zoom_factor.is_finite() && zoom_factor > 0.0 {
-                    self.camera.set_zoom(current_zoom * zoom_factor);
+                    self.camera
+                        .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.renderer.queue();
