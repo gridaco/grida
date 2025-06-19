@@ -45,7 +45,7 @@ enum Command {
     None,
 }
 
-fn handle_window_event(event: WindowEvent) -> Command {
+fn handle_window_event(event: &WindowEvent) -> Command {
     match event {
         WindowEvent::CloseRequested => Command::Close,
         WindowEvent::Resized(size) => Command::Resize {
@@ -70,7 +70,7 @@ fn handle_window_event(event: WindowEvent) -> Command {
             delta,
             phase: _,
         } => Command::ZoomDelta {
-            delta: delta as f32,
+            delta: *delta as f32,
         },
         WindowEvent::MouseWheel { delta, .. } => match delta {
             MouseScrollDelta::PixelDelta(delta) => Command::Pan {
@@ -257,6 +257,9 @@ struct App {
     fb_info: gpu::gl::FramebufferInfo,
     gr_context: skia_safe::gpu::DirectContext,
     camera: Camera2D,
+    input: crate::runtime::input::InputState,
+    hit_result: Option<crate::node::schema::NodeId>,
+    last_hit_test: std::time::Instant,
     window: Window,
     image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
@@ -273,7 +276,12 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        match handle_window_event(event) {
+        if let WindowEvent::CursorMoved { position, .. } = &event {
+            self.input.cursor = [position.x as f32, position.y as f32];
+            self.perform_hit_test();
+        }
+
+        match handle_window_event(&event) {
             Command::Close => {
                 self.renderer.free();
                 event_loop.exit();
@@ -393,6 +401,21 @@ impl App {
             }
         }
         println!("✅ Font repository information printed");
+    }
+
+    /// Hit test the current cursor position and store the result.
+    fn perform_hit_test(&mut self) {
+        const HIT_TEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+        if self.last_hit_test.elapsed() < HIT_TEST_INTERVAL {
+            return;
+        }
+        self.last_hit_test = std::time::Instant::now();
+
+        let camera = &self.camera;
+        let point = camera.screen_to_canvas_point(self.input.cursor);
+        let tester = crate::hit_test::HitTester::new(self.renderer.scene_cache());
+        self.hit_result = tester.hit_first(point);
+        println!("hit result: {:?}", self.hit_result);
     }
 
     fn redraw(&mut self) {
@@ -566,6 +589,9 @@ where
         fb_info,
         gr_context,
         camera,
+        input: crate::runtime::input::InputState::default(),
+        hit_result: None,
+        last_hit_test: std::time::Instant::now(),
         window,
         image_rx: rx,
         font_rx,

@@ -8,7 +8,7 @@ use crate::{
     },
     painter::layer::{Layer, LayerList},
 };
-use math2::rect::Rectangle;
+use math2::{rect::Rectangle, vector2::Vector2};
 use rstar::{AABB, RTree, RTreeObject};
 use skia_safe::{Picture, Surface};
 
@@ -131,6 +131,15 @@ impl SceneCache {
         );
         self.layer_index
             .locate_in_envelope(&env)
+            .map(|il| il.index)
+            .collect()
+    }
+
+    /// Query painter layer indices whose bounds contain the given point.
+    pub fn intersects_point(&self, point: Vector2) -> Vec<usize> {
+        let env = AABB::from_point([point[0], point[1]]);
+        self.layer_index
+            .locate_in_envelope_intersecting(&env)
             .map(|il| il.index)
             .collect()
     }
