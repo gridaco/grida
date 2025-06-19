@@ -491,6 +491,13 @@ impl LayerList {
         let mut clip_shapes = Vec::new();
         let mut current_id = Some(node_id.clone());
 
+        let current_world = cache
+            .get_world_transform(node_id)
+            .unwrap_or_else(AffineTransform::identity);
+        let current_inv = current_world
+            .inverse()
+            .unwrap_or_else(AffineTransform::identity);
+
         // Walk up the hierarchy to collect clip shapes
         while let Some(id) = current_id {
             if let Some(node) = repo.get(&id) {
@@ -502,14 +509,18 @@ impl LayerList {
                                 .get_world_transform(&id)
                                 .unwrap_or_else(AffineTransform::identity);
 
-                            // Build the shape and transform it to world coordinates
+                            // Build the shape and transform it relative to the current node
                             let shape = build_shape(&IntrinsicSizeNode::Container(n.clone()));
                             let mut path = shape.to_path();
+                            let relative_transform = current_inv.compose(&world_transform);
+                            path.transform(&crate::painter::cvt::sk_matrix(
+                                relative_transform.matrix,
+                            ));
 
-                            // Apply the world transform to the path
-                            path.transform(&crate::painter::cvt::sk_matrix(world_transform.matrix));
-
-                            clip_shapes.push((shape, BooleanPathOperation::Intersection));
+                            clip_shapes.push((
+                                PainterShape::from_path(path),
+                                BooleanPathOperation::Intersection,
+                            ));
                         }
                     }
                     Node::BooleanOperation(n) => {
@@ -593,10 +604,13 @@ impl LayerList {
 
                             let merged_path = merge_shapes(&shapes_with_ops);
                             let mut path = merged_path.clone();
-                            path.transform(&crate::painter::cvt::sk_matrix(world_transform.matrix));
+                            let relative_transform = current_inv.compose(&world_transform);
+                            path.transform(&crate::painter::cvt::sk_matrix(
+                                relative_transform.matrix,
+                            ));
 
                             clip_shapes.push((
-                                PainterShape::from_path(merged_path),
+                                PainterShape::from_path(path),
                                 BooleanPathOperation::Intersection,
                             ));
                         }
