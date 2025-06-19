@@ -69,11 +69,24 @@ pub fn subtract(a: Region, b: Region) -> Region {
 
 /// Computes the difference of `base` with one or more hole rectangles.
 ///
-/// Each hole is subtracted sequentially from the remaining regions.
+/// Each hole is subtracted sequentially from the remaining regions. Holes that
+/// lie completely outside the base rectangle are ignored before performing the
+/// subtraction, avoiding unnecessary work and keeping the function side-effect
+/// free.
 pub fn difference(base: Rectangle, holes: &[Rectangle]) -> Vec<Rectangle> {
+    let filtered: Vec<Rectangle> = holes
+        .iter()
+        .copied()
+        .filter(|h| rect::intersects(&base, h))
+        .collect();
+
+    if filtered.is_empty() {
+        return vec![base];
+    }
+
     subtract(
         Region::from_rectangles(vec![base]),
-        Region::from_rectangles(holes.to_vec()),
+        Region::from_rectangles(filtered),
     )
     .rectangles
 }

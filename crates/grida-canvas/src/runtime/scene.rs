@@ -300,13 +300,7 @@ impl Renderer {
     ) -> FramePlan {
         let __before_ll = Instant::now();
 
-        // only consider cached tiles that overlap the current bounds to
-        // avoid expensive difference calculations on distant tiles.
-        let tile_rects: Vec<_> = tiles
-            .keys()
-            .map(|k| k.to_rect())
-            .filter(|r| r.intersects(&bounds))
-            .collect();
+        let tile_rects: Vec<_> = tiles.keys().map(|k| k.to_rect()).collect();
         let region = region::difference(bounds, &tile_rects);
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
