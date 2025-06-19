@@ -1,3 +1,4 @@
+pub mod fps;
 pub mod scheduler;
 
 use crate::font_loader::FontLoader;
@@ -409,8 +410,18 @@ impl App {
             None => return,
         };
 
-        // flush duration measured inside renderer
-        let __flush_time = stats.flush_duration;
+        // fps meter
+        let fps = self.scheduler.average_fps();
+        unsafe {
+            let surface = &mut *self.surface_ptr;
+            fps::FpsMeter::draw(surface, fps);
+            if let Some(mut ctx) = surface.recording_context() {
+                if let Some(mut direct) = ctx.as_direct_context() {
+                    direct.flush_and_submit();
+                }
+            }
+        }
+
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("Error swapping buffers: {:?}", e);
         }
