@@ -293,7 +293,10 @@ impl ApplicationHandler for App {
             }
             Command::ZoomDelta { delta } => {
                 let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom + (delta));
+                let zoom_factor = 1.0 + delta;
+                if zoom_factor.is_finite() && zoom_factor > 0.0 {
+                    self.camera.set_zoom(current_zoom * zoom_factor);
+                }
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.redraw();
                 }
