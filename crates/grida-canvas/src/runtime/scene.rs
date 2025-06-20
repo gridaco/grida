@@ -352,13 +352,18 @@ impl Renderer {
     /// - zoom: the current zoom level
     fn frame(&mut self, bounds: rect::Rectangle, zoom: f32) -> FramePlan {
         let __before_ll = Instant::now();
+        let force_full_repaint = self.scene_cache.tile.needs_full_repaint();
 
         // Get tiles for the region with blur information and sorting
         let region_tiles = self.scene_cache.tile.get_region_tiles(&bounds, zoom);
         let visible_tiles: Vec<FramePlanTileInfo> = region_tiles.tiles().to_vec();
         let tile_rects: Vec<_> = region_tiles.tile_rects().to_vec();
 
-        let region = region::difference(bounds, &tile_rects);
+        let region = if force_full_repaint {
+            vec![bounds]
+        } else {
+            region::difference(bounds, &tile_rects)
+        };
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
@@ -377,7 +382,7 @@ impl Renderer {
 
         FramePlan {
             tiles: visible_tiles,
-            should_repaint_all: self.scene_cache.tile.should_repaint_all(),
+            should_repaint_all: self.scene_cache.tile.should_repaint_all() || force_full_repaint,
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,

@@ -154,6 +154,9 @@ pub struct ImageTileCache {
     /// When zooming in beyond this value the cache is cleared and disabled
     /// as the picture based rendering is fast enough.
     pub max_zoom_for_cache: f32,
+    /// Flag indicating that a full repaint is required to refresh tiles
+    /// after the cache was cleared due to a zoom change.
+    needs_full_repaint: bool,
 }
 
 impl Default for ImageTileCache {
@@ -166,6 +169,7 @@ impl Default for ImageTileCache {
             prev_zoom: None,
             zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
+            needs_full_repaint: false,
         }
     }
 }
@@ -184,6 +188,7 @@ impl ImageTileCache {
             prev_zoom: None,
             zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
+            needs_full_repaint: false,
         }
     }
 
@@ -259,6 +264,7 @@ impl ImageTileCache {
         // Only clear tiles that are not in lowest_zoom_indices
         self.tiles
             .retain(|key, _| self.lowest_zoom_indices.contains(key));
+        self.needs_full_repaint = true;
     }
 
     /// Remove all tiles including lowest zoom tiles.
@@ -266,6 +272,7 @@ impl ImageTileCache {
         self.tiles.clear();
         self.lowest_zoom_indices.clear();
         self.lowest_zoom = None;
+        self.needs_full_repaint = true;
     }
 
     /// Returns true if the cache should repaint all tiles due to a zoom change
@@ -274,6 +281,16 @@ impl ImageTileCache {
         self.zoom_changed_at
             .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
             .unwrap_or(false)
+    }
+
+    /// Returns true if a full repaint is required to refresh tiles
+    pub fn needs_full_repaint(&self) -> bool {
+        self.needs_full_repaint
+    }
+
+    /// Mark that the pending full repaint request has been handled
+    pub fn reset_full_repaint(&mut self) {
+        self.needs_full_repaint = false;
     }
 
     /// Whether tiles should be cached based on zoom change debounce.
@@ -409,6 +426,7 @@ impl ImageTileCache {
             }
         }
         self.zoom_changed_at = None;
+        self.needs_full_repaint = false;
     }
 
     /// Get tiles for a specific region with blur information and sorting.
