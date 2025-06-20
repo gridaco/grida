@@ -523,21 +523,12 @@ impl App {
     }
 
     fn resize(&mut self, width: u32, height: u32) {
-        // Recreate GL surface
-        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-            #[allow(deprecated)]
-            self.window
-                .raw_window_handle()
-                .expect("Failed to get window handle"),
+        // Resize the existing GL surface instead of recreating it
+        self.gl_surface.resize(
+            &self.gl_context,
             NonZeroU32::new(width).unwrap(),
             NonZeroU32::new(height).unwrap(),
         );
-        self.gl_surface = unsafe {
-            self.gl_config
-                .display()
-                .create_window_surface(&self.gl_config, &attrs)
-                .expect("Could not create gl window surface")
-        };
 
         // Recreate Skia surface
         let backend_render_target = gpu::backend_render_targets::make_gl(
@@ -561,7 +552,15 @@ impl App {
         self.surface_ptr = Box::into_raw(Box::new(surface));
         self.renderer.set_backend(Backend::GL(self.surface_ptr));
         self.renderer.invalidate_cache();
-        self.renderer.queue();
+
+        // Update camera viewport size to match the new surface dimensions
+        self.camera.size = Size {
+            width: width as f32,
+            height: height as f32,
+        };
+        if self.renderer.set_camera(self.camera.clone()) {
+            self.renderer.queue();
+        }
     }
 }
 
