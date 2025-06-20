@@ -3,7 +3,9 @@ use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
 use math2::transform::AffineTransform;
-use skia_safe::{Path, PathOp, Point, RRect, Rect, StrokeRec, stroke_rec::InitStyle};
+use skia_safe::{
+    Path, PathOp, Point, RRect, Rect, StrokeRec, path_effect::PathEffect, stroke_rec::InitStyle,
+};
 
 /// Computes the stroke geometry path for a given input `Path`, enabling rich stroke
 /// rendering features such as image fills, gradients, and complex stroke alignment.
@@ -55,7 +57,7 @@ pub fn stroke_geometry(
     source_path: &Path,
     stroke_width: f32,
     stroke_align: StrokeAlign,
-    _stroke_dash_array: Option<&Vec<f32>>, // TODO: implement dash pattern
+    stroke_dash_array: Option<&Vec<f32>>,
 ) -> Path {
     use StrokeAlign::*;
 
@@ -69,9 +71,21 @@ pub fn stroke_geometry(
     let mut stroke_rec = StrokeRec::new(InitStyle::Hairline);
     stroke_rec.set_stroke_style(adjusted_width, false);
 
+    // Apply dash effect if provided
+    let mut path_to_stroke = source_path.clone();
+    if let Some(dashes) = stroke_dash_array {
+        if let Some(pe) = PathEffect::dash(dashes, 0.0) {
+            if let Some((dashed, _)) =
+                pe.filter_path(source_path, &stroke_rec, source_path.bounds())
+            {
+                path_to_stroke = dashed;
+            }
+        }
+    }
+
     // Apply the stroke to create the outline
     let mut stroked_path = Path::new();
-    if stroke_rec.apply_to_path(&mut stroked_path, source_path) {
+    if stroke_rec.apply_to_path(&mut stroked_path, &path_to_stroke) {
         match stroke_align {
             Center => stroked_path,
             Inside => {
