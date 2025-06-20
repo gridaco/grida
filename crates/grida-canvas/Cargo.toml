@@ -44,3 +44,7 @@ criterion = "0.5"
 [[bench]]
 name = "bench_rectangles"
 harness = false
+
+[[bench]]
+name = "bench_mipmap"
+harness = false

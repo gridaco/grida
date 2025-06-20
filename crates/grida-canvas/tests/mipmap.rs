@@ -1,4 +1,4 @@
-use cg::mipmap::{ImageMipmaps, MipmapConfig};
+use cg::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
 use skia_safe::surfaces;
 
 #[test]
@@ -9,7 +9,11 @@ fn full_chain_down_to_1x1() {
     let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
     let image = surface.image_snapshot();
 
-    let mip = ImageMipmaps::from_image(image, &MipmapConfig::FullChain);
+    let config = MipmapConfig {
+        levels: MipmapLevels::FullChain,
+        chained: true,
+    };
+    let mip = ImageMipmaps::from_image(image, &config);
     let expected_levels = (width.max(height) as f32).log2().ceil() as usize + 1;
     assert_eq!(mip.level_count(), expected_levels);
 
@@ -22,7 +26,11 @@ fn best_for_size_selects_correct_level() {
     let mut surface = surfaces::raster_n32_premul((300, 200)).unwrap();
     let image = surface.image_snapshot();
 
-    let mip = ImageMipmaps::from_image(image, &MipmapConfig::FullChain);
+    let config = MipmapConfig {
+        levels: MipmapLevels::FullChain,
+        chained: true,
+    };
+    let mip = ImageMipmaps::from_image(image, &config);
     let level = mip.best_for_size(100.0, 100.0).unwrap();
 
     assert_eq!(level.width(), 150);
