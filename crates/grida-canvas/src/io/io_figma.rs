@@ -64,33 +64,36 @@ impl From<&FigmaPaint> for Paint {
                 color: Color::from(&solid.color),
                 opacity: solid.opacity.unwrap_or(1.0) as f32,
             }),
-            FigmaPaint::ImagePaint(image) => Paint::Image(ImagePaint {
-                transform: image.image_transform.as_ref().map_or(
-                    AffineTransform::identity(),
-                    |transform| AffineTransform {
-                        matrix: [
-                            [
-                                transform[0][0] as f32,
-                                transform[0][1] as f32,
-                                transform[0][2] as f32,
+            FigmaPaint::ImagePaint(image) => {
+                let transform =
+                    image
+                        .image_transform
+                        .as_ref()
+                        .map_or(AffineTransform::identity(), |t| AffineTransform {
+                            matrix: [
+                                [t[0][0] as f32, t[0][1] as f32, t[0][2] as f32],
+                                [t[1][0] as f32, t[1][1] as f32, t[1][2] as f32],
                             ],
-                            [
-                                transform[1][0] as f32,
-                                transform[1][1] as f32,
-                                transform[1][2] as f32,
-                            ],
-                        ],
-                    },
-                ),
-                _ref: image.image_ref.clone(),
-                fit: match image.scale_mode {
-                    figma_api::models::image_paint::ScaleMode::Fill => BoxFit::Cover,
-                    figma_api::models::image_paint::ScaleMode::Fit => BoxFit::Contain,
-                    figma_api::models::image_paint::ScaleMode::Tile => BoxFit::None,
-                    figma_api::models::image_paint::ScaleMode::Stretch => BoxFit::None,
-                },
-                opacity: image.opacity.unwrap_or(1.0) as f32,
-            }),
+                        });
+
+                let fit = if transform != AffineTransform::identity() {
+                    BoxFit::None
+                } else {
+                    match image.scale_mode {
+                        figma_api::models::image_paint::ScaleMode::Fill => BoxFit::Cover,
+                        figma_api::models::image_paint::ScaleMode::Fit => BoxFit::Contain,
+                        figma_api::models::image_paint::ScaleMode::Tile => BoxFit::None,
+                        figma_api::models::image_paint::ScaleMode::Stretch => BoxFit::None,
+                    }
+                };
+
+                Paint::Image(ImagePaint {
+                    transform,
+                    _ref: image.image_ref.clone(),
+                    fit,
+                    opacity: image.opacity.unwrap_or(1.0) as f32,
+                })
+            }
             FigmaPaint::GradientPaint(gradient) => {
                 let stops = gradient
                     .gradient_stops
@@ -289,31 +292,32 @@ impl FigmaConverter {
                     .get(&image.image_ref)
                     .cloned()
                     .unwrap_or_else(|| image.image_ref.clone());
-                Paint::Image(ImagePaint {
-                    transform: image.image_transform.as_ref().map_or(
-                        AffineTransform::identity(),
-                        |transform| AffineTransform {
+                let transform =
+                    image
+                        .image_transform
+                        .as_ref()
+                        .map_or(AffineTransform::identity(), |t| AffineTransform {
                             matrix: [
-                                [
-                                    transform[0][0] as f32,
-                                    transform[0][1] as f32,
-                                    transform[0][2] as f32,
-                                ],
-                                [
-                                    transform[1][0] as f32,
-                                    transform[1][1] as f32,
-                                    transform[1][2] as f32,
-                                ],
+                                [t[0][0] as f32, t[0][1] as f32, t[0][2] as f32],
+                                [t[1][0] as f32, t[1][1] as f32, t[1][2] as f32],
                             ],
-                        },
-                    ),
-                    _ref: url,
-                    fit: match image.scale_mode {
+                        });
+
+                let fit = if transform != AffineTransform::identity() {
+                    BoxFit::None
+                } else {
+                    match image.scale_mode {
                         figma_api::models::image_paint::ScaleMode::Fill => BoxFit::Cover,
                         figma_api::models::image_paint::ScaleMode::Fit => BoxFit::Contain,
                         figma_api::models::image_paint::ScaleMode::Tile => BoxFit::None,
                         figma_api::models::image_paint::ScaleMode::Stretch => BoxFit::None,
-                    },
+                    }
+                };
+
+                Paint::Image(ImagePaint {
+                    transform,
+                    _ref: url,
+                    fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                 })
             }

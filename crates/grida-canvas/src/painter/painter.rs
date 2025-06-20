@@ -4,7 +4,7 @@ use super::layer::{LayerList, PainterPictureLayer};
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::repository::{FontRepository, ImageRepository};
-use math2::transform::AffineTransform;
+use math2::{box_fit::BoxFit, transform::AffineTransform};
 use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -147,10 +147,31 @@ impl<'a> Painter<'a> {
         canvas.restore(); // pop the clip
     }
 
+    /// Determine the transformation matrix for an [`ImagePaint`].
+    ///
+    /// If the paint specifies a [`BoxFit`] other than `None`, the box-fit
+    /// transform is used. Otherwise, the paint's own transform is applied.
+    fn image_paint_matrix(
+        &self,
+        paint: &ImagePaint,
+        image_size: (f32, f32),
+        container_size: (f32, f32),
+    ) -> [[f32; 3]; 2] {
+        match paint.fit {
+            BoxFit::None => paint.transform.matrix,
+            _ => {
+                paint
+                    .fit
+                    .calculate_transform(image_size, container_size)
+                    .matrix
+            }
+        }
+    }
+
     /// Draw fill for a shape using given paint.
     fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
         let canvas = self.canvas;
-        let (fill_paint, image) = match fill {
+        let (fill_paint, image, image_params) = match fill {
             Paint::Image(image_paint) => {
                 let images = self.images.borrow();
                 if let Some(image) =
@@ -158,7 +179,7 @@ impl<'a> Painter<'a> {
                 {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
-                    (paint, Some(image.clone()))
+                    (paint, Some(image.clone()), Some(image_paint.clone()))
                 } else {
                     // Image not ready - skip fill
                     return;
@@ -167,14 +188,29 @@ impl<'a> Painter<'a> {
             _ => (
                 cvt::sk_paint(fill, 1.0, (shape.rect.width(), shape.rect.height())),
                 None,
+                None,
             ),
         };
 
-        if let Some(image) = image {
-            // For image fills, we need to clip to the shape's path
+        if let (Some(image), Some(img_paint)) = (image, image_params) {
+            // For image fills, clip to the shape and apply transforms
             canvas.save();
             canvas.clip_path(&shape.to_path(), None, true);
-            canvas.draw_image_rect(image, None, shape.rect, &fill_paint);
+
+            // Apply either the fit transform or the paint's custom transform
+            let m = self.image_paint_matrix(
+                &img_paint,
+                (image.width() as f32, image.height() as f32),
+                (shape.rect.width(), shape.rect.height()),
+            );
+            canvas.concat(&cvt::sk_matrix(m));
+
+            canvas.draw_image_rect(
+                &image,
+                None,
+                skia_safe::Rect::from_xywh(0.0, 0.0, image.width() as f32, image.height() as f32),
+                &fill_paint,
+            );
             canvas.restore();
         } else {
             // For regular fills, draw the shape directly
@@ -225,10 +261,28 @@ impl<'a> Painter<'a> {
                     let mut paint = SkPaint::default();
                     paint.set_anti_alias(true);
 
-                    // For image strokes, we need to clip to the stroke geometry
+                    // For image strokes, clip and apply transforms
                     canvas.save();
                     canvas.clip_path(&stroke_path, None, true);
-                    canvas.draw_image_rect(image, None, shape.rect, &paint);
+
+                    let m = self.image_paint_matrix(
+                        image_paint,
+                        (image.width() as f32, image.height() as f32),
+                        (shape.rect.width(), shape.rect.height()),
+                    );
+                    canvas.concat(&cvt::sk_matrix(m));
+
+                    canvas.draw_image_rect(
+                        &image,
+                        None,
+                        skia_safe::Rect::from_xywh(
+                            0.0,
+                            0.0,
+                            image.width() as f32,
+                            image.height() as f32,
+                        ),
+                        &paint,
+                    );
                     canvas.restore();
                 }
             }
