@@ -5,10 +5,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-/// Caching is enabled while the camera zoom is at or below this level.
-/// When zooming in beyond this value the cache is cleared and disabled
-/// as the picture based rendering is fast enough.
-const MAX_ZOOM_FOR_CACHE: f32 = 2.0;
 /// Debounce duration after zooming before capturing tiles
 const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
@@ -34,12 +30,40 @@ pub struct TileAtZoom {
 }
 
 /// Simple raster tile cache used by the renderer.
+///
+/// This cache maintains two types of tiles:
+/// 1. Regular tiles at various zoom levels for current viewport coverage
+/// 2. Lowest zoom tiles as explicit fallbacks for zoom out optimization
+///
+/// Why we save lowest zoom tiles explicitly:
+/// 1. Zoom out optimization: When zooming out, we need tiles at lower zoom levels.
+///    Without explicit lowest zoom caching, we'd have no way to optimize zoom out
+///    as we'd need to re-render everything at the new zoom level.
+/// 2. Memory efficiency: Lowest zoom means fewer tiles to cover the same area,
+///    keeping memory usage minimal while providing essential fallback coverage.
+/// 3. Progressive quality: Allows smooth transitions between zoom levels by
+///    providing immediate fallback tiles while higher quality tiles load.
 #[derive(Debug, Clone)]
 pub struct ImageTileCache {
     tile_size: u16,
     tiles: HashMap<TileRectKey, TileAtZoom>,
+    /// The lowest zoom level resolved, even if at least 1 tile exists.
+    /// This is used to track the most zoomed-out level we've cached,
+    /// ensuring we always have fallback tiles for zoom out operations.
+    lowest_zoom: Option<f32>,
+    /// Keys to tiles that are at the lowest zoom level.
+    /// These tiles are protected from being cleared during zoom changes
+    /// and serve as essential fallbacks for zoom out optimization.
+    /// Since lowest zoom means fewer tiles to cover the same area,
+    /// keeping these in memory is memory-efficient while providing
+    /// critical coverage for smooth zoom out operations.
+    lowest_zoom_indices: std::collections::HashSet<TileRectKey>,
     prev_zoom: Option<f32>,
     zoom_changed_at: Option<Instant>,
+    /// Caching is enabled while the camera zoom is at or below this level.
+    /// When zooming in beyond this value the cache is cleared and disabled
+    /// as the picture based rendering is fast enough.
+    pub max_zoom_for_cache: f32,
 }
 
 impl Default for ImageTileCache {
@@ -47,8 +71,11 @@ impl Default for ImageTileCache {
         Self {
             tile_size: 512,
             tiles: HashMap::new(),
+            lowest_zoom: None,
+            lowest_zoom_indices: std::collections::HashSet::new(),
             prev_zoom: None,
             zoom_changed_at: None,
+            max_zoom_for_cache: 2.0,
         }
     }
 }
@@ -62,9 +89,17 @@ impl ImageTileCache {
         Self {
             tile_size,
             tiles: HashMap::new(),
+            lowest_zoom: None,
+            lowest_zoom_indices: std::collections::HashSet::new(),
             prev_zoom: None,
             zoom_changed_at: None,
+            max_zoom_for_cache: 2.0,
         }
+    }
+
+    pub fn with_max_zoom(mut self, max_zoom: f32) -> Self {
+        self.max_zoom_for_cache = max_zoom;
+        self
     }
 
     /// Access currently cached raster tiles.
@@ -72,9 +107,28 @@ impl ImageTileCache {
         &self.tiles
     }
 
-    /// Get all tiles that intersect with the given bounds.
+    /// Get the lowest zoom level resolved.
+    pub fn lowest_zoom(&self) -> Option<f32> {
+        self.lowest_zoom
+    }
+
+    /// Get the keys of tiles at the lowest zoom level.
+    pub fn lowest_zoom_indices(&self) -> &std::collections::HashSet<TileRectKey> {
+        &self.lowest_zoom_indices
+    }
+
+    /// Get a tile from regular storage only.
+    /// Lowest zoom tiles are maintained separately for future use.
+    pub fn get_tile(&self, key: &TileRectKey) -> Option<&TileAtZoom> {
+        self.tiles.get(key)
+    }
+
+    /// Get all tiles that intersect with the given bounds (regular tiles only).
+    /// Returns tiles sorted by zoom level (lowest first) so lower resolution tiles
+    /// are drawn below higher resolution tiles.
     pub fn filter(&self, bounds: &Rectangle) -> Vec<&TileRectKey> {
-        self.tiles
+        let mut keys: Vec<&TileRectKey> = self
+            .tiles
             .iter()
             .filter_map(|(key, _)| {
                 if rect::intersects(&key.to_rect(), bounds) {
@@ -83,12 +137,45 @@ impl ImageTileCache {
                     None
                 }
             })
-            .collect()
+            .collect();
+
+        // Sort by zoom level in ascending order (lowest zoom first)
+        keys.sort_by(|a, b| {
+            let zoom_a = self
+                .tiles
+                .get(*a)
+                .map(|tile| tile.zoom)
+                .unwrap_or(f32::INFINITY);
+            let zoom_b = self
+                .tiles
+                .get(*b)
+                .map(|tile| tile.zoom)
+                .unwrap_or(f32::INFINITY);
+            zoom_a
+                .partial_cmp(&zoom_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        keys
     }
 
-    /// Remove all cached tiles.
+    /// Remove all cached tiles (but preserve lowest zoom tiles).
+    ///
+    /// Lowest zoom tiles are preserved because:
+    /// 1. They provide essential fallback coverage for zoom out operations
+    /// 2. They represent minimal memory usage while covering large areas
+    /// 3. Without them, zoom out would require expensive re-rendering
     pub fn clear(&mut self) {
+        // Only clear tiles that are not in lowest_zoom_indices
+        self.tiles
+            .retain(|key, _| self.lowest_zoom_indices.contains(key));
+    }
+
+    /// Remove all tiles including lowest zoom tiles.
+    pub fn clear_all(&mut self) {
         self.tiles.clear();
+        self.lowest_zoom_indices.clear();
+        self.lowest_zoom = None;
     }
 
     /// Returns true if the cache should repaint all tiles due to a zoom change
@@ -112,13 +199,14 @@ impl ImageTileCache {
             .prev_zoom
             .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
         {
-            if zoom > MAX_ZOOM_FOR_CACHE {
+            if zoom > self.max_zoom_for_cache {
                 // Disable caching when sufficiently zoomed in - picture mode
                 // is fast enough at this scale.
-                self.tiles.clear();
+                self.clear();
                 self.zoom_changed_at = None;
             } else {
                 // Mark tiles as outdated so they are refreshed after debounce.
+                // Note: lowest_zoom_indices are preserved
                 self.zoom_changed_at = Some(Instant::now());
             }
             self.prev_zoom = Some(zoom);
@@ -137,9 +225,9 @@ impl ImageTileCache {
         F: FnMut(Rectangle) -> bool,
     {
         let zoom = camera.get_zoom();
-        if zoom > MAX_ZOOM_FOR_CACHE {
+        if zoom > self.max_zoom_for_cache {
             // Caching disabled when zoomed in beyond the threshold
-            self.tiles.clear();
+            self.clear();
             self.zoom_changed_at = None;
             return;
         }
@@ -178,7 +266,40 @@ impl ImageTileCache {
                         world_rect.width.round() as u32,
                         world_rect.height.round() as u32,
                     );
-                    if !self.tiles.contains_key(&key) {
+
+                    // Check if we should update lowest zoom tracking
+                    let should_update_lowest_zoom = if let Some(current_lowest) = self.lowest_zoom {
+                        if zoom < current_lowest {
+                            // New lower zoom level found, clear previous lowest zoom indices
+                            self.lowest_zoom_indices.clear();
+                            true
+                        } else if (zoom - current_lowest).abs() < f32::EPSILON {
+                            // Same zoom level, add to lowest zoom indices
+                            true
+                        } else {
+                            // Higher zoom level, don't update lowest zoom tracking
+                            false
+                        }
+                    } else {
+                        // No lowest zoom set yet, this becomes the lowest
+                        true
+                    };
+
+                    if should_update_lowest_zoom {
+                        self.lowest_zoom = Some(zoom);
+                        self.lowest_zoom_indices.insert(key);
+                    }
+
+                    // Always update regular tiles if they don't exist or if we have a higher zoom (better quality)
+                    let should_update_tile = if let Some(existing_tile) = self.tiles.get(&key) {
+                        // Update if the new tile has higher zoom (better quality)
+                        zoom > existing_tile.zoom
+                    } else {
+                        // No existing tile, so add it
+                        true
+                    };
+
+                    if should_update_tile {
                         if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
                             screen_rect.x as i32,
                             screen_rect.y as i32,

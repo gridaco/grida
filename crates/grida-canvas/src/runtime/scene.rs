@@ -270,7 +270,10 @@ impl Renderer {
                 self.scene_cache.tile.clear();
             }
 
-            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()));
+            let frame = self.frame(
+                rect.unwrap_or(rect::Rectangle::empty()),
+                self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
+            );
             let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
@@ -350,21 +353,21 @@ impl Renderer {
 
     /// Plan the frame for rendering.
     /// Arguments:
-    /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(&mut self, bounds: rect::Rectangle) -> FramePlan {
+    /// - bounds: the bounding rect to be rendered (in world space)
+    /// - zoom: the current zoom level
+    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32) -> FramePlan {
         let __before_ll = Instant::now();
 
         // filter tiles that intersect with the current viewport bounds
         let mut visible_tiles: Vec<FramePlanTileInfo> = Vec::new();
         let mut tile_rects: Vec<_> = Vec::new();
-        let current_zoom = self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0);
         const BLUR_SCALE: f32 = 2.0;
         const MAX_BLUR_RADIUS: f32 = 16.0;
 
         for k in self.scene_cache.tile.filter(&bounds) {
-            let tile_at_zoom = self.scene_cache.tile.tiles().get(k);
+            let tile_at_zoom = self.scene_cache.tile.get_tile(k);
             let (should_blur, blur_radius, tile_zoom) = if let Some(tile) = tile_at_zoom {
-                let zoom_diff = current_zoom / tile.zoom;
+                let zoom_diff = zoom / tile.zoom;
                 if zoom_diff > 1.0 + f32::EPSILON {
                     let blur_radius = ((zoom_diff - 1.0) * BLUR_SCALE).clamp(0.0, MAX_BLUR_RADIUS);
                     (true, blur_radius, tile.zoom)
@@ -383,6 +386,16 @@ impl Renderer {
             });
             tile_rects.push(k.to_rect());
         }
+
+        // Sort visible_tiles by zoom difference from current zoom (closest to current zoom last)
+        // This ensures highest quality tiles are drawn on top
+        visible_tiles.sort_by(|a, b| {
+            let diff_a = (zoom - a.zoom).abs();
+            let diff_b = (zoom - b.zoom).abs();
+            diff_b
+                .partial_cmp(&diff_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let region = region::difference(bounds, &tile_rects);
 
@@ -448,36 +461,37 @@ impl Renderer {
 
         // draw image cache tiles
         for tk in plan.tiles.iter() {
-            let tile_at_zoom = self.scene_cache.tile.tiles().get(&tk.key);
-            let tile_at_zoom = tile_at_zoom.unwrap();
-            let image = &tile_at_zoom.image;
-            let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-            let dst = Rect::from_xywh(
-                tk.key.0 as f32,
-                tk.key.1 as f32,
-                tk.key.2 as f32,
-                tk.key.3 as f32,
-            );
-            let mut paint = SkPaint::default();
-
-            // Apply adaptive blur filter when the tile was captured at a lower zoom level
-            // (lower resolution) than the current view
-            if tk.blur && tk.blur_radius > 0.0 {
-                let blur_filter = skia_safe::image_filters::blur(
-                    (tk.blur_radius, tk.blur_radius),
-                    None,
-                    None,
-                    None,
+            let tile_at_zoom = self.scene_cache.tile.get_tile(&tk.key);
+            if let Some(tile_at_zoom) = tile_at_zoom {
+                let image = &tile_at_zoom.image;
+                let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
+                let dst = Rect::from_xywh(
+                    tk.key.0 as f32,
+                    tk.key.1 as f32,
+                    tk.key.2 as f32,
+                    tk.key.3 as f32,
                 );
-                paint.set_image_filter(blur_filter);
-            }
+                let mut paint = SkPaint::default();
 
-            canvas.draw_image_rect(
-                image,
-                Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
-                dst,
-                &paint,
-            );
+                // Apply adaptive blur filter when the tile was captured at a lower zoom level
+                // (lower resolution) than the current view
+                if tk.blur && tk.blur_radius > 0.0 {
+                    let blur_filter = skia_safe::image_filters::blur(
+                        (tk.blur_radius, tk.blur_radius),
+                        None,
+                        None,
+                        None,
+                    );
+                    paint.set_image_filter(blur_filter);
+                }
+
+                canvas.draw_image_rect(
+                    image,
+                    Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                    dst,
+                    &paint,
+                );
+            }
         }
 
         // draw picture regions
