@@ -543,7 +543,7 @@ impl FigmaConverter {
                 component
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: component
@@ -642,7 +642,7 @@ impl FigmaConverter {
                 instance
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: instance
@@ -805,7 +805,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1040,7 +1040,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1080,7 +1080,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1114,7 +1114,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1153,7 +1153,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1194,7 +1194,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin
@@ -1234,7 +1234,7 @@ impl FigmaConverter {
                 origin
                     .stroke_align
                     .as_ref()
-                    .map(|a| serde_json::to_string(a).unwrap())
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
                     .unwrap_or_else(|| "CENTER".to_string()),
             ),
             stroke_dash_array: origin

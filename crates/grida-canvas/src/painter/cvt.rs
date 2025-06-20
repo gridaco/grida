@@ -36,7 +36,7 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
         Paint::LinearGradient(gradient) => {
             let (colors, positions) =
                 cg_build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
-            let shader = skia_safe::Shader::linear_gradient(
+            if let Some(shader) = skia_safe::Shader::linear_gradient(
                 (
                     skia_safe::Point::new(0.0, 0.0),
                     skia_safe::Point::new(width, 0.0),
@@ -46,16 +46,16 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
                 skia_safe::TileMode::Clamp,
                 None,
                 Some(&sk_matrix(gradient.transform.matrix)),
-            )
-            .unwrap();
-            skia_paint.set_shader(shader);
+            ) {
+                skia_paint.set_shader(shader);
+            }
         }
         Paint::RadialGradient(gradient) => {
             let (colors, positions) =
                 cg_build_gradient_stops(&gradient.stops, opacity * gradient.opacity);
             let center = skia_safe::Point::new(width / 2.0, height / 2.0);
             let radius = width.min(height) / 2.0;
-            let shader = skia_safe::Shader::radial_gradient(
+            if let Some(shader) = skia_safe::Shader::radial_gradient(
                 center,
                 radius,
                 &colors[..],
@@ -63,9 +63,9 @@ pub fn sk_paint(paint: &Paint, opacity: f32, size: (f32, f32)) -> skia_safe::Pai
                 skia_safe::TileMode::Clamp,
                 None,
                 Some(&sk_matrix(gradient.transform.matrix)),
-            )
-            .unwrap();
-            skia_paint.set_shader(shader);
+            ) {
+                skia_paint.set_shader(shader);
+            }
         }
         Paint::Image(image_paint) => {
             // For image paints, we just set the opacity since the actual drawing

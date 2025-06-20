@@ -121,25 +121,18 @@ fn init_window(
     // Build display and get window
     let display_builder = DisplayBuilder::new().with_window_attributes(window_attributes.into());
     let (window, gl_config) = display_builder
-        .build(&el, template, |configs| {
-            // Find the config with the minimum number of samples. Usually Skia takes care of
-            // anti-aliasing and may not be able to create appropriate Surfaces for samples > 0.
-            // See https://github.com/rust-skia/rust-skia/issues/782
-            // And https://github.com/rust-skia/rust-skia/issues/764
-            configs
-                .reduce(|accum, config| {
-                    let transparency_check = config.supports_transparency().unwrap_or(false)
-                        & !accum.supports_transparency().unwrap_or(false);
-
-                    if transparency_check || config.num_samples() < accum.num_samples() {
-                        config
-                    } else {
-                        accum
-                    }
-                })
-                .unwrap()
+        .build(&el, template, |mut configs| {
+            let mut best = configs.next().expect("no gl config available");
+            for config in configs {
+                let transparency_check = config.supports_transparency().unwrap_or(false)
+                    & !best.supports_transparency().unwrap_or(false);
+                if transparency_check || config.num_samples() < best.num_samples() {
+                    best = config;
+                }
+            }
+            best
         })
-        .unwrap();
+        .expect("failed to build window");
     println!("Picked a config with {} samples", gl_config.num_samples());
     let window = window.expect("Could not create window with OpenGL context");
     #[allow(deprecated)]
@@ -178,8 +171,8 @@ fn init_window(
 
     let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
         raw_window_handle,
-        NonZeroU32::new(width).unwrap(),
-        NonZeroU32::new(height).unwrap(),
+        NonZeroU32::new(width).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
+        NonZeroU32::new(height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
     );
 
     let gl_surface = unsafe {
@@ -194,18 +187,20 @@ fn init_window(
         .expect("Could not make GL context current");
 
     gl::load_with(|s| {
-        gl_config
-            .display()
-            .get_proc_address(CString::new(s).unwrap().as_c_str())
+        let Ok(cstr) = CString::new(s) else {
+            return std::ptr::null();
+        };
+        gl_config.display().get_proc_address(cstr.as_c_str())
     });
 
     let interface = skia_safe::gpu::gl::Interface::new_load_with(|name| {
         if name == "eglGetCurrentDisplay" {
             return std::ptr::null();
         }
-        gl_config
-            .display()
-            .get_proc_address(CString::new(name).unwrap().as_c_str())
+        let Ok(cstr) = CString::new(name) else {
+            return std::ptr::null();
+        };
+        gl_config.display().get_proc_address(cstr.as_c_str())
     })
     .expect("Could not create interface");
 
@@ -217,7 +212,7 @@ fn init_window(
         let mut fboid: GLint = 0;
         unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
         gpu::gl::FramebufferInfo {
-            fboid: fboid.try_into().unwrap(),
+            fboid: fboid.try_into().unwrap_or_default(),
             format: skia_safe::gpu::gl::Format::RGBA8.into(),
             ..Default::default()
         }
@@ -531,8 +526,8 @@ impl App {
         // Resize the existing GL surface instead of recreating it
         self.gl_surface.resize(
             &self.gl_context,
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
+            NonZeroU32::new(width).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
+            NonZeroU32::new(height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
         );
 
         // Recreate Skia surface
@@ -663,5 +658,7 @@ where
     };
 
     println!("🎭 Starting event loop...");
-    el.run_app(&mut app).unwrap();
+    if let Err(e) = el.run_app(&mut app) {
+        eprintln!("Event loop error: {:?}", e);
+    }
 }

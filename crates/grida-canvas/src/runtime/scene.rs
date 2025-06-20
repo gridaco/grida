@@ -259,7 +259,10 @@ impl Renderer {
         if let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) {
             // SAFETY: the pointer is only used for the duration of this call
             // and the scene is not mutated while borrowed.
-            let surface = unsafe { &mut *self.backend.as_ref().unwrap().get_surface() };
+            let Some(backend) = self.backend.as_ref() else {
+                return None;
+            };
+            let surface = unsafe { &mut *backend.get_surface() };
             let scene = unsafe { &*scene_ptr };
             let width = surface.width() as f32;
             let height = surface.height() as f32;
@@ -340,7 +343,9 @@ impl Renderer {
             return Some(pic.clone());
         }
 
-        let bounds = self.scene_cache.geometry.get_render_bounds(&id).unwrap();
+        let Some(bounds) = self.scene_cache.geometry.get_render_bounds(&id) else {
+            return None;
+        };
         let pic = self.with_recording(&bounds, draw);
 
         if let Some(pic) = &pic {
@@ -571,7 +576,7 @@ mod tests {
             .scene_cache
             .geometry
             .get_render_bounds(&rect_id)
-            .unwrap();
+            .expect("bounds not found");
         let pic = renderer
             .scene_cache
             .picture
@@ -583,6 +588,19 @@ mod tests {
         assert_eq!(cull.top(), bounds.y);
         assert_eq!(cull.width(), bounds.width);
         assert_eq!(cull.height(), bounds.height);
+
+        renderer.free();
+    }
+
+    #[test]
+    fn recording_cached_returns_none_without_bounds() {
+        let mut renderer = Renderer::new();
+        let surface_ptr = Renderer::init_raster(50, 50);
+        renderer.set_backend(Backend::Raster(surface_ptr));
+
+        // no scene loaded so geometry cache is empty
+        let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});
+        assert!(pic.is_none());
 
         renderer.free();
     }

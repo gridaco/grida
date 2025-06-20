@@ -21,12 +21,11 @@ thread_local! {
         let font_mgr = FontMgr::new();
         let typeface = font_mgr
             .match_family_style("Arial", skia_safe::FontStyle::default())
-            .unwrap_or_else(|| {
-                font_mgr
-                    .match_family_style("", skia_safe::FontStyle::default())
-                    .unwrap()
-            });
-        Font::new(typeface, 16.0)
+            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
+        match typeface {
+            Some(tf) => Font::new(tf, 16.0),
+            None => Font::default(),
+        }
     };
 }
 

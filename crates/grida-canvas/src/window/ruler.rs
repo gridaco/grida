@@ -34,9 +34,11 @@ thread_local! {
         let font_mgr = FontMgr::new();
         let typeface = font_mgr
             .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()))
-            .unwrap();
-        Font::new(typeface, 10.0)
+            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
+        match typeface {
+            Some(tf) => Font::new(tf, 10.0),
+            None => Font::default(),
+        }
     };
 
     static CACHE: RefCell<Option<Cache>> = RefCell::new(None);
@@ -53,7 +55,7 @@ impl Ruler {
             .iter()
             .find(|s| **s * zoom >= MIN_PX_PER_TICK)
             .copied()
-            .unwrap_or(*STEPS.last().unwrap());
+            .unwrap_or_else(|| STEPS[STEPS.len() - 1]);
 
         let world_rect = camera.rect();
         let view = camera.view_matrix();

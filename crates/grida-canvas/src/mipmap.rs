@@ -47,7 +47,7 @@ impl ImageMipmaps {
 
         if !scales.is_empty() {
             // ensure the scales are sorted from large to small for efficient chaining
-            scales.sort_by(|a, b| b.partial_cmp(a).unwrap());
+            scales.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
 
             if config.chained {
                 // start from the original image or the first scale
@@ -122,7 +122,9 @@ impl ImageMipmaps {
 fn scale_image(image: &Image, scale: f32) -> Image {
     let width = ((image.width() as f32 * scale).round() as i32).max(1);
     let height = ((image.height() as f32 * scale).round() as i32).max(1);
-    let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
+    let Some(mut surface) = surfaces::raster_n32_premul((width, height)) else {
+        return image.clone();
+    };
     let canvas = surface.canvas();
     let paint = SkPaint::default();
     canvas.draw_image_rect(

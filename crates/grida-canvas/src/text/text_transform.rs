@@ -34,7 +34,7 @@ pub fn transform_text(text: &str, transform: TextTransform) -> String {
 
             for c in text.chars() {
                 if capitalize_next && c.is_alphabetic() {
-                    result.push(c.to_uppercase().next().unwrap());
+                    result.push(c.to_uppercase().next().unwrap_or(c));
                     capitalize_next = false;
                 } else {
                     result.push(c);

@@ -132,8 +132,11 @@ impl<'a> Painter<'a> {
     fn draw_backdrop_blur(&self, shape: &PainterShape, blur: &FeBackdropBlur) {
         let canvas = self.canvas;
         // 1) Build a Gaussian‐blur filter for the backdrop
-        let image_filter =
-            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None).unwrap();
+        let Some(image_filter) =
+            skia_safe::image_filters::blur((blur.radius, blur.radius), None, None, None)
+        else {
+            return;
+        };
 
         // 2) Clip to the shape
         canvas.save();
@@ -769,7 +772,10 @@ impl<'a> Painter<'a> {
                                     width: shape.rect.width(),
                                     height: shape.rect.height(),
                                 },
-                                &text_layer.base.fills.first().unwrap(),
+                                match text_layer.base.fills.first() {
+                                    Some(f) => f,
+                                    None => return,
+                                },
                                 &text_layer.text_align,
                                 &text_layer.text_align_vertical,
                                 &text_layer.text_style,

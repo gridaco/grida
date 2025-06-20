@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn image_repository_basic() {
         let mut repo = ImageRepository::new();
-        let mut surface = surfaces::raster_n32_premul((1, 1)).unwrap();
+        let mut surface = surfaces::raster_n32_premul((1, 1)).expect("failed to create surface");
         let image = surface.image_snapshot();
         repo.insert("img".to_string(), image.clone());
         assert!(repo.get_by_size("img", 1.0, 1.0).is_some());

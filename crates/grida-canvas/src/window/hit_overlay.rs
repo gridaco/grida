@@ -19,12 +19,11 @@ thread_local! {
         let font_mgr = FontMgr::new();
         let typeface = font_mgr
             .match_family_style("Arial", skia_safe::FontStyle::default())
-            .unwrap_or_else(|| {
-                font_mgr
-                    .match_family_style("", skia_safe::FontStyle::default())
-                    .unwrap()
-            });
-        Font::new(typeface, 20.0)
+            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
+        match typeface {
+            Some(tf) => Font::new(tf, 20.0),
+            None => Font::default(),
+        }
     };
 
     static STROKE: Paint = {
@@ -41,10 +40,9 @@ pub struct HitOverlay;
 
 impl HitOverlay {
     pub fn draw(surface: &mut Surface, hit: Option<(&str, Rect)>) {
-        if hit.is_none() {
+        let Some((id, rect)) = hit else {
             return;
-        }
-        let (id, rect) = hit.unwrap();
+        };
         let canvas = surface.canvas();
 
         // background for text

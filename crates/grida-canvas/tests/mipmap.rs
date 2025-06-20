@@ -36,3 +36,18 @@ fn best_for_size_selects_correct_level() {
     assert_eq!(level.width(), 150);
     assert_eq!(level.height(), 100);
 }
+
+#[test]
+fn handles_nan_in_levels() {
+    let mut surface = surfaces::raster_n32_premul((100, 100)).unwrap();
+    let image = surface.image_snapshot();
+
+    let config = MipmapConfig {
+        levels: MipmapLevels::Fixed(vec![1.0, f32::NAN, 0.5]),
+        chained: true,
+    };
+
+    // should not panic
+    let mip = ImageMipmaps::from_image(image, &config);
+    assert_eq!(mip.level_count(), 3);
+}
