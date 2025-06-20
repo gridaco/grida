@@ -1,6 +1,7 @@
 use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
+use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::repository::{FontRepository, ImageRepository};
@@ -560,7 +561,12 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a ContainerNode (background + stroke + children)
-    fn draw_container_node_recursively(&self, node: &ContainerNode, repository: &NodeRepository) {
+    fn draw_container_node_recursively(
+        &self,
+        node: &ContainerNode,
+        repository: &NodeRepository,
+        cache: &GeometryCache,
+    ) {
         self.with_transform(&node.transform.matrix, || {
             self.with_opacity(node.opacity, || {
                 let shape = build_shape(&IntrinsicSizeNode::Container(node.clone()));
@@ -586,7 +592,7 @@ impl<'a> Painter<'a> {
                     self.with_clip(&shape, || {
                         for child_id in &node.children {
                             if let Some(child) = repository.get(child_id) {
-                                self.draw_node_recursively(child, repository);
+                                self.draw_node_recursively(child, repository, cache);
                             }
                         }
                     });
@@ -594,7 +600,7 @@ impl<'a> Painter<'a> {
                     // Draw children without clipping
                     for child_id in &node.children {
                         if let Some(child) = repository.get(child_id) {
-                            self.draw_node_recursively(child, repository);
+                            self.draw_node_recursively(child, repository, cache);
                         }
                     }
                 }
@@ -624,28 +630,52 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw a GroupNode: no shape of its own, only children, but apply transform + opacity
-    fn draw_group_node_recursively(&self, node: &GroupNode, repository: &NodeRepository) {
+    fn draw_group_node_recursively(
+        &self,
+        node: &GroupNode,
+        repository: &NodeRepository,
+        cache: &GeometryCache,
+    ) {
         self.with_transform(&node.transform.matrix, || {
             self.with_opacity(node.opacity, || {
                 for child_id in &node.children {
                     if let Some(child) = repository.get(child_id) {
-                        self.draw_node_recursively(child, repository);
+                        self.draw_node_recursively(child, repository, cache);
                     }
                 }
             });
         });
     }
 
-    #[deprecated(note = "Boolean operations are not implemented properly")]
     fn draw_boolean_operation_node_recursively(
         &self,
         node: &BooleanPathOperationNode,
         repository: &NodeRepository,
+        cache: &GeometryCache,
     ) {
         self.with_transform(&node.transform.matrix, || {
-            for child_id in &node.children {
-                if let Some(child) = repository.get(child_id) {
-                    self.draw_node_recursively(child, repository);
+            if let Some(shape) = boolean_operation_shape(node, repository, cache) {
+                self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
+                    self.with_opacity(node.opacity, || {
+                        self.with_blendmode(node.blend_mode, || {
+                            self.draw_fill(&shape, &node.fill);
+                            if let Some(stroke) = &node.stroke {
+                                self.draw_stroke(
+                                    &shape,
+                                    stroke,
+                                    node.stroke_width,
+                                    node.stroke_align,
+                                    node.stroke_dash_array.as_ref(),
+                                );
+                            }
+                        });
+                    });
+                });
+            } else {
+                for child_id in &node.children {
+                    if let Some(child) = repository.get(child_id) {
+                        self.draw_node_recursively(child, repository, cache);
+                    }
                 }
             }
         });
@@ -669,11 +699,16 @@ impl<'a> Painter<'a> {
     }
 
     /// Dispatch to the correct node‐type draw method
-    pub fn draw_node_recursively(&self, node: &Node, repository: &NodeRepository) {
+    pub fn draw_node_recursively(
+        &self,
+        node: &Node,
+        repository: &NodeRepository,
+        cache: &GeometryCache,
+    ) {
         match node {
             Node::Error(n) => self.draw_error_node(n),
-            Node::Group(n) => self.draw_group_node_recursively(n, repository),
-            Node::Container(n) => self.draw_container_node_recursively(n, repository),
+            Node::Group(n) => self.draw_group_node_recursively(n, repository, cache),
+            Node::Container(n) => self.draw_container_node_recursively(n, repository, cache),
             Node::Rectangle(n) => self.draw_rect_node(n),
             Node::Ellipse(n) => self.draw_ellipse_node(n),
             Node::Polygon(n) => self.draw_polygon_node(n),
@@ -685,7 +720,7 @@ impl<'a> Painter<'a> {
             }
             Node::Path(n) => self.draw_path_node(n),
             Node::BooleanOperation(n) => {
-                self.draw_boolean_operation_node_recursively(n, repository)
+                self.draw_boolean_operation_node_recursively(n, repository, cache)
             }
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
         }
