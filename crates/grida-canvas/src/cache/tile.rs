@@ -5,8 +5,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-/// Screen space tile size in pixels
-const TILE_SIZE_PX: f32 = 512.0;
 /// Caching is enabled while the camera zoom is at or below this level.
 /// When zooming in beyond this value the cache is cleared and disabled
 /// as the picture based rendering is fast enough.
@@ -29,10 +27,17 @@ impl TileRectKey {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TileAtZoom {
+    pub image: Rc<Image>,
+    pub zoom: f32,
+}
+
 /// Simple raster tile cache used by the renderer.
 #[derive(Debug, Clone)]
 pub struct ImageTileCache {
-    tiles: HashMap<TileRectKey, Rc<Image>>,
+    tile_size: u16,
+    tiles: HashMap<TileRectKey, TileAtZoom>,
     prev_zoom: Option<f32>,
     zoom_changed_at: Option<Instant>,
 }
@@ -40,6 +45,7 @@ pub struct ImageTileCache {
 impl Default for ImageTileCache {
     fn default() -> Self {
         Self {
+            tile_size: 512,
             tiles: HashMap::new(),
             prev_zoom: None,
             zoom_changed_at: None,
@@ -52,9 +58,32 @@ impl ImageTileCache {
         Self::default()
     }
 
+    pub fn from_size(tile_size: u16) -> Self {
+        Self {
+            tile_size,
+            tiles: HashMap::new(),
+            prev_zoom: None,
+            zoom_changed_at: None,
+        }
+    }
+
     /// Access currently cached raster tiles.
-    pub fn tiles(&self) -> &HashMap<TileRectKey, Rc<Image>> {
+    pub fn tiles(&self) -> &HashMap<TileRectKey, TileAtZoom> {
         &self.tiles
+    }
+
+    /// Get all tiles that intersect with the given bounds.
+    pub fn filter(&self, bounds: &Rectangle) -> Vec<&TileRectKey> {
+        self.tiles
+            .iter()
+            .filter_map(|(key, _)| {
+                if rect::intersects(&key.to_rect(), bounds) {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Remove all cached tiles.
@@ -115,7 +144,7 @@ impl ImageTileCache {
             return;
         }
 
-        let world_size = TILE_SIZE_PX / zoom;
+        let world_size = self.tile_size as f32 / zoom;
         let rect = camera.rect();
 
         let start_col = (rect.x / world_size).floor() as i32;
@@ -153,10 +182,16 @@ impl ImageTileCache {
                         if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
                             screen_rect.x as i32,
                             screen_rect.y as i32,
-                            TILE_SIZE_PX as i32,
-                            TILE_SIZE_PX as i32,
+                            self.tile_size as i32,
+                            self.tile_size as i32,
                         )) {
-                            self.tiles.insert(key, Rc::new(image));
+                            self.tiles.insert(
+                                key,
+                                TileAtZoom {
+                                    image: Rc::new(image),
+                                    zoom,
+                                },
+                            );
                         }
                     }
                 }

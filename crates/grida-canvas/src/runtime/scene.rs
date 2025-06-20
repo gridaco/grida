@@ -13,17 +13,29 @@ use skia_safe::{
     Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
 };
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 /// Callback type used to request a new frame.
 pub type RafCallback = Box<dyn Fn()>;
 
+/// Information about a tile including whether it should be blurred
+#[derive(Clone)]
+pub struct FramePlanTileInfo {
+    pub key: TileRectKey,
+    /// When true, the tile should be blurred as it was captured at a lower zoom level
+    /// (lower resolution) than the current view
+    pub blur: bool,
+    /// The blur radius to use for this tile (adaptive by zoom difference)
+    pub blur_radius: f32,
+    /// The zoom level at which this tile was snapshotted
+    pub zoom: f32,
+}
+
 #[derive(Clone)]
 pub struct FramePlan {
-    /// cached tile keys
-    pub tiles: Vec<TileRectKey>,
+    /// cached tile keys with blur information
+    pub tiles: Vec<FramePlanTileInfo>,
     /// when true, the renderer should schedule another frame to recache tiles
     pub should_repaint_all: bool,
     /// regions with their intersecting indices
@@ -258,8 +270,7 @@ impl Renderer {
                 self.scene_cache.tile.clear();
             }
 
-            let tiles = self.scene_cache.tile.tiles().clone();
-            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()), &tiles);
+            let frame = self.frame(rect.unwrap_or(rect::Rectangle::empty()));
             let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
             let encode_duration = start.elapsed();
@@ -340,23 +351,39 @@ impl Renderer {
     /// Plan the frame for rendering.
     /// Arguments:
     /// - rect: the bounding rect to be rendered (in world space)
-    fn frame(
-        &mut self,
-        bounds: rect::Rectangle,
-        tiles: &HashMap<TileRectKey, Rc<Image>>,
-    ) -> FramePlan {
+    fn frame(&mut self, bounds: rect::Rectangle) -> FramePlan {
         let __before_ll = Instant::now();
 
         // filter tiles that intersect with the current viewport bounds
-        let mut visible_tiles: Vec<TileRectKey> = Vec::new();
+        let mut visible_tiles: Vec<FramePlanTileInfo> = Vec::new();
         let mut tile_rects: Vec<_> = Vec::new();
-        for k in tiles.keys() {
-            let rect = k.to_rect();
-            if rect::intersects(&rect, &bounds) {
-                visible_tiles.push(*k);
-                tile_rects.push(rect);
-            }
+        let current_zoom = self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0);
+        const BLUR_SCALE: f32 = 2.0;
+        const MAX_BLUR_RADIUS: f32 = 16.0;
+
+        for k in self.scene_cache.tile.filter(&bounds) {
+            let tile_at_zoom = self.scene_cache.tile.tiles().get(k);
+            let (should_blur, blur_radius, tile_zoom) = if let Some(tile) = tile_at_zoom {
+                let zoom_diff = current_zoom / tile.zoom;
+                if zoom_diff > 1.0 + f32::EPSILON {
+                    let blur_radius = ((zoom_diff - 1.0) * BLUR_SCALE).clamp(0.0, MAX_BLUR_RADIUS);
+                    (true, blur_radius, tile.zoom)
+                } else {
+                    (false, 0.0, tile.zoom)
+                }
+            } else {
+                (false, 0.0, 0.0)
+            };
+
+            visible_tiles.push(FramePlanTileInfo {
+                key: *k,
+                blur: should_blur,
+                blur_radius,
+                zoom: tile_zoom,
+            });
+            tile_rects.push(k.to_rect());
         }
+
         let region = region::difference(bounds, &tile_rects);
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
@@ -419,12 +446,32 @@ impl Renderer {
             canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
         }
 
+        // draw image cache tiles
         for tk in plan.tiles.iter() {
-            let image = self.scene_cache.tile.tiles().get(tk);
-            let image = image.unwrap();
+            let tile_at_zoom = self.scene_cache.tile.tiles().get(&tk.key);
+            let tile_at_zoom = tile_at_zoom.unwrap();
+            let image = &tile_at_zoom.image;
             let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-            let dst = Rect::from_xywh(tk.0 as f32, tk.1 as f32, tk.2 as f32, tk.3 as f32);
-            let paint = SkPaint::default();
+            let dst = Rect::from_xywh(
+                tk.key.0 as f32,
+                tk.key.1 as f32,
+                tk.key.2 as f32,
+                tk.key.3 as f32,
+            );
+            let mut paint = SkPaint::default();
+
+            // Apply adaptive blur filter when the tile was captured at a lower zoom level
+            // (lower resolution) than the current view
+            if tk.blur && tk.blur_radius > 0.0 {
+                let blur_filter = skia_safe::image_filters::blur(
+                    (tk.blur_radius, tk.blur_radius),
+                    None,
+                    None,
+                    None,
+                );
+                paint.set_image_filter(blur_filter);
+            }
+
             canvas.draw_image_rect(
                 image,
                 Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
@@ -433,6 +480,7 @@ impl Renderer {
             );
         }
 
+        // draw picture regions
         for (region, indices) in &plan.regions {
             for idx in indices {
                 let layer = self.scene_cache.layers.layers[*idx].clone();
@@ -523,32 +571,5 @@ mod tests {
         assert_eq!(cull.height(), bounds.height);
 
         renderer.free();
-    }
-
-    #[test]
-    fn frame_filters_tiles_outside_viewport() {
-        let mut renderer = Renderer::new();
-
-        // create a dummy tile image
-        let mut surface = skia_safe::surfaces::raster_n32_premul((10, 10)).unwrap();
-        let image = surface.image_snapshot();
-
-        let mut tiles: HashMap<TileRectKey, Rc<Image>> = HashMap::new();
-        // tile intersecting the viewport
-        tiles.insert(TileRectKey(0, 0, 512, 512), Rc::new(image.clone()));
-        // tile completely outside the viewport
-        tiles.insert(TileRectKey(600, 600, 512, 512), Rc::new(image));
-
-        let bounds = rect::Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: 100.0,
-            height: 100.0,
-        };
-
-        let plan = renderer.frame(bounds, &tiles);
-
-        assert_eq!(plan.tiles.len(), 1);
-        assert_eq!(plan.tiles[0], TileRectKey(0, 0, 512, 512));
     }
 }

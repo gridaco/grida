@@ -1,9 +1,8 @@
-use crate::cache::tile::TileRectKey;
+use crate::cache::tile::{TileAtZoom, TileRectKey};
 use crate::runtime::camera::Camera2D;
 use math2::rect;
 use skia_safe::{Color, Paint, PaintStyle, Rect, Surface};
 use std::collections::HashMap;
-use std::rc::Rc;
 
 pub struct TileOverlay;
 
@@ -11,7 +10,7 @@ impl TileOverlay {
     pub fn draw(
         surface: &mut Surface,
         camera: &Camera2D,
-        tiles: &HashMap<TileRectKey, Rc<skia_safe::Image>>,
+        tiles: &HashMap<TileRectKey, TileAtZoom>,
     ) {
         if tiles.is_empty() {
             return;
