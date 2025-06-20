@@ -181,7 +181,6 @@ async fn main() {
         println!("📝 Initializing font loader...");
         let font_tx_clone = font_tx.clone();
         let proxy_clone = proxy.clone();
-        let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
 
         // Load all images in the scene - non-blocking
         let should_load_images = !cli.no_image && (cli.file.is_none() || cli.images_dir.is_some());

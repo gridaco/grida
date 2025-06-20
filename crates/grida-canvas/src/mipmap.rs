@@ -123,7 +123,7 @@ fn scale_image(image: &Image, scale: f32) -> Image {
     let width = ((image.width() as f32 * scale).round() as i32).max(1);
     let height = ((image.height() as f32 * scale).round() as i32).max(1);
     let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
-    let mut canvas = surface.canvas();
+    let canvas = surface.canvas();
     let paint = SkPaint::default();
     canvas.draw_image_rect(
         image,

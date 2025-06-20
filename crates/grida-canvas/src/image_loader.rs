@@ -76,7 +76,7 @@ impl ImageLoader {
         // Load the image
         let data = match self.fetch_image_data(src).await {
             Ok(data) => data,
-            Err(e) => {
+            Err(_e) => {
                 // eprintln!("Failed to load image {}: {}", src, e);
                 return None;
             }

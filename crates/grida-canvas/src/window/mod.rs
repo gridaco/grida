@@ -11,7 +11,7 @@ use crate::image_loader::{ImageLoader, load_scene_images};
 use crate::node::schema::*;
 use crate::repository::ResourceRepository;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, RenderStats, Renderer};
+use crate::runtime::scene::{Backend, Renderer};
 use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
@@ -443,7 +443,7 @@ impl App {
         };
 
         let mut overlay_flush_time = std::time::Duration::ZERO;
-        let mut overlay_draw_time = std::time::Duration::ZERO;
+        let overlay_draw_time: std::time::Duration;
 
         // fps meter
         let fps = self.scheduler.average_fps();
