@@ -29,6 +29,96 @@ pub struct TileAtZoom {
     pub zoom: f32,
 }
 
+/// Information about a tile including whether it should be blurred
+#[derive(Debug, Clone)]
+pub struct RegionTileInfo {
+    pub key: TileRectKey,
+    /// When true, the tile should be blurred as it was captured at a lower zoom level
+    /// (lower resolution) than the current view
+    pub blur: bool,
+    /// The blur radius to use for this tile (adaptive by zoom difference)
+    pub blur_radius: f32,
+    /// The zoom level at which this tile was snapshotted
+    pub zoom: f32,
+}
+
+/// A collection of tiles for a specific region with blur information and sorting.
+/// This encapsulates the logic for retrieving tiles from the cache and calculating
+/// blur parameters based on zoom differences.
+#[derive(Debug, Clone)]
+pub struct RegionTiles {
+    pub tiles: Vec<RegionTileInfo>,
+    pub tile_rects: Vec<Rectangle>,
+}
+
+impl RegionTiles {
+    /// Create a new RegionTiles instance with tiles filtered from the cache
+    /// for the given bounds and current zoom level.
+    pub fn new(cache: &ImageTileCache, bounds: &Rectangle, current_zoom: f32) -> Self {
+        let mut tiles: Vec<RegionTileInfo> = Vec::new();
+        let mut tile_rects: Vec<Rectangle> = Vec::new();
+
+        const BLUR_SCALE: f32 = 2.0;
+        const MAX_BLUR_RADIUS: f32 = 16.0;
+
+        // Filter tiles that intersect with the current viewport bounds
+        for key in cache.filter(bounds) {
+            let tile_at_zoom = cache.get_tile(key);
+            let (should_blur, blur_radius, tile_zoom) = if let Some(tile) = tile_at_zoom {
+                let zoom_diff = current_zoom / tile.zoom;
+                if zoom_diff > 1.0 + f32::EPSILON {
+                    let blur_radius = ((zoom_diff - 1.0) * BLUR_SCALE).clamp(0.0, MAX_BLUR_RADIUS);
+                    (true, blur_radius, tile.zoom)
+                } else {
+                    (false, 0.0, tile.zoom)
+                }
+            } else {
+                (false, 0.0, 0.0)
+            };
+
+            tiles.push(RegionTileInfo {
+                key: *key,
+                blur: should_blur,
+                blur_radius,
+                zoom: tile_zoom,
+            });
+            tile_rects.push(key.to_rect());
+        }
+
+        // Sort tiles by zoom difference from current zoom (closest to current zoom last)
+        // This ensures highest quality tiles are drawn on top
+        tiles.sort_by(|a, b| {
+            let diff_a = (current_zoom - a.zoom).abs();
+            let diff_b = (current_zoom - b.zoom).abs();
+            diff_b
+                .partial_cmp(&diff_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        Self { tiles, tile_rects }
+    }
+
+    /// Get the tile information for rendering
+    pub fn tiles(&self) -> &[RegionTileInfo] {
+        &self.tiles
+    }
+
+    /// Get the tile rectangles for region calculation
+    pub fn tile_rects(&self) -> &[Rectangle] {
+        &self.tile_rects
+    }
+
+    /// Get the number of tiles in this region
+    pub fn len(&self) -> usize {
+        self.tiles.len()
+    }
+
+    /// Check if this region has any tiles
+    pub fn is_empty(&self) -> bool {
+        self.tiles.is_empty()
+    }
+}
+
 /// Simple raster tile cache used by the renderer.
 ///
 /// This cache maintains two types of tiles:
@@ -319,5 +409,12 @@ impl ImageTileCache {
             }
         }
         self.zoom_changed_at = None;
+    }
+
+    /// Get tiles for a specific region with blur information and sorting.
+    /// This encapsulates the logic for filtering tiles, calculating blur parameters,
+    /// and sorting by quality for optimal rendering.
+    pub fn get_region_tiles(&self, bounds: &Rectangle, current_zoom: f32) -> RegionTiles {
+        RegionTiles::new(self, bounds, current_zoom)
     }
 }

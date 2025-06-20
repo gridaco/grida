@@ -1,4 +1,4 @@
-use crate::cache::tile::TileRectKey;
+use crate::cache::tile::RegionTileInfo;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{Painter, cvt};
@@ -19,18 +19,8 @@ use std::time::{Duration, Instant};
 /// Callback type used to request a new frame.
 pub type RafCallback = Box<dyn Fn()>;
 
-/// Information about a tile including whether it should be blurred
-#[derive(Clone)]
-pub struct FramePlanTileInfo {
-    pub key: TileRectKey,
-    /// When true, the tile should be blurred as it was captured at a lower zoom level
-    /// (lower resolution) than the current view
-    pub blur: bool,
-    /// The blur radius to use for this tile (adaptive by zoom difference)
-    pub blur_radius: f32,
-    /// The zoom level at which this tile was snapshotted
-    pub zoom: f32,
-}
+/// Type alias for tile information in frame planning
+pub type FramePlanTileInfo = RegionTileInfo;
 
 #[derive(Clone)]
 pub struct FramePlan {
@@ -363,44 +353,10 @@ impl Renderer {
     fn frame(&mut self, bounds: rect::Rectangle, zoom: f32) -> FramePlan {
         let __before_ll = Instant::now();
 
-        // filter tiles that intersect with the current viewport bounds
-        let mut visible_tiles: Vec<FramePlanTileInfo> = Vec::new();
-        let mut tile_rects: Vec<_> = Vec::new();
-        const BLUR_SCALE: f32 = 2.0;
-        const MAX_BLUR_RADIUS: f32 = 16.0;
-
-        for k in self.scene_cache.tile.filter(&bounds) {
-            let tile_at_zoom = self.scene_cache.tile.get_tile(k);
-            let (should_blur, blur_radius, tile_zoom) = if let Some(tile) = tile_at_zoom {
-                let zoom_diff = zoom / tile.zoom;
-                if zoom_diff > 1.0 + f32::EPSILON {
-                    let blur_radius = ((zoom_diff - 1.0) * BLUR_SCALE).clamp(0.0, MAX_BLUR_RADIUS);
-                    (true, blur_radius, tile.zoom)
-                } else {
-                    (false, 0.0, tile.zoom)
-                }
-            } else {
-                (false, 0.0, 0.0)
-            };
-
-            visible_tiles.push(FramePlanTileInfo {
-                key: *k,
-                blur: should_blur,
-                blur_radius,
-                zoom: tile_zoom,
-            });
-            tile_rects.push(k.to_rect());
-        }
-
-        // Sort visible_tiles by zoom difference from current zoom (closest to current zoom last)
-        // This ensures highest quality tiles are drawn on top
-        visible_tiles.sort_by(|a, b| {
-            let diff_a = (zoom - a.zoom).abs();
-            let diff_b = (zoom - b.zoom).abs();
-            diff_b
-                .partial_cmp(&diff_a)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        // Get tiles for the region with blur information and sorting
+        let region_tiles = self.scene_cache.tile.get_region_tiles(&bounds, zoom);
+        let visible_tiles: Vec<FramePlanTileInfo> = region_tiles.tiles().to_vec();
+        let tile_rects: Vec<_> = region_tiles.tile_rects().to_vec();
 
         let region = region::difference(bounds, &tile_rects);
 
