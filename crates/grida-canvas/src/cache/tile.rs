@@ -10,7 +10,7 @@ const TILE_SIZE_PX: f32 = 512.0;
 /// Caching is enabled while the camera zoom is at or below this level.
 /// When zooming in beyond this value the cache is cleared and disabled
 /// as the picture based rendering is fast enough.
-const MAX_ZOOM_FOR_CACHE: f32 = 0.5;
+const MAX_ZOOM_FOR_CACHE: f32 = 2.0;
 /// Debounce duration after zooming before capturing tiles
 const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
