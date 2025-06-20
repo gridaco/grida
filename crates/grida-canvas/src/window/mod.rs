@@ -2,6 +2,7 @@ pub mod fps;
 pub mod hit_overlay;
 pub mod ruler;
 pub mod scheduler;
+pub mod stats_overlay;
 pub mod tile_overlay;
 
 use crate::font_loader::FontLoader;
@@ -270,6 +271,7 @@ struct App {
     font_rx: mpsc::UnboundedReceiver<FontMessage>,
     scheduler: scheduler::FrameScheduler,
     last_frame_time: std::time::Instant,
+    last_stats: Option<String>,
 }
 
 impl ApplicationHandler for App {
@@ -445,12 +447,13 @@ impl App {
         let mut overlay_flush_time = std::time::Duration::ZERO;
         let overlay_draw_time: std::time::Duration;
 
-        // fps meter
-        let fps = self.scheduler.average_fps();
         unsafe {
             let __overlay_start = std::time::Instant::now();
             let surface = &mut *self.surface_ptr;
-            fps::FpsMeter::draw(surface, fps);
+            fps::FpsMeter::draw(surface, self.scheduler.average_fps());
+            if let Some(s) = self.last_stats.as_deref() {
+                stats_overlay::StatsOverlay::draw(surface, s);
+            }
             let hit_rect = if let Some(id) = self.hit_result.as_ref() {
                 if let Some(bounds) = self.renderer.scene_cache().geometry.get_render_bounds(id) {
                     let screen_rect = rect::transform(bounds, &self.camera.view_matrix());
@@ -495,7 +498,7 @@ impl App {
         let __sleep_time = __sleep_start.elapsed();
 
         let __total_frame_time = __frame_start.elapsed();
-        println!(
+        let stat_string = format!(
             "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
@@ -514,6 +517,8 @@ impl App {
             __queue_time,
             __sleep_time
         );
+        println!("{}", stat_string);
+        self.last_stats = Some(stat_string);
 
         self.last_frame_time = __frame_start;
 
@@ -654,6 +659,7 @@ where
         font_rx,
         scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),
         last_frame_time: std::time::Instant::now(),
+        last_stats: None,
     };
 
     println!("🎭 Starting event loop...");
