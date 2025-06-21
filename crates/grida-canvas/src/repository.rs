@@ -118,6 +118,7 @@ impl ResourceRepository<ImageMipmaps> for ImageRepository {
 pub struct FontRepository {
     provider: TypefaceFontProvider,
     fonts: HashMap<String, Vec<Vec<u8>>>,
+    generation: usize,
 }
 
 impl FontRepository {
@@ -125,6 +126,7 @@ impl FontRepository {
         Self {
             provider: TypefaceFontProvider::new(),
             fonts: HashMap::new(),
+            generation: 0,
         }
     }
 
@@ -136,6 +138,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes);
+        self.generation += 1;
     }
 
     pub fn add(&mut self, bytes: &[u8], family: &str) {
@@ -149,6 +152,7 @@ impl FontRepository {
         }
 
         family_fonts.push(bytes.to_vec());
+        self.generation += 1;
     }
 
     pub fn font_collection(&self) -> FontCollection {
@@ -163,6 +167,10 @@ impl FontRepository {
 
     pub fn total_font_count(&self) -> usize {
         self.fonts.values().map(|fonts| fonts.len()).sum()
+    }
+
+    pub fn generation(&self) -> usize {
+        self.generation
     }
 
     pub fn get_family_fonts(&self, family: &str) -> Option<&Vec<Vec<u8>>> {
@@ -181,6 +189,7 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
             }
         }
         self.fonts.insert(id, item);
+        self.generation += 1;
     }
 
     fn get(&self, id: &Self::Id) -> Option<&Vec<Vec<u8>>> {
@@ -192,7 +201,11 @@ impl ResourceRepository<Vec<Vec<u8>>> for FontRepository {
     }
 
     fn remove(&mut self, id: &Self::Id) -> Option<Vec<Vec<u8>>> {
-        self.fonts.remove(id)
+        let res = self.fonts.remove(id);
+        if res.is_some() {
+            self.generation += 1;
+        }
+        res
     }
 
     fn iter(&self) -> Self::Iter<'_> {

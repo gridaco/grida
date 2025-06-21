@@ -1,6 +1,6 @@
 use crate::cache::scene::SceneCache;
 use crate::node::schema::NodeId;
-use crate::painter::layer::Layer;
+use crate::painter::{cvt, layer::Layer};
 use math2::rect;
 use math2::vector2::Vector2;
 
@@ -29,6 +29,46 @@ impl<'a> HitTester<'a> {
         Self { cache }
     }
 
+    /// Fast hit testing using only axis-aligned bounding boxes.
+    pub fn hit_first_fast(&self, point: Vector2) -> Option<NodeId> {
+        let mut indices = self.cache.intersects_point(point);
+        indices.sort();
+        for idx in indices.into_iter().rev() {
+            let layer = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+                if rect::contains_point(&bounds, point) {
+                    return Some(layer.id().clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Return all nodes whose bounding boxes contain the point.
+    pub fn hits_fast(&self, point: Vector2) -> Vec<NodeId> {
+        let mut indices = self.cache.intersects_point(point);
+        indices.sort();
+        let mut out = Vec::with_capacity(indices.len());
+        for idx in indices.into_iter().rev() {
+            let layer = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+                if rect::contains_point(&bounds, point) {
+                    out.push(layer.id().clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// Check bounding box containment for a single node.
+    pub fn contains_fast(&self, id: &NodeId, point: Vector2) -> bool {
+        self.cache
+            .geometry
+            .get_render_bounds(id)
+            .map(|b| rect::contains_point(&b, point))
+            .unwrap_or(false)
+    }
+
     /// Returns the top-most node containing the point, if any.
     ///
     /// Layers are checked from deepest to shallowest, so the first match mimics
@@ -41,8 +81,19 @@ impl<'a> HitTester<'a> {
             let layer = &self.cache.layers.layers[idx];
             if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
                 if rect::contains_point(&bounds, point) {
-                    // TODO: perform precise path hit testing
-                    return Some(layer.id().clone());
+                    let base = match layer {
+                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
+                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
+                    };
+                    let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
+                        (*entry.path).clone()
+                    } else {
+                        base.shape.to_path()
+                    };
+                    path.transform(&cvt::sk_matrix(base.transform.matrix));
+                    if path.contains((point[0], point[1])) {
+                        return Some(layer.id().clone());
+                    }
                 }
             }
         }
@@ -61,7 +112,19 @@ impl<'a> HitTester<'a> {
             let layer = &self.cache.layers.layers[idx];
             if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
                 if rect::contains_point(&bounds, point) {
-                    out.push(layer.id().clone());
+                    let base = match layer {
+                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
+                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
+                    };
+                    let mut path = if let Some(entry) = self.cache.path.borrow().get(layer.id()) {
+                        (*entry.path).clone()
+                    } else {
+                        base.shape.to_path()
+                    };
+                    path.transform(&cvt::sk_matrix(base.transform.matrix));
+                    if path.contains((point[0], point[1])) {
+                        out.push(layer.id().clone());
+                    }
                 }
             }
         }
@@ -71,10 +134,20 @@ impl<'a> HitTester<'a> {
     /// Returns `true` if the specified node contains the point within its
     /// render bounds.
     pub fn contains(&self, id: &NodeId, point: Vector2) -> bool {
-        self.cache
-            .geometry
-            .get_render_bounds(id)
-            .map(|b| rect::contains_point(&b, point))
-            .unwrap_or(false)
+        if let Some(layer) = self.cache.layers.layers.iter().find(|l| l.id() == id) {
+            let base = match layer {
+                crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
+                crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
+            };
+            let mut path = if let Some(entry) = self.cache.path.borrow().get(id) {
+                (*entry.path).clone()
+            } else {
+                base.shape.to_path()
+            };
+            path.transform(&cvt::sk_matrix(base.transform.matrix));
+            path.contains((point[0], point[1]))
+        } else {
+            false
+        }
     }
 }
