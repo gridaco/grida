@@ -1,6 +1,6 @@
-use cg::draw::{Backend, Renderer};
-use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::runtime::scene::{Backend, Renderer};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use math2::transform::AffineTransform;
 
@@ -39,14 +39,12 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             effect: if with_effects {
-                Some(cg::schema::FilterEffect::DropShadow(
-                    cg::schema::FeDropShadow {
-                        dx: 2.0,
-                        dy: 2.0,
-                        blur: 4.0,
-                        color: Color(0, 0, 0, 128),
-                    },
-                ))
+                Some(FilterEffect::DropShadow(FeDropShadow {
+                    dx: 2.0,
+                    dy: 2.0,
+                    blur: 4.0,
+                    color: Color(0, 0, 0, 128),
+                }))
             } else {
                 None
             },
@@ -56,7 +54,7 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
     }
 
     // Create root group
-    let root_group = cg::schema::GroupNode {
+    let root_group = GroupNode {
         base: BaseNode {
             id: "root".to_string(),
             name: "Root Group".to_string(),
@@ -91,7 +89,7 @@ fn bench_rectangles(c: &mut Criterion) {
     // 1K rectangles
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+            let mut renderer = Renderer::new();
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
 
@@ -107,7 +105,8 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_scene(&scene);
+            renderer.load_scene(scene);
+            renderer.queue();
             renderer.free();
         })
     });
@@ -115,7 +114,7 @@ fn bench_rectangles(c: &mut Criterion) {
     // 10K rectangles
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+            let mut renderer = Renderer::new();
 
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
@@ -132,14 +131,15 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_scene(&scene);
+            renderer.load_scene(scene);
+            renderer.queue();
             renderer.free();
         })
     });
 
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+            let mut renderer = Renderer::new();
 
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
@@ -156,7 +156,8 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_scene(&scene);
+            renderer.load_scene(scene);
+            renderer.queue();
             renderer.free();
         })
     });
@@ -164,7 +165,7 @@ fn bench_rectangles(c: &mut Criterion) {
     // 50K rectangles
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+            let mut renderer = Renderer::new();
 
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
@@ -181,14 +182,15 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_scene(&scene);
+            renderer.load_scene(scene);
+            renderer.queue();
             renderer.free();
         })
     });
 
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(1000.0, 1000.0, 1.0);
+            let mut renderer = Renderer::new();
 
             let surface_ptr = Renderer::init_raster(width, height);
             renderer.set_backend(Backend::Raster(surface_ptr));
@@ -205,7 +207,8 @@ fn bench_rectangles(c: &mut Criterion) {
                 &paint,
             );
 
-            renderer.render_scene(&scene);
+            renderer.load_scene(scene);
+            renderer.queue();
             renderer.free();
         })
     });

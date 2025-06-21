@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::vector2::Vector2;
 
 /// Represents a side of a rectangle.
@@ -32,6 +34,15 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
+    pub fn empty() -> Self {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
+    }
+
     /// Returns the center point of the rectangle.
     pub fn center(&self) -> Vector2 {
         [self.x + self.width / 2.0, self.y + self.height / 2.0]
@@ -151,6 +162,16 @@ pub fn from_points(points: &[Vector2]) -> Rectangle {
     }
 }
 
+impl fmt::Display for Rectangle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "x: {}, y: {}, width: {}, height: {}",
+            self.x, self.y, self.width, self.height
+        )
+    }
+}
+
 /// Returns an object containing the nine control points of a rectangle.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect9Points {
@@ -208,7 +229,7 @@ pub fn to_9points_chunk(rect: &Rectangle) -> [Vector2; 9] {
 
 /// Returns true if rectangle `a` fully contains rectangle `b`.
 pub fn contains(a: &Rectangle, b: &Rectangle) -> bool {
-    b.contains(a)
+    a.contains(b)
 }
 
 /// Returns true if the point is inside the rectangle (inclusive).
@@ -258,6 +279,39 @@ pub fn union(rects: &[Rectangle]) -> Rectangle {
         width: max_x - min_x,
         height: max_y - min_y,
     }
+}
+
+/// Tiles the rectangle into a grid of equally sized rectangles.
+///
+/// The `size` parameter specifies the number of `(columns, rows)`.
+/// Each must evenly divide the rectangle's width and height respectively.
+///
+/// # Panics
+///
+/// Panics if the provided column or row count is zero or does not
+/// evenly divide the rectangle dimensions.
+pub fn tile(rect: Rectangle, size: (usize, usize)) -> Vec<Rectangle> {
+    let (cols, rows) = size;
+    assert!(cols > 0 && rows > 0, "size must be greater than zero");
+
+    let tile_w = rect.width / cols as f32;
+    let tile_h = rect.height / rows as f32;
+
+    assert!(tile_w.fract() == 0.0, "columns must evenly divide width");
+    assert!(tile_h.fract() == 0.0, "rows must evenly divide height");
+
+    let mut out = Vec::with_capacity(cols * rows);
+    for r in 0..rows {
+        for c in 0..cols {
+            out.push(Rectangle {
+                x: rect.x + c as f32 * tile_w,
+                y: rect.y + r as f32 * tile_h,
+                width: tile_w,
+                height: tile_h,
+            });
+        }
+    }
+    out
 }
 
 /// Boolean operations on rectangles.
@@ -525,11 +579,11 @@ pub fn get_relative_transform(a: Rectangle, b: Rectangle) -> AffineTransform {
         b.height / a.height
     };
 
-    let t1 = AffineTransform::translate(-a.x, -a.y);
+    let t1 = AffineTransform::new(-a.x, -a.y, 0.0);
     let t2 = AffineTransform {
         matrix: [[sx, 0.0, 0.0], [0.0, sy, 0.0]],
     };
-    let t3 = AffineTransform::translate(b.x, b.y);
+    let t3 = AffineTransform::new(b.x, b.y, 0.0);
 
     t3.compose(&t2.compose(&t1))
 }

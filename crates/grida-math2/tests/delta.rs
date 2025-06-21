@@ -10,7 +10,7 @@ fn identity() {
 
 #[test]
 fn translation() {
-    let t = AffineTransform::translate(10.0, 20.0);
+    let t = AffineTransform::new(10.0, 20.0, 0.0);
     assert_eq!(delta_transform(5.0, Axis::X, &t), 15.0);
     assert_eq!(delta_transform(7.0, Axis::Y, &t), 27.0);
 }

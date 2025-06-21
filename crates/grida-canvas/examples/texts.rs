@@ -1,10 +1,9 @@
-use cg::factory::NodeFactory;
 use cg::font_loader::FontLoader;
-use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::node::factory::NodeFactory;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 const LOREM: &str = r#"
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed leo quis orci porta auctor eget nec dui. Nullam egestas tempus sapien quis venenatis. Nullam placerat, elit eu aliquet luctus, risus elit sodales elit, eu iaculis ante lacus nec lacus. Vestibulum eget dolor at orci iaculis malesuada. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque cursus tincidunt accumsan. In hac habitasse platea dictumst. Etiam ultricies laoreet ipsum id pulvinar. Aenean fermentum gravida nisi, et congue lectus interdum et. Cras pellentesque scelerisque quam, ut mollis ligula aliquet ut.
@@ -32,6 +31,7 @@ async fn demo_texts() -> Scene {
         text_decoration: TextDecoration::None,
         font_family: "Arial".to_string(),
         font_size: 48.0,
+        italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(700), // Bold
         letter_spacing: None,
         line_height: None,
@@ -60,6 +60,7 @@ async fn demo_texts() -> Scene {
         text_decoration: TextDecoration::Underline,
         font_family: "Caveat".to_string(),
         font_size: 32.0,
+        italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: None,
@@ -81,6 +82,7 @@ async fn demo_texts() -> Scene {
         text_decoration: TextDecoration::None,
         font_family: "Arial".to_string(),
         font_size: 16.0,
+        italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: Some(1.5), // 1.5 line height for better readability
@@ -102,6 +104,7 @@ async fn demo_texts() -> Scene {
         text_decoration: TextDecoration::None,
         font_family: "VT323".to_string(),
         font_size: 16.0,
+        italic: false,                     // TODO: add italic to text style
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
         line_height: Some(1.5), // 1.5 line height for better readability

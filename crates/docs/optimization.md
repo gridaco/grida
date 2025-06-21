@@ -37,9 +37,10 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 6. **Tile-Based Raster Cache (Hybrid Rendering)**
 
-   - Divide the scene into fixed-size tiles (e.g., 512×512).
-   - Each tile stores a rasterized `SkImage` generated from the scene-level `SkPicture`.
-   - Blit tiles during zoomed-out views or under frame budget pressure.
+   - Render the full viewport, take snapshot. debounced (after no more changes. e.g. 150ms)
+   - Divide the snapshot into fixed-size tiles (e.g., 512×512).
+   - When new area discovered, render the cached, non-overlapping parts with tile cache. only render newly discovered area.
+   - Repeat step 1.
    - Optional padding per tile to account for effects (blur, shadows).
 
 7. **Dynamic Mode Switching (Picture vs Tile)**
@@ -154,6 +155,9 @@ A summary of all discussed optimization techniques for achieving high-performanc
 17. **ImageRepository with Transform-Aware Access**
 
     - Pick image resolution based on projected screen size.
+    - _TODO_: currently we select mipmap levels solely by the size of the
+      drawing rectangle. This is a temporary strategy until a proper cache
+      invalidation mechanism based on zoom is introduced.
 
 ---
 
@@ -204,6 +208,18 @@ A summary of all discussed optimization techniques for achieving high-performanc
 25. **BVH or Quadtree Spatial Index**
 
     - Build dynamic index from `world_bounds` for fast spatial queries.
+
+---
+
+## With Compromises
+
+> Practical, UX-safe tradeoffs that simplify implementation and improve performance, especially under load. These techniques sacrifice exactness for speed — but in ways users won’t notice.
+
+---
+
+- **Quantize Camera Transform**
+
+  Instead of using fully continuous float precision for the camera position and zoom, round them to the nearest N units (e.g., 0.1 for position, 0.01 for zoom):
 
 ---
 

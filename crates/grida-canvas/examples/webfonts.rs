@@ -1,11 +1,11 @@
-use cg::factory::NodeFactory;
 use cg::font_loader::FontLoader;
-use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::node::factory::NodeFactory;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
 use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
+use cg::window;
+use futures::future::join_all;
 use math2::transform::AffineTransform;
-
-mod window;
 
 const PARAGRAPH: &str = r#"
 This demo showcases how multiple static TTF font files—each representing a different weight or style—can be loaded under the same font family name. It verifies that our system can correctly resolve and apply the appropriate font file when rendering text spans with varying font weights and styles. Each text line uses the same font family (“Albert Sans”) but specifies a different combination of weight and italic flag. If the system behaves correctly, the rendered output should match the intended visual style for each variant, demonstrating accurate font resolution and fallback handling within the shared family context.
@@ -29,6 +29,7 @@ async fn demo_webfonts() -> Scene {
         font_size: 64.0,
         font_weight: FontWeight::new(700), // Bold
         letter_spacing: None,
+        italic: false,
         line_height: None,
         text_transform: TextTransform::None,
     };
@@ -50,6 +51,7 @@ async fn demo_webfonts() -> Scene {
         font_size: 14.0,
         font_weight: FontWeight::new(400), // Regular
         letter_spacing: None,
+        italic: false,
         line_height: Some(1.5), // 1.5 line height for better readability
         text_transform: TextTransform::None,
     };
@@ -93,6 +95,7 @@ async fn demo_webfonts() -> Scene {
             font_size: 24.0,
             font_weight: FontWeight::new(*weight),
             letter_spacing: None,
+            italic: *is_italic,
             line_height: None,
             text_transform: TextTransform::None,
         };
@@ -176,26 +179,40 @@ async fn main() {
         scene_for_window,
         move |_renderer, _img_tx, font_tx, proxy| {
             println!("📝 Initializing font loader...");
-            let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
+            // No need to create a FontLoader here
 
             // Load all fonts in the scene - non-blocking
             println!("🔄 Starting to load scene fonts in background...");
             let font_files = font_files_clone.clone();
+            let font_tx = font_tx.clone();
+            let proxy = proxy.clone();
             tokio::spawn(async move {
-                for font_file in font_files {
-                    println!(
-                        "Loading font: {} ({})",
-                        font_file.family, font_file.postscript_name
-                    );
-                    font_loader
-                        .load_font(&font_file.family, &font_file.url)
-                        .await;
-                    println!(
-                        "✅ Font loaded: {} ({})",
-                        font_file.family, font_file.postscript_name
-                    );
-                }
+                let font_loading_futures: Vec<_> = font_files
+                    .into_iter()
+                    .map(|font_file| {
+                        let font_tx = font_tx.clone();
+                        let proxy = proxy.clone();
+                        async move {
+                            let family = font_file.family;
+                            let style = font_file.style;
+                            let url = font_file.url;
+                            let postscript_name = font_file.postscript_name;
+                            println!("Loading font: {} ({})", family, postscript_name);
+                            let mut font_loader = FontLoader::new_lifecycle(font_tx, proxy);
+                            font_loader
+                                .load_font_with_style(&family, Some(&style), &url)
+                                .await;
+                            println!("✅ Font loaded: {} ({})", family, postscript_name);
+                        }
+                    })
+                    .collect();
+                join_all(font_loading_futures).await;
                 println!("✅ Scene fonts loading completed in background");
+                println!("\n🔍 Font Repository Information:");
+                println!("================================");
+                println!("All fonts have been loaded and sent to the renderer.");
+                println!("Check the console output above for registration messages.");
+                println!("The renderer's font repository now contains the loaded fonts.");
             });
         },
     )

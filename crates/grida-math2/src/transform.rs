@@ -5,7 +5,7 @@
 ///   [b, d, ty] ]
 ///
 /// It supports translation and rotation, and can be composed or inverted.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AffineTransform {
     /// The 2x3 transformation matrix: [ [a, c, tx], [b, d, ty] ]
     pub matrix: [[f32; 3]; 2],
@@ -21,15 +21,8 @@ impl AffineTransform {
         }
     }
 
-    /// Creates a translation transform by (tx, ty).
-    pub fn translate(tx: f32, ty: f32) -> Self {
-        Self {
-            matrix: [[1.0, 0.0, tx], [0.0, 1.0, ty]],
-        }
-    }
-
     /// Creates a rotation transform in degrees, counter-clockwise.
-    pub fn rotate(degrees: f32) -> Self {
+    pub fn from_rotatation(degrees: f32) -> Self {
         let rad = degrees.to_radians();
         let (sin, cos) = rad.sin_cos();
 
@@ -40,7 +33,10 @@ impl AffineTransform {
 
     /// Creates a combined transform of translation followed by rotation.
     pub fn new(tx: f32, ty: f32, rotation: f32) -> Self {
-        Self::translate(tx, ty).compose(&Self::rotate(rotation))
+        let mut t = Self::identity();
+        t.set_translation(tx, ty);
+        t.set_rotation(rotation);
+        t
     }
 
     pub fn x(&self) -> f32 {
@@ -48,6 +44,19 @@ impl AffineTransform {
     }
     pub fn y(&self) -> f32 {
         self.matrix[1][2]
+    }
+
+    pub fn get_scale_x(&self) -> f32 {
+        (self.matrix[0][0].powi(2) + self.matrix[1][0].powi(2)).sqrt()
+    }
+
+    pub fn get_scale_y(&self) -> f32 {
+        (self.matrix[0][1].powi(2) + self.matrix[1][1].powi(2)).sqrt()
+    }
+
+    /// Returns the scale factors of the transform.
+    pub fn get_scale(&self) -> (f32, f32) {
+        (self.get_scale_x(), self.get_scale_y())
     }
 
     /// Composes this transform with another.
@@ -97,6 +106,12 @@ impl AffineTransform {
         Some(Self {
             matrix: [[a_inv, c_inv, tx_inv], [b_inv, d_inv, ty_inv]],
         })
+    }
+
+    /// Applies a translation to a 2D transform matrix.
+    pub fn translate(&mut self, tx: f32, ty: f32) {
+        self.matrix[0][2] += tx;
+        self.matrix[1][2] += ty;
     }
 
     /// Sets the translation components of the transform.

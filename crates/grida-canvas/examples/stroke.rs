@@ -1,9 +1,8 @@
-use cg::factory::NodeFactory;
-use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::node::factory::NodeFactory;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 async fn demo_strokes() -> Scene {
     let nf = NodeFactory::new();
@@ -11,6 +10,10 @@ async fn demo_strokes() -> Scene {
     // Create a root container node
     let mut root_container_node = nf.create_container_node();
     root_container_node.base.name = "Root Container".to_string();
+    root_container_node.size = Size {
+        width: 1000.0,
+        height: 1000.0,
+    };
 
     let mut repository = NodeRepository::new();
 
@@ -246,6 +249,128 @@ async fn demo_strokes() -> Scene {
             _ => unreachable!(),
         };
 
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+    }
+
+    // Stroke Paint Types Demo Row
+    {
+        // Linear Gradient Stroke
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Linear Gradient Stroke".to_string();
+        rect.transform = AffineTransform::new(start_x, 850.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.fill = Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        });
+        rect.stroke = Paint::LinearGradient(LinearGradientPaint {
+            transform: AffineTransform::new(0.0, 0.0, 0.0),
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Color(255, 0, 0, 255), // Red
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Color(0, 0, 255, 255), // Blue
+                },
+            ],
+            opacity: 1.0,
+        });
+        rect.stroke_width = 8.0;
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+
+        // Radial Gradient Stroke
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Radial Gradient Stroke".to_string();
+        rect.transform = AffineTransform::new(start_x + spacing, 850.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.fill = Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        });
+        rect.stroke = Paint::RadialGradient(RadialGradientPaint {
+            transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Color(255, 255, 0, 255), // Yellow
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Color(255, 0, 255, 255), // Magenta
+                },
+            ],
+            opacity: 1.0,
+        });
+        rect.stroke_width = 8.0;
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+
+        // Conic Gradient Stroke
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Conic Gradient Stroke".to_string();
+        rect.transform = AffineTransform::new(start_x + spacing * 2.0, 850.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.fill = Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        });
+        rect.stroke = Paint::RadialGradient(RadialGradientPaint {
+            transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
+            stops: vec![
+                GradientStop {
+                    offset: 0.0,
+                    color: Color(0, 255, 0, 255), // Green
+                },
+                GradientStop {
+                    offset: 0.5,
+                    color: Color(0, 255, 255, 255), // Cyan
+                },
+                GradientStop {
+                    offset: 1.0,
+                    color: Color(0, 255, 0, 255), // Green
+                },
+            ],
+            opacity: 1.0,
+        });
+        rect.stroke_width = 8.0;
+        all_shape_ids.push(rect.base.id.clone());
+        repository.insert(Node::Rectangle(rect));
+
+        // Multi-color Solid Stroke
+        let mut rect = nf.create_rectangle_node();
+        rect.base.name = "Multi-color Stroke".to_string();
+        rect.transform = AffineTransform::new(start_x + spacing * 3.0, 850.0, 0.0);
+        rect.size = Size {
+            width: base_size,
+            height: base_size,
+        };
+        rect.corner_radius = RectangularCornerRadius::all(8.0);
+        rect.fill = Paint::Solid(SolidPaint {
+            color: Color(0, 0, 0, 0),
+            opacity: 1.0,
+        });
+        rect.stroke = Paint::Solid(SolidPaint {
+            color: Color(255, 128, 0, 255), // Orange
+            opacity: 1.0,
+        });
+        rect.stroke_width = 8.0;
+        rect.stroke_dash_array = Some(vec![20.0, 10.0, 5.0, 10.0]); // Complex dash pattern
         all_shape_ids.push(rect.base.id.clone());
         repository.insert(Node::Rectangle(rect));
     }
