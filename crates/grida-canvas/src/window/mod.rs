@@ -13,7 +13,6 @@ use crate::node::schema::*;
 use crate::repository::ResourceRepository;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
-use console_error_panic_hook::set_once as init_panic_hook;
 use gl::types::*;
 use gl_rs as gl;
 use glutin::{
@@ -103,7 +102,6 @@ fn init_window(
     skia_safe::gpu::DirectContext,
     f64, // scale factor
 ) {
-    init_panic_hook();
     println!("🔄 Window process started with PID: {}", std::process::id());
 
     // Create event loop and window

@@ -12,6 +12,9 @@ cargo test
 # run fmt
 cargo fmt
 
+# run check
+cargo check
+
 # run build
 cargo build
 
