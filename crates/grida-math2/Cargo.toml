@@ -12,4 +12,4 @@ categories = ["algorithms", "graphics", "mathematics", "data-structures"]
 authors = ["Grida"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
