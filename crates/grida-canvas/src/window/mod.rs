@@ -1,7 +1,9 @@
+pub mod command;
 pub mod fps;
 pub mod hit_overlay;
 pub mod ruler;
 pub mod scheduler;
+pub mod state;
 pub mod stats_overlay;
 pub mod tile_overlay;
 
@@ -13,8 +15,9 @@ use crate::node::schema::*;
 use crate::repository::ResourceRepository;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
+use crate::window::command::WindowCommand;
+use crate::window::state::GpuState;
 use gl::types::*;
-use gl_rs as gl;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
@@ -37,22 +40,10 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-#[derive(Debug)]
-enum Command {
-    Close,
-    ZoomIn,
-    ZoomOut,
-    ZoomDelta { delta: f32 },
-    Pan { tx: f32, ty: f32 },
-    Redraw,
-    Resize { width: u32, height: u32 },
-    None,
-}
-
-fn handle_window_event(event: &WindowEvent) -> Command {
+fn handle_window_event(event: &WindowEvent) -> WindowCommand {
     match event {
-        WindowEvent::CloseRequested => Command::Close,
-        WindowEvent::Resized(size) => Command::Resize {
+        WindowEvent::CloseRequested => WindowCommand::Close,
+        WindowEvent::Resized(size) => WindowCommand::Resize {
             width: size.width,
             height: size.height,
         },
@@ -65,26 +56,26 @@ fn handle_window_event(event: &WindowEvent) -> Command {
                 },
             ..
         } => match key {
-            Key::Character(c) if c == "=" => Command::ZoomIn,
-            Key::Character(c) if c == "-" => Command::ZoomOut,
-            _ => Command::None,
+            Key::Character(c) if c == "=" => WindowCommand::ZoomIn,
+            Key::Character(c) if c == "-" => WindowCommand::ZoomOut,
+            _ => WindowCommand::None,
         },
         WindowEvent::PinchGesture {
             device_id: _,
             delta,
             phase: _,
-        } => Command::ZoomDelta {
+        } => WindowCommand::ZoomDelta {
             delta: *delta as f32,
         },
         WindowEvent::MouseWheel { delta, .. } => match delta {
-            MouseScrollDelta::PixelDelta(delta) => Command::Pan {
+            MouseScrollDelta::PixelDelta(delta) => WindowCommand::Pan {
                 tx: -(delta.x as f32),
                 ty: -(delta.y as f32),
             },
-            _ => Command::None,
+            _ => WindowCommand::None,
         },
-        WindowEvent::RedrawRequested => Command::Redraw,
-        _ => Command::None,
+        WindowEvent::RedrawRequested => WindowCommand::Redraw,
+        _ => WindowCommand::None,
     }
 }
 
@@ -252,8 +243,7 @@ struct App {
     gl_surface: GlutinSurface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
     gl_config: glutin::config::Config,
-    fb_info: gpu::gl::FramebufferInfo,
-    gr_context: skia_safe::gpu::DirectContext,
+    gpu_state: GpuState,
     camera: Camera2D,
     input: crate::runtime::input::InputState,
     hit_result: Option<crate::node::schema::NodeId>,
@@ -281,25 +271,25 @@ impl ApplicationHandler for App {
         }
 
         match handle_window_event(&event) {
-            Command::Close => {
+            WindowCommand::Close => {
                 self.renderer.free();
                 event_loop.exit();
             }
-            Command::ZoomIn => {
+            WindowCommand::ZoomIn => {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom * 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.renderer.queue();
                 }
             }
-            Command::ZoomOut => {
+            WindowCommand::ZoomOut => {
                 let current_zoom = self.camera.get_zoom();
                 self.camera.set_zoom(current_zoom / 1.2);
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.renderer.queue();
                 }
             }
-            Command::ZoomDelta { delta } => {
+            WindowCommand::ZoomDelta { delta } => {
                 let current_zoom = self.camera.get_zoom();
                 let zoom_factor = 1.0 + delta;
                 if zoom_factor.is_finite() && zoom_factor > 0.0 {
@@ -310,20 +300,20 @@ impl ApplicationHandler for App {
                     self.renderer.queue();
                 }
             }
-            Command::Pan { tx, ty } => {
+            WindowCommand::Pan { tx, ty } => {
                 let zoom = self.camera.get_zoom();
                 self.camera.translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 if self.renderer.set_camera(self.camera.clone()) {
                     self.renderer.queue();
                 }
             }
-            Command::Resize { width, height } => {
+            WindowCommand::Resize { width, height } => {
                 self.resize(width, height);
             }
-            Command::Redraw => {
+            WindowCommand::Redraw => {
                 self.redraw();
             }
-            Command::None => {}
+            WindowCommand::None => {}
         }
     }
 
@@ -523,10 +513,10 @@ impl App {
             (width as i32, height as i32),
             self.gl_config.num_samples() as usize,
             self.gl_config.stencil_size() as usize,
-            self.fb_info,
+            self.gpu_state.framebuffer_info,
         );
         let surface = gpu::surfaces::wrap_backend_render_target(
-            &mut self.gr_context,
+            &mut self.gpu_state.context,
             &backend_render_target,
             skia_safe::gpu::SurfaceOrigin::BottomLeft,
             skia_safe::ColorType::RGBA8888,
@@ -631,8 +621,10 @@ where
         gl_surface,
         gl_context,
         gl_config,
-        fb_info,
-        gr_context,
+        gpu_state: GpuState {
+            context: gr_context,
+            framebuffer_info: fb_info,
+        },
         camera,
         input: crate::runtime::input::InputState::default(),
         hit_result: None,
