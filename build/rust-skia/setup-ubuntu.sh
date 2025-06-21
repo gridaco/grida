@@ -7,7 +7,7 @@ set -e
 
 # Update and install essential packages
 sudo apt-get update
-sudo apt-get install -y software-properties-common wget curl git make unzip python pkg-config
+sudo apt-get install -y software-properties-common wget curl git make unzip python-is-python3 pkg-config
 
 # Add newer git and LLVM toolchain
 sudo add-apt-repository ppa:git-core/ppa -y
