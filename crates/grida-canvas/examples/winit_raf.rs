@@ -1,4 +1,4 @@
-use cg::scheduler;
+use cg::window::scheduler;
 use rand::Rng;
 use std::time::{Duration, Instant};
 use winit::{

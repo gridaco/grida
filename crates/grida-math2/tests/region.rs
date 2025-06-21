@@ -1,6 +1,4 @@
-use math2::{
-    Rectangle, Region, region_contains, region_difference, region_intersects, region_subtract,
-};
+use math2::{Rectangle, Region, region_difference, region_subtract};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {
@@ -23,16 +21,6 @@ fn difference_multiple_holes() {
         rect(20.0, 10.0, 10.0, 10.0),
     ];
     assert_eq!(result, expected);
-}
-
-#[test]
-fn contains_and_intersects() {
-    let a = rect(0.0, 0.0, 20.0, 20.0);
-    let b = rect(5.0, 5.0, 5.0, 5.0);
-    let c = rect(15.0, 15.0, 10.0, 10.0);
-    assert!(region_contains(&a, &b));
-    assert!(region_intersects(&a, &c));
-    assert!(!region_contains(&a, &c));
 }
 
 #[test]

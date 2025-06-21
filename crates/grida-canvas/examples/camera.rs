@@ -1,7 +1,8 @@
+use cg::node::factory::NodeFactory;
 use cg::{
-    camera::Camera2D,
-    draw::{Backend, Renderer},
-    schema::{BaseNode, Color, GroupNode, Node, Scene, Size},
+    node::schema::*,
+    runtime::camera::Camera2D,
+    runtime::scene::{Backend, Renderer},
 };
 use gl_rs as gl;
 use glutin::{
@@ -14,7 +15,7 @@ use glutin::{
 use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu, picture_recorder};
+use skia_safe::{Surface, gpu};
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -23,8 +24,8 @@ use winit::{
 };
 
 fn create_static_scene() -> Scene {
-    let mut repository = cg::repository::NodeRepository::new();
-    let nf = cg::factory::NodeFactory::new();
+    let mut repository = cg::node::repository::NodeRepository::new();
+    let nf = NodeFactory::new();
 
     // Create a grid of rectangles
     let mut ids = Vec::new();
@@ -53,7 +54,7 @@ fn create_static_scene() -> Scene {
         transform: AffineTransform::identity(),
         children: ids,
         opacity: 1.0,
-        blend_mode: cg::schema::BlendMode::Normal,
+        blend_mode: BlendMode::Normal,
     };
 
     repository.insert(Node::Group(root_group));
@@ -231,7 +232,7 @@ fn main() {
     ) = init_window(800, 600);
 
     // Create renderer
-    let mut renderer = Renderer::new(800.0, 600.0, scale_factor as f32);
+    let mut renderer = Renderer::new();
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Create static scene
@@ -246,9 +247,9 @@ fn main() {
     camera.set_zoom(1.0);
     renderer.set_camera(camera);
 
-    // First render to warm up the cache
-    renderer.render_scene(&scene);
-    renderer.flush();
+    // Load and warm up the scene cache
+    renderer.load_scene(scene.clone());
+    renderer.queue();
 
     // Benchmark rendering with camera transformations
     let mut frame_count = 0;
@@ -315,8 +316,7 @@ fn main() {
                 renderer.camera.as_mut().unwrap().set_position(x, y);
 
                 // Render the scene
-                renderer.render_scene(&scene);
-                renderer.flush();
+                renderer.queue();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {
                     eprintln!("Error swapping buffers: {:?}", e);

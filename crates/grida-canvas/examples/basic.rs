@@ -1,9 +1,8 @@
-use cg::factory::NodeFactory;
-use cg::repository::NodeRepository;
-use cg::schema::*;
+use cg::node::factory::NodeFactory;
+use cg::node::repository::NodeRepository;
+use cg::node::schema::*;
+use cg::window;
 use math2::transform::AffineTransform;
-
-mod window;
 
 async fn demo_basic() -> Scene {
     let font_caveat_family = "Caveat".to_string();
@@ -138,6 +137,7 @@ async fn demo_basic() -> Scene {
         font_family: font_caveat_family.clone(),
         font_size: 32.0,
         font_weight: FontWeight::new(900),
+        italic: false,
         letter_spacing: None,
         line_height: None,
         text_transform: TextTransform::None,

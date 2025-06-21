@@ -1,4 +1,9 @@
+use crate::node::schema::*;
 use std::collections::HashMap;
+
+use async_trait::async_trait;
+
+use crate::resource_loader::ResourceLoader;
 
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest;
@@ -71,8 +76,8 @@ impl ImageLoader {
         // Load the image
         let data = match self.fetch_image_data(src).await {
             Ok(data) => data,
-            Err(e) => {
-                eprintln!("Failed to load image {}: {}", src, e);
+            Err(_e) => {
+                // eprintln!("Failed to load image {}: {}", src, e);
                 return None;
             }
         };
@@ -118,15 +123,30 @@ impl ImageLoader {
     }
 }
 
+#[async_trait]
+impl ResourceLoader for ImageLoader {
+    type Output = Vec<u8>;
+
+    async fn load(&mut self, key: &str, src: &str) -> Option<Self::Output> {
+        // For images, the key and src are generally the same
+        let path = if src.is_empty() { key } else { src };
+        self.load_image(path).await
+    }
+
+    async fn unload(&mut self, key: &str) {
+        self.remove_from_cache(key);
+    }
+}
+
 /// Helper function to extract image URLs from a scene
-pub fn extract_image_urls(scene: &crate::schema::Scene) -> Vec<String> {
+pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
     scene
         .nodes
         .iter()
         .filter_map(|(_, n)| match n {
-            crate::schema::Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
-                (crate::schema::Paint::Image(img), _) => Some(img._ref.clone()),
-                (_, crate::schema::Paint::Image(img)) => Some(img._ref.clone()),
+            Node::Rectangle(rect) => match (&rect.fill, &rect.stroke) {
+                (Paint::Image(img), _) => Some(img._ref.clone()),
+                (_, Paint::Image(img)) => Some(img._ref.clone()),
                 _ => None,
             },
             _ => None,
@@ -135,10 +155,13 @@ pub fn extract_image_urls(scene: &crate::schema::Scene) -> Vec<String> {
 }
 
 /// Helper function to load all images in a scene
-pub async fn load_scene_images(loader: &mut ImageLoader, scene: &crate::schema::Scene) {
+pub async fn load_scene_images<L>(loader: &mut L, scene: &Scene)
+where
+    L: ResourceLoader<Output = Vec<u8>> + Send,
+{
     let urls = extract_image_urls(scene);
     for url in urls {
-        let _ = loader.load_image(&url).await;
+        let _ = loader.load(&url, &url).await;
     }
 }
 

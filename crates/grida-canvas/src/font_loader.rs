@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use async_trait::async_trait;
+
+use crate::resource_loader::ResourceLoader;
+
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest;
 #[cfg(not(target_arch = "wasm32"))]
@@ -29,6 +33,7 @@ pub enum FontLoadingMode {
 #[derive(Debug, Clone)]
 pub struct FontMessage {
     pub family: String,
+    pub style: Option<String>,
     pub data: Vec<u8>,
 }
 
@@ -63,8 +68,24 @@ impl FontLoader {
 
     /// Load a font from a URL or file path
     pub async fn load_font(&mut self, family: &str, src: &str) -> Option<Vec<u8>> {
+        self.load_font_with_style(family, None, src).await
+    }
+
+    /// Load a font from a URL or file path with style information
+    pub async fn load_font_with_style(
+        &mut self,
+        family: &str,
+        style: Option<&str>,
+        src: &str,
+    ) -> Option<Vec<u8>> {
         // Check cache first
-        if let Some(data) = self.cache.get(family) {
+        let cache_key = if let Some(style) = style {
+            format!("{}:{}", family, style)
+        } else {
+            family.to_string()
+        };
+
+        if let Some(data) = self.cache.get(&cache_key) {
             return Some(data.clone());
         }
 
@@ -78,13 +99,14 @@ impl FontLoader {
         };
 
         // Cache the data
-        self.cache.insert(family.to_string(), data.clone());
+        self.cache.insert(cache_key, data.clone());
 
         // If in lifecycle mode, send the font data through the channel
         #[cfg(not(target_arch = "wasm32"))]
         if let FontLoadingMode::Lifecycle { tx, proxy } = &self.mode {
             let _ = tx.send(FontMessage {
                 family: family.to_string(),
+                style: style.map(|s| s.to_string()),
                 data: data.clone(),
             });
             let _ = proxy.send_event(());
@@ -115,6 +137,19 @@ impl FontLoader {
     /// Remove a specific font from the cache
     pub fn remove_from_cache(&mut self, family: &str) {
         self.cache.remove(family);
+    }
+}
+
+#[async_trait]
+impl ResourceLoader for FontLoader {
+    type Output = Vec<u8>;
+
+    async fn load(&mut self, key: &str, src: &str) -> Option<Self::Output> {
+        self.load_font(key, src).await
+    }
+
+    async fn unload(&mut self, key: &str) {
+        self.remove_from_cache(key);
     }
 }
 
