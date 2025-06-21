@@ -3,8 +3,10 @@ use crate::runtime::camera::Camera2D;
 use crate::{
     cache::{
         geometry::GeometryCache,
+        paragraph::ParagraphCache,
         picture::{PictureCache, PictureCacheStrategy},
         tile::ImageTileCache,
+        vector_path::VectorPathCache,
     },
     painter::layer::{Layer, LayerList},
 };
@@ -33,6 +35,8 @@ pub struct SceneCache {
     pub geometry: GeometryCache,
     pub picture: PictureCache,
     pub tile: ImageTileCache,
+    pub paragraph: std::cell::RefCell<ParagraphCache>,
+    pub path: std::cell::RefCell<VectorPathCache>,
     pub layer_index: RTree<IndexedLayer>,
 }
 
@@ -44,6 +48,8 @@ impl SceneCache {
             geometry: GeometryCache::new(),
             picture: PictureCache::new(),
             tile: ImageTileCache::new(),
+            paragraph: std::cell::RefCell::new(ParagraphCache::new()),
+            path: std::cell::RefCell::new(VectorPathCache::new()),
             layer_index: RTree::new(),
         }
     }
@@ -93,6 +99,8 @@ impl SceneCache {
     /// Invalidate all cached data.
     pub fn invalidate(&mut self) {
         self.picture.invalidate();
+        self.paragraph.borrow_mut().invalidate();
+        self.path.borrow_mut().invalidate();
     }
 
     /// Return a picture for a specific node if cached.
