@@ -2,5 +2,6 @@ packages:
   - "editor"
   - "database"
   - "apps/*"
+  - "crates/*"
   - "packages/*"
   - "packages/lib/*"

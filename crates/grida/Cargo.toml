@@ -1,0 +1,14 @@
+[package]
+name = "grida"
+version = "0.0.0"
+license = "Apache-2.0"
+description = "reserved for future use by grida"
+edition = "2021"
+
+
+[features]
+default = ["skia-safe/gl"]
+
+[dependencies]
+skia-safe = { version = "0.86.0", features = ["gpu", "gl", "textlayout"] }
+gl = "0.14.0"
