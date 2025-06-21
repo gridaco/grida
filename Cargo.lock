@@ -1080,6 +1080,10 @@ dependencies = [
 [[package]]
 name = "grida"
 version = "0.0.0"
+dependencies = [
+ "gl",
+ "skia-safe",
+]
 
 [[package]]
 name = "h2"
