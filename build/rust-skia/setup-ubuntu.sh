@@ -4,15 +4,16 @@ set -e
 # This setup script is based on rust-skia container setup
 # https://github.com/pragmatrix/rust-skia-containers
 # Adjusted for local Ubuntu (20.04 or later)
+# Tested on Ubuntu 22.04, also works with codex universal container https://github.com/openai/codex-universal
 
 # Update and install essential packages
 sudo apt-get update
 sudo apt-get install -y software-properties-common wget curl git make unzip python-is-python3 pkg-config
 
 # Add newer git and LLVM toolchain
-sudo add-apt-repository ppa:git-core/ppa -y
+sudo add-apt-repository -y ppa:git-core/ppa
 wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main"
+sudo add-apt-repository -y "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main"
 sudo apt-get update
 
 # Install development packages
@@ -33,8 +34,10 @@ sudo apt-get install -y \
 sudo update-alternatives \
   --install /usr/bin/clang clang /usr/bin/clang-16 90 \
   --slave /usr/bin/clang++ clang++ /usr/bin/clang++-16 \
-  --slave /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-16 \
-  --slave /usr/bin/c++ c++ /usr/bin/clang++-16
+  --slave /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-16
+
+sudo update-alternatives \
+  --install /usr/bin/c++ c++ /usr/bin/clang++-16 90
 
 # Install Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y
