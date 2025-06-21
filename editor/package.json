@@ -40,7 +40,6 @@
     "@grida/pixel-grid": "workspace:*",
     "@grida/ruler": "workspace:*",
     "@grida/schema": "workspace:*",
-    "@grida/skia": "workspace:*",
     "@grida/tokens": "workspace:*",
     "@grida/transparency-grid": "workspace:*",
     "@grida/tree": "workspace:*",

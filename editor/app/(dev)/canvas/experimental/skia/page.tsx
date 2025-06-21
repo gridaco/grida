@@ -1,6 +1,5 @@
 "use client";
 import * as React from "react";
-import { CanvasKitRenderer } from "@grida/skia";
 import {
   AutoInitialFitTransformer,
   EditorSurface,
@@ -76,24 +75,23 @@ import { Hotkeys } from "@/grida-canvas-react/viewport/hotkeys";
 
 export default function SkiaCanvasKitExperimentalPage() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = React.useRef<CanvasKitRenderer | null>(null);
+  // const rendererRef = React.useRef<CanvasKitRenderer | null>(null);
   const editor = useEditor();
 
   React.useEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      const renderer = new CanvasKitRenderer(canvasRef.current);
-      rendererRef.current = renderer;
-
-      editor.subscribeWithSelector(
-        (state) => state.document.nodes,
-        (editor, selected) => {
-          rendererRef.current?.setDocument(
-            selected,
-            editor.state.document.scenes["main"].children[0]
-          );
-        }
-      );
-    }
+    // if (canvasRef.current && !rendererRef.current) {
+    //   const renderer = new CanvasKitRenderer(canvasRef.current);
+    //   rendererRef.current = renderer;
+    //   editor.subscribeWithSelector(
+    //     (state) => state.document.nodes,
+    //     (editor, selected) => {
+    //       rendererRef.current?.setDocument(
+    //         selected,
+    //         editor.state.document.scenes["main"].children[0]
+    //       );
+    //     }
+    //   );
+    // }
   }, []);
 
   return (

@@ -259,7 +259,9 @@ importers:
         specifier: ^5
         version: 5.8.3
 
-  crates/grida-cmath: {}
+  crates/grida-canvas: {}
+
+  crates/grida-math2: {}
 
   database:
     dependencies:
@@ -344,9 +346,6 @@ importers:
       '@grida/schema':
         specifier: workspace:*
         version: link:../packages/grida-canvas-schema
-      '@grida/skia':
-        specifier: workspace:*
-        version: link:../packages/grida-canvas-skia
       '@grida/tokens':
         specifier: workspace:*
         version: link:../packages/grida-tokens
@@ -1147,25 +1146,6 @@ importers:
       csstype:
         specifier: 3.1.0
         version: 3.1.0
-
-  packages/grida-canvas-skia:
-    dependencies:
-      '@grida/cg':
-        specifier: workspace:*
-        version: link:../grida-canvas-cg
-      '@grida/cmath':
-        specifier: workspace:*
-        version: link:../grida-cmath
-      '@grida/vn':
-        specifier: workspace:*
-        version: link:../grida-canvas-vn
-      canvaskit-wasm:
-        specifier: ^0.40.0
-        version: 0.40.0
-    devDependencies:
-      '@grida/schema':
-        specifier: workspace:*
-        version: link:../grida-canvas-schema
 
   packages/grida-canvas-tailwind: {}
 
@@ -6178,9 +6158,6 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@webgpu/types@0.1.21':
-    resolution: {integrity: sha512-pUrWq3V5PiSGFLeLxoGqReTZmiiXwY3jRkIG5sLLKjyqNxrwm/04b4nw7LSmGWJcKk59XOM/YRTUwOzo4MMlow==}
-
   '@webgpu/types@0.1.60':
     resolution: {integrity: sha512-8B/tdfRFKdrnejqmvq95ogp8tf52oZ51p3f4QD5m5Paey/qlX4Rhhy5Y8tgFMi7Ms70HzcMMw3EQjH/jdhTwlA==}
 
@@ -6728,9 +6705,6 @@ packages:
   canvas@3.1.0:
     resolution: {integrity: sha512-tTj3CqqukVJ9NgSahykNwtGda7V33VLObwrHfzT0vqJXu7J4d4C/7kQQW3fOEGDfZZoILPut5H00gOjyttPGyg==}
     engines: {node: ^18.12.0 || >= 20.9.0}
-
-  canvaskit-wasm@0.40.0:
-    resolution: {integrity: sha512-Od2o+ZmoEw9PBdN/yCGvzfu0WVqlufBPEWNG452wY7E9aT8RBE+ChpZF526doOlg7zumO4iCS+RAeht4P0Gbpw==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -20027,8 +20001,6 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webgpu/types@0.1.21': {}
-
   '@webgpu/types@0.1.60': {}
 
   '@webgpu/types@0.1.61': {}
@@ -20705,10 +20677,6 @@ snapshots:
       node-addon-api: 7.1.1
       prebuild-install: 7.1.3
     optional: true
-
-  canvaskit-wasm@0.40.0:
-    dependencies:
-      '@webgpu/types': 0.1.21
 
   ccount@2.0.1: {}
 
