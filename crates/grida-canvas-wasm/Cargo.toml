@@ -1,8 +1,8 @@
 [package]
-name = "grida"
+name = "grida-canvas-wasm"
 version = "0.0.0"
 license = "Apache-2.0"
-description = "reserved for future use by grida"
+description = "Grida Canvas WASM"
 edition = "2021"
 
 

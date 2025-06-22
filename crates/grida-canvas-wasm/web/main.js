@@ -17,7 +17,7 @@ createGridaCanvas().then((RustSkia) => {
   console.log(RustSkia);
   // Create the WebGL context
   let context;
-  const canvas = document.querySelector("#glcanvas");
+  const canvas = document.querySelector("#canvas");
   context = canvas.getContext("webgl2", {
     antialias: true,
     depth: true,
