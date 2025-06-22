@@ -1,6 +1,5 @@
 use crate::font_loader::FontMessage;
 use crate::image_loader::ImageMessage;
-use crate::node::factory::*;
 use crate::node::schema::*;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
@@ -113,8 +112,7 @@ impl WebGlApplication {
     /// Update the cursor position in logical screen coordinates and perform a
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
-        self.app.input.cursor = [x, y];
-        self.app.perform_hit_test();
+        self.app.pointer_move(x, y);
     }
 
     /// Forward a [`WindowCommand`] to the inner application.
@@ -123,112 +121,12 @@ impl WebGlApplication {
     }
 
     pub fn load_dummy_scene(&mut self) {
-        use crate::node::repository::NodeRepository;
-        use crate::node::schema::*;
-        use math2::transform::AffineTransform;
-
-        let nf = NodeFactory::new();
-        let mut nodes = NodeRepository::new();
-
-        // Create a few rectangles with different colors and positions
-        let mut rect1 = nf.create_rectangle_node();
-        rect1.base.name = "Red Rectangle".to_string();
-        rect1.transform = AffineTransform::new(100.0, 100.0, 0.0);
-        rect1.size = Size {
-            width: 150.0,
-            height: 100.0,
-        };
-        rect1.fill = Paint::Solid(SolidPaint {
-            color: Color(255, 0, 0, 255), // Red
-            opacity: 1.0,
-        });
-        let rect1_id = rect1.base.id.clone();
-        nodes.insert(Node::Rectangle(rect1));
-
-        let mut rect2 = nf.create_rectangle_node();
-        rect2.base.name = "Blue Rectangle".to_string();
-        rect2.transform = AffineTransform::new(300.0, 100.0, 0.0);
-        rect2.size = Size {
-            width: 120.0,
-            height: 80.0,
-        };
-        rect2.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 255, 255), // Blue
-            opacity: 1.0,
-        });
-        let rect2_id = rect2.base.id.clone();
-        nodes.insert(Node::Rectangle(rect2));
-
-        let mut rect3 = nf.create_rectangle_node();
-        rect3.base.name = "Green Rectangle".to_string();
-        rect3.transform = AffineTransform::new(500.0, 100.0, 0.0);
-        rect3.size = Size {
-            width: 100.0,
-            height: 120.0,
-        };
-        rect3.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 255, 0, 255), // Green
-            opacity: 1.0,
-        });
-        let rect3_id = rect3.base.id.clone();
-        nodes.insert(Node::Rectangle(rect3));
-
-        // Create a scene with the rectangles
-        let scene = Scene {
-            id: "dummy".to_string(),
-            name: "Dummy Scene".to_string(),
-            transform: AffineTransform::identity(),
-            children: vec![rect1_id, rect2_id, rect3_id],
-            nodes,
-            background_color: Some(Color(240, 240, 240, 255)), // Light gray background
-        };
-
-        // Load the scene into the renderer
-        self.app.renderer.load_scene(scene);
+        self.app.load_dummy_scene();
     }
 
     /// Load a heavy scene useful for performance benchmarking.
-    pub fn load_benchmark_scene(&mut self) {
-        use crate::node::repository::NodeRepository;
-        use crate::node::schema::*;
-        use math2::transform::AffineTransform;
-
-        let nf = NodeFactory::new();
-        let mut nodes = NodeRepository::new();
-        let mut children = Vec::new();
-
-        // generate a grid of rectangles
-        let grid = 50;
-        let size = 20.0;
-        for y in 0..grid {
-            for x in 0..grid {
-                let mut rect = nf.create_rectangle_node();
-                rect.base.name = format!("rect-{}-{}", x, y);
-                rect.transform = AffineTransform::new(x as f32 * size, y as f32 * size, 0.0);
-                rect.size = Size {
-                    width: size,
-                    height: size,
-                };
-                rect.fill = Paint::Solid(SolidPaint {
-                    color: Color(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
-                    opacity: 1.0,
-                });
-                let id = rect.base.id.clone();
-                nodes.insert(Node::Rectangle(rect));
-                children.push(id);
-            }
-        }
-
-        let scene = Scene {
-            id: "benchmark".to_string(),
-            name: "Benchmark Scene".to_string(),
-            transform: AffineTransform::identity(),
-            children,
-            nodes,
-            background_color: Some(Color(255, 255, 255, 255)),
-        };
-
-        self.app.renderer.load_scene(scene);
+    pub fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
+        self.app.load_benchmark_scene(cols, rows);
     }
 
     /// Load a scene from a JSON string using the `io_json` parser.

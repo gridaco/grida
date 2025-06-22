@@ -48,9 +48,9 @@ pub unsafe extern "C" fn load_dummy_scene(app: *mut WebGlApplication) {
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn load_benchmark_scene(app: *mut WebGlApplication) {
+pub unsafe extern "C" fn load_benchmark_scene(app: *mut WebGlApplication, cols: u32, rows: u32) {
     if let Some(app) = app.as_mut() {
-        app.load_benchmark_scene();
+        app.load_benchmark_scene(cols, rows);
     }
 }
 

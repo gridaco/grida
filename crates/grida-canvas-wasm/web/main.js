@@ -58,7 +58,7 @@ createGridaCanvas().then((RustSkia) => {
   //   });
 
   // RustSkia._load_dummy_scene(state);
-  RustSkia._load_benchmark_scene(state);
+  RustSkia._load_benchmark_scene(state, 50, 50);
   requestAnimationFrame(render);
 
   canvas.addEventListener("pointermove", (event) => {
