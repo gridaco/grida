@@ -242,7 +242,7 @@ pub struct IOPath {
     pub fill: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RGBA {
     pub r: u8,
     pub g: u8,

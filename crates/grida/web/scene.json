@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "document": {
+    "bitmaps": {},
+    "properties": {},
+    "nodes": {
+      "rect1": {
+        "type": "container",
+        "id": "rect1",
+        "name": "Rect",
+        "left": 20,
+        "top": 20,
+        "width": 100,
+        "height": 100,
+        "children": [],
+        "fill": {"type": "solid", "color": {"r": 255, "g": 0, "b": 0, "a": 1.0}}
+      }
+    },
+    "scenes": {
+      "scene1": {
+        "id": "scene1",
+        "name": "Scene 1",
+        "type": "scene",
+        "children": ["rect1"],
+        "backgroundColor": {"r": 255, "g": 255, "b": 255, "a": 1.0}
+      }
+    },
+    "entry_scene_id": "scene1"
+  }
+}

@@ -1,7 +1,7 @@
 [package]
 name = "cg"
 version = "0.0.0"
-edition = "2024"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -21,7 +21,6 @@ gl = "0.14.0"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 reqwest = "0.12.19"
 glutin = "0.32.0"
 glutin-winit = "0.5.0"
@@ -35,6 +34,7 @@ web = []
 [dev-dependencies]
 criterion = "0.5"
 clap = { version = "4.5.39", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [[bench]]
 name = "bench_rectangles"

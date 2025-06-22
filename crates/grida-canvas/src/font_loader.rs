@@ -5,9 +5,9 @@ use async_trait::async_trait;
 use crate::resource_loader::ResourceLoader;
 
 #[cfg(not(target_arch = "wasm32"))]
-use reqwest;
+use futures::channel::mpsc;
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::sync::mpsc;
+use reqwest;
 #[cfg(not(target_arch = "wasm32"))]
 use winit::event_loop::EventLoopProxy;
 
@@ -104,7 +104,7 @@ impl FontLoader {
         // If in lifecycle mode, send the font data through the channel
         #[cfg(not(target_arch = "wasm32"))]
         if let FontLoadingMode::Lifecycle { tx, proxy } = &self.mode {
-            let _ = tx.send(FontMessage {
+            let _ = tx.unbounded_send(FontMessage {
                 family: family.to_string(),
                 style: style.map(|s| s.to_string()),
                 data: data.clone(),

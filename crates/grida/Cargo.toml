@@ -6,9 +6,8 @@ description = "reserved for future use by grida"
 edition = "2021"
 
 
-[features]
-default = ["skia-safe/gl"]
-
 [dependencies]
-skia-safe = { version = "0.86.0", features = ["gpu", "gl", "textlayout"] }
-gl = "0.14.0"
+cg = { path = "../grida-canvas" }
+
+[features]
+default = []

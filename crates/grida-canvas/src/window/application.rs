@@ -1,0 +1,257 @@
+use crate::font_loader::FontMessage;
+use crate::image_loader::ImageMessage;
+use crate::repository::ResourceRepository;
+use crate::runtime::camera::Camera2D;
+use crate::runtime::scene::{Backend, Renderer};
+use crate::window::command::WindowCommand;
+use crate::window::scheduler;
+use crate::window::{fps, hit_overlay, ruler, stats_overlay, tile_overlay};
+use futures::channel::mpsc;
+
+/// Shared application logic independent of the final target.
+pub struct UnknownTargetApplication {
+    pub(crate) renderer: Renderer,
+    pub(crate) state: crate::window::state::State,
+    pub(crate) camera: Camera2D,
+    pub(crate) input: crate::runtime::input::InputState,
+    pub(crate) hit_result: Option<crate::node::schema::NodeId>,
+    pub(crate) last_hit_test: std::time::Instant,
+    pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+    pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
+    pub(crate) scheduler: scheduler::FrameScheduler,
+    pub(crate) last_frame_time: std::time::Instant,
+    pub(crate) last_stats: Option<String>,
+}
+
+impl UnknownTargetApplication {
+    pub(crate) fn process_image_queue(&mut self) {
+        let mut updated = false;
+        while let Ok(Some(msg)) = self.image_rx.try_next() {
+            self.renderer.add_image(msg.src.clone(), &msg.data);
+            println!("📝 Registered image with renderer: {}", msg.src);
+            updated = true;
+        }
+        if updated {
+            self.renderer.invalidate_cache();
+        }
+    }
+
+    pub(crate) fn process_font_queue(&mut self) {
+        let mut updated = false;
+        let mut font_count = 0;
+        while let Ok(Some(msg)) = self.font_rx.try_next() {
+            let family_name = &msg.family;
+            self.renderer.add_font(family_name, &msg.data);
+
+            if let Some(style) = &msg.style {
+                println!(
+                    "📝 Registered font with renderer: '{}' (style: {})",
+                    family_name, style
+                );
+            } else {
+                println!("📝 Registered font with renderer: '{}'", family_name);
+            }
+            font_count += 1;
+            updated = true;
+        }
+        if updated {
+            self.renderer.invalidate_cache();
+            if font_count > 0 {
+                self.print_font_repository_info();
+            }
+        }
+    }
+
+    fn print_font_repository_info(&self) {
+        let font_repo = self.renderer.font_repository.borrow();
+        let family_count = font_repo.family_count();
+        let total_font_count = font_repo.total_font_count();
+
+        println!("\n🔍 Font Repository Status:");
+        println!("===========================");
+        println!("Font families: {}", family_count);
+        println!("Total fonts: {}", total_font_count);
+
+        if family_count > 0 {
+            println!("\n📋 Registered font families:");
+            println!("---------------------------");
+            for (i, (family_name, font_variants)) in font_repo.iter().enumerate() {
+                println!(
+                    "  {}. {} ({} variants)",
+                    i + 1,
+                    family_name,
+                    font_variants.len()
+                );
+                for (j, font_data) in font_variants.iter().enumerate() {
+                    println!("     - Variant {}: {} bytes", j + 1, font_data.len());
+                }
+            }
+        }
+        println!("✅ Font repository information printed");
+    }
+
+    /// Hit test the current cursor position and store the result.
+    pub(crate) fn perform_hit_test(&mut self) {
+        const HIT_TEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
+        if self.last_hit_test.elapsed() < HIT_TEST_INTERVAL {
+            return;
+        }
+        self.last_hit_test = std::time::Instant::now();
+
+        let camera = &self.camera;
+        let point = camera.screen_to_canvas_point(self.input.cursor);
+        let tester = crate::hit_test::HitTester::new(self.renderer.scene_cache());
+
+        let new_hit_result = tester.hit_first(point);
+        if self.hit_result != new_hit_result {
+            self.renderer.queue();
+        }
+        self.hit_result = new_hit_result;
+    }
+
+    /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.
+    pub(crate) fn command(&mut self, cmd: WindowCommand) -> bool {
+        match cmd {
+            WindowCommand::Close => return true,
+            WindowCommand::ZoomIn => {
+                let current_zoom = self.camera.get_zoom();
+                self.camera.set_zoom(current_zoom * 1.2);
+                if self.renderer.set_camera(self.camera.clone()) {
+                    self.renderer.queue();
+                }
+            }
+            WindowCommand::ZoomOut => {
+                let current_zoom = self.camera.get_zoom();
+                self.camera.set_zoom(current_zoom / 1.2);
+                if self.renderer.set_camera(self.camera.clone()) {
+                    self.renderer.queue();
+                }
+            }
+            WindowCommand::ZoomDelta { delta } => {
+                let current_zoom = self.camera.get_zoom();
+                let zoom_factor = 1.0 + delta;
+                if zoom_factor.is_finite() && zoom_factor > 0.0 {
+                    self.camera
+                        .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
+                }
+                if self.renderer.set_camera(self.camera.clone()) {
+                    self.renderer.queue();
+                }
+            }
+            WindowCommand::Pan { tx, ty } => {
+                let zoom = self.camera.get_zoom();
+                self.camera.translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
+                if self.renderer.set_camera(self.camera.clone()) {
+                    self.renderer.queue();
+                }
+            }
+            WindowCommand::Resize { width, height } => {
+                self.resize(width, height);
+            }
+            WindowCommand::Redraw => {
+                self.redraw();
+            }
+            WindowCommand::None => {}
+        }
+
+        false
+    }
+
+    /// Perform a redraw and print diagnostic information.
+    pub(crate) fn redraw(&mut self) {
+        let __frame_start = std::time::Instant::now();
+        let __queue_start = std::time::Instant::now();
+        self.process_image_queue();
+        self.process_font_queue();
+        let __queue_time = __queue_start.elapsed();
+
+        let stats = match self.renderer.flush() {
+            Some(stats) => stats,
+            None => return,
+        };
+
+        let mut overlay_flush_time = std::time::Duration::ZERO;
+        let overlay_draw_time: std::time::Duration;
+
+        {
+            let __overlay_start = std::time::Instant::now();
+            let surface = self.state.surface_mut();
+            fps::FpsMeter::draw(surface, self.scheduler.average_fps());
+            if let Some(s) = self.last_stats.as_deref() {
+                stats_overlay::StatsOverlay::draw(surface, s);
+            }
+            hit_overlay::HitOverlay::draw(
+                surface,
+                self.hit_result.as_ref(),
+                &self.camera,
+                self.renderer.scene_cache(),
+                &self.renderer.font_repository,
+            );
+            if self.renderer.debug_tiles() {
+                tile_overlay::TileOverlay::draw(
+                    surface,
+                    &self.camera,
+                    self.renderer.scene_cache().tile.tiles(),
+                );
+            }
+            ruler::Ruler::draw(surface, &self.camera);
+            if let Some(mut ctx) = surface.recording_context() {
+                if let Some(mut direct) = ctx.as_direct_context() {
+                    let __overlay_flush_start = std::time::Instant::now();
+                    direct.flush_and_submit();
+                    overlay_flush_time = __overlay_flush_start.elapsed();
+                }
+            }
+            overlay_draw_time = __overlay_start.elapsed();
+        }
+
+        let __sleep_start = std::time::Instant::now();
+        self.scheduler.sleep_to_maintain_fps();
+        let __sleep_time = __sleep_start.elapsed();
+
+        let __total_frame_time = __frame_start.elapsed();
+        let stat_string = format!(
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
+            1.0 / __total_frame_time.as_secs_f64(),
+            __total_frame_time.as_secs_f64() * 1000.0,
+            stats.total_duration.as_secs_f64() * 1000.0,
+            stats.flush_duration.as_secs_f64() * 1000.0,
+            (overlay_flush_time.as_secs_f64() + overlay_draw_time.as_secs_f64()) * 1000.0,
+            stats.frame_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_size_estimated,
+            stats.draw.painter_duration.as_secs_f64() * 1000.0,
+            stats.draw.cache_picture_size,
+            stats.draw.cache_picture_used,
+            stats.draw.cache_geometry_size,
+            stats.draw.tiles_total,
+            stats.draw.tiles_used,
+            __queue_time,
+            __sleep_time
+        );
+        println!("{}", stat_string);
+        self.last_stats = Some(stat_string);
+
+        self.last_frame_time = __frame_start;
+
+        if stats.frame.should_repaint_all {
+            self.renderer.queue();
+        }
+    }
+
+    /// Update backing resources after a window resize.
+    pub(crate) fn resize(&mut self, width: u32, height: u32) {
+        self.state.resize(width as i32, height as i32);
+        self.renderer
+            .set_backend(Backend::GL(self.state.surface_mut_ptr()));
+        self.renderer.invalidate_cache();
+
+        self.camera.size = crate::node::schema::Size {
+            width: width as f32,
+            height: height as f32,
+        };
+        if self.renderer.set_camera(self.camera.clone()) {
+            self.renderer.queue();
+        }
+    }
+}

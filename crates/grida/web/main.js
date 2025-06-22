@@ -13,7 +13,8 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 // This loads and initialize our WASM module
-createRustSkiaModule().then((RustSkia) => {
+createGridaCanvas().then((RustSkia) => {
+  console.log(RustSkia);
   // Create the WebGL context
   let context;
   const canvas = document.querySelector("#glcanvas");
@@ -31,18 +32,28 @@ createRustSkiaModule().then((RustSkia) => {
   // Fit the canvas to the viewport
   resizeCanvasToDisplaySize(canvas);
 
-  // Initialize Skia
+  // Initialize the application
   const state = RustSkia._init(canvas.width, canvas.height);
 
-  // Draw a circle that follows the mouse pointer
-  window.addEventListener("mousemove", (event) => {
-    const canvasPos = canvas.getBoundingClientRect();
-    RustSkia._draw_circle(
-      state,
-      event.clientX - canvasPos.x,
-      event.clientY - canvasPos.y
-    );
-  });
+  // Load the demo scene
+  // fetch("scene.json")
+  //   .then((r) => r.text())
+  //   .then((txt) => {
+  //     const len = RustSkia.lengthBytesUTF8(txt) + 1;
+  //     const ptr = RustSkia._malloc(len);
+  //     RustSkia.stringToUTF8(txt, ptr, len);
+  //     RustSkia._load_scene_json(state, ptr, len - 1);
+  //     RustSkia._free(ptr);
+  //     requestAnimationFrame(render);
+  //   });
+
+  RustSkia._load_dummy_scene(state);
+  requestAnimationFrame(render);
+
+  function render() {
+    RustSkia._redraw(state);
+    requestAnimationFrame(render);
+  }
 
   // Make canvas size stick to the window size
   window.addEventListener("resize", () => {
