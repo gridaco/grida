@@ -35,6 +35,16 @@ createGridaCanvas().then((RustSkia) => {
   // Initialize the application
   const state = RustSkia._init(canvas.width, canvas.height);
 
+  const CMD = {
+    Close: 0,
+    ZoomIn: 1,
+    ZoomOut: 2,
+    ZoomDelta: 3,
+    Pan: 4,
+    Redraw: 5,
+    Resize: 6,
+  };
+
   // Load the demo scene
   // fetch("scene.json")
   //   .then((r) => r.text())
@@ -47,8 +57,28 @@ createGridaCanvas().then((RustSkia) => {
   //     requestAnimationFrame(render);
   //   });
 
-  RustSkia._load_dummy_scene(state);
+  // RustSkia._load_dummy_scene(state);
+  RustSkia._load_benchmark_scene(state);
   requestAnimationFrame(render);
+
+  canvas.addEventListener("pointermove", (event) => {
+    console.log("pointermove", event);
+    const rect = canvas.getBoundingClientRect();
+    RustSkia._pointer_move(
+      state,
+      event.clientX - rect.left,
+      event.clientY - rect.top
+    );
+  });
+
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    if (event.ctrlKey) {
+      RustSkia._command(state, CMD.ZoomDelta, event.deltaY * -0.01, 0);
+    } else {
+      RustSkia._command(state, CMD.Pan, event.deltaX, event.deltaY);
+    }
+  });
 
   function render() {
     RustSkia._redraw(state);

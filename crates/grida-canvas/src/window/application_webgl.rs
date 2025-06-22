@@ -110,6 +110,18 @@ impl WebGlApplication {
         self.app.redraw();
     }
 
+    /// Update the cursor position in logical screen coordinates and perform a
+    /// hit test. Should be called whenever the pointer moves.
+    pub fn pointer_move(&mut self, x: f32, y: f32) {
+        self.app.input.cursor = [x, y];
+        self.app.perform_hit_test();
+    }
+
+    /// Forward a [`WindowCommand`] to the inner application.
+    pub fn command(&mut self, cmd: crate::window::command::WindowCommand) {
+        self.app.command(cmd);
+    }
+
     pub fn load_dummy_scene(&mut self) {
         use crate::node::repository::NodeRepository;
         use crate::node::schema::*;
@@ -172,6 +184,50 @@ impl WebGlApplication {
         };
 
         // Load the scene into the renderer
+        self.app.renderer.load_scene(scene);
+    }
+
+    /// Load a heavy scene useful for performance benchmarking.
+    pub fn load_benchmark_scene(&mut self) {
+        use crate::node::repository::NodeRepository;
+        use crate::node::schema::*;
+        use math2::transform::AffineTransform;
+
+        let nf = NodeFactory::new();
+        let mut nodes = NodeRepository::new();
+        let mut children = Vec::new();
+
+        // generate a grid of rectangles
+        let grid = 50;
+        let size = 20.0;
+        for y in 0..grid {
+            for x in 0..grid {
+                let mut rect = nf.create_rectangle_node();
+                rect.base.name = format!("rect-{}-{}", x, y);
+                rect.transform = AffineTransform::new(x as f32 * size, y as f32 * size, 0.0);
+                rect.size = Size {
+                    width: size,
+                    height: size,
+                };
+                rect.fill = Paint::Solid(SolidPaint {
+                    color: Color(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
+                    opacity: 1.0,
+                });
+                let id = rect.base.id.clone();
+                nodes.insert(Node::Rectangle(rect));
+                children.push(id);
+            }
+        }
+
+        let scene = Scene {
+            id: "benchmark".to_string(),
+            name: "Benchmark Scene".to_string(),
+            transform: AffineTransform::identity(),
+            children,
+            nodes,
+            background_color: Some(Color(255, 255, 255, 255)),
+        };
+
         self.app.renderer.load_scene(scene);
     }
 
