@@ -1,0 +1,12 @@
+{
+  "name": "grida-canvas-wasm32-unknown-emscripten",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "containerEnv": {},
+  "customizations": {
+    "vscode": {
+      "extensions": ["rust-lang.rust-analyzer"]
+    }
+  }
+}
