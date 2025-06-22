@@ -250,8 +250,10 @@ impl UnknownTargetApplication {
             width: width as f32,
             height: height as f32,
         };
-        if self.renderer.set_camera(self.camera.clone()) {
-            self.renderer.queue();
-        }
+        // Always update the camera and queue a new frame after resizing
+        // to ensure the surface repaints even if the quantized
+        // transform does not change.
+        self.renderer.set_camera(self.camera.clone());
+        self.renderer.queue();
     }
 }
