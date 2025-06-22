@@ -2,8 +2,8 @@
  * Make a canvas element fit to the display window.
  */
 function resizeCanvasToDisplaySize(canvas) {
-  const width = Math.max(1, canvas.clientWidth);
-  const height = Math.max(1, canvas.clientHeight);
+  const width = canvas.clientWidth | 1;
+  const height = canvas.clientHeight | 1;
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width;
     canvas.height = height;
@@ -13,11 +13,10 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 // This loads and initialize our WASM module
-createGridaCanvas().then((RustSkia) => {
-  console.log(RustSkia);
+createRustSkiaModule().then((RustSkia) => {
   // Create the WebGL context
   let context;
-  const canvas = document.querySelector("#canvas");
+  const canvas = document.querySelector("#glcanvas");
   context = canvas.getContext("webgl2", {
     antialias: true,
     depth: true,
@@ -32,28 +31,18 @@ createGridaCanvas().then((RustSkia) => {
   // Fit the canvas to the viewport
   resizeCanvasToDisplaySize(canvas);
 
-  // Initialize the application
+  // Initialize Skia
   const state = RustSkia._init(canvas.width, canvas.height);
 
-  // Load the demo scene
-  // fetch("scene.json")
-  //   .then((r) => r.text())
-  //   .then((txt) => {
-  //     const len = RustSkia.lengthBytesUTF8(txt) + 1;
-  //     const ptr = RustSkia._malloc(len);
-  //     RustSkia.stringToUTF8(txt, ptr, len);
-  //     RustSkia._load_scene_json(state, ptr, len - 1);
-  //     RustSkia._free(ptr);
-  //     requestAnimationFrame(render);
-  //   });
-
-  RustSkia._load_dummy_scene(state);
-  requestAnimationFrame(render);
-
-  function render() {
-    RustSkia._redraw(state);
-    requestAnimationFrame(render);
-  }
+  // Draw a circle that follows the mouse pointer
+  window.addEventListener("mousemove", (event) => {
+    const canvasPos = canvas.getBoundingClientRect();
+    RustSkia._draw_circle(
+      state,
+      event.clientX - canvasPos.x,
+      event.clientY - canvasPos.y
+    );
+  });
 
   // Make canvas size stick to the window size
   window.addEventListener("resize", () => {

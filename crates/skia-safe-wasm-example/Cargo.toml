@@ -1,0 +1,13 @@
+[package]
+name = "skia-safe-wasm-example"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[features]
+default = ["skia-safe/gl"]
+
+[dependencies]
+skia-safe = { version = "0.86.0", features = ["gpu", "gl"] }
+gl = "0.14.0"

@@ -1,7 +1,9 @@
 use skia_safe::{
+    gpu::{self, gl::FramebufferInfo, DirectContext},
     Surface,
-    gpu::{self, DirectContext, gl::FramebufferInfo},
 };
+
+use gl;
 
 pub struct GpuState {
     pub context: DirectContext,
@@ -71,6 +73,9 @@ impl State {
 }
 /// Create a GPU-backed surface used for rendering.
 pub(crate) fn create_surface(gpu_state: &mut GpuState, width: i32, height: i32) -> Surface {
+    unsafe {
+        gl::Viewport(0, 0, width, height);
+    }
     let backend_render_target =
         gpu::backend_render_targets::make_gl((width, height), 1, 8, gpu_state.framebuffer_info);
 
