@@ -367,4 +367,14 @@ impl UnknownTargetApplication {
 
         self.renderer.load_scene(scene);
     }
+
+    /// Enable or disable rendering of tile overlays.
+    pub fn set_debug_tiles(&mut self, debug: bool) {
+        self.renderer.set_debug_tiles(debug);
+    }
+
+    /// Returns `true` if tile overlay rendering is enabled.
+    pub fn debug_tiles(&self) -> bool {
+        self.renderer.debug_tiles()
+    }
 }

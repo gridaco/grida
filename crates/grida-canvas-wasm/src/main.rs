@@ -84,6 +84,14 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn set_debug_tiles(app: *mut WebGlApplication, enabled: bool) {
+    if let Some(app) = app.as_mut() {
+        app.set_debug_tiles(enabled);
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}
 

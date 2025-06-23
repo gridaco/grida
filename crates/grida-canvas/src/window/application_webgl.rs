@@ -84,7 +84,7 @@ impl WebGlApplication {
         });
         renderer.set_camera(camera.clone());
 
-        Self {
+        let mut app = Self {
             app: UnknownTargetApplication {
                 renderer,
                 state,
@@ -99,7 +99,9 @@ impl WebGlApplication {
                 last_frame_time: std::time::Instant::now(),
                 last_stats: None,
             },
-        }
+        };
+        app.app.set_debug_tiles(true);
+        app
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
@@ -167,6 +169,16 @@ impl WebGlApplication {
             };
             self.app.renderer.load_scene(scene);
         }
+    }
+
+    /// Enable or disable rendering of tile overlays.
+    pub fn set_debug_tiles(&mut self, debug: bool) {
+        self.app.set_debug_tiles(debug);
+    }
+
+    /// Returns `true` if tile overlay rendering is enabled.
+    pub fn debug_tiles(&self) -> bool {
+        self.app.debug_tiles()
     }
 }
 
