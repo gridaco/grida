@@ -92,6 +92,7 @@ impl WebGlApplication {
                 input: crate::runtime::input::InputState::default(),
                 hit_result: None,
                 last_hit_test: std::time::Instant::now(),
+                hit_test_interval: std::time::Duration::ZERO,
                 image_rx,
                 font_rx,
                 scheduler: scheduler::FrameScheduler::new(60).with_max_fps(60),

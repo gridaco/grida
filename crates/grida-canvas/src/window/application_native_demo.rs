@@ -75,6 +75,7 @@ where
             input: crate::runtime::input::InputState::default(),
             hit_result: None,
             last_hit_test: std::time::Instant::now(),
+            hit_test_interval: std::time::Duration::from_millis(50),
             image_rx: rx,
             font_rx,
             scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),

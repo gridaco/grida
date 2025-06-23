@@ -17,6 +17,7 @@ pub struct UnknownTargetApplication {
     pub(crate) input: crate::runtime::input::InputState,
     pub(crate) hit_result: Option<crate::node::schema::NodeId>,
     pub(crate) last_hit_test: std::time::Instant,
+    pub(crate) hit_test_interval: std::time::Duration,
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) scheduler: scheduler::FrameScheduler,
@@ -93,8 +94,9 @@ impl UnknownTargetApplication {
 
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
-        const HIT_TEST_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
-        if self.last_hit_test.elapsed() < HIT_TEST_INTERVAL {
+        if self.hit_test_interval != std::time::Duration::ZERO
+            && self.last_hit_test.elapsed() < self.hit_test_interval
+        {
             return;
         }
         self.last_hit_test = std::time::Instant::now();

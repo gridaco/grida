@@ -34,6 +34,9 @@ createGridaCanvas().then((RustSkia) => {
 
   // Initialize the application
   const state = RustSkia._init(canvas.width, canvas.height);
+  let isDragging = false;
+  let lastX = 0;
+  let lastY = 0;
 
   const CMD = {
     Close: 0,
@@ -62,14 +65,30 @@ createGridaCanvas().then((RustSkia) => {
   requestAnimationFrame(render);
 
   canvas.addEventListener("pointermove", (event) => {
-    console.log("pointermove", event);
     const rect = canvas.getBoundingClientRect();
-    RustSkia._pointer_move(
-      state,
-      event.clientX - rect.left,
-      event.clientY - rect.top
-    );
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    RustSkia._pointer_move(state, x, y);
+    if (isDragging) {
+      RustSkia._command(state, CMD.Pan, -(x - lastX), -(y - lastY));
+    }
+    lastX = x;
+    lastY = y;
   });
+
+  canvas.addEventListener("pointerdown", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    lastX = event.clientX - rect.left;
+    lastY = event.clientY - rect.top;
+    isDragging = true;
+  });
+
+  const endDrag = () => {
+    isDragging = false;
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("pointerleave", endDrag);
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
