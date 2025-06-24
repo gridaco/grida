@@ -1,0 +1,7 @@
+{
+  "name": "@grida/canvas-wasm",
+  "description": "(WIP) WASM bindings for Grida Canvas",
+  "version": "0.0.0",
+  "main": "index.js",
+  "scripts": {}
+}
