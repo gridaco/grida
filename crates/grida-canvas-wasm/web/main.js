@@ -51,21 +51,20 @@ createGridaCanvas().then((GridaCanvas) => {
     Resize: 6,
   };
 
-  // Load the demo scene
-  // fetch("scene.json")
-  //   .then((r) => r.text())
-  //   .then((txt) => {
-  //     const len = GridaCanvas.lengthBytesUTF8(txt) + 1;
-  //     const ptr = GridaCanvas._malloc(len);
-  //     GridaCanvas.stringToUTF8(txt, ptr, len);
-  //     GridaCanvas._load_scene_json(state, ptr, len - 1);
-  //     GridaCanvas._free(ptr);
-  //     requestAnimationFrame(render);
-  //   });
+  // Load the demo scene from JSON
+  fetch("scene.json")
+    .then((r) => r.text())
+    .then((txt) => {
+      const len = GridaCanvas.lengthBytesUTF8(txt) + 1;
+      const ptr = GridaCanvas._allocate(len);
+      GridaCanvas.stringToUTF8(txt, ptr, len);
+      GridaCanvas._load_scene_json(state, ptr, len - 1);
+      GridaCanvas._deallocate(ptr, len);
+      requestAnimationFrame(render);
+    });
 
   // GridaCanvas._load_dummy_scene(state);
-  GridaCanvas._load_benchmark_scene(state, 50, 50);
-  requestAnimationFrame(render);
+  // GridaCanvas._load_benchmark_scene(state, 50, 50);
 
   canvas.addEventListener("pointermove", (event) => {
     const rect = canvas.getBoundingClientRect();

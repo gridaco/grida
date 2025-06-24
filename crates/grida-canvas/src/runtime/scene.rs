@@ -1,7 +1,7 @@
 use crate::cache::tile::RegionTileInfo;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
-use crate::painter::{Painter, cvt};
+use crate::painter::{cvt, Painter};
 use crate::{
     cache,
     repository::{FontRepository, ImageRepository},
@@ -10,7 +10,7 @@ use crate::{
 
 use math2::{self, rect, region};
 use skia_safe::{
-    Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface, surfaces,
+    surfaces, Canvas, Image, Paint as SkPaint, Picture, PictureRecorder, Rect, Surface,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -228,7 +228,7 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
-        println!("load_scene: {:?}", scene.nodes.len());
+        println!("load_scene: size={}", scene.nodes.len());
         self.scene_cache.update_geometry(&scene);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);

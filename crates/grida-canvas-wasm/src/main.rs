@@ -92,6 +92,23 @@ pub unsafe extern "C" fn set_debug_tiles(app: *mut WebGlApplication, enabled: bo
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn allocate(len: usize) -> *mut u8 {
+    let mut buf = Vec::<u8>::with_capacity(len);
+    let ptr = buf.as_mut_ptr();
+    std::mem::forget(buf);
+    ptr
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len != 0 {
+        drop(Vec::from_raw_parts(ptr, len, len));
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}
 

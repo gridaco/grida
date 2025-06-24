@@ -43,6 +43,8 @@ pub enum IONode {
     Vector(IOVectorNode),
     #[serde(rename = "ellipse")]
     Ellipse(IOEllipseNode),
+    #[serde(rename = "rectangle")]
+    Rectangle(IORectangleNode),
     #[serde(other)]
     Unknown,
 }
@@ -215,6 +217,38 @@ pub struct IOEllipseNode {
     #[serde(rename = "strokeCap")]
     pub stroke_cap: Option<String>,
     pub effects: Option<Vec<serde_json::Value>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IORectangleNode {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_active")]
+    pub active: bool,
+    #[serde(default = "default_locked")]
+    pub locked: bool,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    #[serde(default = "default_rotation")]
+    pub rotation: f32,
+    #[serde(rename = "zIndex", default = "default_z_index")]
+    pub z_index: i32,
+    pub position: Option<String>,
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+    pub fill: Option<Fill>,
+    #[serde(rename = "strokeWidth")]
+    pub stroke_width: Option<f32>,
+    #[serde(rename = "strokeCap")]
+    pub stroke_cap: Option<String>,
+    pub effects: Option<Vec<serde_json::Value>>,
+    #[serde(
+        rename = "cornerRadius",
+        deserialize_with = "deserialize_corner_radius"
+    )]
+    pub corner_radius: Option<RectangularCornerRadius>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -425,6 +459,39 @@ impl From<IOEllipseNode> for Node {
     }
 }
 
+impl From<IORectangleNode> for Node {
+    fn from(node: IORectangleNode) -> Self {
+        let transform = AffineTransform::new(node.left, node.top, node.rotation);
+
+        Node::Rectangle(RectangleNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform,
+            size: Size {
+                width: node.width,
+                height: node.height,
+            },
+            corner_radius: node
+                .corner_radius
+                .unwrap_or(RectangularCornerRadius::zero()),
+            fill: node.fill.into(),
+            stroke: Paint::Solid(SolidPaint {
+                color: Color(0, 0, 0, 255),
+                opacity: 1.0,
+            }),
+            stroke_width: node.stroke_width.unwrap_or(0.0),
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            effect: None,
+            opacity: node.opacity,
+        })
+    }
+}
+
 impl From<IOVectorNode> for Node {
     fn from(node: IOVectorNode) -> Self {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
@@ -466,6 +533,7 @@ impl From<IONode> for Node {
             IONode::Text(text) => Node::TextSpan(text.into()),
             IONode::Vector(vector) => vector.into(),
             IONode::Ellipse(ellipse) => ellipse.into(),
+            IONode::Rectangle(rectangle) => rectangle.into(),
             IONode::Unknown => Node::Group(GroupNode {
                 base: BaseNode {
                     id: "unknown".to_string(),
