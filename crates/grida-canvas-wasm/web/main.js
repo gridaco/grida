@@ -2,8 +2,9 @@
  * Make a canvas element fit to the display window.
  */
 function resizeCanvasToDisplaySize(canvas) {
-  const width = Math.max(1, canvas.clientWidth);
-  const height = Math.max(1, canvas.clientHeight);
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width;
     canvas.height = height;
@@ -71,9 +72,10 @@ createGridaCanvas().then((GridaCanvas) => {
   // GridaCanvas._load_benchmark_scene(state, 50, 50);
 
   canvas.addEventListener("pointermove", (event) => {
+    const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const x = (event.clientX - rect.left) * dpr;
+    const y = (event.clientY - rect.top) * dpr;
     GridaCanvas._pointer_move(state, x, y);
     if (isDragging) {
       GridaCanvas._command(state, CMD.Pan, -(x - lastX), -(y - lastY));
@@ -83,9 +85,10 @@ createGridaCanvas().then((GridaCanvas) => {
   });
 
   canvas.addEventListener("pointerdown", (event) => {
+    const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    lastX = event.clientX - rect.left;
-    lastY = event.clientY - rect.top;
+    lastX = (event.clientX - rect.left) * dpr;
+    lastY = (event.clientY - rect.top) * dpr;
     isDragging = true;
   });
 
@@ -98,10 +101,11 @@ createGridaCanvas().then((GridaCanvas) => {
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
+    const dpr = window.devicePixelRatio || 1;
     if (event.ctrlKey) {
       GridaCanvas._command(state, CMD.ZoomDelta, event.deltaY * -0.01, 0);
     } else {
-      GridaCanvas._command(state, CMD.Pan, event.deltaX, event.deltaY);
+      GridaCanvas._command(state, CMD.Pan, event.deltaX * dpr, event.deltaY * dpr);
     }
   });
 
