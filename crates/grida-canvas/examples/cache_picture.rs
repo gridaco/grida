@@ -1,5 +1,4 @@
 use cg::window::scheduler::FrameScheduler;
-use gl_rs as gl;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},

@@ -4,7 +4,6 @@ use cg::{
     runtime::camera::Camera2D,
     runtime::scene::{Backend, Renderer},
 };
-use gl_rs as gl;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},

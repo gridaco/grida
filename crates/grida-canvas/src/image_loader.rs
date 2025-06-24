@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use crate::resource_loader::ResourceLoader;
 
 #[cfg(not(target_arch = "wasm32"))]
-use reqwest;
+use futures::channel::mpsc;
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::sync::mpsc;
+use reqwest;
 #[cfg(not(target_arch = "wasm32"))]
 use winit::event_loop::EventLoopProxy;
 
@@ -88,7 +88,7 @@ impl ImageLoader {
         // If in lifecycle mode, send the image data through the channel
         #[cfg(not(target_arch = "wasm32"))]
         if let ImageLoadingMode::Lifecycle { tx, proxy } = &self.mode {
-            let _ = tx.send(ImageMessage {
+            let _ = tx.unbounded_send(ImageMessage {
                 src: src.to_string(),
                 data: data.clone(),
             });

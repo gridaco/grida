@@ -12,20 +12,24 @@ fn resource_path(name: &str) -> String {
         .to_string()
 }
 
-#[tokio::test]
-async fn font_loader_simple_load_unload() {
-    let mut loader = FontLoader::new_simple();
-    let path = resource_path("Caveat-VariableFont_wght.ttf");
-    let data = loader.load("Caveat", &path).await;
-    assert!(data.is_some());
-    loader.unload("Caveat").await;
+#[test]
+fn font_loader_simple_load_unload() {
+    futures::executor::block_on(async {
+        let mut loader = FontLoader::new_simple();
+        let path = resource_path("Caveat-VariableFont_wght.ttf");
+        let data = loader.load("Caveat", &path).await;
+        assert!(data.is_some());
+        loader.unload("Caveat").await;
+    });
 }
 
-#[tokio::test]
-async fn image_loader_simple_load_unload() {
-    let mut loader = ImageLoader::new_simple();
-    let path = resource_path("4k.jpg");
-    let data = loader.load(&path, &path).await;
-    assert!(data.is_some());
-    loader.unload(&path).await;
+#[test]
+fn image_loader_simple_load_unload() {
+    futures::executor::block_on(async {
+        let mut loader = ImageLoader::new_simple();
+        let path = resource_path("4k.jpg");
+        let data = loader.load(&path, &path).await;
+        assert!(data.is_some());
+        loader.unload(&path).await;
+    });
 }

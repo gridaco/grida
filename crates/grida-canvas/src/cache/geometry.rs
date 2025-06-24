@@ -58,7 +58,9 @@ impl GeometryCache {
         parent_id: Option<NodeId>,
         cache: &mut GeometryCache,
     ) -> Rectangle {
-        let node = repo.get(id).expect("node not found");
+        let node = repo
+            .get(id)
+            .expect(&format!("node not found in geometry cache {id:?}"));
 
         match node {
             Node::Group(n) => {

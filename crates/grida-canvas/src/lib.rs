@@ -12,5 +12,4 @@ pub mod runtime;
 pub mod text;
 pub mod webfont_helper;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub mod window;
