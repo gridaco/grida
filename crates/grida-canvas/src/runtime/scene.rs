@@ -179,7 +179,7 @@ impl Renderer {
     }
 
     /// Enable or disable tile debug rendering.
-    pub fn set_debug_tiles(&mut self, debug: bool) {
+    pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.debug_tiles = debug;
     }
 

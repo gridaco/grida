@@ -38,8 +38,12 @@ createGridaCanvas().then((GridaCanvas) => {
   let lastX = 0;
   let lastY = 0;
 
-  // Configure optional debug tile overlay
-  GridaCanvas._set_debug_tiles(state, true);
+  // Configure optional overlays
+  GridaCanvas._devtools_rendering_set_show_tiles(state, true);
+  GridaCanvas._devtools_rendering_set_show_fps_meter(state, true);
+  GridaCanvas._devtools_rendering_set_show_stats(state, false);
+  GridaCanvas._devtools_rendering_set_show_hit_testing(state, true);
+  GridaCanvas._set_show_ruler(state, true);
 
   const CMD = {
     Close: 0,
@@ -52,7 +56,7 @@ createGridaCanvas().then((GridaCanvas) => {
   };
 
   // Load the demo scene from JSON
-  fetch("scene.json")
+  fetch("http://grida.co/examples/canvas/hero-main-demo.grida")
     .then((r) => r.text())
     .then((txt) => {
       const len = GridaCanvas.lengthBytesUTF8(txt) + 1;

@@ -98,9 +98,13 @@ impl WebGlApplication {
                 scheduler: scheduler::FrameScheduler::new(60).with_max_fps(60),
                 last_frame_time: std::time::Instant::now(),
                 last_stats: None,
+                show_fps: true,
+                show_stats: true,
+                show_hit_overlay: true,
+                show_ruler: true,
             },
         };
-        app.app.set_debug_tiles(true);
+        app.app.devtools_rendering_set_show_tiles(true);
         app
     }
 
@@ -172,13 +176,29 @@ impl WebGlApplication {
     }
 
     /// Enable or disable rendering of tile overlays.
-    pub fn set_debug_tiles(&mut self, debug: bool) {
-        self.app.set_debug_tiles(debug);
+    pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
+        self.app.devtools_rendering_set_show_tiles(debug);
     }
 
     /// Returns `true` if tile overlay rendering is enabled.
     pub fn debug_tiles(&self) -> bool {
         self.app.debug_tiles()
+    }
+
+    pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_fps_meter(show);
+    }
+
+    pub fn devtools_rendering_set_show_stats(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_stats(show);
+    }
+
+    pub fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_hit_testing(show);
+    }
+
+    pub fn set_show_ruler(&mut self, show: bool) {
+        self.app.set_show_ruler(show);
     }
 }
 

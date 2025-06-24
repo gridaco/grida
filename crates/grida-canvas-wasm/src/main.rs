@@ -7,6 +7,23 @@ use std::boxed::Box;
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
+pub extern "C" fn allocate(len: usize) -> *mut u8 {
+    let mut buf = Vec::<u8>::with_capacity(len);
+    let ptr = buf.as_mut_ptr();
+    std::mem::forget(buf);
+    ptr
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len != 0 {
+        drop(Vec::from_raw_parts(ptr, len, len));
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
 pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
     Box::new(WebGlApplication::new(width, height))
 }
@@ -86,26 +103,50 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_debug_tiles(app: *mut WebGlApplication, enabled: bool) {
+pub unsafe extern "C" fn set_show_ruler(app: *mut WebGlApplication, show: bool) {
     if let Some(app) = app.as_mut() {
-        app.set_debug_tiles(enabled);
+        app.set_show_ruler(show);
     }
 }
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub extern "C" fn allocate(len: usize) -> *mut u8 {
-    let mut buf = Vec::<u8>::with_capacity(len);
-    let ptr = buf.as_mut_ptr();
-    std::mem::forget(buf);
-    ptr
+pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
+    app: *mut WebGlApplication,
+    enabled: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.devtools_rendering_set_show_tiles(enabled);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
-    if !ptr.is_null() && len != 0 {
-        drop(Vec::from_raw_parts(ptr, len, len));
+pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
+    app: *mut WebGlApplication,
+    show: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.devtools_rendering_set_show_fps_meter(show);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn devtools_rendering_set_show_stats(app: *mut WebGlApplication, show: bool) {
+    if let Some(app) = app.as_mut() {
+        app.devtools_rendering_set_show_stats(show);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
+    app: *mut WebGlApplication,
+    show: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.devtools_rendering_set_show_hit_testing(show);
     }
 }
 

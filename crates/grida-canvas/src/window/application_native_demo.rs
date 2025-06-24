@@ -1,8 +1,8 @@
 use super::application::UnknownTargetApplication;
-use super::application_native::{NativeApplication, init_native_window};
+use super::application_native::{init_native_window, NativeApplication};
 use crate::font_loader::FontLoader;
 use crate::font_loader::FontMessage;
-use crate::image_loader::{ImageLoader, ImageMessage, load_scene_images};
+use crate::image_loader::{load_scene_images, ImageLoader, ImageMessage};
 use crate::node::schema::*;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
@@ -42,7 +42,7 @@ where
         }
     });
 
-    renderer.set_debug_tiles(true);
+    renderer.devtools_rendering_set_show_tiles(true);
     renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
     println!("📸 Initializing image loader...");
@@ -81,6 +81,10 @@ where
             scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
+            show_fps: true,
+            show_stats: true,
+            show_hit_overlay: true,
+            show_ruler: true,
         },
         gl_surface,
         gl_context,
