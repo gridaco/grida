@@ -1,9 +1,9 @@
 use skia_safe::{
-    FontMgr, Image,
     textlayout::{FontCollection, TypefaceFontProvider},
+    FontMgr, Image,
 };
 
-use crate::mipmap::{ImageMipmaps, MipmapConfig};
+use crate::cache::mipmap::{ImageMipmaps, MipmapConfig};
 use std::collections::HashMap;
 
 /// Generic repository trait for storing resources keyed by an identifier.
