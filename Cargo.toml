@@ -3,5 +3,5 @@ resolver = "3"
 members = [
   "crates/grida-canvas",
   "crates/grida-canvas-wasm",
-  "crates/grida-math2",
+  "crates/math2",
 ]

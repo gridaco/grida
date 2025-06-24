@@ -163,8 +163,8 @@ async fn demo_texts() -> Scene {
 #[tokio::main]
 async fn main() {
     let scene = demo_texts().await;
-    let caveat_font_path = "resources/Caveat-VariableFont_wght.ttf".to_string();
-    let vt323_font_path = "resources/VT323-Regular.ttf".to_string();
+    let caveat_font_path = "../fixtures/fonts/Caveat-VariableFont_wght.ttf".to_string();
+    let vt323_font_path = "../fixtures/fonts/VT323-Regular.ttf".to_string();
 
     window::run_demo_window_with(scene, move |_renderer, _img_tx, font_tx, proxy| {
         println!("📝 Loading fonts asynchronously...");

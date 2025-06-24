@@ -4,9 +4,9 @@ use cg::resource_loader::ResourceLoader;
 
 use std::path::PathBuf;
 
-fn resource_path(name: &str) -> String {
+fn fixture_path(name: &str) -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("resources")
+        .join("../fixtures")
         .join(name)
         .to_string_lossy()
         .to_string()
@@ -16,7 +16,7 @@ fn resource_path(name: &str) -> String {
 fn font_loader_simple_load_unload() {
     futures::executor::block_on(async {
         let mut loader = FontLoader::new_simple();
-        let path = resource_path("Caveat-VariableFont_wght.ttf");
+        let path = fixture_path("fonts/Caveat-VariableFont_wght.ttf");
         let data = loader.load("Caveat", &path).await;
         assert!(data.is_some());
         loader.unload("Caveat").await;
@@ -27,7 +27,7 @@ fn font_loader_simple_load_unload() {
 fn image_loader_simple_load_unload() {
     futures::executor::block_on(async {
         let mut loader = ImageLoader::new_simple();
-        let path = resource_path("4k.jpg");
+        let path = fixture_path("images/4k.jpg");
         let data = loader.load(&path, &path).await;
         assert!(data.is_some());
         loader.unload(&path).await;
