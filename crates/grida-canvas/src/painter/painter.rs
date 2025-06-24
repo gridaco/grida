@@ -2,11 +2,12 @@ use super::cvt;
 use super::geometry::*;
 use super::layer::{LayerList, PainterPictureLayer};
 use crate::cache::geometry::GeometryCache;
+use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::repository::{FontRepository, ImageRepository};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use skia_safe::{Paint as SkPaint, Point, canvas::SaveLayerRec, textlayout};
+use skia_safe::{Paint as SkPaint, Path, Point, canvas::SaveLayerRec, textlayout};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,6 +17,8 @@ pub struct Painter<'a> {
     canvas: &'a skia_safe::Canvas,
     fonts: Rc<RefCell<FontRepository>>,
     images: Rc<RefCell<ImageRepository>>,
+    paragraph_cache: RefCell<ParagraphCache>,
+    path_cache: RefCell<VectorPathCache>,
 }
 
 impl<'a> Painter<'a> {
@@ -29,7 +32,19 @@ impl<'a> Painter<'a> {
             canvas,
             fonts,
             images,
+            paragraph_cache: RefCell::new(ParagraphCache::new()),
+            path_cache: RefCell::new(VectorPathCache::new()),
         }
+    }
+
+    #[cfg(test)]
+    pub fn paragraph_cache(&self) -> &RefCell<ParagraphCache> {
+        &self.paragraph_cache
+    }
+
+    #[cfg(test)]
+    pub fn path_cache(&self) -> &RefCell<VectorPathCache> {
+        &self.path_cache
     }
 
     // ============================
@@ -149,6 +164,32 @@ impl<'a> Painter<'a> {
         // We don't draw any content here—just pushing and popping the layer
         canvas.restore(); // pop the SaveLayer
         canvas.restore(); // pop the clip
+    }
+
+    fn cached_path(&self, id: &NodeId, data: &str) -> Rc<Path> {
+        self.path_cache.borrow_mut().get_or_create(id, data)
+    }
+
+    fn cached_paragraph(
+        &self,
+        id: &NodeId,
+        text: &str,
+        size: &Size,
+        fill: &Paint,
+        align: &TextAlign,
+        valign: &TextAlignVertical,
+        style: &TextStyle,
+    ) -> Rc<textlayout::Paragraph> {
+        self.paragraph_cache.borrow_mut().get_or_create(
+            id,
+            text,
+            size,
+            fill,
+            align,
+            valign,
+            style,
+            &self.fonts.borrow(),
+        )
     }
 
     /// Determine the transformation matrix for an [`ImagePaint`].
@@ -422,8 +463,8 @@ impl<'a> Painter<'a> {
     /// Draw a PathNode (SVG path data)
     fn draw_path_node(&self, node: &PathNode) {
         self.with_transform(&node.transform.matrix, || {
-            let path = skia_safe::path::Path::from_svg(&node.data).expect("invalid SVG path");
-            let shape = PainterShape::from_path(path.clone());
+            let path = self.cached_path(&node.base.id, &node.data);
+            let shape = PainterShape::from_path((*path).clone());
             self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
@@ -477,38 +518,23 @@ impl<'a> Painter<'a> {
 
     fn draw_text_span(
         &self,
+        id: &NodeId,
         text: &str,
         size: &Size,
         fill: &Paint,
         text_align: &TextAlign,
-        _text_align_vertical: &TextAlignVertical,
+        text_align_vertical: &TextAlignVertical,
         text_style: &TextStyle,
     ) {
-        // Prepare paint for fill
-        let fill_paint = cvt::sk_paint(&fill, 1.0, (size.width, size.height));
-
-        // Build paragraph style
-        let mut paragraph_style = textlayout::ParagraphStyle::new();
-        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
-        paragraph_style.set_text_align(text_align.clone().into());
-
-        let fonts = self.fonts.borrow();
-        let mut para_builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &fonts.font_collection());
-
-        // Build text style
-        let mut ts = make_textstyle(&text_style);
-        ts.set_foreground_paint(&fill_paint);
-
-        para_builder.push_style(&ts);
-        // Apply text transform before adding text
-        let transformed_text =
-            crate::text::text_transform::transform_text(&text, text_style.text_transform);
-        para_builder.add_text(&transformed_text);
-        let mut paragraph = para_builder.build();
-        para_builder.pop();
-        paragraph.layout(size.width);
-
+        let paragraph = self.cached_paragraph(
+            id,
+            text,
+            size,
+            fill,
+            text_align,
+            text_align_vertical,
+            text_style,
+        );
         paragraph.paint(self.canvas, Point::new(0.0, 0.0));
     }
 
@@ -518,6 +544,7 @@ impl<'a> Painter<'a> {
             self.with_opacity(node.opacity, || {
                 self.with_blendmode(node.blend_mode, || {
                     self.draw_text_span(
+                        &node.base.id,
                         &node.text,
                         &node.size,
                         &node.fill,
@@ -767,6 +794,7 @@ impl<'a> Painter<'a> {
                     let draw_content = || {
                         self.with_opacity(text_layer.base.opacity, || {
                             self.draw_text_span(
+                                &text_layer.base.id,
                                 &text_layer.text,
                                 &Size {
                                     width: shape.rect.width(),
@@ -803,7 +831,7 @@ impl<'a> Painter<'a> {
     }
 }
 
-fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
+pub(crate) fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     let mut ts = skia_safe::textlayout::TextStyle::new();
     ts.set_font_size(text_style.font_size);
     if let Some(letter_spacing) = text_style.letter_spacing {
@@ -827,4 +855,78 @@ fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::TextStyle {
     );
     ts.set_font_style(font_style);
     ts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::factory::NodeFactory;
+    use crate::repository::{FontRepository, ImageRepository};
+    use skia_safe::surfaces;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn caches_reuse_paragraph_and_path() {
+        let mut surface = surfaces::raster_n32_premul((100, 100)).unwrap();
+        let canvas = surface.canvas();
+        let fonts = Rc::new(RefCell::new(FontRepository::new()));
+        let images = Rc::new(RefCell::new(ImageRepository::new()));
+        let painter = Painter::new(canvas, fonts.clone(), images.clone());
+
+        let nf = NodeFactory::new();
+        let mut text = nf.create_text_span_node();
+        text.text = "Hello".into();
+        let text_id = text.base.id.clone();
+
+        painter.draw_text_span_node(&text);
+        let p_first = {
+            let cache = painter.paragraph_cache().borrow();
+            Rc::as_ptr(&cache.get(&text_id).unwrap().paragraph)
+        };
+
+        painter.draw_text_span_node(&text);
+        {
+            let cache = painter.paragraph_cache().borrow();
+            assert_eq!(cache.len(), 1);
+            assert_eq!(p_first, Rc::as_ptr(&cache.get(&text_id).unwrap().paragraph));
+        }
+
+        fonts.borrow_mut().insert("F".to_string(), vec![0u8; 4]);
+        painter.draw_text_span_node(&text);
+        {
+            let cache = painter.paragraph_cache().borrow();
+            assert_ne!(p_first, Rc::as_ptr(&cache.get(&text_id).unwrap().paragraph));
+        }
+
+        let mut path_node = nf.create_path_node();
+        path_node.data = "M0 0L10 10Z".to_string();
+        let path_id = path_node.base.id.clone();
+
+        painter.draw_path_node(&path_node);
+        let path_first = {
+            let cache = painter.path_cache().borrow();
+            cache.get(&path_id).unwrap().path.clone()
+        };
+
+        painter.draw_path_node(&path_node);
+        {
+            let cache = painter.path_cache().borrow();
+            assert_eq!(cache.len(), 1);
+            assert_eq!(
+                Rc::ptr_eq(&path_first, &cache.get(&path_id).unwrap().path),
+                true
+            );
+        }
+
+        path_node.data = "M0 0L20 20Z".to_string();
+        painter.draw_path_node(&path_node);
+        {
+            let cache = painter.path_cache().borrow();
+            assert_eq!(
+                Rc::ptr_eq(&path_first, &cache.get(&path_id).unwrap().path),
+                false
+            );
+        }
+    }
 }

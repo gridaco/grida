@@ -188,7 +188,7 @@ impl From<BlendMode> for skia_safe::BlendMode {
 
 /// Text Transform (Text Case)
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextTransform {
     #[serde(rename = "none")]
     None,
@@ -206,7 +206,7 @@ pub enum TextTransform {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextDecoration {
     #[serde(rename = "none")]
     None,
@@ -235,7 +235,7 @@ impl From<TextDecoration> for skia_safe::textlayout::TextDecoration {
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlign {
     #[serde(rename = "left")]
     Left,
@@ -265,7 +265,7 @@ impl From<TextAlign> for skia_safe::textlayout::TextAlign {
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/align-content)  
 /// - [Konva](https://konvajs.org/api/Konva.Text.html#verticalAlign)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlignVertical {
     #[serde(rename = "top")]
     Top,
@@ -280,7 +280,7 @@ pub enum TextAlignVertical {
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html)  
 /// - [OpenType spec](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
 pub struct FontWeight(pub u32);
 
 impl FontWeight {

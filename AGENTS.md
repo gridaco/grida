@@ -185,6 +185,9 @@ turbo typecheck # fallback when build fails due to network issues (nextjs packag
 # for crates specific tests
 cargo test
 
+# for crates specific check
+cargo check
+
 # for crates specific build
 cargo build
 

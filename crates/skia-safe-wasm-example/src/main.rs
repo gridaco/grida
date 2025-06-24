@@ -1,8 +1,8 @@
 use std::boxed::Box;
 
 use skia_safe::{
+    gpu::{self, gl::FramebufferInfo, DirectContext},
     Color, Paint, PaintStyle, Surface,
-    gpu::{self, DirectContext, gl::FramebufferInfo},
 };
 
 extern "C" {

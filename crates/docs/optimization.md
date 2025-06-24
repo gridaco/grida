@@ -135,8 +135,11 @@ A summary of all discussed optimization techniques for achieving high-performanc
 
 14. **Text & Path Caching**
 
-    - Cache laid-out paragraphs and SkPaths.
-    - Avoid layout recomputation every frame.
+    - Cache laid-out paragraphs and SVG paths keyed by node ID.
+    - Each entry stores a hash of the text/style or path string and the current
+      font repository generation.
+    - Caches are invalidated when fonts or the original data change.
+    - Hit testing reuses these paths for `path.contains` checks.
 
 15. **Render Pass Flattening**
 

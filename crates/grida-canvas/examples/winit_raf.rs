@@ -1,12 +1,20 @@
 use cg::window::scheduler;
-use rand::Rng;
 use std::time::{Duration, Instant};
+use std::time::{SystemTime, UNIX_EPOCH};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event_loop::EventLoop,
     window::{Window, WindowAttributes},
 };
+
+fn pseudo_random_u32(max: u32) -> u32 {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
+    (nanos % max) + 1
+}
 
 // Main application struct holding the window and rendering loop state
 struct App {
@@ -19,9 +27,8 @@ struct App {
 impl App {
     /// Simulates rendering work by sleeping for a few milliseconds
     fn render(&self) {
-        let mut rng = rand::thread_rng();
-        let render_time = rng.gen_range(1..=5);
-        std::thread::sleep(Duration::from_millis(render_time));
+        let render_time = pseudo_random_u32(5);
+        std::thread::sleep(Duration::from_millis(render_time as u64));
     }
 }
 

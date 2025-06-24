@@ -1,0 +1,13 @@
+[package]
+name = "grida-canvas-wasm"
+version = "0.0.0"
+license = "Apache-2.0"
+description = "Grida Canvas WASM"
+edition = "2021"
+
+
+[dependencies]
+cg = { path = "../grida-canvas" }
+
+[features]
+default = []
