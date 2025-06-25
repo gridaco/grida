@@ -272,12 +272,14 @@ impl UnknownTargetApplication {
     }
 
     /// Update the cursor position and run a debounced hit test.
+    #[allow(dead_code)]
     pub(crate) fn pointer_move(&mut self, x: f32, y: f32) {
         self.input.cursor = [x, y];
         self.perform_hit_test();
     }
 
     /// Load a simple demo scene with a few colored rectangles.
+    #[allow(dead_code)]
     pub(crate) fn load_dummy_scene(&mut self) {
         let nf = NodeFactory::new();
         let mut nodes = NodeRepository::new();
@@ -337,6 +339,7 @@ impl UnknownTargetApplication {
     }
 
     /// Load a heavy scene useful for performance benchmarking.
+    #[allow(dead_code)]
     pub(crate) fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
         let nf = NodeFactory::new();
         let mut nodes = NodeRepository::new();
