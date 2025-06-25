@@ -16,8 +16,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-/// Callback type used to request a new frame.
-pub type RafCallback = Box<dyn Fn()>;
+/// Callback type used to request a redraw from the host window.
+pub type RequestRedrawCallback = Box<dyn Fn()>;
 
 /// Type alias for tile information in frame planning
 pub type FramePlanTileInfo = RegionTileInfo;
@@ -80,14 +80,13 @@ pub struct Renderer {
     pub image_repository: Rc<RefCell<ImageRepository>>,
     pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
-    raf_callback: Option<RafCallback>,
-    raf_requested: bool,
-    pending_stats: Option<RenderStats>,
+    request_redraw: RequestRedrawCallback,
+    needs_redraw: bool,
     debug_tiles: bool,
 }
 
 impl Renderer {
-    pub fn new() -> Self {
+    pub fn new(request_redraw: RequestRedrawCallback) -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
@@ -100,9 +99,8 @@ impl Renderer {
             image_repository,
             font_repository,
             scene_cache: cache::scene::SceneCache::new(),
-            raf_callback: None,
-            raf_requested: false,
-            pending_stats: None,
+            request_redraw,
+            needs_redraw: false,
             debug_tiles: false,
         }
     }
@@ -136,46 +134,72 @@ impl Renderer {
         }
     }
 
-    /// Flush the queued frame if any and return the completed statistics.
+    /// Render the queued frame if any and return the completed statistics.
     pub fn flush(&mut self) -> Option<RenderStats> {
-        // early exit when there is nothing queued to render
-        if self.pending_stats.is_none() {
+        if !self.needs_redraw {
             return None;
         }
 
         let start = Instant::now();
-        if let Some(backend) = &self.backend {
-            let surface = unsafe { &mut *backend.get_surface() };
-            if let Some(mut gr_context) = surface.recording_context() {
-                if let Some(mut direct_context) = gr_context.as_direct_context() {
-                    direct_context.flush_and_submit();
-                }
+
+        let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
+            return None;
+        };
+        let Some(backend) = self.backend.as_ref() else {
+            return None;
+        };
+
+        let surface = unsafe { &mut *backend.get_surface() };
+        let scene = unsafe { &*scene_ptr };
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
+        let mut canvas = surface.canvas();
+        let rect = self.camera.as_ref().map(|c| c.rect());
+
+        if self.scene_cache.tile.should_repaint_all() {
+            self.scene_cache.tile.clear();
+        }
+
+        let frame = self.frame(
+            rect.unwrap_or(rect::Rectangle::empty()),
+            self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
+        );
+        let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
+
+        let render_duration = start.elapsed();
+
+        // update tile cache when zoom is stable
+        if self.should_cache_tiles() {
+            if let Some(camera) = &self.camera {
+                self.scene_cache
+                    .update_tiles(camera, surface, width, height);
             }
         }
-        self.raf_requested = false;
 
-        let flush_duration = start.elapsed();
-        if let Some(mut stats) = self.pending_stats.take() {
-            stats.flush_duration = flush_duration;
-            stats.total_duration = stats.frame_duration + flush_duration;
-            Some(stats)
-        } else {
-            None
+        let flush_start = Instant::now();
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.flush_and_submit();
+            }
         }
+        let flush_duration = flush_start.elapsed();
+
+        let stats = RenderStats {
+            frame,
+            draw: paint,
+            frame_duration: render_duration,
+            flush_duration,
+            total_duration: render_duration + flush_duration,
+        };
+
+        self.needs_redraw = false;
+
+        Some(stats)
     }
 
     /// Returns `true` if a frame has been queued but not yet flushed.
     pub fn has_pending_frame(&self) -> bool {
-        self.pending_stats.is_some()
-    }
-
-    /// Set a callback that will be invoked whenever the renderer wants to
-    /// schedule another frame.
-    pub fn set_raf_callback<F>(&mut self, cb: F)
-    where
-        F: Fn() + 'static,
-    {
-        self.raf_callback = Some(Box::new(cb));
+        self.needs_redraw
     }
 
     /// Enable or disable tile debug rendering.
@@ -188,14 +212,9 @@ impl Renderer {
         self.debug_tiles
     }
 
-    /// Request the next animation frame if one has not already been queued.
-    pub fn request_animation_frame(&mut self) {
-        if !self.raf_requested {
-            if let Some(cb) = &self.raf_callback {
-                cb();
-                self.raf_requested = true;
-            }
-        }
+    /// Invoke the request redraw callback.
+    fn request_redraw(&self) {
+        (self.request_redraw)();
     }
 
     pub fn free(&mut self) {
@@ -238,63 +257,12 @@ impl Renderer {
         self.scene_cache.tile.should_cache_tiles()
     }
 
-    /// Render the currently loaded scene if any. and report the time it took.
-    pub fn queue(&mut self) -> Option<RenderStats> {
-        let start = Instant::now();
-
-        if self.scene.is_none() {
-            return None;
+    /// Mark the renderer as needing a redraw and request it from the host.
+    pub fn queue(&mut self) {
+        if !self.needs_redraw {
+            self.needs_redraw = true;
+            self.request_redraw();
         }
-
-        if let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) {
-            // SAFETY: the pointer is only used for the duration of this call
-            // and the scene is not mutated while borrowed.
-            let Some(backend) = self.backend.as_ref() else {
-                return None;
-            };
-            let surface = unsafe { &mut *backend.get_surface() };
-            let scene = unsafe { &*scene_ptr };
-            let width = surface.width() as f32;
-            let height = surface.height() as f32;
-            let mut canvas = surface.canvas();
-            let rect = self.camera.as_ref().map(|c| c.rect());
-
-            if self.scene_cache.tile.should_repaint_all() {
-                self.scene_cache.tile.clear();
-            }
-
-            let frame = self.frame(
-                rect.unwrap_or(rect::Rectangle::empty()),
-                self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
-            );
-            let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
-
-            let encode_duration = start.elapsed();
-
-            // update tile cache when zoom is stable
-            if self.should_cache_tiles() {
-                if let Some(camera) = &self.camera {
-                    self.scene_cache
-                        .update_tiles(camera, surface, width, height);
-                }
-            }
-
-            let duration = start.elapsed();
-
-            let stats = RenderStats {
-                frame,
-                draw: paint,
-                frame_duration: encode_duration,
-                flush_duration: Duration::default(),
-                total_duration: duration,
-            };
-
-            self.pending_stats = Some(stats.clone());
-            self.request_animation_frame();
-            return Some(stats);
-        }
-
-        return None;
     }
 
     /// Clear the cached scene picture.
@@ -527,11 +495,12 @@ mod tests {
             background_color: None,
         };
 
-        let mut renderer = Renderer::new();
+        let mut renderer = Renderer::new(Box::new(|| {}));
         let surface_ptr = Renderer::init_raster(100, 100);
         renderer.set_backend(Backend::Raster(surface_ptr));
         renderer.load_scene(scene);
         renderer.queue();
+        renderer.flush();
 
         let bounds = renderer
             .scene_cache
@@ -555,7 +524,7 @@ mod tests {
 
     #[test]
     fn recording_cached_returns_none_without_bounds() {
-        let mut renderer = Renderer::new();
+        let mut renderer = Renderer::new(Box::new(|| {}));
         let surface_ptr = Renderer::init_raster(50, 50);
         renderer.set_backend(Backend::Raster(surface_ptr));
 

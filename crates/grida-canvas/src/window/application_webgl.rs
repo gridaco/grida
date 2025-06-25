@@ -75,7 +75,7 @@ impl WebGlApplication {
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
-        let mut renderer = Renderer::new();
+        let mut renderer = Renderer::new(Box::new(|| {}));
         renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
         let camera = Camera2D::new(crate::node::schema::Size {

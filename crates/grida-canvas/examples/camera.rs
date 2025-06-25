@@ -14,7 +14,7 @@ use glutin::{
 use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu};
+use skia_safe::{gpu, Surface};
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -231,7 +231,10 @@ fn main() {
     ) = init_window(800, 600);
 
     // Create renderer
-    let mut renderer = Renderer::new();
+    let window_ptr = &window as *const Window;
+    let mut renderer = Renderer::new(Box::new(move || unsafe {
+        (*window_ptr).request_redraw();
+    }));
     renderer.set_backend(Backend::GL(surface_ptr));
 
     // Create static scene
@@ -249,6 +252,7 @@ fn main() {
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
     renderer.queue();
+    renderer.flush();
 
     // Benchmark rendering with camera transformations
     let mut frame_count = 0;
@@ -316,6 +320,7 @@ fn main() {
 
                 // Render the scene
                 renderer.queue();
+                renderer.flush();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {
                     eprintln!("Error swapping buffers: {:?}", e);

@@ -8,6 +8,7 @@ use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
 use crate::window::scheduler;
 use futures::channel::mpsc;
+use winit::window::Window;
 
 #[allow(dead_code)]
 pub async fn run_demo_window(scene: Scene) {
@@ -34,13 +35,10 @@ where
     let (font_tx, font_rx) = mpsc::unbounded();
     let proxy = el.create_proxy();
 
-    let mut renderer = Renderer::new();
-    renderer.set_raf_callback({
-        let proxy = proxy.clone();
-        move || {
-            let _ = proxy.send_event(());
-        }
-    });
+    let window_ptr = &window as *const Window;
+    let mut renderer = Renderer::new(Box::new(move || unsafe {
+        (*window_ptr).request_redraw();
+    }));
 
     renderer.devtools_rendering_set_show_tiles(true);
     renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
