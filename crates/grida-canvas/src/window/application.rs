@@ -154,9 +154,6 @@ impl UnknownTargetApplication {
             WindowCommand::Resize { width, height } => {
                 self.resize(width, height);
             }
-            WindowCommand::Redraw => {
-                self.redraw();
-            }
             WindowCommand::None => {}
         }
 

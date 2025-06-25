@@ -53,7 +53,6 @@ fn handle_window_event(event: &WindowEvent) -> WindowCommand {
             },
             _ => WindowCommand::None,
         },
-        WindowEvent::RedrawRequested => WindowCommand::Redraw,
         _ => WindowCommand::None,
     }
 }
@@ -213,6 +212,13 @@ impl NativeApplicationHandler for NativeApplication {
             self.app.perform_hit_test();
         }
 
+        if let WindowEvent::RedrawRequested = &event {
+            self.app.redraw();
+            if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
+                eprintln!("Error swapping buffers: {:?}", e);
+            }
+        }
+
         match handle_window_event(&event) {
             WindowCommand::Close => {
                 self.app.renderer.free();
@@ -225,12 +231,6 @@ impl NativeApplicationHandler for NativeApplication {
                     NonZeroU32::new(height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
                 );
                 self.app.command(WindowCommand::Resize { width, height });
-            }
-            WindowCommand::Redraw => {
-                self.app.command(WindowCommand::Redraw);
-                if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
-                    eprintln!("Error swapping buffers: {:?}", e);
-                }
             }
             cmd => {
                 self.app.command(cmd);

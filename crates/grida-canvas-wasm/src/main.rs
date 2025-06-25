@@ -90,8 +90,7 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
             2 => WindowCommand::ZoomOut,
             3 => WindowCommand::ZoomDelta { delta: a },
             4 => WindowCommand::Pan { tx: a, ty: b },
-            5 => WindowCommand::Redraw,
-            6 => WindowCommand::Resize {
+            5 => WindowCommand::Resize {
                 width: a as u32,
                 height: b as u32,
             },

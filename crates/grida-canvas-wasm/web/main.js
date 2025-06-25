@@ -52,8 +52,7 @@ createGridaCanvas().then((GridaCanvas) => {
     ZoomOut: 2,
     ZoomDelta: 3,
     Pan: 4,
-    Redraw: 5,
-    Resize: 6,
+    Resize: 5,
   };
 
   // Load the demo scene from JSON
@@ -105,7 +104,12 @@ createGridaCanvas().then((GridaCanvas) => {
     if (event.ctrlKey) {
       GridaCanvas._command(state, CMD.ZoomDelta, event.deltaY * -0.01, 0);
     } else {
-      GridaCanvas._command(state, CMD.Pan, event.deltaX * dpr, event.deltaY * dpr);
+      GridaCanvas._command(
+        state,
+        CMD.Pan,
+        event.deltaX * dpr,
+        event.deltaY * dpr
+      );
     }
   });
 
