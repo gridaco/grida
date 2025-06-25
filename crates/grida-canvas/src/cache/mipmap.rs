@@ -1,4 +1,4 @@
-use skia_safe::{Image, Paint as SkPaint, Rect, surfaces};
+use skia_safe::{surfaces, Image, Paint as SkPaint, Rect};
 
 /// Strategy for generating the scale levels for mipmaps.
 #[derive(Debug, Clone)]

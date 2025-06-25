@@ -1,4 +1,4 @@
-use math2::{Rectangle, raster_bresenham, raster_rectangle};
+use math2::{raster_bresenham, raster_rectangle, Rectangle};
 
 #[test]
 fn bresenham_single_point() {

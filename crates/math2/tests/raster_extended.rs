@@ -1,6 +1,6 @@
 use math2::{
-    Bitmap, raster_circle, raster_ellipse, raster_floodfill, raster_gaussian, raster_pad,
-    raster_pascaltriangle, raster_resize, raster_scale, raster_smoothstep, raster_tile,
+    raster_circle, raster_ellipse, raster_floodfill, raster_gaussian, raster_pad,
+    raster_pascaltriangle, raster_resize, raster_scale, raster_smoothstep, raster_tile, Bitmap,
 };
 
 fn bmp(w: usize, h: usize, color: [u8; 4]) -> Bitmap {

@@ -1,4 +1,4 @@
-use math2::{Rectangle, Snap2DAxisConfig, SnapGuide, snap_to_canvas_geometry};
+use math2::{snap_to_canvas_geometry, Rectangle, Snap2DAxisConfig, SnapGuide};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

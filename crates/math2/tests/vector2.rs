@@ -1,4 +1,4 @@
-use math2::vector2::{Vector2, add, angle, intersection, intersects, multiply, rotate, sub};
+use math2::vector2::{add, angle, intersection, intersects, multiply, rotate, sub, Vector2};
 
 #[test]
 fn add_multiple() {

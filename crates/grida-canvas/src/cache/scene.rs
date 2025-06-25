@@ -11,7 +11,7 @@ use crate::{
     painter::layer::{Layer, LayerList},
 };
 use math2::{rect::Rectangle, vector2::Vector2};
-use rstar::{AABB, RTree, RTreeObject};
+use rstar::{RTree, RTreeObject, AABB};
 use skia_safe::{Picture, Surface};
 
 #[derive(Debug, Clone, Copy, PartialEq)]

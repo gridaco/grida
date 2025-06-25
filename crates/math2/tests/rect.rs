@@ -1,8 +1,8 @@
 use math2::vector2::{self, Axis};
 use math2::{
-    AlignKind, Alignment, CardinalDirection, Rectangle, axis_projection_intersection, from_points,
-    get_cardinal_point, get_relative_transform, intersection, offset, rect_align as align,
-    rect_inset as inset, rect_pad as pad, rect_rotate, to_9points_chunk, union,
+    axis_projection_intersection, from_points, get_cardinal_point, get_relative_transform,
+    intersection, offset, rect_align as align, rect_inset as inset, rect_pad as pad, rect_rotate,
+    to_9points_chunk, union, AlignKind, Alignment, CardinalDirection, Rectangle,
 };
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {

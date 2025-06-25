@@ -316,7 +316,7 @@ pub fn tile(rect: Rectangle, size: (usize, usize)) -> Vec<Rectangle> {
 
 /// Boolean operations on rectangles.
 pub mod boolean {
-    use super::{Rectangle, intersection};
+    use super::{intersection, Rectangle};
 
     /// Subtracts rectangle `b` from rectangle `a`, returning the remaining subregions.
     pub fn subtract(a: Rectangle, b: Rectangle) -> Vec<Rectangle> {

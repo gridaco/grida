@@ -1,4 +1,4 @@
-use super::vector2::{Vector2, distance};
+use super::vector2::{distance, Vector2};
 
 /// Aligns a scalar value to the nearest value in `targets` if it is within
 /// `threshold`.

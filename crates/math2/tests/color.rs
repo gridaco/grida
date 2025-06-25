@@ -1,5 +1,5 @@
 use math2::{
-    RGBA8888, RGBAf, hex_to_rgba8888, rgba_to_unit8_chunk, rgba8888_to_hex, rgbaf_to_rgba8888,
+    hex_to_rgba8888, rgba8888_to_hex, rgba_to_unit8_chunk, rgbaf_to_rgba8888, RGBAf, RGBA8888,
 };
 
 #[test]

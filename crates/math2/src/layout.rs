@@ -1,6 +1,6 @@
 use crate::utils::mean;
 use crate::vector2::Axis;
-use crate::{Rectangle, rect};
+use crate::{rect, Rectangle};
 
 pub mod flex {
     use super::*;
@@ -120,7 +120,11 @@ pub mod flex {
                 Axis::Y
             }
         } else {
-            if width >= height { Axis::X } else { Axis::Y }
+            if width >= height {
+                Axis::X
+            } else {
+                Axis::Y
+            }
         };
 
         let gaps = rect::get_gaps(boundingboxes, axis);
