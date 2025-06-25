@@ -1,9 +1,9 @@
 use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
+use crate::dummy;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
-use crate::window::application_demo;
 use crate::window::command::WindowCommand;
 use crate::window::scheduler;
 use futures::channel::mpsc;
@@ -69,7 +69,7 @@ impl UnknownTargetApplication {
     }
 
     fn print_font_repository_info(&self) {
-        let font_repo = self.renderer.font_repository.borrow();
+        let font_repo = self.renderer.fonts.borrow();
         let family_count = font_repo.family_count();
         let total_font_count = font_repo.total_font_count();
 
@@ -194,7 +194,7 @@ impl UnknownTargetApplication {
                     self.hit_result.as_ref(),
                     &self.camera,
                     self.renderer.scene_cache(),
-                    &self.renderer.font_repository,
+                    &self.renderer.fonts,
                 );
             }
             if self.devtools_rendering_show_tiles {
@@ -302,14 +302,14 @@ impl UnknownTargetApplication {
     /// Load a simple demo scene with a few colored rectangles.
     #[allow(dead_code)]
     pub(crate) fn load_dummy_scene(&mut self) {
-        let scene = application_demo::create_dummy_scene();
+        let scene = dummy::create_dummy_scene();
         self.renderer.load_scene(scene);
     }
 
     /// Load a heavy scene useful for performance benchmarking.
     #[allow(dead_code)]
     pub(crate) fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        let scene = application_demo::create_benchmark_scene(cols, rows);
+        let scene = dummy::create_benchmark_scene(cols, rows);
         self.renderer.load_scene(scene);
     }
 }

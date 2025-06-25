@@ -2,6 +2,7 @@ use crate::cache::tile::RegionTileInfo;
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{cvt, Painter};
+use crate::runtime::counter::FrameCounter;
 use crate::{
     cache,
     runtime::camera::Camera2D,
@@ -67,21 +68,21 @@ impl Backend {
     }
 }
 
-/// test rect in canvas space
-
 /// ---------------------------------------------------------------------------
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
 /// ---------------------------------------------------------------------------
 pub struct Renderer {
     backend: Option<Backend>,
     scene: Option<Scene>,
-    pub camera: Option<Camera2D>,
-    prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
-    pub image_repository: Rc<RefCell<ImageRepository>>,
-    pub font_repository: Rc<RefCell<FontRepository>>,
     scene_cache: cache::scene::SceneCache,
+    pub camera: Option<Camera2D>,
+    pub images: Rc<RefCell<ImageRepository>>,
+    pub fonts: Rc<RefCell<FontRepository>>,
+    prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
+    /// when called, the host will request a redraw in os-specific way
     request_redraw: RequestRedrawCallback,
-    needs_redraw: bool,
+    /// frame counter for managing render queue
+    frame_counter: FrameCounter,
 }
 
 impl Renderer {
@@ -95,11 +96,11 @@ impl Renderer {
             scene: None,
             camera: None,
             prev_quantized_camera_transform: None,
-            image_repository,
-            font_repository,
+            images: image_repository,
+            fonts: font_repository,
             scene_cache: cache::scene::SceneCache::new(),
             request_redraw,
-            needs_redraw: false,
+            frame_counter: FrameCounter::new(),
         }
     }
 
@@ -119,7 +120,7 @@ impl Renderer {
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
-        self.font_repository
+        self.fonts
             .borrow_mut()
             .insert(family.to_string(), bytes.to_vec());
     }
@@ -128,13 +129,13 @@ impl Renderer {
     pub fn add_image(&self, src: String, bytes: &[u8]) {
         let data = skia_safe::Data::new_copy(bytes);
         if let Some(image) = Image::from_encoded(data) {
-            self.image_repository.borrow_mut().insert(src, image);
+            self.images.borrow_mut().insert(src, image);
         }
     }
 
     /// Render the queued frame if any and return the completed statistics.
     pub fn flush(&mut self) -> Option<FrameFlushStats> {
-        if !self.needs_redraw {
+        if !self.frame_counter.has_pending() {
             return None;
         }
 
@@ -190,14 +191,14 @@ impl Renderer {
             total_duration: render_duration + flush_duration,
         };
 
-        self.needs_redraw = false;
+        self.frame_counter.flush();
 
         Some(stats)
     }
 
     /// Returns `true` if a frame has been queued but not yet flushed.
     pub fn has_pending_frame(&self) -> bool {
-        self.needs_redraw
+        self.frame_counter.has_pending()
     }
 
     /// Invoke the request redraw callback.
@@ -247,8 +248,8 @@ impl Renderer {
 
     /// Mark the renderer as needing a redraw and request it from the host.
     pub fn queue(&mut self) {
-        if !self.needs_redraw {
-            self.needs_redraw = true;
+        if !self.frame_counter.has_pending() {
+            self.frame_counter.queue();
             self.request_redraw();
         }
     }
@@ -271,11 +272,7 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, None);
-        let painter = Painter::new(
-            canvas,
-            self.font_repository.clone(),
-            self.image_repository.clone(),
-        );
+        let painter = Painter::new(canvas, self.fonts.clone(), self.images.clone());
         draw(&painter);
         recorder.finish_recording_as_picture(None)
     }

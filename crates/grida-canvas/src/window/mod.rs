@@ -1,5 +1,4 @@
 pub mod application;
-pub mod application_demo;
 pub mod command;
 pub mod input;
 pub mod scheduler;
