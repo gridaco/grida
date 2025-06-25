@@ -44,7 +44,7 @@ createGridaCanvas().then((GridaCanvas) => {
   GridaCanvas._devtools_rendering_set_show_fps_meter(state, true);
   GridaCanvas._devtools_rendering_set_show_stats(state, false);
   GridaCanvas._devtools_rendering_set_show_hit_testing(state, true);
-  GridaCanvas._set_show_ruler(state, true);
+  GridaCanvas._devtools_rendering_set_show_ruler(state, true);
 
   const CMD = {
     Close: 0,

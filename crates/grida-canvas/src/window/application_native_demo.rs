@@ -40,7 +40,6 @@ where
         (*window_ptr).request_redraw();
     }));
 
-    renderer.devtools_rendering_set_show_tiles(true);
     renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
     println!("📸 Initializing image loader...");
@@ -79,10 +78,11 @@ where
             scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
-            show_fps: true,
-            show_stats: true,
-            show_hit_overlay: true,
-            show_ruler: true,
+            devtools_rendering_show_fps: true,
+            devtools_rendering_show_stats: true,
+            devtools_rendering_show_hit_overlay: true,
+            devtools_rendering_show_ruler: true,
+            devtools_rendering_show_tiles: true,
         },
         gl_surface,
         gl_context,

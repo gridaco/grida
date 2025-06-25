@@ -102,9 +102,9 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_show_ruler(app: *mut WebGlApplication, show: bool) {
+pub unsafe extern "C" fn devtools_rendering_set_show_ruler(app: *mut WebGlApplication, show: bool) {
     if let Some(app) = app.as_mut() {
-        app.set_show_ruler(show);
+        app.devtools_rendering_set_show_ruler(show);
     }
 }
 

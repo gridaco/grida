@@ -1,6 +1,5 @@
-use crate::font_loader::FontMessage;
-use crate::image_loader::ImageMessage;
-use crate::node::schema::*;
+use crate::resource::font_loader::FontMessage;
+use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
 use crate::window::application::UnknownTargetApplication;
@@ -33,6 +32,11 @@ fn init_gl() {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn init_gl() {
+    // no-op
+}
+
 #[cfg(target_arch = "wasm32")]
 fn create_gpu_state() -> GpuState {
     let interface = skia_safe::gpu::gl::Interface::new_native().unwrap();
@@ -54,12 +58,16 @@ fn create_gpu_state() -> GpuState {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(target_arch = "wasm32"))]
+fn create_gpu_state() -> GpuState {
+    // no-op
+    panic!("create_gpu_state is not supported on native");
+}
+
 pub struct WebGlApplication {
     pub(crate) app: UnknownTargetApplication,
 }
 
-#[cfg(target_arch = "wasm32")]
 impl WebGlApplication {
     /// Create a new [`WebGlApplication`] with an initialized renderer.
     pub fn new(width: i32, height: i32) -> Self {
@@ -84,27 +92,28 @@ impl WebGlApplication {
         });
         renderer.set_camera(camera.clone());
 
-        let mut app = Self {
+        let app = Self {
             app: UnknownTargetApplication {
                 renderer,
                 state,
                 camera,
-                input: crate::runtime::input::InputState::default(),
+                input: crate::window::input::InputState::default(),
                 hit_result: None,
                 last_hit_test: std::time::Instant::now(),
                 hit_test_interval: std::time::Duration::ZERO,
                 image_rx,
                 font_rx,
-                scheduler: scheduler::FrameScheduler::new(60).with_max_fps(60),
+                scheduler: scheduler::FrameScheduler::new(120).with_max_fps(120),
                 last_frame_time: std::time::Instant::now(),
                 last_stats: None,
-                show_fps: true,
-                show_stats: true,
-                show_hit_overlay: true,
-                show_ruler: true,
+                devtools_rendering_show_fps: false,
+                devtools_rendering_show_stats: false,
+                devtools_rendering_show_hit_overlay: false,
+                devtools_rendering_show_ruler: false,
+                devtools_rendering_show_tiles: false,
             },
         };
-        app.app.devtools_rendering_set_show_tiles(true);
+
         app
     }
 
@@ -180,11 +189,6 @@ impl WebGlApplication {
         self.app.devtools_rendering_set_show_tiles(debug);
     }
 
-    /// Returns `true` if tile overlay rendering is enabled.
-    pub fn debug_tiles(&self) -> bool {
-        self.app.debug_tiles()
-    }
-
     pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
         self.app.devtools_rendering_set_show_fps_meter(show);
     }
@@ -197,19 +201,17 @@ impl WebGlApplication {
         self.app.devtools_rendering_set_show_hit_testing(show);
     }
 
-    pub fn set_show_ruler(&mut self, show: bool) {
-        self.app.set_show_ruler(show);
+    pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_ruler(show);
     }
 }
 
 #[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
 pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
     Box::new(WebGlApplication::new(width, height))
 }
 
 #[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
     if let Some(app) = app.as_mut() {
         app.resize(width, height);
@@ -217,7 +219,6 @@ pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, 
 }
 
 #[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
     if let Some(app) = app.as_mut() {
         app.redraw();
@@ -225,7 +226,6 @@ pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
 }
 
 #[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
 pub unsafe extern "C" fn load_scene_json(app: *mut WebGlApplication, ptr: *const u8, len: usize) {
     if let Some(app) = app.as_mut() {
         let slice = std::slice::from_raw_parts(ptr, len);

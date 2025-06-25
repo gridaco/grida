@@ -22,10 +22,11 @@ pub struct UnknownTargetApplication {
     pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
-    pub(crate) show_fps: bool,
-    pub(crate) show_stats: bool,
-    pub(crate) show_hit_overlay: bool,
-    pub(crate) show_ruler: bool,
+    pub(crate) devtools_rendering_show_fps: bool,
+    pub(crate) devtools_rendering_show_tiles: bool,
+    pub(crate) devtools_rendering_show_stats: bool,
+    pub(crate) devtools_rendering_show_hit_overlay: bool,
+    pub(crate) devtools_rendering_show_ruler: bool,
 }
 
 impl UnknownTargetApplication {
@@ -179,15 +180,15 @@ impl UnknownTargetApplication {
         {
             let __overlay_start = std::time::Instant::now();
             let surface = self.state.surface_mut();
-            if self.show_fps {
+            if self.devtools_rendering_show_fps {
                 fps_overlay::FpsMeter::draw(surface, self.scheduler.average_fps());
             }
-            if self.show_stats {
+            if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
                     stats_overlay::StatsOverlay::draw(surface, s);
                 }
             }
-            if self.show_hit_overlay {
+            if self.devtools_rendering_show_hit_overlay {
                 hit_overlay::HitOverlay::draw(
                     surface,
                     self.hit_result.as_ref(),
@@ -196,14 +197,14 @@ impl UnknownTargetApplication {
                     &self.renderer.font_repository,
                 );
             }
-            if self.renderer.debug_tiles() {
+            if self.devtools_rendering_show_tiles {
                 tile_overlay::TileOverlay::draw(
                     surface,
                     &self.camera,
                     self.renderer.scene_cache().tile.tiles(),
                 );
             }
-            if self.show_ruler {
+            if self.devtools_rendering_show_ruler {
                 ruler_overlay::Ruler::draw(surface, &self.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
@@ -277,24 +278,23 @@ impl UnknownTargetApplication {
 
     /// Enable or disable rendering of tile overlays.
     pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
-        self.renderer.devtools_rendering_set_show_tiles(debug);
-    }
-
-    /// Returns `true` if tile overlay rendering is enabled.
-    pub fn debug_tiles(&self) -> bool {
-        self.renderer.debug_tiles()
+        self.devtools_rendering_show_tiles = debug;
     }
 
     pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
-        self.show_fps = show;
+        self.devtools_rendering_show_fps = show;
     }
 
     pub fn devtools_rendering_set_show_stats(&mut self, show: bool) {
-        self.show_stats = show;
+        self.devtools_rendering_show_stats = show;
     }
 
     pub fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
-        self.show_hit_overlay = show;
+        self.devtools_rendering_show_hit_overlay = show;
+    }
+
+    pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
+        self.devtools_rendering_show_ruler = show;
     }
 
     // static demo scenes

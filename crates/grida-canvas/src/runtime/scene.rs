@@ -82,7 +82,6 @@ pub struct Renderer {
     scene_cache: cache::scene::SceneCache,
     request_redraw: RequestRedrawCallback,
     needs_redraw: bool,
-    debug_tiles: bool,
 }
 
 impl Renderer {
@@ -101,7 +100,6 @@ impl Renderer {
             scene_cache: cache::scene::SceneCache::new(),
             request_redraw,
             needs_redraw: false,
-            debug_tiles: false,
         }
     }
 
@@ -200,16 +198,6 @@ impl Renderer {
     /// Returns `true` if a frame has been queued but not yet flushed.
     pub fn has_pending_frame(&self) -> bool {
         self.needs_redraw
-    }
-
-    /// Enable or disable tile debug rendering.
-    pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
-        self.debug_tiles = debug;
-    }
-
-    /// Returns `true` if tile debug rendering is enabled.
-    pub fn debug_tiles(&self) -> bool {
-        self.debug_tiles
     }
 
     /// Invoke the request redraw callback.
