@@ -45,7 +45,7 @@ pub struct DrawResult {
 }
 
 #[derive(Clone)]
-pub struct RenderStats {
+pub struct FrameFlushStats {
     pub frame: FramePlan,
     pub draw: DrawResult,
     pub frame_duration: Duration,
@@ -135,7 +135,7 @@ impl Renderer {
     }
 
     /// Render the queued frame if any and return the completed statistics.
-    pub fn flush(&mut self) -> Option<RenderStats> {
+    pub fn flush(&mut self) -> Option<FrameFlushStats> {
         if !self.needs_redraw {
             return None;
         }
@@ -184,7 +184,7 @@ impl Renderer {
         }
         let flush_duration = flush_start.elapsed();
 
-        let stats = RenderStats {
+        let stats = FrameFlushStats {
             frame,
             draw: paint,
             frame_duration: render_duration,
