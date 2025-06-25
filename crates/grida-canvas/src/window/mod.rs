@@ -1,9 +1,9 @@
+pub mod application;
+pub mod application_demo;
 pub mod command;
 pub mod input;
 pub mod scheduler;
 pub mod state;
-
-pub mod application;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod application_native;

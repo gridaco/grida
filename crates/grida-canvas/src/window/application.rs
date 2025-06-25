@@ -1,9 +1,9 @@
 use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
-use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
+use crate::window::application_demo;
 use crate::window::command::WindowCommand;
 use crate::window::scheduler;
 use futures::channel::mpsc;
@@ -275,110 +275,6 @@ impl UnknownTargetApplication {
         self.perform_hit_test();
     }
 
-    /// Load a simple demo scene with a few colored rectangles.
-    #[allow(dead_code)]
-    pub(crate) fn load_dummy_scene(&mut self) {
-        let nf = NodeFactory::new();
-        let mut nodes = NodeRepository::new();
-
-        let mut rect1 = nf.create_rectangle_node();
-        rect1.base.name = "Red Rectangle".to_string();
-        rect1.transform = math2::transform::AffineTransform::new(100.0, 100.0, 0.0);
-        rect1.size = Size {
-            width: 150.0,
-            height: 100.0,
-        };
-        rect1.fill = Paint::Solid(SolidPaint {
-            color: Color(255, 0, 0, 255),
-            opacity: 1.0,
-        });
-        let rect1_id = rect1.base.id.clone();
-        nodes.insert(Node::Rectangle(rect1));
-
-        let mut rect2 = nf.create_rectangle_node();
-        rect2.base.name = "Blue Rectangle".to_string();
-        rect2.transform = math2::transform::AffineTransform::new(300.0, 100.0, 0.0);
-        rect2.size = Size {
-            width: 120.0,
-            height: 80.0,
-        };
-        rect2.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 0, 255, 255),
-            opacity: 1.0,
-        });
-        let rect2_id = rect2.base.id.clone();
-        nodes.insert(Node::Rectangle(rect2));
-
-        let mut rect3 = nf.create_rectangle_node();
-        rect3.base.name = "Green Rectangle".to_string();
-        rect3.transform = math2::transform::AffineTransform::new(500.0, 100.0, 0.0);
-        rect3.size = Size {
-            width: 100.0,
-            height: 120.0,
-        };
-        rect3.fill = Paint::Solid(SolidPaint {
-            color: Color(0, 255, 0, 255),
-            opacity: 1.0,
-        });
-        let rect3_id = rect3.base.id.clone();
-        nodes.insert(Node::Rectangle(rect3));
-
-        let scene = Scene {
-            id: "dummy".to_string(),
-            name: "Dummy Scene".to_string(),
-            transform: math2::transform::AffineTransform::identity(),
-            children: vec![rect1_id, rect2_id, rect3_id],
-            nodes,
-            background_color: Some(Color(240, 240, 240, 255)),
-        };
-
-        self.renderer.load_scene(scene);
-    }
-
-    /// Load a heavy scene useful for performance benchmarking.
-    #[allow(dead_code)]
-    pub(crate) fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        let nf = NodeFactory::new();
-        let mut nodes = NodeRepository::new();
-        let mut children = Vec::new();
-
-        let size = 20.0f32;
-        let spacing = 5.0f32;
-        for y in 0..rows {
-            for x in 0..cols {
-                let mut rect = nf.create_rectangle_node();
-                rect.base.name = format!("rect-{}-{}", x, y);
-                rect.transform = math2::transform::AffineTransform::new(
-                    x as f32 * (size + spacing),
-                    y as f32 * (size + spacing),
-                    0.0,
-                );
-                rect.size = Size {
-                    width: size,
-                    height: size,
-                };
-                rect.fill = Paint::Solid(SolidPaint {
-                    color: Color(((x * 5) % 255) as u8, ((y * 3) % 255) as u8, 128, 255),
-                    opacity: 1.0,
-                });
-                let id = rect.base.id.clone();
-                nodes.insert(Node::Rectangle(rect));
-                children.push(id);
-            }
-        }
-
-        let scene = Scene {
-            id: "benchmark".to_string(),
-            name: "Benchmark Scene".to_string(),
-            transform: math2::transform::AffineTransform::identity(),
-            children,
-            nodes,
-            background_color: Some(Color(255, 255, 255, 255)),
-        };
-
-        self.renderer.load_scene(scene);
-    }
-
     /// Enable or disable rendering of tile overlays.
     pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.renderer.devtools_rendering_set_show_tiles(debug);
@@ -393,31 +289,27 @@ impl UnknownTargetApplication {
         self.show_fps = show;
     }
 
-    pub fn show_fps(&self) -> bool {
-        self.show_fps
-    }
-
     pub fn devtools_rendering_set_show_stats(&mut self, show: bool) {
         self.show_stats = show;
-    }
-
-    pub fn show_stats(&self) -> bool {
-        self.show_stats
     }
 
     pub fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
         self.show_hit_overlay = show;
     }
 
-    pub fn show_hit_overlay(&self) -> bool {
-        self.show_hit_overlay
+    // static demo scenes
+
+    /// Load a simple demo scene with a few colored rectangles.
+    #[allow(dead_code)]
+    pub(crate) fn load_dummy_scene(&mut self) {
+        let scene = application_demo::create_dummy_scene();
+        self.renderer.load_scene(scene);
     }
 
-    pub fn set_show_ruler(&mut self, show: bool) {
-        self.show_ruler = show;
-    }
-
-    pub fn show_ruler(&self) -> bool {
-        self.show_ruler
+    /// Load a heavy scene useful for performance benchmarking.
+    #[allow(dead_code)]
+    pub(crate) fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
+        let scene = application_demo::create_benchmark_scene(cols, rows);
+        self.renderer.load_scene(scene);
     }
 }
