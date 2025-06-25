@@ -1,20 +1,19 @@
-use crate::font_loader::FontMessage;
-use crate::image_loader::ImageMessage;
+use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
 use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
-use crate::repository::ResourceRepository;
+use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
 use crate::window::command::WindowCommand;
 use crate::window::scheduler;
-use crate::window::{fps, hit_overlay, ruler, stats_overlay, tile_overlay};
 use futures::channel::mpsc;
 
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
     pub(crate) renderer: Renderer,
-    pub(crate) state: crate::window::state::State,
+    pub(crate) state: super::state::State,
     pub(crate) camera: Camera2D,
-    pub(crate) input: crate::runtime::input::InputState,
+    pub(crate) input: super::input::InputState,
     pub(crate) hit_result: Option<crate::node::schema::NodeId>,
     pub(crate) last_hit_test: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
@@ -107,7 +106,7 @@ impl UnknownTargetApplication {
 
         let camera = &self.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
-        let tester = crate::hit_test::HitTester::new(self.renderer.scene_cache());
+        let tester = crate::hittest::HitTester::new(self.renderer.scene_cache());
 
         let new_hit_result = tester.hit_first(point);
         if self.hit_result != new_hit_result {
@@ -184,7 +183,7 @@ impl UnknownTargetApplication {
             let __overlay_start = std::time::Instant::now();
             let surface = self.state.surface_mut();
             if self.show_fps {
-                fps::FpsMeter::draw(surface, self.scheduler.average_fps());
+                fps_overlay::FpsMeter::draw(surface, self.scheduler.average_fps());
             }
             if self.show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
@@ -208,7 +207,7 @@ impl UnknownTargetApplication {
                 );
             }
             if self.show_ruler {
-                ruler::Ruler::draw(surface, &self.camera);
+                ruler_overlay::Ruler::draw(surface, &self.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {

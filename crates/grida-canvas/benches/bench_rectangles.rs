@@ -1,7 +1,7 @@
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
 use cg::runtime::scene::{Backend, Renderer};
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use math2::transform::AffineTransform;
 
 fn create_rectangles(count: usize, with_effects: bool) -> Scene {

@@ -4,8 +4,8 @@ use crate::painter::layer::Layer;
 use crate::painter::{cvt, Painter};
 use crate::{
     cache,
-    repository::{FontRepository, ImageRepository},
     runtime::camera::Camera2D,
+    runtime::repository::{FontRepository, ImageRepository},
 };
 
 use math2::{self, rect, region};

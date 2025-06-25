@@ -20,9 +20,9 @@
 //! cargo run --example figma -- --archive-dir path/to/archive --scene-index 0 --no-image
 //! ```
 
-use cg::font_loader::FontLoader;
-use cg::image_loader::{load_scene_images, ImageLoader};
-use cg::webfont_helper::{find_font_files, load_webfonts_metadata};
+use cg::helpers::webfont_helper::{find_font_files, load_webfonts_metadata};
+use cg::resource::image_loader::{load_scene_images, ImageLoader};
+use cg::resource::FontLoader;
 use cg::window;
 use cg::{io::io_figma::FigmaConverter, node::schema::Scene};
 use clap::Parser;

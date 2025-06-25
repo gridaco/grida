@@ -1,9 +1,7 @@
+use super::ResourceLoader;
 use crate::node::schema::*;
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-
-use crate::resource_loader::ResourceLoader;
+use std::collections::HashMap;
 
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;

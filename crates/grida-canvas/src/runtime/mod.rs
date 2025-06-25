@@ -1,3 +1,3 @@
 pub mod camera;
-pub mod input;
+pub mod repository;
 pub mod scene;

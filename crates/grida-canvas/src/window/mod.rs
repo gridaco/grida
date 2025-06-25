@@ -1,11 +1,7 @@
 pub mod command;
-pub mod fps;
-pub mod hit_overlay;
-pub mod ruler;
+pub mod input;
 pub mod scheduler;
 pub mod state;
-pub mod stats_overlay;
-pub mod tile_overlay;
 
 pub mod application;
 

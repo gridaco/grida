@@ -1,9 +1,9 @@
 use super::application::UnknownTargetApplication;
 use super::application_native::{init_native_window, NativeApplication};
-use crate::font_loader::FontLoader;
-use crate::font_loader::FontMessage;
-use crate::image_loader::{load_scene_images, ImageLoader, ImageMessage};
 use crate::node::schema::*;
+use crate::resource::font_loader::FontLoader;
+use crate::resource::font_loader::FontMessage;
+use crate::resource::image_loader::{load_scene_images, ImageLoader, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::{Backend, Renderer};
 use crate::window::scheduler;
@@ -72,7 +72,7 @@ where
             renderer,
             state,
             camera,
-            input: crate::runtime::input::InputState::default(),
+            input: super::input::InputState::default(),
             hit_result: None,
             last_hit_test: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(50),

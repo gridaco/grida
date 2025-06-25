@@ -1,5 +1,5 @@
 use cg::cache::scene::SceneCache;
-use cg::hit_test::HitTester;
+use cg::hittest::HitTester;
 use cg::node::{factory::NodeFactory, repository::NodeRepository, schema::*};
 use math2::transform::AffineTransform;
 
