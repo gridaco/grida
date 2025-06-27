@@ -153,13 +153,9 @@ impl SceneCache {
     }
 
     /// Update raster tile cache using the given camera and surface.
-    pub fn update_tiles(
-        &mut self,
-        camera: &Camera2D,
-        surface: &mut Surface,
-        width: f32,
-        height: f32,
-    ) {
+    pub fn update_tiles(&mut self, camera: &Camera2D, surface: &mut Surface) {
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
         let index = &self.layer_index;
         let intersects = |rect: Rectangle| {
             let env = AABB::from_corners(

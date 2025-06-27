@@ -18,14 +18,21 @@ use math2::{quantize, rect, rect::Rectangle, transform::AffineTransform, vector2
 /// This shifts the camera's center to the screen center and transforms the scene accordingly.
 #[derive(Debug, Clone)]
 pub struct Camera2D {
-    pub transform: AffineTransform,
-    pub size: Size,
+    /// The current transform.
+    transform: AffineTransform,
+    /// The previous transform.
+    prev_transform: AffineTransform,
+    /// The previous quantized camera transform.
+    prev_quantized_camera_transform: Option<AffineTransform>,
+    /// The logical size of the viewport in pixels (not affected by zoom)
+    size: Size,
     /// Minimum allowed zoom value
     pub min_zoom: f32,
     /// Maximum allowed zoom value
     pub max_zoom: f32,
-    /// The previous quantized camera transform.
-    prev_quantized_camera_transform: Option<AffineTransform>,
+
+    /// The last time the camera was changed.
+    pub t: std::time::Instant,
 }
 
 impl Camera2D {
@@ -39,7 +46,7 @@ impl Camera2D {
     /// Create with identity transform + no zoom (1:1).
     /// Create with identity transform + no zoom (1:1) using default zoom limits.
     pub fn new(viewport_size: Size) -> Self {
-        Self::with_zoom_limits(
+        Self::with_zoom_constraints(
             viewport_size,
             Self::DEFAULT_MIN_ZOOM,
             Self::DEFAULT_MAX_ZOOM,
@@ -47,36 +54,28 @@ impl Camera2D {
     }
 
     /// Create a camera specifying custom zoom limits.
-    pub fn with_zoom_limits(viewport_size: Size, min_zoom: f32, max_zoom: f32) -> Self {
+    pub fn with_zoom_constraints(viewport_size: Size, min_zoom: f32, max_zoom: f32) -> Self {
+        let transform = AffineTransform::identity();
         let mut c = Self {
-            transform: AffineTransform::identity(),
+            transform,
+            prev_transform: transform,
             size: viewport_size,
             min_zoom,
             max_zoom,
             prev_quantized_camera_transform: None,
+            t: std::time::Instant::now(),
         };
         c.set_zoom(1.0);
         c
     }
 
-    /// Returns true if the camera was changed.
-    pub fn changed(&self) -> bool {
-        let quantized = self.quantized_transform();
-        match self.prev_quantized_camera_transform {
-            Some(prev) => prev != quantized,
-            None => true,
-        }
-    }
-
-    /// Pan camera by (tx, ty) in world units.
-    pub fn translate(&mut self, tx: f32, ty: f32) -> bool {
-        self.transform.translate(tx, ty);
-        self.notify_change()
+    fn before_change(&mut self) {
+        self.prev_transform = self.transform.clone();
     }
 
     /// Sync the camera cache whenever the camera is changed.
     /// Returns true if the camera was changed.
-    pub fn notify_change(&mut self) -> bool {
+    fn after_change(&mut self) -> bool {
         let quantized = self.quantized_transform();
         let changed = match self.prev_quantized_camera_transform {
             Some(prev) => prev != quantized,
@@ -84,34 +83,51 @@ impl Camera2D {
         };
         if changed {
             self.prev_quantized_camera_transform = Some(quantized);
+
+            self.t = std::time::Instant::now();
         }
         changed
     }
 
-    /// Jump camera center to (x, y) in world units.
-    pub fn set_position(&mut self, x: f32, y: f32) -> bool {
-        self.transform.set_translation(x, y);
-        self.notify_change()
+    /// Pan camera by (tx, ty) in world units.
+    pub fn translate(&mut self, tx: f32, ty: f32) -> bool {
+        self.before_change();
+        self.transform.translate(tx, ty);
+        self.after_change()
     }
 
-    /// Set zoom factor (1 = 100%). Preserves rotation & translation.
-    pub fn set_zoom(&mut self, zoom: f32) -> bool {
+    /// Jump camera center to (x, y) in world units.
+    pub fn set_center(&mut self, x: f32, y: f32) -> bool {
+        self.before_change();
+        self.transform.set_translation(x, y);
+        self.after_change()
+    }
+
+    fn _set_zoom(&mut self, zoom: f32) {
         let zoom = zoom.clamp(self.min_zoom, self.max_zoom);
         let tx = self.transform.x();
         let ty = self.transform.y();
         let (s, c) = self.transform.rotation().sin_cos();
         let scale = 1.0 / zoom;
         self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
-        self.notify_change()
+    }
+
+    /// Set zoom factor (1 = 100%). Preserves rotation & translation.
+    pub fn set_zoom(&mut self, zoom: f32) -> bool {
+        self.before_change();
+        self._set_zoom(zoom);
+        self.after_change()
     }
 
     /// Sets the zoom while keeping the given screen-space point fixed.
     pub fn set_zoom_at(&mut self, zoom: f32, screen_point: vector2::Vector2) -> bool {
+        self.before_change();
         let before = self.screen_to_canvas_point(screen_point);
-        self.set_zoom(zoom);
+        self._set_zoom(zoom);
         let after = self.screen_to_canvas_point(screen_point);
-        self.translate(before[0] - after[0], before[1] - after[1]);
-        self.notify_change()
+        self.transform
+            .translate(before[0] - after[0], before[1] - after[1]);
+        self.after_change()
     }
 
     /// Get current zoom (1/scale).
@@ -159,6 +175,15 @@ impl Camera2D {
         t.compose(&inv)
     }
 
+    pub fn get_size(&self) -> &Size {
+        &self.size
+    }
+
+    pub fn set_size(&mut self, size: Size) {
+        self.size = size;
+        self.after_change();
+    }
+
     /// World‐space rect currently visible.
     pub fn rect(&self) -> Rectangle {
         let vp = Rectangle {
@@ -181,5 +206,82 @@ impl Camera2D {
             .inverse()
             .unwrap_or_else(AffineTransform::identity);
         vector2::transform(screen, &inv)
+    }
+
+    /// Get the current transform.
+    pub fn get_transform(&self) -> &AffineTransform {
+        &self.transform
+    }
+
+    /// Get the previous transform.
+    pub fn get_prev_transform(&self) -> &AffineTransform {
+        &self.prev_transform
+    }
+
+    /// Check if the transform has changed since the last update.
+    pub fn has_transform_changed(&self) -> bool {
+        self.transform != self.prev_transform
+    }
+
+    pub fn has_zoom_changed(&self) -> bool {
+        self.get_zoom() != 1.0 / self.prev_transform.get_scale_x()
+    }
+
+    /// Set the transform directly. This will update the previous transform.
+    pub fn set_transform(&mut self, transform: AffineTransform) -> bool {
+        self.before_change();
+        self.transform = transform;
+        self.after_change()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::schema::Size;
+
+    #[test]
+    fn test_prev_transform_functionality() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+
+        // Initially, prev_transform should be the same as current transform
+        assert_eq!(camera.get_transform(), camera.get_prev_transform());
+        assert!(!camera.has_transform_changed());
+
+        // After translation, prev_transform should hold the old value
+        let original_transform = camera.get_transform().clone();
+        camera.translate(10.0, 20.0);
+
+        assert_eq!(camera.get_prev_transform(), &original_transform);
+        assert_ne!(camera.get_transform(), camera.get_prev_transform());
+        assert!(camera.has_transform_changed());
+
+        // After another change, prev_transform should be updated
+        let second_transform = camera.get_transform().clone();
+        camera.set_zoom(2.0);
+
+        assert_eq!(camera.get_prev_transform(), &second_transform);
+        assert_ne!(camera.get_transform(), camera.get_prev_transform());
+        assert!(camera.has_transform_changed());
+    }
+
+    #[test]
+    fn test_set_transform_updates_prev_transform() {
+        let mut camera = Camera2D::new(Size {
+            width: 100.0,
+            height: 100.0,
+        });
+
+        let original_transform = camera.get_transform().clone();
+        let new_transform = AffineTransform::new(50.0, 50.0, 0.0);
+
+        camera.set_transform(new_transform.clone());
+
+        assert_eq!(camera.get_prev_transform(), &original_transform);
+        assert_eq!(camera.get_transform(), &new_transform);
+        assert!(camera.has_transform_changed());
     }
 }

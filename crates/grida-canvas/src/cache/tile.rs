@@ -289,7 +289,6 @@ impl ImageTileCache {
     {
         let zoom = camera.get_zoom();
         if zoom > self.max_zoom_for_cache {
-            // Caching disabled when zoomed in beyond the threshold
             self.clear();
             return;
         }
@@ -297,90 +296,119 @@ impl ImageTileCache {
         let world_size = self.tile_size as f32 / zoom;
         let rect = camera.rect();
 
+        for (col, row) in self.tile_indices(&rect, world_size) {
+            let world_rect = self.tile_world_rect(col, row, world_size);
+
+            if !intersects(world_rect) {
+                continue;
+            }
+
+            let screen_rect = rect::transform(world_rect, &camera.view_matrix());
+            if !self.is_tile_visible(&screen_rect, width, height) {
+                continue;
+            }
+
+            let key = self.tile_key(&world_rect);
+            self.update_lowest_zoom_tracking(&key, zoom);
+
+            if self.should_update_tile(&key, zoom) {
+                self.capture_tile(surface, &screen_rect, key, zoom);
+            }
+        }
+
+        self.no_cache_next = false;
+    }
+
+    /// Generate tile indices for the given camera rect and world size
+    fn tile_indices(&self, rect: &Rectangle, world_size: f32) -> impl Iterator<Item = (i32, i32)> {
         let start_col = (rect.x / world_size).floor() as i32;
         let end_col = ((rect.x + rect.width) / world_size).ceil() as i32;
         let start_row = (rect.y / world_size).floor() as i32;
         let end_row = ((rect.y + rect.height) / world_size).ceil() as i32;
 
-        for col in start_col..end_col {
-            for row in start_row..end_row {
-                let world_rect = Rectangle {
-                    x: col as f32 * world_size,
-                    y: row as f32 * world_size,
-                    width: world_size,
-                    height: world_size,
-                };
+        (start_col..end_col).flat_map(move |col| (start_row..end_row).map(move |row| (col, row)))
+    }
 
-                if !intersects(world_rect) {
-                    continue;
-                }
+    /// Create world rectangle for a tile at given column and row
+    fn tile_world_rect(&self, col: i32, row: i32, world_size: f32) -> Rectangle {
+        Rectangle {
+            x: col as f32 * world_size,
+            y: row as f32 * world_size,
+            width: world_size,
+            height: world_size,
+        }
+    }
 
-                let screen_rect = rect::transform(world_rect, &camera.view_matrix());
+    /// Check if a tile is fully visible on screen
+    fn is_tile_visible(&self, screen_rect: &Rectangle, width: f32, height: f32) -> bool {
+        screen_rect.x >= 0.0
+            && screen_rect.y >= 0.0
+            && screen_rect.x + screen_rect.width <= width
+            && screen_rect.y + screen_rect.height <= height
+    }
 
-                if screen_rect.x >= 0.0
-                    && screen_rect.y >= 0.0
-                    && screen_rect.x + screen_rect.width <= width
-                    && screen_rect.y + screen_rect.height <= height
-                {
-                    let key = TileRectKey(
-                        world_rect.x.round() as i32,
-                        world_rect.y.round() as i32,
-                        world_rect.width.round() as u32,
-                        world_rect.height.round() as u32,
-                    );
+    /// Create tile key from world rectangle
+    fn tile_key(&self, world_rect: &Rectangle) -> TileRectKey {
+        TileRectKey(
+            world_rect.x.round() as i32,
+            world_rect.y.round() as i32,
+            world_rect.width.round() as u32,
+            world_rect.height.round() as u32,
+        )
+    }
 
-                    // Check if we should update lowest zoom tracking
-                    let should_update_lowest_zoom = if let Some(current_lowest) = self.lowest_zoom {
-                        if zoom < current_lowest {
-                            // New lower zoom level found, clear previous lowest zoom indices
-                            self.lowest_zoom_indices.clear();
-                            true
-                        } else if (zoom - current_lowest).abs() < f32::EPSILON {
-                            // Same zoom level, add to lowest zoom indices
-                            true
-                        } else {
-                            // Higher zoom level, don't update lowest zoom tracking
-                            false
-                        }
-                    } else {
-                        // No lowest zoom set yet, this becomes the lowest
-                        true
-                    };
-
-                    if should_update_lowest_zoom {
-                        self.lowest_zoom = Some(zoom);
-                        self.lowest_zoom_indices.insert(key);
-                    }
-
-                    // Always update regular tiles if they don't exist or if we have a higher zoom (better quality)
-                    let should_update_tile = if let Some(existing_tile) = self.tiles.get(&key) {
-                        // Update if the new tile has higher zoom (better quality)
-                        zoom > existing_tile.zoom
-                    } else {
-                        // No existing tile, so add it
-                        true
-                    };
-
-                    if should_update_tile {
-                        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
-                            screen_rect.x as i32,
-                            screen_rect.y as i32,
-                            self.tile_size as i32,
-                            self.tile_size as i32,
-                        )) {
-                            self.tiles.insert(
-                                key,
-                                TileAtZoom {
-                                    image: Rc::new(image),
-                                    zoom,
-                                },
-                            );
-                        }
-                    }
+    /// Update lowest zoom tracking for the given tile key
+    fn update_lowest_zoom_tracking(&mut self, key: &TileRectKey, zoom: f32) {
+        let should_update = match self.lowest_zoom {
+            Some(current_lowest) => {
+                if zoom < current_lowest {
+                    self.lowest_zoom_indices.clear();
+                    true
+                } else if (zoom - current_lowest).abs() < f32::EPSILON {
+                    true
+                } else {
+                    false
                 }
             }
+            None => true,
+        };
+
+        if should_update {
+            self.lowest_zoom = Some(zoom);
+            self.lowest_zoom_indices.insert(*key);
         }
-        self.no_cache_next = false;
+    }
+
+    /// Check if a tile should be updated based on zoom level
+    fn should_update_tile(&self, key: &TileRectKey, zoom: f32) -> bool {
+        self.tiles
+            .get(key)
+            .map(|existing_tile| zoom > existing_tile.zoom)
+            .unwrap_or(true)
+    }
+
+    /// Capture a tile from the surface and store it in the cache
+    fn capture_tile(
+        &mut self,
+        surface: &mut Surface,
+        screen_rect: &Rectangle,
+        key: TileRectKey,
+        zoom: f32,
+    ) {
+        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
+            screen_rect.x as i32,
+            screen_rect.y as i32,
+            self.tile_size as i32,
+            self.tile_size as i32,
+        )) {
+            self.tiles.insert(
+                key,
+                TileAtZoom {
+                    image: Rc::new(image),
+                    zoom,
+                },
+            );
+        }
     }
 
     /// Get tiles for a specific region with blur information and sorting.

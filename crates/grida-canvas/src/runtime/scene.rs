@@ -166,11 +166,9 @@ impl Renderer {
 
         let frame_duration = start.elapsed();
 
-        // // update tile cache when zoom is stable
-        // if self.scene_cache.tile.should_cache_tiles() {
-        // }
-        self.scene_cache
-            .update_tiles(&self.camera, surface, width, height);
+        if !self.camera.has_zoom_changed() {
+            self.scene_cache.update_tiles(&self.camera, surface);
+        }
 
         let flush_start = Instant::now();
         if let Some(mut gr_context) = surface.recording_context() {

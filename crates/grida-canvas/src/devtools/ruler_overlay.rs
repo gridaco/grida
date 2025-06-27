@@ -61,8 +61,8 @@ impl Ruler {
         let view = camera.view_matrix();
 
         let canvas = surface.canvas();
-        let width = camera.size.width;
-        let height = camera.size.height;
+        let width = camera.get_size().width;
+        let height = camera.get_size().height;
 
         CACHE.with(|c| {
             let mut cache = c.borrow_mut();

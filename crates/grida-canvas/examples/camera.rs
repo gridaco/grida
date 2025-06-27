@@ -246,7 +246,7 @@ fn main() {
     // Create static scene
     let scene = create_static_scene();
 
-    renderer.camera.set_position(400.0, 300.0);
+    renderer.camera.set_center(400.0, 300.0);
     renderer.camera.set_zoom(1.0);
 
     // Load and warm up the scene cache
@@ -316,7 +316,7 @@ fn main() {
                 let angle = elapsed * 2.0;
                 let x = 400.0 + angle.cos() * 100.0;
                 let y = 300.0 + angle.sin() * 100.0;
-                renderer.camera.set_position(x, y);
+                renderer.camera.set_center(x, y);
 
                 // Render the scene
                 renderer.queue();

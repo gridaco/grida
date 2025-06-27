@@ -40,7 +40,7 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> Self {
-        let mut renderer = Renderer::new(backend, Box::new(|| {}), camera);
+        let renderer = Renderer::new(backend, Box::new(|| {}), camera);
 
         Self {
             renderer,
@@ -287,14 +287,10 @@ impl UnknownTargetApplication {
         self.state.resize(width as i32, height as i32);
         self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
         self.renderer.invalidate_cache();
-
-        self.renderer.camera.size = crate::node::schema::Size {
+        self.renderer.camera.set_size(crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
-        };
-        // Always update the camera and queue a new frame after resizing
-        // to ensure the surface repaints even if the quantized
-        // transform does not change.
+        });
         self.renderer.queue();
     }
 
