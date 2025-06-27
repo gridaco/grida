@@ -28,7 +28,7 @@ pub struct FramePlan {
     /// cached tile keys with blur information
     pub tiles: Vec<FramePlanTileInfo>,
     /// when true, the renderer should schedule another frame to recache tiles
-    pub should_repaint_all: bool,
+    pub force_full_repaint: bool,
     /// regions with their intersecting indices
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
@@ -78,7 +78,6 @@ pub struct Renderer {
     pub camera: Camera2D,
     pub images: Rc<RefCell<ImageRepository>>,
     pub fonts: Rc<RefCell<FontRepository>>,
-    prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
     /// when called, the host will request a redraw in os-specific way
     request_redraw: RequestRedrawCallback,
     /// frame counter for managing render queue
@@ -95,7 +94,6 @@ impl Renderer {
             backend,
             scene: None,
             camera,
-            prev_quantized_camera_transform: None,
             images: image_repository,
             fonts: font_repository,
             scene_cache: cache::scene::SceneCache::new(),
@@ -153,10 +151,6 @@ impl Renderer {
 
         let rect = Some(self.camera.rect());
 
-        if self.scene_cache.tile.should_repaint_all() {
-            self.scene_cache.tile.clear();
-        }
-
         let force_full_repaint = !self.scene_cache.tile.should_use_cache_next();
 
         let frame = self.frame(
@@ -172,11 +166,11 @@ impl Renderer {
 
         let frame_duration = start.elapsed();
 
-        // update tile cache when zoom is stable
-        if self.should_cache_tiles() {
-            self.scene_cache
-                .update_tiles(&self.camera, surface, width, height);
-        }
+        // // update tile cache when zoom is stable
+        // if self.scene_cache.tile.should_cache_tiles() {
+        // }
+        self.scene_cache
+            .update_tiles(&self.camera, surface, width, height);
 
         let flush_start = Instant::now();
         if let Some(mut gr_context) = surface.recording_context() {
@@ -219,22 +213,6 @@ impl Renderer {
         }
     }
 
-    /// Commit changes made to the internal camera.
-    /// Returns `true` if the quantized transform changed.
-    pub fn update_camera(&mut self) -> bool {
-        let quantized = self.camera.quantized_transform();
-        let changed = match self.prev_quantized_camera_transform {
-            Some(prev) => prev != quantized,
-            None => true,
-        };
-        if changed {
-            self.prev_quantized_camera_transform = Some(quantized);
-        }
-        let zoom = self.camera.get_zoom();
-        self.scene_cache.tile.update_zoom(zoom);
-        changed
-    }
-
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
@@ -243,12 +221,11 @@ impl Renderer {
         self.scene = Some(scene);
     }
 
-    pub fn should_cache_tiles(&self) -> bool {
-        self.scene_cache.tile.should_cache_tiles()
-    }
-
     /// Mark the renderer as needing a redraw and request it from the host.
     pub fn queue(&mut self) {
+        // let deps_camera_changed = self.camera.changed();
+        // TODO: check for dependencies
+
         if !self.fc.has_pending() {
             self.fc.queue();
             self.request_redraw();
@@ -336,7 +313,7 @@ impl Renderer {
 
         FramePlan {
             tiles: visible_tiles,
-            should_repaint_all: self.scene_cache.tile.should_repaint_all() || force_full_repaint,
+            force_full_repaint,
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
@@ -488,7 +465,6 @@ mod tests {
                 height: 100.0,
             }),
         );
-        renderer.update_camera();
         renderer.load_scene(scene);
         renderer.queue();
         renderer.flush();
@@ -524,7 +500,6 @@ mod tests {
                 height: 50.0,
             }),
         );
-        renderer.update_camera();
 
         // no scene loaded so geometry cache is empty
         let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});

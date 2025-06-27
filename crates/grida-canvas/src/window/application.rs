@@ -41,7 +41,6 @@ impl UnknownTargetApplication {
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> Self {
         let mut renderer = Renderer::new(backend, Box::new(|| {}), camera);
-        renderer.update_camera();
 
         Self {
             renderer,
@@ -162,16 +161,12 @@ impl UnknownTargetApplication {
             WindowCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
-                if self.renderer.update_camera() {
-                    self.renderer.queue();
-                }
+                self.renderer.queue();
             }
             WindowCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
-                if self.renderer.update_camera() {
-                    self.renderer.queue();
-                }
+                self.renderer.queue();
             }
             WindowCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -181,18 +176,14 @@ impl UnknownTargetApplication {
                         .camera
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
-                if self.renderer.update_camera() {
-                    self.renderer.queue();
-                }
+                self.renderer.queue();
             }
             WindowCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
                 self.renderer
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
-                if self.renderer.update_camera() {
-                    self.renderer.queue();
-                }
+                self.renderer.queue();
             }
             WindowCommand::Resize { width, height } => {
                 self.resize(width, height);
@@ -265,7 +256,7 @@ impl UnknownTargetApplication {
 
         let __total_frame_time = __frame_start.elapsed();
         let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use) | q: {:?} | z: {:?}",
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use)",
             1.0 / __total_frame_time.as_secs_f64(),
             __total_frame_time.as_secs_f64() * 1000.0,
             stats.total_duration.as_secs_f64() * 1000.0,
@@ -280,15 +271,13 @@ impl UnknownTargetApplication {
             stats.draw.cache_geometry_size,
             stats.draw.tiles_total,
             stats.draw.tiles_used,
-            __queue_time,
-            __sleep_time
         );
         println!("{}", stat_string);
         self.last_stats = Some(stat_string);
 
         self.last_frame_time = __frame_start;
 
-        if stats.frame.should_repaint_all {
+        if stats.frame.force_full_repaint {
             self.renderer.queue();
         }
     }
@@ -306,7 +295,6 @@ impl UnknownTargetApplication {
         // Always update the camera and queue a new frame after resizing
         // to ensure the surface repaints even if the quantized
         // transform does not change.
-        self.renderer.update_camera();
         self.renderer.queue();
     }
 

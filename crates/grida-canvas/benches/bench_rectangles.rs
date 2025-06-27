@@ -1,5 +1,6 @@
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
+use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use math2::transform::AffineTransform;
@@ -98,7 +99,6 @@ fn bench_rectangles(c: &mut Criterion) {
                     height: height as f32,
                 }),
             );
-            renderer.update_camera();
 
             let scene = create_rectangles(black_box(1_000), false);
 
@@ -131,7 +131,6 @@ fn bench_rectangles(c: &mut Criterion) {
                     height: height as f32,
                 }),
             );
-            renderer.update_camera();
 
             let scene = create_rectangles(black_box(10_000), false);
 
@@ -163,7 +162,6 @@ fn bench_rectangles(c: &mut Criterion) {
                     height: height as f32,
                 }),
             );
-            renderer.update_camera();
 
             let scene = create_rectangles(black_box(10_000), true);
 
@@ -196,7 +194,6 @@ fn bench_rectangles(c: &mut Criterion) {
                     height: height as f32,
                 }),
             );
-            renderer.update_camera();
 
             let scene = create_rectangles(black_box(50_000), false);
 
@@ -228,7 +225,6 @@ fn bench_rectangles(c: &mut Criterion) {
                     height: height as f32,
                 }),
             );
-            renderer.update_camera();
 
             let scene = create_rectangles(black_box(50_000), true);
 

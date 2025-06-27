@@ -24,6 +24,8 @@ pub struct Camera2D {
     pub min_zoom: f32,
     /// Maximum allowed zoom value
     pub max_zoom: f32,
+    /// The previous quantized camera transform.
+    prev_quantized_camera_transform: Option<AffineTransform>,
 }
 
 impl Camera2D {
@@ -51,37 +53,65 @@ impl Camera2D {
             size: viewport_size,
             min_zoom,
             max_zoom,
+            prev_quantized_camera_transform: None,
         };
         c.set_zoom(1.0);
         c
     }
 
+    /// Returns true if the camera was changed.
+    pub fn changed(&self) -> bool {
+        let quantized = self.quantized_transform();
+        match self.prev_quantized_camera_transform {
+            Some(prev) => prev != quantized,
+            None => true,
+        }
+    }
+
     /// Pan camera by (tx, ty) in world units.
-    pub fn translate(&mut self, tx: f32, ty: f32) {
+    pub fn translate(&mut self, tx: f32, ty: f32) -> bool {
         self.transform.translate(tx, ty);
+        self.notify_change()
+    }
+
+    /// Sync the camera cache whenever the camera is changed.
+    /// Returns true if the camera was changed.
+    pub fn notify_change(&mut self) -> bool {
+        let quantized = self.quantized_transform();
+        let changed = match self.prev_quantized_camera_transform {
+            Some(prev) => prev != quantized,
+            None => true,
+        };
+        if changed {
+            self.prev_quantized_camera_transform = Some(quantized);
+        }
+        changed
     }
 
     /// Jump camera center to (x, y) in world units.
-    pub fn set_position(&mut self, x: f32, y: f32) {
+    pub fn set_position(&mut self, x: f32, y: f32) -> bool {
         self.transform.set_translation(x, y);
+        self.notify_change()
     }
 
     /// Set zoom factor (1 = 100%). Preserves rotation & translation.
-    pub fn set_zoom(&mut self, zoom: f32) {
+    pub fn set_zoom(&mut self, zoom: f32) -> bool {
         let zoom = zoom.clamp(self.min_zoom, self.max_zoom);
         let tx = self.transform.x();
         let ty = self.transform.y();
         let (s, c) = self.transform.rotation().sin_cos();
         let scale = 1.0 / zoom;
         self.transform.matrix = [[c * scale, -s * scale, tx], [s * scale, c * scale, ty]];
+        self.notify_change()
     }
 
     /// Sets the zoom while keeping the given screen-space point fixed.
-    pub fn set_zoom_at(&mut self, zoom: f32, screen_point: vector2::Vector2) {
+    pub fn set_zoom_at(&mut self, zoom: f32, screen_point: vector2::Vector2) -> bool {
         let before = self.screen_to_canvas_point(screen_point);
         self.set_zoom(zoom);
         let after = self.screen_to_canvas_point(screen_point);
         self.translate(before[0] - after[0], before[1] - after[1]);
+        self.notify_change()
     }
 
     /// Get current zoom (1/scale).

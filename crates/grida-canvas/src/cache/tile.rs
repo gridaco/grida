@@ -1,12 +1,8 @@
 use crate::runtime::camera::Camera2D;
 use math2::rect::{self, Rectangle};
-use skia_safe::{IRect, Image, Surface};
+use skia_safe::{IRect, Image, Path, Surface};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
-
-/// Debounce duration after zooming before capturing tiles
-const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
 
 /// (x, y, width, height) in canvas space
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -41,6 +37,17 @@ pub struct RegionTileInfo {
     /// The zoom level at which this tile was snapshotted
     pub zoom: f32,
 }
+
+// /// The clip rects (region path) should be applied to this tile.
+// /// this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
+// // pub clippath: Path,
+
+// enum ImageTileCacheState {
+//     /// only use matching tiles
+//     Default,
+//     /// forces to use the cache even for invalid regions
+//     ForceCache,
+// }
 
 /// A collection of tiles for a specific region with blur information and sorting.
 /// This encapsulates the logic for retrieving tiles from the cache and calculating
@@ -114,15 +121,6 @@ impl RegionTiles {
     }
 }
 
-// /// The clip rect should be applied to this tile
-// // pub cliprect: Rectangle,
-// enum ImageTileCacheState {
-//     /// only use matching tiles
-//     Default,
-//     /// forces to use the cache even for invalid regions
-//     ForceCache,
-// }
-
 /// Simple raster tile cache used by the renderer.
 ///
 /// This cache maintains two types of tiles:
@@ -152,8 +150,6 @@ pub struct ImageTileCache {
     /// keeping these in memory is memory-efficient while providing
     /// critical coverage for smooth zoom out operations.
     lowest_zoom_indices: std::collections::HashSet<TileRectKey>,
-    prev_zoom: Option<f32>,
-    zoom_changed_at: Option<Instant>,
     /// Caching is enabled while the camera zoom is at or below this level.
     /// When zooming in beyond this value the cache is cleared and disabled
     /// as the picture based rendering is fast enough.
@@ -170,8 +166,6 @@ impl Default for ImageTileCache {
             tiles: HashMap::new(),
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
-            prev_zoom: None,
-            zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
             no_cache_next: false,
         }
@@ -189,8 +183,6 @@ impl ImageTileCache {
             tiles: HashMap::new(),
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
-            prev_zoom: None,
-            zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
             no_cache_next: false,
         }
@@ -279,49 +271,9 @@ impl ImageTileCache {
         self.no_cache_next = true;
     }
 
-    /// Returns true if the cache should repaint all tiles due to a zoom change
-    /// that has settled for the debounce duration.
-    pub fn should_repaint_all(&self) -> bool {
-        self.zoom_changed_at
-            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
-            .unwrap_or(false)
-    }
-
     /// Returns true if a full repaint is required to refresh tiles
     pub fn should_use_cache_next(&self) -> bool {
         !self.no_cache_next
-    }
-
-    /// Mark that the pending full repaint request has been handled
-    pub fn reset_full_repaint(&mut self) {
-        self.no_cache_next = false;
-    }
-
-    /// Whether tiles should be cached based on zoom change debounce.
-    pub fn should_cache_tiles(&self) -> bool {
-        self.zoom_changed_at
-            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
-            .unwrap_or(true)
-    }
-
-    /// Notify the cache about a camera zoom change.
-    pub fn update_zoom(&mut self, zoom: f32) {
-        if self
-            .prev_zoom
-            .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
-        {
-            if zoom > self.max_zoom_for_cache {
-                // Disable caching when sufficiently zoomed in - picture mode
-                // is fast enough at this scale.
-                self.clear();
-                self.zoom_changed_at = None;
-            } else {
-                // Mark tiles as outdated so they are refreshed after debounce.
-                // Note: lowest_zoom_indices are preserved
-                self.zoom_changed_at = Some(Instant::now());
-            }
-            self.prev_zoom = Some(zoom);
-        }
     }
 
     /// Capture visible region tiles from the provided surface.
@@ -339,7 +291,6 @@ impl ImageTileCache {
         if zoom > self.max_zoom_for_cache {
             // Caching disabled when zoomed in beyond the threshold
             self.clear();
-            self.zoom_changed_at = None;
             return;
         }
 
@@ -429,7 +380,6 @@ impl ImageTileCache {
                 }
             }
         }
-        self.zoom_changed_at = None;
         self.no_cache_next = false;
     }
 

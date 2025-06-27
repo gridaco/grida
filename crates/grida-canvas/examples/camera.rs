@@ -248,7 +248,6 @@ fn main() {
 
     renderer.camera.set_position(400.0, 300.0);
     renderer.camera.set_zoom(1.0);
-    renderer.update_camera();
 
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
@@ -318,7 +317,6 @@ fn main() {
                 let x = 400.0 + angle.cos() * 100.0;
                 let y = 300.0 + angle.sin() * 100.0;
                 renderer.camera.set_position(x, y);
-                renderer.update_camera();
 
                 // Render the scene
                 renderer.queue();
