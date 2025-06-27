@@ -30,6 +30,48 @@ pub struct UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    /// Create a new [`UnknownTargetApplication`] with a renderer configured for
+    /// the given backend and camera. Each platform should supply a callback
+    /// that requests a redraw on the host when invoked.
+    pub fn new(
+        state: super::state::State,
+        backend: Backend,
+        camera: Camera2D,
+        target_fps: u32,
+        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+    ) -> Self {
+        let mut renderer = Renderer::new(Box::new(|| {}));
+        renderer.set_backend(backend);
+        renderer.set_camera(camera.clone());
+
+        Self {
+            renderer,
+            state,
+            camera,
+            input: super::input::InputState::default(),
+            hit_result: None,
+            last_hit_test: std::time::Instant::now(),
+            hit_test_interval: std::time::Duration::from_millis(50),
+            image_rx,
+            font_rx,
+            scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
+            last_frame_time: std::time::Instant::now(),
+            last_stats: None,
+            devtools_rendering_show_fps: false,
+            devtools_rendering_show_tiles: false,
+            devtools_rendering_show_stats: false,
+            devtools_rendering_show_hit_overlay: false,
+            devtools_rendering_show_ruler: false,
+        }
+    }
+
+    /// Provide the platform-specific callback used to request a redraw from the
+    /// host window.
+    pub fn set_request_redraw(&mut self, cb: crate::runtime::scene::RequestRedrawCallback) {
+        self.renderer.set_request_redraw(cb);
+    }
+
     pub(crate) fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {

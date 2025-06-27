@@ -1,9 +1,8 @@
 use crate::resource::font_loader::FontMessage;
 use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
-use crate::window::scheduler;
 use crate::window::state::{self, GpuState, State};
 use futures::channel::mpsc;
 
@@ -83,35 +82,14 @@ impl WebGlApplication {
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
 
-        let mut renderer = Renderer::new(Box::new(|| {}));
-        renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
-
         let camera = Camera2D::new(crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
         });
-        renderer.set_camera(camera.clone());
 
+        let backend = Backend::GL(state.surface_mut_ptr());
         let app = Self {
-            app: UnknownTargetApplication {
-                renderer,
-                state,
-                camera,
-                input: crate::window::input::InputState::default(),
-                hit_result: None,
-                last_hit_test: std::time::Instant::now(),
-                hit_test_interval: std::time::Duration::ZERO,
-                image_rx,
-                font_rx,
-                scheduler: scheduler::FrameScheduler::new(120).with_max_fps(120),
-                last_frame_time: std::time::Instant::now(),
-                last_stats: None,
-                devtools_rendering_show_fps: false,
-                devtools_rendering_show_stats: false,
-                devtools_rendering_show_hit_overlay: false,
-                devtools_rendering_show_ruler: false,
-                devtools_rendering_show_tiles: false,
-            },
+            app: UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx),
         };
 
         app

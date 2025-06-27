@@ -1,5 +1,10 @@
+use crate::node::schema::Size;
+use crate::resource::{FontMessage, ImageMessage};
+use crate::runtime::camera::Camera2D;
+use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::command::WindowCommand;
+use futures::channel::mpsc;
 
 use gl::types::*;
 use glutin::{
@@ -196,6 +201,40 @@ pub struct NativeApplication {
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
     pub(crate) gl_context: PossiblyCurrentContext,
     pub(crate) window: Window,
+}
+
+impl NativeApplication {
+    /// Create a new [`NativeApplication`] and corresponding [`EventLoop`].
+    pub fn new(
+        width: i32,
+        height: i32,
+        image_rx: mpsc::UnboundedReceiver<ImageMessage>,
+        font_rx: mpsc::UnboundedReceiver<FontMessage>,
+    ) -> (Self, EventLoop<()>) {
+        let (mut state, el, window, gl_surface, gl_context, scale_factor) =
+            init_native_window(width, height);
+        let proxy = el.create_proxy();
+
+        let camera = Camera2D::new(Size {
+            width: width as f32 * scale_factor as f32,
+            height: height as f32 * scale_factor as f32,
+        });
+
+        let backend = Backend::GL(state.surface_mut_ptr());
+        let mut app = NativeApplication {
+            app: UnknownTargetApplication::new(state, backend, camera, 144, image_rx, font_rx),
+            gl_surface,
+            gl_context,
+            window,
+        };
+
+        // set the redraw callback to dispatch a user event for redraws
+        app.app.set_request_redraw(Box::new(move || {
+            let _ = proxy.send_event(());
+        }));
+
+        (app, el)
+    }
 }
 
 impl NativeApplicationHandler for NativeApplication {

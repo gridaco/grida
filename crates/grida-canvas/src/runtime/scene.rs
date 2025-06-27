@@ -104,6 +104,12 @@ impl Renderer {
         }
     }
 
+    /// Update the redraw callback used to notify the host when a new frame is
+    /// ready.
+    pub fn set_request_redraw(&mut self, cb: RequestRedrawCallback) {
+        self.request_redraw = cb;
+    }
+
     /// Access the cached scene data.
     pub fn scene_cache(&self) -> &cache::scene::SceneCache {
         &self.scene_cache
