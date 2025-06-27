@@ -3,7 +3,7 @@ use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
-use crate::window::command::WindowCommand;
+use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 
 use gl::types::*;
@@ -28,12 +28,8 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-fn handle_window_event(event: &WindowEvent) -> WindowCommand {
+fn handle_window_event(event: &WindowEvent) -> ApplicationCommand {
     match event {
-        WindowEvent::Resized(size) => WindowCommand::Resize {
-            width: size.width,
-            height: size.height,
-        },
         WindowEvent::KeyboardInput {
             event:
                 KeyEvent {
@@ -43,21 +39,21 @@ fn handle_window_event(event: &WindowEvent) -> WindowCommand {
                 },
             ..
         } => match key {
-            Key::Character(c) if c == "=" => WindowCommand::ZoomIn,
-            Key::Character(c) if c == "-" => WindowCommand::ZoomOut,
-            _ => WindowCommand::None,
+            Key::Character(c) if c == "=" => ApplicationCommand::ZoomIn,
+            Key::Character(c) if c == "-" => ApplicationCommand::ZoomOut,
+            _ => ApplicationCommand::None,
         },
-        WindowEvent::PinchGesture { delta, .. } => WindowCommand::ZoomDelta {
+        WindowEvent::PinchGesture { delta, .. } => ApplicationCommand::ZoomDelta {
             delta: *delta as f32,
         },
         WindowEvent::MouseWheel { delta, .. } => match delta {
-            MouseScrollDelta::PixelDelta(delta) => WindowCommand::Pan {
+            MouseScrollDelta::PixelDelta(delta) => ApplicationCommand::Pan {
                 tx: -(delta.x as f32),
                 ty: -(delta.y as f32),
             },
-            _ => WindowCommand::None,
+            _ => ApplicationCommand::None,
         },
-        _ => WindowCommand::None,
+        _ => ApplicationCommand::None,
     }
 }
 
@@ -262,15 +258,16 @@ impl NativeApplicationHandler for NativeApplication {
             event_loop.exit();
         }
 
+        if let WindowEvent::Resized(size) = &event {
+            self.gl_surface.resize(
+                &self.gl_context,
+                NonZeroU32::new(size.width).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
+                NonZeroU32::new(size.height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
+            );
+            self.app.resize(size.width, size.height);
+        }
+
         match handle_window_event(&event) {
-            WindowCommand::Resize { width, height } => {
-                self.gl_surface.resize(
-                    &self.gl_context,
-                    NonZeroU32::new(width).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
-                    NonZeroU32::new(height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
-                );
-                self.app.command(WindowCommand::Resize { width, height });
-            }
             cmd => {
                 self.app.command(cmd);
             }

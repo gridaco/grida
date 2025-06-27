@@ -82,7 +82,7 @@ pub unsafe extern "C" fn pointer_move(app: *mut WebGlApplication, x: f32, y: f32
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b: f32) {
-    use cg::window::command::WindowCommand;
+    use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
             0 => WindowCommand::Close,

@@ -4,7 +4,7 @@ use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
-use crate::window::command::WindowCommand;
+use crate::window::command::ApplicationCommand;
 use crate::window::scheduler;
 use futures::channel::mpsc;
 
@@ -155,19 +155,19 @@ impl UnknownTargetApplication {
     }
 
     /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.
-    pub(crate) fn command(&mut self, cmd: WindowCommand) -> bool {
+    pub(crate) fn command(&mut self, cmd: ApplicationCommand) -> bool {
         match cmd {
-            WindowCommand::ZoomIn => {
+            ApplicationCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
                 self.renderer.queue_unstable();
             }
-            WindowCommand::ZoomOut => {
+            ApplicationCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
                 self.renderer.queue_unstable();
             }
-            WindowCommand::ZoomDelta { delta } => {
+            ApplicationCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 let zoom_factor = 1.0 + delta;
                 if zoom_factor.is_finite() && zoom_factor > 0.0 {
@@ -177,17 +177,14 @@ impl UnknownTargetApplication {
                 }
                 self.renderer.queue_unstable();
             }
-            WindowCommand::Pan { tx, ty } => {
+            ApplicationCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
                 self.renderer
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 self.renderer.queue_unstable();
             }
-            WindowCommand::Resize { width, height } => {
-                self.resize(width, height);
-            }
-            WindowCommand::None => {}
+            ApplicationCommand::None => {}
         }
 
         false
