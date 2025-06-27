@@ -4,6 +4,15 @@ use skia_safe::{IRect, Image, Path, Surface};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// The resolution strategy to use for the image tile cache.
+pub enum ImageTileCacheResolutionStrategy {
+    /// only use matching tiles
+    Exact,
+    /// only use matching tiles (exact or higher)
+    Default,
+    /// forces to use the cache even for invalid regions
+    ForceCache,
+}
 /// (x, y, width, height) in canvas space
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TileRectKey(pub i32, pub i32, pub u32, pub u32);
@@ -42,13 +51,6 @@ pub struct RegionTileInfo {
 // /// this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
 // // pub clippath: Path,
 
-// enum ImageTileCacheState {
-//     /// only use matching tiles
-//     Default,
-//     /// forces to use the cache even for invalid regions
-//     ForceCache,
-// }
-
 /// A collection of tiles for a specific region with blur information and sorting.
 /// This encapsulates the logic for retrieving tiles from the cache and calculating
 /// blur parameters based on zoom differences.
@@ -59,9 +61,46 @@ pub struct RegionTiles {
 }
 
 impl RegionTiles {
+    pub fn empty() -> Self {
+        Self {
+            tiles: Vec::new(),
+            tile_rects: Vec::new(),
+        }
+    }
+
+    /// Determines if a tile should be included based on the resolution strategy.
+    fn should_include_tile(
+        strategy: &ImageTileCacheResolutionStrategy,
+        tile_at_zoom: Option<&TileAtZoom>,
+        current_zoom: f32,
+    ) -> bool {
+        match strategy {
+            ImageTileCacheResolutionStrategy::Exact => {
+                if let Some(tile) = tile_at_zoom {
+                    (tile.zoom - current_zoom).abs() < f32::EPSILON
+                } else {
+                    false
+                }
+            }
+            ImageTileCacheResolutionStrategy::Default => {
+                if let Some(tile) = tile_at_zoom {
+                    tile.zoom >= current_zoom
+                } else {
+                    false
+                }
+            }
+            ImageTileCacheResolutionStrategy::ForceCache => tile_at_zoom.is_some(),
+        }
+    }
+
     /// Create a new RegionTiles instance with tiles filtered from the cache
     /// for the given bounds and current zoom level.
-    pub fn new(cache: &ImageTileCache, bounds: &Rectangle, current_zoom: f32) -> Self {
+    pub fn new(
+        cache: &ImageTileCache,
+        bounds: &Rectangle,
+        current_zoom: f32,
+        strategy: ImageTileCacheResolutionStrategy,
+    ) -> Self {
         let mut tiles: Vec<RegionTileInfo> = Vec::new();
         let mut tile_rects: Vec<Rectangle> = Vec::new();
 
@@ -83,13 +122,18 @@ impl RegionTiles {
                 (false, 0.0, 0.0)
             };
 
-            tiles.push(RegionTileInfo {
-                key: *key,
-                blur: should_blur,
-                blur_radius,
-                zoom: tile_zoom,
-            });
-            tile_rects.push(key.to_rect());
+            // Apply strategy-based filtering
+            let should_include = Self::should_include_tile(&strategy, tile_at_zoom, current_zoom);
+
+            if should_include {
+                tiles.push(RegionTileInfo {
+                    key: *key,
+                    blur: should_blur,
+                    blur_radius,
+                    zoom: tile_zoom,
+                });
+                tile_rects.push(key.to_rect());
+            }
         }
 
         // Sort tiles by zoom difference from current zoom (closest to current zoom last)
@@ -154,9 +198,6 @@ pub struct ImageTileCache {
     /// When zooming in beyond this value the cache is cleared and disabled
     /// as the picture based rendering is fast enough.
     pub max_zoom_for_cache: f32,
-    /// Flag indicating that a full repaint is required to refresh tiles
-    /// after the cache was cleared due to a zoom change.
-    no_cache_next: bool,
 }
 
 impl Default for ImageTileCache {
@@ -167,7 +208,6 @@ impl Default for ImageTileCache {
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
             max_zoom_for_cache: 2.0,
-            no_cache_next: false,
         }
     }
 }
@@ -184,7 +224,6 @@ impl ImageTileCache {
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
             max_zoom_for_cache: 2.0,
-            no_cache_next: false,
         }
     }
 
@@ -260,7 +299,6 @@ impl ImageTileCache {
         // Only clear tiles that are not in lowest_zoom_indices
         self.tiles
             .retain(|key, _| self.lowest_zoom_indices.contains(key));
-        self.no_cache_next = true;
     }
 
     /// Remove all tiles including lowest zoom tiles.
@@ -268,12 +306,6 @@ impl ImageTileCache {
         self.tiles.clear();
         self.lowest_zoom_indices.clear();
         self.lowest_zoom = None;
-        self.no_cache_next = true;
-    }
-
-    /// Returns true if a full repaint is required to refresh tiles
-    pub fn should_use_cache_next(&self) -> bool {
-        !self.no_cache_next
     }
 
     /// Capture visible region tiles from the provided surface.
@@ -289,7 +321,6 @@ impl ImageTileCache {
     {
         let zoom = camera.get_zoom();
         if zoom > self.max_zoom_for_cache {
-            self.clear();
             return;
         }
 
@@ -315,8 +346,6 @@ impl ImageTileCache {
                 self.capture_tile(surface, &screen_rect, key, zoom);
             }
         }
-
-        self.no_cache_next = false;
     }
 
     /// Generate tile indices for the given camera rect and world size
@@ -414,7 +443,15 @@ impl ImageTileCache {
     /// Get tiles for a specific region with blur information and sorting.
     /// This encapsulates the logic for filtering tiles, calculating blur parameters,
     /// and sorting by quality for optimal rendering.
-    pub fn get_region_tiles(&self, bounds: &Rectangle, current_zoom: f32) -> RegionTiles {
-        RegionTiles::new(self, bounds, current_zoom)
+    pub fn get_region_tiles(
+        &self,
+        bounds: &Rectangle,
+        current_zoom: f32,
+        strategy: ImageTileCacheResolutionStrategy,
+    ) -> RegionTiles {
+        if current_zoom > self.max_zoom_for_cache {
+            return RegionTiles::empty();
+        }
+        RegionTiles::new(self, bounds, current_zoom, strategy)
     }
 }

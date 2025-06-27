@@ -1,4 +1,4 @@
-use crate::cache::tile::RegionTileInfo;
+use crate::cache::tile::{ImageTileCacheResolutionStrategy, RegionTileInfo};
 use crate::node::schema::*;
 use crate::painter::layer::Layer;
 use crate::painter::{cvt, Painter};
@@ -151,12 +151,10 @@ impl Renderer {
 
         let rect = Some(self.camera.rect());
 
-        let force_full_repaint = !self.scene_cache.tile.should_use_cache_next();
-
         let frame = self.frame(
             rect.unwrap_or(rect::Rectangle::empty()),
             self.camera.get_zoom(),
-            force_full_repaint,
+            false,
         );
 
         let width = surface.width() as f32;
@@ -280,15 +278,18 @@ impl Renderer {
     /// - bounds: the bounding rect to be rendered (in world space)
     /// - zoom: the current zoom level
     fn frame(&mut self, bounds: rect::Rectangle, zoom: f32, force_full_repaint: bool) -> FramePlan {
-        let __before_ll = Instant::now();
-        // let force_full_repaint = self.scene_cache.tile.needs_full_repaint();
+        let __start = Instant::now();
 
         // Get tiles for the region with blur information and sorting
-        let region_tiles = self.scene_cache.tile.get_region_tiles(&bounds, zoom);
+        let region_tiles = self.scene_cache.tile.get_region_tiles(
+            &bounds,
+            zoom,
+            ImageTileCacheResolutionStrategy::ForceCache,
+        );
         let visible_tiles: Vec<FramePlanTileInfo> = region_tiles.tiles().to_vec();
         let tile_rects: Vec<_> = region_tiles.tile_rects().to_vec();
 
-        let region = if force_full_repaint {
+        let painter_region = if force_full_repaint {
             vec![bounds]
         } else {
             region::difference(bounds, &tile_rects)
@@ -296,7 +297,7 @@ impl Renderer {
 
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
-        for rect in region {
+        for rect in painter_region {
             let mut indices = self.scene_cache.intersects(rect);
 
             // TODO: sort is expensive
@@ -307,7 +308,7 @@ impl Renderer {
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
 
-        let __ll_duration = __before_ll.elapsed();
+        let __ll_duration = __start.elapsed();
 
         FramePlan {
             tiles: visible_tiles,
