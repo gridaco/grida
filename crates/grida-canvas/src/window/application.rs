@@ -52,7 +52,7 @@ impl UnknownTargetApplication {
             input: super::input::InputState::default(),
             hit_result: None,
             last_hit_test: std::time::Instant::now(),
-            hit_test_interval: std::time::Duration::from_millis(50),
+            hit_test_interval: std::time::Duration::from_millis(0),
             image_rx,
             font_rx,
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
@@ -149,7 +149,7 @@ impl UnknownTargetApplication {
 
         let camera = &self.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
-        let tester = crate::hittest::HitTester::new(self.renderer.scene_cache());
+        let tester = crate::hittest::HitTester::new(self.renderer.get_cache());
 
         let new_hit_result = tester.hit_first(point);
         if self.hit_result != new_hit_result {
@@ -235,7 +235,7 @@ impl UnknownTargetApplication {
                     surface,
                     self.hit_result.as_ref(),
                     &self.camera,
-                    self.renderer.scene_cache(),
+                    self.renderer.get_cache(),
                     &self.renderer.fonts,
                 );
             }
@@ -243,7 +243,7 @@ impl UnknownTargetApplication {
                 tile_overlay::TileOverlay::draw(
                     surface,
                     &self.camera,
-                    self.renderer.scene_cache().tile.tiles(),
+                    self.renderer.get_cache().tile.tiles(),
                 );
             }
             if self.devtools_rendering_show_ruler {

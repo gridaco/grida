@@ -82,7 +82,7 @@ pub struct Renderer {
     /// when called, the host will request a redraw in os-specific way
     request_redraw: RequestRedrawCallback,
     /// frame counter for managing render queue
-    frame_counter: FrameCounter,
+    fc: FrameCounter,
 }
 
 impl Renderer {
@@ -100,7 +100,7 @@ impl Renderer {
             fonts: font_repository,
             scene_cache: cache::scene::SceneCache::new(),
             request_redraw,
-            frame_counter: FrameCounter::new(),
+            fc: FrameCounter::new(),
         }
     }
 
@@ -111,7 +111,7 @@ impl Renderer {
     }
 
     /// Access the cached scene data.
-    pub fn scene_cache(&self) -> &cache::scene::SceneCache {
+    pub fn get_cache(&self) -> &cache::scene::SceneCache {
         &self.scene_cache
     }
 
@@ -141,7 +141,7 @@ impl Renderer {
 
     /// Render the queued frame if any and return the completed statistics.
     pub fn flush(&mut self) -> Option<FrameFlushStats> {
-        if !self.frame_counter.has_pending() {
+        if !self.fc.has_pending() {
             return None;
         }
 
@@ -169,9 +169,9 @@ impl Renderer {
             rect.unwrap_or(rect::Rectangle::empty()),
             self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
         );
-        let paint = self.draw(&mut canvas, &frame, scene.background_color, width, height);
+        let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
-        let render_duration = start.elapsed();
+        let frame_duration = start.elapsed();
 
         // update tile cache when zoom is stable
         if self.should_cache_tiles() {
@@ -191,20 +191,20 @@ impl Renderer {
 
         let stats = FrameFlushStats {
             frame,
-            draw: paint,
-            frame_duration: render_duration,
+            draw,
+            frame_duration,
             flush_duration,
-            total_duration: render_duration + flush_duration,
+            total_duration: frame_duration + flush_duration,
         };
 
-        self.frame_counter.flush();
+        self.fc.flush();
 
         Some(stats)
     }
 
     /// Returns `true` if a frame has been queued but not yet flushed.
     pub fn has_pending_frame(&self) -> bool {
-        self.frame_counter.has_pending()
+        self.fc.has_pending()
     }
 
     /// Invoke the request redraw callback.
@@ -242,7 +242,6 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
-        println!("load_scene: size={}", scene.nodes.len());
         self.scene_cache.update_geometry(&scene);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
@@ -254,8 +253,8 @@ impl Renderer {
 
     /// Mark the renderer as needing a redraw and request it from the host.
     pub fn queue(&mut self) {
-        if !self.frame_counter.has_pending() {
-            self.frame_counter.queue();
+        if !self.fc.has_pending() {
+            self.fc.queue();
             self.request_redraw();
         }
     }
