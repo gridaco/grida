@@ -72,7 +72,7 @@ impl Backend {
 /// Renderer: manages backend, DPI, camera, and iterates over scene children
 /// ---------------------------------------------------------------------------
 pub struct Renderer {
-    backend: Option<Backend>,
+    pub backend: Backend,
     scene: Option<Scene>,
     scene_cache: cache::scene::SceneCache,
     pub camera: Option<Camera2D>,
@@ -86,13 +86,13 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(request_redraw: RequestRedrawCallback) -> Self {
+    pub fn new(backend: Backend, request_redraw: RequestRedrawCallback) -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
         let image_repository = Rc::new(RefCell::new(image_repository));
         Self {
-            backend: None,
+            backend,
             scene: None,
             camera: None,
             prev_quantized_camera_transform: None,
@@ -121,10 +121,6 @@ impl Renderer {
         Box::into_raw(Box::new(surface))
     }
 
-    pub fn set_backend(&mut self, backend: Backend) {
-        self.backend = Some(backend);
-    }
-
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
         self.fonts
             .borrow_mut()
@@ -140,6 +136,7 @@ impl Renderer {
     }
 
     /// Render the queued frame if any and return the completed statistics.
+    /// Intended to be called by the host when a redraw request is received.
     pub fn flush(&mut self) -> Option<FrameFlushStats> {
         if !self.fc.has_pending() {
             return None;
@@ -150,25 +147,27 @@ impl Renderer {
         let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
             return None;
         };
-        let Some(backend) = self.backend.as_ref() else {
-            return None;
-        };
 
-        let surface = unsafe { &mut *backend.get_surface() };
+        let surface = unsafe { &mut *self.backend.get_surface() };
         let scene = unsafe { &*scene_ptr };
-        let width = surface.width() as f32;
-        let height = surface.height() as f32;
-        let mut canvas = surface.canvas();
+
         let rect = self.camera.as_ref().map(|c| c.rect());
 
         if self.scene_cache.tile.should_repaint_all() {
             self.scene_cache.tile.clear();
         }
 
+        let force_full_repaint = !self.scene_cache.tile.should_use_cache_next();
+
         let frame = self.frame(
             rect.unwrap_or(rect::Rectangle::empty()),
             self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
+            force_full_repaint,
         );
+
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
+        let mut canvas = surface.canvas();
         let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
         let frame_duration = start.elapsed();
@@ -213,12 +212,11 @@ impl Renderer {
     }
 
     pub fn free(&mut self) {
-        if let Some(backend) = self.backend.take() {
-            let surface = unsafe { Box::from_raw(backend.get_surface()) };
-            if let Some(mut gr_context) = surface.recording_context() {
-                if let Some(mut direct_context) = gr_context.as_direct_context() {
-                    direct_context.abandon();
-                }
+        let backend = std::mem::replace(&mut self.backend, Backend::Raster(std::ptr::null_mut()));
+        let surface = unsafe { Box::from_raw(backend.get_surface()) };
+        if let Some(mut gr_context) = surface.recording_context() {
+            if let Some(mut direct_context) = gr_context.as_direct_context() {
+                direct_context.abandon();
             }
         }
     }
@@ -308,9 +306,9 @@ impl Renderer {
     /// Arguments:
     /// - bounds: the bounding rect to be rendered (in world space)
     /// - zoom: the current zoom level
-    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32) -> FramePlan {
+    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32, force_full_repaint: bool) -> FramePlan {
         let __before_ll = Instant::now();
-        let force_full_repaint = self.scene_cache.tile.needs_full_repaint();
+        // let force_full_repaint = self.scene_cache.tile.needs_full_repaint();
 
         // Get tiles for the region with blur information and sorting
         let region_tiles = self.scene_cache.tile.get_region_tiles(&bounds, zoom);
@@ -485,9 +483,8 @@ mod tests {
             background_color: None,
         };
 
-        let mut renderer = Renderer::new(Box::new(|| {}));
         let surface_ptr = Renderer::init_raster(100, 100);
-        renderer.set_backend(Backend::Raster(surface_ptr));
+        let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
         renderer.load_scene(scene);
         renderer.queue();
         renderer.flush();
@@ -514,9 +511,8 @@ mod tests {
 
     #[test]
     fn recording_cached_returns_none_without_bounds() {
-        let mut renderer = Renderer::new(Box::new(|| {}));
         let surface_ptr = Renderer::init_raster(50, 50);
-        renderer.set_backend(Backend::Raster(surface_ptr));
+        let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
         // no scene loaded so geometry cache is empty
         let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});

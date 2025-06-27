@@ -89,9 +89,8 @@ fn bench_rectangles(c: &mut Criterion) {
     // 1K rectangles
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(Box::new(|| {}));
             let surface_ptr = Renderer::init_raster(width, height);
-            renderer.set_backend(Backend::Raster(surface_ptr));
+            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
             let scene = create_rectangles(black_box(1_000), false);
 
@@ -115,10 +114,8 @@ fn bench_rectangles(c: &mut Criterion) {
     // 10K rectangles
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(Box::new(|| {}));
-
             let surface_ptr = Renderer::init_raster(width, height);
-            renderer.set_backend(Backend::Raster(surface_ptr));
+            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
             let scene = create_rectangles(black_box(10_000), false);
 
@@ -141,10 +138,8 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(Box::new(|| {}));
-
             let surface_ptr = Renderer::init_raster(width, height);
-            renderer.set_backend(Backend::Raster(surface_ptr));
+            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
             let scene = create_rectangles(black_box(10_000), true);
 
@@ -168,10 +163,8 @@ fn bench_rectangles(c: &mut Criterion) {
     // 50K rectangles
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(Box::new(|| {}));
-
             let surface_ptr = Renderer::init_raster(width, height);
-            renderer.set_backend(Backend::Raster(surface_ptr));
+            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
             let scene = create_rectangles(black_box(50_000), false);
 
@@ -194,10 +187,8 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
-            let mut renderer = Renderer::new(Box::new(|| {}));
-
             let surface_ptr = Renderer::init_raster(width, height);
-            renderer.set_backend(Backend::Raster(surface_ptr));
+            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
 
             let scene = create_rectangles(black_box(50_000), true);
 

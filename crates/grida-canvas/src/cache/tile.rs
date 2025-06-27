@@ -112,12 +112,16 @@ impl RegionTiles {
     pub fn len(&self) -> usize {
         self.tiles.len()
     }
-
-    /// Check if this region has any tiles
-    pub fn is_empty(&self) -> bool {
-        self.tiles.is_empty()
-    }
 }
+
+// /// The clip rect should be applied to this tile
+// // pub cliprect: Rectangle,
+// enum ImageTileCacheState {
+//     /// only use matching tiles
+//     Default,
+//     /// forces to use the cache even for invalid regions
+//     ForceCache,
+// }
 
 /// Simple raster tile cache used by the renderer.
 ///
@@ -156,7 +160,7 @@ pub struct ImageTileCache {
     pub max_zoom_for_cache: f32,
     /// Flag indicating that a full repaint is required to refresh tiles
     /// after the cache was cleared due to a zoom change.
-    needs_full_repaint: bool,
+    no_cache_next: bool,
 }
 
 impl Default for ImageTileCache {
@@ -169,7 +173,7 @@ impl Default for ImageTileCache {
             prev_zoom: None,
             zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
-            needs_full_repaint: false,
+            no_cache_next: false,
         }
     }
 }
@@ -188,7 +192,7 @@ impl ImageTileCache {
             prev_zoom: None,
             zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
-            needs_full_repaint: false,
+            no_cache_next: false,
         }
     }
 
@@ -264,7 +268,7 @@ impl ImageTileCache {
         // Only clear tiles that are not in lowest_zoom_indices
         self.tiles
             .retain(|key, _| self.lowest_zoom_indices.contains(key));
-        self.needs_full_repaint = true;
+        self.no_cache_next = true;
     }
 
     /// Remove all tiles including lowest zoom tiles.
@@ -272,7 +276,7 @@ impl ImageTileCache {
         self.tiles.clear();
         self.lowest_zoom_indices.clear();
         self.lowest_zoom = None;
-        self.needs_full_repaint = true;
+        self.no_cache_next = true;
     }
 
     /// Returns true if the cache should repaint all tiles due to a zoom change
@@ -284,13 +288,13 @@ impl ImageTileCache {
     }
 
     /// Returns true if a full repaint is required to refresh tiles
-    pub fn needs_full_repaint(&self) -> bool {
-        self.needs_full_repaint
+    pub fn should_use_cache_next(&self) -> bool {
+        !self.no_cache_next
     }
 
     /// Mark that the pending full repaint request has been handled
     pub fn reset_full_repaint(&mut self) {
-        self.needs_full_repaint = false;
+        self.no_cache_next = false;
     }
 
     /// Whether tiles should be cached based on zoom change debounce.
@@ -426,7 +430,7 @@ impl ImageTileCache {
             }
         }
         self.zoom_changed_at = None;
-        self.needs_full_repaint = false;
+        self.no_cache_next = false;
     }
 
     /// Get tiles for a specific region with blur information and sorting.

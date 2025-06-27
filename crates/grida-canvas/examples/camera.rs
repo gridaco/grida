@@ -232,10 +232,12 @@ fn main() {
 
     // Create renderer
     let window_ptr = &window as *const Window;
-    let mut renderer = Renderer::new(Box::new(move || unsafe {
-        (*window_ptr).request_redraw();
-    }));
-    renderer.set_backend(Backend::GL(surface_ptr));
+    let mut renderer = Renderer::new(
+        Backend::GL(surface_ptr),
+        Box::new(move || unsafe {
+            (*window_ptr).request_redraw();
+        }),
+    );
 
     // Create static scene
     let scene = create_static_scene();
@@ -306,7 +308,7 @@ fn main() {
                 // Update surface pointer
                 unsafe { _ = Box::from_raw(surface_ptr) };
                 let new_surface_ptr = Box::into_raw(Box::new(surface));
-                renderer.set_backend(Backend::GL(new_surface_ptr));
+                renderer.backend = Backend::GL(new_surface_ptr);
             }
             Event::AboutToWait => {
                 let frame_start = std::time::Instant::now();

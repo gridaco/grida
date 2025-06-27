@@ -41,8 +41,7 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> Self {
-        let mut renderer = Renderer::new(Box::new(|| {}));
-        renderer.set_backend(backend);
+        let mut renderer = Renderer::new(backend, Box::new(|| {}));
         renderer.set_camera(camera.clone());
 
         Self {
@@ -296,8 +295,7 @@ impl UnknownTargetApplication {
     /// Update backing resources after a window resize.
     pub(crate) fn resize(&mut self, width: u32, height: u32) {
         self.state.resize(width as i32, height as i32);
-        self.renderer
-            .set_backend(Backend::GL(self.state.surface_mut_ptr()));
+        self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
         self.renderer.invalidate_cache();
 
         self.camera.size = crate::node::schema::Size {
