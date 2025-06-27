@@ -75,7 +75,7 @@ pub struct Renderer {
     pub backend: Backend,
     scene: Option<Scene>,
     scene_cache: cache::scene::SceneCache,
-    pub camera: Option<Camera2D>,
+    pub camera: Camera2D,
     pub images: Rc<RefCell<ImageRepository>>,
     pub fonts: Rc<RefCell<FontRepository>>,
     prev_quantized_camera_transform: Option<math2::transform::AffineTransform>,
@@ -86,7 +86,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(backend: Backend, request_redraw: RequestRedrawCallback) -> Self {
+    pub fn new(backend: Backend, request_redraw: RequestRedrawCallback, camera: Camera2D) -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
@@ -94,7 +94,7 @@ impl Renderer {
         Self {
             backend,
             scene: None,
-            camera: None,
+            camera,
             prev_quantized_camera_transform: None,
             images: image_repository,
             fonts: font_repository,
@@ -151,7 +151,7 @@ impl Renderer {
         let surface = unsafe { &mut *self.backend.get_surface() };
         let scene = unsafe { &*scene_ptr };
 
-        let rect = self.camera.as_ref().map(|c| c.rect());
+        let rect = Some(self.camera.rect());
 
         if self.scene_cache.tile.should_repaint_all() {
             self.scene_cache.tile.clear();
@@ -161,7 +161,7 @@ impl Renderer {
 
         let frame = self.frame(
             rect.unwrap_or(rect::Rectangle::empty()),
-            self.camera.as_ref().map(|c| c.get_zoom()).unwrap_or(1.0),
+            self.camera.get_zoom(),
             force_full_repaint,
         );
 
@@ -174,10 +174,8 @@ impl Renderer {
 
         // update tile cache when zoom is stable
         if self.should_cache_tiles() {
-            if let Some(camera) = &self.camera {
-                self.scene_cache
-                    .update_tiles(camera, surface, width, height);
-            }
+            self.scene_cache
+                .update_tiles(&self.camera, surface, width, height);
         }
 
         let flush_start = Instant::now();
@@ -221,9 +219,10 @@ impl Renderer {
         }
     }
 
-    /// Set the active camera. Returns `true` if the quantized transform changed.
-    pub fn set_camera(&mut self, camera: Camera2D) -> bool {
-        let quantized = camera.quantized_transform();
+    /// Commit changes made to the internal camera.
+    /// Returns `true` if the quantized transform changed.
+    pub fn update_camera(&mut self) -> bool {
+        let quantized = self.camera.quantized_transform();
         let changed = match self.prev_quantized_camera_transform {
             Some(prev) => prev != quantized,
             None => true,
@@ -231,9 +230,8 @@ impl Renderer {
         if changed {
             self.prev_quantized_camera_transform = Some(quantized);
         }
-        let zoom = camera.get_zoom();
+        let zoom = self.camera.get_zoom();
         self.scene_cache.tile.update_zoom(zoom);
-        self.camera = Some(camera);
         changed
     }
 
@@ -376,10 +374,8 @@ impl Renderer {
 
         canvas.save();
 
-        // Apply camera transform if present
-        if let Some(camera) = &self.camera {
-            canvas.concat(&cvt::sk_matrix(camera.view_matrix().matrix));
-        }
+        // Apply camera transform
+        canvas.concat(&cvt::sk_matrix(self.camera.view_matrix().matrix));
 
         // draw image cache tiles
         for tk in plan.tiles.iter() {
@@ -458,7 +454,7 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{factory::NodeFactory, repository::NodeRepository};
+    use crate::node::{factory::NodeFactory, repository::NodeRepository, schema::Size};
     use math2::transform::AffineTransform;
 
     #[test]
@@ -484,7 +480,15 @@ mod tests {
         };
 
         let surface_ptr = Renderer::init_raster(100, 100);
-        let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+        let mut renderer = Renderer::new(
+            Backend::Raster(surface_ptr),
+            Box::new(|| {}),
+            Camera2D::new(Size {
+                width: 100.0,
+                height: 100.0,
+            }),
+        );
+        renderer.update_camera();
         renderer.load_scene(scene);
         renderer.queue();
         renderer.flush();
@@ -512,7 +516,15 @@ mod tests {
     #[test]
     fn recording_cached_returns_none_without_bounds() {
         let surface_ptr = Renderer::init_raster(50, 50);
-        let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+        let mut renderer = Renderer::new(
+            Backend::Raster(surface_ptr),
+            Box::new(|| {}),
+            Camera2D::new(Size {
+                width: 50.0,
+                height: 50.0,
+            }),
+        );
+        renderer.update_camera();
 
         // no scene loaded so geometry cache is empty
         let pic = renderer.with_recording_cached(&"missing".to_string(), |_| {});

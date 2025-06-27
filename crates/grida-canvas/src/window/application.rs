@@ -12,7 +12,6 @@ use futures::channel::mpsc;
 pub struct UnknownTargetApplication {
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::State,
-    pub(crate) camera: Camera2D,
     pub(crate) input: super::input::InputState,
     pub(crate) hit_result: Option<crate::node::schema::NodeId>,
     pub(crate) last_hit_test: std::time::Instant,
@@ -41,13 +40,12 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> Self {
-        let mut renderer = Renderer::new(backend, Box::new(|| {}));
-        renderer.set_camera(camera.clone());
+        let mut renderer = Renderer::new(backend, Box::new(|| {}), camera);
+        renderer.update_camera();
 
         Self {
             renderer,
             state,
-            camera,
             input: super::input::InputState::default(),
             hit_result: None,
             last_hit_test: std::time::Instant::now(),
@@ -146,7 +144,7 @@ impl UnknownTargetApplication {
         }
         self.last_hit_test = std::time::Instant::now();
 
-        let camera = &self.camera;
+        let camera = &self.renderer.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
         let tester = crate::hittest::HitTester::new(self.renderer.get_cache());
 
@@ -162,34 +160,37 @@ impl UnknownTargetApplication {
         match cmd {
             WindowCommand::Close => return true,
             WindowCommand::ZoomIn => {
-                let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom * 1.2);
-                if self.renderer.set_camera(self.camera.clone()) {
+                let current_zoom = self.renderer.camera.get_zoom();
+                self.renderer.camera.set_zoom(current_zoom * 1.2);
+                if self.renderer.update_camera() {
                     self.renderer.queue();
                 }
             }
             WindowCommand::ZoomOut => {
-                let current_zoom = self.camera.get_zoom();
-                self.camera.set_zoom(current_zoom / 1.2);
-                if self.renderer.set_camera(self.camera.clone()) {
+                let current_zoom = self.renderer.camera.get_zoom();
+                self.renderer.camera.set_zoom(current_zoom / 1.2);
+                if self.renderer.update_camera() {
                     self.renderer.queue();
                 }
             }
             WindowCommand::ZoomDelta { delta } => {
-                let current_zoom = self.camera.get_zoom();
+                let current_zoom = self.renderer.camera.get_zoom();
                 let zoom_factor = 1.0 + delta;
                 if zoom_factor.is_finite() && zoom_factor > 0.0 {
-                    self.camera
+                    self.renderer
+                        .camera
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
-                if self.renderer.set_camera(self.camera.clone()) {
+                if self.renderer.update_camera() {
                     self.renderer.queue();
                 }
             }
             WindowCommand::Pan { tx, ty } => {
-                let zoom = self.camera.get_zoom();
-                self.camera.translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
-                if self.renderer.set_camera(self.camera.clone()) {
+                let zoom = self.renderer.camera.get_zoom();
+                self.renderer
+                    .camera
+                    .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
+                if self.renderer.update_camera() {
                     self.renderer.queue();
                 }
             }
@@ -233,7 +234,7 @@ impl UnknownTargetApplication {
                 hit_overlay::HitOverlay::draw(
                     surface,
                     self.hit_result.as_ref(),
-                    &self.camera,
+                    &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,
                 );
@@ -241,12 +242,12 @@ impl UnknownTargetApplication {
             if self.devtools_rendering_show_tiles {
                 tile_overlay::TileOverlay::draw(
                     surface,
-                    &self.camera,
+                    &self.renderer.camera,
                     self.renderer.get_cache().tile.tiles(),
                 );
             }
             if self.devtools_rendering_show_ruler {
-                ruler_overlay::Ruler::draw(surface, &self.camera);
+                ruler_overlay::Ruler::draw(surface, &self.renderer.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {
@@ -298,14 +299,14 @@ impl UnknownTargetApplication {
         self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
         self.renderer.invalidate_cache();
 
-        self.camera.size = crate::node::schema::Size {
+        self.renderer.camera.size = crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
         };
         // Always update the camera and queue a new frame after resizing
         // to ensure the surface repaints even if the quantized
         // transform does not change.
-        self.renderer.set_camera(self.camera.clone());
+        self.renderer.update_camera();
         self.renderer.queue();
     }
 

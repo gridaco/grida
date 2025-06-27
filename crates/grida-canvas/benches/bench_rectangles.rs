@@ -90,7 +90,15 @@ fn bench_rectangles(c: &mut Criterion) {
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
             let surface_ptr = Renderer::init_raster(width, height);
-            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+            let mut renderer = Renderer::new(
+                Backend::Raster(surface_ptr),
+                Box::new(|| {}),
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            renderer.update_camera();
 
             let scene = create_rectangles(black_box(1_000), false);
 
@@ -115,7 +123,15 @@ fn bench_rectangles(c: &mut Criterion) {
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
             let surface_ptr = Renderer::init_raster(width, height);
-            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+            let mut renderer = Renderer::new(
+                Backend::Raster(surface_ptr),
+                Box::new(|| {}),
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            renderer.update_camera();
 
             let scene = create_rectangles(black_box(10_000), false);
 
@@ -139,7 +155,15 @@ fn bench_rectangles(c: &mut Criterion) {
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
             let surface_ptr = Renderer::init_raster(width, height);
-            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+            let mut renderer = Renderer::new(
+                Backend::Raster(surface_ptr),
+                Box::new(|| {}),
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            renderer.update_camera();
 
             let scene = create_rectangles(black_box(10_000), true);
 
@@ -164,7 +188,15 @@ fn bench_rectangles(c: &mut Criterion) {
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
             let surface_ptr = Renderer::init_raster(width, height);
-            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+            let mut renderer = Renderer::new(
+                Backend::Raster(surface_ptr),
+                Box::new(|| {}),
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            renderer.update_camera();
 
             let scene = create_rectangles(black_box(50_000), false);
 
@@ -188,7 +220,15 @@ fn bench_rectangles(c: &mut Criterion) {
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
             let surface_ptr = Renderer::init_raster(width, height);
-            let mut renderer = Renderer::new(Backend::Raster(surface_ptr), Box::new(|| {}));
+            let mut renderer = Renderer::new(
+                Backend::Raster(surface_ptr),
+                Box::new(|| {}),
+                Camera2D::new(Size {
+                    width: width as f32,
+                    height: height as f32,
+                }),
+            );
+            renderer.update_camera();
 
             let scene = create_rectangles(black_box(50_000), true);
 

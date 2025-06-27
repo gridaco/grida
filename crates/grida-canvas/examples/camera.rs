@@ -237,19 +237,18 @@ fn main() {
         Box::new(move || unsafe {
             (*window_ptr).request_redraw();
         }),
+        Camera2D::new(Size {
+            width: 800.0,
+            height: 600.0,
+        }),
     );
 
     // Create static scene
     let scene = create_static_scene();
 
-    // Create camera
-    let mut camera = Camera2D::new(Size {
-        width: 800.0,
-        height: 600.0,
-    });
-    camera.set_position(400.0, 300.0);
-    camera.set_zoom(1.0);
-    renderer.set_camera(camera);
+    renderer.camera.set_position(400.0, 300.0);
+    renderer.camera.set_zoom(1.0);
+    renderer.update_camera();
 
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
@@ -318,7 +317,8 @@ fn main() {
                 let angle = elapsed * 2.0;
                 let x = 400.0 + angle.cos() * 100.0;
                 let y = 300.0 + angle.sin() * 100.0;
-                renderer.camera.as_mut().unwrap().set_position(x, y);
+                renderer.camera.set_position(x, y);
+                renderer.update_camera();
 
                 // Render the scene
                 renderer.queue();
