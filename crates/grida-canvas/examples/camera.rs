@@ -251,7 +251,7 @@ fn main() {
 
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
-    renderer.queue();
+    renderer.queue_unstable();
     renderer.flush();
 
     // Benchmark rendering with camera transformations
@@ -319,7 +319,7 @@ fn main() {
                 renderer.camera.set_center(x, y);
 
                 // Render the scene
-                renderer.queue();
+                renderer.queue_unstable();
                 renderer.flush();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {

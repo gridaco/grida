@@ -149,7 +149,7 @@ impl UnknownTargetApplication {
 
         let new_hit_result = tester.hit_first(point);
         if self.hit_result != new_hit_result {
-            self.renderer.queue();
+            self.renderer.queue_unstable();
         }
         self.hit_result = new_hit_result;
     }
@@ -161,12 +161,12 @@ impl UnknownTargetApplication {
             WindowCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
-                self.renderer.queue();
+                self.renderer.queue_unstable();
             }
             WindowCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
-                self.renderer.queue();
+                self.renderer.queue_unstable();
             }
             WindowCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -176,14 +176,14 @@ impl UnknownTargetApplication {
                         .camera
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
-                self.renderer.queue();
+                self.renderer.queue_unstable();
             }
             WindowCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
                 self.renderer
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
-                self.renderer.queue();
+                self.renderer.queue_unstable();
             }
             WindowCommand::Resize { width, height } => {
                 self.resize(width, height);
@@ -276,10 +276,6 @@ impl UnknownTargetApplication {
         self.last_stats = Some(stat_string);
 
         self.last_frame_time = __frame_start;
-
-        if stats.frame.force_full_repaint {
-            self.renderer.queue();
-        }
     }
 
     /// Update backing resources after a window resize.
@@ -291,7 +287,7 @@ impl UnknownTargetApplication {
             width: width as f32,
             height: height as f32,
         });
-        self.renderer.queue();
+        self.renderer.queue_unstable();
     }
 
     /// Update the cursor position and run a debounced hit test.

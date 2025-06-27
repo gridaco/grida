@@ -25,10 +25,9 @@ pub type FramePlanTileInfo = RegionTileInfo;
 
 #[derive(Clone)]
 pub struct FramePlan {
+    pub stable: bool,
     /// cached tile keys with blur information
     pub tiles: Vec<FramePlanTileInfo>,
-    /// when true, the renderer should schedule another frame to recache tiles
-    pub force_full_repaint: bool,
     /// regions with their intersecting indices
     pub regions: Vec<(rect::Rectangle, Vec<usize>)>,
     pub display_list_duration: Duration,
@@ -82,6 +81,8 @@ pub struct Renderer {
     request_redraw: RequestRedrawCallback,
     /// frame counter for managing render queue
     fc: FrameCounter,
+    /// the frame plan for the next frame, to be drawn and flushed
+    plan: Option<FramePlan>,
 }
 
 impl Renderer {
@@ -99,6 +100,7 @@ impl Renderer {
             scene_cache: cache::scene::SceneCache::new(),
             request_redraw,
             fc: FrameCounter::new(),
+            plan: None,
         }
     }
 
@@ -140,6 +142,8 @@ impl Renderer {
             return None;
         }
 
+        let frame = self.plan.take().unwrap();
+
         let start = Instant::now();
 
         let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
@@ -148,14 +152,6 @@ impl Renderer {
 
         let surface = unsafe { &mut *self.backend.get_surface() };
         let scene = unsafe { &*scene_ptr };
-
-        let rect = Some(self.camera.rect());
-
-        let frame = self.frame(
-            rect.unwrap_or(rect::Rectangle::empty()),
-            self.camera.get_zoom(),
-            false,
-        );
 
         let width = surface.width() as f32;
         let height = surface.height() as f32;
@@ -185,6 +181,7 @@ impl Renderer {
         };
 
         self.fc.flush();
+        self.plan = None;
 
         Some(stats)
     }
@@ -217,15 +214,32 @@ impl Renderer {
         self.scene = Some(scene);
     }
 
-    /// Mark the renderer as needing a redraw and request it from the host.
-    pub fn queue(&mut self) {
+    fn queue(&mut self, stable: bool) {
         // let deps_camera_changed = self.camera.changed();
         // TODO: check for dependencies
 
         if !self.fc.has_pending() {
+            let rect = Some(self.camera.rect());
+
+            self.plan = Some(self.frame(
+                rect.unwrap_or(rect::Rectangle::empty()),
+                self.camera.get_zoom(),
+                stable,
+            ));
+
             self.fc.queue();
             self.request_redraw();
         }
+    }
+
+    /// queue a frame with unstable (fast) frame plan
+    pub fn queue_unstable(&mut self) {
+        self.queue(false);
+    }
+
+    /// queue a frame with stable (slow) frame plan
+    pub fn queue_stable(&mut self) {
+        self.queue(true);
     }
 
     /// Clear the cached scene picture.
@@ -277,19 +291,25 @@ impl Renderer {
     /// Arguments:
     /// - bounds: the bounding rect to be rendered (in world space)
     /// - zoom: the current zoom level
-    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32, force_full_repaint: bool) -> FramePlan {
+    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32, stable: bool) -> FramePlan {
         let __start = Instant::now();
 
+        let strategy = if stable {
+            ImageTileCacheResolutionStrategy::Default
+        } else {
+            ImageTileCacheResolutionStrategy::ForceCache
+        };
+
         // Get tiles for the region with blur information and sorting
-        let region_tiles = self.scene_cache.tile.get_region_tiles(
-            &bounds,
-            zoom,
-            ImageTileCacheResolutionStrategy::ForceCache,
-        );
+        let region_tiles = self
+            .scene_cache
+            .tile
+            .get_region_tiles(&bounds, zoom, strategy);
+
         let visible_tiles: Vec<FramePlanTileInfo> = region_tiles.tiles().to_vec();
         let tile_rects: Vec<_> = region_tiles.tile_rects().to_vec();
 
-        let painter_region = if force_full_repaint {
+        let painter_region = if stable {
             vec![bounds]
         } else {
             region::difference(bounds, &tile_rects)
@@ -311,8 +331,8 @@ impl Renderer {
         let __ll_duration = __start.elapsed();
 
         FramePlan {
+            stable: stable,
             tiles: visible_tiles,
-            force_full_repaint,
             regions,
             // indices_should_paint: intersections.clone(),
             display_list_duration: __ll_duration,
@@ -465,7 +485,7 @@ mod tests {
             }),
         );
         renderer.load_scene(scene);
-        renderer.queue();
+        renderer.queue_unstable();
         renderer.flush();
 
         let bounds = renderer
