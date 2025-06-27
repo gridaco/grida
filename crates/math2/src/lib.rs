@@ -12,6 +12,7 @@ pub mod raster;
 pub mod rect;
 pub mod region;
 pub mod snap;
+pub mod tile;
 pub mod transform;
 pub mod ui;
 pub mod utils;
