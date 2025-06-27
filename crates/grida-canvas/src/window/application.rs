@@ -157,7 +157,6 @@ impl UnknownTargetApplication {
     /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.
     pub(crate) fn command(&mut self, cmd: WindowCommand) -> bool {
         match cmd {
-            WindowCommand::Close => return true,
             WindowCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);

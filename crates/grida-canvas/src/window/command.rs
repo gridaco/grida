@@ -1,6 +1,5 @@
 #[derive(Debug)]
 pub enum WindowCommand {
-    Close,
     ZoomIn,
     ZoomOut,
     ZoomDelta { delta: f32 },

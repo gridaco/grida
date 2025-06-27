@@ -30,7 +30,6 @@ use winit::{
 
 fn handle_window_event(event: &WindowEvent) -> WindowCommand {
     match event {
-        WindowEvent::CloseRequested => WindowCommand::Close,
         WindowEvent::Resized(size) => WindowCommand::Resize {
             width: size.width,
             height: size.height,
@@ -258,11 +257,12 @@ impl NativeApplicationHandler for NativeApplication {
             }
         }
 
+        if let WindowEvent::CloseRequested = &event {
+            self.app.renderer.free();
+            event_loop.exit();
+        }
+
         match handle_window_event(&event) {
-            WindowCommand::Close => {
-                self.app.renderer.free();
-                event_loop.exit();
-            }
             WindowCommand::Resize { width, height } => {
                 self.gl_surface.resize(
                     &self.gl_context,
