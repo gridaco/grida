@@ -45,11 +45,12 @@ pub struct RegionTileInfo {
     pub blur_radius: f32,
     /// The zoom level at which this tile was snapshotted
     pub zoom: f32,
+    // TODO:
+    // The clip rects (region path) should be applied to this tile.
+    // this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
+    // we use clip since cropping the image can be expensive.
+    // pub clippath: Option<Path>,
 }
-
-// /// The clip rects (region path) should be applied to this tile.
-// /// this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
-// // pub clippath: Path,
 
 /// A collection of tiles for a specific region with blur information and sorting.
 /// This encapsulates the logic for retrieving tiles from the cache and calculating
