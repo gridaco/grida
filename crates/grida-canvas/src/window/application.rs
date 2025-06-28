@@ -9,18 +9,35 @@ use crate::sys::scheduler;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 
+/// Host events
+pub enum HostEvent {
+    /// tick the clock for the application
+    /// the Tick Hz should aim higher than the target FPS
+    Tick,
+
+    /// request a redraw
+    RedrawRequest,
+
+    /// notify image loaded
+    ImageLoaded(ImageMessage),
+
+    /// notify font loaded
+    FontLoaded(FontMessage),
+}
+
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
+    // pub(crate) timer: timer::Timer,
+    pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::State,
     pub(crate) input: super::input::InputState,
-    pub(crate) hit_result: Option<crate::node::schema::NodeId>,
-    pub(crate) last_hit_test: std::time::Instant,
+    pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
+    pub(crate) hit_test_last: std::time::Instant,
     pub(crate) hit_test_interval: std::time::Duration,
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
-    pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
     pub(crate) devtools_rendering_show_fps: bool,
@@ -49,8 +66,8 @@ impl UnknownTargetApplication {
             renderer,
             state,
             input: super::input::InputState::default(),
-            hit_result: None,
-            last_hit_test: std::time::Instant::now(),
+            hit_test_result: None,
+            hit_test_last: std::time::Instant::now(),
             hit_test_interval: std::time::Duration::from_millis(0),
             image_rx,
             font_rx,
@@ -144,21 +161,21 @@ impl UnknownTargetApplication {
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO
-            && self.last_hit_test.elapsed() < self.hit_test_interval
+            && self.hit_test_last.elapsed() < self.hit_test_interval
         {
             return;
         }
-        self.last_hit_test = std::time::Instant::now();
+        self.hit_test_last = std::time::Instant::now();
 
         let camera = &self.renderer.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
         let tester = crate::hittest::HitTester::new(self.renderer.get_cache());
 
         let new_hit_result = tester.hit_first(point);
-        if self.hit_result != new_hit_result {
+        if self.hit_test_result != new_hit_result {
             self.renderer.queue_unstable();
         }
-        self.hit_result = new_hit_result;
+        self.hit_test_result = new_hit_result;
     }
 
     /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.
@@ -197,6 +214,11 @@ impl UnknownTargetApplication {
         false
     }
 
+    pub(crate) fn resource_loaded(&mut self) {
+        self.process_image_queue();
+        self.process_font_queue();
+    }
+
     pub(crate) fn redraw_requested(&mut self) {
         self.redraw();
     }
@@ -204,17 +226,13 @@ impl UnknownTargetApplication {
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
         let __frame_start = std::time::Instant::now();
-        let __queue_start = std::time::Instant::now();
-        self.process_image_queue();
-        self.process_font_queue();
-        let __queue_time = __queue_start.elapsed();
 
         let stats = match self.renderer.flush() {
             Some(stats) => stats,
             None => return,
         };
 
-        let overlay_time = self.draw_overlay();
+        let overlay_time = self.draw_and_flush_devtools_overlay();
 
         let __sleep_start = std::time::Instant::now();
         self.scheduler.sleep_to_maintain_fps();
@@ -244,7 +262,7 @@ impl UnknownTargetApplication {
         self.last_frame_time = __frame_start;
     }
 
-    fn draw_overlay(&mut self) -> std::time::Duration {
+    fn draw_and_flush_devtools_overlay(&mut self) -> std::time::Duration {
         let mut overlay_flush_time = std::time::Duration::ZERO;
         let overlay_draw_time: std::time::Duration;
 
@@ -262,7 +280,7 @@ impl UnknownTargetApplication {
             if self.devtools_rendering_show_hit_overlay {
                 hit_overlay::HitOverlay::draw(
                     surface,
-                    self.hit_result.as_ref(),
+                    self.hit_test_result.as_ref(),
                     &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,

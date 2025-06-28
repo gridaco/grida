@@ -2,10 +2,9 @@ use crate::node::schema::Size;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
-use crate::window::application::UnknownTargetApplication;
+use crate::window::application::{HostEvent, UnknownTargetApplication};
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
-
 use gl::types::*;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
@@ -62,7 +61,7 @@ pub(crate) fn init_native_window(
     height: i32,
 ) -> (
     crate::window::state::State,
-    EventLoop<NativeUserEvent>,
+    EventLoop<HostEvent>,
     Window,
     GlutinSurface<WindowSurface>,
     PossiblyCurrentContext,
@@ -70,9 +69,7 @@ pub(crate) fn init_native_window(
 ) {
     println!("🔄 Window process started with PID: {}", std::process::id());
 
-    let el = EventLoop::<NativeUserEvent>::with_user_event()
-        .build()
-        .unwrap();
+    let el = EventLoop::<HostEvent>::with_user_event().build().unwrap();
 
     let window_attributes = WindowAttributes::default()
         .with_title("Grida - grida-canvas / glutin / skia-safe::gpu::gl")
@@ -194,13 +191,6 @@ pub(crate) fn init_native_window(
     (state, el, window, gl_surface, gl_context, scale_factor)
 }
 
-pub enum NativeUserEvent {
-    Tick,
-    RedrawRequest,
-    ImageLoaded(ImageMessage),
-    FontLoaded(FontMessage),
-}
-
 pub struct NativeApplication {
     pub(crate) app: UnknownTargetApplication,
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
@@ -215,7 +205,7 @@ impl NativeApplication {
         height: i32,
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
-    ) -> (Self, EventLoop<NativeUserEvent>) {
+    ) -> (Self, EventLoop<HostEvent>) {
         let (mut state, el, window, gl_surface, gl_context, scale_factor) =
             init_native_window(width, height);
         let proxy = el.create_proxy();
@@ -236,11 +226,11 @@ impl NativeApplication {
         // set the redraw callback to dispatch a user event for redraws
         let redraw_proxy = proxy.clone();
         app.app.set_request_redraw(Box::new(move || {
-            let _ = redraw_proxy.send_event(NativeUserEvent::RedrawRequest);
+            let _ = redraw_proxy.send_event(HostEvent::RedrawRequest);
         }));
 
         std::thread::spawn(move || loop {
-            let _ = proxy.send_event(NativeUserEvent::Tick);
+            let _ = proxy.send_event(HostEvent::Tick);
             std::thread::sleep(std::time::Duration::from_millis(1000 / 240));
         });
 
@@ -248,7 +238,7 @@ impl NativeApplication {
     }
 }
 
-impl NativeApplicationHandler<NativeUserEvent> for NativeApplication {
+impl NativeApplicationHandler<HostEvent> for NativeApplication {
     fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {}
 
     fn window_event(
@@ -290,15 +280,17 @@ impl NativeApplicationHandler<NativeUserEvent> for NativeApplication {
         }
     }
 
-    fn user_event(
-        &mut self,
-        _event_loop: &winit::event_loop::ActiveEventLoop,
-        event: NativeUserEvent,
-    ) {
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: HostEvent) {
         match event {
-            NativeUserEvent::Tick => self.app.tick(),
-            NativeUserEvent::RedrawRequest => self.window.request_redraw(),
-            _ => self.window.request_redraw(),
+            HostEvent::Tick => self.app.tick(),
+            HostEvent::RedrawRequest => self.window.request_redraw(),
+            HostEvent::FontLoaded(_f) => {
+                self.app.resource_loaded();
+            }
+            HostEvent::ImageLoaded(_i) => {
+                self.app.resource_loaded();
+            }
+            _ => {}
         }
     }
 }

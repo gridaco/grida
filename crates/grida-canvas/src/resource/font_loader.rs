@@ -1,13 +1,11 @@
 use super::ResourceLoader;
+use crate::window::application::HostEvent;
 use async_trait::async_trait;
-use std::collections::HashMap;
-
-#[cfg(not(target_arch = "wasm32"))]
-use crate::window::application_native::NativeUserEvent;
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest;
+use std::collections::HashMap;
 #[cfg(not(target_arch = "wasm32"))]
 use winit::event_loop::EventLoopProxy;
 
@@ -19,7 +17,7 @@ pub enum FontLoadingMode {
     /// Lifecycle mode - full lifecycle management with async loading
     Lifecycle {
         tx: mpsc::UnboundedSender<FontMessage>,
-        proxy: EventLoopProxy<NativeUserEvent>,
+        proxy: EventLoopProxy<HostEvent>,
     },
 }
 
@@ -61,7 +59,7 @@ impl FontLoader {
     /// Create a lifecycle-based font loader
     pub fn new_lifecycle(
         tx: mpsc::UnboundedSender<FontMessage>,
-        proxy: EventLoopProxy<NativeUserEvent>,
+        proxy: EventLoopProxy<HostEvent>,
     ) -> Self {
         Self::new(FontLoadingMode::Lifecycle { tx, proxy })
     }
@@ -109,7 +107,7 @@ impl FontLoader {
                 style: style.map(|s| s.to_string()),
                 data: data.clone(),
             });
-            let _ = proxy.send_event(NativeUserEvent::FontLoaded(FontMessage {
+            let _ = proxy.send_event(HostEvent::FontLoaded(FontMessage {
                 family: family.to_string(),
                 style: style.map(|s| s.to_string()),
                 data: data.clone(),

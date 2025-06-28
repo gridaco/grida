@@ -1,7 +1,6 @@
 use super::ResourceLoader;
 use crate::node::schema::*;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::window::application_native::NativeUserEvent;
+use crate::window::application::HostEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -20,7 +19,7 @@ pub enum ImageLoadingMode {
     /// Lifecycle mode - full lifecycle management with async loading
     Lifecycle {
         tx: mpsc::UnboundedSender<ImageMessage>,
-        proxy: EventLoopProxy<NativeUserEvent>,
+        proxy: EventLoopProxy<HostEvent>,
     },
 }
 
@@ -61,7 +60,7 @@ impl ImageLoader {
     /// Create a lifecycle-based image loader
     pub fn new_lifecycle(
         tx: mpsc::UnboundedSender<ImageMessage>,
-        proxy: EventLoopProxy<NativeUserEvent>,
+        proxy: EventLoopProxy<HostEvent>,
     ) -> Self {
         Self::new(ImageLoadingMode::Lifecycle { tx, proxy })
     }
@@ -92,7 +91,7 @@ impl ImageLoader {
                 src: src.to_string(),
                 data: data.clone(),
             });
-            let _ = proxy.send_event(NativeUserEvent::ImageLoaded(ImageMessage {
+            let _ = proxy.send_event(HostEvent::ImageLoaded(ImageMessage {
                 src: src.to_string(),
                 data: data.clone(),
             }));

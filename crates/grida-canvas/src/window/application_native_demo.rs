@@ -1,4 +1,5 @@
-use super::application_native::{NativeApplication, NativeUserEvent};
+use super::application::HostEvent;
+use super::application_native::NativeApplication;
 use crate::node::schema::*;
 use crate::resource::font_loader::FontLoader;
 use crate::resource::font_loader::FontMessage;
@@ -17,7 +18,7 @@ where
         &mut Renderer,
         mpsc::UnboundedSender<ImageMessage>,
         mpsc::UnboundedSender<FontMessage>,
-        winit::event_loop::EventLoopProxy<NativeUserEvent>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
     let width = 1080;
