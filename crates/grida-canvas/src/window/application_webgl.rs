@@ -109,8 +109,8 @@ impl WebGlApplication {
         self.app.pointer_move(x, y);
     }
 
-    /// Forward a [`WindowCommand`] to the inner application.
-    pub fn command(&mut self, cmd: crate::window::command::WindowCommand) {
+    /// Forward a [`ApplicationCommand`] to the inner application.
+    pub fn command(&mut self, cmd: crate::window::command::ApplicationCommand) {
         self.app.command(cmd);
     }
 
@@ -181,34 +181,5 @@ impl WebGlApplication {
 
     pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
         self.app.devtools_rendering_set_show_ruler(show);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
-    Box::new(WebGlApplication::new(width, height))
-}
-
-#[cfg(target_arch = "wasm32")]
-pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
-    if let Some(app) = app.as_mut() {
-        app.resize(width, height);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
-    if let Some(app) = app.as_mut() {
-        app.redraw();
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub unsafe extern "C" fn load_scene_json(app: *mut WebGlApplication, ptr: *const u8, len: usize) {
-    if let Some(app) = app.as_mut() {
-        let slice = std::slice::from_raw_parts(ptr, len);
-        if let Ok(json) = std::str::from_utf8(slice) {
-            app.load_scene_json(json);
-        }
     }
 }

@@ -47,12 +47,10 @@ createGridaCanvas().then((GridaCanvas) => {
   GridaCanvas._devtools_rendering_set_show_ruler(state, true);
 
   const CMD = {
-    Close: 0,
     ZoomIn: 1,
     ZoomOut: 2,
     ZoomDelta: 3,
     Pan: 4,
-    Resize: 5,
   };
 
   // Load the demo scene from JSON

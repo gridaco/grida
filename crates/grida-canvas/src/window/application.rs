@@ -4,12 +4,14 @@ use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
+use crate::sys::clock;
 use crate::sys::scheduler;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
+    pub(crate) clock: clock::EventLoopClock,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::State,
     pub(crate) input: super::input::InputState,
@@ -43,6 +45,7 @@ impl UnknownTargetApplication {
         let renderer = Renderer::new(backend, Box::new(|| {}), camera);
 
         Self {
+            clock: clock::EventLoopClock::new(),
             renderer,
             state,
             input: super::input::InputState::default(),
@@ -60,6 +63,10 @@ impl UnknownTargetApplication {
             devtools_rendering_show_hit_overlay: false,
             devtools_rendering_show_ruler: false,
         }
+    }
+
+    pub fn tick(&mut self) {
+        self.clock.tick();
     }
 
     /// Provide the platform-specific callback used to request a redraw from the
@@ -190,6 +197,10 @@ impl UnknownTargetApplication {
         false
     }
 
+    pub(crate) fn redraw_requested(&mut self) {
+        self.redraw();
+    }
+
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
         let __frame_start = std::time::Instant::now();
@@ -203,6 +214,37 @@ impl UnknownTargetApplication {
             None => return,
         };
 
+        let overlay_time = self.draw_overlay();
+
+        let __sleep_start = std::time::Instant::now();
+        self.scheduler.sleep_to_maintain_fps();
+        let __sleep_time = __sleep_start.elapsed();
+
+        let __total_frame_time = __frame_start.elapsed();
+        let stat_string = format!(
+            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use)",
+            1.0 / __total_frame_time.as_secs_f64(),
+            __total_frame_time.as_secs_f64() * 1000.0,
+            stats.total_duration.as_secs_f64() * 1000.0,
+            stats.flush_duration.as_secs_f64() * 1000.0,
+            overlay_time.as_secs_f64() * 1000.0,
+            stats.frame_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
+            stats.frame.display_list_size_estimated,
+            stats.draw.painter_duration.as_secs_f64() * 1000.0,
+            stats.draw.cache_picture_size,
+            stats.draw.cache_picture_used,
+            stats.draw.cache_geometry_size,
+            stats.draw.tiles_total,
+            stats.draw.tiles_used,
+        );
+        println!("{}", stat_string);
+        self.last_stats = Some(stat_string);
+
+        self.last_frame_time = __frame_start;
+    }
+
+    fn draw_overlay(&mut self) -> std::time::Duration {
         let mut overlay_flush_time = std::time::Duration::ZERO;
         let overlay_draw_time: std::time::Duration;
 
@@ -245,33 +287,7 @@ impl UnknownTargetApplication {
             }
             overlay_draw_time = __overlay_start.elapsed();
         }
-
-        let __sleep_start = std::time::Instant::now();
-        self.scheduler.sleep_to_maintain_fps();
-        let __sleep_time = __sleep_start.elapsed();
-
-        let __total_frame_time = __frame_start.elapsed();
-        let stat_string = format!(
-            "fps*: {:.0} | t: {:.2}ms | render: {:.1}ms | flush: {:.1}ms | overlays: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | tiles: {:?} ({:?} use)",
-            1.0 / __total_frame_time.as_secs_f64(),
-            __total_frame_time.as_secs_f64() * 1000.0,
-            stats.total_duration.as_secs_f64() * 1000.0,
-            stats.flush_duration.as_secs_f64() * 1000.0,
-            (overlay_flush_time.as_secs_f64() + overlay_draw_time.as_secs_f64()) * 1000.0,
-            stats.frame_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_duration.as_secs_f64() * 1000.0,
-            stats.frame.display_list_size_estimated,
-            stats.draw.painter_duration.as_secs_f64() * 1000.0,
-            stats.draw.cache_picture_size,
-            stats.draw.cache_picture_used,
-            stats.draw.cache_geometry_size,
-            stats.draw.tiles_total,
-            stats.draw.tiles_used,
-        );
-        println!("{}", stat_string);
-        self.last_stats = Some(stat_string);
-
-        self.last_frame_time = __frame_start;
+        overlay_flush_time + overlay_draw_time
     }
 
     /// Update backing resources after a window resize.

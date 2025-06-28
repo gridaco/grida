@@ -85,16 +85,11 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
-            0 => WindowCommand::Close,
-            1 => WindowCommand::ZoomIn,
-            2 => WindowCommand::ZoomOut,
-            3 => WindowCommand::ZoomDelta { delta: a },
-            4 => WindowCommand::Pan { tx: a, ty: b },
-            5 => WindowCommand::Resize {
-                width: a as u32,
-                height: b as u32,
-            },
-            _ => WindowCommand::None,
+            1 => ApplicationCommand::ZoomIn,
+            2 => ApplicationCommand::ZoomOut,
+            3 => ApplicationCommand::ZoomDelta { delta: a },
+            4 => ApplicationCommand::Pan { tx: a, ty: b },
+            _ => ApplicationCommand::None,
         };
         app.command(cmd);
     }

@@ -26,10 +26,12 @@ glutin = "0.32.0"
 glutin-winit = "0.5.0"
 raw-window-handle = "0.6.0"
 winit = "0.30.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
 [features]
 default = ["figma-api/client"]
 web = []
+native-clock-tick = []
 
 [dev-dependencies]
 criterion = "0.5"

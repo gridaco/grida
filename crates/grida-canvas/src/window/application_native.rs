@@ -62,7 +62,7 @@ pub(crate) fn init_native_window(
     height: i32,
 ) -> (
     crate::window::state::State,
-    EventLoop<()>,
+    EventLoop<NativeUserEvent>,
     Window,
     GlutinSurface<WindowSurface>,
     PossiblyCurrentContext,
@@ -70,7 +70,10 @@ pub(crate) fn init_native_window(
 ) {
     println!("🔄 Window process started with PID: {}", std::process::id());
 
-    let el = EventLoop::new().expect("Failed to create event loop");
+    let el = EventLoop::<NativeUserEvent>::with_user_event()
+        .build()
+        .unwrap();
+
     let window_attributes = WindowAttributes::default()
         .with_title("Grida - grida-canvas / glutin / skia-safe::gpu::gl")
         .with_inner_size(LogicalSize::new(width, height));
@@ -191,6 +194,13 @@ pub(crate) fn init_native_window(
     (state, el, window, gl_surface, gl_context, scale_factor)
 }
 
+pub enum NativeUserEvent {
+    Tick,
+    RedrawRequest,
+    ImageLoaded(ImageMessage),
+    FontLoaded(FontMessage),
+}
+
 pub struct NativeApplication {
     pub(crate) app: UnknownTargetApplication,
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
@@ -205,7 +215,7 @@ impl NativeApplication {
         height: i32,
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
-    ) -> (Self, EventLoop<()>) {
+    ) -> (Self, EventLoop<NativeUserEvent>) {
         let (mut state, el, window, gl_surface, gl_context, scale_factor) =
             init_native_window(width, height);
         let proxy = el.create_proxy();
@@ -224,15 +234,21 @@ impl NativeApplication {
         };
 
         // set the redraw callback to dispatch a user event for redraws
+        let redraw_proxy = proxy.clone();
         app.app.set_request_redraw(Box::new(move || {
-            let _ = proxy.send_event(());
+            let _ = redraw_proxy.send_event(NativeUserEvent::RedrawRequest);
         }));
+
+        std::thread::spawn(move || loop {
+            let _ = proxy.send_event(NativeUserEvent::Tick);
+            std::thread::sleep(std::time::Duration::from_millis(1000 / 240));
+        });
 
         (app, el)
     }
 }
 
-impl NativeApplicationHandler for NativeApplication {
+impl NativeApplicationHandler<NativeUserEvent> for NativeApplication {
     fn resumed(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {}
 
     fn window_event(
@@ -247,7 +263,7 @@ impl NativeApplicationHandler for NativeApplication {
         }
 
         if let WindowEvent::RedrawRequested = &event {
-            self.app.redraw();
+            self.app.redraw_requested();
             if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
                 eprintln!("Error swapping buffers: {:?}", e);
             }
@@ -274,7 +290,15 @@ impl NativeApplicationHandler for NativeApplication {
         }
     }
 
-    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, _event: ()) {
-        self.window.request_redraw();
+    fn user_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        event: NativeUserEvent,
+    ) {
+        match event {
+            NativeUserEvent::Tick => self.app.tick(),
+            NativeUserEvent::RedrawRequest => self.window.request_redraw(),
+            _ => self.window.request_redraw(),
+        }
     }
 }
