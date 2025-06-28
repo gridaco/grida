@@ -95,6 +95,16 @@ impl UnknownTargetApplication {
         self.renderer.set_request_redraw(cb);
     }
 
+    fn queue(&mut self) {
+        self.renderer.queue_unstable();
+        // self.debounce(
+        //     std::time::Duration::from_millis(100),
+        //     || self.renderer.queue_stable(),
+        //     false,
+        //     true,
+        // );
+    }
+
     pub(crate) fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
@@ -176,7 +186,7 @@ impl UnknownTargetApplication {
 
         let new_hit_result = tester.hit_first(point);
         if self.hit_test_result != new_hit_result {
-            self.renderer.queue_unstable();
+            self.queue();
         }
         self.hit_test_result = new_hit_result;
     }
@@ -187,12 +197,12 @@ impl UnknownTargetApplication {
             ApplicationCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
-                self.renderer.queue_unstable();
+                self.queue();
             }
             ApplicationCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
-                self.renderer.queue_unstable();
+                self.queue();
             }
             ApplicationCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -202,14 +212,14 @@ impl UnknownTargetApplication {
                         .camera
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
-                self.renderer.queue_unstable();
+                self.queue();
             }
             ApplicationCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
                 self.renderer
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
-                self.renderer.queue_unstable();
+                self.queue();
             }
             ApplicationCommand::None => {}
         }
@@ -320,7 +330,7 @@ impl UnknownTargetApplication {
             width: width as f32,
             height: height as f32,
         });
-        self.renderer.queue_unstable();
+        self.queue();
     }
 
     /// Update the cursor position and run a debounced hit test.
