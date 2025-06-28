@@ -381,6 +381,20 @@ impl UnknownTargetApplication {
         self.timer.set_interval(interval, callback)
     }
 
+    /// Create a debounced function associated with the application's timer manager.
+    pub fn debounce<F>(
+        &mut self,
+        wait: std::time::Duration,
+        callback: F,
+        leading: bool,
+        trailing: bool,
+    ) -> crate::sys::timer::Debounce
+    where
+        F: FnMut() + Send + 'static,
+    {
+        self.timer.debounce(wait, callback, leading, trailing)
+    }
+
     /// Cancels a timer by its ID
     ///
     /// Returns `true` if the timer was found and cancelled, `false` otherwise

@@ -12,9 +12,10 @@ use std::time::{Duration, Instant};
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```rust,no_run
 /// use std::time::Duration;
-/// use crate::sys::timer::TimerMgr;
+/// use cg::sys::timer::TimerMgr;
+/// use cg::sys::clock::EventLoopClock;
 ///
 /// let mut timer_system = TimerMgr::new();
 /// let clock = EventLoopClock::new();
@@ -25,9 +26,12 @@ use std::time::{Duration, Instant};
 /// });
 ///
 /// // Create a debounced function
-/// let debounced_fn = timer_system.debounce(Duration::from_millis(300), || {
-///     println!("Debounced operation executed!");
-/// });
+/// let mut debounced_fn = timer_system.debounce(
+///     Duration::from_millis(300),
+///     || println!("Debounced operation executed!"),
+///     true,
+///     true,
+/// );
 ///
 /// // In your main loop
 /// loop {
@@ -178,6 +182,36 @@ impl TimerMgr {
         id
     }
 
+    /// Create a debounced function similar to lodash's `debounce`.
+    ///
+    /// The returned [`Debounce`] can be called with a mutable reference to
+    /// this [`TimerMgr`]. Trailing executions are scheduled using the timer
+    /// system, so no additional tick logic is required.
+    pub fn debounce<F>(
+        &mut self,
+        wait: Duration,
+        callback: F,
+        leading: bool,
+        trailing: bool,
+    ) -> Debounce
+    where
+        F: FnMut() + Send + 'static,
+    {
+        let state = DebounceState {
+            wait,
+            callback: Box::new(callback),
+            leading,
+            trailing,
+            timer_id: None,
+            last_call_time: None,
+            last_execute_time: None,
+        };
+
+        Debounce {
+            state: std::sync::Arc::new(std::sync::Mutex::new(state)),
+        }
+    }
+
     /// Cancels a timer by its ID
     ///
     /// Returns `true` if the timer was found and cancelled, `false` otherwise
@@ -223,130 +257,77 @@ impl Default for TimerMgr {
     }
 }
 
-/// A proper debouncer that supports leading and trailing execution
-///
-/// This implements a debounce function similar to lodash's debounce with support for:
-/// - `leading`: Execute on the leading edge (first call)
-/// - `trailing`: Execute on the trailing edge (after wait period)
-/// - Both leading and trailing can be enabled/disabled independently
-///
-/// # Usage
-///
-/// ```rust
-/// use std::time::Duration;
-/// use crate::sys::timer::Debouncer;
-///
-/// let mut debouncer = Debouncer::new(
-///     Duration::from_millis(300),
-///     || println!("Debounced!"),
-///     true,  // leading
-///     true   // trailing
-/// );
-///
-/// // Call multiple times rapidly
-/// debouncer.call(); // Executes immediately (leading)
-/// debouncer.call(); // Delayed
-/// debouncer.call(); // Delayed
-/// // After 300ms, executes again (trailing)
-/// ```
-pub struct Debouncer {
+/// A debounced function returned by [`TimerMgr::debounce`].
+pub struct Debounce {
+    state: std::sync::Arc<std::sync::Mutex<DebounceState>>,
+}
+
+struct DebounceState {
     wait: Duration,
-    callback: Box<dyn Fn() + Send + 'static>,
+    callback: Box<dyn FnMut() + Send + 'static>,
     leading: bool,
     trailing: bool,
-    timeout_deadline: Option<Instant>,
+    timer_id: Option<TimerId>,
     last_call_time: Option<Instant>,
     last_execute_time: Option<Instant>,
 }
 
-impl Debouncer {
-    /// Creates a new debouncer with the specified configuration
-    ///
-    /// # Arguments
-    /// * `wait` - The number of milliseconds to delay
-    /// * `callback` - The function to debounce
-    /// * `leading` - Specify invoking on the leading edge of the timeout
-    /// * `trailing` - Specify invoking on the trailing edge of the timeout
-    pub fn new<F>(wait: Duration, callback: F, leading: bool, trailing: bool) -> Self
-    where
-        F: Fn() + Send + 'static,
-    {
-        Self {
-            wait,
-            callback: Box::new(callback),
-            leading,
-            trailing,
-            timeout_deadline: None,
-            last_call_time: None,
-            last_execute_time: None,
-        }
-    }
-
-    /// Calls the debounced function
-    ///
-    /// This method should be called whenever you want to trigger the debounced function.
-    /// The actual execution depends on the leading/trailing configuration.
-    pub fn call(&mut self) {
+impl Debounce {
+    /// Trigger the debounced function using the provided [`TimerMgr`].
+    pub fn call(&mut self, mgr: &mut TimerMgr) {
+        let mut state = self.state.lock().unwrap();
         let now = Instant::now();
-        let is_first_call = self.last_call_time.is_none();
-        let time_since_last_execute = self
+        let is_first_call = state.last_call_time.is_none();
+        let time_since_last_execute = state
             .last_execute_time
             .map(|last| now.duration_since(last))
             .unwrap_or(Duration::from_secs(0));
 
-        self.last_call_time = Some(now);
+        state.last_call_time = Some(now);
 
-        // Execute on leading edge
-        if self.leading && (is_first_call || time_since_last_execute >= self.wait) {
-            self.execute();
+        if state.leading && (is_first_call || time_since_last_execute >= state.wait) {
+            (state.callback)();
+            state.last_execute_time = Some(now);
         }
 
-        // Set up trailing execution
-        if self.trailing {
-            self.timeout_deadline = Some(now + self.wait);
-        }
-    }
-
-    /// Checks if the debouncer should execute on trailing edge
-    ///
-    /// This should be called regularly in your main loop to check if the trailing
-    /// execution should happen
-    pub fn tick(&mut self, now: Instant) -> bool {
-        if let Some(deadline) = self.timeout_deadline {
-            if now >= deadline {
-                self.timeout_deadline = None;
-                if self.trailing {
-                    self.execute();
-                    return true;
-                }
+        if state.trailing {
+            if let Some(id) = state.timer_id.take() {
+                mgr.cancel(id);
             }
+            let weak = std::sync::Arc::downgrade(&self.state);
+            let wait = state.wait;
+            state.timer_id = Some(mgr.set_timeout(wait, move || {
+                if let Some(state_rc) = weak.upgrade() {
+                    let mut s = state_rc.lock().unwrap();
+                    s.timer_id = None;
+                    (s.callback)();
+                    s.last_execute_time = Some(Instant::now());
+                }
+            }));
         }
-        false
     }
 
-    /// Cancels the debounced function call
-    pub fn cancel(&mut self) {
-        self.timeout_deadline = None;
-        self.last_call_time = None;
-        self.last_execute_time = None;
+    /// Cancel any pending execution.
+    pub fn cancel(&mut self, mgr: &mut TimerMgr) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(id) = state.timer_id.take() {
+            mgr.cancel(id);
+        }
+        state.last_call_time = None;
+        state.last_execute_time = None;
     }
 
-    /// Immediately executes the debounced function and cancels any pending execution
-    pub fn flush(&mut self) {
-        self.timeout_deadline = None;
-        self.execute();
+    /// Immediately execute the callback and cancel pending timeouts.
+    pub fn flush(&mut self, mgr: &mut TimerMgr) {
+        self.cancel(mgr);
+        let mut state = self.state.lock().unwrap();
+        (state.callback)();
+        state.last_execute_time = Some(Instant::now());
     }
 
-    /// Checks if the debouncer is currently waiting (has a pending timeout)
+    /// Returns `true` if a trailing execution is scheduled.
     pub fn is_pending(&self) -> bool {
-        self.timeout_deadline.is_some()
-    }
-
-    // Private helper methods
-
-    fn execute(&mut self) {
-        self.last_execute_time = Some(Instant::now());
-        (self.callback)();
+        self.state.lock().unwrap().timer_id.is_some()
     }
 }
 
@@ -402,25 +383,28 @@ mod tests {
     }
 
     #[test]
-    fn test_debouncer() {
-        let mut debouncer = Debouncer::new(
+    fn test_debounce() {
+        let mut mgr = TimerMgr::new();
+        let executed = Arc::new(Mutex::new(0));
+        let executed_clone = executed.clone();
+
+        let mut debounced = mgr.debounce(
             Duration::from_millis(50),
-            || println!("Debounced!"),
+            move || {
+                *executed_clone.lock().unwrap() += 1;
+            },
             true,
             true,
         );
 
-        // First call should execute immediately (leading)
-        debouncer.call();
-        assert!(debouncer.is_pending());
+        debounced.call(&mut mgr); // leading
+        assert!(debounced.is_pending());
 
-        // Wait for debounce to expire
         thread::sleep(Duration::from_millis(60));
+        mgr.tick(Instant::now());
 
-        // Tick to check for trailing execution
-        let executed = debouncer.tick(Instant::now());
-        assert!(executed);
-        assert!(!debouncer.is_pending());
+        assert_eq!(*executed.lock().unwrap(), 2);
+        assert!(!debounced.is_pending());
     }
 
     #[test]

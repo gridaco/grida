@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 /// # Example
 /// ```rust
 /// use std::time::{Duration, Instant};
-/// use grida_canvas::sys::timeout::Timeout;
+/// use cg::sys::timeout::Timeout;
 ///
 /// let mut timeout = Timeout::new();
 /// let now = Instant::now();

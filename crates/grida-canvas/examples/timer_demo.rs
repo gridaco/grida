@@ -1,5 +1,5 @@
 use cg::sys::clock::EventLoopClock;
-use cg::sys::timer::{Debouncer, TimerMgr};
+use cg::sys::timer::TimerMgr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -69,11 +69,12 @@ fn basic_timer_demo() {
 }
 
 fn debouncer_demo() {
-    let mut debouncer = Debouncer::new(
+    let mut timer_system = TimerMgr::new();
+    let mut debouncer = timer_system.debounce(
         Duration::from_millis(300),
         || println!("   🎯 Debounced operation executed!"),
-        true, // leading - execute on first call
-        true, // trailing - execute after wait period
+        true,
+        true,
     );
     let mut clock = EventLoopClock::new();
 
@@ -83,16 +84,12 @@ fn debouncer_demo() {
     // Simulate rapid-fire triggers
     for i in 0..5 {
         println!("   Call {}: ", i);
-        debouncer.call(); // This will execute immediately on first call (leading)
+        debouncer.call(&mut timer_system); // leading on first call
 
         // Simulate time passing
         thread::sleep(Duration::from_millis(50));
         clock.tick();
-
-        // Check for trailing execution
-        if debouncer.tick(clock.now()) {
-            println!("   ✅ Trailing execution happened!");
-        }
+        timer_system.tick(clock.now());
     }
 
     // Wait for the debounce to expire
@@ -100,36 +97,35 @@ fn debouncer_demo() {
     thread::sleep(Duration::from_millis(350));
     clock.tick();
 
-    if debouncer.tick(clock.now()) {
-        println!("   🎯 Final trailing execution!");
-    }
+    timer_system.tick(clock.now());
+
+    println!("   🎯 Final trailing execution!");
 
     println!("   ✅ Debouncer demo completed");
 
     // Test different configurations
     println!("\n   Testing leading=false, trailing=true:");
-    let mut debouncer2 = Debouncer::new(
+    let mut debouncer2 = timer_system.debounce(
         Duration::from_millis(200),
         || println!("   🎯 Trailing-only debounced operation!"),
-        false, // leading - don't execute on first call
-        true,  // trailing - execute after wait period
+        false,
+        true,
     );
 
     for i in 0..3 {
         println!("   Call {}: ", i);
-        debouncer2.call(); // This will NOT execute immediately
+        debouncer2.call(&mut timer_system); // no immediate execution
 
         thread::sleep(Duration::from_millis(50));
         clock.tick();
-        debouncer2.tick(clock.now());
+        timer_system.tick(clock.now());
     }
 
     // Wait for trailing execution
     thread::sleep(Duration::from_millis(250));
     clock.tick();
-    if debouncer2.tick(clock.now()) {
-        println!("   ✅ Trailing-only execution completed!");
-    }
+    timer_system.tick(clock.now());
+    println!("   ✅ Trailing-only execution completed!");
 }
 
 fn application_integration_demo() {
@@ -209,23 +205,26 @@ mod tests {
 
     #[test]
     fn test_debouncer_basic() {
-        let mut debouncer = Debouncer::new(
+        let mut mgr = TimerMgr::new();
+        let hits = Arc::new(Mutex::new(0));
+        let hits_clone = hits.clone();
+
+        let mut debounced = mgr.debounce(
             Duration::from_millis(50),
-            || println!("Test debounced!"),
-            true, // leading
-            true, // trailing
+            move || {
+                *hits_clone.lock().unwrap() += 1;
+            },
+            true,
+            true,
         );
 
-        // First call should execute immediately (leading)
-        debouncer.call();
-        assert!(debouncer.is_pending());
+        debounced.call(&mut mgr);
+        assert!(debounced.is_pending());
 
-        // Wait for debounce to expire
         thread::sleep(Duration::from_millis(60));
+        mgr.tick(Instant::now());
 
-        // Tick to check for trailing execution
-        let executed = debouncer.tick(Instant::now());
-        assert!(executed);
-        assert!(!debouncer.is_pending());
+        assert_eq!(*hits.lock().unwrap(), 2);
+        assert!(!debounced.is_pending());
     }
 }

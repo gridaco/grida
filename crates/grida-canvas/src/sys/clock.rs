@@ -17,7 +17,8 @@ use std::time::{Duration, Instant};
 ///
 /// # Usage Pattern
 ///
-/// ```rust
+/// ```rust,no_run
+/// use cg::sys::clock::EventLoopClock;
 /// let mut clock = EventLoopClock::new();
 ///
 /// // In your event loop (e.g., VSync callback, redraw request, etc.)
