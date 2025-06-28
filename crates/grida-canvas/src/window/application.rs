@@ -46,6 +46,8 @@ pub struct UnknownTargetApplication {
     pub(crate) devtools_rendering_show_stats: bool,
     pub(crate) devtools_rendering_show_hit_overlay: bool,
     pub(crate) devtools_rendering_show_ruler: bool,
+    /// timer id for debouncing stable frame queues
+    queue_stable_timer: Option<crate::sys::timer::TimerId>,
 }
 
 impl UnknownTargetApplication {
@@ -81,6 +83,7 @@ impl UnknownTargetApplication {
             devtools_rendering_show_hit_overlay: false,
             devtools_rendering_show_ruler: false,
             timer: TimerMgr::new(),
+            queue_stable_timer: None,
         }
     }
 
@@ -97,6 +100,20 @@ impl UnknownTargetApplication {
 
     fn queue(&mut self) {
         self.renderer.queue_unstable();
+
+        if let Some(id) = self.queue_stable_timer.take() {
+            self.timer.cancel(id);
+        }
+
+        let renderer_ptr: *mut Renderer = &mut self.renderer;
+        self.queue_stable_timer = Some(self.timer.set_timeout(
+            std::time::Duration::from_millis(200),
+            move || unsafe {
+                (*renderer_ptr).queue_stable();
+            },
+        ));
+
+        // TODO: can't use debounce - let's try this later
         // self.debounce(
         //     std::time::Duration::from_millis(100),
         //     || self.renderer.queue_stable(),

@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 /// use cg::sys::clock::EventLoopClock;
 ///
 /// let mut timer_system = TimerMgr::new();
-/// let clock = EventLoopClock::new();
+/// let mut clock = EventLoopClock::new();
 ///
 /// // Create a one-shot timeout
 /// let timeout_id = timer_system.set_timeout(Duration::from_secs(5), || {
@@ -68,10 +68,10 @@ enum TimerType {
 }
 
 /// Callback function for timer execution
-type TimerCallback = Box<dyn FnOnce() + Send + 'static>;
+type TimerCallback = Box<dyn FnOnce() + 'static>;
 
 /// Callback function for interval execution (can be called multiple times)
-type IntervalCallback = Box<dyn Fn() + Send + 'static>;
+type IntervalCallback = Box<dyn Fn() + 'static>;
 
 impl TimerMgr {
     /// Creates a new timer system
@@ -141,7 +141,7 @@ impl TimerMgr {
     /// Returns a `TimerId` that can be used to cancel the timeout
     pub fn set_timeout<F>(&mut self, duration: Duration, callback: F) -> TimerId
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce() + 'static,
     {
         let id = self.next_timer_id();
         let deadline = Instant::now() + duration;
@@ -164,7 +164,7 @@ impl TimerMgr {
     /// Returns a `TimerId` that can be used to cancel the interval
     pub fn set_interval<F>(&mut self, interval: Duration, callback: F) -> TimerId
     where
-        F: Fn() + Send + 'static,
+        F: Fn() + 'static,
     {
         let id = self.next_timer_id();
         let deadline = Instant::now() + interval;
@@ -195,7 +195,7 @@ impl TimerMgr {
         trailing: bool,
     ) -> Debounce
     where
-        F: FnMut() + Send + 'static,
+        F: FnMut() + 'static,
     {
         let state = DebounceState {
             wait,
@@ -264,7 +264,7 @@ pub struct Debounce {
 
 struct DebounceState {
     wait: Duration,
-    callback: Box<dyn FnMut() + Send + 'static>,
+    callback: Box<dyn FnMut() + 'static>,
     leading: bool,
     trailing: bool,
     timer_id: Option<TimerId>,

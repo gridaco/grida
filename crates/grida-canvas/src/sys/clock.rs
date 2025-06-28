@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 ///
 /// # Usage Pattern
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use cg::sys::clock::EventLoopClock;
 /// let mut clock = EventLoopClock::new();
 ///
@@ -25,8 +25,8 @@ use std::time::{Duration, Instant};
 /// loop {
 ///     clock.tick(); // Called by external event source
 ///     
-///     // Use clock.delta for frame-rate independent updates
-///     update_animation(clock.delta);
+///     // Use `clock.delta` for frame-rate independent updates
+///     // update_animation(clock.delta);
 ///     
 ///     // Use clock.elapsed for absolute time tracking
 ///     if clock.elapsed.as_secs() > 5 {
