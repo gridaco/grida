@@ -6,6 +6,7 @@ use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
 use crate::sys::clock;
 use crate::sys::scheduler;
+use crate::sys::timer::TimerMgr;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 
@@ -28,7 +29,7 @@ pub enum HostEvent {
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
-    // pub(crate) timer: timer::Timer,
+    pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::State,
@@ -79,11 +80,13 @@ impl UnknownTargetApplication {
             devtools_rendering_show_stats: false,
             devtools_rendering_show_hit_overlay: false,
             devtools_rendering_show_ruler: false,
+            timer: TimerMgr::new(),
         }
     }
 
     pub fn tick(&mut self) {
         self.clock.tick();
+        self.timer.tick(self.clock.now());
     }
 
     /// Provide the platform-specific callback used to request a redraw from the
@@ -346,6 +349,43 @@ impl UnknownTargetApplication {
 
     pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
         self.devtools_rendering_show_ruler = show;
+    }
+
+    // Timer convenience methods
+
+    /// Sets a timeout that will execute the callback after the specified duration
+    ///
+    /// Returns a `TimerId` that can be used to cancel the timeout
+    pub fn set_timeout<F>(
+        &mut self,
+        duration: std::time::Duration,
+        callback: F,
+    ) -> crate::sys::timer::TimerId
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.timer.set_timeout(duration, callback)
+    }
+
+    /// Sets a repeating timer that will execute the callback at regular intervals
+    ///
+    /// Returns a `TimerId` that can be used to cancel the interval
+    pub fn set_interval<F>(
+        &mut self,
+        interval: std::time::Duration,
+        callback: F,
+    ) -> crate::sys::timer::TimerId
+    where
+        F: Fn() + Send + 'static,
+    {
+        self.timer.set_interval(interval, callback)
+    }
+
+    /// Cancels a timer by its ID
+    ///
+    /// Returns `true` if the timer was found and cancelled, `false` otherwise
+    pub fn cancel_timer(&mut self, id: crate::sys::timer::TimerId) -> bool {
+        self.timer.cancel(id)
     }
 
     // static demo scenes
