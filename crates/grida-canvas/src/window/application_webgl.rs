@@ -95,6 +95,10 @@ impl WebGlApplication {
         app
     }
 
+    pub fn tick(&mut self) {
+        self.app.tick();
+    }
+
     pub fn resize(&mut self, width: i32, height: i32) {
         self.app.resize(width as u32, height as u32);
     }

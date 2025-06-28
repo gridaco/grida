@@ -87,6 +87,8 @@ impl UnknownTargetApplication {
         }
     }
 
+    /// tick the application clock and timer.
+    /// this can be called as many times as needed, from different sources (e.g. isolated timer thread, or raf, as the platform requires)
     pub fn tick(&mut self) {
         self.clock.tick();
         self.timer.tick(self.clock.now());
@@ -255,6 +257,8 @@ impl UnknownTargetApplication {
 
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
+        self.tick();
+
         let __frame_start = std::time::Instant::now();
 
         let stats = match self.renderer.flush() {

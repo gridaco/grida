@@ -30,6 +30,14 @@ pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
+pub unsafe extern "C" fn tick(app: *mut WebGlApplication) {
+    if let Some(app) = app.as_mut() {
+        app.tick();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
 pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
     if let Some(app) = app.as_mut() {
         app.resize(width, height);
