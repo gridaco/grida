@@ -1,4 +1,4 @@
-use cg::window::scheduler::FrameScheduler;
+use cg::sys::scheduler::FrameScheduler;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},

@@ -4,8 +4,8 @@ use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
 use crate::runtime::scene::{Backend, Renderer};
+use crate::sys::scheduler;
 use crate::window::command::ApplicationCommand;
-use crate::window::scheduler;
 use futures::channel::mpsc;
 
 /// Shared application logic independent of the final target.

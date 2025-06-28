@@ -1,7 +1,6 @@
 pub mod application;
 pub mod command;
 pub mod input;
-pub mod scheduler;
 pub mod state;
 
 #[cfg(not(target_arch = "wasm32"))]
