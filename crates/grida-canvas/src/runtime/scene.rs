@@ -158,13 +158,13 @@ impl Renderer {
         let mut canvas = surface.canvas();
         let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
-        let frame_duration = start.elapsed();
-
         if frame.stable {
             if !self.camera.has_zoom_changed() {
                 self.scene_cache.update_tiles(&self.camera, surface);
             }
         }
+
+        let frame_duration = start.elapsed();
 
         let flush_start = Instant::now();
         if let Some(mut gr_context) = surface.recording_context() {
@@ -186,11 +186,6 @@ impl Renderer {
         self.plan = None;
 
         Some(stats)
-    }
-
-    /// Returns `true` if a frame has been queued but not yet flushed.
-    pub fn has_pending_frame(&self) -> bool {
-        self.fc.has_pending()
     }
 
     /// Invoke the request redraw callback.

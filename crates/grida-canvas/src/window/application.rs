@@ -28,6 +28,7 @@ pub enum HostEvent {
 
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
+    pub(crate) debug: bool,
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
@@ -65,7 +66,10 @@ impl UnknownTargetApplication {
     ) -> Self {
         let renderer = Renderer::new(backend, Box::new(|| {}), camera);
 
+        let debug = false;
+
         Self {
+            debug,
             clock: clock::EventLoopClock::new(),
             renderer,
             state,
@@ -78,11 +82,11 @@ impl UnknownTargetApplication {
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
-            devtools_rendering_show_fps: false,
-            devtools_rendering_show_tiles: false,
-            devtools_rendering_show_stats: false,
-            devtools_rendering_show_hit_overlay: false,
-            devtools_rendering_show_ruler: false,
+            devtools_rendering_show_fps: debug,
+            devtools_rendering_show_tiles: debug,
+            devtools_rendering_show_stats: debug,
+            devtools_rendering_show_hit_overlay: debug,
+            devtools_rendering_show_ruler: debug,
             timer: TimerMgr::new(),
             queue_stable_timer: None,
             queue_stable_debounce_millis: 50,
@@ -242,10 +246,24 @@ impl UnknownTargetApplication {
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 self.queue();
             }
+            ApplicationCommand::ToggleDebugMode => {
+                self.toggle_debug();
+                self.queue();
+            }
             ApplicationCommand::None => {}
         }
 
         false
+    }
+
+    fn toggle_debug(&mut self) {
+        self.debug = !self.debug;
+
+        self.devtools_rendering_show_fps = self.debug;
+        self.devtools_rendering_show_tiles = self.debug;
+        self.devtools_rendering_show_stats = self.debug;
+        self.devtools_rendering_show_hit_overlay = self.debug;
+        self.devtools_rendering_show_ruler = self.debug;
     }
 
     pub(crate) fn resource_loaded(&mut self) {

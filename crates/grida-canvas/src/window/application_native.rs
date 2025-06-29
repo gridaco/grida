@@ -27,7 +27,10 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-fn handle_window_event(event: &WindowEvent) -> ApplicationCommand {
+fn handle_window_event(
+    event: &WindowEvent,
+    modifiers: &winit::keyboard::ModifiersState,
+) -> ApplicationCommand {
     match event {
         WindowEvent::KeyboardInput {
             event:
@@ -37,11 +40,7 @@ fn handle_window_event(event: &WindowEvent) -> ApplicationCommand {
                     ..
                 },
             ..
-        } => match key {
-            Key::Character(c) if c == "=" => ApplicationCommand::ZoomIn,
-            Key::Character(c) if c == "-" => ApplicationCommand::ZoomOut,
-            _ => ApplicationCommand::None,
-        },
+        } => handle_key_pressed(key, modifiers),
         WindowEvent::PinchGesture { delta, .. } => ApplicationCommand::ZoomDelta {
             delta: *delta as f32,
         },
@@ -53,6 +52,25 @@ fn handle_window_event(event: &WindowEvent) -> ApplicationCommand {
             _ => ApplicationCommand::None,
         },
         _ => ApplicationCommand::None,
+    }
+}
+
+fn handle_key_pressed(
+    key: &Key,
+    modifiers: &winit::keyboard::ModifiersState,
+) -> ApplicationCommand {
+    if modifiers.super_key() {
+        match key {
+            Key::Character(c) => match c.as_str() {
+                "=" => ApplicationCommand::ZoomIn,
+                "-" => ApplicationCommand::ZoomOut,
+                "i" => ApplicationCommand::ToggleDebugMode,
+                _ => ApplicationCommand::None,
+            },
+            _ => ApplicationCommand::None,
+        }
+    } else {
+        ApplicationCommand::None
     }
 }
 
@@ -196,6 +214,7 @@ pub struct NativeApplication {
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
     pub(crate) gl_context: PossiblyCurrentContext,
     pub(crate) window: Window,
+    pub(crate) modifiers: winit::keyboard::ModifiersState,
 }
 
 impl NativeApplication {
@@ -221,6 +240,7 @@ impl NativeApplication {
             gl_surface,
             gl_context,
             window,
+            modifiers: winit::keyboard::ModifiersState::default(),
         };
 
         // set the redraw callback to dispatch a user event for redraws
@@ -247,6 +267,10 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
+        if let WindowEvent::ModifiersChanged(modifiers) = &event {
+            self.modifiers = modifiers.state();
+        }
+
         if let WindowEvent::CursorMoved { position, .. } = &event {
             self.app.input.cursor = [position.x as f32, position.y as f32];
             self.app.perform_hit_test();
@@ -273,7 +297,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             self.app.resize(size.width, size.height);
         }
 
-        match handle_window_event(&event) {
+        match handle_window_event(&event, &self.modifiers) {
             cmd => {
                 self.app.command(cmd);
             }
