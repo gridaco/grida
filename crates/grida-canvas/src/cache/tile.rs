@@ -1,6 +1,6 @@
 use crate::runtime::camera::Camera2D;
 use math2::rect::{self, Rectangle};
-use skia_safe::{IRect, Image, Path, Surface};
+use skia_safe::{IRect, Image, Surface};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -34,6 +34,8 @@ pub struct TileAtZoom {
     pub image: Rc<Image>,
     /// the zoom level at which this tile was snapshotted
     pub zoom: f32,
+    /// captured world rect of the tile. may be smaller than tile key
+    pub rect: Rectangle,
     /// if the tile is partial capture of the edge.
     pub partial: bool,
 }
@@ -49,6 +51,8 @@ pub struct RegionTileInfo {
     pub blur_radius: f32,
     /// The zoom level at which this tile was snapshotted
     pub zoom: f32,
+    /// actual world rect captured for this tile
+    pub rect: Rectangle,
     // TODO:
     // The clip rects (region path) should be applied to this tile.
     // this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
@@ -131,13 +135,17 @@ impl RegionTiles {
             let should_include = Self::should_include_tile(&strategy, tile_at_zoom, current_zoom);
 
             if should_include {
+                let rect = tile_at_zoom
+                    .map(|t| t.rect)
+                    .unwrap_or_else(|| key.to_rect());
                 tiles.push(RegionTileInfo {
                     key: *key,
                     blur: should_blur,
                     blur_radius,
                     zoom: tile_zoom,
+                    rect,
                 });
-                tile_rects.push(key.to_rect());
+                tile_rects.push(rect);
             }
         }
 
@@ -320,6 +328,7 @@ impl ImageTileCache {
         width: f32,
         height: f32,
         surface: &mut Surface,
+        partial: bool,
         mut intersects: F,
     ) where
         F: FnMut(Rectangle) -> bool,
@@ -332,6 +341,13 @@ impl ImageTileCache {
         let world_size = self.tile_size as f32 / zoom;
         let rect = camera.rect();
 
+        let screen_bounds = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+        };
+
         for (col, row) in self.tile_indices(&rect, world_size) {
             let world_rect = self.tile_world_rect(col, row, world_size);
 
@@ -340,15 +356,35 @@ impl ImageTileCache {
             }
 
             let screen_rect = rect::transform(world_rect, &camera.view_matrix());
-            if !self.is_tile_visible(&screen_rect, width, height) {
+            let visible = if partial {
+                rect::intersects(&screen_rect, &screen_bounds)
+            } else {
+                self.is_tile_visible(&screen_rect, width, height)
+            };
+            if !visible {
                 continue;
             }
 
             let key = self.tile_key(&world_rect);
             self.update_lowest_zoom_tracking(&key, zoom);
 
+            let capture_world_rect = if partial {
+                world_rect
+                    .intersection(&camera.rect())
+                    .unwrap_or(world_rect)
+            } else {
+                world_rect
+            };
+
             if self.should_update_tile(&key, zoom) {
-                self.capture_tile(surface, &screen_rect, key, zoom);
+                self.capture_tile(
+                    surface,
+                    &screen_rect,
+                    key,
+                    zoom,
+                    capture_world_rect,
+                    partial,
+                );
             }
         }
     }
@@ -417,7 +453,7 @@ impl ImageTileCache {
     fn should_update_tile(&self, key: &TileRectKey, zoom: f32) -> bool {
         self.tiles
             .get(key)
-            .map(|existing_tile| zoom > existing_tile.zoom)
+            .map(|existing_tile| existing_tile.partial || zoom > existing_tile.zoom)
             .unwrap_or(true)
     }
 
@@ -428,19 +464,38 @@ impl ImageTileCache {
         screen_rect: &Rectangle,
         key: TileRectKey,
         zoom: f32,
+        world_rect: Rectangle,
+        partial: bool,
     ) {
+        let rect = if partial {
+            let bounds = Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: surface.width() as f32,
+                height: surface.height() as f32,
+            };
+            if let Some(int) = screen_rect.intersection(&bounds) {
+                int
+            } else {
+                *screen_rect
+            }
+        } else {
+            *screen_rect
+        };
+
         if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
-            screen_rect.x as i32,
-            screen_rect.y as i32,
-            self.tile_size as i32,
-            self.tile_size as i32,
+            rect.x as i32,
+            rect.y as i32,
+            rect.width as i32,
+            rect.height as i32,
         )) {
             self.tiles.insert(
                 key,
                 TileAtZoom {
                     image: Rc::new(image),
                     zoom,
-                    partial: false,
+                    rect: world_rect,
+                    partial,
                 },
             );
         }

@@ -160,7 +160,7 @@ impl Renderer {
 
         if frame.stable {
             if !self.camera.has_zoom_changed() {
-                self.scene_cache.update_tiles(&self.camera, surface);
+                self.scene_cache.update_tiles(&self.camera, surface, true);
             }
         }
 
@@ -376,12 +376,8 @@ impl Renderer {
             if let Some(tile_at_zoom) = tile_at_zoom {
                 let image = &tile_at_zoom.image;
                 let src = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
-                let dst = Rect::from_xywh(
-                    tk.key.0 as f32,
-                    tk.key.1 as f32,
-                    tk.key.2 as f32,
-                    tk.key.3 as f32,
-                );
+                let r = tk.rect;
+                let dst = Rect::from_xywh(r.x, r.y, r.width, r.height);
                 let mut paint = SkPaint::default();
 
                 // Apply adaptive blur filter when the tile was captured at a lower zoom level

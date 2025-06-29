@@ -153,7 +153,7 @@ impl SceneCache {
     }
 
     /// Update raster tile cache using the given camera and surface.
-    pub fn update_tiles(&mut self, camera: &Camera2D, surface: &mut Surface) {
+    pub fn update_tiles(&mut self, camera: &Camera2D, surface: &mut Surface, partial: bool) {
         let width = surface.width() as f32;
         let height = surface.height() as f32;
         let index = &self.layer_index;
@@ -165,6 +165,6 @@ impl SceneCache {
             index.locate_in_envelope_intersecting(&env).next().is_some()
         };
         self.tile
-            .update_tiles(camera, width, height, surface, intersects);
+            .update_tiles(camera, width, height, surface, partial, intersects);
     }
 }
