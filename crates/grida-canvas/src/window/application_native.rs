@@ -60,7 +60,7 @@ pub(crate) fn init_native_window(
     width: i32,
     height: i32,
 ) -> (
-    crate::window::state::State,
+    crate::window::state::SurfaceState,
     EventLoop<HostEvent>,
     Window,
     GlutinSurface<WindowSurface>,
@@ -186,7 +186,7 @@ pub(crate) fn init_native_window(
     )
     .expect("Could not create skia surface");
 
-    let state = crate::window::state::State::from_parts(gr_context, fb_info, surface);
+    let state = crate::window::state::SurfaceState::from_parts(gr_context, fb_info, surface);
 
     (state, el, window, gl_surface, gl_context, scale_factor)
 }

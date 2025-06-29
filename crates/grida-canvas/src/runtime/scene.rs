@@ -160,8 +160,10 @@ impl Renderer {
 
         let frame_duration = start.elapsed();
 
-        if !self.camera.has_zoom_changed() {
-            self.scene_cache.update_tiles(&self.camera, surface);
+        if frame.stable {
+            if !self.camera.has_zoom_changed() {
+                self.scene_cache.update_tiles(&self.camera, surface);
+            }
         }
 
         let flush_start = Instant::now();

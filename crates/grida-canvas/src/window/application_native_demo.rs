@@ -51,7 +51,7 @@ where
     app.app.devtools_rendering_show_stats = true;
     app.app.devtools_rendering_show_hit_overlay = true;
     app.app.devtools_rendering_show_ruler = true;
-    app.app.devtools_rendering_show_tiles = true;
+    app.app.devtools_rendering_show_tiles = false;
 
     println!("🎭 Starting event loop...");
     if let Err(e) = el.run_app(&mut app) {

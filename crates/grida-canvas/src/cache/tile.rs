@@ -30,8 +30,12 @@ impl TileRectKey {
 
 #[derive(Debug, Clone)]
 pub struct TileAtZoom {
+    /// the image of the tile
     pub image: Rc<Image>,
+    /// the zoom level at which this tile was snapshotted
     pub zoom: f32,
+    /// if the tile is partial capture of the edge.
+    pub partial: bool,
 }
 
 /// Information about a tile including whether it should be blurred
@@ -105,8 +109,8 @@ impl RegionTiles {
         let mut tiles: Vec<RegionTileInfo> = Vec::new();
         let mut tile_rects: Vec<Rectangle> = Vec::new();
 
-        const BLUR_SCALE: f32 = 2.0;
-        const MAX_BLUR_RADIUS: f32 = 16.0;
+        const BLUR_SCALE: f32 = 1.0;
+        const MAX_BLUR_RADIUS: f32 = 8.0;
 
         // Filter tiles that intersect with the current viewport bounds
         for key in cache.filter(bounds) {
@@ -436,6 +440,7 @@ impl ImageTileCache {
                 TileAtZoom {
                     image: Rc::new(image),
                     zoom,
+                    partial: false,
                 },
             );
         }

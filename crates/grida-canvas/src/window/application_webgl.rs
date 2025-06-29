@@ -3,7 +3,7 @@ use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
-use crate::window::state::{self, GpuState, State};
+use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
 
 #[cfg(target_arch = "wasm32")]
@@ -77,7 +77,7 @@ impl WebGlApplication {
             context,
             framebuffer_info,
         } = gpu_state;
-        let mut state = State::from_parts(context, framebuffer_info, surface);
+        let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
 
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();

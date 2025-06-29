@@ -32,7 +32,7 @@ pub struct UnknownTargetApplication {
     pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
     pub(crate) renderer: Renderer,
-    pub(crate) state: super::state::State,
+    pub(crate) state: super::state::SurfaceState,
     pub(crate) input: super::input::InputState,
     pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
     pub(crate) hit_test_last: std::time::Instant,
@@ -46,6 +46,7 @@ pub struct UnknownTargetApplication {
     pub(crate) devtools_rendering_show_stats: bool,
     pub(crate) devtools_rendering_show_hit_overlay: bool,
     pub(crate) devtools_rendering_show_ruler: bool,
+    pub(crate) queue_stable_debounce_millis: u64,
     /// timer id for debouncing stable frame queues
     queue_stable_timer: Option<crate::sys::timer::TimerId>,
 }
@@ -55,7 +56,7 @@ impl UnknownTargetApplication {
     /// the given backend and camera. Each platform should supply a callback
     /// that requests a redraw on the host when invoked.
     pub fn new(
-        state: super::state::State,
+        state: super::state::SurfaceState,
         backend: Backend,
         camera: Camera2D,
         target_fps: u32,
@@ -84,6 +85,7 @@ impl UnknownTargetApplication {
             devtools_rendering_show_ruler: false,
             timer: TimerMgr::new(),
             queue_stable_timer: None,
+            queue_stable_debounce_millis: 50,
         }
     }
 
@@ -109,7 +111,7 @@ impl UnknownTargetApplication {
 
         let renderer_ptr: *mut Renderer = &mut self.renderer;
         self.queue_stable_timer = Some(self.timer.set_timeout(
-            std::time::Duration::from_millis(200),
+            std::time::Duration::from_millis(self.queue_stable_debounce_millis),
             move || unsafe {
                 (*renderer_ptr).queue_stable();
             },
