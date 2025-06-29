@@ -46,7 +46,10 @@ fn offset_top_left() {
 fn intersection_partial() {
     let a = rect(10.0, 10.0, 30.0, 30.0);
     let b = rect(25.0, 25.0, 20.0, 20.0);
+
+    // order should not matter
     assert_eq!(intersection(&a, &b), Some(rect(25.0, 25.0, 15.0, 15.0)));
+    assert_eq!(intersection(&b, &a), Some(rect(25.0, 25.0, 15.0, 15.0)));
 }
 
 #[test]
