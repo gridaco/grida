@@ -196,6 +196,7 @@ impl RegionTiles {
 pub struct ImageTileCache {
     tile_size: u16,
     tiles: HashMap<TileRectKey, TileAtZoom>,
+    prev_zoom: Option<f32>,
     /// The lowest zoom level resolved, even if at least 1 tile exists.
     /// This is used to track the most zoomed-out level we've cached,
     /// ensuring we always have fallback tiles for zoom out operations.
@@ -218,6 +219,7 @@ impl Default for ImageTileCache {
         Self {
             tile_size: 512,
             tiles: HashMap::new(),
+            prev_zoom: None,
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
             max_zoom_for_cache: 2.0,
@@ -234,6 +236,7 @@ impl ImageTileCache {
         Self {
             tile_size,
             tiles: HashMap::new(),
+            prev_zoom: None,
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
             max_zoom_for_cache: 2.0,
@@ -337,6 +340,13 @@ impl ImageTileCache {
         if zoom > self.max_zoom_for_cache {
             return;
         }
+
+        if let Some(prev_zoom) = self.prev_zoom {
+            if (prev_zoom - zoom).abs() < f32::EPSILON {
+                self.clear();
+            }
+        }
+        self.prev_zoom = Some(zoom);
 
         let world_size = self.tile_size as f32 / zoom;
         let rect = camera.rect();

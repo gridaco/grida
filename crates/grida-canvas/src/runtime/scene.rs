@@ -159,9 +159,8 @@ impl Renderer {
         let draw = self.draw(&mut canvas, &frame, scene.background_color, width, height);
 
         if frame.stable {
-            if !self.camera.has_zoom_changed() {
-                self.scene_cache.update_tiles(&self.camera, surface, true);
-            }
+            // if !self.camera.has_zoom_changed() {}
+            self.scene_cache.update_tiles(&self.camera, surface, true);
         }
 
         let frame_duration = start.elapsed();
