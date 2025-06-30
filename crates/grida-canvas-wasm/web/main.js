@@ -1,3 +1,5 @@
+import init from "../dist/index.mjs";
+
 /**
  * Make a canvas element fit to the display window.
  */
@@ -14,81 +16,58 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 // This loads and initialize our WASM module
-createGridaCanvas({
-  locateFile: (path, directory) => {
-    console.log(path, directory);
-    return directory + path;
+init({
+  locateFile: (path) => {
+    return `../lib/bin/${path}`;
   },
-}).then((GridaCanvas) => {
-  console.log(GridaCanvas);
-  // Create the WebGL context
-  let context;
-  const canvas = document.querySelector("#canvas");
-  context = canvas.getContext("webgl2", {
-    antialias: true,
-    depth: true,
-    stencil: true,
-    alpha: true,
-  });
+}).then((Factory) => {
+  console.log(Factory);
 
-  // Register the context with emscripten
-  handle = GridaCanvas.GL.registerContext(context, { majorVersion: 2 });
-  GridaCanvas.GL.makeContextCurrent(handle);
-
-  // Fit the canvas to the viewport
-  resizeCanvasToDisplaySize(canvas);
-
-  // Initialize the application
-  const state = GridaCanvas._init(canvas.width, canvas.height);
   let isDragging = false;
   let lastX = 0;
   let lastY = 0;
 
-  // Configure optional overlays
-  GridaCanvas._devtools_rendering_set_show_tiles(state, true);
-  GridaCanvas._devtools_rendering_set_show_fps_meter(state, true);
-  GridaCanvas._devtools_rendering_set_show_stats(state, false);
-  GridaCanvas._devtools_rendering_set_show_hit_testing(state, true);
-  GridaCanvas._devtools_rendering_set_show_ruler(state, true);
+  const canvasel = document.getElementById("canvas");
+  const grida = Factory.createCanvasSurface("canvas");
+  console.log(grida);
 
-  const CMD = {
-    ZoomIn: 1,
-    ZoomOut: 2,
-    ZoomDelta: 3,
-    Pan: 4,
-  };
+  // Fit the canvas to the viewport
+  resizeCanvasToDisplaySize(canvasel);
+
+  grida.devtools_rendering_set_show_tiles(true);
+  grida.devtools_rendering_set_show_fps_meter(true);
+  grida.devtools_rendering_set_show_stats(false);
+  grida.devtools_rendering_set_show_hit_testing(true);
+  grida.devtools_rendering_set_show_ruler(true);
 
   // Load the demo scene from JSON
   fetch("./demo.grida")
     .then((r) => r.text())
     .then((txt) => {
-      const len = GridaCanvas.lengthBytesUTF8(txt) + 1;
-      const ptr = GridaCanvas._allocate(len);
-      GridaCanvas.stringToUTF8(txt, ptr, len);
-      GridaCanvas._load_scene_json(state, ptr, len - 1);
-      GridaCanvas._deallocate(ptr, len);
+      grida.loadScene(txt);
       requestAnimationFrame(render);
     });
 
-  // GridaCanvas._load_dummy_scene(state);
-  // GridaCanvas._load_benchmark_scene(state, 50, 50);
+  // grida.loadDummyScene();
+  // grida.loadBenchmarkScene(50, 50);
 
-  canvas.addEventListener("pointermove", (event) => {
+  canvasel.addEventListener("pointermove", (event) => {
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvasel.getBoundingClientRect();
     const x = (event.clientX - rect.left) * dpr;
     const y = (event.clientY - rect.top) * dpr;
-    GridaCanvas._pointer_move(state, x, y);
+
+    grida.pointermove(x, y);
     if (isDragging) {
-      GridaCanvas._command(state, CMD.Pan, -(x - lastX), -(y - lastY));
+      grida.execCommandPan(-(x - lastX), -(y - lastY));
     }
     lastX = x;
     lastY = y;
   });
 
-  canvas.addEventListener("pointerdown", (event) => {
+  canvasel.addEventListener("pointerdown", (event) => {
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvasel.getBoundingClientRect();
     lastX = (event.clientX - rect.left) * dpr;
     lastY = (event.clientY - rect.top) * dpr;
     isDragging = true;
@@ -97,34 +76,29 @@ createGridaCanvas({
   const endDrag = () => {
     isDragging = false;
   };
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
-  canvas.addEventListener("pointerleave", endDrag);
+  canvasel.addEventListener("pointerup", endDrag);
+  canvasel.addEventListener("pointercancel", endDrag);
+  canvasel.addEventListener("pointerleave", endDrag);
 
-  canvas.addEventListener("wheel", (event) => {
+  canvasel.addEventListener("wheel", (event) => {
     event.preventDefault();
     const dpr = window.devicePixelRatio || 1;
     if (event.ctrlKey) {
-      GridaCanvas._command(state, CMD.ZoomDelta, event.deltaY * -0.01, 0);
+      grida.execCommandZoomDelta(event.deltaY * -0.01);
     } else {
-      GridaCanvas._command(
-        state,
-        CMD.Pan,
-        event.deltaX * dpr,
-        event.deltaY * dpr
-      );
+      grida.execCommandPan(event.deltaX * dpr, event.deltaY * dpr);
     }
   });
 
   function render() {
-    GridaCanvas._redraw(state);
+    grida.redraw();
     requestAnimationFrame(render);
   }
 
   // Make canvas size stick to the window size
   window.addEventListener("resize", () => {
-    if (resizeCanvasToDisplaySize(canvas)) {
-      GridaCanvas._resize_surface(state, canvas.width, canvas.height);
+    if (resizeCanvasToDisplaySize(canvasel)) {
+      grida.resize(canvasel.width, canvasel.height);
     }
   });
 });
