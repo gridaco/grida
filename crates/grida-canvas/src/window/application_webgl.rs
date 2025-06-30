@@ -133,7 +133,8 @@ impl WebGlApplication {
         use math2::transform::AffineTransform;
 
         let Ok(file) = io_json::parse(json) else {
-            eprintln!("failed to parse scene json");
+            let err = io_json::parse(json).unwrap_err();
+            eprintln!("failed to parse scene json: {}", err);
             return;
         };
 

@@ -37,6 +37,15 @@ class ApplicationFactory {
     const ptr = this.module._init(canvas.width, canvas.height);
     return new Grida2D(this.module, ptr);
   }
+
+  createWebGLCanvasSurfaceById(htmlcanvasid: string) {
+    const canvas = document.getElementById(htmlcanvasid) as HTMLCanvasElement;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error(`Element with id ${htmlcanvasid} is not a <canvas>`);
+    }
+
+    return this.createWebGLCanvasSurface(canvas);
+  }
 }
 
 const ApplicationCommandID = {

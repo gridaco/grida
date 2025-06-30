@@ -28,7 +28,7 @@ init({
   let lastY = 0;
 
   const canvasel = document.getElementById("canvas");
-  const grida = Factory.createCanvasSurface("canvas");
+  const grida = Factory.createWebGLCanvasSurface(canvasel);
   console.log(grida);
 
   // Fit the canvas to the viewport
