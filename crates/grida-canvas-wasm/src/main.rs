@@ -30,6 +30,14 @@ pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
+pub unsafe extern "C" fn tick(app: *mut WebGlApplication) {
+    if let Some(app) = app.as_mut() {
+        app.tick();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
 pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
     if let Some(app) = app.as_mut() {
         app.resize(width, height);
@@ -82,20 +90,14 @@ pub unsafe extern "C" fn pointer_move(app: *mut WebGlApplication, x: f32, y: f32
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b: f32) {
-    use cg::window::command::WindowCommand;
+    use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
-            0 => WindowCommand::Close,
-            1 => WindowCommand::ZoomIn,
-            2 => WindowCommand::ZoomOut,
-            3 => WindowCommand::ZoomDelta { delta: a },
-            4 => WindowCommand::Pan { tx: a, ty: b },
-            5 => WindowCommand::Redraw,
-            6 => WindowCommand::Resize {
-                width: a as u32,
-                height: b as u32,
-            },
-            _ => WindowCommand::None,
+            1 => ApplicationCommand::ZoomIn,
+            2 => ApplicationCommand::ZoomOut,
+            3 => ApplicationCommand::ZoomDelta { delta: a },
+            4 => ApplicationCommand::Pan { tx: a, ty: b },
+            _ => ApplicationCommand::None,
         };
         app.command(cmd);
     }
@@ -103,9 +105,9 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_show_ruler(app: *mut WebGlApplication, show: bool) {
+pub unsafe extern "C" fn devtools_rendering_set_show_ruler(app: *mut WebGlApplication, show: bool) {
     if let Some(app) = app.as_mut() {
-        app.set_show_ruler(show);
+        app.devtools_rendering_set_show_ruler(show);
     }
 }
 

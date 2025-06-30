@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let path = "resources/local/document.json";
+        let path = "../fixtures/local/document.json";
         let Ok(data) = fs::read_to_string(path) else {
             eprintln!("test resource not found: {}", path);
             return;

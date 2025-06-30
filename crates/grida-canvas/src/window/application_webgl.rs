@@ -1,11 +1,9 @@
-use crate::font_loader::FontMessage;
-use crate::image_loader::ImageMessage;
-use crate::node::schema::*;
+use crate::resource::font_loader::FontMessage;
+use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
-use crate::window::scheduler;
-use crate::window::state::{self, GpuState, State};
+use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
 
 #[cfg(target_arch = "wasm32")]
@@ -33,6 +31,11 @@ fn init_gl() {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn init_gl() {
+    // no-op
+}
+
 #[cfg(target_arch = "wasm32")]
 fn create_gpu_state() -> GpuState {
     let interface = skia_safe::gpu::gl::Interface::new_native().unwrap();
@@ -54,12 +57,16 @@ fn create_gpu_state() -> GpuState {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(target_arch = "wasm32"))]
+fn create_gpu_state() -> GpuState {
+    // no-op
+    panic!("create_gpu_state is not supported on native");
+}
+
 pub struct WebGlApplication {
     pub(crate) app: UnknownTargetApplication,
 }
 
-#[cfg(target_arch = "wasm32")]
 impl WebGlApplication {
     /// Create a new [`WebGlApplication`] with an initialized renderer.
     pub fn new(width: i32, height: i32) -> Self {
@@ -70,42 +77,26 @@ impl WebGlApplication {
             context,
             framebuffer_info,
         } = gpu_state;
-        let mut state = State::from_parts(context, framebuffer_info, surface);
+        let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
 
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
-
-        let mut renderer = Renderer::new();
-        renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
         let camera = Camera2D::new(crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
         });
-        renderer.set_camera(camera.clone());
 
-        let mut app = Self {
-            app: UnknownTargetApplication {
-                renderer,
-                state,
-                camera,
-                input: crate::runtime::input::InputState::default(),
-                hit_result: None,
-                last_hit_test: std::time::Instant::now(),
-                hit_test_interval: std::time::Duration::ZERO,
-                image_rx,
-                font_rx,
-                scheduler: scheduler::FrameScheduler::new(60).with_max_fps(60),
-                last_frame_time: std::time::Instant::now(),
-                last_stats: None,
-                show_fps: true,
-                show_stats: true,
-                show_hit_overlay: true,
-                show_ruler: true,
-            },
+        let backend = Backend::GL(state.surface_mut_ptr());
+        let app = Self {
+            app: UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx),
         };
-        app.app.devtools_rendering_set_show_tiles(true);
+
         app
+    }
+
+    pub fn tick(&mut self) {
+        self.app.tick();
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
@@ -122,8 +113,8 @@ impl WebGlApplication {
         self.app.pointer_move(x, y);
     }
 
-    /// Forward a [`WindowCommand`] to the inner application.
-    pub fn command(&mut self, cmd: crate::window::command::WindowCommand) {
+    /// Forward a [`ApplicationCommand`] to the inner application.
+    pub fn command(&mut self, cmd: crate::window::command::ApplicationCommand) {
         self.app.command(cmd);
     }
 
@@ -180,11 +171,6 @@ impl WebGlApplication {
         self.app.devtools_rendering_set_show_tiles(debug);
     }
 
-    /// Returns `true` if tile overlay rendering is enabled.
-    pub fn debug_tiles(&self) -> bool {
-        self.app.debug_tiles()
-    }
-
     pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
         self.app.devtools_rendering_set_show_fps_meter(show);
     }
@@ -197,40 +183,7 @@ impl WebGlApplication {
         self.app.devtools_rendering_set_show_hit_testing(show);
     }
 
-    pub fn set_show_ruler(&mut self, show: bool) {
-        self.app.set_show_ruler(show);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
-    Box::new(WebGlApplication::new(width, height))
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
-    if let Some(app) = app.as_mut() {
-        app.resize(width, height);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
-    if let Some(app) = app.as_mut() {
-        app.redraw();
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn load_scene_json(app: *mut WebGlApplication, ptr: *const u8, len: usize) {
-    if let Some(app) = app.as_mut() {
-        let slice = std::slice::from_raw_parts(ptr, len);
-        if let Ok(json) = std::str::from_utf8(slice) {
-            app.load_scene_json(json);
-        }
+    pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_ruler(show);
     }
 }

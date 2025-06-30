@@ -14,7 +14,12 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 // This loads and initialize our WASM module
-createGridaCanvas().then((GridaCanvas) => {
+createGridaCanvas({
+  locateFile: (path, directory) => {
+    console.log(path, directory);
+    return directory + path;
+  },
+}).then((GridaCanvas) => {
   console.log(GridaCanvas);
   // Create the WebGL context
   let context;
@@ -44,20 +49,17 @@ createGridaCanvas().then((GridaCanvas) => {
   GridaCanvas._devtools_rendering_set_show_fps_meter(state, true);
   GridaCanvas._devtools_rendering_set_show_stats(state, false);
   GridaCanvas._devtools_rendering_set_show_hit_testing(state, true);
-  GridaCanvas._set_show_ruler(state, true);
+  GridaCanvas._devtools_rendering_set_show_ruler(state, true);
 
   const CMD = {
-    Close: 0,
     ZoomIn: 1,
     ZoomOut: 2,
     ZoomDelta: 3,
     Pan: 4,
-    Redraw: 5,
-    Resize: 6,
   };
 
   // Load the demo scene from JSON
-  fetch("http://grida.co/examples/canvas/hero-main-demo.grida")
+  fetch("./demo.grida")
     .then((r) => r.text())
     .then((txt) => {
       const len = GridaCanvas.lengthBytesUTF8(txt) + 1;
@@ -105,7 +107,12 @@ createGridaCanvas().then((GridaCanvas) => {
     if (event.ctrlKey) {
       GridaCanvas._command(state, CMD.ZoomDelta, event.deltaY * -0.01, 0);
     } else {
-      GridaCanvas._command(state, CMD.Pan, event.deltaX * dpr, event.deltaY * dpr);
+      GridaCanvas._command(
+        state,
+        CMD.Pan,
+        event.deltaX * dpr,
+        event.deltaY * dpr
+      );
     }
   });
 

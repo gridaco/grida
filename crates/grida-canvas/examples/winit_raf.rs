@@ -1,4 +1,4 @@
-use cg::window::scheduler;
+use cg::sys::scheduler;
 use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use winit::{
@@ -57,7 +57,7 @@ impl ApplicationHandler for App {
                 // Log FPS every second
                 let elapsed = self.start_time.elapsed();
                 if elapsed >= Duration::from_secs(1) {
-                    println!("Frames in last second: {}", self.frame_count);
+                    println!("Hz in last second: {}", self.frame_count);
                     self.frame_count = 0;
                     self.start_time = Instant::now();
                 }
@@ -88,7 +88,7 @@ fn main() {
         window,
         frame_count: 0,
         start_time: now,
-        scheduler: scheduler::FrameScheduler::new(120).with_max_fps(144),
+        scheduler: scheduler::FrameScheduler::new(u32::MAX).with_max_fps(u32::MAX),
     };
 
     // Start the app's event loop
