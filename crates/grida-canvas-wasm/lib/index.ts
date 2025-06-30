@@ -46,7 +46,7 @@ const ApplicationCommandID = {
   Pan: 4,
 } as const;
 
-class Grida2D {
+export class Grida2D {
   private ptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings, ptr: number) {

@@ -11,6 +11,7 @@ import {
 } from "@/grida-canvas-react";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { Hotkeys } from "@/grida-canvas-react/viewport/hotkeys";
+import init, { type Grida2D } from "@grida/canvas-wasm";
 
 // const imageNode: grida.program.nodes.ImageNode = {
 //   type: "image",
@@ -73,25 +74,30 @@ import { Hotkeys } from "@/grida-canvas-react/viewport/hotkeys";
 //   rotation: 0,
 // };
 
-export default function SkiaCanvasKitExperimentalPage() {
+export default function CanvasWasmExperimentalPage() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  // const rendererRef = React.useRef<CanvasKitRenderer | null>(null);
+  const rendererRef = React.useRef<Grida2D | null>(null);
   const editor = useEditor();
 
   React.useEffect(() => {
-    // if (canvasRef.current && !rendererRef.current) {
-    //   const renderer = new CanvasKitRenderer(canvasRef.current);
-    //   rendererRef.current = renderer;
-    //   editor.subscribeWithSelector(
-    //     (state) => state.document.nodes,
-    //     (editor, selected) => {
-    //       rendererRef.current?.setDocument(
-    //         selected,
-    //         editor.state.document.scenes["main"].children[0]
-    //       );
-    //     }
-    //   );
-    // }
+    if (canvasRef.current && !rendererRef.current) {
+      init({
+        locateFile: (path) =>
+          `https://unpkg.com/@grida/canvas-wasm@0.0.3/dist/${path}`,
+      }).then((factory) => {
+        console.log("grida wasm initialized");
+        const app = factory.createWebGLCanvasSurface(canvasRef.current!);
+        rendererRef.current = app;
+        editor.subscribeWithSelector(
+          (state) => state.document.nodes,
+          (editor, selected) => {
+            app.loadScene(
+              JSON.stringify(editor.state.document.scenes["main"].children[0])
+            );
+          }
+        );
+      });
+    }
   }, []);
 
   return (
