@@ -29,6 +29,7 @@ pub enum HostEvent {
 /// Shared application logic independent of the final target.
 pub struct UnknownTargetApplication {
     pub(crate) debug: bool,
+    pub(crate) verbose: bool,
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
@@ -70,6 +71,7 @@ impl UnknownTargetApplication {
 
         Self {
             debug,
+            verbose: false,
             clock: clock::EventLoopClock::new(),
             renderer,
             state,
@@ -256,14 +258,22 @@ impl UnknownTargetApplication {
         false
     }
 
-    fn toggle_debug(&mut self) {
-        self.debug = !self.debug;
+    pub fn set_debug(&mut self, debug: bool) {
+        self.debug = debug;
 
         self.devtools_rendering_show_fps = self.debug;
         self.devtools_rendering_show_tiles = self.debug;
         self.devtools_rendering_show_stats = self.debug;
         self.devtools_rendering_show_hit_overlay = self.debug;
         self.devtools_rendering_show_ruler = self.debug;
+    }
+
+    pub fn toggle_debug(&mut self) {
+        self.set_debug(!self.debug);
+    }
+
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
     }
 
     pub(crate) fn resource_loaded(&mut self) {
@@ -310,7 +320,11 @@ impl UnknownTargetApplication {
             stats.draw.tiles_total,
             stats.draw.tiles_used,
         );
-        println!("{}", stat_string);
+
+        if self.verbose {
+            println!("{}", stat_string);
+        }
+
         self.last_stats = Some(stat_string);
 
         self.last_frame_time = __frame_start;

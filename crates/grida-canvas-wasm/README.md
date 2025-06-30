@@ -25,3 +25,27 @@ const scene = factory.createWebGLCanvasSurface(canvas);
 // ready to draw
 scene.loadDummyScene();
 ```
+
+## Serving locally for development
+
+For local development, this package has `serve` ready.
+
+```bash
+pnpm install
+pnpm serve
+# will be served at http://localhost:4020/
+# e.g. http://localhost:4020/dist/index.js
+```
+
+For instance, you can use the locally served wasm like below.
+
+```ts
+await init({
+  locateFile: (path) => {
+    if (process.env.NODE_ENV === "development") {
+      return `http://localhost:4020/dist/${path}`;
+    }
+    `https://unpkg.com/@grida/canvas-wasm@latest/${path}`,
+  },
+});
+```

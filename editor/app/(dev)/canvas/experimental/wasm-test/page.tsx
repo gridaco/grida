@@ -13,7 +13,7 @@ export default function CanvasWasmExperimentalPage() {
       const canvasel = canvasRef.current;
       init({
         locateFile: (path) =>
-          `https://unpkg.com/@grida/canvas-wasm@0.0.3/dist/${path}`,
+          `https://unpkg.com/@grida/canvas-wasm@latest/dist/${path}`,
       }).then((factory) => {
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
@@ -44,8 +44,8 @@ export default function CanvasWasmExperimentalPage() {
         <aside className="flex-1 relative">
           <canvas
             ref={canvasRef}
-            width={1080}
-            height={1080}
+            width={1000}
+            height={1000}
             className="absolute inset-0 z-10 bg-transparent"
           />
         </aside>

@@ -35,7 +35,10 @@ class ApplicationFactory {
     });
     this.module.GL.makeContextCurrent(handle);
     const ptr = this.module._init(canvas.width, canvas.height);
-    return new Grida2D(this.module, ptr);
+    const _ = new Grida2D(this.module, ptr);
+    _.resize(canvas.width, canvas.height);
+
+    return _;
   }
 
   createWebGLCanvasSurfaceById(htmlcanvasid: string) {

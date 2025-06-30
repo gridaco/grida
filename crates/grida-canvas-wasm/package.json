@@ -18,13 +18,15 @@
   "homepage": "https://grida.co",
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "serve": "serve -p 4020"
   },
   "files": [
     "dist"
   ],
   "devDependencies": {
     "@webgpu/types": "^0.1.61",
+    "serve": "^14.2.4",
     "tsup": "^8.5.0"
   }
 }

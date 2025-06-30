@@ -205,6 +205,7 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
+        self.scene_cache = cache::scene::SceneCache::new();
         self.scene_cache.update_geometry(&scene);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);

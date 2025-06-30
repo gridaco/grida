@@ -83,13 +83,24 @@ export default function CanvasWasmExperimentalPage() {
 
   React.useEffect(() => {
     if (canvasRef.current && !rendererRef.current) {
+      const canvasel = canvasRef.current;
       init({
-        locateFile: (path) =>
-          `https://unpkg.com/@grida/canvas-wasm@0.0.3/dist/${path}`,
+        locateFile: (path) => {
+          if (process.env.NODE_ENV === "development") {
+            return `http://localhost:4020/dist/${path}`;
+          }
+          return `https://unpkg.com/@grida/canvas-wasm@latest/dist/${path}`;
+        },
       }).then((factory) => {
         console.log("grida wasm initialized");
-        const app = factory.createWebGLCanvasSurface(canvasRef.current!);
-        rendererRef.current = app;
+        const grida = factory.createWebGLCanvasSurface(canvasel);
+        grida.devtools_rendering_set_show_tiles(true);
+        grida.devtools_rendering_set_show_fps_meter(true);
+        grida.devtools_rendering_set_show_stats(false);
+        grida.devtools_rendering_set_show_hit_testing(true);
+        grida.devtools_rendering_set_show_ruler(true);
+
+        rendererRef.current = grida;
         editor.subscribeWithSelector(
           (state) => state.document.nodes,
           (editor, selected) => {
@@ -100,8 +111,9 @@ export default function CanvasWasmExperimentalPage() {
             requestAnimationFrame(() => {
               console.log(scenedata);
               // app.loadScene(JSON.stringify(scenedata));
-              app.loadScene(__test_document);
-              app.redraw();
+              grida.loadScene(__test_document);
+              grida.redraw();
+              grida.resize(canvasel.width, canvasel.height);
               // app.loadDummyScene();
             });
           }
