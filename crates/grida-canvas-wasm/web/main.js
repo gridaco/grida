@@ -14,7 +14,12 @@ function resizeCanvasToDisplaySize(canvas) {
 }
 
 // This loads and initialize our WASM module
-createGridaCanvas().then((GridaCanvas) => {
+createGridaCanvas({
+  locateFile: (path, directory) => {
+    console.log(path, directory);
+    return directory + path;
+  },
+}).then((GridaCanvas) => {
   console.log(GridaCanvas);
   // Create the WebGL context
   let context;
@@ -54,7 +59,7 @@ createGridaCanvas().then((GridaCanvas) => {
   };
 
   // Load the demo scene from JSON
-  fetch("http://grida.co/examples/canvas/hero-main-demo.grida")
+  fetch("./demo.grida")
     .then((r) => r.text())
     .then((txt) => {
       const len = GridaCanvas.lengthBytesUTF8(txt) + 1;
