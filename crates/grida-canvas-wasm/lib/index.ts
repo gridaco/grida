@@ -18,12 +18,7 @@ class ApplicationFactory {
     this.module = module;
   }
 
-  createCanvasSurface(htmlcanvasid: string) {
-    const canvas = document.getElementById(htmlcanvasid) as HTMLCanvasElement;
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new Error(`Element with id ${htmlcanvasid} is not a <canvas>`);
-    }
-
+  createWebGLCanvasSurface(canvas: HTMLCanvasElement) {
     const context = canvas.getContext("webgl2", {
       antialias: true,
       depth: true,
@@ -40,11 +35,6 @@ class ApplicationFactory {
     });
     this.module.GL.makeContextCurrent(handle);
     const ptr = this.module._init(canvas.width, canvas.height);
-    return new Grida2D(this.module, ptr);
-  }
-
-  createSurface(width: number, height: number) {
-    const ptr = this.module._init(width, height);
     return new Grida2D(this.module, ptr);
   }
 }
