@@ -187,6 +187,21 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+
+      // static files (under //public)
+      {
+        source: "/examples/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*",
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, OPTIONS",
+          },
+        ],
+      },
     ];
   },
   turbopack: {
