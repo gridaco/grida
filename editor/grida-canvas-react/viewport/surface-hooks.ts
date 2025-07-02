@@ -1,13 +1,13 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
-import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
+import type { editor } from "@/grida-canvas";
 import "core-js/features/object/group-by";
 
 export interface SurfaceNodeObject {
@@ -168,7 +168,7 @@ function computeSurfaceSelectionGroup({
   items,
   transform,
 }: {
-  geometry: dq.GeometryQuery;
+  geometry: editor.api.IDocumentGeometryQuery;
   group: string;
   items: string[];
   transform: cmath.Transform;
@@ -271,7 +271,7 @@ export function useSelectionGroups(
     const groups = groupkeys.map((key) => {
       const items = grouped[key]!;
       const group = computeSurfaceSelectionGroup({
-        geometry: instance.geometry,
+        geometry: instance,
         group: key,
         items: items.map((it) => it.id),
         transform,

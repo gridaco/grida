@@ -1,7 +1,6 @@
 import type { Editor } from "../editor";
 import equal from "fast-deep-equal";
 import cmath from "@grida/cmath";
-import { domapi } from "../backends/dom";
 
 export class EditorFollowPlugin {
   private _isFollowing: boolean = false;

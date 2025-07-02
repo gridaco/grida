@@ -1483,6 +1483,33 @@ export namespace editor.api {
     drag(event: TCanvasEventTargetDragGestureState): void;
   }
 
+  export interface IDocumentGeometryQuery {
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point
+     * @returns
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: NodeID): cmath.Rectangle | null;
+    /**
+     * returns the absolute rotation of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteRotation(node_id: NodeID): number;
+  }
+
   export interface IDocumentEditorActions {
     loadScene(scene_id: string): void;
     createScene(scene?: grida.program.document.SceneInit): void;
@@ -1534,7 +1561,7 @@ export namespace editor.api {
     getNodeSnapshotById(node_id: NodeID): Readonly<grida.program.nodes.Node>;
     getNodeById(node_id: NodeID): NodeProxy<grida.program.nodes.Node>;
     getNodeDepth(node_id: NodeID): number;
-    getNodeAbsoluteRotation(node_id: NodeID): number;
+    //
 
     //
     insertNode(prototype: grida.program.nodes.NodePrototype): NodeID;

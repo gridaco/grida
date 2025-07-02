@@ -1,6 +1,5 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
-import { dq } from "../query";
 
 /**
  * A dom api for the canvas html backend.
@@ -113,7 +112,28 @@ export namespace domapi {
     return node_elements.map((el) => el.id);
   }
 
-  export class DOMGeometryQuery implements dq.GeometryQuery {
+  export interface GeometryQuery {
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point
+     * @returns
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
+  }
+
+  export class DOMGeometryQuery implements GeometryQuery {
     private content: DOMContentApi;
 
     constructor(

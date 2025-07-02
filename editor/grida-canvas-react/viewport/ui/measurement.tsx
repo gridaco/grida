@@ -8,7 +8,6 @@ import cmath from "@grida/cmath";
 import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { useLayoutEffect, useState } from "react";
-import { domapi } from "@/grida-canvas/backends/dom";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 
 function useMeasurement() {

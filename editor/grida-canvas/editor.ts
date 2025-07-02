@@ -41,6 +41,7 @@ function resolveNumberChangeValue(
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
+    editor.api.IDocumentGeometryQuery,
     editor.api.ISchemaActions,
     editor.api.INodeChangeActions,
     editor.api.IBrushToolActions,
@@ -56,7 +57,7 @@ export class Editor
   private mstate: editor.state.IEditorState;
 
   readonly viewport: domapi.DOMViewportApi;
-  readonly geometry: dq.GeometryQuery;
+  readonly geometry: domapi.GeometryQuery;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
@@ -190,7 +191,13 @@ export class Editor
 
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
-    this.mstate = reducer(this.mstate, action);
+    this.mstate = reducer(this.mstate, action, {
+      geometry: this,
+      viewport: {
+        width: this.viewport.size.width,
+        height: this.viewport.size.height,
+      },
+    });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
   }
@@ -459,33 +466,6 @@ export class Editor
 
   public getNodeDepth(node_id: editor.NodeID): number {
     return dq.getDepth(this.mstate.document_ctx, node_id);
-  }
-
-  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
-    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
-
-    let rotation = 0;
-    // Calculate the absolute rotation
-    try {
-      for (const parent_id of parent_ids) {
-        const parent_node = this.getNodeSnapshotById(parent_id);
-        assert(parent_node, `parent node not found: ${parent_id}`);
-        if ("rotation" in parent_node) {
-          rotation += parent_node.rotation ?? 0;
-        }
-      }
-
-      // finally, add the node's own rotation
-      const node = this.getNodeSnapshotById(node_id);
-      assert(node, `node not found: ${node_id}`);
-      if ("rotation" in node) {
-        rotation += node.rotation ?? 0;
-      }
-    } catch (e) {
-      reportError(e);
-    }
-
-    return rotation;
   }
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
@@ -758,6 +738,51 @@ export class Editor
   }
 
   // #endregion IDocumentEditorActions implementation
+
+  // #region IDocumentGeometryQuery implementation
+
+  public getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+    return this.geometry.getNodeIdsFromPoint(point);
+  }
+
+  public getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
+    return this.geometry.getNodeIdsFromEnvelope(envelope);
+  }
+
+  public getNodeAbsoluteBoundingRect(
+    node_id: editor.NodeID
+  ): cmath.Rectangle | null {
+    return this.geometry.getNodeAbsoluteBoundingRect(node_id);
+  }
+
+  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
+    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
+
+    let rotation = 0;
+    // Calculate the absolute rotation
+    try {
+      for (const parent_id of parent_ids) {
+        const parent_node = this.getNodeSnapshotById(parent_id);
+        assert(parent_node, `parent node not found: ${parent_id}`);
+        if ("rotation" in parent_node) {
+          rotation += parent_node.rotation ?? 0;
+        }
+      }
+
+      // finally, add the node's own rotation
+      const node = this.getNodeSnapshotById(node_id);
+      assert(node, `node not found: ${node_id}`);
+      if ("rotation" in node) {
+        rotation += node.rotation ?? 0;
+      }
+    } catch (e) {
+      reportError(e);
+    }
+
+    return rotation;
+  }
+
+  // #endregion IDocumentGeometryQuery implementation
 
   // #region ISchemaActions implementation
   public schemaDefineProperty(

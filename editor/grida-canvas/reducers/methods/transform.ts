@@ -5,7 +5,6 @@ import { self_try_remove_node } from "./delete";
 import cmath from "@grida/cmath";
 import { dnd } from "@grida/cmath/_dnd";
 import { dq } from "@/grida-canvas/query";
-import { domapi } from "../../backends/dom";
 import {
   getSnapTargets,
   snapObjectsTranslation,
@@ -17,6 +16,7 @@ import assert from "assert";
 import grida from "@grida/schema";
 import vn from "@grida/vn";
 import nid from "../tools/id";
+import type { ReducerContext } from "..";
 
 /**
  * Cardinal direction vector
@@ -40,7 +40,7 @@ const cardinal_direction_vector = {
 
 export function self_update_gesture_transform<
   S extends editor.state.IEditorState,
->(draft: Draft<S>) {
+>(draft: Draft<S>, context: ReducerContext) {
   if (draft.gesture.type === "idle") return;
   if (draft.gesture.type === "draw") return;
   if (draft.gesture.type === "corner-radius") return;
@@ -53,13 +53,13 @@ export function self_update_gesture_transform<
 
   switch (draft.gesture.type) {
     case "translate": {
-      return __self_update_gesture_transform_translate(draft);
+      return __self_update_gesture_transform_translate(draft, context);
     }
     case "sort": {
       return __self_update_gesture_transform_translate_sort(draft);
     }
     case "scale": {
-      return __self_update_gesture_transform_scale(draft);
+      return __self_update_gesture_transform_scale(draft, context);
     }
     case "rotate": {
       return __self_update_gesture_transform_rotate(draft);
@@ -72,7 +72,8 @@ export function self_update_gesture_transform<
 }
 
 function __self_update_gesture_transform_translate(
-  draft: Draft<editor.state.IEditorState>
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
 ) {
   assert(draft.gesture.type === "translate", "Gesture type must be translate");
   assert(draft.scene_id, "scene_id is not set");
@@ -278,11 +279,10 @@ function __self_update_gesture_transform_translate(
   }
   // #endregion
 
-  const cdom = new domapi.DOMGeometryQuery(draft.transform);
   const snap_target_node_ids = getSnapTargets(current_selection, draft);
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
-      const r = cdom.getNodeAbsoluteBoundingRect(node_id);
+      const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
       if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
       return r!;
     })
@@ -315,7 +315,8 @@ function __self_update_gesture_transform_translate(
       let relative_position: cmath.Vector2;
       if (parent_id) {
         // sub node
-        const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
         if (!parent_rect) {
           console.error("below error is caused by");
@@ -433,7 +434,8 @@ function __self_update_gesture_transform_translate_sort(
 }
 
 function __self_update_gesture_transform_scale(
-  draft: Draft<editor.state.IEditorState>
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
 ) {
   assert(draft.gesture.type === "scale", "Gesture type must be scale");
   assert(draft.scene_id, "scene_id is not set");
@@ -521,9 +523,9 @@ function __self_update_gesture_transform_scale(
         preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
       });
     } else {
-      const cdom = new domapi.DOMGeometryQuery(draft.transform);
       const parent_id = dq.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
+      const parent_rect =
+        context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
       assert(
         parent_rect,
