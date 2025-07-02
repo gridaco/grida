@@ -621,12 +621,12 @@ function __self_evt_on_drag_end(
     case "zoom": {
       if (draft.marquee) {
         // update zoom
-        const _viewport_rect = domapi.get_viewport_rect();
+        const { width, height } = domapi.getViewportSize();
         const vrect = {
           x: 0,
           y: 0,
-          width: _viewport_rect.width,
-          height: _viewport_rect.height,
+          width,
+          height,
         };
         const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
         const t = cmath.ext.viewport.transformToFit(vrect, mrect);

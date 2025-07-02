@@ -1388,7 +1388,7 @@ export class Editor
     let ox, oy: number;
     if (origin === "center") {
       // Canvas size (you need to know or pass this)
-      const { width, height } = domapi.get_viewport_rect();
+      const { width, height } = domapi.getViewportSize();
 
       // Calculate the absolute transform origin
       ox = width / 2;
@@ -1453,8 +1453,8 @@ export class Editor
 
     const area = cmath.rect.union(rects);
 
-    const _view = domapi.get_viewport_rect();
-    const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+    const { width, height } = domapi.getViewportSize();
+    const view = { x: 0, y: 0, width, height };
 
     const next_transform = cmath.ext.viewport.transformToFit(
       view,
@@ -1491,14 +1491,11 @@ export class Editor
   // #region IEventTargetActions implementation
 
   pointerDown(event: PointerEvent) {
-    const els = domapi.get_grida_node_elements_from_point(
-      event.clientX,
-      event.clientY
-    );
+    const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
 
     this.dispatch({
       type: "event-target/event/on-pointer-down",
-      node_ids_from_point: els.map((n) => n.id),
+      node_ids_from_point: ids,
       shiftKey: event.shiftKey,
     });
   }
@@ -1514,7 +1511,7 @@ export class Editor
   ) => {
     const { clientX, clientY } = pointer_event;
 
-    const canvas_rect = domapi.get_viewport_rect();
+    const canvas_rect = domapi.getViewportRect();
     const position = {
       x: clientX - canvas_rect.left,
       y: clientY - canvas_rect.top,
@@ -1526,14 +1523,11 @@ export class Editor
   private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
+      const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
 
       this.dispatch({
         type: "event-target/event/on-pointer-move-raycast",
-        node_ids_from_point: els.map((n) => n.id),
+        node_ids_from_point: ids,
         position,
         shiftKey: event.shiftKey,
       });
@@ -1554,14 +1548,11 @@ export class Editor
   }
 
   click(event: MouseEvent) {
-    const els = domapi.get_grida_node_elements_from_point(
-      event.clientX,
-      event.clientY
-    );
+    const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
 
     this.dispatch({
       type: "event-target/event/on-click",
-      node_ids_from_point: els.map((n) => n.id),
+      node_ids_from_point: ids,
       shiftKey: event.shiftKey,
     });
   }

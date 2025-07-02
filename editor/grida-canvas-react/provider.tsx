@@ -863,15 +863,12 @@ export function useMultipleSelectionOverlayClick(): UseMultipleSelectionOverlayC
   //
   const multipleSelectionOverlayClick = useCallback(
     (selection: string[], event: MouseEvent) => {
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
+      const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
 
       dispatch({
         type: "event-target/event/multiple-selection-overlay/on-click",
         selection: selection,
-        node_ids_from_point: els.map((n) => n.id),
+        node_ids_from_point: ids,
         shiftKey: event.shiftKey,
       });
     },
@@ -1023,7 +1020,7 @@ export function useDataTransferEventTarget() {
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) => {
-      const viewportdomrect = domapi.get_viewport_rect();
+      const viewportdomrect = domapi.getViewportRect();
       const viewport_pos: cmath.Vector2 = [
         viewportdomrect.x,
         viewportdomrect.y,

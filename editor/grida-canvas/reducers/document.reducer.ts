@@ -234,15 +234,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // [root rect for calculating next placement]
       // if the insertion parent is null (root), use viewport rect (canvas space)
       // otherwise, use the parent's bounding rect (canvas space) (TODO:)
-      const _viewport_rect = domapi.get_viewport_rect();
+      const { width, height } = domapi.getViewportSize();
 
       // apply the inset before convering to canvas space
       const _inset_rect = cmath.rect.inset(
         {
           x: 0,
           y: 0,
-          width: _viewport_rect.width,
-          height: _viewport_rect.height,
+          width,
+          height,
         },
         PLACEMENT_VIEWPORT_INSET
       );

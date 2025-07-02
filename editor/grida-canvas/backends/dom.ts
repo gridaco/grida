@@ -7,13 +7,63 @@ import cmath from "@grida/cmath";
  * @deprecated
  */
 export namespace domapi {
+  type INode = {
+    id: string;
+  };
+
   export namespace k {
     export const VIEWPORT_ELEMENT_ID = "grida-canvas-sdk-viewport";
     export const EDITOR_CONTENT_ELEMENT_ID = "grida-canvas-sdk-editor-content";
   }
 
-  export function get_node_element(node_id: string) {
-    return window.document.getElementById(node_id);
+  /**
+   * All elements with the `data-grida-node-id` attribute.
+   * @deprecated Expensive
+   */
+  function __get_grida_node_elements(): NodeListOf<Element> | undefined {
+    const content = __get_content_element();
+    return content?.querySelectorAll(
+      `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
+    );
+  }
+
+  function __get_content_element() {
+    return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
+  }
+
+  function __get_viewport_element() {
+    return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
+  }
+
+  export function getViewportRect() {
+    const el = __get_viewport_element();
+    return el!.getBoundingClientRect();
+  }
+
+  export function getViewportSize(): { width: number; height: number } {
+    const el = __get_viewport_element();
+    return {
+      width: el!.clientWidth,
+      height: el!.clientHeight,
+    };
+  }
+
+  /**
+   *
+   * @param x clientX
+   * @param y clientY
+   * @returns
+   */
+  export function getNodeIdsFromPoint(x: number, y: number): string[] {
+    const hits = window.document.elementsFromPoint(x, y);
+
+    const node_elements = hits.filter((h) =>
+      h.attributes.getNamedItem(
+        grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
+      )
+    );
+
+    return node_elements.map((el) => el.id);
   }
 
   export class CanvasDOM {
@@ -22,15 +72,11 @@ export namespace domapi {
       this.scale = cmath.transform.getScale(transform);
     }
 
-    getAllNodeElements(): NodeListOf<Element> | undefined {
-      return get_grida_node_elements();
-    }
-
     getNodesIntersectsArea(area: cmath.Rectangle): string[] {
       const contained: string[] = [];
-      const all_els = get_grida_node_elements();
+      const all_els = __get_grida_node_elements();
 
-      all_els?.forEach((el) => {
+      all_els?.forEach((el: INode) => {
         const rect = this.getNodeBoundingRect(el.id);
         if (!rect) return;
         if (cmath.rect.intersects(rect, area)) {
@@ -47,8 +93,10 @@ export namespace domapi {
      * @returns
      */
     getNodeBoundingRect(node_id: string): cmath.Rectangle | null {
-      const contentrect = get_content_element()?.getBoundingClientRect();
-      const noderect = get_node_element(node_id)?.getBoundingClientRect();
+      const contentrect = __get_content_element()?.getBoundingClientRect();
+      const noderect = window.document
+        .getElementById(node_id)
+        ?.getBoundingClientRect();
 
       if (!contentrect) {
         throw new Error("renderer missing - content element rect is null");
@@ -83,47 +131,5 @@ export namespace domapi {
 
       return rect;
     }
-  }
-
-  function get_content_element() {
-    return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
-  }
-
-  function get_viewport_element() {
-    return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
-  }
-
-  export function get_viewport_rect() {
-    const el = get_viewport_element();
-    return el!.getBoundingClientRect();
-  }
-
-  /**
-   * All elements with the `data-grida-node-id` attribute.
-   * @deprecated Expensive
-   */
-  function get_grida_node_elements(): NodeListOf<Element> | undefined {
-    const content = get_content_element();
-    return content?.querySelectorAll(
-      `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
-    );
-  }
-
-  /**
-   *
-   * @param x clientX
-   * @param y clientY
-   * @returns
-   */
-  export function get_grida_node_elements_from_point(x: number, y: number) {
-    const hits = window.document.elementsFromPoint(x, y);
-
-    const node_elements = hits.filter((h) =>
-      h.attributes.getNamedItem(
-        grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
-      )
-    );
-
-    return node_elements;
   }
 }
