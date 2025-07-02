@@ -10,6 +10,7 @@ use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
+use math2::transform::AffineTransform;
 
 /// Host events
 pub enum HostEvent {
@@ -220,6 +221,10 @@ impl UnknownTargetApplication {
             self.queue();
         }
         self.hit_test_result = new_hit_result;
+    }
+
+    pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {
+        self.renderer.camera.set_transform(transform); //
     }
 
     /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.

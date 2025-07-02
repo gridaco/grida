@@ -21,6 +21,15 @@ impl AffineTransform {
         }
     }
 
+    /// Creates a transform from the matrix elements.
+    /// [a, c, e(tx)]
+    /// [b, d, f(ty)]
+    pub fn from_acebdf(a: f32, c: f32, e: f32, b: f32, d: f32, f: f32) -> Self {
+        Self {
+            matrix: [[a, c, e], [b, d, f]],
+        }
+    }
+
     /// Creates a rotation transform in degrees, counter-clockwise.
     pub fn from_rotatation(degrees: f32) -> Self {
         let rad = degrees.to_radians();

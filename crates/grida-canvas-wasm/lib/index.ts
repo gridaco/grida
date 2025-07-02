@@ -1,6 +1,8 @@
 import createGridaCanvas from "./bin/grida-canvas-wasm";
 import { GridaCanvasInitOptions } from "./api";
 
+type Transform2D = [[number, number, number], [number, number, number]];
+
 export default async function init(
   opts?: GridaCanvasInitOptions
 ): Promise<ApplicationFactory> {
@@ -120,6 +122,18 @@ export class Grida2D {
 
   redraw() {
     this.module._redraw(this.ptr);
+  }
+
+  setMainCameraTransform(transform: Transform2D) {
+    this.module._set_main_camera_transform(
+      this.ptr,
+      transform[0][0], // a
+      transform[0][1], // c
+      transform[0][2], // e
+      transform[1][0], // b
+      transform[1][1], // d
+      transform[1][2] // f
+    );
   }
 
   execCommand(command: "ZoomIn" | "ZoomOut") {

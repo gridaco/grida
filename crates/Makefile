@@ -6,9 +6,13 @@ WORKDIR=workspace
 OUT_DIR=$(WASM_CRATE)/target
 BIN_DIR=$(WASM_CRATE)/lib/bin
 
-.PHONY: all build extract bin
+.PHONY: all clean build extract bin
 
 all: build extract bin
+
+clean:
+	-@docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
+	-@docker rmi -f $(IMAGE_NAME) 2>/dev/null || true
 
 build:
 	docker build -f Dockerfile -t $(IMAGE_NAME) .

@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 cg = { path = "../grida-canvas" }
+math2 = { path = "../math2" }
 
 [features]
 default = []

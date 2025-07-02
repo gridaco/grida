@@ -58,6 +58,15 @@ declare namespace createGridaCanvas {
       x: number,
       y: number
     ): void;
+    _set_main_camera_transform(
+      state: GridaCanvasWebGlApplicationPtr,
+      a: number,
+      c: number,
+      e: number,
+      b: number,
+      d: number,
+      f: number
+    ): void;
     _command(
       state: GridaCanvasWebGlApplicationPtr,
       id: number,

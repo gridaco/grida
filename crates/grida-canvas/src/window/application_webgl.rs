@@ -5,6 +5,7 @@ use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
+use math2::transform::AffineTransform;
 
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
@@ -111,6 +112,10 @@ impl WebGlApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.app.pointer_move(x, y);
+    }
+
+    pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {
+        self.app.set_main_camera_transform(transform);
     }
 
     /// Forward a [`ApplicationCommand`] to the inner application.

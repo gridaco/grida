@@ -1069,6 +1069,7 @@ name = "grida-canvas-wasm"
 version = "0.0.0"
 dependencies = [
  "cg",
+ "math2",
 ]
 
 [[package]]

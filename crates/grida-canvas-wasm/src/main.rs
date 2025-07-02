@@ -2,7 +2,7 @@
 
 #[cfg(target_arch = "wasm32")]
 use cg::window::application_webgl::WebGlApplication;
-#[cfg(target_arch = "wasm32")]
+use math2::transform::AffineTransform;
 use std::boxed::Box;
 
 #[cfg(target_arch = "wasm32")]
@@ -100,6 +100,22 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
             _ => ApplicationCommand::None,
         };
         app.command(cmd);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn set_main_camera_transform(
+    app: *mut WebGlApplication,
+    a: f32,
+    c: f32,
+    e: f32,
+    b: f32,
+    d: f32,
+    f: f32,
+) {
+    if let Some(app) = app.as_mut() {
+        app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
     }
 }
 
