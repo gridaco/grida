@@ -209,6 +209,7 @@ impl Renderer {
         self.scene_cache.update_geometry(&scene);
         self.scene_cache.update_layers(&scene);
         self.scene = Some(scene);
+        self.queue_stable();
     }
 
     fn queue(&mut self, stable: bool) {
