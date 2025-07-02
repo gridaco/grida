@@ -13,7 +13,6 @@ import {
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
 import { GoogleFontsManager } from "./components/google-fonts";
-import { domapi } from "../grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import type { Action } from "@/grida-canvas/action";
 import mixed, { PropertyCompareFn } from "@grida/mixed-properties";
@@ -860,10 +859,9 @@ export function useMultipleSelectionOverlayClick(): UseMultipleSelectionOverlayC
     [instance]
   );
 
-  //
   const multipleSelectionOverlayClick = useCallback(
     (selection: string[], event: MouseEvent) => {
-      const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
+      const ids = instance.getNodeIdsFromPointerEvent(event);
 
       dispatch({
         type: "event-target/event/multiple-selection-overlay/on-click",
@@ -1018,17 +1016,6 @@ export function useDataTransferEventTarget() {
   }));
   const current_clipboard = useEditorState(instance, (s) => s.user_clipboard);
 
-  const canvasXY = useCallback(
-    (xy: cmath.Vector2) => {
-      const translate = cmath.transform.getTranslate(state.transform);
-      return cmath.vector2.quantize(
-        cmath.vector2.sub(xy, instance.viewport.offset, translate),
-        1
-      );
-    },
-    [state.transform]
-  );
-
   const insertText = useCallback(
     (
       text: string,
@@ -1037,7 +1024,7 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const [x, y] = canvasXY(
+      const [x, y] = instance.clientPointToCanvasPoint(
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
@@ -1047,7 +1034,7 @@ export function useDataTransferEventTarget() {
       node.$.left = x;
       node.$.top = y;
     },
-    [instance, canvasXY]
+    [instance]
   );
 
   const insertImage = useCallback(
@@ -1059,7 +1046,7 @@ export function useDataTransferEventTarget() {
         clientY: number;
       }
     ) => {
-      const [x, y] = canvasXY(
+      const [x, y] = instance.clientPointToCanvasPoint(
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
@@ -1072,7 +1059,7 @@ export function useDataTransferEventTarget() {
       node.$.left = x;
       node.$.top = y;
     },
-    [instance, canvasXY]
+    [instance]
   );
 
   const insertSVG = useCallback(
@@ -1096,7 +1083,7 @@ export function useDataTransferEventTarget() {
           ? node.$.height / 2
           : 0;
 
-      const [x, y] = canvasXY(
+      const [x, y] = instance.clientPointToCanvasPoint(
         cmath.vector2.sub(
           position ? [position.clientX, position.clientY] : [0, 0],
           [center_dx, center_dy]
@@ -1107,7 +1094,7 @@ export function useDataTransferEventTarget() {
       node.$.left = x;
       node.$.top = y;
     },
-    [instance, canvasXY]
+    [instance]
   );
 
   const insertFromFile = useCallback(

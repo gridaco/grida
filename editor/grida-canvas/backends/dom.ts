@@ -77,47 +77,8 @@ export namespace domapi {
     }
   }
 
-  function __get_viewport_element() {
-    return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
-  }
-
-  /**
-   * @deprecated
-   */
-  export function getViewportSize(): { width: number; height: number } {
-    const el = __get_viewport_element();
-    const rect = el!.getBoundingClientRect();
-
-    return {
-      width: rect.width,
-      height: rect.height,
-    };
-  }
-
-  /**
-   *
-   * @param x clientX
-   * @param y clientY
-   * @returns
-   */
-  export function getNodeIdsFromPoint(point: cmath.Vector2): string[] {
-    const hits = window.document.elementsFromPoint(point[0], point[1]);
-
-    const node_elements = hits.filter((h) =>
-      h.attributes.getNamedItem(
-        grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
-      )
-    );
-
-    return node_elements.map((el) => el.id);
-  }
-
   export interface GeometryQuery {
-    /**
-     * returns a list of node ids that are intersecting with the point in canvas space
-     * @param point
-     * @returns
-     */
+    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
     getNodeIdsFromPoint(point: cmath.Vector2): string[];
     /**
      * returns a list of node ids that are intersecting with the envelope in canvas space
@@ -137,7 +98,8 @@ export namespace domapi {
     private content: DOMContentApi;
 
     constructor(
-      readonly _transform: cmath.Transform | (() => cmath.Transform)
+      readonly _transform: cmath.Transform | (() => cmath.Transform),
+      readonly canvasPointToClientPoint: (point: cmath.Vector2) => cmath.Vector2
     ) {
       this.content = new DOMContentApi(k.EDITOR_CONTENT_ELEMENT_ID);
     }
@@ -149,12 +111,30 @@ export namespace domapi {
       return this._transform;
     }
 
-    /**
-     * @deprecated not accurately implemented. - does not convert the point.
-     */
+    getNodeIdsFromPointerEvent(event: {
+      clientX: number;
+      clientY: number;
+    }): string[] {
+      const hits = window.document.elementsFromPoint(
+        event.clientX,
+        event.clientY
+      );
+
+      const node_elements = hits.filter((h) =>
+        h.attributes.getNamedItem(
+          grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
+        )
+      );
+
+      return node_elements.map((el) => el.id);
+    }
+
     getNodeIdsFromPoint(point: cmath.Vector2): string[] {
-      // TODO: convert point to window space
-      return domapi.getNodeIdsFromPoint(point);
+      const _p = this.canvasPointToClientPoint(point);
+      return this.getNodeIdsFromPointerEvent({
+        clientX: _p[0],
+        clientY: _p[1],
+      });
     }
 
     getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {

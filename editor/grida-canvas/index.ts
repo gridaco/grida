@@ -1486,25 +1486,31 @@ export namespace editor.api {
   export interface IDocumentGeometryQuery {
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
-     * @param point
+     * @param point canvas space point
      * @returns
      */
     getNodeIdsFromPoint(point: cmath.Vector2): string[];
     /**
+     * returns a list of node ids that are intersecting with the pointer event
+     * @param event window event
+     * @returns
+     */
+    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    /**
      * returns a list of node ids that are intersecting with the envelope in canvas space
-     * @param envelope
+     * @param envelope canvas space envelope
      * @returns
      */
     getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
     /**
      * returns a bounding rect of the node in canvas space
-     * @param node_id
+     * @param node_id node id
      * @returns
      */
     getNodeAbsoluteBoundingRect(node_id: NodeID): cmath.Rectangle | null;
     /**
      * returns the absolute rotation of the node in canvas space
-     * @param node_id
+     * @param node_id node id
      * @returns
      */
     getNodeAbsoluteRotation(node_id: NodeID): number;

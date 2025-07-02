@@ -73,7 +73,10 @@ export class Editor
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
     this.viewport = new domapi.DOMViewportApi(viewport_id);
-    this.geometry = new domapi.DOMGeometryQuery(() => this.mstate.transform);
+    this.geometry = new domapi.DOMGeometryQuery(
+      () => this.mstate.transform,
+      this.canvasPointToClientPoint
+    );
     //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
     instanceConfig.onCreate?.(this);
@@ -143,6 +146,75 @@ export class Editor
     });
 
     return blob;
+  }
+
+  /**
+   * Convert a point in client (window) to viewport relative (offset applied) point.
+   * @param pointer_event
+   * @returns viewport relative point
+   */
+  private pointerEventToViewportPoint = (
+    pointer_event: PointerEvent | MouseEvent
+  ) => {
+    const { clientX, clientY } = pointer_event;
+
+    const [x, y] = this.viewport.offset;
+    const position = {
+      x: clientX - x,
+      y: clientY - y,
+    };
+
+    return position;
+  };
+
+  /**
+   * Convert a point in client (window) space to canvas space.
+   * @param point
+   * @returns canvas space point
+   *
+   * @example
+   * ```ts
+   * const canvasPoint = editor.clientPointToCanvasPoint([event.clientX, event.clientY]);
+   * ```
+   */
+  public clientPointToCanvasPoint(point: cmath.Vector2): cmath.Vector2 {
+    const [clientX, clientY] = point;
+    const [offsetX, offsetY] = this.viewport.offset;
+
+    // Convert from client coordinates to viewport coordinates
+    const viewportX = clientX - offsetX;
+    const viewportY = clientY - offsetY;
+
+    // Apply inverse transform to convert from viewport space to canvas space
+    const inverseTransform = cmath.transform.invert(this.mstate.transform);
+    const canvasPoint = cmath.vector2.transform(
+      [viewportX, viewportY],
+      inverseTransform
+    );
+
+    return canvasPoint;
+  }
+
+  /**
+   * Convert a point in canvas space to client (window) space.
+   * @param point
+   * @returns client space point
+   *
+   * @example
+   * ```ts
+   * const clientPoint = editor.canvasPointToClientPoint([500, 500]);
+   * ```
+   */
+  public canvasPointToClientPoint(point: cmath.Vector2): cmath.Vector2 {
+    // Apply transform to convert from canvas space to viewport space
+    const viewportPoint = cmath.vector2.transform(point, this.mstate.transform);
+
+    // Convert from viewport coordinates to client coordinates
+    const [offsetX, offsetY] = this.viewport.offset;
+    const clientX = viewportPoint[0] + offsetX;
+    const clientY = viewportPoint[1] + offsetY;
+
+    return [clientX, clientY];
   }
 
   private __createNodeId(): editor.NodeID {
@@ -740,6 +812,12 @@ export class Editor
   // #endregion IDocumentEditorActions implementation
 
   // #region IDocumentGeometryQuery implementation
+
+  public getNodeIdsFromPointerEvent(
+    event: PointerEvent | MouseEvent
+  ): string[] {
+    return this.geometry.getNodeIdsFromPointerEvent(event);
+  }
 
   public getNodeIdsFromPoint(point: cmath.Vector2): string[] {
     return this.geometry.getNodeIdsFromPoint(point);
@@ -1520,7 +1598,7 @@ export class Editor
   // #region IEventTargetActions implementation
 
   pointerDown(event: PointerEvent) {
-    const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
+    const ids = this.getNodeIdsFromPointerEvent(event);
 
     this.dispatch({
       type: "event-target/event/on-pointer-down",
@@ -1535,25 +1613,10 @@ export class Editor
     });
   }
 
-  private __canvas_space_position = (
-    pointer_event: PointerEvent | MouseEvent
-  ) => {
-    const { clientX, clientY } = pointer_event;
-
-    const [x, y] = this.viewport.offset;
-    const position = {
-      x: clientX - x,
-      y: clientY - y,
-    };
-
-    return position;
-  };
-
   private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
-      const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
-
+      const ids = this.getNodeIdsFromPointerEvent(event);
       this.dispatch({
         type: "event-target/event/on-pointer-move-raycast",
         node_ids_from_point: ids,
@@ -1565,7 +1628,7 @@ export class Editor
   );
 
   pointerMove(event: PointerEvent) {
-    const position = this.__canvas_space_position(event);
+    const position = this.pointerEventToViewportPoint(event);
 
     this.dispatch({
       type: "event-target/event/on-pointer-move",
@@ -1577,7 +1640,7 @@ export class Editor
   }
 
   click(event: MouseEvent) {
-    const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
+    const ids = this.getNodeIdsFromPointerEvent(event);
 
     this.dispatch({
       type: "event-target/event/on-click",
