@@ -44,16 +44,24 @@ function SizedCanvasContent({
 
   useEffect(() => {
     if (rendererRef.current) {
+      // the transform is the canvas transform, which needs to be converted to camera transform.
+      // input transform = translation + scale of the viewport, top left aligned
+      // camera transform = transform of the camera, center aligned
+      // - translate the transform to the center of the canvas
+      // - reverse the transform to match the canvas coordinate system
+
+      const toCenter = cmath.transform.translate(cmath.transform.identity, [
+        -width / 2,
+        -height / 2,
+      ]);
+
+      const viewMatrix = cmath.transform.multiply(toCenter, transform);
+
       rendererRef.current.setMainCameraTransform(
-        // the transform is the canvas transform, which needs to be converted to camera transform.
-        // input transform = translation + scale of the viewport, top left aligned
-        // camera transform = transform of the camera, center aligned
-        // - translate the transform to the center of the canvas
-        // - reverse the transform to match the canvas coordinate system
-        cmath.transform.invert(transform)
+        cmath.transform.invert(viewMatrix)
       );
     }
-  }, [transform]);
+  }, [transform, width, height]);
 
   useEffect(() => {
     if (rendererRef.current && data) {
