@@ -1,5 +1,6 @@
 use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
 use crate::dummy;
+use crate::node::schema::Scene;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
@@ -24,6 +25,9 @@ pub enum HostEvent {
 
     /// notify font loaded
     FontLoaded(FontMessage),
+
+    /// load a new scene on the renderer
+    LoadScene(Scene),
 }
 
 /// Shared application logic independent of the final target.

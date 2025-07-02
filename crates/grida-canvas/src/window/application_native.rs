@@ -314,6 +314,11 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             HostEvent::ImageLoaded(_i) => {
                 self.app.resource_loaded();
             }
+            HostEvent::LoadScene(scene) => {
+                self.app.renderer.load_scene(scene);
+                self.app.renderer.queue_unstable();
+                self.window.request_redraw();
+            }
             _ => {}
         }
     }
