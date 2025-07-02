@@ -2,15 +2,31 @@ import * as React from "react";
 import { Editor } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
-
 import type { editor } from "@/grida-canvas";
 import deepEqual from "fast-deep-equal/es6/react.js";
-import { domapi } from "@/grida-canvas/backends/dom";
+import {
+  domapi,
+  DOMGeometryQuery,
+  NoopGeometryQuery,
+} from "@/grida-canvas/backends";
 
-export function useEditor(init?: editor.state.IEditorStateInit) {
+type EditorRenderingBackend = "dom" | "canvas";
+
+export function useEditor(
+  init?: editor.state.IEditorStateInit,
+  backend: EditorRenderingBackend = "dom"
+) {
   const [_editor] = React.useState(
     new Editor(
       domapi.k.VIEWPORT_ELEMENT_ID,
+      (_) => {
+        switch (backend) {
+          case "dom":
+            return new DOMGeometryQuery(_);
+          case "canvas":
+            return new NoopGeometryQuery();
+        }
+      },
       init ?? {
         debug: false,
         document: {

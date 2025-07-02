@@ -1416,7 +1416,7 @@ export namespace editor.api {
   }
 
   export interface ICameraActions {
-    transform(transform: cmath.Transform): void;
+    setTransform(transform: cmath.Transform): void;
 
     /**
      * zoom the camera by the given delta
@@ -1481,6 +1481,23 @@ export namespace editor.api {
     dragStart(event: PointerEvent): void;
     dragEnd(event: PointerEvent): void;
     drag(event: TCanvasEventTargetDragGestureState): void;
+  }
+
+  export interface IDocumentGeometryInterfaceProvider {
+    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
   }
 
   export interface IDocumentGeometryQuery {

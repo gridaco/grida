@@ -183,7 +183,7 @@ export default function CanvasPlayground({
   src,
   room_id,
 }: CanvasPlaygroundProps) {
-  const instance = useEditor(editor.state.init(document));
+  const instance = useEditor(editor.state.init(document), "canvas");
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useGoogleFontsList();
 
@@ -283,10 +283,10 @@ function Consumer() {
                   <ViewportRoot className="relative w-full h-full overflow-hidden">
                     <Hotkyes />
                     <EditorSurface />
-                    <AutoInitialFitTransformer>
+                    {/* <AutoInitialFitTransformer>
                       <StandaloneSceneContent />
-                    </AutoInitialFitTransformer>
-                    {/* <__WIP_UNSTABLE_WasmContent /> */}
+                    </AutoInitialFitTransformer> */}
+                    <__WIP_UNSTABLE_WasmContent />
                     {ui.toolbar === "visible" && (
                       <>
                         <BrushToolbarPosition>

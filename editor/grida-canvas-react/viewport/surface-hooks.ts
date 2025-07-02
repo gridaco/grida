@@ -268,16 +268,20 @@ export function useSelectionGroups(
       return;
     }
 
-    const groups = groupkeys.map((key) => {
-      const items = grouped[key]!;
-      const group = computeSurfaceSelectionGroup({
-        geometry: instance,
-        group: key,
-        items: items.map((it) => it.id),
-        transform,
-      });
-      return group;
-    });
+    const groups = groupkeys
+      .map((key) => {
+        try {
+          const items = grouped[key]!;
+          const group = computeSurfaceSelectionGroup({
+            geometry: instance,
+            group: key,
+            items: items.map((it) => it.id),
+            transform,
+          });
+          return group;
+        } catch {}
+      })
+      .filter((it): it is SurfaceSelectionGroup => !!it);
 
     setGroups(groups);
   }, [grouped, transform]);
@@ -317,7 +321,12 @@ export function useSingleSelection(
     const scale = cmath.transform.getScale(transform);
 
     // Collect bounding rectangle
-    const br = instance.geometry.getNodeAbsoluteBoundingRect(node_id)!;
+    const br = instance.geometry.getNodeAbsoluteBoundingRect(node_id);
+    if (!br) {
+      setData(undefined);
+      return;
+    }
+
     const bsr = cmath.rect.transform(br, transform);
     const object: SurfaceNodeObject = {
       id: node_id,

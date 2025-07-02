@@ -57,13 +57,16 @@ export class Editor
   private mstate: editor.state.IEditorState;
 
   readonly viewport: domapi.DOMViewportApi;
-  readonly geometry: domapi.GeometryQuery;
+  readonly geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
   constructor(
     viewport_id: string,
+    geometry:
+      | editor.api.IDocumentGeometryInterfaceProvider
+      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider),
     initialState: editor.state.IEditorStateInit,
     instanceConfig: {
       pointer_move_throttle_ms: number;
@@ -73,10 +76,7 @@ export class Editor
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
     this.viewport = new domapi.DOMViewportApi(viewport_id);
-    this.geometry = new domapi.DOMGeometryQuery(
-      () => this.mstate.transform,
-      this.canvasPointToClientPoint
-    );
+    this.geometry = typeof geometry === "function" ? geometry(this) : geometry;
     //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
     instanceConfig.onCreate?.(this);
@@ -105,6 +105,10 @@ export class Editor
 
   get debug() {
     return this.mstate.debug;
+  }
+
+  get transform() {
+    return this.mstate.transform;
   }
 
   set debug(value: boolean) {
@@ -1442,7 +1446,7 @@ export class Editor
   // #endregion IGuide2DActions implementation
 
   // #region ICameraActions implementation
-  transform(transform: cmath.Transform, sync: boolean = true) {
+  setTransform(transform: cmath.Transform, sync: boolean = true) {
     this.dispatch({
       type: "transform",
       transform,
@@ -1477,11 +1481,11 @@ export class Editor
       [transform[1][0], newscale, newy],
     ];
 
-    this.transform(next, true);
+    this.setTransform(next, true);
   }
 
   pan(delta: [dx: number, dy: number]) {
-    this.transform(
+    this.setTransform(
       cmath.transform.translate(this.state.transform, delta),
       true
     );
@@ -1531,7 +1535,7 @@ export class Editor
       [transform[1][0], sy, newy],
     ];
 
-    this.transform(next);
+    this.setTransform(next);
   }
 
   /**
@@ -1571,10 +1575,10 @@ export class Editor
 
     if (options.animate) {
       animateTransformTo(transform, next_transform, (t) => {
-        this.transform(t);
+        this.setTransform(t);
       });
     } else {
-      this.transform(next_transform);
+      this.setTransform(next_transform);
     }
   }
 

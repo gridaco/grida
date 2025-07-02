@@ -51,7 +51,7 @@ export class EditorFollowPlugin {
 
     this.__cursor_id = cursor_id;
 
-    this.editor.transform(this.fit(initial), false);
+    this.editor.setTransform(this.fit(initial), false);
     this.__unsubscribe_cursor = this.editor.subscribeWithSelector(
       (state) => state.cursors.find((c) => c.id === cursor_id),
       (editor, cursor) => {
@@ -60,7 +60,7 @@ export class EditorFollowPlugin {
           editor.loadScene(cursor.scene_id);
         }
         if (cursor.transform) {
-          editor.transform(this.fit(cursor.transform), false);
+          editor.setTransform(this.fit(cursor.transform), false);
         }
       },
       equal
