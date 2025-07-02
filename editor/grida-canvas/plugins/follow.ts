@@ -96,7 +96,7 @@ export class EditorFollowPlugin {
    * - viewer's transform
    */
   private fit(presenter: cmath.Transform): cmath.Transform {
-    const { width, height } = domapi.getViewportSize();
+    const { width, height } = this.editor.viewport.size;
     const viewport = { x: 0, y: 0, width, height };
     const inv = cmath.transform.invert(presenter);
     const presenter_viewbox = cmath.rect.transform(viewport, inv);

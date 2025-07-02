@@ -16,19 +16,19 @@ function createLayoutSnapshot(
   group: string | null,
   items: string[]
 ): editor.gesture.LayoutSnapshot {
-  const cdom = new domapi.CanvasDOM(state.transform);
+  const cdom = new domapi.DOMGeometryQuery(state.transform);
 
   let reldelta: cmath.Vector2 = [0, 0];
   let parent: grida.program.nodes.Node | null = null;
   if (group) {
     parent = dq.__getNodeById(state, group);
-    const parent_rect = cdom.getNodeBoundingRect(group)!;
+    const parent_rect = cdom.getNodeAbsoluteBoundingRect(group)!;
     reldelta = [-parent_rect.x, -parent_rect.y];
   }
 
   const objects: editor.gesture.LayoutSnapshot["objects"] = items.map(
     (node_id) => {
-      const abs_rect = cdom.getNodeBoundingRect(node_id)!;
+      const abs_rect = cdom.getNodeAbsoluteBoundingRect(node_id)!;
       const rel_rect = cmath.rect.translate(abs_rect, reldelta);
 
       return {
@@ -233,7 +233,7 @@ function __self_set_brush_opacity(
 function __self_start_gesture(
   draft: editor.state.IEditorState,
   gesture: EditorSurface_StartGesture["gesture"],
-  cdom: domapi.CanvasDOM
+  cdom: domapi.DOMGeometryQuery
 ) {
   draft.surface_snapping = undefined;
 
@@ -323,7 +323,7 @@ function __self_start_gesture(
         movement: cmath.vector2.zero,
         first: cmath.vector2.zero,
         last: cmath.vector2.zero,
-        initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
+        initial_bounding_rectangle: cdom.getNodeAbsoluteBoundingRect(node_id)!,
         node_id: node_id,
       };
       break;
@@ -334,7 +334,8 @@ function __self_start_gesture(
       self_selectNode(draft, "reset", selection);
       __self_start_gesture_rotate(draft, {
         selection: selection,
-        initial_bounding_rectangle: cdom.getNodeBoundingRect(selection)!,
+        initial_bounding_rectangle:
+          cdom.getNodeAbsoluteBoundingRect(selection)!,
         // TODO: the offset of rotation handle relative to the center of the rectangle
         offset: cmath.vector2.zero,
       });
@@ -496,11 +497,13 @@ function __self_start_gesture_scale(
   }: {
     selection: string[];
     direction: cmath.CardinalDirection;
-    cdom: domapi.CanvasDOM;
+    cdom: domapi.DOMGeometryQuery;
   }
 ) {
   if (selection.length === 0) return;
-  const rects = selection.map((node_id) => cdom.getNodeBoundingRect(node_id)!);
+  const rects = selection.map(
+    (node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!
+  );
 
   draft.gesture = {
     type: "scale",
@@ -638,7 +641,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
       }
       case "surface/gesture/start": {
         const { gesture } = action;
-        const cdom = new domapi.CanvasDOM(state.transform);
+        const cdom = new domapi.DOMGeometryQuery(state.transform);
         __self_start_gesture(draft, gesture, cdom);
         break;
       }

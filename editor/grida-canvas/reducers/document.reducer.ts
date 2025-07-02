@@ -252,14 +252,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         cmath.transform.invert(state.transform)
       );
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.DOMGeometryQuery(state.transform);
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
       assert(state.scene_id, "scene_id is required for insertion");
       const scene = state.document.scenes[state.scene_id];
       const siblings = scene.children;
       const anchors = siblings
         .map((node_id) => {
-          const r = cdom.getNodeBoundingRect(node_id);
+          const r = cdom.getNodeAbsoluteBoundingRect(node_id);
           if (!r) return null;
           return cmath.rect.pad(
             { x: r.x, y: r.y, width: r.width, height: r.height },
@@ -431,9 +431,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         //
       }
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.DOMGeometryQuery(state.transform);
       const rects = bounding_node_ids.map(
-        (node_id) => cdom.getNodeBoundingRect(node_id)!
+        (node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!
       );
 
       //
@@ -466,9 +466,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target, axis } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.DOMGeometryQuery(state.transform);
       const rects = target_node_ids.map(
-        (node_id) => cdom.getNodeBoundingRect(node_id)!
+        (node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!
       );
 
       // Only allow distribute-evenly of 3 or more nodes
@@ -514,15 +514,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       );
 
-      const cdom = new domapi.CanvasDOM(state.transform);
+      const cdom = new domapi.DOMGeometryQuery(state.transform);
 
       const layouts = Object.keys(groups).map((parent_id) => {
         const g = groups[parent_id]!;
 
-        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+        const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
 
         const rects = g
-          .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+          .map((node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!)
           // make the rects relative to the parent
           .map((rect) =>
             cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
@@ -618,18 +618,18 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         Object.keys(groups).forEach((parent_id) => {
           const g = groups[parent_id]!;
           const is_root = parent_id === "<root>";
-          const cdom = new domapi.CanvasDOM(state.transform);
+          const cdom = new domapi.DOMGeometryQuery(state.transform);
 
           let delta: cmath.Vector2;
           if (is_root) {
             delta = [0, 0];
           } else {
-            const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+            const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
             delta = [-parent_rect.x, -parent_rect.y];
           }
 
           const rects = g
-            .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+            .map((node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!)
             // make the rects relative to the parent
             .map((rect) => cmath.rect.translate(rect, delta))
             .map((rect) => cmath.rect.quantize(rect, 1));
@@ -952,14 +952,14 @@ function __self_nudge(
 
   // for nudge, gesture is not required, but only for surface ux.
   if (draft.gesture.type === "nudge") {
-    const cdpm = new domapi.CanvasDOM(draft.transform);
+    const cdpm = new domapi.DOMGeometryQuery(draft.transform);
 
     const snap_target_node_ids = getSnapTargets(draft.selection, draft);
     const snap_target_node_rects = snap_target_node_ids.map(
-      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+      (node_id) => cdpm.getNodeAbsoluteBoundingRect(node_id)!
     );
     const origin_rects = targets.map(
-      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+      (node_id) => cdpm.getNodeAbsoluteBoundingRect(node_id)!
     );
     const { snapping } = snapObjectsTranslation(
       origin_rects,

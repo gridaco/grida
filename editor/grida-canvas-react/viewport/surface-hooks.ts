@@ -163,19 +163,19 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
 }
 
 function computeSurfaceSelectionGroup({
+  geometry,
   group,
   items,
   transform,
 }: {
+  geometry: dq.GeometryQuery;
   group: string;
   items: string[];
   transform: cmath.Transform;
 }): SurfaceSelectionGroup {
-  const cdom = new domapi.CanvasDOM(transform);
-
   // Collect bounding rectangles for all node elements
   const objects: SurfaceNodeObject[] = items.map((id) => {
-    const br = cdom.getNodeBoundingRect(id)!;
+    const br = geometry.getNodeAbsoluteBoundingRect(id)!;
     const bsr = cmath.rect.transform(br, transform);
     return {
       id: id,
@@ -242,6 +242,7 @@ function computeSurfaceSelectionGroup({
 export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
+  const instance = useCurrentEditor();
   const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
 
@@ -270,6 +271,7 @@ export function useSelectionGroups(
     const groups = groupkeys.map((key) => {
       const items = grouped[key]!;
       const group = computeSurfaceSelectionGroup({
+        geometry: instance.geometry,
         group: key,
         items: items.map((it) => it.id),
         transform,
@@ -313,10 +315,9 @@ export function useSingleSelection(
     }
 
     const scale = cmath.transform.getScale(transform);
-    const cdom = new domapi.CanvasDOM(transform);
 
     // Collect bounding rectangle
-    const br = cdom.getNodeBoundingRect(node_id)!;
+    const br = instance.geometry.getNodeAbsoluteBoundingRect(node_id)!;
     const bsr = cmath.rect.transform(br, transform);
     const object: SurfaceNodeObject = {
       id: node_id,
@@ -371,7 +372,7 @@ export function useSingleSelection(
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
-        .map((id) => cdom.getNodeBoundingRect(id))
+        .map((id) => instance.geometry.getNodeAbsoluteBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);
 
       distribution.rects = children_rects;

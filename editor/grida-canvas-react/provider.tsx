@@ -863,7 +863,7 @@ export function useMultipleSelectionOverlayClick(): UseMultipleSelectionOverlayC
   //
   const multipleSelectionOverlayClick = useCallback(
     (selection: string[], event: MouseEvent) => {
-      const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
+      const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
 
       dispatch({
         type: "event-target/event/multiple-selection-overlay/on-click",
@@ -1020,14 +1020,9 @@ export function useDataTransferEventTarget() {
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) => {
-      const viewportdomrect = domapi.getViewportRect();
-      const viewport_pos: cmath.Vector2 = [
-        viewportdomrect.x,
-        viewportdomrect.y,
-      ];
       const translate = cmath.transform.getTranslate(state.transform);
       return cmath.vector2.quantize(
-        cmath.vector2.sub(xy, viewport_pos, translate),
+        cmath.vector2.sub(xy, instance.viewport.offset, translate),
         1
       );
     },

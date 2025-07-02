@@ -17,7 +17,7 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
   const origins: string[] = [];
   const clones: string[] = [];
 
-  const cdom = new domapi.CanvasDOM(draft.transform);
+  const cdom = new domapi.DOMGeometryQuery(draft.transform);
   const nextdelta = get_repeating_translation_delta(
     draft.active_duplication,
     targets,
@@ -74,7 +74,7 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
 function get_repeating_translation_delta(
   prev: editor.state.ActiveDuplication | null,
   targets: grida.program.nodes.NodeID[],
-  cdom: domapi.CanvasDOM
+  cdom: domapi.DOMGeometryQuery
 ): cmath.Vector2 | null {
   //
   if (
@@ -89,10 +89,10 @@ function get_repeating_translation_delta(
     const a = prev.origins;
     const b = prev.clones;
     const a_rects = a
-      .map((a) => cdom.getNodeBoundingRect(a))
+      .map((a) => cdom.getNodeAbsoluteBoundingRect(a))
       .filter((r): r is cmath.Rectangle => r !== null);
     const b_rects = b
-      .map((b) => cdom.getNodeBoundingRect(b))
+      .map((b) => cdom.getNodeAbsoluteBoundingRect(b))
       .filter((r): r is cmath.Rectangle => r !== null);
 
     const a_rect = cmath.rect.union(a_rects);

@@ -278,11 +278,11 @@ function __self_update_gesture_transform_translate(
   }
   // #endregion
 
-  const cdom = new domapi.CanvasDOM(draft.transform);
+  const cdom = new domapi.DOMGeometryQuery(draft.transform);
   const snap_target_node_ids = getSnapTargets(current_selection, draft);
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
-      const r = cdom.getNodeBoundingRect(node_id);
+      const r = cdom.getNodeAbsoluteBoundingRect(node_id);
       if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
       return r!;
     })
@@ -315,7 +315,7 @@ function __self_update_gesture_transform_translate(
       let relative_position: cmath.Vector2;
       if (parent_id) {
         // sub node
-        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+        const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
 
         if (!parent_rect) {
           console.error("below error is caused by");
@@ -521,9 +521,9 @@ function __self_update_gesture_transform_scale(
         preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
       });
     } else {
-      const cdom = new domapi.CanvasDOM(draft.transform);
+      const cdom = new domapi.DOMGeometryQuery(draft.transform);
       const parent_id = dq.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+      const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent_id)!;
 
       assert(
         parent_rect,

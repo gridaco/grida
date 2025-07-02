@@ -1,5 +1,6 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import { dq } from "../query";
 
 /**
  * A dom api for the canvas html backend.
@@ -16,35 +17,81 @@ export namespace domapi {
     export const EDITOR_CONTENT_ELEMENT_ID = "grida-canvas-sdk-editor-content";
   }
 
-  /**
-   * All elements with the `data-grida-node-id` attribute.
-   * @deprecated Expensive
-   */
-  function __get_grida_node_elements(): NodeListOf<Element> | undefined {
-    const content = __get_content_element();
-    return content?.querySelectorAll(
-      `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
-    );
+  export class DOMViewportApi {
+    constructor(readonly id: string = k.VIEWPORT_ELEMENT_ID) {}
+
+    getViewport() {
+      return window.document.getElementById(this.id);
+    }
+
+    get offset(): cmath.Vector2 {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return [rect.left, rect.top];
+    }
+
+    get rect() {
+      return this.getViewport()!.getBoundingClientRect();
+    }
+
+    get size() {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    getViewportRect() {
+      return this.getViewport()!.getBoundingClientRect();
+    }
+
+    getViewportSize(): { width: number; height: number } {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+      };
+    }
   }
 
-  function __get_content_element() {
-    return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
+  export class DOMContentApi {
+    constructor(readonly containerId: string) {}
+
+    private getContainerElement() {
+      return window.document.getElementById(this.containerId);
+    }
+
+    /**
+     * All elements with the `data-grida-node-id` attribute.
+     * @deprecated Expensive
+     */
+    getElements(): NodeListOf<Element> | undefined {
+      const content = this.getContainerElement();
+      return content?.querySelectorAll(
+        `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
+      );
+    }
+
+    getBoundingClientRect(): DOMRect | null {
+      const el = this.getContainerElement();
+      return el?.getBoundingClientRect() ?? null;
+    }
   }
 
   function __get_viewport_element() {
     return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
   }
 
-  export function getViewportRect() {
-    const el = __get_viewport_element();
-    return el!.getBoundingClientRect();
-  }
-
+  /**
+   * @deprecated
+   */
   export function getViewportSize(): { width: number; height: number } {
     const el = __get_viewport_element();
+    const rect = el!.getBoundingClientRect();
+
     return {
-      width: el!.clientWidth,
-      height: el!.clientHeight,
+      width: rect.width,
+      height: rect.height,
     };
   }
 
@@ -54,8 +101,8 @@ export namespace domapi {
    * @param y clientY
    * @returns
    */
-  export function getNodeIdsFromPoint(x: number, y: number): string[] {
-    const hits = window.document.elementsFromPoint(x, y);
+  export function getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+    const hits = window.document.elementsFromPoint(point[0], point[1]);
 
     const node_elements = hits.filter((h) =>
       h.attributes.getNamedItem(
@@ -66,20 +113,38 @@ export namespace domapi {
     return node_elements.map((el) => el.id);
   }
 
-  export class CanvasDOM {
-    readonly scale: cmath.Vector2;
-    constructor(readonly transform: cmath.Transform) {
-      this.scale = cmath.transform.getScale(transform);
+  export class DOMGeometryQuery implements dq.GeometryQuery {
+    private content: DOMContentApi;
+
+    constructor(
+      readonly _transform: cmath.Transform | (() => cmath.Transform)
+    ) {
+      this.content = new DOMContentApi(k.EDITOR_CONTENT_ELEMENT_ID);
     }
 
-    getNodesIntersectsArea(area: cmath.Rectangle): string[] {
+    get transform(): cmath.Transform {
+      if (typeof this._transform === "function") {
+        return this._transform();
+      }
+      return this._transform;
+    }
+
+    /**
+     * @deprecated not accurately implemented. - does not convert the point.
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+      // TODO: convert point to window space
+      return domapi.getNodeIdsFromPoint(point);
+    }
+
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
       const contained: string[] = [];
-      const all_els = __get_grida_node_elements();
+      const all_els = this.content.getElements();
 
       all_els?.forEach((el: INode) => {
-        const rect = this.getNodeBoundingRect(el.id);
+        const rect = this.getNodeAbsoluteBoundingRect(el.id);
         if (!rect) return;
-        if (cmath.rect.intersects(rect, area)) {
+        if (cmath.rect.intersects(rect, envelope)) {
           contained.push(el.id);
         }
       });
@@ -87,13 +152,8 @@ export namespace domapi {
       return contained;
     }
 
-    /**
-     * returns a bounding rect of the node in canvas space (consistant with the transform)
-     * @param node_id
-     * @returns
-     */
-    getNodeBoundingRect(node_id: string): cmath.Rectangle | null {
-      const contentrect = __get_content_element()?.getBoundingClientRect();
+    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+      const contentrect = this.content.getBoundingClientRect()!;
       const noderect = window.document
         .getElementById(node_id)
         ?.getBoundingClientRect();
@@ -113,10 +173,11 @@ export namespace domapi {
         height: noderect.height,
       } satisfies cmath.Rectangle;
 
+      const scale = cmath.transform.getScale(this.transform);
       const rect = cmath.rect.scale(
         domrect,
         [0, 0],
-        [1 / this.scale[0], 1 / this.scale[1]]
+        [1 / scale[0], 1 / scale[1]]
       );
 
       // ignore floating point to 0.001 precision

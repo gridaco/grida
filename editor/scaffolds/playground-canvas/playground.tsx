@@ -286,7 +286,7 @@ function Consumer() {
                     <AutoInitialFitTransformer>
                       <StandaloneSceneContent />
                     </AutoInitialFitTransformer>
-                    <__WIP_UNSTABLE_WasmContent />
+                    {/* <__WIP_UNSTABLE_WasmContent /> */}
                     {ui.toolbar === "visible" && (
                       <>
                         <BrushToolbarPosition>

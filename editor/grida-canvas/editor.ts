@@ -54,11 +54,15 @@ export class Editor
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
+
+  readonly viewport: domapi.DOMViewportApi;
+  readonly geometry: dq.GeometryQuery;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
   constructor(
+    viewport_id: string,
     initialState: editor.state.IEditorStateInit,
     instanceConfig: {
       pointer_move_throttle_ms: number;
@@ -67,6 +71,8 @@ export class Editor
   ) {
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
+    this.viewport = new domapi.DOMViewportApi(viewport_id);
+    this.geometry = new domapi.DOMGeometryQuery(() => this.mstate.transform);
     //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
     instanceConfig.onCreate?.(this);
@@ -1388,7 +1394,7 @@ export class Editor
     let ox, oy: number;
     if (origin === "center") {
       // Canvas size (you need to know or pass this)
-      const { width, height } = domapi.getViewportSize();
+      const { width, height } = this.viewport.size;
 
       // Calculate the absolute transform origin
       ox = width / 2;
@@ -1441,10 +1447,8 @@ export class Editor
     const { document_ctx, selection, transform } = this.state;
     const ids = dq.querySelector(document_ctx, selection, selector);
 
-    const cdom = new domapi.CanvasDOM(transform);
-
     const rects = ids
-      .map((id) => cdom.getNodeBoundingRect(id))
+      .map((id) => this.geometry.getNodeAbsoluteBoundingRect(id))
       .filter((r) => r) as cmath.Rectangle[];
 
     if (rects.length === 0) {
@@ -1453,7 +1457,7 @@ export class Editor
 
     const area = cmath.rect.union(rects);
 
-    const { width, height } = domapi.getViewportSize();
+    const { width, height } = this.viewport.size;
     const view = { x: 0, y: 0, width, height };
 
     const next_transform = cmath.ext.viewport.transformToFit(
@@ -1491,7 +1495,7 @@ export class Editor
   // #region IEventTargetActions implementation
 
   pointerDown(event: PointerEvent) {
-    const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
+    const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
 
     this.dispatch({
       type: "event-target/event/on-pointer-down",
@@ -1511,10 +1515,10 @@ export class Editor
   ) => {
     const { clientX, clientY } = pointer_event;
 
-    const canvas_rect = domapi.getViewportRect();
+    const [x, y] = this.viewport.offset;
     const position = {
-      x: clientX - canvas_rect.left,
-      y: clientY - canvas_rect.top,
+      x: clientX - x,
+      y: clientY - y,
     };
 
     return position;
@@ -1523,7 +1527,7 @@ export class Editor
   private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
-      const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
+      const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
 
       this.dispatch({
         type: "event-target/event/on-pointer-move-raycast",
@@ -1548,7 +1552,7 @@ export class Editor
   }
 
   click(event: MouseEvent) {
-    const ids = domapi.getNodeIdsFromPoint(event.clientX, event.clientY);
+    const ids = domapi.getNodeIdsFromPoint([event.clientX, event.clientY]);
 
     this.dispatch({
       type: "event-target/event/on-click",
@@ -1576,8 +1580,7 @@ export class Editor
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
-      const cdom = new domapi.CanvasDOM(transform);
-      const contained = cdom.getNodesIntersectsArea(area);
+      const contained = this.geometry.getNodeIdsFromEnvelope(area);
 
       this.dispatch({
         type: "event-target/event/on-drag-end",

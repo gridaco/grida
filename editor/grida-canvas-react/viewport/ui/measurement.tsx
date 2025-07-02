@@ -32,16 +32,20 @@ function useMeasurement() {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(transform);
-
       const a_rect = cmath.rect.quantize(
-        cmath.rect.union(selection.map((id) => cdom.getNodeBoundingRect(id)!)),
+        cmath.rect.union(
+          selection.map(
+            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
+          )
+        ),
         0.01
       );
 
       const b_rect = cmath.rect.quantize(
         cmath.rect.union(
-          surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+          surface_measurement_target.map(
+            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
+          )
         ),
         0.01
       );

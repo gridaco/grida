@@ -1,3 +1,4 @@
+import cmath from "@grida/cmath";
 import type { editor } from "..";
 import type grida from "@grida/schema";
 import assert from "assert";
@@ -9,6 +10,27 @@ type NodeID = string & {};
  */
 export namespace dq {
   const HARD_MAX_WHILE_LOOP = 5000;
+
+  export interface GeometryQuery {
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point
+     * @returns
+     */
+    getNodeIdsFromPoint(point: cmath.Vector2): string[];
+    /**
+     * returns a list of node ids that are intersecting with the envelope in canvas space
+     * @param envelope
+     * @returns
+     */
+    getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[];
+    /**
+     * returns a bounding rect of the node in canvas space
+     * @param node_id
+     * @returns
+     */
+    getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
+  }
 
   /**
    * Builds the runtime context for document hierarchy, providing mappings for

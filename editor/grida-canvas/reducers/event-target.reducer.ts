@@ -132,8 +132,8 @@ function __self_evt_on_click(
 
       let relpos: cmath.Vector2;
       if (parent) {
-        const cdom = new domapi.CanvasDOM(draft.transform);
-        const parent_rect = cdom.getNodeBoundingRect(parent)!;
+        const cdom = new domapi.DOMGeometryQuery(draft.transform);
+        const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent)!;
         const p: cmath.Vector2 = [parent_rect.x, parent_rect.y];
         relpos = cmath.vector2.sub(draft.pointer.position, p);
       } else {
@@ -505,12 +505,12 @@ function __self_evt_on_drag_start(
       const parent = __get_insertion_target(draft);
       self_try_insert_node(draft, parent, vector);
 
-      const cdom = new domapi.CanvasDOM(draft.transform);
+      const cdom = new domapi.DOMGeometryQuery(draft.transform);
 
       // position relative to the parent
       let node_relative_pos = draft.pointer.position;
       if (parent) {
-        const parent_rect = cdom.getNodeBoundingRect(parent)!;
+        const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent)!;
         node_relative_pos = cmath.vector2.sub(draft.pointer.position, [
           parent_rect.x,
           parent_rect.y,
@@ -702,7 +702,7 @@ function __self_evt_on_drag(
         const counter = axis === "x" ? 0 : 1;
         const m = movement[counter];
 
-        const cdom = new domapi.CanvasDOM(draft.transform);
+        const cdom = new domapi.DOMGeometryQuery(draft.transform);
 
         // [snap the guide offset]
         // 1. to pixel grid (quantize 1)
@@ -710,7 +710,7 @@ function __self_evt_on_drag(
         const { translated } = snapGuideTranslation(
           axis,
           initial_offset,
-          scene.children.map((id) => cdom.getNodeBoundingRect(id)!),
+          scene.children.map((id) => cdom.getNodeAbsoluteBoundingRect(id)!),
           m,
           threshold(
             editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
@@ -1039,10 +1039,10 @@ function __self_prepare_bitmap_node(
     const new_node_id = nid();
     const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
-    const cdom = new domapi.CanvasDOM(draft.transform);
+    const cdom = new domapi.DOMGeometryQuery(draft.transform);
     const parent = __get_insertion_target(draft);
     if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion
-    const parent_rect = cdom.getNodeBoundingRect(parent)!;
+    const parent_rect = cdom.getNodeAbsoluteBoundingRect(parent)!;
     const node_relative_pos = cmath.vector2.quantize(
       cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
       1
@@ -1248,10 +1248,10 @@ function __self_start_gesture_translate(
   const selection = draft.selection;
   if (selection.length === 0) return;
 
-  const cdom = new domapi.CanvasDOM(draft.transform);
+  const cdom = new domapi.DOMGeometryQuery(draft.transform);
 
   const rects = draft.selection.map(
-    (node_id) => cdom.getNodeBoundingRect(node_id)!
+    (node_id) => cdom.getNodeAbsoluteBoundingRect(node_id)!
   );
 
   draft.gesture = {

@@ -5,10 +5,12 @@ import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/w
 
 import type { editor } from "@/grida-canvas";
 import deepEqual from "fast-deep-equal/es6/react.js";
+import { domapi } from "@/grida-canvas/backends/dom";
 
 export function useEditor(init?: editor.state.IEditorStateInit) {
   const [_editor] = React.useState(
     new Editor(
+      domapi.k.VIEWPORT_ELEMENT_ID,
       init ?? {
         debug: false,
         document: {
