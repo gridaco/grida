@@ -92,7 +92,7 @@ impl TimerMgr {
         // Collect expired timers
         for (id, timer) in &mut self.timers {
             if timer.active && now >= timer.deadline {
-                println!("Timer expired: {:?}, type: {:?}", id, timer.timer_type);
+                // println!("Timer expired: {:?}, type: {:?}", id, timer.timer_type);
                 expired_timers.push(*id);
             }
         }
@@ -120,10 +120,10 @@ impl TimerMgr {
                             // Repeating timer, schedule next execution
                             if let Some(interval) = timer.interval {
                                 timer.deadline += interval;
-                                println!(
-                                    "Rescheduled interval for {:?} at {:?}",
-                                    id, timer.deadline
-                                );
+                                // println!(
+                                //     "Rescheduled interval for {:?} at {:?}",
+                                //     id, timer.deadline
+                                // );
                                 // The interval callback can be called again
                             }
                         }
