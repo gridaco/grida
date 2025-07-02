@@ -122,6 +122,7 @@ import colors, {
   neutral_colors,
   randomcolorname,
 } from "@/theme/tailwindcolors";
+import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -285,6 +286,7 @@ function Consumer() {
                     <AutoInitialFitTransformer>
                       <StandaloneSceneContent />
                     </AutoInitialFitTransformer>
+                    <__WIP_UNSTABLE_WasmContent />
                     {ui.toolbar === "visible" && (
                       <>
                         <BrushToolbarPosition>

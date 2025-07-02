@@ -7,54 +7,17 @@ import {
   StandaloneSceneBackground,
   StandaloneSceneContent,
   useEditor,
+  useEditorState,
   ViewportRoot,
 } from "@/grida-canvas-react";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { Hotkeys } from "@/grida-canvas-react/viewport/hotkeys";
-import init, { type Grida2D } from "@grida/canvas-wasm";
+import Canvas from "@/grida-canvas-wasm-react";
 
 export default function CanvasWasmExperimentalPage() {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const rendererRef = React.useRef<Grida2D | null>(null);
   const editor = useEditor();
-
-  React.useEffect(() => {
-    if (canvasRef.current && !rendererRef.current) {
-      const canvasel = canvasRef.current;
-      init({
-        locateFile: (path) => {
-          if (process.env.NODE_ENV === "development") {
-            return `http://localhost:4020/dist/${path}`;
-          }
-          return `https://unpkg.com/@grida/canvas-wasm@latest/dist/${path}`;
-        },
-      }).then((factory) => {
-        console.log("grida wasm initialized");
-        const grida = factory.createWebGLCanvasSurface(canvasel);
-        grida.devtools_rendering_set_show_tiles(true);
-        grida.devtools_rendering_set_show_fps_meter(true);
-        grida.devtools_rendering_set_show_stats(false);
-        grida.devtools_rendering_set_show_hit_testing(true);
-        grida.devtools_rendering_set_show_ruler(true);
-
-        rendererRef.current = grida;
-        editor.subscribeWithSelector(
-          (state) => state.document.nodes,
-          (editor, selected) => {
-            const scenedata = {
-              version: "0.0.1-beta.1+20250303",
-              document: editor.state.document,
-            };
-            requestAnimationFrame(() => {
-              grida.loadScene(JSON.stringify(scenedata));
-              grida.redraw();
-              grida.resize(canvasel.width, canvasel.height);
-            });
-          }
-        );
-      });
-    }
-  }, []);
+  const state = useEditorState(editor, (state) => state.document);
+  const transform = useEditorState(editor, (state) => state.transform);
 
   return (
     <main className="w-dvw h-dvh flex flex-col gap-10">
@@ -79,11 +42,14 @@ export default function CanvasWasmExperimentalPage() {
           </StandaloneDocumentEditor>
         </aside>
         <aside className="flex-1 relative">
-          <canvas
-            ref={canvasRef}
+          <Canvas
             width={800}
             height={600}
-            className="absolute inset-0 z-10 bg-transparent"
+            transform={transform}
+            data={{
+              version: "0.0.1-beta.1+20250303",
+              document: state,
+            }}
           />
         </aside>
       </div>
