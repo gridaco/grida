@@ -1484,7 +1484,17 @@ export namespace editor.api {
   }
 
   export interface IDocumentGeometryInterfaceProvider {
+    /**
+     * returns a list of node ids that are intersecting with the pointer event
+     * @param event window event
+     * @returns
+     */
     getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    /**
+     * returns a list of node ids that are intersecting with the point in canvas space
+     * @param point canvas space point
+     * @returns
+     */
     getNodeIdsFromPoint(point: cmath.Vector2): string[];
     /**
      * returns a list of node ids that are intersecting with the envelope in canvas space

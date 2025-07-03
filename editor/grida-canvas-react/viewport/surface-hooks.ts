@@ -312,12 +312,6 @@ export function useSingleSelection(
   useLayoutEffect(() => {
     if (!enabled) return;
 
-    const element = window.document.getElementById(node_id);
-    if (!element) {
-      setData(undefined);
-      return;
-    }
-
     const scale = cmath.transform.getScale(transform);
 
     // Collect bounding rectangle
@@ -349,9 +343,7 @@ export function useSingleSelection(
       transform
     );
 
-    const width = element.clientWidth;
-    const height = element.clientHeight;
-    const size: cmath.Vector2 = [width, height];
+    const size: cmath.Vector2 = [br.width, br.height];
     const absolute_rotation = instance.getNodeAbsoluteRotation(node_id);
 
     const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
@@ -361,8 +353,8 @@ export function useSingleSelection(
       position: "absolute",
       top: centerY,
       left: centerX,
-      width: width * scale[0],
-      height: height * scale[1],
+      width: br.width * scale[0],
+      height: br.height * scale[1],
       transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
       willChange: "transform",
     };

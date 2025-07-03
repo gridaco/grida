@@ -1,50 +1,79 @@
 import * as React from "react";
-import { Editor } from "@/grida-canvas/editor";
+import { Editor, EditorContentRenderingBackend } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
 import type { editor } from "@/grida-canvas";
 import deepEqual from "fast-deep-equal/es6/react.js";
 import {
   domapi,
-  DOMGeometryQuery,
-  NoopGeometryQuery,
+  DOMGeometryQueryInterfaceProvider,
+  NoopGeometryQueryInterfaceProvider,
 } from "@/grida-canvas/backends";
+import type { Grida2D } from "@grida/canvas-wasm";
+import { CanvasWasmGeometryQueryInterfaceProvider } from "@/grida-canvas/backends/wasm";
 
-type EditorRenderingBackend = "dom" | "canvas";
+const __DEFAULT_STATE: editor.state.IEditorStateInit = {
+  debug: false,
+  document: {
+    nodes: {},
+    entry_scene_id: "main",
+    scenes: {
+      main: {
+        type: "scene",
+        id: "main",
+        name: "main",
+        children: [],
+        guides: [],
+        constraints: { children: "multiple" },
+      },
+    },
+  },
+  editable: true,
+};
 
-export function useEditor(
-  init?: editor.state.IEditorStateInit,
-  backend: EditorRenderingBackend = "dom"
+export function useUnstableWasmEditor(
+  surface: Grida2D,
+  init?: editor.state.IEditorStateInit
 ) {
   const [_editor] = React.useState(
     new Editor(
+      "canvas",
       domapi.k.VIEWPORT_ELEMENT_ID,
+      domapi.k.EDITOR_CONTENT_ELEMENT_ID,
+      (_) => new CanvasWasmGeometryQueryInterfaceProvider(_, surface),
+      init ?? __DEFAULT_STATE
+    )
+  );
+
+  const editor = useSyncExternalStore<Editor>(
+    _editor.subscribe.bind(_editor),
+    () => _editor,
+    () => _editor
+  );
+
+  React.useDebugValue(editor);
+
+  return editor;
+}
+
+export function useEditor(
+  init?: editor.state.IEditorStateInit,
+  backend: EditorContentRenderingBackend = "dom"
+) {
+  const [_editor] = React.useState(
+    new Editor(
+      backend,
+      domapi.k.VIEWPORT_ELEMENT_ID,
+      domapi.k.EDITOR_CONTENT_ELEMENT_ID,
       (_) => {
         switch (backend) {
           case "dom":
-            return new DOMGeometryQuery(_);
+            return new DOMGeometryQueryInterfaceProvider(_);
           case "canvas":
-            return new NoopGeometryQuery();
+            return new NoopGeometryQueryInterfaceProvider();
         }
       },
-      init ?? {
-        debug: false,
-        document: {
-          nodes: {},
-          entry_scene_id: "main",
-          scenes: {
-            main: {
-              type: "scene",
-              id: "main",
-              name: "main",
-              children: [],
-              guides: [],
-              constraints: { children: "multiple" },
-            },
-          },
-        },
-        editable: true,
-      }
+      init ?? __DEFAULT_STATE
     )
   );
 

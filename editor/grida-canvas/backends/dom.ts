@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import type { Editor } from "../editor";
 import { editor } from "..";
+import assert from "assert";
 
 /**
  * A dom api for the canvas html backend.
@@ -19,10 +20,23 @@ export namespace domapi {
   }
 
   export class DOMViewportApi {
-    constructor(readonly id: string = k.VIEWPORT_ELEMENT_ID) {}
+    constructor(
+      readonly element: string | HTMLElement = k.VIEWPORT_ELEMENT_ID
+    ) {
+      assert(
+        typeof element === "string" || element instanceof HTMLElement,
+        "element must be a string (id) or an HTMLElement"
+      );
+    }
 
     getViewport() {
-      return window.document.getElementById(this.id);
+      if (typeof this.element === "string") {
+        return window.document.getElementById(this.element);
+      } else if (this.element instanceof HTMLElement) {
+        return this.element;
+      } else {
+        throw new Error("failed to get viewport element");
+      }
     }
 
     get offset(): cmath.Vector2 {
@@ -80,7 +94,7 @@ class DOMContentApi {
   }
 }
 
-export class DOMGeometryQuery
+export class DOMGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
 {
   private content: DOMContentApi;

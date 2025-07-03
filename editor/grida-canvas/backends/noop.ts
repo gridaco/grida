@@ -1,7 +1,7 @@
 import cmath from "@grida/cmath";
 import type { editor } from "..";
 
-export class NoopGeometryQuery
+export class NoopGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
 {
   getNodeIdsFromPoint(point: cmath.Vector2): string[] {

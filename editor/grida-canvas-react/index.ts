@@ -1,4 +1,9 @@
-export { useEditor, useEditorState, useCurrentEditor } from "./use-editor";
+export {
+  useEditor,
+  useUnstableWasmEditor,
+  useEditorState,
+  useCurrentEditor,
+} from "./use-editor";
 export {
   StandaloneDocumentEditor,
   useDocumentState,

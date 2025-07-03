@@ -10,6 +10,7 @@ import { useMeasure } from "@uidotdev/usehooks";
 import { SizeProvider } from "./viewport/size";
 import cmath from "@grida/cmath";
 import Canvas from "@/grida-canvas-wasm-react";
+import type { Editor } from "@/grida-canvas/editor";
 
 type CustomComponent = React.ComponentType<any>;
 
@@ -64,10 +65,9 @@ export function StandaloneSceneContent({
   );
 }
 
-export function __WIP_UNSTABLE_WasmContent() {
-  const instance = useCurrentEditor();
-  const state = useEditorState(instance, (state) => state.document);
-  const transform = useEditorState(instance, (state) => state.transform);
+export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
+  const state = useEditorState(editor, (state) => state.document);
+  const transform = useEditorState(editor, (state) => state.transform);
 
   return (
     <SizeProvider className="w-full h-full">
@@ -79,6 +79,7 @@ export function __WIP_UNSTABLE_WasmContent() {
           version: "0.0.1-beta.1+20250303",
           document: state,
         }}
+        onMount={editor.setSurface.bind(editor)}
       />
     </SizeProvider>
   );

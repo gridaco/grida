@@ -4,16 +4,18 @@ import init, { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 
-function SizedCanvasContent({
+function CanvasContent({
   width,
   height,
   data,
   transform,
+  onMount,
 }: {
   width: number;
   height: number;
   data: unknown | null;
   transform: cmath.Transform;
+  onMount?: (surface: Grida2D) => void;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<Grida2D | null>(null);
@@ -38,6 +40,7 @@ function SizedCanvasContent({
         grida.devtools_rendering_set_show_ruler(true);
 
         rendererRef.current = grida;
+        onMount?.(grida);
       });
     }
   }, []);
@@ -79,19 +82,22 @@ export default function Canvas({
   height,
   data,
   transform,
+  onMount,
 }: {
   width: number;
   height: number;
   data: unknown | null;
   transform: cmath.Transform;
+  onMount?: (surface: Grida2D) => void;
 }) {
   const size = useSize({ width, height });
   return (
-    <SizedCanvasContent
+    <CanvasContent
       width={size.width}
       height={size.height}
       data={data}
       transform={transform}
+      onMount={onMount}
     />
   );
 }

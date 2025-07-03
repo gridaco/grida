@@ -15,6 +15,8 @@ import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
+import type { Grida2D } from "@grida/canvas-wasm";
+import { CanvasWasmGeometryQueryInterfaceProvider } from "./backends/wasm";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -38,6 +40,8 @@ function resolveNumberChangeValue(
   }
 }
 
+export type EditorContentRenderingBackend = "dom" | "canvas";
+
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
@@ -57,13 +61,18 @@ export class Editor
   private mstate: editor.state.IEditorState;
 
   readonly viewport: domapi.DOMViewportApi;
-  readonly geometry: editor.api.IDocumentGeometryInterfaceProvider;
+  _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
+  get geometry() {
+    return this._m_geometry;
+  }
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
   constructor(
-    viewport_id: string,
+    readonly backend: EditorContentRenderingBackend,
+    viewportElement: string | HTMLElement,
+    contentElement: string | HTMLElement | Grida2D,
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider),
@@ -75,8 +84,9 @@ export class Editor
   ) {
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
-    this.viewport = new domapi.DOMViewportApi(viewport_id);
-    this.geometry = typeof geometry === "function" ? geometry(this) : geometry;
+    this.viewport = new domapi.DOMViewportApi(viewportElement);
+    this._m_geometry =
+      typeof geometry === "function" ? geometry(this) : geometry;
     //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
     instanceConfig.onCreate?.(this);
@@ -137,6 +147,15 @@ export class Editor
       force
     );
     return this._tid;
+  }
+
+  public setSurface(surface: Grida2D) {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    //
+    this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
+      this,
+      surface
+    );
   }
 
   public archive(): Blob {
