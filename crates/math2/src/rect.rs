@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::Vector4;
+
 use super::vector2::Vector2;
 
 /// Represents a side of a rectangle.
@@ -139,6 +141,12 @@ impl Rectangle {
     /// Subtracts `other` from this rectangle, returning the remaining subregions.
     pub fn subtract(&self, other: Rectangle) -> Vec<Rectangle> {
         boolean::subtract(*self, other)
+    }
+
+    /// Returns the rectangle as a 4-dimensional vector. [x, y, w, h]
+    /// used for ffi
+    pub fn to_vec4(&self) -> Vector4 {
+        [self.x, self.y, self.width, self.height]
     }
 }
 

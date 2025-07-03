@@ -12,6 +12,7 @@ COPY . /workspace
 
 RUN source /emsdk/emsdk_env.sh && \
     cd grida-canvas-wasm && \
+    cargo clean && \
     cargo build --release --target wasm32-unknown-emscripten
 
 CMD ["bash"]

@@ -126,6 +126,10 @@ impl WebGlApplication {
         self.app.get_node_ids_from_envelope(rect)
     }
 
+    pub fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
+        self.app.get_node_absolute_bounding_box(id)
+    }
+
     pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.app.set_main_camera_transform(transform);
     }

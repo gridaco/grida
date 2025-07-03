@@ -225,6 +225,10 @@ impl UnknownTargetApplication {
         tester.intersects(&envelope)
     }
 
+    pub fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
+        self.renderer.get_cache().geometry().get_world_bounds(id)
+    }
+
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO

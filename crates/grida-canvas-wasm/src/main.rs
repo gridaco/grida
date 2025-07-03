@@ -185,6 +185,27 @@ pub unsafe extern "C" fn get_node_ids_from_envelope(
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
+pub unsafe extern "C" fn get_node_absolute_bounding_box(
+    app: *mut WebGlApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const f32 {
+    if let Some(app) = app.as_mut() {
+        let slice = std::slice::from_raw_parts(ptr, len);
+        if let Ok(id) = std::str::from_utf8(slice) {
+            if let Some(rect) = app.get_node_absolute_bounding_box(id) {
+                let vec4 = rect.to_vec4(); // [f32; 4]
+                let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
+                std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
+                return out;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_ruler(app: *mut WebGlApplication, show: bool) {
     if let Some(app) = app.as_mut() {
         app.devtools_rendering_set_show_ruler(show);

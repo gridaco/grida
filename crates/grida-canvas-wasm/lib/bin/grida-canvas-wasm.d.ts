@@ -24,6 +24,7 @@ declare namespace createGridaCanvas {
       ): number;
       makeContextCurrent(handle: number): void;
     };
+    HEAPF32: Float32Array;
     stringToUTF8(str: string, outPtr: number, maxBytesToWrite: number): void;
     lengthBytesUTF8(str: string): number;
     UTF8ToString(ptr: number, maxBytesToRead?: number): string;
@@ -91,6 +92,11 @@ declare namespace createGridaCanvas {
       y: number,
       w: number,
       h: number
+    ): Ptr;
+    _get_node_absolute_bounding_box(
+      state: GridaCanvasWebGlApplicationPtr,
+      ptr: number,
+      len: number
     ): Ptr;
     _command(
       state: GridaCanvasWebGlApplicationPtr,

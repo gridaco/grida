@@ -66,6 +66,17 @@ const ApplicationCommandID = {
   Pan: 4,
 } as const;
 
+namespace utils {
+  export function rect_from_vec4(vec4: Float32Array): Rectangle {
+    return {
+      x: vec4[0],
+      y: vec4[1],
+      width: vec4[2],
+      height: vec4[3],
+    };
+  }
+}
+
 export class Grida2D {
   private ptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -176,6 +187,25 @@ export class Grida2D {
     const str = this.module.UTF8ToString(ptr);
     // TODO: free ptr
     return JSON.parse(str);
+  }
+
+  getNodeAbsoluteBoundingBox(id: string): Rectangle | null {
+    const [ptr, len] = this._alloc_string(id);
+    const outptr = this.module._get_node_absolute_bounding_box(
+      this.ptr,
+      ptr,
+      len - 1
+    );
+    this._free_string(ptr, len);
+
+    if (outptr === 0) {
+      return null;
+    }
+
+    const rect = this.module.HEAPF32.slice(outptr >> 2, (outptr >> 2) + 4); // Float32Array [x, y, w, h]
+    this.module._deallocate(outptr, 4 * 4);
+
+    return utils.rect_from_vec4(rect);
   }
 
   execCommand(command: "ZoomIn" | "ZoomOut") {
