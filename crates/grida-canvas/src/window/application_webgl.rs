@@ -5,11 +5,10 @@ use crate::runtime::scene::Backend;
 use crate::window::application::UnknownTargetApplication;
 use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
-use math2::transform::AffineTransform;
+use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
-use math2::vector2::Vector2;
 #[cfg(target_arch = "wasm32")]
 use skia_safe::gpu::gl::FramebufferInfo;
 
@@ -121,6 +120,10 @@ impl WebGlApplication {
 
     pub fn get_node_id_from_point(&mut self, x: f32, y: f32) -> Option<String> {
         self.app.get_node_id_from_point([x, y])
+    }
+
+    pub fn get_node_ids_from_envelope(&mut self, rect: Rectangle) -> Vec<String> {
+        self.app.get_node_ids_from_envelope(rect)
     }
 
     pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {

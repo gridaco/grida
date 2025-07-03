@@ -10,8 +10,7 @@ use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
-use math2::transform::AffineTransform;
-use math2::vector2::Vector2;
+use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 /// Host events
 pub enum HostEvent {
@@ -220,7 +219,11 @@ impl UnknownTargetApplication {
         tester.hit_first(point)
     }
 
-    // pub fn get_node_ids_from_envelope() -> Vec<String> {}
+    /// returns all node ids intersecting with the envelope in canvas space.
+    pub fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String> {
+        let tester = self.get_hit_tester();
+        tester.intersects(&envelope)
+    }
 
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
