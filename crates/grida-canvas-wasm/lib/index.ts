@@ -2,6 +2,12 @@ import createGridaCanvas from "./bin/grida-canvas-wasm";
 import { GridaCanvasInitOptions } from "./api";
 
 type Transform2D = [[number, number, number], [number, number, number]];
+type Rectangle = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export default async function init(
   opts?: GridaCanvasInitOptions
@@ -136,17 +142,40 @@ export class Grida2D {
     );
   }
 
-  // getNodeIdsFromPoint(x: number, y: number): string[] {
-  //   const ptr = this.module._get_node_ids_from_point(this.ptr, x, y);
-  // }
-
   getNodeIdFromPoint(x: number, y: number): string | null {
     const ptr = this.module._get_node_id_from_point(this.ptr, x, y);
     if (ptr === 0) {
       return null;
     }
     const str = this.module.UTF8ToString(ptr);
+    // TODO: free ptr
     return str;
+  }
+
+  getNodeIdsFromPoint(x: number, y: number): string[] {
+    const ptr = this.module._get_node_ids_from_point(this.ptr, x, y);
+    if (ptr === 0) {
+      return [];
+    }
+    const str = this.module.UTF8ToString(ptr);
+    // TODO: free ptr
+    return JSON.parse(str);
+  }
+
+  getNodeIdsFromEnvelope(envelope: Rectangle): string[] {
+    const ptr = this.module._get_node_ids_from_envelope(
+      this.ptr,
+      envelope.x,
+      envelope.y,
+      envelope.width,
+      envelope.height
+    );
+    if (ptr === 0) {
+      return [];
+    }
+    const str = this.module.UTF8ToString(ptr);
+    // TODO: free ptr
+    return JSON.parse(str);
   }
 
   execCommand(command: "ZoomIn" | "ZoomOut") {

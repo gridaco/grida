@@ -3,7 +3,7 @@
 #[cfg(target_arch = "wasm32")]
 use cg::window::application_webgl::WebGlApplication;
 use math2::transform::AffineTransform;
-use std::{boxed::Box, ffi::CString};
+use std::boxed::Box;
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -126,6 +126,8 @@ pub unsafe extern "C" fn get_node_id_from_point(
     x: f32,
     y: f32,
 ) -> *const u8 {
+    use std::ffi::CString;
+
     if let Some(app) = app.as_mut() {
         if let Some(s) = app.get_node_id_from_point(x, y) {
             return CString::new(s).unwrap().into_raw() as *const u8;
@@ -134,17 +136,52 @@ pub unsafe extern "C" fn get_node_id_from_point(
     std::ptr::null()
 }
 
-// #[cfg(target_arch = "wasm32")]
-// #[no_mangle]
-// pub unsafe extern "C" fn get_node_id_from_point(
-//     app: *mut WebGlApplication,
-//     x: f32,
-//     y: f32,
-// ) -> *const u8 {
-//     if let Some(app) = app.as_mut() {
-//         app.get_node_id_from_point(x, y)
-//     }
-// }
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_ids_from_point(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_mut() {
+        let ids = app.get_node_ids_from_point(x, y);
+        if let Ok(json) = serde_json::to_string(&ids) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_ids_from_envelope(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) -> *const u8 {
+    use math2::rect::Rectangle;
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_mut() {
+        let ids = app.get_node_ids_from_envelope(Rectangle::from_xywh(x, y, w, h));
+        if let Ok(json) = serde_json::to_string(&ids) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+
+    std::ptr::null()
+}
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]

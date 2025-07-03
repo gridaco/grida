@@ -14,19 +14,25 @@ export class CanvasWasmGeometryQuery
   }
 
   getNodeIdsFromPoint(point: cmath.Vector2): string[] {
-    const node_id = this.surface.getNodeIdFromPoint(point[0], point[1]);
-    return node_id ? [node_id] : [];
+    return this.surface.getNodeIdsFromPoint(point[0], point[1]);
   }
+
   getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
-    return [];
+    return this.surface.getNodeIdsFromEnvelope(envelope);
   }
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
-    return null;
-  }
+
   getNodeIdsFromPointerEvent(event: {
     clientX: number;
     clientY: number;
   }): string[] {
-    return [];
+    const p = this.editor.clientPointToCanvasPoint([
+      event.clientX,
+      event.clientY,
+    ]);
+    return this.getNodeIdsFromPoint(p);
+  }
+
+  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+    return null;
   }
 }

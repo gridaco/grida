@@ -75,15 +75,22 @@ declare namespace createGridaCanvas {
       d: number,
       f: number
     ): void;
+    _get_node_id_from_point(
+      state: GridaCanvasWebGlApplicationPtr,
+      x: number,
+      y: number
+    ): Ptr;
     _get_node_ids_from_point(
       state: GridaCanvasWebGlApplicationPtr,
       x: number,
       y: number
     ): Ptr;
-    _get_node_id_from_point(
+    _get_node_ids_from_envelope(
       state: GridaCanvasWebGlApplicationPtr,
       x: number,
-      y: number
+      y: number,
+      w: number,
+      h: number
     ): Ptr;
     _command(
       state: GridaCanvasWebGlApplicationPtr,
