@@ -136,6 +136,19 @@ export class Grida2D {
     );
   }
 
+  // getNodeIdsFromPoint(x: number, y: number): string[] {
+  //   const ptr = this.module._get_node_ids_from_point(this.ptr, x, y);
+  // }
+
+  getNodeIdFromPoint(x: number, y: number): string | null {
+    const ptr = this.module._get_node_id_from_point(this.ptr, x, y);
+    if (ptr === 0) {
+      return null;
+    }
+    const str = this.module.UTF8ToString(ptr);
+    return str;
+  }
+
   execCommand(command: "ZoomIn" | "ZoomOut") {
     this.module._command(this.ptr, ApplicationCommandID[command], 0, 0);
   }

@@ -1,9 +1,16 @@
+///
+/// see
+/// - https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/emscripten/index.d.ts
+///
+
 export = createGridaCanvas;
 export as namespace createGridaCanvas;
 
 declare function createGridaCanvas(moduleArg?: {
   locateFile?: (path: string, scriptDirectory: string) => string;
 }): Promise<createGridaCanvas.GridaCanvasWasmBindings>;
+
+type Ptr = number;
 
 declare namespace createGridaCanvas {
   interface GridaCanvasWasmBindings {
@@ -19,6 +26,7 @@ declare namespace createGridaCanvas {
     };
     stringToUTF8(str: string, outPtr: number, maxBytesToWrite: number): void;
     lengthBytesUTF8(str: string): number;
+    UTF8ToString(ptr: number, maxBytesToRead?: number): string;
     ___wbindgen_malloc(a0: number, a1: number): number;
     ___wbindgen_free(a0: number, a1: number, a2: number): void;
     ___wbindgen_realloc(a0: number, a1: number, a2: number, a3: number): number;
@@ -67,6 +75,16 @@ declare namespace createGridaCanvas {
       d: number,
       f: number
     ): void;
+    _get_node_ids_from_point(
+      state: GridaCanvasWebGlApplicationPtr,
+      x: number,
+      y: number
+    ): Ptr;
+    _get_node_id_from_point(
+      state: GridaCanvasWebGlApplicationPtr,
+      x: number,
+      y: number
+    ): Ptr;
     _command(
       state: GridaCanvasWebGlApplicationPtr,
       id: number,

@@ -9,6 +9,7 @@ use math2::transform::AffineTransform;
 
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
+use math2::vector2::Vector2;
 #[cfg(target_arch = "wasm32")]
 use skia_safe::gpu::gl::FramebufferInfo;
 
@@ -112,6 +113,14 @@ impl WebGlApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.app.pointer_move(x, y);
+    }
+
+    pub fn get_node_ids_from_point(&mut self, x: f32, y: f32) -> Vec<String> {
+        self.app.get_node_ids_from_point([x, y])
+    }
+
+    pub fn get_node_id_from_point(&mut self, x: f32, y: f32) -> Option<String> {
+        self.app.get_node_id_from_point([x, y])
     }
 
     pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {

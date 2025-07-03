@@ -3,7 +3,7 @@
 #[cfg(target_arch = "wasm32")]
 use cg::window::application_webgl::WebGlApplication;
 use math2::transform::AffineTransform;
-use std::boxed::Box;
+use std::{boxed::Box, ffi::CString};
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -118,6 +118,33 @@ pub unsafe extern "C" fn set_main_camera_transform(
         app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
     }
 }
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_id_from_point(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        if let Some(s) = app.get_node_id_from_point(x, y) {
+            return CString::new(s).unwrap().into_raw() as *const u8;
+        }
+    }
+    std::ptr::null()
+}
+
+// #[cfg(target_arch = "wasm32")]
+// #[no_mangle]
+// pub unsafe extern "C" fn get_node_id_from_point(
+//     app: *mut WebGlApplication,
+//     x: f32,
+//     y: f32,
+// ) -> *const u8 {
+//     if let Some(app) = app.as_mut() {
+//         app.get_node_id_from_point(x, y)
+//     }
+// }
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]

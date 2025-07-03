@@ -5,7 +5,7 @@ RUN rustup update && \
     rustup default stable && \
     rustup target add wasm32-unknown-emscripten
 
-ENV EMCC_CFLAGS="-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_NAME=createGridaCanvas -s EXPORTED_RUNTIME_METHODS=['GL','lengthBytesUTF8','stringToUTF8']"
+ENV EMCC_CFLAGS="-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_NAME=createGridaCanvas -s EXPORTED_RUNTIME_METHODS=['GL','lengthBytesUTF8','stringToUTF8','UTF8ToString']"
 
 WORKDIR /workspace
 COPY . /workspace

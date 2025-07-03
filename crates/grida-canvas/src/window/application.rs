@@ -11,6 +11,7 @@ use crate::sys::timer::TimerMgr;
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 use math2::transform::AffineTransform;
+use math2::vector2::Vector2;
 
 /// Host events
 pub enum HostEvent {
@@ -203,6 +204,24 @@ impl UnknownTargetApplication {
         println!("✅ Font repository information printed");
     }
 
+    fn get_hit_tester(&mut self) -> crate::hittest::HitTester {
+        crate::hittest::HitTester::new(self.renderer.get_cache())
+    }
+
+    /// returns all node ids at the point, if any. ordered from top to bottom.
+    pub fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
+        let tester = self.get_hit_tester();
+        tester.hits(point)
+    }
+
+    /// returns the top-most node id at the point, if any.
+    pub fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
+        let tester = self.get_hit_tester();
+        tester.hit_first(point)
+    }
+
+    // pub fn get_node_ids_from_envelope() -> Vec<String> {}
+
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO
@@ -211,12 +230,9 @@ impl UnknownTargetApplication {
             return;
         }
         self.hit_test_last = std::time::Instant::now();
-
         let camera = &self.renderer.camera;
         let point = camera.screen_to_canvas_point(self.input.cursor);
-        let tester = crate::hittest::HitTester::new(self.renderer.get_cache());
-
-        let new_hit_result = tester.hit_first(point);
+        let new_hit_result = self.get_node_id_from_point(point);
         if self.hit_test_result != new_hit_result {
             self.queue();
         }
