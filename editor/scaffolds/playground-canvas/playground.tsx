@@ -124,6 +124,13 @@ import colors, {
   randomcolorname,
 } from "@/theme/tailwindcolors";
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -534,6 +541,19 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
                   }}
                 />
               </Label>
+              {/* <Label className="flex items-center justify-between">
+                Rendering Backend
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a backend" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dom">DOM</SelectItem>
+                    <SelectItem value="canvas">WebGL Canvas (WASM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Label> */}
+
               {/* <label>
                 Snap to geometry
                 <Switch />
