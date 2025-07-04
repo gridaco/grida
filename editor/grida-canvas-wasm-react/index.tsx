@@ -3,6 +3,8 @@ import React, { useEffect } from "react";
 import init, { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
+import grida from "@grida/schema";
+import locateFile from "./locate-file";
 
 function CanvasContent({
   width,
@@ -13,7 +15,7 @@ function CanvasContent({
 }: {
   width: number;
   height: number;
-  data: unknown | null;
+  data: grida.program.document.Document | null;
   transform: cmath.Transform;
   onMount?: (surface: Grida2D) => void;
 }) {
@@ -24,15 +26,7 @@ function CanvasContent({
     if (canvasRef.current && !rendererRef.current) {
       const canvasel = canvasRef.current;
       init({
-        locateFile: (path) => {
-          if (process.env.NEXT_PUBLIC_GRIDA_WASM_SERVE_URL) {
-            return `${process.env.NEXT_PUBLIC_GRIDA_WASM_SERVE_URL}/${path}`;
-          } else if (process.env.NODE_ENV === "development") {
-            return `http://localhost:4020/dist/${path}`;
-          } else {
-            return `https://unpkg.com/@grida/canvas-wasm@latest/dist/${path}`;
-          }
-        },
+        locateFile: locateFile,
       }).then((factory) => {
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
@@ -66,14 +60,19 @@ function CanvasContent({
       rendererRef.current.setMainCameraTransform(
         cmath.transform.invert(viewMatrix)
       );
+      rendererRef.current.redraw();
     }
   }, [transform, width, height]);
 
   useEffect(() => {
     if (rendererRef.current && data) {
-      rendererRef.current.loadScene(JSON.stringify(data));
+      rendererRef.current.loadScene(
+        JSON.stringify({
+          version: "0.0.1-beta.1+20250303",
+          document: data,
+        })
+      );
       rendererRef.current.redraw();
-      rendererRef.current.resize(width, height);
     }
   }, [data]);
 
@@ -89,7 +88,7 @@ export default function Canvas({
 }: {
   width: number;
   height: number;
-  data: unknown | null;
+  data: grida.program.document.Document | null;
   transform: cmath.Transform;
   onMount?: (surface: Grida2D) => void;
 }) {

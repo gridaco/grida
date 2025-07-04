@@ -247,7 +247,8 @@ impl UnknownTargetApplication {
     }
 
     pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {
-        self.renderer.camera.set_transform(transform); //
+        self.renderer.camera.set_transform(transform);
+        self.queue();
     }
 
     /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.

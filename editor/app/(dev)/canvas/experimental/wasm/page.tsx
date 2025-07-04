@@ -16,7 +16,7 @@ import Canvas from "@/grida-canvas-wasm-react";
 
 export default function CanvasWasmExperimentalPage() {
   const editor = useEditor();
-  const state = useEditorState(editor, (state) => state.document);
+  const document = useEditorState(editor, (state) => state.document);
   const transform = useEditorState(editor, (state) => state.transform);
 
   return (
@@ -46,10 +46,7 @@ export default function CanvasWasmExperimentalPage() {
             width={800}
             height={600}
             transform={transform}
-            data={{
-              version: "0.0.1-beta.1+20250303",
-              document: state,
-            }}
+            data={document}
           />
         </aside>
       </div>
