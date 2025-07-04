@@ -15,6 +15,8 @@ import { TCanvasEventTargetDragGestureState } from "./action";
 import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
+import type { Grida2D } from "@grida/canvas-wasm";
+import { CanvasWasmGeometryQueryInterfaceProvider } from "./backends/wasm";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -38,9 +40,12 @@ function resolveNumberChangeValue(
   }
 }
 
+export type EditorContentRenderingBackend = "dom" | "canvas";
+
 export class Editor
   implements
     editor.api.IDocumentEditorActions,
+    editor.api.IDocumentGeometryQuery,
     editor.api.ISchemaActions,
     editor.api.INodeChangeActions,
     editor.api.IBrushToolActions,
@@ -54,11 +59,23 @@ export class Editor
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
+
+  readonly viewport: domapi.DOMViewportApi;
+  _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
+  get geometry() {
+    return this._m_geometry;
+  }
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
   constructor(
+    readonly backend: EditorContentRenderingBackend,
+    viewportElement: string | HTMLElement,
+    contentElement: string | HTMLElement | Grida2D,
+    geometry:
+      | editor.api.IDocumentGeometryInterfaceProvider
+      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider),
     initialState: editor.state.IEditorStateInit,
     instanceConfig: {
       pointer_move_throttle_ms: number;
@@ -67,6 +84,9 @@ export class Editor
   ) {
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
+    this.viewport = new domapi.DOMViewportApi(viewportElement);
+    this._m_geometry =
+      typeof geometry === "function" ? geometry(this) : geometry;
     //
     this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
     instanceConfig.onCreate?.(this);
@@ -97,6 +117,10 @@ export class Editor
     return this.mstate.debug;
   }
 
+  get transform() {
+    return this.mstate.transform;
+  }
+
   set debug(value: boolean) {
     this.reduce((state) => {
       state.debug = value;
@@ -125,6 +149,15 @@ export class Editor
     return this._tid;
   }
 
+  public setSurface(surface: Grida2D) {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    //
+    this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
+      this,
+      surface
+    );
+  }
+
   public archive(): Blob {
     const documentData = {
       version: "0.0.1-beta.1+20250303",
@@ -136,6 +169,75 @@ export class Editor
     });
 
     return blob;
+  }
+
+  /**
+   * Convert a point in client (window) to viewport relative (offset applied) point.
+   * @param pointer_event
+   * @returns viewport relative point
+   */
+  private pointerEventToViewportPoint = (
+    pointer_event: PointerEvent | MouseEvent
+  ) => {
+    const { clientX, clientY } = pointer_event;
+
+    const [x, y] = this.viewport.offset;
+    const position = {
+      x: clientX - x,
+      y: clientY - y,
+    };
+
+    return position;
+  };
+
+  /**
+   * Convert a point in client (window) space to canvas space.
+   * @param point
+   * @returns canvas space point
+   *
+   * @example
+   * ```ts
+   * const canvasPoint = editor.clientPointToCanvasPoint([event.clientX, event.clientY]);
+   * ```
+   */
+  public clientPointToCanvasPoint(point: cmath.Vector2): cmath.Vector2 {
+    const [clientX, clientY] = point;
+    const [offsetX, offsetY] = this.viewport.offset;
+
+    // Convert from client coordinates to viewport coordinates
+    const viewportX = clientX - offsetX;
+    const viewportY = clientY - offsetY;
+
+    // Apply inverse transform to convert from viewport space to canvas space
+    const inverseTransform = cmath.transform.invert(this.mstate.transform);
+    const canvasPoint = cmath.vector2.transform(
+      [viewportX, viewportY],
+      inverseTransform
+    );
+
+    return canvasPoint;
+  }
+
+  /**
+   * Convert a point in canvas space to client (window) space.
+   * @param point
+   * @returns client space point
+   *
+   * @example
+   * ```ts
+   * const clientPoint = editor.canvasPointToClientPoint([500, 500]);
+   * ```
+   */
+  public canvasPointToClientPoint(point: cmath.Vector2): cmath.Vector2 {
+    // Apply transform to convert from canvas space to viewport space
+    const viewportPoint = cmath.vector2.transform(point, this.mstate.transform);
+
+    // Convert from viewport coordinates to client coordinates
+    const [offsetX, offsetY] = this.viewport.offset;
+    const clientX = viewportPoint[0] + offsetX;
+    const clientY = viewportPoint[1] + offsetY;
+
+    return [clientX, clientY];
   }
 
   private __createNodeId(): editor.NodeID {
@@ -184,7 +286,13 @@ export class Editor
 
   public dispatch(action: Action, force: boolean = false) {
     if (this._locked && !force) return;
-    this.mstate = reducer(this.mstate, action);
+    this.mstate = reducer(this.mstate, action, {
+      geometry: this,
+      viewport: {
+        width: this.viewport.size.width,
+        height: this.viewport.size.height,
+      },
+    });
     this._tid++;
     this.listeners.forEach((l) => l(this, action));
   }
@@ -453,33 +561,6 @@ export class Editor
 
   public getNodeDepth(node_id: editor.NodeID): number {
     return dq.getDepth(this.mstate.document_ctx, node_id);
-  }
-
-  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
-    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
-
-    let rotation = 0;
-    // Calculate the absolute rotation
-    try {
-      for (const parent_id of parent_ids) {
-        const parent_node = this.getNodeSnapshotById(parent_id);
-        assert(parent_node, `parent node not found: ${parent_id}`);
-        if ("rotation" in parent_node) {
-          rotation += parent_node.rotation ?? 0;
-        }
-      }
-
-      // finally, add the node's own rotation
-      const node = this.getNodeSnapshotById(node_id);
-      assert(node, `node not found: ${node_id}`);
-      if ("rotation" in node) {
-        rotation += node.rotation ?? 0;
-      }
-    } catch (e) {
-      reportError(e);
-    }
-
-    return rotation;
   }
 
   public insertNode(prototype: grida.program.nodes.NodePrototype) {
@@ -752,6 +833,57 @@ export class Editor
   }
 
   // #endregion IDocumentEditorActions implementation
+
+  // #region IDocumentGeometryQuery implementation
+
+  public getNodeIdsFromPointerEvent(
+    event: PointerEvent | MouseEvent
+  ): string[] {
+    return this.geometry.getNodeIdsFromPointerEvent(event);
+  }
+
+  public getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+    return this.geometry.getNodeIdsFromPoint(point);
+  }
+
+  public getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
+    return this.geometry.getNodeIdsFromEnvelope(envelope);
+  }
+
+  public getNodeAbsoluteBoundingRect(
+    node_id: editor.NodeID
+  ): cmath.Rectangle | null {
+    return this.geometry.getNodeAbsoluteBoundingRect(node_id);
+  }
+
+  public getNodeAbsoluteRotation(node_id: editor.NodeID): number {
+    const parent_ids = dq.getAncestors(this.state.document_ctx, node_id);
+
+    let rotation = 0;
+    // Calculate the absolute rotation
+    try {
+      for (const parent_id of parent_ids) {
+        const parent_node = this.getNodeSnapshotById(parent_id);
+        assert(parent_node, `parent node not found: ${parent_id}`);
+        if ("rotation" in parent_node) {
+          rotation += parent_node.rotation ?? 0;
+        }
+      }
+
+      // finally, add the node's own rotation
+      const node = this.getNodeSnapshotById(node_id);
+      assert(node, `node not found: ${node_id}`);
+      if ("rotation" in node) {
+        rotation += node.rotation ?? 0;
+      }
+    } catch (e) {
+      reportError(e);
+    }
+
+    return rotation;
+  }
+
+  // #endregion IDocumentGeometryQuery implementation
 
   // #region ISchemaActions implementation
   public schemaDefineProperty(
@@ -1333,7 +1465,7 @@ export class Editor
   // #endregion IGuide2DActions implementation
 
   // #region ICameraActions implementation
-  transform(transform: cmath.Transform, sync: boolean = true) {
+  setTransform(transform: cmath.Transform, sync: boolean = true) {
     this.dispatch({
       type: "transform",
       transform,
@@ -1368,11 +1500,11 @@ export class Editor
       [transform[1][0], newscale, newy],
     ];
 
-    this.transform(next, true);
+    this.setTransform(next, true);
   }
 
   pan(delta: [dx: number, dy: number]) {
-    this.transform(
+    this.setTransform(
       cmath.transform.translate(this.state.transform, delta),
       true
     );
@@ -1388,7 +1520,7 @@ export class Editor
     let ox, oy: number;
     if (origin === "center") {
       // Canvas size (you need to know or pass this)
-      const { width, height } = domapi.get_viewport_rect();
+      const { width, height } = this.viewport.size;
 
       // Calculate the absolute transform origin
       ox = width / 2;
@@ -1422,7 +1554,7 @@ export class Editor
       [transform[1][0], sy, newy],
     ];
 
-    this.transform(next);
+    this.setTransform(next);
   }
 
   /**
@@ -1441,10 +1573,8 @@ export class Editor
     const { document_ctx, selection, transform } = this.state;
     const ids = dq.querySelector(document_ctx, selection, selector);
 
-    const cdom = new domapi.CanvasDOM(transform);
-
     const rects = ids
-      .map((id) => cdom.getNodeBoundingRect(id))
+      .map((id) => this.geometry.getNodeAbsoluteBoundingRect(id))
       .filter((r) => r) as cmath.Rectangle[];
 
     if (rects.length === 0) {
@@ -1453,8 +1583,8 @@ export class Editor
 
     const area = cmath.rect.union(rects);
 
-    const _view = domapi.get_viewport_rect();
-    const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+    const { width, height } = this.viewport.size;
+    const view = { x: 0, y: 0, width, height };
 
     const next_transform = cmath.ext.viewport.transformToFit(
       view,
@@ -1464,10 +1594,10 @@ export class Editor
 
     if (options.animate) {
       animateTransformTo(transform, next_transform, (t) => {
-        this.transform(t);
+        this.setTransform(t);
       });
     } else {
-      this.transform(next_transform);
+      this.setTransform(next_transform);
     }
   }
 
@@ -1491,14 +1621,11 @@ export class Editor
   // #region IEventTargetActions implementation
 
   pointerDown(event: PointerEvent) {
-    const els = domapi.get_grida_node_elements_from_point(
-      event.clientX,
-      event.clientY
-    );
+    const ids = this.getNodeIdsFromPointerEvent(event);
 
     this.dispatch({
       type: "event-target/event/on-pointer-down",
-      node_ids_from_point: els.map((n) => n.id),
+      node_ids_from_point: ids,
       shiftKey: event.shiftKey,
     });
   }
@@ -1509,31 +1636,13 @@ export class Editor
     });
   }
 
-  private __canvas_space_position = (
-    pointer_event: PointerEvent | MouseEvent
-  ) => {
-    const { clientX, clientY } = pointer_event;
-
-    const canvas_rect = domapi.get_viewport_rect();
-    const position = {
-      x: clientX - canvas_rect.left,
-      y: clientY - canvas_rect.top,
-    };
-
-    return position;
-  };
-
   private _throttled_pointer_move_with_raycast = editor.throttle(
     (event: PointerEvent, position: { x: number; y: number }) => {
       // this is throttled - as it is expensive
-      const els = domapi.get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
+      const ids = this.getNodeIdsFromPointerEvent(event);
       this.dispatch({
         type: "event-target/event/on-pointer-move-raycast",
-        node_ids_from_point: els.map((n) => n.id),
+        node_ids_from_point: ids,
         position,
         shiftKey: event.shiftKey,
       });
@@ -1542,7 +1651,7 @@ export class Editor
   );
 
   pointerMove(event: PointerEvent) {
-    const position = this.__canvas_space_position(event);
+    const position = this.pointerEventToViewportPoint(event);
 
     this.dispatch({
       type: "event-target/event/on-pointer-move",
@@ -1554,14 +1663,11 @@ export class Editor
   }
 
   click(event: MouseEvent) {
-    const els = domapi.get_grida_node_elements_from_point(
-      event.clientX,
-      event.clientY
-    );
+    const ids = this.getNodeIdsFromPointerEvent(event);
 
     this.dispatch({
       type: "event-target/event/on-click",
-      node_ids_from_point: els.map((n) => n.id),
+      node_ids_from_point: ids,
       shiftKey: event.shiftKey,
     });
   }
@@ -1585,8 +1691,7 @@ export class Editor
       // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
-      const cdom = new domapi.CanvasDOM(transform);
-      const contained = cdom.getNodesIntersectsArea(area);
+      const contained = this.geometry.getNodeIdsFromEnvelope(area);
 
       this.dispatch({
         type: "event-target/event/on-drag-end",

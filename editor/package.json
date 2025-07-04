@@ -30,6 +30,7 @@
     "@fingerprintjs/fingerprintjs": "^4.2.2",
     "@formatjs/intl-localematcher": "^0.6.1",
     "@grida/bitmap": "workspace:*",
+    "@grida/canvas-wasm": "workspace:*",
     "@grida/cg": "workspace:*",
     "@grida/cmath": "workspace:*",
     "@grida/fonts": "workspace:*",

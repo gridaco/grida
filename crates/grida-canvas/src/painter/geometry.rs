@@ -4,7 +4,7 @@ use crate::node::schema::*;
 use crate::painter::cvt;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    Path, PathOp, Point, RRect, Rect, StrokeRec, path_effect::PathEffect, stroke_rec::InitStyle,
+    path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
 };
 
 /// Computes the stroke geometry path for a given input `Path`, enabling rich stroke

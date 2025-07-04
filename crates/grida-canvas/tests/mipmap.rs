@@ -1,4 +1,4 @@
-use cg::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
+use cg::cache::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
 use skia_safe::surfaces;
 
 #[test]

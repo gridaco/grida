@@ -1,5 +1,8 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import type { Editor } from "../editor";
+import { editor } from "..";
+import assert from "assert";
 
 /**
  * A dom api for the canvas html backend.
@@ -7,116 +10,107 @@ import cmath from "@grida/cmath";
  * @deprecated
  */
 export namespace domapi {
+  export type INode = {
+    id: string;
+  };
+
   export namespace k {
     export const VIEWPORT_ELEMENT_ID = "grida-canvas-sdk-viewport";
     export const EDITOR_CONTENT_ELEMENT_ID = "grida-canvas-sdk-editor-content";
   }
 
-  export function get_node_element(node_id: string) {
-    return window.document.getElementById(node_id);
-  }
-
-  export class CanvasDOM {
-    readonly scale: cmath.Vector2;
-    constructor(readonly transform: cmath.Transform) {
-      this.scale = cmath.transform.getScale(transform);
-    }
-
-    getAllNodeElements(): NodeListOf<Element> | undefined {
-      return get_grida_node_elements();
-    }
-
-    getNodesIntersectsArea(area: cmath.Rectangle): string[] {
-      const contained: string[] = [];
-      const all_els = get_grida_node_elements();
-
-      all_els?.forEach((el) => {
-        const rect = this.getNodeBoundingRect(el.id);
-        if (!rect) return;
-        if (cmath.rect.intersects(rect, area)) {
-          contained.push(el.id);
-        }
-      });
-
-      return contained;
-    }
-
-    /**
-     * returns a bounding rect of the node in canvas space (consistant with the transform)
-     * @param node_id
-     * @returns
-     */
-    getNodeBoundingRect(node_id: string): cmath.Rectangle | null {
-      const contentrect = get_content_element()?.getBoundingClientRect();
-      const noderect = get_node_element(node_id)?.getBoundingClientRect();
-
-      if (!contentrect) {
-        throw new Error("renderer missing - content element rect is null");
-      }
-
-      if (!noderect) {
-        return null;
-      }
-
-      const domrect = {
-        x: noderect.x - contentrect.x,
-        y: noderect.y - contentrect.y,
-        width: noderect.width,
-        height: noderect.height,
-      } satisfies cmath.Rectangle;
-
-      const rect = cmath.rect.scale(
-        domrect,
-        [0, 0],
-        [1 / this.scale[0], 1 / this.scale[1]]
+  export class DOMViewportApi {
+    constructor(
+      readonly element: string | HTMLElement = k.VIEWPORT_ELEMENT_ID
+    ) {
+      assert(
+        typeof element === "string" || element instanceof HTMLElement,
+        "element must be a string (id) or an HTMLElement"
       );
+    }
 
-      // ignore floating point to 0.001 precision
-      // // quantized to 0.01 precision
-      // const qrect = {
-      //   x: Math.round(rect.x * 1000) / 1000,
-      //   y: Math.round(rect.y * 1000) / 1000,
-      //   width: Math.round(rect.width * 1000) / 1000,
-      //   height: Math.round(rect.height * 1000) / 1000,
-      // };
-      // return qrect
+    getViewport() {
+      if (typeof this.element === "string") {
+        return window.document.getElementById(this.element);
+      } else if (this.element instanceof HTMLElement) {
+        return this.element;
+      } else {
+        throw new Error("failed to get viewport element");
+      }
+    }
 
-      return rect;
+    get offset(): cmath.Vector2 {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return [rect.left, rect.top];
+    }
+
+    get rect() {
+      return this.getViewport()!.getBoundingClientRect();
+    }
+
+    get size() {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    getViewportRect() {
+      return this.getViewport()!.getBoundingClientRect();
+    }
+
+    getViewportSize(): { width: number; height: number } {
+      const rect = this.getViewport()!.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+      };
     }
   }
+}
 
-  function get_content_element() {
-    return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
-  }
+class DOMContentApi {
+  constructor(readonly containerId: string) {}
 
-  function get_viewport_element() {
-    return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
-  }
-
-  export function get_viewport_rect() {
-    const el = get_viewport_element();
-    return el!.getBoundingClientRect();
+  private getContainerElement() {
+    return window.document.getElementById(this.containerId);
   }
 
   /**
    * All elements with the `data-grida-node-id` attribute.
    * @deprecated Expensive
    */
-  function get_grida_node_elements(): NodeListOf<Element> | undefined {
-    const content = get_content_element();
+  getElements(): NodeListOf<Element> | undefined {
+    const content = this.getContainerElement();
     return content?.querySelectorAll(
       `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
     );
   }
 
-  /**
-   *
-   * @param x clientX
-   * @param y clientY
-   * @returns
-   */
-  export function get_grida_node_elements_from_point(x: number, y: number) {
-    const hits = window.document.elementsFromPoint(x, y);
+  getBoundingClientRect(): DOMRect | null {
+    const el = this.getContainerElement();
+    return el?.getBoundingClientRect() ?? null;
+  }
+}
+
+export class DOMGeometryQueryInterfaceProvider
+  implements editor.api.IDocumentGeometryInterfaceProvider
+{
+  private content: DOMContentApi;
+
+  constructor(readonly editor: Editor) {
+    this.content = new DOMContentApi(domapi.k.EDITOR_CONTENT_ELEMENT_ID);
+  }
+
+  getNodeIdsFromPointerEvent(event: {
+    clientX: number;
+    clientY: number;
+  }): string[] {
+    const hits = window.document.elementsFromPoint(
+      event.clientX,
+      event.clientY
+    );
 
     const node_elements = hits.filter((h) =>
       h.attributes.getNamedItem(
@@ -124,6 +118,70 @@ export namespace domapi {
       )
     );
 
-    return node_elements;
+    return node_elements.map((el) => el.id);
+  }
+
+  getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+    const _p = this.editor.canvasPointToClientPoint(point);
+    return this.getNodeIdsFromPointerEvent({
+      clientX: _p[0],
+      clientY: _p[1],
+    });
+  }
+
+  getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
+    const contained: string[] = [];
+    const all_els = this.content.getElements();
+
+    all_els?.forEach((el: domapi.INode) => {
+      const rect = this.getNodeAbsoluteBoundingRect(el.id);
+      if (!rect) return;
+      if (cmath.rect.intersects(rect, envelope)) {
+        contained.push(el.id);
+      }
+    });
+
+    return contained;
+  }
+
+  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+    const contentrect = this.content.getBoundingClientRect()!;
+    const noderect = window.document
+      .getElementById(node_id)
+      ?.getBoundingClientRect();
+
+    if (!contentrect) {
+      throw new Error("renderer missing - content element rect is null");
+    }
+
+    if (!noderect) {
+      return null;
+    }
+
+    const domrect = {
+      x: noderect.x - contentrect.x,
+      y: noderect.y - contentrect.y,
+      width: noderect.width,
+      height: noderect.height,
+    } satisfies cmath.Rectangle;
+
+    const scale = cmath.transform.getScale(this.editor.transform);
+    const rect = cmath.rect.scale(
+      domrect,
+      [0, 0],
+      [1 / scale[0], 1 / scale[1]]
+    );
+
+    // ignore floating point to 0.001 precision
+    // // quantized to 0.01 precision
+    // const qrect = {
+    //   x: Math.round(rect.x * 1000) / 1000,
+    //   y: Math.round(rect.y * 1000) / 1000,
+    //   width: Math.round(rect.width * 1000) / 1000,
+    //   height: Math.round(rect.height * 1000) / 1000,
+    // };
+    // return qrect
+
+    return rect;
   }
 }

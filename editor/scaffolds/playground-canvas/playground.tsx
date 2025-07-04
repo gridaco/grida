@@ -23,6 +23,7 @@ import {
   type UserCustomTemplatesProps,
   useEditorState,
   useCurrentEditor,
+  useEditor,
 } from "@/grida-canvas-react";
 import {
   useCurrentSceneState,
@@ -111,7 +112,7 @@ import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { sitemap } from "@/www/data/sitemap";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
-import { useEditor } from "@/grida-canvas-react";
+import { useUnstableWasmEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
@@ -122,6 +123,14 @@ import colors, {
   neutral_colors,
   randomcolorname,
 } from "@/theme/tailwindcolors";
+import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -182,7 +191,8 @@ export default function CanvasPlayground({
   src,
   room_id,
 }: CanvasPlaygroundProps) {
-  const instance = useEditor(editor.state.init(document));
+  // const instance = useUnstableWasmEditor(surface);
+  const instance = useEditor(editor.state.init(document), "canvas");
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useGoogleFontsList();
 
@@ -282,9 +292,10 @@ function Consumer() {
                   <ViewportRoot className="relative w-full h-full overflow-hidden">
                     <Hotkyes />
                     <EditorSurface />
-                    <AutoInitialFitTransformer>
+                    {/* <AutoInitialFitTransformer>
                       <StandaloneSceneContent />
-                    </AutoInitialFitTransformer>
+                    </AutoInitialFitTransformer> */}
+                    <__WIP_UNSTABLE_WasmContent editor={instance} />
                     {ui.toolbar === "visible" && (
                       <>
                         <BrushToolbarPosition>
@@ -530,6 +541,19 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
                   }}
                 />
               </Label>
+              {/* <Label className="flex items-center justify-between">
+                Rendering Backend
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a backend" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dom">DOM</SelectItem>
+                    <SelectItem value="canvas">WebGL Canvas (WASM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Label> */}
+
               {/* <label>
                 Snap to geometry
                 <Switch />

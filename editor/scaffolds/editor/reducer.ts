@@ -13,7 +13,6 @@ import type {
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableLoadingAction,
-  EditorDocumentAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -39,8 +38,6 @@ import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
-import builderReducer from "@/grida-canvas/reducers";
-import assert from "assert";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 
@@ -105,20 +102,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/focus":
     case "blocks/blur":
       return blockReducer(state, action);
-
-    case "editor/document": {
-      const { key, action: _action } = <EditorDocumentAction>action;
-      return produce(state, (draft) => {
-        assert(draft.documents, "draft.documents is required");
-        const document = draft.documents[key];
-        assert(document, "document is required");
-        assert(document.__schema_valid, "document schema is not supported");
-        document.state = builderReducer(
-          document.state,
-          _action
-        ) as editor.state.IEditorState & { template_id: string };
-      });
-    }
 
     case "saving": {
       const { saving } = <GlobalSavingAction>action;

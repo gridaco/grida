@@ -2,7 +2,7 @@
 
 #[cfg(target_arch = "wasm32")]
 use cg::window::application_webgl::WebGlApplication;
-#[cfg(target_arch = "wasm32")]
+use math2::transform::AffineTransform;
 use std::boxed::Box;
 
 #[cfg(target_arch = "wasm32")]
@@ -26,6 +26,14 @@ pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
 #[no_mangle]
 pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
     Box::new(WebGlApplication::new(width, height))
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn tick(app: *mut WebGlApplication) {
+    if let Some(app) = app.as_mut() {
+        app.tick();
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -82,20 +90,14 @@ pub unsafe extern "C" fn pointer_move(app: *mut WebGlApplication, x: f32, y: f32
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b: f32) {
-    use cg::window::command::WindowCommand;
+    use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
-            0 => WindowCommand::Close,
-            1 => WindowCommand::ZoomIn,
-            2 => WindowCommand::ZoomOut,
-            3 => WindowCommand::ZoomDelta { delta: a },
-            4 => WindowCommand::Pan { tx: a, ty: b },
-            5 => WindowCommand::Redraw,
-            6 => WindowCommand::Resize {
-                width: a as u32,
-                height: b as u32,
-            },
-            _ => WindowCommand::None,
+            1 => ApplicationCommand::ZoomIn,
+            2 => ApplicationCommand::ZoomOut,
+            3 => ApplicationCommand::ZoomDelta { delta: a },
+            4 => ApplicationCommand::Pan { tx: a, ty: b },
+            _ => ApplicationCommand::None,
         };
         app.command(cmd);
     }
@@ -103,9 +105,110 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_show_ruler(app: *mut WebGlApplication, show: bool) {
+pub unsafe extern "C" fn set_main_camera_transform(
+    app: *mut WebGlApplication,
+    a: f32,
+    c: f32,
+    e: f32,
+    b: f32,
+    d: f32,
+    f: f32,
+) {
     if let Some(app) = app.as_mut() {
-        app.set_show_ruler(show);
+        app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_id_from_point(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+) -> *const u8 {
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_mut() {
+        if let Some(s) = app.get_node_id_from_point(x, y) {
+            return CString::new(s).unwrap().into_raw() as *const u8;
+        }
+    }
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_ids_from_point(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+) -> *const u8 {
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_mut() {
+        let ids = app.get_node_ids_from_point(x, y);
+        if let Ok(json) = serde_json::to_string(&ids) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_ids_from_envelope(
+    app: *mut WebGlApplication,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) -> *const u8 {
+    use math2::rect::Rectangle;
+    use serde_json;
+    use std::ffi::CString;
+
+    if let Some(app) = app.as_mut() {
+        let ids = app.get_node_ids_from_envelope(Rectangle::from_xywh(x, y, w, h));
+        if let Ok(json) = serde_json::to_string(&ids) {
+            if let Ok(cstr) = CString::new(json) {
+                return cstr.into_raw() as *const u8;
+            }
+        }
+    }
+
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn get_node_absolute_bounding_box(
+    app: *mut WebGlApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const f32 {
+    if let Some(app) = app.as_mut() {
+        let slice = std::slice::from_raw_parts(ptr, len);
+        if let Ok(id) = std::str::from_utf8(slice) {
+            if let Some(rect) = app.get_node_absolute_bounding_box(id) {
+                let vec4 = rect.to_vec4(); // [f32; 4]
+                let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
+                std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
+                return out;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn devtools_rendering_set_show_ruler(app: *mut WebGlApplication, show: bool) {
+    if let Some(app) = app.as_mut() {
+        app.devtools_rendering_set_show_ruler(show);
     }
 }
 

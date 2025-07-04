@@ -20,7 +20,6 @@ import type {
 } from "./state";
 import type { tokens } from "@grida/tokens";
 import type { DataQueryAction } from "../data-query";
-import type { Action as CanvasAction } from "@/grida-canvas";
 import type { DataFormat } from "../data-format";
 import type { Platform } from "@/lib/platform";
 import grida from "@grida/schema";
@@ -32,8 +31,6 @@ export type EditorAction =
   | FormsBlockAction
   //
   | InitAssetAction
-  //
-  | EditorDocumentAction
   //
   | GlobalSavingAction
   | EditorSidebarModeAction
@@ -455,21 +452,4 @@ export interface FormStartPageInitAction {
 
 export interface FormStartPageRemoveAction {
   type: "editor/form/startpage/remove";
-}
-
-export interface EditorDocumentAction {
-  type: "editor/document";
-  key: "site" | "form/startpage" | "canvas";
-  action: CanvasAction;
-}
-
-export function composeEditorDocumentAction(
-  document_key: "site" | "form/startpage" | "canvas",
-  action: CanvasAction
-): EditorDocumentAction {
-  return {
-    type: "editor/document",
-    key: document_key,
-    action,
-  };
 }

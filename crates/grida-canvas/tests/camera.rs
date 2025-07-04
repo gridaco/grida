@@ -7,7 +7,7 @@ fn zoom_at_preserves_anchor() {
         width: 200.0,
         height: 200.0,
     });
-    cam.set_position(0.0, 0.0);
+    cam.set_center(0.0, 0.0);
     cam.set_zoom(1.0);
     let anchor = [50.0, 50.0];
     let before = cam.screen_to_canvas_point(anchor);

@@ -262,21 +262,21 @@ impl GeometryCache {
         }
     }
 
-    pub fn get_world_transform(&self, id: &NodeId) -> Option<AffineTransform> {
+    pub fn get_world_transform(&self, id: &str) -> Option<AffineTransform> {
         self.entries.get(id).map(|e| e.absolute_transform)
     }
 
-    pub fn get_world_bounds(&self, id: &NodeId) -> Option<Rectangle> {
+    pub fn get_world_bounds(&self, id: &str) -> Option<Rectangle> {
         self.entries.get(id).map(|e| e.absolute_bounding_box)
     }
 
     /// Return expanded render bounds for a node if available.
-    pub fn get_render_bounds(&self, id: &NodeId) -> Option<Rectangle> {
+    pub fn get_render_bounds(&self, id: &str) -> Option<Rectangle> {
         self.entries.get(id).map(|e| e.absolute_render_bounds)
     }
 
     /// Return the parent NodeId for a given node if available.
-    pub fn get_parent(&self, id: &NodeId) -> Option<NodeId> {
+    pub fn get_parent(&self, id: &str) -> Option<NodeId> {
         self.entries.get(id).and_then(|e| e.parent.clone())
     }
 
@@ -284,7 +284,7 @@ impl GeometryCache {
         self.entries.len()
     }
 
-    pub fn has(&self, id: &NodeId) -> bool {
+    pub fn has(&self, id: &str) -> bool {
         self.entries.contains_key(id)
     }
 

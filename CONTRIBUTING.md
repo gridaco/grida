@@ -12,6 +12,9 @@ cd grida
 # setup node & package manager
 nvm use
 corepack enable pnpm
+
+# install just
+brew install just
 ```
 
 Then, install the dependencies and run the development server:
@@ -36,6 +39,12 @@ pnpm turbo build
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Packaging canvas wasm
+
+```bash
+just build canvas wasm
+```
 
 ## Running backend (supabase) locally
 

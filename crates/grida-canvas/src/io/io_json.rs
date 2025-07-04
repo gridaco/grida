@@ -534,16 +534,19 @@ impl From<IONode> for Node {
             IONode::Vector(vector) => vector.into(),
             IONode::Ellipse(ellipse) => ellipse.into(),
             IONode::Rectangle(rectangle) => rectangle.into(),
-            IONode::Unknown => Node::Group(GroupNode {
+            IONode::Unknown => Node::Error(ErrorNode {
                 base: BaseNode {
                     id: "unknown".to_string(),
                     name: "Unknown Node".to_string(),
                     active: false,
                 },
                 transform: AffineTransform::identity(),
-                children: vec![],
-                opacity: 0.0,
-                blend_mode: BlendMode::Normal,
+                size: Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                opacity: 1.0,
+                error: "Unknown node".to_string(),
             }),
         }
     }
@@ -556,7 +559,7 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let path = "resources/local/document.json";
+        let path = "../fixtures/local/document.json";
         let Ok(data) = fs::read_to_string(path) else {
             eprintln!("test resource not found: {}", path);
             return;
