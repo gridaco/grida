@@ -142,7 +142,9 @@ impl Renderer {
             return None;
         }
 
-        let frame = self.plan.take().unwrap();
+        let Some(frame) = self.plan.take() else {
+            return None;
+        };
 
         let start = Instant::now();
 
@@ -405,22 +407,27 @@ impl Renderer {
         // draw picture regions
         for (region, indices) in &plan.regions {
             for idx in indices {
-                let layer = self.scene_cache.layers.layers[*idx].clone();
-                let picture = self.with_recording_cached(&layer.id(), |painter| {
-                    painter.draw_layer(&layer);
-                });
+                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
+                    let layer = layer.clone();
+                    let picture = self.with_recording_cached(&layer.id(), |painter| {
+                        painter.draw_layer(&layer);
+                    });
 
-                if let Some(pic) = picture {
-                    // clip to region
-                    canvas.save();
-                    canvas.clip_rect(
-                        Rect::from_xywh(region.x, region.y, region.width, region.height),
-                        None,
-                        false,
-                    );
-                    canvas.draw_picture(pic, None, None);
-                    canvas.restore();
-                    cache_picture_used += 1;
+                    if let Some(pic) = picture {
+                        // clip to region
+                        canvas.save();
+                        canvas.clip_rect(
+                            Rect::from_xywh(region.x, region.y, region.width, region.height),
+                            None,
+                            false,
+                        );
+                        canvas.draw_picture(pic, None, None);
+                        canvas.restore();
+                        cache_picture_used += 1;
+                    }
+                } else {
+                    // report error
+                    println!("layer not found: {}", idx);
                 }
             }
         }

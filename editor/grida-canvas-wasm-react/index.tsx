@@ -38,6 +38,14 @@ function CanvasContent({
 
         rendererRef.current = grida;
         onMount?.(grida);
+
+        // start the ticker
+        const loop = () => {
+          grida.tick();
+          requestAnimationFrame(loop);
+        };
+
+        loop();
       });
     }
   }, []);
