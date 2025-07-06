@@ -7,8 +7,7 @@ import { cn } from "@/components/lib/utils";
 import cmath from "@grida/cmath";
 import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
-import { useLayoutEffect, useState } from "react";
-import { domapi } from "@/grida-canvas/backends/dom";
+import { useEffect, useState } from "react";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 
 function useMeasurement() {
@@ -23,7 +22,7 @@ function useMeasurement() {
 
   const [measurement, setMeasurement] = useState<Measurement>();
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     try {
       const b = surface_measurement_target;
 
@@ -32,16 +31,20 @@ function useMeasurement() {
         return;
       }
 
-      const cdom = new domapi.CanvasDOM(transform);
-
       const a_rect = cmath.rect.quantize(
-        cmath.rect.union(selection.map((id) => cdom.getNodeBoundingRect(id)!)),
+        cmath.rect.union(
+          selection.map(
+            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
+          )
+        ),
         0.01
       );
 
       const b_rect = cmath.rect.quantize(
         cmath.rect.union(
-          surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+          surface_measurement_target.map(
+            (id) => editor.geometry.getNodeAbsoluteBoundingRect(id)!
+          )
         ),
         0.01
       );

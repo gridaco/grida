@@ -41,6 +41,8 @@ pub enum IONode {
     Text(IOTextNode),
     #[serde(rename = "vector")]
     Vector(IOVectorNode),
+    #[serde(rename = "path")]
+    Path(IOPathNode),
     #[serde(rename = "ellipse")]
     Ellipse(IOEllipseNode),
     #[serde(rename = "rectangle")]
@@ -193,6 +195,53 @@ pub struct IOVectorNode {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct IOVectorNetworkVertex {
+    pub p: [f32; 2],
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IOVectorNetworkSegment {
+    pub a: usize,
+    pub b: usize,
+    pub ta: [f32; 2],
+    pub tb: [f32; 2],
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IOVectorNetwork {
+    #[serde(default)]
+    pub vertices: Vec<IOVectorNetworkVertex>,
+    #[serde(default)]
+    pub segments: Vec<IOVectorNetworkSegment>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IOPathNode {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_active")]
+    pub active: bool,
+    #[serde(default = "default_locked")]
+    pub locked: bool,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    #[serde(default = "default_rotation")]
+    pub rotation: f32,
+    #[serde(rename = "zIndex", default = "default_z_index")]
+    pub z_index: i32,
+    pub position: Option<String>,
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+    #[serde(rename = "vectorNetwork")]
+    pub vector_network: Option<IOVectorNetwork>,
+    pub fill: Option<Fill>,
+    #[serde(rename = "strokeWidth")]
+    pub stroke_width: Option<f32>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct IOEllipseNode {
     pub id: String,
     pub name: String,
@@ -252,10 +301,37 @@ pub struct IORectangleNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Fill {
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub color: Option<RGBA>,
+pub struct IOGradientStop {
+    pub offset: f32,
+    pub color: RGBA,
+}
+
+impl From<IOGradientStop> for GradientStop {
+    fn from(stop: IOGradientStop) -> Self {
+        GradientStop {
+            offset: stop.offset,
+            color: stop.color.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum Fill {
+    #[serde(rename = "solid")]
+    Solid { color: Option<RGBA> },
+    #[serde(rename = "linear_gradient")]
+    LinearGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<IOGradientStop>,
+    },
+    #[serde(rename = "radial_gradient")]
+    RadialGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<IOGradientStop>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -326,26 +402,35 @@ impl From<RGBA> for Color {
 impl From<Option<Fill>> for Paint {
     fn from(fill: Option<Fill>) -> Self {
         match fill {
-            Some(fill) => match fill.kind.as_str() {
-                "solid" => {
-                    if let Some(color) = fill.color {
-                        Paint::Solid(SolidPaint {
-                            color: Color(color.r, color.g, color.b, (color.a * 255.0) as u8),
-                            opacity: 1.0,
-                        })
-                    } else {
-                        Paint::Solid(SolidPaint {
-                            color: Color(0, 0, 0, 0),
-                            opacity: 1.0,
-                        })
-                    }
-                }
-                _ => Paint::Solid(SolidPaint {
-                    color: Color(0, 0, 0, 0),
+            Some(Fill::Solid { color }) => Paint::Solid(SolidPaint {
+                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
+                opacity: 1.0,
+            }),
+            Some(Fill::LinearGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
                     opacity: 1.0,
-                }),
-            },
-            None => Paint::Solid(SolidPaint {
+                })
+            }
+            Some(Fill::RadialGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
+            Some(_) | None => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 0),
                 opacity: 1.0,
             }),
@@ -526,24 +611,88 @@ impl From<IOVectorNode> for Node {
     }
 }
 
+fn vector_network_to_path(vn: &IOVectorNetwork) -> String {
+    if vn.vertices.is_empty() {
+        return String::new();
+    }
+
+    let mut d = String::new();
+    let first = vn
+        .segments
+        .get(0)
+        .map(|s| vn.vertices[s.a].p)
+        .unwrap_or([0.0, 0.0]);
+    d.push_str(&format!("M{} {}", first[0], first[1]));
+
+    for seg in &vn.segments {
+        let a = vn.vertices[seg.a].p;
+        let b = vn.vertices[seg.b].p;
+        let c1 = [a[0] + seg.ta[0], a[1] + seg.ta[1]];
+        let c2 = [b[0] + seg.tb[0], b[1] + seg.tb[1]];
+        d.push_str(&format!(
+            " C{} {},{} {},{} {}",
+            c1[0], c1[1], c2[0], c2[1], b[0], b[1]
+        ));
+    }
+
+    d
+}
+
+impl From<IOPathNode> for Node {
+    fn from(node: IOPathNode) -> Self {
+        let transform = AffineTransform::new(node.left, node.top, node.rotation);
+
+        let data = node
+            .vector_network
+            .as_ref()
+            .map(|vn| vector_network_to_path(vn))
+            .unwrap_or_else(String::new);
+
+        Node::Path(PathNode {
+            base: BaseNode {
+                id: node.id,
+                name: node.name,
+                active: node.active,
+            },
+            blend_mode: BlendMode::Normal,
+            transform,
+            fill: node.fill.into(),
+            data,
+            stroke: Paint::Solid(SolidPaint {
+                color: Color(0, 0, 0, 255),
+                opacity: 1.0,
+            }),
+            stroke_width: node.stroke_width.unwrap_or(0.0),
+            stroke_align: StrokeAlign::Inside,
+            stroke_dash_array: None,
+            opacity: node.opacity,
+            effect: None,
+        })
+    }
+}
+
 impl From<IONode> for Node {
     fn from(node: IONode) -> Self {
         match node {
             IONode::Container(container) => Node::Container(container.into()),
             IONode::Text(text) => Node::TextSpan(text.into()),
             IONode::Vector(vector) => vector.into(),
+            IONode::Path(path) => path.into(),
             IONode::Ellipse(ellipse) => ellipse.into(),
             IONode::Rectangle(rectangle) => rectangle.into(),
-            IONode::Unknown => Node::Group(GroupNode {
+            IONode::Unknown => Node::Error(ErrorNode {
                 base: BaseNode {
                     id: "unknown".to_string(),
                     name: "Unknown Node".to_string(),
                     active: false,
                 },
                 transform: AffineTransform::identity(),
-                children: vec![],
-                opacity: 0.0,
-                blend_mode: BlendMode::Normal,
+                size: Size {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                opacity: 1.0,
+                error: "Unknown node".to_string(),
             }),
         }
     }
@@ -556,7 +705,7 @@ mod tests {
 
     #[test]
     fn parse_canvas_json() {
-        let path = "resources/local/document.json";
+        let path = "../fixtures/local/document.json";
         let Ok(data) = fs::read_to_string(path) else {
             eprintln!("test resource not found: {}", path);
             return;

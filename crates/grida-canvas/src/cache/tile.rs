@@ -3,11 +3,16 @@ use math2::rect::{self, Rectangle};
 use skia_safe::{IRect, Image, Surface};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
 
-/// Debounce duration after zooming before capturing tiles
-const CACHE_DEBOUNCE_BY_ZOOM: Duration = Duration::from_millis(500);
-
+/// The resolution strategy to use for the image tile cache.
+pub enum ImageTileCacheResolutionStrategy {
+    /// only use matching tiles
+    Exact,
+    /// only use matching tiles (exact or higher)
+    Default,
+    /// forces to use the cache even for invalid regions
+    ForceCache,
+}
 /// (x, y, width, height) in canvas space
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TileRectKey(pub i32, pub i32, pub u32, pub u32);
@@ -25,8 +30,14 @@ impl TileRectKey {
 
 #[derive(Debug, Clone)]
 pub struct TileAtZoom {
+    /// the image of the tile
     pub image: Rc<Image>,
+    /// the zoom level at which this tile was snapshotted
     pub zoom: f32,
+    /// captured world rect of the tile. may be smaller than tile key
+    pub rect: Rectangle,
+    /// if the tile is partial capture of the edge.
+    pub partial: bool,
 }
 
 /// Information about a tile including whether it should be blurred
@@ -40,6 +51,13 @@ pub struct RegionTileInfo {
     pub blur_radius: f32,
     /// The zoom level at which this tile was snapshotted
     pub zoom: f32,
+    /// actual world rect captured for this tile
+    pub rect: Rectangle,
+    // TODO:
+    // The clip rects (region path) should be applied to this tile.
+    // this is required as the upper tiles can have opaque, and the lower tiles should be clipped to prevent them from flooding.
+    // we use clip since cropping the image can be expensive.
+    // pub clippath: Option<Path>,
 }
 
 /// A collection of tiles for a specific region with blur information and sorting.
@@ -52,14 +70,51 @@ pub struct RegionTiles {
 }
 
 impl RegionTiles {
+    pub fn empty() -> Self {
+        Self {
+            tiles: Vec::new(),
+            tile_rects: Vec::new(),
+        }
+    }
+
+    /// Determines if a tile should be included based on the resolution strategy.
+    fn should_include_tile(
+        strategy: &ImageTileCacheResolutionStrategy,
+        tile_at_zoom: Option<&TileAtZoom>,
+        current_zoom: f32,
+    ) -> bool {
+        match strategy {
+            ImageTileCacheResolutionStrategy::Exact => {
+                if let Some(tile) = tile_at_zoom {
+                    (tile.zoom - current_zoom).abs() < f32::EPSILON
+                } else {
+                    false
+                }
+            }
+            ImageTileCacheResolutionStrategy::Default => {
+                if let Some(tile) = tile_at_zoom {
+                    tile.zoom >= current_zoom
+                } else {
+                    false
+                }
+            }
+            ImageTileCacheResolutionStrategy::ForceCache => tile_at_zoom.is_some(),
+        }
+    }
+
     /// Create a new RegionTiles instance with tiles filtered from the cache
     /// for the given bounds and current zoom level.
-    pub fn new(cache: &ImageTileCache, bounds: &Rectangle, current_zoom: f32) -> Self {
+    pub fn new(
+        cache: &ImageTileCache,
+        bounds: &Rectangle,
+        current_zoom: f32,
+        strategy: ImageTileCacheResolutionStrategy,
+    ) -> Self {
         let mut tiles: Vec<RegionTileInfo> = Vec::new();
         let mut tile_rects: Vec<Rectangle> = Vec::new();
 
-        const BLUR_SCALE: f32 = 2.0;
-        const MAX_BLUR_RADIUS: f32 = 16.0;
+        const BLUR_SCALE: f32 = 1.0;
+        const MAX_BLUR_RADIUS: f32 = 8.0;
 
         // Filter tiles that intersect with the current viewport bounds
         for key in cache.filter(bounds) {
@@ -76,13 +131,22 @@ impl RegionTiles {
                 (false, 0.0, 0.0)
             };
 
-            tiles.push(RegionTileInfo {
-                key: *key,
-                blur: should_blur,
-                blur_radius,
-                zoom: tile_zoom,
-            });
-            tile_rects.push(key.to_rect());
+            // Apply strategy-based filtering
+            let should_include = Self::should_include_tile(&strategy, tile_at_zoom, current_zoom);
+
+            if should_include {
+                let rect = tile_at_zoom
+                    .map(|t| t.rect)
+                    .unwrap_or_else(|| key.to_rect());
+                tiles.push(RegionTileInfo {
+                    key: *key,
+                    blur: should_blur,
+                    blur_radius,
+                    zoom: tile_zoom,
+                    rect,
+                });
+                tile_rects.push(rect);
+            }
         }
 
         // Sort tiles by zoom difference from current zoom (closest to current zoom last)
@@ -112,11 +176,6 @@ impl RegionTiles {
     pub fn len(&self) -> usize {
         self.tiles.len()
     }
-
-    /// Check if this region has any tiles
-    pub fn is_empty(&self) -> bool {
-        self.tiles.is_empty()
-    }
 }
 
 /// Simple raster tile cache used by the renderer.
@@ -137,6 +196,7 @@ impl RegionTiles {
 pub struct ImageTileCache {
     tile_size: u16,
     tiles: HashMap<TileRectKey, TileAtZoom>,
+    prev_zoom: Option<f32>,
     /// The lowest zoom level resolved, even if at least 1 tile exists.
     /// This is used to track the most zoomed-out level we've cached,
     /// ensuring we always have fallback tiles for zoom out operations.
@@ -148,15 +208,10 @@ pub struct ImageTileCache {
     /// keeping these in memory is memory-efficient while providing
     /// critical coverage for smooth zoom out operations.
     lowest_zoom_indices: std::collections::HashSet<TileRectKey>,
-    prev_zoom: Option<f32>,
-    zoom_changed_at: Option<Instant>,
     /// Caching is enabled while the camera zoom is at or below this level.
     /// When zooming in beyond this value the cache is cleared and disabled
     /// as the picture based rendering is fast enough.
     pub max_zoom_for_cache: f32,
-    /// Flag indicating that a full repaint is required to refresh tiles
-    /// after the cache was cleared due to a zoom change.
-    needs_full_repaint: bool,
 }
 
 impl Default for ImageTileCache {
@@ -164,12 +219,10 @@ impl Default for ImageTileCache {
         Self {
             tile_size: 512,
             tiles: HashMap::new(),
+            prev_zoom: None,
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
-            prev_zoom: None,
-            zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
-            needs_full_repaint: false,
         }
     }
 }
@@ -183,12 +236,10 @@ impl ImageTileCache {
         Self {
             tile_size,
             tiles: HashMap::new(),
+            prev_zoom: None,
             lowest_zoom: None,
             lowest_zoom_indices: std::collections::HashSet::new(),
-            prev_zoom: None,
-            zoom_changed_at: None,
             max_zoom_for_cache: 2.0,
-            needs_full_repaint: false,
         }
     }
 
@@ -264,7 +315,6 @@ impl ImageTileCache {
         // Only clear tiles that are not in lowest_zoom_indices
         self.tiles
             .retain(|key, _| self.lowest_zoom_indices.contains(key));
-        self.needs_full_repaint = true;
     }
 
     /// Remove all tiles including lowest zoom tiles.
@@ -272,52 +322,6 @@ impl ImageTileCache {
         self.tiles.clear();
         self.lowest_zoom_indices.clear();
         self.lowest_zoom = None;
-        self.needs_full_repaint = true;
-    }
-
-    /// Returns true if the cache should repaint all tiles due to a zoom change
-    /// that has settled for the debounce duration.
-    pub fn should_repaint_all(&self) -> bool {
-        self.zoom_changed_at
-            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
-            .unwrap_or(false)
-    }
-
-    /// Returns true if a full repaint is required to refresh tiles
-    pub fn needs_full_repaint(&self) -> bool {
-        self.needs_full_repaint
-    }
-
-    /// Mark that the pending full repaint request has been handled
-    pub fn reset_full_repaint(&mut self) {
-        self.needs_full_repaint = false;
-    }
-
-    /// Whether tiles should be cached based on zoom change debounce.
-    pub fn should_cache_tiles(&self) -> bool {
-        self.zoom_changed_at
-            .map(|t| t.elapsed() >= CACHE_DEBOUNCE_BY_ZOOM)
-            .unwrap_or(true)
-    }
-
-    /// Notify the cache about a camera zoom change.
-    pub fn update_zoom(&mut self, zoom: f32) {
-        if self
-            .prev_zoom
-            .map_or(true, |z| (z - zoom).abs() > f32::EPSILON)
-        {
-            if zoom > self.max_zoom_for_cache {
-                // Disable caching when sufficiently zoomed in - picture mode
-                // is fast enough at this scale.
-                self.clear();
-                self.zoom_changed_at = None;
-            } else {
-                // Mark tiles as outdated so they are refreshed after debounce.
-                // Note: lowest_zoom_indices are preserved
-                self.zoom_changed_at = Some(Instant::now());
-            }
-            self.prev_zoom = Some(zoom);
-        }
     }
 
     /// Capture visible region tiles from the provided surface.
@@ -327,112 +331,198 @@ impl ImageTileCache {
         width: f32,
         height: f32,
         surface: &mut Surface,
+        partial: bool,
         mut intersects: F,
     ) where
         F: FnMut(Rectangle) -> bool,
     {
         let zoom = camera.get_zoom();
         if zoom > self.max_zoom_for_cache {
-            // Caching disabled when zoomed in beyond the threshold
-            self.clear();
-            self.zoom_changed_at = None;
             return;
         }
+
+        if let Some(prev_zoom) = self.prev_zoom {
+            if (prev_zoom - zoom).abs() < f32::EPSILON {
+                self.clear();
+            }
+        }
+        self.prev_zoom = Some(zoom);
 
         let world_size = self.tile_size as f32 / zoom;
         let rect = camera.rect();
 
+        let screen_bounds = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+        };
+
+        for (col, row) in self.tile_indices(&rect, world_size) {
+            let world_rect = self.tile_world_rect(col, row, world_size);
+
+            if !intersects(world_rect) {
+                continue;
+            }
+
+            let screen_rect = rect::transform(world_rect, &camera.view_matrix());
+            let visible = if partial {
+                rect::intersects(&screen_rect, &screen_bounds)
+            } else {
+                self.is_tile_visible(&screen_rect, width, height)
+            };
+            if !visible {
+                continue;
+            }
+
+            let key = self.tile_key(&world_rect);
+            self.update_lowest_zoom_tracking(&key, zoom);
+
+            let capture_world_rect = if partial {
+                world_rect
+                    .intersection(&camera.rect())
+                    .unwrap_or(world_rect)
+            } else {
+                world_rect
+            };
+
+            if self.should_update_tile(&key, zoom) {
+                self.capture_tile(
+                    surface,
+                    &screen_rect,
+                    key,
+                    zoom,
+                    capture_world_rect,
+                    partial,
+                );
+            }
+        }
+    }
+
+    /// Generate tile indices for the given camera rect and world size
+    fn tile_indices(&self, rect: &Rectangle, world_size: f32) -> impl Iterator<Item = (i32, i32)> {
         let start_col = (rect.x / world_size).floor() as i32;
         let end_col = ((rect.x + rect.width) / world_size).ceil() as i32;
         let start_row = (rect.y / world_size).floor() as i32;
         let end_row = ((rect.y + rect.height) / world_size).ceil() as i32;
 
-        for col in start_col..end_col {
-            for row in start_row..end_row {
-                let world_rect = Rectangle {
-                    x: col as f32 * world_size,
-                    y: row as f32 * world_size,
-                    width: world_size,
-                    height: world_size,
-                };
+        (start_col..end_col).flat_map(move |col| (start_row..end_row).map(move |row| (col, row)))
+    }
 
-                if !intersects(world_rect) {
-                    continue;
-                }
+    /// Create world rectangle for a tile at given column and row
+    fn tile_world_rect(&self, col: i32, row: i32, world_size: f32) -> Rectangle {
+        Rectangle {
+            x: col as f32 * world_size,
+            y: row as f32 * world_size,
+            width: world_size,
+            height: world_size,
+        }
+    }
 
-                let screen_rect = rect::transform(world_rect, &camera.view_matrix());
+    /// Check if a tile is fully visible on screen
+    fn is_tile_visible(&self, screen_rect: &Rectangle, width: f32, height: f32) -> bool {
+        screen_rect.x >= 0.0
+            && screen_rect.y >= 0.0
+            && screen_rect.x + screen_rect.width <= width
+            && screen_rect.y + screen_rect.height <= height
+    }
 
-                if screen_rect.x >= 0.0
-                    && screen_rect.y >= 0.0
-                    && screen_rect.x + screen_rect.width <= width
-                    && screen_rect.y + screen_rect.height <= height
-                {
-                    let key = TileRectKey(
-                        world_rect.x.round() as i32,
-                        world_rect.y.round() as i32,
-                        world_rect.width.round() as u32,
-                        world_rect.height.round() as u32,
-                    );
+    /// Create tile key from world rectangle
+    fn tile_key(&self, world_rect: &Rectangle) -> TileRectKey {
+        TileRectKey(
+            world_rect.x.round() as i32,
+            world_rect.y.round() as i32,
+            world_rect.width.round() as u32,
+            world_rect.height.round() as u32,
+        )
+    }
 
-                    // Check if we should update lowest zoom tracking
-                    let should_update_lowest_zoom = if let Some(current_lowest) = self.lowest_zoom {
-                        if zoom < current_lowest {
-                            // New lower zoom level found, clear previous lowest zoom indices
-                            self.lowest_zoom_indices.clear();
-                            true
-                        } else if (zoom - current_lowest).abs() < f32::EPSILON {
-                            // Same zoom level, add to lowest zoom indices
-                            true
-                        } else {
-                            // Higher zoom level, don't update lowest zoom tracking
-                            false
-                        }
-                    } else {
-                        // No lowest zoom set yet, this becomes the lowest
-                        true
-                    };
-
-                    if should_update_lowest_zoom {
-                        self.lowest_zoom = Some(zoom);
-                        self.lowest_zoom_indices.insert(key);
-                    }
-
-                    // Always update regular tiles if they don't exist or if we have a higher zoom (better quality)
-                    let should_update_tile = if let Some(existing_tile) = self.tiles.get(&key) {
-                        // Update if the new tile has higher zoom (better quality)
-                        zoom > existing_tile.zoom
-                    } else {
-                        // No existing tile, so add it
-                        true
-                    };
-
-                    if should_update_tile {
-                        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
-                            screen_rect.x as i32,
-                            screen_rect.y as i32,
-                            self.tile_size as i32,
-                            self.tile_size as i32,
-                        )) {
-                            self.tiles.insert(
-                                key,
-                                TileAtZoom {
-                                    image: Rc::new(image),
-                                    zoom,
-                                },
-                            );
-                        }
-                    }
+    /// Update lowest zoom tracking for the given tile key
+    fn update_lowest_zoom_tracking(&mut self, key: &TileRectKey, zoom: f32) {
+        let should_update = match self.lowest_zoom {
+            Some(current_lowest) => {
+                if zoom < current_lowest {
+                    self.lowest_zoom_indices.clear();
+                    true
+                } else if (zoom - current_lowest).abs() < f32::EPSILON {
+                    true
+                } else {
+                    false
                 }
             }
+            None => true,
+        };
+
+        if should_update {
+            self.lowest_zoom = Some(zoom);
+            self.lowest_zoom_indices.insert(*key);
         }
-        self.zoom_changed_at = None;
-        self.needs_full_repaint = false;
+    }
+
+    /// Check if a tile should be updated based on zoom level
+    fn should_update_tile(&self, key: &TileRectKey, zoom: f32) -> bool {
+        self.tiles
+            .get(key)
+            .map(|existing_tile| existing_tile.partial || zoom > existing_tile.zoom)
+            .unwrap_or(true)
+    }
+
+    /// Capture a tile from the surface and store it in the cache
+    fn capture_tile(
+        &mut self,
+        surface: &mut Surface,
+        screen_rect: &Rectangle,
+        key: TileRectKey,
+        zoom: f32,
+        world_rect: Rectangle,
+        partial: bool,
+    ) {
+        let rect = if partial {
+            let bounds = Rectangle {
+                x: 0.0,
+                y: 0.0,
+                width: surface.width() as f32,
+                height: surface.height() as f32,
+            };
+            if let Some(int) = screen_rect.intersection(&bounds) {
+                int
+            } else {
+                *screen_rect
+            }
+        } else {
+            *screen_rect
+        };
+
+        if let Some(image) = surface.image_snapshot_with_bounds(IRect::from_xywh(
+            rect.x as i32,
+            rect.y as i32,
+            rect.width as i32,
+            rect.height as i32,
+        )) {
+            self.tiles.insert(
+                key,
+                TileAtZoom {
+                    image: Rc::new(image),
+                    zoom,
+                    rect: world_rect,
+                    partial,
+                },
+            );
+        }
     }
 
     /// Get tiles for a specific region with blur information and sorting.
     /// This encapsulates the logic for filtering tiles, calculating blur parameters,
     /// and sorting by quality for optimal rendering.
-    pub fn get_region_tiles(&self, bounds: &Rectangle, current_zoom: f32) -> RegionTiles {
-        RegionTiles::new(self, bounds, current_zoom)
+    pub fn get_region_tiles(
+        &self,
+        bounds: &Rectangle,
+        current_zoom: f32,
+        strategy: ImageTileCacheResolutionStrategy,
+    ) -> RegionTiles {
+        if current_zoom > self.max_zoom_for_cache {
+            return RegionTiles::empty();
+        }
+        RegionTiles::new(self, bounds, current_zoom, strategy)
     }
 }

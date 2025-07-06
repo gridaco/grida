@@ -1,0 +1,47 @@
+name: Publish Packages
+
+
+on:
+  workflow_dispatch:
+    
+  push:
+    branches:
+      # (DISABLED)
+      - __noop__
+
+jobs:
+  publish-grida-canvas-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Setup just
+        uses: extractions/setup-just@v3
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Grida Canvas WASM
+        run: just build canvas wasm
+
+      - name: Configure Git for Changesets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Publish Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish-packages

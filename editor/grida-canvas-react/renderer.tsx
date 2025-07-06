@@ -5,9 +5,12 @@ import { useCurrentSceneState, useTransformState } from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "../grida-canvas/backends/dom";
-import cmath from "@grida/cmath";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
+import { SizeProvider } from "./viewport/size";
+import cmath from "@grida/cmath";
+import Canvas from "@/grida-canvas-wasm-react";
+import type { Editor } from "@/grida-canvas/editor";
 
 type CustomComponent = React.ComponentType<any>;
 
@@ -59,6 +62,25 @@ export function StandaloneSceneContent({
     >
       {children?.map((id) => <NodeElement key={id} node_id={id} />)}
     </div>
+  );
+}
+
+export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
+  const document = useEditorState(editor, (state) => state.document);
+  const debug = useEditorState(editor, (state) => state.debug);
+  const transform = useEditorState(editor, (state) => state.transform);
+
+  return (
+    <SizeProvider className="w-full h-full">
+      <Canvas
+        width={100}
+        height={100}
+        transform={transform}
+        data={document}
+        debug={debug}
+        onMount={editor.setSurface.bind(editor)}
+      />
+    </SizeProvider>
   );
 }
 

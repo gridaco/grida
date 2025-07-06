@@ -14,14 +14,14 @@ pub struct GpuState {
 ///
 /// It is created by [init] and passed to the other exported functions. Note that rust-skia data
 /// structures are not thread safe, so a state must not be shared between different Web Workers.
-pub struct State {
+pub struct SurfaceState {
     gpu_state: GpuState,
     surface: Surface,
 }
 
-impl State {
+impl SurfaceState {
     fn new(gpu_state: GpuState, surface: Surface) -> Self {
-        State { gpu_state, surface }
+        SurfaceState { gpu_state, surface }
     }
 
     fn set_surface(&mut self, surface: Surface) {
@@ -29,8 +29,8 @@ impl State {
     }
 }
 
-impl State {
-    /// Create a new [`State`] for native targets using the provided context,
+impl SurfaceState {
+    /// Create a new [`SurfaceState`] for native targets using the provided context,
     /// framebuffer information and surface. This mirrors the initialization
     /// logic used on the wasm side.
     pub fn from_parts(

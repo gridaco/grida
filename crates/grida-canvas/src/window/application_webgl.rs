@@ -1,12 +1,13 @@
-use crate::font_loader::FontMessage;
-use crate::image_loader::ImageMessage;
-use crate::node::schema::*;
+use crate::resource::font_loader::FontMessage;
+use crate::resource::image_loader::ImageMessage;
 use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::Backend;
+use crate::window::application::ApplicationApi;
 use crate::window::application::UnknownTargetApplication;
-use crate::window::scheduler;
-use crate::window::state::{self, GpuState, State};
+use crate::window::command::ApplicationCommand;
+use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
+use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
@@ -33,6 +34,11 @@ fn init_gl() {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn init_gl() {
+    // no-op
+}
+
 #[cfg(target_arch = "wasm32")]
 fn create_gpu_state() -> GpuState {
     let interface = skia_safe::gpu::gl::Interface::new_native().unwrap();
@@ -54,12 +60,96 @@ fn create_gpu_state() -> GpuState {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(target_arch = "wasm32"))]
+fn create_gpu_state() -> GpuState {
+    // no-op
+    panic!("create_gpu_state is not supported on native");
+}
+
 pub struct WebGlApplication {
     pub(crate) app: UnknownTargetApplication,
 }
 
-#[cfg(target_arch = "wasm32")]
+impl ApplicationApi for WebGlApplication {
+    fn tick(&mut self) {
+        self.app.tick();
+    }
+
+    fn resize(&mut self, width: u32, height: u32) {
+        self.app.resize(width, height);
+    }
+
+    fn set_debug(&mut self, debug: bool) {
+        self.app.set_debug(debug);
+    }
+
+    fn toggle_debug(&mut self) {
+        self.app.toggle_debug();
+    }
+
+    fn set_verbose(&mut self, verbose: bool) {
+        self.app.set_verbose(verbose);
+    }
+
+    fn command(&mut self, cmd: ApplicationCommand) -> bool {
+        self.app.command(cmd)
+    }
+
+    fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
+        self.app.get_node_ids_from_point(point)
+    }
+
+    fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
+        self.app.get_node_id_from_point(point)
+    }
+
+    fn get_node_ids_from_envelope(&mut self, rect: Rectangle) -> Vec<String> {
+        self.app.get_node_ids_from_envelope(rect)
+    }
+
+    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
+        self.app.get_node_absolute_bounding_box(id)
+    }
+
+    fn set_main_camera_transform(&mut self, transform: AffineTransform) {
+        self.app.set_main_camera_transform(transform);
+    }
+
+    /// Enable or disable rendering of tile overlays.
+    fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
+        self.app.devtools_rendering_set_show_tiles(debug);
+    }
+
+    fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_fps_meter(show);
+    }
+
+    fn devtools_rendering_set_show_stats(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_stats(show);
+    }
+
+    fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_hit_testing(show);
+    }
+
+    fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
+        self.app.devtools_rendering_set_show_ruler(show);
+    }
+
+    fn load_scene_json(&mut self, json: &str) {
+        self.app.load_scene_json(json);
+    }
+
+    fn load_dummy_scene(&mut self) {
+        self.app.load_dummy_scene();
+    }
+
+    /// Load a heavy scene useful for performance benchmarking.
+    fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
+        self.app.load_benchmark_scene(cols, rows);
+    }
+}
+
 impl WebGlApplication {
     /// Create a new [`WebGlApplication`] with an initialized renderer.
     pub fn new(width: i32, height: i32) -> Self {
@@ -70,46 +160,22 @@ impl WebGlApplication {
             context,
             framebuffer_info,
         } = gpu_state;
-        let mut state = State::from_parts(context, framebuffer_info, surface);
+        let mut state = SurfaceState::from_parts(context, framebuffer_info, surface);
 
         let (_image_tx, image_rx) = mpsc::unbounded::<ImageMessage>();
         let (_font_tx, font_rx) = mpsc::unbounded::<FontMessage>();
-
-        let mut renderer = Renderer::new();
-        renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
         let camera = Camera2D::new(crate::node::schema::Size {
             width: width as f32,
             height: height as f32,
         });
-        renderer.set_camera(camera.clone());
 
-        let mut app = Self {
-            app: UnknownTargetApplication {
-                renderer,
-                state,
-                camera,
-                input: crate::runtime::input::InputState::default(),
-                hit_result: None,
-                last_hit_test: std::time::Instant::now(),
-                hit_test_interval: std::time::Duration::ZERO,
-                image_rx,
-                font_rx,
-                scheduler: scheduler::FrameScheduler::new(60).with_max_fps(60),
-                last_frame_time: std::time::Instant::now(),
-                last_stats: None,
-                show_fps: true,
-                show_stats: true,
-                show_hit_overlay: true,
-                show_ruler: true,
-            },
+        let backend = Backend::GL(state.surface_mut_ptr());
+        let app = Self {
+            app: UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx),
         };
-        app.app.devtools_rendering_set_show_tiles(true);
-        app
-    }
 
-    pub fn resize(&mut self, width: i32, height: i32) {
-        self.app.resize(width as u32, height as u32);
+        app
     }
 
     pub fn redraw(&mut self) {
@@ -120,117 +186,5 @@ impl WebGlApplication {
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.app.pointer_move(x, y);
-    }
-
-    /// Forward a [`WindowCommand`] to the inner application.
-    pub fn command(&mut self, cmd: crate::window::command::WindowCommand) {
-        self.app.command(cmd);
-    }
-
-    pub fn load_dummy_scene(&mut self) {
-        self.app.load_dummy_scene();
-    }
-
-    /// Load a heavy scene useful for performance benchmarking.
-    pub fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        self.app.load_benchmark_scene(cols, rows);
-    }
-
-    /// Load a scene from a JSON string using the `io_json` parser.
-    pub fn load_scene_json(&mut self, json: &str) {
-        use crate::io::io_json;
-        use math2::transform::AffineTransform;
-
-        let Ok(file) = io_json::parse(json) else {
-            eprintln!("failed to parse scene json");
-            return;
-        };
-
-        let nodes = file
-            .document
-            .nodes
-            .into_iter()
-            .map(|(id, node)| (id, node.into()))
-            .collect();
-
-        let scene_id = file.document.entry_scene_id.unwrap_or_else(|| {
-            file.document
-                .scenes
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_else(|| "scene".to_string())
-        });
-
-        if let Some(scene) = file.document.scenes.get(&scene_id) {
-            let scene = crate::node::schema::Scene {
-                id: scene_id,
-                name: scene.name.clone(),
-                transform: AffineTransform::identity(),
-                children: scene.children.clone(),
-                nodes,
-                background_color: scene.background_color.clone().map(Into::into),
-            };
-            self.app.renderer.load_scene(scene);
-        }
-    }
-
-    /// Enable or disable rendering of tile overlays.
-    pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
-        self.app.devtools_rendering_set_show_tiles(debug);
-    }
-
-    /// Returns `true` if tile overlay rendering is enabled.
-    pub fn debug_tiles(&self) -> bool {
-        self.app.debug_tiles()
-    }
-
-    pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_fps_meter(show);
-    }
-
-    pub fn devtools_rendering_set_show_stats(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_stats(show);
-    }
-
-    pub fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_hit_testing(show);
-    }
-
-    pub fn set_show_ruler(&mut self, show: bool) {
-        self.app.set_show_ruler(show);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
-    Box::new(WebGlApplication::new(width, height))
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
-    if let Some(app) = app.as_mut() {
-        app.resize(width, height);
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
-    if let Some(app) = app.as_mut() {
-        app.redraw();
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-// #[unsafe(no_mangle)]
-pub unsafe extern "C" fn load_scene_json(app: *mut WebGlApplication, ptr: *const u8, len: usize) {
-    if let Some(app) = app.as_mut() {
-        let slice = std::slice::from_raw_parts(ptr, len);
-        if let Ok(json) = std::str::from_utf8(slice) {
-            app.load_scene_json(json);
-        }
     }
 }

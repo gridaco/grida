@@ -1,5 +1,5 @@
-use cg::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use cg::cache::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use skia_safe::surfaces;
 
 fn bench_mipmap_generation(c: &mut Criterion) {

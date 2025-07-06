@@ -1,32 +1,52 @@
 import * as React from "react";
-import { Editor } from "@/grida-canvas/editor";
+import { Editor, EditorContentRenderingBackend } from "@/grida-canvas/editor";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector";
-
 import type { editor } from "@/grida-canvas";
 import deepEqual from "fast-deep-equal/es6/react.js";
+import {
+  domapi,
+  DOMGeometryQueryInterfaceProvider,
+  NoopGeometryQueryInterfaceProvider,
+} from "@/grida-canvas/backends";
 
-export function useEditor(init?: editor.state.IEditorStateInit) {
+const __DEFAULT_STATE: editor.state.IEditorStateInit = {
+  debug: false,
+  document: {
+    nodes: {},
+    entry_scene_id: "main",
+    scenes: {
+      main: {
+        type: "scene",
+        id: "main",
+        name: "main",
+        children: [],
+        guides: [],
+        constraints: { children: "multiple" },
+      },
+    },
+  },
+  editable: true,
+};
+
+export function useEditor(
+  init?: editor.state.IEditorStateInit,
+  backend: EditorContentRenderingBackend = "dom"
+) {
   const [_editor] = React.useState(
     new Editor(
-      init ?? {
-        debug: false,
-        document: {
-          nodes: {},
-          entry_scene_id: "main",
-          scenes: {
-            main: {
-              type: "scene",
-              id: "main",
-              name: "main",
-              children: [],
-              guides: [],
-              constraints: { children: "multiple" },
-            },
-          },
-        },
-        editable: true,
-      }
+      backend,
+      domapi.k.VIEWPORT_ELEMENT_ID,
+      domapi.k.EDITOR_CONTENT_ELEMENT_ID,
+      (_) => {
+        switch (backend) {
+          case "dom":
+            return new DOMGeometryQueryInterfaceProvider(_);
+          case "canvas":
+            return new NoopGeometryQueryInterfaceProvider();
+        }
+      },
+      init ?? __DEFAULT_STATE
     )
   );
 

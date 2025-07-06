@@ -1,9 +1,9 @@
 use crate::node::schema::{NodeId, Paint, Size, TextAlign, TextAlignVertical, TextStyle};
 use crate::painter::{cvt, make_textstyle};
-use crate::repository::FontRepository;
+use crate::runtime::repository::FontRepository;
 use skia_safe::textlayout;
-use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 

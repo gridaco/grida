@@ -5,9 +5,9 @@ use crate::cache::geometry::GeometryCache;
 use crate::cache::{paragraph::ParagraphCache, vector_path::VectorPathCache};
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
-use crate::repository::{FontRepository, ImageRepository};
+use crate::runtime::repository::{FontRepository, ImageRepository};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use skia_safe::{Paint as SkPaint, Path, Point, canvas::SaveLayerRec, textlayout};
+use skia_safe::{canvas::SaveLayerRec, textlayout, Paint as SkPaint, Path, Point};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -861,7 +861,7 @@ pub(crate) fn make_textstyle(text_style: &TextStyle) -> skia_safe::textlayout::T
 mod tests {
     use super::*;
     use crate::node::factory::NodeFactory;
-    use crate::repository::{FontRepository, ImageRepository};
+    use crate::runtime::repository::{FontRepository, ImageRepository};
     use skia_safe::surfaces;
     use std::cell::RefCell;
     use std::rc::Rc;

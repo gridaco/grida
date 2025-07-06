@@ -1,4 +1,5 @@
 pub mod geometry;
+pub mod mipmap;
 pub mod paragraph;
 pub mod picture;
 pub mod scene;
