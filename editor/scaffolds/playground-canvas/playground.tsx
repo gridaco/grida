@@ -123,13 +123,6 @@ import colors, {
   randomcolorname,
 } from "@/theme/tailwindcolors";
 import { __WIP_UNSTABLE_WasmContent } from "@/grida-canvas-react/renderer";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type UIConfig = {
   sidebar: "hidden" | "visible";
@@ -163,6 +156,7 @@ export type CanvasPlaygroundProps = {
   src?: string;
   document?: editor.state.IEditorStateInit;
   room_id?: string;
+  backend?: "dom" | "canvas";
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -186,11 +180,12 @@ export default function CanvasPlayground({
       },
     },
   },
+  backend = "dom",
   templates,
   src,
   room_id,
 }: CanvasPlaygroundProps) {
-  const instance = useEditor(document, "canvas");
+  const instance = useEditor(document, backend);
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useGoogleFontsList();
 
@@ -219,7 +214,7 @@ export default function CanvasPlayground({
                 <StandaloneDocumentEditor editor={instance}>
                   <WindowCurrentEditorProvider />
                   <UserCustomTemplatesProvider templates={templates}>
-                    <Consumer />
+                    <Consumer backend={backend} />
                   </UserCustomTemplatesProvider>
                 </StandaloneDocumentEditor>
               </ErrorBoundary>
@@ -231,7 +226,7 @@ export default function CanvasPlayground({
   );
 }
 
-function Consumer() {
+function Consumer({ backend }: { backend: "dom" | "canvas" }) {
   const [ui, setUI] = useState<UIConfig>({
     sidebar: "visible",
     toolbar: "visible",
@@ -290,10 +285,13 @@ function Consumer() {
                   <ViewportRoot className="relative w-full h-full overflow-hidden">
                     <Hotkyes />
                     <EditorSurface />
-                    {/* <AutoInitialFitTransformer>
-                      <StandaloneSceneContent />
-                    </AutoInitialFitTransformer> */}
-                    <__WIP_UNSTABLE_WasmContent editor={instance} />
+                    {backend === "canvas" ? (
+                      <__WIP_UNSTABLE_WasmContent editor={instance} />
+                    ) : (
+                      <AutoInitialFitTransformer>
+                        <StandaloneSceneContent />
+                      </AutoInitialFitTransformer>
+                    )}
                     {ui.toolbar === "visible" && (
                       <>
                         <BrushToolbarPosition>
@@ -529,7 +527,7 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
             <TabsTrigger value="ai">AI</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
-            <div className="py-4 divide-y-2">
+            <div className="py-4 space-y-2">
               <Label className="flex items-center justify-between">
                 Debug Mode
                 <Switch
@@ -539,18 +537,25 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
                   }}
                 />
               </Label>
-              {/* <Label className="flex items-center justify-between">
+              <hr />
+              <Label className="flex items-center justify-between">
                 Rendering Backend
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a backend" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dom">DOM</SelectItem>
-                    <SelectItem value="canvas">WebGL Canvas (WASM)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Label> */}
+                <Link href="/canvas" target="_blank">
+                  <Button size="sm" variant="outline">
+                    DOM
+                    <OpenInNewWindowIcon />
+                  </Button>
+                </Link>
+              </Label>
+              <Label className="flex items-center justify-between">
+                Rendering Backend
+                <Link href="/canvas/experimental/wasm" target="_blank">
+                  <Button size="sm" variant="outline">
+                    CANVAS WASM
+                    <OpenInNewWindowIcon />
+                  </Button>
+                </Link>
+              </Label>
 
               {/* <label>
                 Snap to geometry

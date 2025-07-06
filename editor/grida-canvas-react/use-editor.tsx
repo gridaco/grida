@@ -9,8 +9,6 @@ import {
   DOMGeometryQueryInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
 } from "@/grida-canvas/backends";
-import type { Grida2D } from "@grida/canvas-wasm";
-import { CanvasWasmGeometryQueryInterfaceProvider } from "@/grida-canvas/backends/wasm";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   debug: false,
