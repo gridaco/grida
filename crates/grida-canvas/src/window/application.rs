@@ -12,6 +12,44 @@ use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
+pub trait ApplicationApi {
+    fn tick(&mut self);
+    fn resize(&mut self, width: u32, height: u32);
+
+    /// Handle a [`ApplicationCommand`]. Returns `true` if the caller should exit.
+    fn command(&mut self, cmd: ApplicationCommand) -> bool;
+    //
+    fn set_debug(&mut self, debug: bool);
+    fn toggle_debug(&mut self);
+    fn set_verbose(&mut self, verbose: bool);
+
+    fn set_main_camera_transform(&mut self, transform: AffineTransform);
+
+    /// returns the top-most node id at the point, if any.
+    fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String>;
+    /// returns all node ids at the point, if any. ordered from top to bottom.
+    fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String>;
+    /// returns all node ids intersecting with the envelope in canvas space.
+    fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
+    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
+
+    /// Enable or disable rendering of tile overlays.
+    fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
+    fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
+    fn devtools_rendering_set_show_stats(&mut self, show: bool);
+    fn devtools_rendering_set_show_hit_testing(&mut self, show: bool);
+    fn devtools_rendering_set_show_ruler(&mut self, show: bool);
+
+    /// Load a scene from a JSON string using the `io_json` parser.
+    fn load_scene_json(&mut self, json: &str);
+
+    // static demo scenes
+    /// Load a simple demo scene with a few colored rectangles.
+    fn load_dummy_scene(&mut self);
+    /// Load a heavy scene useful for performance benchmarking.
+    fn load_benchmark_scene(&mut self, cols: u32, rows: u32);
+}
+
 /// Host events
 pub enum HostEvent {
     /// tick the clock for the application
@@ -58,6 +96,177 @@ pub struct UnknownTargetApplication {
     queue_stable_timer: Option<crate::sys::timer::TimerId>,
 }
 
+impl ApplicationApi for UnknownTargetApplication {
+    /// tick the application clock and timer.
+    /// this can be called as many times as needed, from different sources (e.g. isolated timer thread, or raf, as the platform requires)
+    fn tick(&mut self) {
+        self.clock.tick();
+        self.timer.tick(self.clock.now());
+    }
+
+    /// Update backing resources after a window resize.
+    fn resize(&mut self, width: u32, height: u32) {
+        self.state.resize(width as i32, height as i32);
+        self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
+        self.renderer.invalidate_cache();
+        self.renderer.camera.set_size(crate::node::schema::Size {
+            width: width as f32,
+            height: height as f32,
+        });
+        self.queue();
+    }
+
+    fn command(&mut self, cmd: ApplicationCommand) -> bool {
+        match cmd {
+            ApplicationCommand::ZoomIn => {
+                let current_zoom = self.renderer.camera.get_zoom();
+                self.renderer.camera.set_zoom(current_zoom * 1.2);
+                self.queue();
+            }
+            ApplicationCommand::ZoomOut => {
+                let current_zoom = self.renderer.camera.get_zoom();
+                self.renderer.camera.set_zoom(current_zoom / 1.2);
+                self.queue();
+            }
+            ApplicationCommand::ZoomDelta { delta } => {
+                let current_zoom = self.renderer.camera.get_zoom();
+                let zoom_factor = 1.0 + delta;
+                if zoom_factor.is_finite() && zoom_factor > 0.0 {
+                    self.renderer
+                        .camera
+                        .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
+                }
+                self.queue();
+            }
+            ApplicationCommand::Pan { tx, ty } => {
+                let zoom = self.renderer.camera.get_zoom();
+                self.renderer
+                    .camera
+                    .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
+                self.queue();
+            }
+            ApplicationCommand::ToggleDebugMode => {
+                self.toggle_debug();
+                self.queue();
+            }
+            ApplicationCommand::None => {}
+        }
+
+        false
+    }
+
+    fn set_debug(&mut self, debug: bool) {
+        self.debug = debug;
+
+        self.devtools_rendering_show_fps = self.debug;
+        self.devtools_rendering_show_tiles = self.debug;
+        self.devtools_rendering_show_stats = self.debug;
+        self.devtools_rendering_show_hit_overlay = self.debug;
+        self.devtools_rendering_show_ruler = self.debug;
+    }
+
+    fn toggle_debug(&mut self) {
+        self.set_debug(!self.debug);
+    }
+
+    fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
+    }
+
+    fn set_main_camera_transform(&mut self, transform: AffineTransform) {
+        self.renderer.camera.set_transform(transform);
+        self.queue();
+    }
+
+    fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
+        let tester = self.get_hit_tester();
+        tester.hits(point)
+    }
+
+    fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
+        let tester = self.get_hit_tester();
+        tester.hit_first(point)
+    }
+
+    fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String> {
+        let tester = self.get_hit_tester();
+        tester.intersects(&envelope)
+    }
+
+    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
+        self.renderer.get_cache().geometry().get_world_bounds(id)
+    }
+
+    fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
+        self.devtools_rendering_show_tiles = debug;
+    }
+
+    fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
+        self.devtools_rendering_show_fps = show;
+    }
+
+    fn devtools_rendering_set_show_stats(&mut self, show: bool) {
+        self.devtools_rendering_show_stats = show;
+    }
+
+    fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
+        self.devtools_rendering_show_hit_overlay = show;
+    }
+
+    fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
+        self.devtools_rendering_show_ruler = show;
+    }
+
+    fn load_scene_json(&mut self, json: &str) {
+        use crate::io::io_json;
+        use math2::transform::AffineTransform;
+
+        let Ok(file) = io_json::parse(json) else {
+            let err = io_json::parse(json).unwrap_err();
+            eprintln!("failed to parse scene json: {}", err);
+            return;
+        };
+
+        let nodes = file
+            .document
+            .nodes
+            .into_iter()
+            .map(|(id, node)| (id, node.into()))
+            .collect();
+
+        let scene_id = file.document.entry_scene_id.unwrap_or_else(|| {
+            file.document
+                .scenes
+                .keys()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| "scene".to_string())
+        });
+
+        if let Some(scene) = file.document.scenes.get(&scene_id) {
+            let scene = crate::node::schema::Scene {
+                id: scene_id,
+                name: scene.name.clone(),
+                transform: AffineTransform::identity(),
+                children: scene.children.clone(),
+                nodes,
+                background_color: scene.background_color.clone().map(Into::into),
+            };
+            self.renderer.load_scene(scene);
+        }
+    }
+
+    fn load_dummy_scene(&mut self) {
+        let scene = dummy::create_dummy_scene();
+        self.renderer.load_scene(scene);
+    }
+
+    fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
+        let scene = dummy::create_benchmark_scene(cols, rows);
+        self.renderer.load_scene(scene);
+    }
+}
+
 impl UnknownTargetApplication {
     /// Create a new [`UnknownTargetApplication`] with a renderer configured for
     /// the given backend and camera. Each platform should supply a callback
@@ -98,13 +307,6 @@ impl UnknownTargetApplication {
             queue_stable_timer: None,
             queue_stable_debounce_millis: 50,
         }
-    }
-
-    /// tick the application clock and timer.
-    /// this can be called as many times as needed, from different sources (e.g. isolated timer thread, or raf, as the platform requires)
-    pub fn tick(&mut self) {
-        self.clock.tick();
-        self.timer.tick(self.clock.now());
     }
 
     /// Provide the platform-specific callback used to request a redraw from the
@@ -207,28 +409,6 @@ impl UnknownTargetApplication {
         crate::hittest::HitTester::new(self.renderer.get_cache())
     }
 
-    /// returns all node ids at the point, if any. ordered from top to bottom.
-    pub fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
-        let tester = self.get_hit_tester();
-        tester.hits(point)
-    }
-
-    /// returns the top-most node id at the point, if any.
-    pub fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
-        let tester = self.get_hit_tester();
-        tester.hit_first(point)
-    }
-
-    /// returns all node ids intersecting with the envelope in canvas space.
-    pub fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String> {
-        let tester = self.get_hit_tester();
-        tester.intersects(&envelope)
-    }
-
-    pub fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        self.renderer.get_cache().geometry().get_world_bounds(id)
-    }
-
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO
@@ -244,69 +424,6 @@ impl UnknownTargetApplication {
             self.queue();
         }
         self.hit_test_result = new_hit_result;
-    }
-
-    pub fn set_main_camera_transform(&mut self, transform: AffineTransform) {
-        self.renderer.camera.set_transform(transform);
-        self.queue();
-    }
-
-    /// Handle a [`WindowCommand`]. Returns `true` if the caller should exit.
-    pub(crate) fn command(&mut self, cmd: ApplicationCommand) -> bool {
-        match cmd {
-            ApplicationCommand::ZoomIn => {
-                let current_zoom = self.renderer.camera.get_zoom();
-                self.renderer.camera.set_zoom(current_zoom * 1.2);
-                self.queue();
-            }
-            ApplicationCommand::ZoomOut => {
-                let current_zoom = self.renderer.camera.get_zoom();
-                self.renderer.camera.set_zoom(current_zoom / 1.2);
-                self.queue();
-            }
-            ApplicationCommand::ZoomDelta { delta } => {
-                let current_zoom = self.renderer.camera.get_zoom();
-                let zoom_factor = 1.0 + delta;
-                if zoom_factor.is_finite() && zoom_factor > 0.0 {
-                    self.renderer
-                        .camera
-                        .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
-                }
-                self.queue();
-            }
-            ApplicationCommand::Pan { tx, ty } => {
-                let zoom = self.renderer.camera.get_zoom();
-                self.renderer
-                    .camera
-                    .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
-                self.queue();
-            }
-            ApplicationCommand::ToggleDebugMode => {
-                self.toggle_debug();
-                self.queue();
-            }
-            ApplicationCommand::None => {}
-        }
-
-        false
-    }
-
-    pub fn set_debug(&mut self, debug: bool) {
-        self.debug = debug;
-
-        self.devtools_rendering_show_fps = self.debug;
-        self.devtools_rendering_show_tiles = self.debug;
-        self.devtools_rendering_show_stats = self.debug;
-        self.devtools_rendering_show_hit_overlay = self.debug;
-        self.devtools_rendering_show_ruler = self.debug;
-    }
-
-    pub fn toggle_debug(&mut self) {
-        self.set_debug(!self.debug);
-    }
-
-    pub fn set_verbose(&mut self, verbose: bool) {
-        self.verbose = verbose;
     }
 
     pub(crate) fn resource_loaded(&mut self) {
@@ -409,44 +526,11 @@ impl UnknownTargetApplication {
         overlay_flush_time + overlay_draw_time
     }
 
-    /// Update backing resources after a window resize.
-    pub(crate) fn resize(&mut self, width: u32, height: u32) {
-        self.state.resize(width as i32, height as i32);
-        self.renderer.backend = Backend::GL(self.state.surface_mut_ptr());
-        self.renderer.invalidate_cache();
-        self.renderer.camera.set_size(crate::node::schema::Size {
-            width: width as f32,
-            height: height as f32,
-        });
-        self.queue();
-    }
-
     /// Update the cursor position and run a debounced hit test.
     #[allow(dead_code)]
     pub(crate) fn pointer_move(&mut self, x: f32, y: f32) {
         self.input.cursor = [x, y];
         self.perform_hit_test();
-    }
-
-    /// Enable or disable rendering of tile overlays.
-    pub fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
-        self.devtools_rendering_show_tiles = debug;
-    }
-
-    pub fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
-        self.devtools_rendering_show_fps = show;
-    }
-
-    pub fn devtools_rendering_set_show_stats(&mut self, show: bool) {
-        self.devtools_rendering_show_stats = show;
-    }
-
-    pub fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
-        self.devtools_rendering_show_hit_overlay = show;
-    }
-
-    pub fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
-        self.devtools_rendering_show_ruler = show;
     }
 
     // Timer convenience methods
@@ -498,21 +582,5 @@ impl UnknownTargetApplication {
     /// Returns `true` if the timer was found and cancelled, `false` otherwise
     pub fn cancel_timer(&mut self, id: crate::sys::timer::TimerId) -> bool {
         self.timer.cancel(id)
-    }
-
-    // static demo scenes
-
-    /// Load a simple demo scene with a few colored rectangles.
-    #[allow(dead_code)]
-    pub(crate) fn load_dummy_scene(&mut self) {
-        let scene = dummy::create_dummy_scene();
-        self.renderer.load_scene(scene);
-    }
-
-    /// Load a heavy scene useful for performance benchmarking.
-    #[allow(dead_code)]
-    pub(crate) fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        let scene = dummy::create_benchmark_scene(cols, rows);
-        self.renderer.load_scene(scene);
     }
 }

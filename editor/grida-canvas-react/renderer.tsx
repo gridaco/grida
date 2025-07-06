@@ -67,6 +67,7 @@ export function StandaloneSceneContent({
 
 export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
   const document = useEditorState(editor, (state) => state.document);
+  const debug = useEditorState(editor, (state) => state.debug);
   const transform = useEditorState(editor, (state) => state.transform);
 
   return (
@@ -76,6 +77,7 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
         height={100}
         transform={transform}
         data={document}
+        debug={debug}
         onMount={editor.setSurface.bind(editor)}
       />
     </SizeProvider>

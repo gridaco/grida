@@ -228,6 +228,18 @@ export class Grida2D {
   // DEVTOOLS
   // ====================================================================================================
 
+  setDebug(debug: boolean) {
+    this.module._set_debug(this.ptr, debug);
+  }
+
+  toggleDebug() {
+    this.module._toggle_debug(this.ptr);
+  }
+
+  setVerbose(verbose: boolean) {
+    this.module._set_verbose(this.ptr, verbose);
+  }
+
   /**
    * Set the visibility of the tiles.
    * @param show - The visibility of the tiles.

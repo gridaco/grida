@@ -104,6 +104,10 @@ declare namespace createGridaCanvas {
       a: number,
       b: number
     ): void;
+
+    _set_debug(state: GridaCanvasWebGlApplicationPtr, debug: boolean): void;
+    _toggle_debug(state: GridaCanvasWebGlApplicationPtr): void;
+    _set_verbose(state: GridaCanvasWebGlApplicationPtr, verbose: boolean): void;
     _devtools_rendering_set_show_tiles(
       state: GridaCanvasWebGlApplicationPtr,
       show: boolean

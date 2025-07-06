@@ -2,6 +2,7 @@ use crate::node::schema::Size;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::scene::Backend;
+use crate::window::application::ApplicationApi;
 use crate::window::application::{HostEvent, UnknownTargetApplication};
 use crate::window::command::ApplicationCommand;
 use futures::channel::mpsc;

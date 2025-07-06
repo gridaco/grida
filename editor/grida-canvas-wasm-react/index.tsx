@@ -11,12 +11,14 @@ function CanvasContent({
   height,
   data,
   transform,
+  debug,
   onMount,
 }: {
   width: number;
   height: number;
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
+  debug?: boolean;
   onMount?: (surface: Grida2D) => void;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -30,11 +32,7 @@ function CanvasContent({
       }).then((factory) => {
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
-        grida.devtools_rendering_set_show_tiles(true);
-        grida.devtools_rendering_set_show_fps_meter(true);
-        grida.devtools_rendering_set_show_stats(false);
-        grida.devtools_rendering_set_show_hit_testing(true);
-        grida.devtools_rendering_set_show_ruler(true);
+        // grida.setDebug(false);
 
         rendererRef.current = grida;
         onMount?.(grida);
@@ -49,6 +47,12 @@ function CanvasContent({
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.setDebug(debug ?? false);
+    }
+  }, [rendererRef.current, debug]);
 
   useEffect(() => {
     if (rendererRef.current) {
@@ -92,12 +96,14 @@ export default function Canvas({
   height,
   data,
   transform,
+  debug,
   onMount,
 }: {
   width: number;
   height: number;
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
+  debug?: boolean;
   onMount?: (surface: Grida2D) => void;
 }) {
   const size = useSize({ width, height });
@@ -107,6 +113,7 @@ export default function Canvas({
       height={size.height}
       data={data}
       transform={transform}
+      debug={debug}
       onMount={onMount}
     />
   );

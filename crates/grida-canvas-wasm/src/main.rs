@@ -1,5 +1,6 @@
 #![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 
+use cg::window::application::ApplicationApi;
 #[cfg(target_arch = "wasm32")]
 use cg::window::application_webgl::WebGlApplication;
 use math2::transform::AffineTransform;
@@ -40,7 +41,7 @@ pub unsafe extern "C" fn tick(app: *mut WebGlApplication) {
 #[no_mangle]
 pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
     if let Some(app) = app.as_mut() {
-        app.resize(width, height);
+        app.resize(width as u32, height as u32);
     }
 }
 
@@ -129,7 +130,7 @@ pub unsafe extern "C" fn get_node_id_from_point(
     use std::ffi::CString;
 
     if let Some(app) = app.as_mut() {
-        if let Some(s) = app.get_node_id_from_point(x, y) {
+        if let Some(s) = app.get_node_id_from_point([x, y]) {
             return CString::new(s).unwrap().into_raw() as *const u8;
         }
     }
@@ -147,7 +148,7 @@ pub unsafe extern "C" fn get_node_ids_from_point(
     use std::ffi::CString;
 
     if let Some(app) = app.as_mut() {
-        let ids = app.get_node_ids_from_point(x, y);
+        let ids = app.get_node_ids_from_point([x, y]);
         if let Ok(json) = serde_json::to_string(&ids) {
             if let Ok(cstr) = CString::new(json) {
                 return cstr.into_raw() as *const u8;
@@ -202,6 +203,30 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
         }
     }
     std::ptr::null()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn set_debug(app: *mut WebGlApplication, debug: bool) {
+    if let Some(app) = app.as_mut() {
+        app.set_debug(debug);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn toggle_debug(app: *mut WebGlApplication) {
+    if let Some(app) = app.as_mut() {
+        app.toggle_debug();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub unsafe extern "C" fn set_verbose(app: *mut WebGlApplication, verbose: bool) {
+    if let Some(app) = app.as_mut() {
+        app.set_verbose(verbose);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
