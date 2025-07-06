@@ -301,10 +301,37 @@ pub struct IORectangleNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Fill {
-    #[serde(rename = "type")]
-    pub kind: String,
-    pub color: Option<RGBA>,
+pub struct IOGradientStop {
+    pub offset: f32,
+    pub color: RGBA,
+}
+
+impl From<IOGradientStop> for GradientStop {
+    fn from(stop: IOGradientStop) -> Self {
+        GradientStop {
+            offset: stop.offset,
+            color: stop.color.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum Fill {
+    #[serde(rename = "solid")]
+    Solid { color: Option<RGBA> },
+    #[serde(rename = "linear_gradient")]
+    LinearGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<IOGradientStop>,
+    },
+    #[serde(rename = "radial_gradient")]
+    RadialGradient {
+        id: Option<String>,
+        transform: Option<[[f32; 3]; 2]>,
+        stops: Vec<IOGradientStop>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -375,26 +402,35 @@ impl From<RGBA> for Color {
 impl From<Option<Fill>> for Paint {
     fn from(fill: Option<Fill>) -> Self {
         match fill {
-            Some(fill) => match fill.kind.as_str() {
-                "solid" => {
-                    if let Some(color) = fill.color {
-                        Paint::Solid(SolidPaint {
-                            color: Color(color.r, color.g, color.b, (color.a * 255.0) as u8),
-                            opacity: 1.0,
-                        })
-                    } else {
-                        Paint::Solid(SolidPaint {
-                            color: Color(0, 0, 0, 0),
-                            opacity: 1.0,
-                        })
-                    }
-                }
-                _ => Paint::Solid(SolidPaint {
-                    color: Color(0, 0, 0, 0),
+            Some(Fill::Solid { color }) => Paint::Solid(SolidPaint {
+                color: color.map_or(Color(0, 0, 0, 0), |c| c.into()),
+                opacity: 1.0,
+            }),
+            Some(Fill::LinearGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::LinearGradient(LinearGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
                     opacity: 1.0,
-                }),
-            },
-            None => Paint::Solid(SolidPaint {
+                })
+            }
+            Some(Fill::RadialGradient {
+                transform, stops, ..
+            }) => {
+                let stops = stops.into_iter().map(|s| s.into()).collect();
+                Paint::RadialGradient(RadialGradientPaint {
+                    transform: transform
+                        .map(|m| AffineTransform { matrix: m })
+                        .unwrap_or_else(AffineTransform::identity),
+                    stops,
+                    opacity: 1.0,
+                })
+            }
+            Some(_) | None => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 0),
                 opacity: 1.0,
             }),
