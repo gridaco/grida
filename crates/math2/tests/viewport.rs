@@ -1,4 +1,4 @@
-use math2::{Rectangle, viewport_transform_to_fit};
+use math2::{viewport_transform_to_fit, Rectangle};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

@@ -24,13 +24,13 @@ import {
 } from "./methods";
 import cmath from "@grida/cmath";
 import { layout } from "@grida/cmath/_layout";
-import { domapi } from "../backends/dom";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import vn from "@grida/vn";
 import schemaReducer from "./schema.reducer";
 import { self_moveNode } from "./methods/move";
 import { v4 } from "uuid";
+import type { ReducerContext } from ".";
 import "core-js/features/object/group-by";
 
 /**
@@ -49,7 +49,8 @@ const PLACEMENT_VIEWPORT_INSET = 40;
 
 export default function documentReducer<S extends editor.state.IEditorState>(
   state: S,
-  action: DocumentAction
+  action: DocumentAction,
+  context: ReducerContext
 ): S {
   if (!state.editable) return state;
 
@@ -165,7 +166,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return produce(state, (draft) => {
         const target_node_ids =
           target === "selection" ? state.selection : [target];
-        self_duplicateNode(draft, new Set(target_node_ids));
+        self_duplicateNode(draft, new Set(target_node_ids), context);
       });
       break;
     }
@@ -234,15 +235,15 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       // [root rect for calculating next placement]
       // if the insertion parent is null (root), use viewport rect (canvas space)
       // otherwise, use the parent's bounding rect (canvas space) (TODO:)
-      const _viewport_rect = domapi.get_viewport_rect();
+      const { width, height } = context.viewport;
 
       // apply the inset before convering to canvas space
       const _inset_rect = cmath.rect.inset(
         {
           x: 0,
           y: 0,
-          width: _viewport_rect.width,
-          height: _viewport_rect.height,
+          width,
+          height,
         },
         PLACEMENT_VIEWPORT_INSET
       );
@@ -252,14 +253,13 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         cmath.transform.invert(state.transform)
       );
 
-      const cdom = new domapi.CanvasDOM(state.transform);
       // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
       assert(state.scene_id, "scene_id is required for insertion");
       const scene = state.document.scenes[state.scene_id];
       const siblings = scene.children;
       const anchors = siblings
         .map((node_id) => {
-          const r = cdom.getNodeBoundingRect(node_id);
+          const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
           if (!r) return null;
           return cmath.rect.pad(
             { x: r.x, y: r.y, width: r.width, height: r.height },
@@ -328,7 +328,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       if (target_node_ids.length === 0) return state;
       return produce(state, (draft) => {
-        __self_nudge(draft, target_node_ids, dx, dy);
+        __self_nudge(draft, target_node_ids, dx, dy, context);
       });
     }
     case "nudge-resize": {
@@ -398,7 +398,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             nudge_mod * editor.a11y.a11y_direction_to_vector[direction][0];
           const nudge_dy =
             nudge_mod * editor.a11y.a11y_direction_to_vector[direction][1];
-          __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy);
+          __self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy, context);
         }
       });
       //
@@ -431,9 +431,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         //
       }
 
-      const cdom = new domapi.CanvasDOM(state.transform);
       const rects = bounding_node_ids.map(
-        (node_id) => cdom.getNodeBoundingRect(node_id)!
+        (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
       );
 
       //
@@ -466,9 +465,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target, axis } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      const cdom = new domapi.CanvasDOM(state.transform);
       const rects = target_node_ids.map(
-        (node_id) => cdom.getNodeBoundingRect(node_id)!
+        (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
       );
 
       // Only allow distribute-evenly of 3 or more nodes
@@ -514,15 +512,16 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         }
       );
 
-      const cdom = new domapi.CanvasDOM(state.transform);
-
       const layouts = Object.keys(groups).map((parent_id) => {
         const g = groups[parent_id]!;
 
-        const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
 
         const rects = g
-          .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+          .map(
+            (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+          )
           // make the rects relative to the parent
           .map((rect) =>
             cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
@@ -618,18 +617,21 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         Object.keys(groups).forEach((parent_id) => {
           const g = groups[parent_id]!;
           const is_root = parent_id === "<root>";
-          const cdom = new domapi.CanvasDOM(state.transform);
 
           let delta: cmath.Vector2;
           if (is_root) {
             delta = [0, 0];
           } else {
-            const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+            const parent_rect =
+              context.geometry.getNodeAbsoluteBoundingRect(parent_id)!;
             delta = [-parent_rect.x, -parent_rect.y];
           }
 
           const rects = g
-            .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+            .map(
+              (node_id) =>
+                context.geometry.getNodeAbsoluteBoundingRect(node_id)!
+            )
             // make the rects relative to the parent
             .map((rect) => cmath.rect.translate(rect, delta))
             .map((rect) => cmath.rect.quantize(rect, 1));
@@ -754,7 +756,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
     case "surface/brush/size":
     case "surface/brush/opacity":
     case "surface/gesture/start": {
-      return surfaceReducer(state, action);
+      return surfaceReducer(state, action, context);
     }
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
@@ -945,21 +947,20 @@ function __self_nudge(
   draft: Draft<editor.state.IEditorState>,
   targets: string[],
   dx: number,
-  dy: number
+  dy: number,
+  context: ReducerContext
 ) {
   // clear the previous surface snapping
   draft.surface_snapping = undefined;
 
   // for nudge, gesture is not required, but only for surface ux.
   if (draft.gesture.type === "nudge") {
-    const cdpm = new domapi.CanvasDOM(draft.transform);
-
     const snap_target_node_ids = getSnapTargets(draft.selection, draft);
     const snap_target_node_rects = snap_target_node_ids.map(
-      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
     );
     const origin_rects = targets.map(
-      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+      (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
     );
     const { snapping } = snapObjectsTranslation(
       origin_rects,

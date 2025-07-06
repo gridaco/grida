@@ -1,8 +1,7 @@
 use crate::cache::scene::SceneCache;
 use crate::node::schema::NodeId;
 use crate::painter::{cvt, layer::Layer};
-use math2::rect;
-use math2::vector2::Vector2;
+use math2::{rect, rect::Rectangle, vector2::Vector2};
 
 /// Hit testing utilities for [`SceneCache`].
 ///
@@ -149,5 +148,24 @@ impl<'a> HitTester<'a> {
         } else {
             false
         }
+    }
+
+    /// Returns all nodes whose bounding boxes intersect the given rectangle.
+    ///
+    /// The returned vector is sorted from deepest to shallowest, mirroring how
+    /// events bubble in typical DOM systems.
+    pub fn intersects(&self, rect: &Rectangle) -> Vec<NodeId> {
+        let mut indices = self.cache.intersects(*rect);
+        indices.sort();
+        let mut out = Vec::with_capacity(indices.len());
+        for idx in indices.into_iter().rev() {
+            let layer = &self.cache.layers.layers[idx];
+            if let Some(bounds) = self.cache.geometry.get_render_bounds(layer.id()) {
+                if rect::intersects(&bounds, rect) {
+                    out.push(layer.id().clone());
+                }
+            }
+        }
+        out
     }
 }

@@ -27,7 +27,6 @@ import {
   self_update_gesture_transform,
 } from "./methods";
 import cmath from "@grida/cmath";
-import { domapi } from "../backends/dom";
 import nid from "./tools/id";
 import { getMarqueeSelection, getRayTarget } from "./tools/target";
 import vn from "@grida/vn";
@@ -35,6 +34,7 @@ import { getInitialCurveGesture } from "./tools/gesture";
 import { snapGuideTranslation, threshold } from "./tools/snap";
 import { BitmapLayerEditor } from "@grida/bitmap";
 import cg from "@grida/cg";
+import type { ReducerContext } from ".";
 
 const black = { r: 0, g: 0, b: 0, a: 1 };
 
@@ -107,7 +107,8 @@ function __self_evt_on_pointer_move_raycast(
 
 function __self_evt_on_click(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_Click
+  action: EditorEventTarget_Click,
+  context: ReducerContext
 ) {
   const { node_ids_from_point } = <EditorEventTarget_Click>action;
   draft.hits = node_ids_from_point;
@@ -132,8 +133,8 @@ function __self_evt_on_click(
 
       let relpos: cmath.Vector2;
       if (parent) {
-        const cdom = new domapi.CanvasDOM(draft.transform);
-        const parent_rect = cdom.getNodeBoundingRect(parent)!;
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent)!;
         const p: cmath.Vector2 = [parent_rect.x, parent_rect.y];
         relpos = cmath.vector2.sub(draft.pointer.position, p);
       } else {
@@ -220,7 +221,8 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
 
 function __self_evt_on_pointer_down(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_PointerDown
+  action: EditorEventTarget_PointerDown,
+  context: ReducerContext
 ) {
   const { node_ids_from_point, shiftKey } = <EditorEventTarget_PointerDown>(
     action
@@ -349,7 +351,7 @@ function __self_evt_on_pointer_down(
     }
     case "eraser":
     case "brush": {
-      __self_brush(draft, { is_gesture: false });
+      __self_brush(draft, { is_gesture: false }, context);
       break;
     }
     case "flood-fill": {
@@ -366,7 +368,8 @@ function __self_evt_on_pointer_up(draft: editor.state.IEditorState) {
 
 function __self_evt_on_drag_start(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_DragStart
+  action: EditorEventTarget_DragStart,
+  context: ReducerContext
 ) {
   const { shiftKey } = <EditorEventTarget_DragStart>action;
 
@@ -385,7 +388,7 @@ function __self_evt_on_drag_start(
       // TODO: improve logic
       if (shiftKey) {
         if (draft.hovered_node_id) {
-          __self_start_gesture_translate(draft);
+          __self_start_gesture_translate(draft, context);
         } else {
           // marquee selection
           draft.marquee = {
@@ -401,7 +404,7 @@ function __self_evt_on_drag_start(
             b: draft.pointer.position,
           };
         } else {
-          __self_start_gesture_translate(draft);
+          __self_start_gesture_translate(draft, context);
         }
       }
       break;
@@ -505,12 +508,11 @@ function __self_evt_on_drag_start(
       const parent = __get_insertion_target(draft);
       self_try_insert_node(draft, parent, vector);
 
-      const cdom = new domapi.CanvasDOM(draft.transform);
-
       // position relative to the parent
       let node_relative_pos = draft.pointer.position;
       if (parent) {
-        const parent_rect = cdom.getNodeBoundingRect(parent)!;
+        const parent_rect =
+          context.geometry.getNodeAbsoluteBoundingRect(parent)!;
         node_relative_pos = cmath.vector2.sub(draft.pointer.position, [
           parent_rect.x,
           parent_rect.y,
@@ -592,7 +594,7 @@ function __self_evt_on_drag_start(
     }
     case "eraser":
     case "brush": {
-      __self_brush(draft, { is_gesture: true });
+      __self_brush(draft, { is_gesture: true }, context);
       break;
     }
   }
@@ -600,7 +602,8 @@ function __self_evt_on_drag_start(
 
 function __self_evt_on_drag_end(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_DragEnd
+  action: EditorEventTarget_DragEnd,
+  context: ReducerContext
 ) {
   const { node_ids_from_area, shiftKey } = <EditorEventTarget_DragEnd>action;
   draft.dragging = false;
@@ -621,12 +624,12 @@ function __self_evt_on_drag_end(
     case "zoom": {
       if (draft.marquee) {
         // update zoom
-        const _viewport_rect = domapi.get_viewport_rect();
+        const { width, height } = context.viewport;
         const vrect = {
           x: 0,
           y: 0,
-          width: _viewport_rect.width,
-          height: _viewport_rect.height,
+          width,
+          height,
         };
         const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
         const t = cmath.ext.viewport.transformToFit(vrect, mrect);
@@ -666,7 +669,8 @@ function __self_evt_on_drag_end(
 
 function __self_evt_on_drag(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_Drag
+  action: EditorEventTarget_Drag,
+  context: ReducerContext
 ) {
   const scene = draft.document.scenes[draft.scene_id!];
   const {
@@ -702,15 +706,15 @@ function __self_evt_on_drag(
         const counter = axis === "x" ? 0 : 1;
         const m = movement[counter];
 
-        const cdom = new domapi.CanvasDOM(draft.transform);
-
         // [snap the guide offset]
         // 1. to pixel grid (quantize 1)
         // 2. to objects geometry
         const { translated } = snapGuideTranslation(
           axis,
           initial_offset,
-          scene.children.map((id) => cdom.getNodeBoundingRect(id)!),
+          scene.children.map(
+            (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
+          ),
           m,
           threshold(
             editor.config.DEFAULT_SNAP_MOVEMNT_THRESHOLD_FACTOR,
@@ -726,20 +730,20 @@ function __self_evt_on_drag(
       }
       // [insertion mode - resize after insertion]
       case "scale": {
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
         break;
       }
       // this is to handle "immediately drag move node"
       case "translate": {
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
         break;
       }
       case "sort": {
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
         break;
       }
       case "rotate": {
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
         break;
       }
       case "draw": {
@@ -799,7 +803,7 @@ function __self_evt_on_drag(
       }
 
       case "brush": {
-        __self_brush(draft, { is_gesture: true });
+        __self_brush(draft, { is_gesture: true }, context);
         break;
       }
       case "curve": {
@@ -1033,16 +1037,16 @@ function __self_evt_on_multiple_selection_overlay_click(
 
 function __self_prepare_bitmap_node(
   draft: Draft<editor.state.IEditorState>,
-  node_id: string | null
+  node_id: string | null,
+  context: ReducerContext
 ): Draft<grida.program.nodes.BitmapNode> {
   if (!node_id) {
     const new_node_id = nid();
     const new_bitmap_ref_id = nid(); // TODO: use other id generator
 
-    const cdom = new domapi.CanvasDOM(draft.transform);
     const parent = __get_insertion_target(draft);
     if (!parent) throw new Error("document level insertion not supported"); // FIXME: support document level insertion
-    const parent_rect = cdom.getNodeBoundingRect(parent)!;
+    const parent_rect = context.geometry.getNodeAbsoluteBoundingRect(parent)!;
     const node_relative_pos = cmath.vector2.quantize(
       cmath.vector2.sub(draft.pointer.position, [parent_rect.x, parent_rect.y]),
       1
@@ -1098,7 +1102,8 @@ function __self_brush(
     is_gesture,
   }: {
     is_gesture: boolean;
-  }
+  },
+  context: ReducerContext
 ) {
   assert(draft.tool.type === "brush" || draft.tool.type === "eraser");
 
@@ -1118,7 +1123,7 @@ function __self_brush(
     draft.tool.type === "brush" ? "source-over" : "destination-out";
   const brush = draft.brush;
 
-  const node = __self_prepare_bitmap_node(draft, node_id);
+  const node = __self_prepare_bitmap_node(draft, node_id, context);
 
   const nodepos: cmath.Vector2 = [node.left!, node.top!];
 
@@ -1243,15 +1248,14 @@ function __self_start_gesture_scale_draw_new_node(
 }
 
 function __self_start_gesture_translate(
-  draft: Draft<editor.state.IEditorState>
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
 ) {
   const selection = draft.selection;
   if (selection.length === 0) return;
 
-  const cdom = new domapi.CanvasDOM(draft.transform);
-
   const rects = draft.selection.map(
-    (node_id) => cdom.getNodeBoundingRect(node_id)!
+    (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
   );
 
   draft.gesture = {
@@ -1324,7 +1328,8 @@ function __get_insertion_target(
 
 export default function eventTargetReducer<S extends editor.state.IEditorState>(
   state: S,
-  action: EventTargetAction
+  action: EventTargetAction,
+  context: ReducerContext
 ): S {
   assert(state.scene_id, "scene_id is not set");
 
@@ -1361,7 +1366,7 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
     }
     case "event-target/event/on-click": {
       return produce(state, (draft) => {
-        __self_evt_on_click(draft, action);
+        __self_evt_on_click(draft, action, context);
       });
     }
     case "event-target/event/on-double-click": {
@@ -1371,7 +1376,7 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
     }
     case "event-target/event/on-pointer-down": {
       return produce(state, (draft) => {
-        __self_evt_on_pointer_down(draft, action);
+        __self_evt_on_pointer_down(draft, action, context);
       });
     }
     case "event-target/event/on-pointer-up": {
@@ -1382,17 +1387,17 @@ export default function eventTargetReducer<S extends editor.state.IEditorState>(
     // #region drag event
     case "event-target/event/on-drag-start": {
       return produce(state, (draft) => {
-        __self_evt_on_drag_start(draft, action);
+        __self_evt_on_drag_start(draft, action, context);
       });
     }
     case "event-target/event/on-drag-end": {
       return produce(state, (draft) => {
-        __self_evt_on_drag_end(draft, action);
+        __self_evt_on_drag_end(draft, action, context);
       });
     }
     case "event-target/event/on-drag": {
       return produce(state, (draft) => {
-        __self_evt_on_drag(draft, action);
+        __self_evt_on_drag(draft, action, context);
       });
     }
     //

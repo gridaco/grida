@@ -59,7 +59,7 @@ export function useEdgeScrolling({ enabled = true }: EdgeScrollingProps) {
 
       const next = cmath.transform.translate(transform, delta);
 
-      instance.transform(next);
+      instance.setTransform(next);
       rafId = requestAnimationFrame(loop);
     };
 

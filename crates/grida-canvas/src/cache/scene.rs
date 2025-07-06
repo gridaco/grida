@@ -11,7 +11,7 @@ use crate::{
     painter::layer::{Layer, LayerList},
 };
 use math2::{rect::Rectangle, vector2::Vector2};
-use rstar::{AABB, RTree, RTreeObject};
+use rstar::{RTree, RTreeObject, AABB};
 use skia_safe::{Picture, Surface};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -153,13 +153,9 @@ impl SceneCache {
     }
 
     /// Update raster tile cache using the given camera and surface.
-    pub fn update_tiles(
-        &mut self,
-        camera: &Camera2D,
-        surface: &mut Surface,
-        width: f32,
-        height: f32,
-    ) {
+    pub fn update_tiles(&mut self, camera: &Camera2D, surface: &mut Surface, partial: bool) {
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
         let index = &self.layer_index;
         let intersects = |rect: Rectangle| {
             let env = AABB::from_corners(
@@ -169,6 +165,6 @@ impl SceneCache {
             index.locate_in_envelope_intersecting(&env).next().is_some()
         };
         self.tile
-            .update_tiles(camera, width, height, surface, intersects);
+            .update_tiles(camera, width, height, surface, partial, intersects);
     }
 }

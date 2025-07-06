@@ -1,4 +1,4 @@
-use math2::{Range, group_ranges_by_uniform_gap};
+use math2::{group_ranges_by_uniform_gap, Range};
 
 fn r(a: f32, b: f32) -> Range {
     [a, b]

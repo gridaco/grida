@@ -1,6 +1,6 @@
-use cg::font_loader::FontLoader;
-use cg::image_loader::ImageLoader;
-use cg::resource_loader::ResourceLoader;
+use cg::resource::font_loader::FontLoader;
+use cg::resource::image_loader::ImageLoader;
+use cg::resource::ResourceLoader;
 
 use std::path::PathBuf;
 

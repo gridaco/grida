@@ -14,7 +14,7 @@ use glutin::{
 use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
-use skia_safe::{Surface, gpu};
+use skia_safe::{gpu, Surface};
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -231,24 +231,28 @@ fn main() {
     ) = init_window(800, 600);
 
     // Create renderer
-    let mut renderer = Renderer::new();
-    renderer.set_backend(Backend::GL(surface_ptr));
+    let window_ptr = &window as *const Window;
+    let mut renderer = Renderer::new(
+        Backend::GL(surface_ptr),
+        Box::new(move || unsafe {
+            (*window_ptr).request_redraw();
+        }),
+        Camera2D::new(Size {
+            width: 800.0,
+            height: 600.0,
+        }),
+    );
 
     // Create static scene
     let scene = create_static_scene();
 
-    // Create camera
-    let mut camera = Camera2D::new(Size {
-        width: 800.0,
-        height: 600.0,
-    });
-    camera.set_position(400.0, 300.0);
-    camera.set_zoom(1.0);
-    renderer.set_camera(camera);
+    renderer.camera.set_center(400.0, 300.0);
+    renderer.camera.set_zoom(1.0);
 
     // Load and warm up the scene cache
     renderer.load_scene(scene.clone());
-    renderer.queue();
+    renderer.queue_unstable();
+    renderer.flush();
 
     // Benchmark rendering with camera transformations
     let mut frame_count = 0;
@@ -302,7 +306,7 @@ fn main() {
                 // Update surface pointer
                 unsafe { _ = Box::from_raw(surface_ptr) };
                 let new_surface_ptr = Box::into_raw(Box::new(surface));
-                renderer.set_backend(Backend::GL(new_surface_ptr));
+                renderer.backend = Backend::GL(new_surface_ptr);
             }
             Event::AboutToWait => {
                 let frame_start = std::time::Instant::now();
@@ -312,10 +316,11 @@ fn main() {
                 let angle = elapsed * 2.0;
                 let x = 400.0 + angle.cos() * 100.0;
                 let y = 300.0 + angle.sin() * 100.0;
-                renderer.camera.as_mut().unwrap().set_position(x, y);
+                renderer.camera.set_center(x, y);
 
                 // Render the scene
-                renderer.queue();
+                renderer.queue_unstable();
+                renderer.flush();
 
                 if let Err(e) = gl_surface.swap_buffers(&gl_context) {
                     eprintln!("Error swapping buffers: {:?}", e);

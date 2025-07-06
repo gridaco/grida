@@ -1,6 +1,6 @@
 use super::geometry::{
-    PainterShape, boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes,
-    stroke_geometry,
+    boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, stroke_geometry,
+    PainterShape,
 };
 use crate::cache::geometry::GeometryCache;
 use crate::node::repository::NodeRepository;

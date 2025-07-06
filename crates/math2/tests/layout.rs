@@ -1,4 +1,4 @@
-use math2::{FlexAxisDirection, Rectangle, layout_flex_guess};
+use math2::{layout_flex_guess, FlexAxisDirection, Rectangle};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

@@ -4,9 +4,9 @@ use crate::painter::{
     cvt,
     layer::{Layer, PainterPictureTextLayer},
 };
-use crate::repository::FontRepository;
 use crate::runtime::camera::Camera2D;
-use skia_safe::{Color, Font, FontMgr, Paint, PaintStyle, Path, Point, Rect, Surface, textlayout};
+use crate::runtime::repository::FontRepository;
+use skia_safe::{textlayout, Color, Font, FontMgr, Paint, PaintStyle, Path, Point, Rect, Surface};
 
 thread_local! {
     static BG_PAINT: Paint = {

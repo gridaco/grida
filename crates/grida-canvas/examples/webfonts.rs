@@ -1,8 +1,8 @@
-use cg::font_loader::FontLoader;
+use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
-use cg::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
+use cg::resource::FontLoader;
 use cg::window;
 use futures::future::join_all;
 use math2::transform::AffineTransform;

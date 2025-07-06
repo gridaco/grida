@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::Vector4;
+
 use super::vector2::Vector2;
 
 /// Represents a side of a rectangle.
@@ -34,6 +36,15 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
+    pub fn from_xywh(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self {
+            x,
+            y,
+            width: w,
+            height: h,
+        }
+    }
+
     pub fn empty() -> Self {
         Rectangle {
             x: 0.0,
@@ -130,6 +141,12 @@ impl Rectangle {
     /// Subtracts `other` from this rectangle, returning the remaining subregions.
     pub fn subtract(&self, other: Rectangle) -> Vec<Rectangle> {
         boolean::subtract(*self, other)
+    }
+
+    /// Returns the rectangle as a 4-dimensional vector. [x, y, w, h]
+    /// used for ffi
+    pub fn to_vec4(&self) -> Vector4 {
+        [self.x, self.y, self.width, self.height]
     }
 }
 
@@ -316,7 +333,7 @@ pub fn tile(rect: Rectangle, size: (usize, usize)) -> Vec<Rectangle> {
 
 /// Boolean operations on rectangles.
 pub mod boolean {
-    use super::{Rectangle, intersection};
+    use super::{intersection, Rectangle};
 
     /// Subtracts rectangle `b` from rectangle `a`, returning the remaining subregions.
     pub fn subtract(a: Rectangle, b: Rectangle) -> Vec<Rectangle> {

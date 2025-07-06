@@ -13,9 +13,18 @@ import { editor } from "@/grida-canvas";
 import nid from "./tools/id";
 import { v4 } from "uuid";
 
+export type ReducerContext = {
+  geometry: editor.api.IDocumentGeometryQuery;
+  viewport: {
+    width: number;
+    height: number;
+  };
+};
+
 export default function reducer<S extends editor.state.IEditorState>(
   state: S,
-  action: Action
+  action: Action,
+  context: ReducerContext
 ): S {
   if (
     state.debug &&
@@ -207,7 +216,7 @@ export default function reducer<S extends editor.state.IEditorState>(
       });
     }
     default:
-      return historyExtension(state, action, _reducer(state, action));
+      return historyExtension(state, action, _reducer(state, action, context));
   }
 }
 
@@ -244,7 +253,8 @@ function historyExtension<S extends editor.state.IEditorState>(
 
 function _reducer<S extends editor.state.IEditorState>(
   state: S,
-  action: EditorAction
+  action: EditorAction,
+  context: ReducerContext
 ): S {
   switch (action.type) {
     case "config/surface/raycast-targeting": {
@@ -284,35 +294,35 @@ function _reducer<S extends editor.state.IEditorState>(
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.translate_with_clone =
           action.translate_with_clone;
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/translate-with-axis-lock": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.tarnslate_with_axis_lock =
           action.tarnslate_with_axis_lock;
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/transform-with-center-origin": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_center_origin =
           action.transform_with_center_origin;
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/transform-with-preserve-aspect-ratio": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.transform_with_preserve_aspect_ratio =
           action.transform_with_preserve_aspect_ratio;
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
       });
     }
     case "config/modifiers/rotate-with-quantize": {
       return produce(state, (draft: Draft<S>) => {
         draft.gesture_modifiers.rotate_with_quantize =
           action.rotate_with_quantize;
-        self_update_gesture_transform(draft);
+        self_update_gesture_transform(draft, context);
       });
     }
     case "gesture/nudge": {
@@ -340,11 +350,11 @@ function _reducer<S extends editor.state.IEditorState>(
     case "event-target/event/on-pointer-move":
     case "event-target/event/on-pointer-move-raycast":
     case "event-target/event/on-pointer-up": {
-      return eventTargetReducer(state, action);
+      return eventTargetReducer(state, action, context);
     }
     // history actions
     default:
-      return documentReducer(state, action);
+      return documentReducer(state, action, context);
   }
   //
 }

@@ -1,0 +1,32 @@
+{
+  "name": "@grida/canvas-wasm",
+  "description": "WASM bindings for Grida Canvas",
+  "version": "0.0.4",
+  "keywords": [
+    "grida",
+    "canvas",
+    "wasm",
+    "webgl",
+    "webgpu",
+    "2d"
+  ],
+  "private": false,
+  "main": "dist/index.js",
+  "license": "Apache-2.0",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida.git",
+  "homepage": "https://grida.co",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "serve": "serve -p 4020"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@webgpu/types": "^0.1.61",
+    "serve": "^14.2.4",
+    "tsup": "^8.5.0"
+  }
+}

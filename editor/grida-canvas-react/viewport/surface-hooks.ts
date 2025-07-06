@@ -1,13 +1,13 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
-import { domapi } from "@/grida-canvas/backends/dom";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
 import { is_direct_component_consumer } from "@/grida-canvas-utils/utils/supports";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 import grida from "@grida/schema";
 import { dq } from "@/grida-canvas/query";
+import type { editor } from "@/grida-canvas";
 import "core-js/features/object/group-by";
 
 export interface SurfaceNodeObject {
@@ -163,19 +163,19 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
 }
 
 function computeSurfaceSelectionGroup({
+  geometry,
   group,
   items,
   transform,
 }: {
+  geometry: editor.api.IDocumentGeometryQuery;
   group: string;
   items: string[];
   transform: cmath.Transform;
 }): SurfaceSelectionGroup {
-  const cdom = new domapi.CanvasDOM(transform);
-
   // Collect bounding rectangles for all node elements
   const objects: SurfaceNodeObject[] = items.map((id) => {
-    const br = cdom.getNodeBoundingRect(id)!;
+    const br = geometry.getNodeAbsoluteBoundingRect(id)!;
     const bsr = cmath.rect.transform(br, transform);
     return {
       id: id,
@@ -242,6 +242,7 @@ function computeSurfaceSelectionGroup({
 export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
+  const instance = useCurrentEditor();
   const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
 
@@ -267,15 +268,20 @@ export function useSelectionGroups(
       return;
     }
 
-    const groups = groupkeys.map((key) => {
-      const items = grouped[key]!;
-      const group = computeSurfaceSelectionGroup({
-        group: key,
-        items: items.map((it) => it.id),
-        transform,
-      });
-      return group;
-    });
+    const groups = groupkeys
+      .map((key) => {
+        try {
+          const items = grouped[key]!;
+          const group = computeSurfaceSelectionGroup({
+            geometry: instance,
+            group: key,
+            items: items.map((it) => it.id),
+            transform,
+          });
+          return group;
+        } catch {}
+      })
+      .filter((it): it is SurfaceSelectionGroup => !!it);
 
     setGroups(groups);
   }, [grouped, transform]);
@@ -306,17 +312,15 @@ export function useSingleSelection(
   useLayoutEffect(() => {
     if (!enabled) return;
 
-    const element = window.document.getElementById(node_id);
-    if (!element) {
+    const scale = cmath.transform.getScale(transform);
+
+    // Collect bounding rectangle
+    const br = instance.geometry.getNodeAbsoluteBoundingRect(node_id);
+    if (!br) {
       setData(undefined);
       return;
     }
 
-    const scale = cmath.transform.getScale(transform);
-    const cdom = new domapi.CanvasDOM(transform);
-
-    // Collect bounding rectangle
-    const br = cdom.getNodeBoundingRect(node_id)!;
     const bsr = cmath.rect.transform(br, transform);
     const object: SurfaceNodeObject = {
       id: node_id,
@@ -339,9 +343,7 @@ export function useSingleSelection(
       transform
     );
 
-    const width = element.clientWidth;
-    const height = element.clientHeight;
-    const size: cmath.Vector2 = [width, height];
+    const size: cmath.Vector2 = [br.width, br.height];
     const absolute_rotation = instance.getNodeAbsoluteRotation(node_id);
 
     const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
@@ -351,8 +353,8 @@ export function useSingleSelection(
       position: "absolute",
       top: centerY,
       left: centerX,
-      width: width * scale[0],
-      height: height * scale[1],
+      width: br.width * scale[0],
+      height: br.height * scale[1],
       transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
       willChange: "transform",
     };
@@ -371,7 +373,7 @@ export function useSingleSelection(
       const axis = direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
-        .map((id) => cdom.getNodeBoundingRect(id))
+        .map((id) => instance.geometry.getNodeAbsoluteBoundingRect(id))
         .filter((it): it is cmath.Rectangle => !!it);
 
       distribution.rects = children_rects;

@@ -1,7 +1,6 @@
 import type { Editor } from "../editor";
 import equal from "fast-deep-equal";
 import cmath from "@grida/cmath";
-import { domapi } from "../backends/dom";
 
 export class EditorFollowPlugin {
   private _isFollowing: boolean = false;
@@ -52,7 +51,7 @@ export class EditorFollowPlugin {
 
     this.__cursor_id = cursor_id;
 
-    this.editor.transform(this.fit(initial), false);
+    this.editor.setTransform(this.fit(initial), false);
     this.__unsubscribe_cursor = this.editor.subscribeWithSelector(
       (state) => state.cursors.find((c) => c.id === cursor_id),
       (editor, cursor) => {
@@ -61,7 +60,7 @@ export class EditorFollowPlugin {
           editor.loadScene(cursor.scene_id);
         }
         if (cursor.transform) {
-          editor.transform(this.fit(cursor.transform), false);
+          editor.setTransform(this.fit(cursor.transform), false);
         }
       },
       equal
@@ -96,8 +95,8 @@ export class EditorFollowPlugin {
    * - viewer's transform
    */
   private fit(presenter: cmath.Transform): cmath.Transform {
-    const view = domapi.get_viewport_rect();
-    const viewport = { x: 0, y: 0, width: view.width, height: view.height };
+    const { width, height } = this.editor.viewport.size;
+    const viewport = { x: 0, y: 0, width, height };
     const inv = cmath.transform.invert(presenter);
     const presenter_viewbox = cmath.rect.transform(viewport, inv);
     return cmath.ext.viewport.transformToFit(viewport, presenter_viewbox);

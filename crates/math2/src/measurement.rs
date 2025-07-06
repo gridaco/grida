@@ -1,4 +1,4 @@
-use crate::{Rectangle, RectangleSide, rect, vector2::Vector2};
+use crate::{rect, vector2::Vector2, Rectangle, RectangleSide};
 
 /// Result returned by [`measure`].
 ///

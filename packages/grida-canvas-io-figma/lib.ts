@@ -257,9 +257,64 @@ export namespace iofigma {
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
-            throw new Error(`Unsupported node type: ${node.type}`);
+            const { fills, strokes, strokeWeight } = node;
+
+            const first_visible_fill = first_visible(fills);
+            const first_visible_stroke = strokes
+              ? first_visible(strokes)
+              : undefined;
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: node.rotation ?? 0,
+              opacity: 1,
+              zIndex: 0,
+              type: "container",
+              expanded: false,
+              //
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
+              //
+              border:
+                first_visible_stroke?.type === "SOLID"
+                  ? {
+                      borderWidth: strokeWeight ?? 0,
+                      borderColor: cmath.color.rgbaf_multiply_alpha(
+                        cmath.color.rgbaf_to_rgba8888(
+                          first_visible_stroke.color
+                        ),
+                        first_visible_stroke.opacity ?? 1
+                      ),
+                      borderStyle: "none",
+                    }
+                  : undefined,
+
+              //
+              style: {},
+              cornerRadius: 0,
+              padding: 0,
+              // TODO:
+              layout: "flow",
+              direction: "horizontal",
+              mainAxisAlignment: "start",
+              crossAxisAlignment: "start",
+              mainAxisGap: 0,
+              crossAxisGap: 0,
+              children: [],
+            } satisfies grida.program.nodes.ContainerNode;
           }
           //
+          case "COMPONENT":
           case "INSTANCE":
           case "FRAME": {
             const {
@@ -723,7 +778,6 @@ export namespace iofigma {
           }
 
           // components
-          case "COMPONENT":
           case "COMPONENT_SET": {
             throw new Error(`Unsupported node type: ${node.type}`);
           }

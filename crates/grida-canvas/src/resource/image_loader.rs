@@ -1,9 +1,8 @@
+use super::ResourceLoader;
 use crate::node::schema::*;
-use std::collections::HashMap;
-
+use crate::window::application::HostEvent;
 use async_trait::async_trait;
-
-use crate::resource_loader::ResourceLoader;
+use std::collections::HashMap;
 
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
@@ -20,7 +19,7 @@ pub enum ImageLoadingMode {
     /// Lifecycle mode - full lifecycle management with async loading
     Lifecycle {
         tx: mpsc::UnboundedSender<ImageMessage>,
-        proxy: EventLoopProxy<()>,
+        proxy: EventLoopProxy<HostEvent>,
     },
 }
 
@@ -61,7 +60,7 @@ impl ImageLoader {
     /// Create a lifecycle-based image loader
     pub fn new_lifecycle(
         tx: mpsc::UnboundedSender<ImageMessage>,
-        proxy: EventLoopProxy<()>,
+        proxy: EventLoopProxy<HostEvent>,
     ) -> Self {
         Self::new(ImageLoadingMode::Lifecycle { tx, proxy })
     }
@@ -92,7 +91,10 @@ impl ImageLoader {
                 src: src.to_string(),
                 data: data.clone(),
             });
-            let _ = proxy.send_event(());
+            let _ = proxy.send_event(HostEvent::ImageLoaded(ImageMessage {
+                src: src.to_string(),
+                data: data.clone(),
+            }));
         }
 
         Some(data)

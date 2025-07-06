@@ -1,4 +1,4 @@
-use super::rect::{Rectangle, from_points};
+use super::rect::{from_points, Rectangle};
 use super::vector2::Vector2;
 
 /// Represents a cubic Bézier curve segment with absolute control points.

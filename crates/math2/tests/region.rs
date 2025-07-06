@@ -1,4 +1,4 @@
-use math2::{Rectangle, Region, region_difference, region_subtract};
+use math2::{region_difference, region_subtract, Rectangle, Region};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle {

@@ -1,12 +1,10 @@
-use super::application::UnknownTargetApplication;
-use super::application_native::{init_native_window, NativeApplication};
-use crate::font_loader::FontLoader;
-use crate::font_loader::FontMessage;
-use crate::image_loader::{load_scene_images, ImageLoader, ImageMessage};
+use super::application::HostEvent;
+use super::application_native::NativeApplication;
 use crate::node::schema::*;
-use crate::runtime::camera::Camera2D;
-use crate::runtime::scene::{Backend, Renderer};
-use crate::window::scheduler;
+use crate::resource::font_loader::FontLoader;
+use crate::resource::font_loader::FontMessage;
+use crate::resource::image_loader::{load_scene_images, ImageLoader, ImageMessage};
+use crate::runtime::scene::Renderer;
 use futures::channel::mpsc;
 
 #[allow(dead_code)]
@@ -20,30 +18,18 @@ where
         &mut Renderer,
         mpsc::UnboundedSender<ImageMessage>,
         mpsc::UnboundedSender<FontMessage>,
-        winit::event_loop::EventLoopProxy<()>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
     let width = 1080;
     let height = 1080;
 
     println!("🚀 Starting demo window...");
-    let (mut state, el, window, gl_surface, gl_context, scale_factor) =
-        init_native_window(width, height);
-
     let (tx, rx) = mpsc::unbounded();
     let (font_tx, font_rx) = mpsc::unbounded();
+
+    let (mut app, el) = NativeApplication::new(width, height, rx, font_rx);
     let proxy = el.create_proxy();
-
-    let mut renderer = Renderer::new();
-    renderer.set_raf_callback({
-        let proxy = proxy.clone();
-        move || {
-            let _ = proxy.send_event(());
-        }
-    });
-
-    renderer.devtools_rendering_set_show_tiles(true);
-    renderer.set_backend(Backend::GL(state.surface_mut_ptr()));
 
     println!("📸 Initializing image loader...");
     let mut image_loader = ImageLoader::new_lifecycle(tx.clone(), proxy.clone());
@@ -58,38 +44,14 @@ where
         });
     });
 
-    init(&mut renderer, tx, font_tx, proxy);
+    init(&mut app.app.renderer, tx, font_tx, proxy);
 
-    let camera = Camera2D::new(Size {
-        width: width as f32 * scale_factor as f32,
-        height: height as f32 * scale_factor as f32,
-    });
-    renderer.set_camera(camera.clone());
-    renderer.load_scene(scene.clone());
-
-    let mut app = NativeApplication {
-        app: UnknownTargetApplication {
-            renderer,
-            state,
-            camera,
-            input: crate::runtime::input::InputState::default(),
-            hit_result: None,
-            last_hit_test: std::time::Instant::now(),
-            hit_test_interval: std::time::Duration::from_millis(50),
-            image_rx: rx,
-            font_rx,
-            scheduler: scheduler::FrameScheduler::new(144).with_max_fps(144),
-            last_frame_time: std::time::Instant::now(),
-            last_stats: None,
-            show_fps: true,
-            show_stats: true,
-            show_hit_overlay: true,
-            show_ruler: true,
-        },
-        gl_surface,
-        gl_context,
-        window,
-    };
+    app.app.renderer.load_scene(scene.clone());
+    app.app.devtools_rendering_show_fps = true;
+    app.app.devtools_rendering_show_stats = true;
+    app.app.devtools_rendering_show_hit_overlay = true;
+    app.app.devtools_rendering_show_ruler = true;
+    app.app.devtools_rendering_show_tiles = false;
 
     println!("🎭 Starting event loop...");
     if let Err(e) = el.run_app(&mut app) {
