@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useLayoutEffect } from "react";
 import init, { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
@@ -24,7 +24,7 @@ function CanvasContent({
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<Grida2D | null>(null);
 
-  React.useEffect(() => {
+  useLayoutEffect(() => {
     if (canvasRef.current && !rendererRef.current) {
       const canvasel = canvasRef.current;
       init({
@@ -48,13 +48,13 @@ function CanvasContent({
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (rendererRef.current) {
       rendererRef.current.setDebug(debug ?? false);
     }
   }, [rendererRef.current, debug]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (rendererRef.current) {
       // the transform is the canvas transform, which needs to be converted to camera transform.
       // input transform = translation + scale of the viewport, top left aligned
@@ -76,7 +76,7 @@ function CanvasContent({
     }
   }, [transform, width, height]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (rendererRef.current && data) {
       rendererRef.current.loadScene(
         JSON.stringify({

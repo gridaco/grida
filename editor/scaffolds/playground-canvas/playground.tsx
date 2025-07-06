@@ -112,7 +112,6 @@ import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { sitemap } from "@/www/data/sitemap";
 import iofigma from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
-import { useUnstableWasmEditor } from "@/grida-canvas-react";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import { LibraryContent } from "./library";
@@ -191,8 +190,7 @@ export default function CanvasPlayground({
   src,
   room_id,
 }: CanvasPlaygroundProps) {
-  // const instance = useUnstableWasmEditor(surface);
-  const instance = useEditor(editor.state.init(document), "canvas");
+  const instance = useEditor(document, "canvas");
   useSyncMultiplayerCursors(instance, room_id);
   const fonts = useGoogleFontsList();
 
