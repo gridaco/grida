@@ -9,8 +9,6 @@ import {
   DOMGeometryQueryInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
 } from "@/grida-canvas/backends";
-import type { Grida2D } from "@grida/canvas-wasm";
-import { CanvasWasmGeometryQueryInterfaceProvider } from "@/grida-canvas/backends/wasm";
 
 const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   debug: false,
@@ -30,31 +28,6 @@ const __DEFAULT_STATE: editor.state.IEditorStateInit = {
   },
   editable: true,
 };
-
-export function useUnstableWasmEditor(
-  surface: Grida2D,
-  init?: editor.state.IEditorStateInit
-) {
-  const [_editor] = React.useState(
-    new Editor(
-      "canvas",
-      domapi.k.VIEWPORT_ELEMENT_ID,
-      domapi.k.EDITOR_CONTENT_ELEMENT_ID,
-      (_) => new CanvasWasmGeometryQueryInterfaceProvider(_, surface),
-      init ?? __DEFAULT_STATE
-    )
-  );
-
-  const editor = useSyncExternalStore<Editor>(
-    _editor.subscribe.bind(_editor),
-    () => _editor,
-    () => _editor
-  );
-
-  React.useDebugValue(editor);
-
-  return editor;
-}
 
 export function useEditor(
   init?: editor.state.IEditorStateInit,

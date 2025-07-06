@@ -7,7 +7,7 @@ import { cn } from "@/components/lib/utils";
 import cmath from "@grida/cmath";
 import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 
 function useMeasurement() {
@@ -22,7 +22,7 @@ function useMeasurement() {
 
   const [measurement, setMeasurement] = useState<Measurement>();
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     try {
       const b = surface_measurement_target;
 

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import cmath from "@grida/cmath";
@@ -261,7 +261,7 @@ export function useSelectionGroups(
     );
   }, [document.nodes, document_ctx, __node_ids]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const groupkeys = Object.keys(grouped);
     if (groupkeys.length === 0) {
       setGroups([]);
@@ -309,7 +309,7 @@ export function useSingleSelection(
     undefined
   );
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!enabled) return;
 
     const scale = cmath.transform.getScale(transform);
