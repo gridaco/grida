@@ -64,6 +64,7 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -237,7 +238,10 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
   useDisableSwipeBack();
 
-  useHotkeys("meta+\\, ctrl+\\", () => {
+  useHotkeys("meta+\\, ctrl+\\", (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    e.preventDefault();
     setUI((ui) => ({
       ...ui,
       sidebar: ui.sidebar === "visible" ? "hidden" : "visible",
@@ -308,11 +312,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
               </EditorSurfaceContextMenu>
             </EditorSurfaceDropzone>
           </EditorSurfaceClipboardSyncProvider>
-          {ui.sidebar === "visible" && (
-            <aside className="h-full">
-              <SidebarRight />
-            </aside>
-          )}
+          {ui.sidebar === "visible" && <SidebarRight />}
         </div>
       </PreviewProvider>
 
@@ -323,6 +323,7 @@ function Consumer({ backend }: { backend: "dom" | "canvas" }) {
 
 function SidebarLeft() {
   const libraryDialog = useDialogState("library");
+
   return (
     <aside className="relative">
       <div className="absolute top-4 -right-14 z-50">
@@ -436,55 +437,57 @@ function SidebarRight() {
   const should_show_artboards_list = useArtboardListCondition();
 
   return (
-    <SidebarRoot side="right" className="hidden sm:block">
-      <header className="flex h-11 px-2 justify-between items-center gap-2">
-        <div className="flex-1">
-          <Presense />
-        </div>
-        <div className="flex items-center">
-          <Zoom
-            className={cn(
-              WorkbenchUI.inputVariants({
-                variant: "input",
-                size: "xs",
-              }),
-              "w-auto"
-            )}
-          />
-          <PreviewButton />
-        </div>
-      </header>
-      <hr />
-      {should_show_artboards_list ? (
-        <>
-          <DialogPrimitive.Root open>
-            <DialogPrimitive.Content className="h-full">
-              <DialogPrimitive.Title className="sr-only">
-                Artboards
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Description className="sr-only">
-                Select an artboard to insert
-              </DialogPrimitive.Description>
-              <SidebarRoot>
-                <ArtboardsList />
-              </SidebarRoot>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Root>
-        </>
-      ) : (
-        <>
-          <Align />
-          <hr />
-          <Selection
-            empty={
-              <div className="mt-4 mb-10">
-                <DocumentProperties />
-              </div>
-            }
-          />
-        </>
-      )}
-    </SidebarRoot>
+    <aside className="relative">
+      <Sidebar side="right" variant="sidebar" className="hidden sm:block">
+        <header className="flex h-11 px-2 justify-between items-center gap-2">
+          <div className="flex-1">
+            <Presense />
+          </div>
+          <div className="flex items-center">
+            <Zoom
+              className={cn(
+                WorkbenchUI.inputVariants({
+                  variant: "input",
+                  size: "xs",
+                }),
+                "w-auto"
+              )}
+            />
+            <PreviewButton />
+          </div>
+        </header>
+        <hr />
+        {should_show_artboards_list ? (
+          <>
+            <DialogPrimitive.Root open>
+              <DialogPrimitive.Content className="h-full">
+                <DialogPrimitive.Title className="sr-only">
+                  Artboards
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description className="sr-only">
+                  Select an artboard to insert
+                </DialogPrimitive.Description>
+                <SidebarRoot>
+                  <ArtboardsList />
+                </SidebarRoot>
+              </DialogPrimitive.Content>
+            </DialogPrimitive.Root>
+          </>
+        ) : (
+          <>
+            <Align />
+            <hr />
+            <Selection
+              empty={
+                <div className="mt-4 mb-10">
+                  <DocumentProperties />
+                </div>
+              }
+            />
+          </>
+        )}
+      </Sidebar>
+    </aside>
   );
 }
 
