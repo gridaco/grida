@@ -1,5 +1,5 @@
-use super::font::make_debugger_font;
 use crate::cache::scene::SceneCache;
+use crate::fonts::alletra::alletra;
 use crate::node::schema::NodeId;
 use crate::painter::{
     cvt,
@@ -24,7 +24,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = make_debugger_font(20.0);
+    static FONT: Font = alletra(20.0);
 
     static STROKE: Paint = {
         let mut p = Paint::default();

@@ -1,4 +1,4 @@
-use super::font::make_debugger_font;
+use crate::fonts::alletra::alletra;
 use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct FpsMeter;
@@ -18,7 +18,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = make_debugger_font(36.0);
+    static FONT: Font = alletra(36.0);
 }
 
 impl FpsMeter {

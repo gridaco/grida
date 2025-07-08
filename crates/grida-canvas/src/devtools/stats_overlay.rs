@@ -1,5 +1,6 @@
-use super::font::make_debugger_font;
 use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
+
+use crate::fonts::alletra::alletra;
 
 pub struct StatsOverlay;
 
@@ -18,7 +19,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = make_debugger_font(16.0);
+    static FONT: Font = alletra(16.0);
 }
 
 impl StatsOverlay {

@@ -20,6 +20,8 @@ default:
 # Main recipe that runs all steps
 build canvas wasm: grida-canvas-wasm-build grida-canvas-wasm-extract grida-canvas-wasm-bin grida-canvas-wasm-package
 
+serve canvas wasm: grida-canvas-wasm-serve
+
 # Build Docker image
 grida-canvas-wasm-build:
     docker build -f {{docker-grida-canvas-wasm-build-file}} -t {{docker-grida-canvas-wasm-build-image-name}} {{prj-crates-dir}}
@@ -41,3 +43,6 @@ grida-canvas-wasm-bin:
 # Build package with pnpm
 grida-canvas-wasm-package:
     pnpm --filter @grida/canvas-wasm build 
+
+grida-canvas-wasm-serve:
+    pnpm --filter @grida/canvas-wasm serve
