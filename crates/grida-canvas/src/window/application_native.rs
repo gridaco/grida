@@ -18,6 +18,7 @@ use glutin_winit::DisplayBuilder;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::gpu;
+use std::sync::Arc;
 use std::{ffi::CString, num::NonZeroU32};
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
@@ -246,7 +247,7 @@ impl NativeApplication {
 
         // set the redraw callback to dispatch a user event for redraws
         let redraw_proxy = proxy.clone();
-        app.app.set_request_redraw(Box::new(move || {
+        app.app.set_request_redraw(Arc::new(move || {
             let _ = redraw_proxy.send_event(HostEvent::RedrawRequest);
         }));
 

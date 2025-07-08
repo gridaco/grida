@@ -93,7 +93,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
                 Backend::Raster(surface_ptr),
-                Box::new(|| {}),
+                std::sync::Arc::new(|| {}),
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -125,7 +125,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
                 Backend::Raster(surface_ptr),
-                Box::new(|| {}),
+                std::sync::Arc::new(|| {}),
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -156,7 +156,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
                 Backend::Raster(surface_ptr),
-                Box::new(|| {}),
+                std::sync::Arc::new(|| {}),
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -188,7 +188,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
                 Backend::Raster(surface_ptr),
-                Box::new(|| {}),
+                std::sync::Arc::new(|| {}),
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -219,7 +219,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
                 Backend::Raster(surface_ptr),
-                Box::new(|| {}),
+                std::sync::Arc::new(|| {}),
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,

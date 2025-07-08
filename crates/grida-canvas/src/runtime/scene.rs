@@ -15,10 +15,11 @@ use skia_safe::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Callback type used to request a redraw from the host window.
-pub type RequestRedrawCallback = Box<dyn Fn()>;
+pub type RequestRedrawCallback = Arc<dyn Fn()>;
 
 /// Type alias for tile information in frame planning
 pub type FramePlanTileInfo = RegionTileInfo;
@@ -479,7 +480,7 @@ mod tests {
         let surface_ptr = Renderer::init_raster(100, 100);
         let mut renderer = Renderer::new(
             Backend::Raster(surface_ptr),
-            Box::new(|| {}),
+            std::sync::Arc::new(|| {}),
             Camera2D::new(Size {
                 width: 100.0,
                 height: 100.0,
@@ -514,7 +515,7 @@ mod tests {
         let surface_ptr = Renderer::init_raster(50, 50);
         let mut renderer = Renderer::new(
             Backend::Raster(surface_ptr),
-            Box::new(|| {}),
+            std::sync::Arc::new(|| {}),
             Camera2D::new(Size {
                 width: 50.0,
                 height: 50.0,

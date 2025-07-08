@@ -76,6 +76,7 @@ pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
+    pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::SurfaceState,
     pub(crate) input: super::input::InputState,
@@ -279,7 +280,9 @@ impl UnknownTargetApplication {
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
     ) -> Self {
-        let renderer = Renderer::new(backend, Box::new(|| {}), camera);
+        let request_redraw: crate::runtime::scene::RequestRedrawCallback =
+            std::sync::Arc::new(|| {});
+        let renderer = Renderer::new(backend, request_redraw.clone(), camera);
 
         let debug = false;
 
@@ -287,6 +290,7 @@ impl UnknownTargetApplication {
             debug,
             verbose: false,
             clock: clock::EventLoopClock::new(),
+            request_redraw,
             renderer,
             state,
             input: super::input::InputState::default(),
@@ -312,7 +316,13 @@ impl UnknownTargetApplication {
     /// Provide the platform-specific callback used to request a redraw from the
     /// host window.
     pub fn set_request_redraw(&mut self, cb: crate::runtime::scene::RequestRedrawCallback) {
+        self.request_redraw = cb.clone();
         self.renderer.set_request_redraw(cb);
+    }
+
+    /// Request a redraw from the host window using the provided callback.
+    pub fn request_redraw(&self) {
+        (self.request_redraw)();
     }
 
     fn queue(&mut self) {
