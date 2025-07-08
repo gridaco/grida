@@ -13,6 +13,7 @@ function CanvasContent({
   transform,
   debug,
   onMount,
+  className,
 }: {
   width: number;
   height: number;
@@ -20,6 +21,7 @@ function CanvasContent({
   transform: cmath.Transform;
   debug?: boolean;
   onMount?: (surface: Grida2D) => void;
+  className?: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<Grida2D | null>(null);
@@ -54,27 +56,41 @@ function CanvasContent({
     }
   }, [rendererRef.current, debug]);
 
+  const syncTransform = (
+    surface: Grida2D,
+    transform: cmath.Transform,
+    width: number,
+    height: number
+  ) => {
+    // the transform is the canvas transform, which needs to be converted to camera transform.
+    // input transform = translation + scale of the viewport, top left aligned
+    // camera transform = transform of the camera, center aligned
+    // - translate the transform to the center of the canvas
+    // - reverse the transform to match the canvas coordinate system
+
+    const toCenter = cmath.transform.translate(cmath.transform.identity, [
+      -width / 2,
+      -height / 2,
+    ]);
+
+    const viewMatrix = cmath.transform.multiply(toCenter, transform);
+
+    surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
+    surface.redraw();
+  };
+
   useLayoutEffect(() => {
     if (rendererRef.current) {
-      // the transform is the canvas transform, which needs to be converted to camera transform.
-      // input transform = translation + scale of the viewport, top left aligned
-      // camera transform = transform of the camera, center aligned
-      // - translate the transform to the center of the canvas
-      // - reverse the transform to match the canvas coordinate system
-
-      const toCenter = cmath.transform.translate(cmath.transform.identity, [
-        -width / 2,
-        -height / 2,
-      ]);
-
-      const viewMatrix = cmath.transform.multiply(toCenter, transform);
-
-      rendererRef.current.setMainCameraTransform(
-        cmath.transform.invert(viewMatrix)
-      );
-      rendererRef.current.redraw();
+      syncTransform(rendererRef.current, transform, width, height);
     }
   }, [transform, width, height]);
+
+  useLayoutEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.resize(width, height);
+      syncTransform(rendererRef.current, transform, width, height);
+    }
+  }, [width, height]);
 
   useLayoutEffect(() => {
     if (rendererRef.current && data) {
@@ -88,7 +104,14 @@ function CanvasContent({
     }
   }, [data]);
 
-  return <canvas ref={canvasRef} width={width} height={height} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className={className}
+    />
+  );
 }
 
 export default function Canvas({
@@ -98,6 +121,7 @@ export default function Canvas({
   transform,
   debug,
   onMount,
+  className,
 }: {
   width: number;
   height: number;
@@ -105,6 +129,7 @@ export default function Canvas({
   transform: cmath.Transform;
   debug?: boolean;
   onMount?: (surface: Grida2D) => void;
+  className?: string;
 }) {
   const size = useSize({ width, height });
   return (
@@ -115,6 +140,7 @@ export default function Canvas({
       transform={transform}
       debug={debug}
       onMount={onMount}
+      className={className}
     />
   );
 }
