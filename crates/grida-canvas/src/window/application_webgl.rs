@@ -172,7 +172,15 @@ impl WebGlApplication {
 
         let backend = Backend::GL(state.surface_mut_ptr());
         let app = Self {
-            app: UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx),
+            app: UnknownTargetApplication::new(
+                state,
+                backend,
+                camera,
+                120,
+                image_rx,
+                font_rx,
+                None,
+            ),
         };
 
         app

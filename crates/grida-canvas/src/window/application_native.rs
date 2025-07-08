@@ -237,19 +237,28 @@ impl NativeApplication {
         });
 
         let backend = Backend::GL(state.surface_mut_ptr());
-        let mut app = NativeApplication {
-            app: UnknownTargetApplication::new(state, backend, camera, 144, image_rx, font_rx),
+        let redraw_cb: Arc<dyn Fn()> = {
+            let redraw_proxy = proxy.clone();
+            Arc::new(move || {
+                let _ = redraw_proxy.send_event(HostEvent::RedrawRequest);
+            })
+        };
+
+        let app = NativeApplication {
+            app: UnknownTargetApplication::new(
+                state,
+                backend,
+                camera,
+                144,
+                image_rx,
+                font_rx,
+                Some(redraw_cb),
+            ),
             gl_surface,
             gl_context,
             window,
             modifiers: winit::keyboard::ModifiersState::default(),
         };
-
-        // set the redraw callback to dispatch a user event for redraws
-        let redraw_proxy = proxy.clone();
-        app.app.set_request_redraw(Arc::new(move || {
-            let _ = redraw_proxy.send_event(HostEvent::RedrawRequest);
-        }));
 
         std::thread::spawn(move || loop {
             let _ = proxy.send_event(HostEvent::Tick);

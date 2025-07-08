@@ -279,9 +279,9 @@ impl UnknownTargetApplication {
         target_fps: u32,
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
     ) -> Self {
-        let request_redraw: crate::runtime::scene::RequestRedrawCallback =
-            std::sync::Arc::new(|| {});
+        let request_redraw = request_redraw.unwrap_or_else(|| std::sync::Arc::new(|| {}));
         let renderer = Renderer::new(backend, request_redraw.clone(), camera);
 
         let debug = false;
@@ -313,12 +313,6 @@ impl UnknownTargetApplication {
         }
     }
 
-    /// Provide the platform-specific callback used to request a redraw from the
-    /// host window.
-    pub fn set_request_redraw(&mut self, cb: crate::runtime::scene::RequestRedrawCallback) {
-        self.request_redraw = cb.clone();
-        self.renderer.set_request_redraw(cb);
-    }
 
     /// Request a redraw from the host window using the provided callback.
     pub fn request_redraw(&self) {
