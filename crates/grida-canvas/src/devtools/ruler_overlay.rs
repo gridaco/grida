@@ -1,4 +1,5 @@
-use crate::{fonts::alletra::alletra, runtime::camera::Camera2D};
+use crate::fonts::geistmono::geistmono;
+use crate::runtime::camera::Camera2D;
 use math2::{rect::Rectangle, vector2};
 use skia_safe::{Color, Font, Paint, PaintStyle, Path, Point, Surface};
 use std::cell::RefCell;
@@ -30,7 +31,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = alletra(10.0);
+    static FONT: Font = geistmono(10.0);
 
     static CACHE: RefCell<Option<Cache>> = RefCell::new(None);
 }

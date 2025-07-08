@@ -1,4 +1,4 @@
-use crate::fonts::alletra::alletra;
+use crate::fonts::geistmono::geistmono;
 use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct FpsMeter;
@@ -18,7 +18,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = alletra(36.0);
+    static FONT: Font = geistmono(36.0);
 }
 
 impl FpsMeter {

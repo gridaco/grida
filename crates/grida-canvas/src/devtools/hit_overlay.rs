@@ -1,5 +1,5 @@
 use crate::cache::scene::SceneCache;
-use crate::fonts::alletra::alletra;
+use crate::fonts::geistmono::geistmono;
 use crate::node::schema::NodeId;
 use crate::painter::{
     cvt,
@@ -24,7 +24,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = alletra(20.0);
+    static FONT: Font = geistmono(20.0);
 
     static STROKE: Paint = {
         let mut p = Paint::default();
