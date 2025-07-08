@@ -4,7 +4,7 @@ use crate::node::schema::*;
 use crate::resource::font_loader::FontLoader;
 use crate::resource::font_loader::FontMessage;
 use crate::resource::image_loader::{load_scene_images, ImageLoader, ImageMessage};
-use crate::runtime::scene::Renderer;
+use crate::runtime::scene::{Backend, Renderer};
 use futures::channel::mpsc;
 
 #[allow(dead_code)]
@@ -30,6 +30,8 @@ where
 
     let (mut app, el) = NativeApplication::new(width, height, rx, font_rx);
     let proxy = el.create_proxy();
+
+    app.app.renderer.backend = Backend::GL(app.app.state.surface_mut_ptr());
 
     println!("📸 Initializing image loader...");
     let mut image_loader = ImageLoader::new_lifecycle(tx.clone(), proxy.clone());
