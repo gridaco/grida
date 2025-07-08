@@ -1,4 +1,5 @@
-use skia_safe::{Color, Font, FontMgr, Paint, Point, Rect, Surface};
+use super::font::make_debugger_font;
+use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct StatsOverlay;
 
@@ -17,16 +18,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = {
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
-        match typeface {
-            Some(tf) => Font::new(tf, 16.0),
-            None => Font::default(),
-        }
-    };
+    static FONT: Font = make_debugger_font(16.0);
 }
 
 impl StatsOverlay {

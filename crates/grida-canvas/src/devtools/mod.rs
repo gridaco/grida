@@ -1,3 +1,4 @@
+pub mod font;
 pub mod fps_overlay;
 pub mod hit_overlay;
 pub mod ruler_overlay;

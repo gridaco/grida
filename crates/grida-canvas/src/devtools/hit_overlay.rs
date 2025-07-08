@@ -1,3 +1,4 @@
+use super::font::make_debugger_font;
 use crate::cache::scene::SceneCache;
 use crate::node::schema::NodeId;
 use crate::painter::{
@@ -6,7 +7,7 @@ use crate::painter::{
 };
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::FontRepository;
-use skia_safe::{textlayout, Color, Font, FontMgr, Paint, PaintStyle, Path, Point, Rect, Surface};
+use skia_safe::{textlayout, Color, Font, Paint, PaintStyle, Path, Point, Rect, Surface};
 
 thread_local! {
     static BG_PAINT: Paint = {
@@ -23,16 +24,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = {
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
-        match typeface {
-            Some(tf) => Font::new(tf, 20.0),
-            None => Font::default(),
-        }
-    };
+    static FONT: Font = make_debugger_font(20.0);
 
     static STROKE: Paint = {
         let mut p = Paint::default();

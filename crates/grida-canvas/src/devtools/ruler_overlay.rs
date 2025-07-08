@@ -1,6 +1,7 @@
+use super::font::make_debugger_font;
 use crate::runtime::camera::Camera2D;
 use math2::{rect::Rectangle, vector2};
-use skia_safe::{Color, Font, FontMgr, Paint, PaintStyle, Path, Point, Surface};
+use skia_safe::{Color, Font, Paint, PaintStyle, Path, Point, Surface};
 use std::cell::RefCell;
 
 pub struct Ruler;
@@ -30,16 +31,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = {
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
-        match typeface {
-            Some(tf) => Font::new(tf, 10.0),
-            None => Font::default(),
-        }
-    };
+    static FONT: Font = make_debugger_font(10.0);
 
     static CACHE: RefCell<Option<Cache>> = RefCell::new(None);
 }
