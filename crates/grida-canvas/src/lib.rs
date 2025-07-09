@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod devtools;
 pub mod dummy;
+pub mod export;
 pub mod fonts;
 pub mod helpers;
 pub mod hittest;

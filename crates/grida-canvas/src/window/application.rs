@@ -1,5 +1,6 @@
 use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
 use crate::dummy;
+use crate::export::{export_node_as, ExportAs, Exported};
 use crate::node::schema::Scene;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -33,6 +34,7 @@ pub trait ApplicationApi {
     /// returns all node ids intersecting with the envelope in canvas space.
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
+    fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
@@ -88,6 +90,7 @@ pub struct UnknownTargetApplication {
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
+    pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -128,11 +131,13 @@ impl ApplicationApi for UnknownTargetApplication {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
                 self.queue();
+                return true;
             }
             ApplicationCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
                 self.queue();
+                return true;
             }
             ApplicationCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -143,6 +148,7 @@ impl ApplicationApi for UnknownTargetApplication {
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
                 self.queue();
+                return true;
             }
             ApplicationCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
@@ -150,10 +156,30 @@ impl ApplicationApi for UnknownTargetApplication {
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 self.queue();
+                return true;
             }
             ApplicationCommand::ToggleDebugMode => {
                 self.toggle_debug();
                 self.queue();
+                return true;
+            }
+            ApplicationCommand::TryCopyAsPNG => {
+                if let Some(id) = self.devtools_selection.clone() {
+                    let exported = self.export_node_as(&id, ExportAs::png());
+                    if let Some(exported) = exported {
+                        // non wasm32
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            // save to file
+
+                            use std::io::Write;
+                            let path = format!("exported_{}.png", id);
+                            let mut file = std::fs::File::create(path).unwrap();
+                            file.write_all(exported.data()).unwrap();
+                            return true;
+                        }
+                    }
+                }
             }
             ApplicationCommand::None => {}
         }
@@ -201,6 +227,13 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
         self.renderer.get_cache().geometry().get_world_bounds(id)
+    }
+
+    fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
+        }
+        return None;
     }
 
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
@@ -287,7 +320,7 @@ impl UnknownTargetApplication {
         request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
     ) -> Self {
         let request_redraw = request_redraw.unwrap_or_else(|| std::sync::Arc::new(|| {}));
-        let renderer = Renderer::new(backend, request_redraw.clone(), camera);
+        let renderer = Renderer::new(backend, Some(request_redraw.clone()), camera);
 
         let debug = false;
 
@@ -307,6 +340,7 @@ impl UnknownTargetApplication {
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
+            devtools_selection: None,
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
@@ -519,6 +553,7 @@ impl UnknownTargetApplication {
                 hit_overlay::HitOverlay::draw(
                     surface,
                     self.hit_test_result.as_ref(),
+                    self.devtools_selection.as_ref(),
                     &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,

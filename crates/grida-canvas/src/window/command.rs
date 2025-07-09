@@ -6,4 +6,5 @@ pub enum ApplicationCommand {
     ZoomDelta { delta: f32 },
     Pan { tx: f32, ty: f32 },
     ToggleDebugMode,
+    TryCopyAsPNG,
 }

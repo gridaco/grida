@@ -73,6 +73,17 @@ impl Backend {
             Backend::GL(ptr) | Backend::Raster(ptr) => *ptr,
         }
     }
+
+    pub fn new_from_raster(width: i32, height: i32) -> Self {
+        let surface = Self::init_raster_surface(width, height);
+        Self::Raster(surface)
+    }
+
+    pub fn init_raster_surface(width: i32, height: i32) -> *mut Surface {
+        let surface =
+            surfaces::raster_n32_premul((width, height)).expect("Failed to create raster surface");
+        Box::into_raw(Box::new(surface))
+    }
 }
 
 /// ---------------------------------------------------------------------------
@@ -80,13 +91,13 @@ impl Backend {
 /// ---------------------------------------------------------------------------
 pub struct Renderer {
     pub backend: Backend,
-    scene: Option<Scene>,
+    pub scene: Option<Scene>,
     scene_cache: cache::scene::SceneCache,
     pub camera: Camera2D,
     pub images: Rc<RefCell<ImageRepository>>,
     pub fonts: Rc<RefCell<FontRepository>>,
     /// when called, the host will request a redraw in os-specific way
-    request_redraw: RequestRedrawCallback,
+    request_redraw: Option<RequestRedrawCallback>,
     /// frame counter for managing render queue
     fc: FrameCounter,
     /// the frame plan for the next frame, to be drawn and flushed
@@ -94,7 +105,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(backend: Backend, request_redraw: RequestRedrawCallback, camera: Camera2D) -> Self {
+    pub fn new(
+        backend: Backend,
+        request_redraw: Option<RequestRedrawCallback>,
+        camera: Camera2D,
+    ) -> Self {
         let font_repository = FontRepository::new();
         let font_repository = Rc::new(RefCell::new(font_repository));
         let image_repository = ImageRepository::new();
@@ -115,7 +130,7 @@ impl Renderer {
     /// Update the redraw callback used to notify the host when a new frame is
     /// ready.
     pub fn set_request_redraw(&mut self, cb: RequestRedrawCallback) {
-        self.request_redraw = cb;
+        self.request_redraw = Some(cb);
     }
 
     /// Access the cached scene data.
@@ -123,10 +138,9 @@ impl Renderer {
         &self.scene_cache
     }
 
-    pub fn init_raster(width: i32, height: i32) -> *mut Surface {
-        let surface =
-            surfaces::raster_n32_premul((width, height)).expect("Failed to create raster surface");
-        Box::into_raw(Box::new(surface))
+    pub fn canvas(&self) -> &Canvas {
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        surface.canvas()
     }
 
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) {
@@ -199,7 +213,9 @@ impl Renderer {
 
     /// Invoke the request redraw callback.
     fn request_redraw(&self) {
-        (self.request_redraw)();
+        if let Some(cb) = &self.request_redraw {
+            cb();
+        }
     }
 
     pub fn free(&mut self) {
@@ -299,7 +315,7 @@ impl Renderer {
     /// Arguments:
     /// - bounds: the bounding rect to be rendered (in world space)
     /// - zoom: the current zoom level
-    fn frame(&mut self, bounds: rect::Rectangle, zoom: f32, stable: bool) -> FramePlan {
+    fn frame(&self, bounds: rect::Rectangle, zoom: f32, stable: bool) -> FramePlan {
         let __start = Instant::now();
 
         let strategy = if stable {
@@ -454,6 +470,80 @@ impl Renderer {
         }
         //
     }
+
+    /// Draw the scene to the canvas.
+    /// - canvas: the canvas to render to
+    /// - plan: the frame plan
+    /// - width: the width of the canvas
+    /// - height: the height of the canvas
+    fn draw_nocache(
+        &self,
+        canvas: &Canvas,
+        plan: &FramePlan,
+        background_color: Option<Color>,
+        width: f32,
+        height: f32,
+    ) -> DrawResult {
+        let __before_paint = Instant::now();
+
+        canvas.clear(skia_safe::Color::TRANSPARENT);
+
+        // Paint background color first if present
+        if let Some(bg_color) = background_color {
+            let Color(r, g, b, a) = bg_color;
+            let color = skia_safe::Color::from_argb(a, r, g, b);
+            let mut paint = SkPaint::default();
+            paint.set_color(color);
+            // Paint the entire canvas with the background color
+            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
+        }
+
+        canvas.save();
+
+        // Apply camera transform
+        canvas.concat(&cvt::sk_matrix(self.camera.view_matrix().matrix));
+
+        // draw picture regions
+        let painter = Painter::new(canvas, self.fonts.clone(), self.images.clone());
+        for (_region, indices) in &plan.regions {
+            for idx in indices {
+                if let Some(layer) = self.scene_cache.layers.layers.get(*idx) {
+                    let layer = layer.clone();
+
+                    painter.draw_layer(&layer);
+                } else {
+                    // report error
+                    println!("layer not found: {}", idx);
+                }
+            }
+        }
+
+        let __painter_duration = __before_paint.elapsed();
+
+        canvas.restore();
+
+        DrawResult {
+            painter_duration: __painter_duration,
+            cache_picture_used: 0,
+            cache_picture_size: 0,
+            cache_geometry_size: 0,
+            tiles_total: 0,
+            tiles_used: 0,
+        }
+        //
+    }
+
+    pub fn snapshot(&self) -> Image {
+        let surface = unsafe { &mut *self.backend.get_surface() };
+
+        let width = surface.width() as f32;
+        let height = surface.height() as f32;
+        let mut canvas = surface.canvas();
+        let frame = self.frame(self.camera.rect(), 1.0, true);
+        let draw = self.draw_nocache(&mut canvas, &frame, None, width, height);
+
+        surface.image_snapshot()
+    }
 }
 
 #[cfg(test)]
@@ -484,10 +574,9 @@ mod tests {
             background_color: None,
         };
 
-        let surface_ptr = Renderer::init_raster(100, 100);
         let mut renderer = Renderer::new(
-            Backend::Raster(surface_ptr),
-            std::sync::Arc::new(|| {}),
+            Backend::new_from_raster(100, 100),
+            None,
             Camera2D::new(Size {
                 width: 100.0,
                 height: 100.0,
@@ -519,10 +608,9 @@ mod tests {
 
     #[test]
     fn recording_cached_returns_none_without_bounds() {
-        let surface_ptr = Renderer::init_raster(50, 50);
         let mut renderer = Renderer::new(
-            Backend::Raster(surface_ptr),
-            std::sync::Arc::new(|| {}),
+            Backend::new_from_raster(50, 50),
+            None,
             Camera2D::new(Size {
                 width: 50.0,
                 height: 50.0,

@@ -125,6 +125,14 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.get_node_absolute_bounding_box(id)
     }
 
+    fn export_node_as(
+        &mut self,
+        id: &str,
+        format: crate::export::ExportAs,
+    ) -> Option<crate::export::Exported> {
+        self.base.export_node_as(id, format)
+    }
+
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
         self.base.set_main_camera_transform(transform);
     }

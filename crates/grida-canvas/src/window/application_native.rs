@@ -15,7 +15,7 @@ use glutin::{
 use std::num::NonZeroU32;
 #[allow(deprecated)]
 use std::sync::Arc;
-use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::Key;
 use winit::{
     application::ApplicationHandler as NativeApplicationHandler, event_loop::EventLoop,
@@ -56,12 +56,19 @@ fn handle_key_pressed(
 ) -> ApplicationCommand {
     if modifiers.super_key() {
         match key {
-            Key::Character(c) => match c.as_str() {
-                "=" => ApplicationCommand::ZoomIn,
-                "-" => ApplicationCommand::ZoomOut,
-                "i" => ApplicationCommand::ToggleDebugMode,
-                _ => ApplicationCommand::None,
-            },
+            Key::Character(c) => {
+                // meta+shift+c => "copy as png"
+                if modifiers.shift_key() && c.as_str().to_lowercase() == "c" {
+                    return ApplicationCommand::TryCopyAsPNG;
+                }
+
+                match c.as_str() {
+                    "=" => ApplicationCommand::ZoomIn,
+                    "-" => ApplicationCommand::ZoomOut,
+                    "i" => ApplicationCommand::ToggleDebugMode,
+                    _ => ApplicationCommand::None,
+                }
+            }
             _ => ApplicationCommand::None,
         }
     } else {
@@ -142,15 +149,6 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        if let WindowEvent::ModifiersChanged(modifiers) = &event {
-            self.modifiers = modifiers.state();
-        }
-
-        if let WindowEvent::CursorMoved { position, .. } = &event {
-            self.app.input.cursor = [position.x as f32, position.y as f32];
-            self.app.perform_hit_test();
-        }
-
         if let WindowEvent::RedrawRequested = &event {
             self.app.redraw_requested();
             if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
@@ -170,6 +168,22 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 NonZeroU32::new(size.height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
             );
             self.app.resize(size.width, size.height);
+        }
+
+        if let WindowEvent::ModifiersChanged(modifiers) = &event {
+            self.modifiers = modifiers.state();
+        }
+
+        if let WindowEvent::CursorMoved { position, .. } = &event {
+            self.app.input.cursor = [position.x as f32, position.y as f32];
+            self.app.perform_hit_test();
+        }
+
+        if let WindowEvent::MouseInput { state, button, .. } = &event {
+            // down
+            if *state == ElementState::Pressed && *button == MouseButton::Left {
+                self.app.devtools_selection = self.app.hit_test_result.clone();
+            }
         }
 
         match handle_window_event(&event, &self.modifiers) {

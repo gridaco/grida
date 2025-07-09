@@ -90,10 +90,9 @@ fn bench_rectangles(c: &mut Criterion) {
     // 1K rectangles
     group.bench_function("1k_basic", |b| {
         b.iter(|| {
-            let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
-                Backend::Raster(surface_ptr),
-                std::sync::Arc::new(|| {}),
+                Backend::new_from_raster(width, height),
+                None,
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -103,8 +102,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let scene = create_rectangles(black_box(1_000), false);
 
             // Clear canvas
-            let surface = unsafe { &mut *surface_ptr };
-            let canvas = surface.canvas();
+            let canvas = renderer.canvas();
             let mut paint = skia_safe::Paint::default();
             paint.set_color(skia_safe::Color::WHITE);
             canvas.draw_rect(
@@ -122,10 +120,9 @@ fn bench_rectangles(c: &mut Criterion) {
     // 10K rectangles
     group.bench_function("10k_basic", |b| {
         b.iter(|| {
-            let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
-                Backend::Raster(surface_ptr),
-                std::sync::Arc::new(|| {}),
+                Backend::new_from_raster(width, height),
+                None,
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -135,8 +132,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let scene = create_rectangles(black_box(10_000), false);
 
             // Clear canvas
-            let surface = unsafe { &mut *surface_ptr };
-            let canvas = surface.canvas();
+            let canvas = renderer.canvas();
             let mut paint = skia_safe::Paint::default();
             paint.set_color(skia_safe::Color::WHITE);
             canvas.draw_rect(
@@ -153,10 +149,9 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("10k_with_effects", |b| {
         b.iter(|| {
-            let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
-                Backend::Raster(surface_ptr),
-                std::sync::Arc::new(|| {}),
+                Backend::new_from_raster(width, height),
+                None,
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -166,8 +161,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let scene = create_rectangles(black_box(10_000), true);
 
             // Clear canvas
-            let surface = unsafe { &mut *surface_ptr };
-            let canvas = surface.canvas();
+            let canvas = renderer.canvas();
             let mut paint = skia_safe::Paint::default();
             paint.set_color(skia_safe::Color::WHITE);
             canvas.draw_rect(
@@ -185,10 +179,9 @@ fn bench_rectangles(c: &mut Criterion) {
     // 50K rectangles
     group.bench_function("50k_basic", |b| {
         b.iter(|| {
-            let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
-                Backend::Raster(surface_ptr),
-                std::sync::Arc::new(|| {}),
+                Backend::new_from_raster(width, height),
+                None,
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -198,8 +191,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let scene = create_rectangles(black_box(50_000), false);
 
             // Clear canvas
-            let surface = unsafe { &mut *surface_ptr };
-            let canvas = surface.canvas();
+            let canvas = renderer.canvas();
             let mut paint = skia_safe::Paint::default();
             paint.set_color(skia_safe::Color::WHITE);
             canvas.draw_rect(
@@ -216,10 +208,9 @@ fn bench_rectangles(c: &mut Criterion) {
 
     group.bench_function("50k_with_effects", |b| {
         b.iter(|| {
-            let surface_ptr = Renderer::init_raster(width, height);
             let mut renderer = Renderer::new(
-                Backend::Raster(surface_ptr),
-                std::sync::Arc::new(|| {}),
+                Backend::new_from_raster(width, height),
+                None,
                 Camera2D::new(Size {
                     width: width as f32,
                     height: height as f32,
@@ -229,8 +220,7 @@ fn bench_rectangles(c: &mut Criterion) {
             let scene = create_rectangles(black_box(50_000), true);
 
             // Clear canvas
-            let surface = unsafe { &mut *surface_ptr };
-            let canvas = surface.canvas();
+            let canvas = renderer.canvas();
             let mut paint = skia_safe::Paint::default();
             paint.set_color(skia_safe::Color::WHITE);
             canvas.draw_rect(

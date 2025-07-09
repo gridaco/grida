@@ -235,9 +235,9 @@ fn main() {
     let window_ptr = &window as *const Window;
     let mut renderer = Renderer::new(
         Backend::GL(surface_ptr),
-        std::sync::Arc::new(move || unsafe {
+        Some(std::sync::Arc::new(move || unsafe {
             (*window_ptr).request_redraw();
-        }),
+        })),
         Camera2D::new(Size {
             width: 800.0,
             height: 600.0,
