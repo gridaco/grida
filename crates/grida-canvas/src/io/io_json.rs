@@ -430,7 +430,7 @@ impl From<Option<Fill>> for Paint {
                     opacity: 1.0,
                 })
             }
-            Some(_) | None => Paint::Solid(SolidPaint {
+            None => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 0),
                 opacity: 1.0,
             }),

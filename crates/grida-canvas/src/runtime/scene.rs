@@ -45,6 +45,13 @@ pub struct DrawResult {
     pub tiles_used: usize,
 }
 
+pub enum FrameFlushResult {
+    OK(FrameFlushStats),
+    NoPending,
+    NoFrame,
+    NoScene,
+}
+
 #[derive(Clone)]
 pub struct FrameFlushStats {
     pub frame: FramePlan,
@@ -138,19 +145,19 @@ impl Renderer {
 
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
-    pub fn flush(&mut self) -> Option<FrameFlushStats> {
+    pub fn flush(&mut self) -> FrameFlushResult {
         if !self.fc.has_pending() {
-            return None;
+            return FrameFlushResult::NoPending;
         }
 
         let Some(frame) = self.plan.take() else {
-            return None;
+            return FrameFlushResult::NoFrame;
         };
 
         let start = Instant::now();
 
         let Some(scene_ptr) = self.scene.as_ref().map(|s| s as *const Scene) else {
-            return None;
+            return FrameFlushResult::NoScene;
         };
 
         let surface = unsafe { &mut *self.backend.get_surface() };
@@ -187,7 +194,7 @@ impl Renderer {
         self.fc.flush();
         self.plan = None;
 
-        Some(stats)
+        FrameFlushResult::OK(stats)
     }
 
     /// Invoke the request redraw callback.

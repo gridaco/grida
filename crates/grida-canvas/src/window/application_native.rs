@@ -330,7 +330,6 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 self.app.renderer.queue_unstable();
                 self.window.request_redraw();
             }
-            _ => {}
         }
     }
 }

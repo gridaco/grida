@@ -9,6 +9,9 @@ use crate::window::state::{self, GpuState, SurfaceState};
 use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
+#[cfg(target_os = "emscripten")]
+use crate::window::emscripten::*;
+
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
 #[cfg(target_arch = "wasm32")]
@@ -17,14 +20,7 @@ use skia_safe::gpu::gl::FramebufferInfo;
 #[cfg(target_arch = "wasm32")]
 use std::boxed::Box;
 
-#[cfg(target_arch = "wasm32")]
-unsafe extern "C" {
-    pub fn emscripten_GetProcAddress(
-        name: *const ::std::os::raw::c_char,
-    ) -> *const ::std::os::raw::c_void;
-}
-
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_os = "emscripten")]
 fn init_gl() {
     unsafe {
         gl::load_with(|addr| {
@@ -66,92 +62,111 @@ fn create_gpu_state() -> GpuState {
     panic!("create_gpu_state is not supported on native");
 }
 
-pub struct WebGlApplication {
-    pub(crate) app: UnknownTargetApplication,
+#[cfg(target_os = "emscripten")]
+unsafe extern "C" fn request_animation_frame_callback(
+    _time: f64,
+    user_data: *mut std::os::raw::c_void,
+) -> bool {
+    println!("request_animation_frame_callback {:?}", _time);
+    if !user_data.is_null() {
+        // Cast the user_data pointer back to &mut EmscriptenApplication and call tick
+        let app = &mut *(user_data as *mut EmscriptenApplication);
+        app.tick();
+        // app.redraw_requested();
+    }
+    true
 }
 
-impl ApplicationApi for WebGlApplication {
+pub struct EmscriptenApplication {
+    pub(crate) base: UnknownTargetApplication,
+}
+
+impl ApplicationApi for EmscriptenApplication {
     fn tick(&mut self) {
-        self.app.tick();
+        self.base.tick();
+    }
+
+    fn redraw_requested(&mut self) {
+        self.base.redraw_requested();
     }
 
     fn resize(&mut self, width: u32, height: u32) {
-        self.app.resize(width, height);
+        self.base.resize(width, height);
     }
 
     fn set_debug(&mut self, debug: bool) {
-        self.app.set_debug(debug);
+        self.base.set_debug(debug);
     }
 
     fn toggle_debug(&mut self) {
-        self.app.toggle_debug();
+        self.base.toggle_debug();
     }
 
     fn set_verbose(&mut self, verbose: bool) {
-        self.app.set_verbose(verbose);
+        self.base.set_verbose(verbose);
     }
 
     fn command(&mut self, cmd: ApplicationCommand) -> bool {
-        self.app.command(cmd)
+        self.base.command(cmd)
     }
 
     fn get_node_ids_from_point(&mut self, point: Vector2) -> Vec<String> {
-        self.app.get_node_ids_from_point(point)
+        self.base.get_node_ids_from_point(point)
     }
 
     fn get_node_id_from_point(&mut self, point: Vector2) -> Option<String> {
-        self.app.get_node_id_from_point(point)
+        self.base.get_node_id_from_point(point)
     }
 
     fn get_node_ids_from_envelope(&mut self, rect: Rectangle) -> Vec<String> {
-        self.app.get_node_ids_from_envelope(rect)
+        self.base.get_node_ids_from_envelope(rect)
     }
 
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        self.app.get_node_absolute_bounding_box(id)
+        self.base.get_node_absolute_bounding_box(id)
     }
 
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
-        self.app.set_main_camera_transform(transform);
+        self.base.set_main_camera_transform(transform);
     }
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
-        self.app.devtools_rendering_set_show_tiles(debug);
+        self.base.devtools_rendering_set_show_tiles(debug);
     }
 
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_fps_meter(show);
+        self.base.devtools_rendering_set_show_fps_meter(show);
     }
 
     fn devtools_rendering_set_show_stats(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_stats(show);
+        self.base.devtools_rendering_set_show_stats(show);
     }
 
     fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_hit_testing(show);
+        self.base.devtools_rendering_set_show_hit_testing(show);
     }
 
     fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
-        self.app.devtools_rendering_set_show_ruler(show);
+        self.base.devtools_rendering_set_show_ruler(show);
     }
 
     fn load_scene_json(&mut self, json: &str) {
-        self.app.load_scene_json(json);
+        self.base.load_scene_json(json);
     }
 
     fn load_dummy_scene(&mut self) {
-        self.app.load_dummy_scene();
+        self.base.load_dummy_scene();
     }
 
     /// Load a heavy scene useful for performance benchmarking.
     fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        self.app.load_benchmark_scene(cols, rows);
+        self.base.load_benchmark_scene(cols, rows);
     }
 }
 
-impl WebGlApplication {
-    /// Create a new [`WebGlApplication`] with an initialized renderer.
+impl EmscriptenApplication {
+    /// Create a new [`EmscriptenApplication`] with an initialized renderer.
     pub fn new(width: i32, height: i32) -> Self {
         init_gl();
         let mut gpu_state = create_gpu_state();
@@ -171,28 +186,32 @@ impl WebGlApplication {
         });
 
         let backend = Backend::GL(state.surface_mut_ptr());
-        let app = Self {
-            app: UnknownTargetApplication::new(
-                state,
-                backend,
-                camera,
-                120,
-                image_rx,
-                font_rx,
-                None,
-            ),
-        };
+        let base =
+            UnknownTargetApplication::new(state, backend, camera, 120, image_rx, font_rx, None);
+        let app = Self { base };
+
+        #[cfg(target_os = "emscripten")]
+        unsafe {
+            // Box and leak the app so its pointer can be used in the callback
+            let app_ptr = Box::into_raw(Box::new(app));
+            emscripten_request_animation_frame_loop(
+                Some(request_animation_frame_callback),
+                app_ptr as *mut _,
+            );
+            // Return the leaked app (ownership is now with the runtime)
+            return *Box::from_raw(app_ptr);
+        }
 
         app
     }
 
     pub fn redraw(&mut self) {
-        self.app.redraw();
+        self.base.redraw();
     }
 
     /// Update the cursor position in logical screen coordinates and perform a
     /// hit test. Should be called whenever the pointer moves.
     pub fn pointer_move(&mut self, x: f32, y: f32) {
-        self.app.pointer_move(x, y);
+        self.base.pointer_move(x, y);
     }
 }

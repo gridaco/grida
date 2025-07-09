@@ -4,7 +4,7 @@ use crate::node::schema::Scene;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
@@ -15,6 +15,7 @@ use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 pub trait ApplicationApi {
     fn tick(&mut self);
     fn resize(&mut self, width: u32, height: u32);
+    fn redraw_requested(&mut self);
 
     /// Handle a [`ApplicationCommand`]. Returns `true` if the caller should exit.
     fn command(&mut self, cmd: ApplicationCommand) -> bool;
@@ -115,6 +116,10 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
         self.queue();
+    }
+
+    fn redraw_requested(&mut self) {
+        self.redraw();
     }
 
     fn command(&mut self, cmd: ApplicationCommand) -> bool {
@@ -313,7 +318,6 @@ impl UnknownTargetApplication {
         }
     }
 
-
     /// Request a redraw from the host window using the provided callback.
     pub fn request_redraw(&self) {
         (self.request_redraw)();
@@ -343,7 +347,7 @@ impl UnknownTargetApplication {
         // );
     }
 
-    pub(crate) fn process_image_queue(&mut self) {
+    fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
             self.renderer.add_image(msg.src.clone(), &msg.data);
@@ -355,7 +359,7 @@ impl UnknownTargetApplication {
         }
     }
 
-    pub(crate) fn process_font_queue(&mut self) {
+    fn process_font_queue(&mut self) {
         let mut updated = false;
         let mut font_count = 0;
         while let Ok(Some(msg)) = self.font_rx.try_next() {
@@ -413,6 +417,12 @@ impl UnknownTargetApplication {
         crate::hittest::HitTester::new(self.renderer.get_cache())
     }
 
+    fn verbose(&self, msg: &str) {
+        if self.verbose {
+            println!("{}", msg);
+        }
+    }
+
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO
@@ -435,10 +445,6 @@ impl UnknownTargetApplication {
         self.process_font_queue();
     }
 
-    pub(crate) fn redraw_requested(&mut self) {
-        self.redraw();
-    }
-
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
         self.tick();
@@ -446,8 +452,19 @@ impl UnknownTargetApplication {
         let __frame_start = std::time::Instant::now();
 
         let stats = match self.renderer.flush() {
-            Some(stats) => stats,
-            None => return,
+            FrameFlushResult::OK(stats) => stats,
+            FrameFlushResult::NoFrame => {
+                self.verbose("redraw/noframe: No frame to flush");
+                return;
+            }
+            FrameFlushResult::NoScene => {
+                self.verbose("redraw/noscene: No scene to flush");
+                return;
+            }
+            FrameFlushResult::NoPending => {
+                self.verbose("redraw/nopending: No pending frame to flush");
+                return;
+            }
         };
 
         let overlay_time = self.draw_and_flush_devtools_overlay();
@@ -475,9 +492,7 @@ impl UnknownTargetApplication {
             stats.draw.tiles_used,
         );
 
-        if self.verbose {
-            println!("{}", stat_string);
-        }
+        self.verbose(&stat_string);
 
         self.last_stats = Some(stat_string);
 
