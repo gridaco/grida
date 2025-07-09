@@ -17,5 +17,3 @@ pub use application::UnknownTargetApplication;
 pub use application_native::NativeApplication;
 
 pub mod application_emscripten;
-
-pub mod emscripten;

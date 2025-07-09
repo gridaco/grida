@@ -6,6 +6,7 @@ pub mod helpers;
 pub mod hittest;
 pub mod io;
 pub mod node;
+pub mod os;
 pub mod painter;
 pub mod resource;
 pub mod runtime;

@@ -10,7 +10,7 @@ use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 #[cfg(target_os = "emscripten")]
-use crate::window::emscripten::*;
+use crate::os::emscripten::*;
 
 #[cfg(target_arch = "wasm32")]
 use gl::types::*;
@@ -64,14 +64,13 @@ fn create_gpu_state() -> GpuState {
 
 #[cfg(target_os = "emscripten")]
 unsafe extern "C" fn request_animation_frame_callback(
-    _time: f64,
+    time: f64,
     user_data: *mut std::os::raw::c_void,
 ) -> bool {
-    println!("request_animation_frame_callback {:?}", _time);
     if !user_data.is_null() {
         // Cast the user_data pointer back to &mut EmscriptenApplication and call tick
         let app = &mut *(user_data as *mut EmscriptenApplication);
-        app.tick(_time);
+        app.tick(time);
         // app.redraw_requested();
     }
     true
