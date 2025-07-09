@@ -1,10 +1,20 @@
 "use client";
-import React, { useLayoutEffect } from "react";
+import React, { useLayoutEffect, useEffect, useState } from "react";
 import init, { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
 import grida from "@grida/schema";
 import locateFile from "./locate-file";
+
+function useDPR() {
+  const [dpr, setDPR] = useState<number | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setDPR(window.devicePixelRatio);
+    }
+  }, []);
+  return dpr;
+}
 
 function CanvasContent({
   width,
@@ -14,6 +24,7 @@ function CanvasContent({
   debug,
   onMount,
   className,
+  dpr,
 }: {
   width: number;
   height: number;
@@ -22,6 +33,7 @@ function CanvasContent({
   debug?: boolean;
   onMount?: (surface: Grida2D) => void;
   className?: string;
+  dpr: number;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<Grida2D | null>(null);
@@ -60,13 +72,15 @@ function CanvasContent({
     surface: Grida2D,
     transform: cmath.Transform,
     width: number,
-    height: number
+    height: number,
+    dpr: number
   ) => {
     // the transform is the canvas transform, which needs to be converted to camera transform.
     // input transform = translation + scale of the viewport, top left aligned
     // camera transform = transform of the camera, center aligned
     // - translate the transform to the center of the canvas
     // - reverse the transform to match the canvas coordinate system
+    // - account for DPR scaling
 
     const toCenter = cmath.transform.translate(cmath.transform.identity, [
       -width / 2,
@@ -81,16 +95,17 @@ function CanvasContent({
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
-      syncTransform(rendererRef.current, transform, width, height);
+      syncTransform(rendererRef.current, transform, width, height, dpr);
     }
-  }, [transform, width, height]);
+  }, [transform, width, height, dpr]);
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
-      rendererRef.current.resize(width, height);
-      syncTransform(rendererRef.current, transform, width, height);
+      // Resize the WASM surface to physical pixels
+      rendererRef.current.resize(width * dpr, height * dpr);
+      syncTransform(rendererRef.current, transform, width, height, dpr);
     }
-  }, [width, height]);
+  }, [width, height, dpr]);
 
   useLayoutEffect(() => {
     if (rendererRef.current && data) {
@@ -107,8 +122,12 @@ function CanvasContent({
   return (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height}
+      width={width * dpr}
+      height={height * dpr}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+      }}
       className={className}
     />
   );
@@ -132,10 +151,17 @@ export default function Canvas({
   className?: string;
 }) {
   const size = useSize({ width, height });
+  const dpr = useDPR();
+  
+  if (dpr === null) {
+    return null; // Wait for DPR to be available
+  }
+
   return (
     <CanvasContent
       width={size.width}
       height={size.height}
+      dpr={dpr}
       data={data}
       transform={transform}
       debug={debug}
