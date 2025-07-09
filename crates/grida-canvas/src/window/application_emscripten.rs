@@ -71,7 +71,7 @@ unsafe extern "C" fn request_animation_frame_callback(
     if !user_data.is_null() {
         // Cast the user_data pointer back to &mut EmscriptenApplication and call tick
         let app = &mut *(user_data as *mut EmscriptenApplication);
-        app.tick();
+        app.tick(_time);
         // app.redraw_requested();
     }
     true
@@ -82,8 +82,8 @@ pub struct EmscriptenApplication {
 }
 
 impl ApplicationApi for EmscriptenApplication {
-    fn tick(&mut self) {
-        self.base.tick();
+    fn tick(&mut self, time: f64) {
+        self.base.tick(time);
     }
 
     fn redraw_requested(&mut self) {

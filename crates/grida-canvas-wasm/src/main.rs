@@ -31,9 +31,9 @@ pub extern "C" fn init(width: i32, height: i32) -> Box<EmscriptenApplication> {
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn tick(app: *mut EmscriptenApplication) {
+pub unsafe extern "C" fn tick(app: *mut EmscriptenApplication, time: f64) {
     if let Some(app) = app.as_mut() {
-        app.tick();
+        app.tick(time);
     }
 }
 

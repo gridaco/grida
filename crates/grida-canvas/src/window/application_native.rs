@@ -317,7 +317,11 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: HostEvent) {
         match event {
-            HostEvent::Tick => self.app.tick(),
+            HostEvent::Tick => {
+                let now = self.app.clock.now()
+                    + self.app.last_frame_time.elapsed().as_secs_f64() * 1000.0;
+                self.app.tick(now);
+            }
             HostEvent::RedrawRequest => self.window.request_redraw(),
             HostEvent::FontLoaded(_f) => {
                 self.app.resource_loaded();

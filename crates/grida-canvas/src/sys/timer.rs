@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// A timer system for managing time-sensitive operations within the application.
 ///
@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 ///
 /// # Usage
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use std::time::Duration;
 /// use cg::sys::timer::TimerMgr;
 /// use cg::sys::clock::EventLoopClock;
@@ -35,13 +35,16 @@ use std::time::{Duration, Instant};
 ///
 /// // In your main loop
 /// loop {
-///     clock.tick();
+///     // `now` should be a high precision timestamp in milliseconds
+///     let now = performance_now();
+///     clock.tick(now);
 ///     timer_system.tick(clock.now());
 /// }
 /// ```
 pub struct TimerMgr {
     timers: HashMap<TimerId, Timer>,
     next_id: u64,
+    now: f64,
 }
 
 /// Unique identifier for a timer
@@ -51,8 +54,8 @@ pub struct TimerId(u64);
 /// Represents a single timer with its configuration
 struct Timer {
     timer_type: TimerType,
-    deadline: Instant,
-    interval: Option<Duration>,
+    deadline: f64,
+    interval: Option<f64>,
     callback: Option<TimerCallback>,
     interval_callback: Option<IntervalCallback>,
     active: bool,
@@ -79,6 +82,7 @@ impl TimerMgr {
         Self {
             timers: HashMap::new(),
             next_id: 1,
+            now: 0.0,
         }
     }
 
@@ -86,7 +90,8 @@ impl TimerMgr {
     ///
     /// This should be called regularly (e.g., in your main event loop) with
     /// the current time from your clock system.
-    pub fn tick(&mut self, now: Instant) {
+    pub fn tick(&mut self, now: f64) {
+        self.now = now;
         let mut expired_timers = Vec::new();
 
         // Collect expired timers
@@ -144,7 +149,7 @@ impl TimerMgr {
         F: FnOnce() + 'static,
     {
         let id = self.next_timer_id();
-        let deadline = Instant::now() + duration;
+        let deadline = self.now + duration.as_secs_f64() * 1000.0;
 
         let timer = Timer {
             timer_type: TimerType::Timeout,
@@ -167,12 +172,12 @@ impl TimerMgr {
         F: Fn() + 'static,
     {
         let id = self.next_timer_id();
-        let deadline = Instant::now() + interval;
+        let deadline = self.now + interval.as_secs_f64() * 1000.0;
 
         let timer = Timer {
             timer_type: TimerType::Interval,
             deadline,
-            interval: Some(interval),
+            interval: Some(interval.as_secs_f64() * 1000.0),
             callback: None,
             interval_callback: Some(Box::new(callback)),
             active: true,
@@ -198,7 +203,7 @@ impl TimerMgr {
         F: FnMut() + 'static,
     {
         let state = DebounceState {
-            wait,
+            wait: wait.as_secs_f64() * 1000.0,
             callback: Box::new(callback),
             leading,
             trailing,
@@ -263,25 +268,24 @@ pub struct Debounce {
 }
 
 struct DebounceState {
-    wait: Duration,
+    wait: f64,
     callback: Box<dyn FnMut() + 'static>,
     leading: bool,
     trailing: bool,
     timer_id: Option<TimerId>,
-    last_call_time: Option<Instant>,
-    last_execute_time: Option<Instant>,
+    last_call_time: Option<f64>,
+    last_execute_time: Option<f64>,
 }
 
 impl Debounce {
     /// Trigger the debounced function using the provided [`TimerMgr`].
-    pub fn call(&mut self, mgr: &mut TimerMgr) {
+    pub fn call(&mut self, mgr: &mut TimerMgr, now: f64) {
         let mut state = self.state.lock().unwrap();
-        let now = Instant::now();
         let is_first_call = state.last_call_time.is_none();
         let time_since_last_execute = state
             .last_execute_time
-            .map(|last| now.duration_since(last))
-            .unwrap_or(Duration::from_secs(0));
+            .map(|last| now - last)
+            .unwrap_or(0.0);
 
         state.last_call_time = Some(now);
 
@@ -295,13 +299,14 @@ impl Debounce {
                 mgr.cancel(id);
             }
             let weak = std::sync::Arc::downgrade(&self.state);
-            let wait = state.wait;
-            state.timer_id = Some(mgr.set_timeout(wait, move || {
+            let execute_time = now + state.wait;
+            let wait_duration = Duration::from_secs_f64(state.wait / 1000.0);
+            state.timer_id = Some(mgr.set_timeout(wait_duration, move || {
                 if let Some(state_rc) = weak.upgrade() {
                     let mut s = state_rc.lock().unwrap();
                     s.timer_id = None;
                     (s.callback)();
-                    s.last_execute_time = Some(Instant::now());
+                    s.last_execute_time = Some(execute_time);
                 }
             }));
         }
@@ -322,7 +327,7 @@ impl Debounce {
         self.cancel(mgr);
         let mut state = self.state.lock().unwrap();
         (state.callback)();
-        state.last_execute_time = Some(Instant::now());
+        state.last_execute_time = Some(mgr.now);
     }
 
     /// Returns `true` if a trailing execution is scheduled.
@@ -336,6 +341,7 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
     use std::thread;
+    use std::time::Instant;
 
     #[test]
     fn test_timeout() {
@@ -348,8 +354,9 @@ mod tests {
         });
 
         // Wait for timeout to expire
+        let start = Instant::now();
         thread::sleep(Duration::from_millis(20));
-        timer_system.tick(Instant::now());
+        timer_system.tick(start.elapsed().as_secs_f64() * 1000.0);
 
         assert_eq!(*counter.lock().unwrap(), 1);
     }
@@ -368,12 +375,12 @@ mod tests {
 
         // Wait for multiple intervals
         println!("Waiting 35ms for intervals...");
+        let start = Instant::now();
         thread::sleep(Duration::from_millis(35));
-
         // Tick multiple times to simulate regular updates
         for i in 0..5 {
             println!("Tick {}", i);
-            timer_system.tick(Instant::now());
+            timer_system.tick(start.elapsed().as_secs_f64() * 1000.0);
             thread::sleep(Duration::from_millis(1));
         }
 
@@ -397,11 +404,12 @@ mod tests {
             true,
         );
 
-        debounced.call(&mut mgr); // leading
+        debounced.call(&mut mgr, 0.0); // leading
         assert!(debounced.is_pending());
 
+        let start = Instant::now();
         thread::sleep(Duration::from_millis(60));
-        mgr.tick(Instant::now());
+        mgr.tick(start.elapsed().as_secs_f64() * 1000.0);
 
         assert_eq!(*executed.lock().unwrap(), 2);
         assert!(!debounced.is_pending());
@@ -421,8 +429,9 @@ mod tests {
         assert!(timer_system.cancel(id));
 
         // Wait and tick - should not execute
+        let start = Instant::now();
         thread::sleep(Duration::from_millis(120));
-        timer_system.tick(Instant::now());
+        timer_system.tick(start.elapsed().as_secs_f64() * 1000.0);
 
         assert_eq!(*counter.lock().unwrap(), 0);
     }

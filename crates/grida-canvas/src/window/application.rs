@@ -13,7 +13,7 @@ use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 pub trait ApplicationApi {
-    fn tick(&mut self);
+    fn tick(&mut self, time: f64);
     fn resize(&mut self, width: u32, height: u32);
     fn redraw_requested(&mut self);
 
@@ -101,8 +101,8 @@ pub struct UnknownTargetApplication {
 impl ApplicationApi for UnknownTargetApplication {
     /// tick the application clock and timer.
     /// this can be called as many times as needed, from different sources (e.g. isolated timer thread, or raf, as the platform requires)
-    fn tick(&mut self) {
-        self.clock.tick();
+    fn tick(&mut self, time: f64) {
+        self.clock.tick(time);
         self.timer.tick(self.clock.now());
     }
 
@@ -447,7 +447,8 @@ impl UnknownTargetApplication {
 
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
-        self.tick();
+        let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;
+        self.tick(now);
 
         let __frame_start = std::time::Instant::now();
 
