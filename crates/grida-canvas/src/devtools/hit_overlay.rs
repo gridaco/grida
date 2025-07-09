@@ -43,6 +43,15 @@ thread_local! {
         p.set_anti_alias(true);
         p
     };
+
+    static FOCUS_STROKE: Paint = {
+        let mut p = Paint::default();
+        p.set_color(Color::from_argb(200, 0, 0, 255));
+        p.set_style(PaintStyle::Stroke);
+        p.set_stroke_width(4.0);
+        p.set_anti_alias(true);
+        p
+    };
 }
 
 pub struct HitOverlay;
@@ -51,71 +60,92 @@ impl HitOverlay {
     pub fn draw(
         surface: &mut Surface,
         hit: Option<&NodeId>,
+        focus: Option<&NodeId>,
         camera: &Camera2D,
         cache: &SceneCache,
         fonts: &std::cell::RefCell<FontRepository>,
     ) {
-        let id = match hit {
-            Some(id) => id,
-            None => return,
-        };
-
-        let layer = match cache.layers.layers.iter().find(|l| l.id() == id) {
-            Some(l) => l,
-            None => return,
-        };
-
-        let bounds = match cache.geometry.get_render_bounds(id) {
-            Some(b) => b,
-            None => return,
-        };
-
-        let screen_rect = math2::rect::transform(bounds, &camera.view_matrix());
-        let rect = Rect::from_xywh(
-            screen_rect.x,
-            screen_rect.y,
-            screen_rect.width,
-            screen_rect.height,
-        );
-
-        let base = match layer {
-            crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
-            crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
-        };
-        let mut path = if let Some(entry) = cache.path.borrow().get(id) {
-            (*entry.path).clone()
-        } else {
-            match layer {
-                crate::painter::layer::PainterPictureLayer::Text(t) => {
-                    Self::text_layer_path(&fonts.borrow(), t)
-                }
-                _ => base.shape.to_path(),
-            }
-        };
-        path.transform(&cvt::sk_matrix(base.transform.matrix));
-        path.transform(&cvt::sk_matrix(camera.view_matrix().matrix));
-
         let canvas = surface.canvas();
 
-        // background for text
-        let text_rect = Rect::from_xywh(10.0, 80.0, 300.0, 40.0);
-        BG_PAINT.with(|bg| {
-            canvas.draw_rect(text_rect, bg);
-        });
+        // Render hit if present
+        if let Some(id) = hit {
+            if let Some(layer) = cache.layers.layers.iter().find(|l| l.id() == id) {
+                if let Some(bounds) = cache.geometry.get_render_bounds(id) {
+                    let screen_rect = math2::rect::transform(bounds, &camera.view_matrix());
+                    let rect = Rect::from_xywh(
+                        screen_rect.x,
+                        screen_rect.y,
+                        screen_rect.width,
+                        screen_rect.height,
+                    );
 
-        TEXT_PAINT.with(|paint| {
-            FONT.with(|font| {
-                canvas.draw_str(format!("hit: {}", id), Point::new(24.0, 104.0), font, paint);
-            });
-        });
+                    let base = match layer {
+                        crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
+                        crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
+                    };
+                    let mut path = if let Some(entry) = cache.path.borrow().get(id) {
+                        (*entry.path).clone()
+                    } else {
+                        match layer {
+                            crate::painter::layer::PainterPictureLayer::Text(t) => {
+                                Self::text_layer_path(&fonts.borrow(), t)
+                            }
+                            _ => base.shape.to_path(),
+                        }
+                    };
+                    path.transform(&cvt::sk_matrix(base.transform.matrix));
+                    path.transform(&cvt::sk_matrix(camera.view_matrix().matrix));
 
-        STROKE.with(|stroke| {
-            canvas.draw_rect(rect, stroke);
-        });
+                    // background for hit text
+                    let hit_text_rect = Rect::from_xywh(10.0, 80.0, 300.0, 40.0);
+                    BG_PAINT.with(|bg| {
+                        canvas.draw_rect(hit_text_rect, bg);
+                    });
 
-        PATH_STROKE.with(|stroke| {
-            canvas.draw_path(&path, stroke);
-        });
+                    TEXT_PAINT.with(|paint| {
+                        FONT.with(|font| {
+                            canvas.draw_str(
+                                format!("hit: {}", id),
+                                Point::new(24.0, 104.0),
+                                font,
+                                paint,
+                            );
+                        });
+                    });
+
+                    STROKE.with(|stroke| {
+                        canvas.draw_rect(rect, stroke);
+                    });
+
+                    PATH_STROKE.with(|stroke| {
+                        canvas.draw_path(&path, stroke);
+                    });
+                }
+            }
+        }
+
+        // Render focus if present (and different from hit)
+        if let Some(focus_id) = focus {
+            if hit.map_or(true, |hit_id| focus_id != hit_id) {
+                if let Some(_focus_layer) = cache.layers.layers.iter().find(|l| l.id() == focus_id)
+                {
+                    if let Some(focus_bounds) = cache.geometry.get_render_bounds(focus_id) {
+                        let focus_screen_rect =
+                            math2::rect::transform(focus_bounds, &camera.view_matrix());
+                        let focus_rect = Rect::from_xywh(
+                            focus_screen_rect.x,
+                            focus_screen_rect.y,
+                            focus_screen_rect.width,
+                            focus_screen_rect.height,
+                        );
+
+                        FOCUS_STROKE.with(|focus_stroke| {
+                            canvas.draw_rect(focus_rect, focus_stroke);
+                        });
+                    }
+                }
+            }
+        }
     }
 
     fn text_layer_path(fonts: &FontRepository, layer: &PainterPictureTextLayer) -> Path {
