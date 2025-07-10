@@ -546,7 +546,7 @@ impl UnknownTargetApplication {
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(surface, s);
+                    stats_overlay::StatsOverlay::draw(surface, s, &self.clock);
                 }
             }
             if self.devtools_rendering_show_hit_overlay {
