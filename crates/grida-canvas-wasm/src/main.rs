@@ -227,8 +227,19 @@ pub unsafe extern "C" fn export_node_as(
 
     if let Some(exported) = app.export_node_as(&id, fmt) {
         let data = exported.data();
-        let out = allocate(data.len()) as *mut u8;
-        std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len());
+        let data_len = data.len();
+        
+        // Allocate memory for: [4 bytes for length] + [actual data]
+        let total_size = 4 + data_len;
+        let out = allocate(total_size) as *mut u8;
+        
+        // Write the length as first 4 bytes (little-endian u32)
+        let len_bytes = (data_len as u32).to_le_bytes();
+        std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
+        
+        // Write the actual data after the length
+        std::ptr::copy_nonoverlapping(data.as_ptr(), out.add(4), data_len);
+        
         return out;
     }
 
@@ -311,3 +322,4 @@ fn main() {}
 
 #[cfg(target_arch = "wasm32")]
 fn main() {}
+

@@ -242,11 +242,18 @@ export class Grida2D {
       throw new Error("Failed to export node as PNG");
     }
 
+    // Read the length from the first 4 bytes (little-endian u32)
+    const lengthBytes = this.module.HEAPU8.slice(outptr, outptr + 4);
+    const dataLength = new Uint32Array(lengthBytes.buffer, lengthBytes.byteOffset, 1)[0];
+    
+    // Read the actual data starting after the length prefix
     const data = this.module.HEAPU8.slice(
-      outptr,
-      outptr + this.module.HEAPU8.length
+      outptr + 4,
+      outptr + 4 + dataLength
     );
-    this.module._deallocate(outptr, data.length);
+    
+    // Free the entire allocated block (length + data)
+    this.module._deallocate(outptr, 4 + dataLength);
 
     return {
       data: new Uint8Array(data),
@@ -325,3 +332,4 @@ export class Grida2D {
     this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
 }
+

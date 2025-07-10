@@ -14,6 +14,7 @@ type Ptr = number;
 
 declare namespace createGridaCanvas {
   interface GridaCanvasWasmBindings {
+    // #region
     // ====================================================================================================
     // EMSCRIPTEN EXPOSED METHODS
     // ====================================================================================================
@@ -24,14 +25,25 @@ declare namespace createGridaCanvas {
       ): number;
       makeContextCurrent(handle: number): void;
     };
-    HEAPU8: Uint8Array;
+
+    HEAP8: Int8Array;
+    HEAP16: Int16Array;
+    HEAP32: Int32Array;
     HEAPF32: Float32Array;
+    HEAPF64: Float64Array;
+    HEAPU8: Uint8Array;
+    HEAPU16: Uint16Array;
+    HEAPU32: Uint32Array;
+
+    UTF8ToString(ptr: number, maxBytesToRead?: number): string;
     stringToUTF8(str: string, outPtr: number, maxBytesToWrite: number): void;
     lengthBytesUTF8(str: string): number;
-    UTF8ToString(ptr: number, maxBytesToRead?: number): string;
+
     ___wbindgen_malloc(a0: number, a1: number): number;
     ___wbindgen_free(a0: number, a1: number, a2: number): void;
     ___wbindgen_realloc(a0: number, a1: number, a2: number, a3: number): number;
+
+    // #endregion
 
     // core memory wrapper
     _allocate(len: number): number;
