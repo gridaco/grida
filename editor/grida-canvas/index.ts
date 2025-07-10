@@ -1510,6 +1510,37 @@ export namespace editor.api {
     getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null;
   }
 
+  export interface IDocumentImageExportInterfaceProvider {
+    /**
+     * exports the node as an image
+     * @param node_id
+     * @param format
+     * @returns
+     */
+    exportNodeAsImage(
+      node_id: string,
+      format: "PNG" | "JPEG"
+    ): Promise<Uint8Array>;
+  }
+
+  export interface IDocumentSVGExportInterfaceProvider {
+    /**
+     * exports the node as an svg
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsSVG(node_id: string): Promise<string>;
+  }
+
+  export interface IDocumentPDFExportInterfaceProvider {
+    /**
+     * exports the node as an pdf
+     * @param node_id
+     * @returns
+     */
+    exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
+  }
+
   export interface IDocumentGeometryQuery {
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
@@ -1674,5 +1705,9 @@ export namespace editor.api {
   export interface IFollowPluginActions {
     follow(cursor_id: string): void;
     unfollow(): void;
+  }
+
+  export interface IExportPluginActions {
+    exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
   }
 }

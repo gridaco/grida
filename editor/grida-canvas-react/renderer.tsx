@@ -78,7 +78,7 @@ export function __WIP_UNSTABLE_WasmContent({ editor }: { editor: Editor }) {
         transform={transform}
         data={document}
         debug={debug}
-        onMount={editor.setSurface.bind(editor)}
+        onMount={editor.bind.bind(editor)}
       />
     </SizeProvider>
   );

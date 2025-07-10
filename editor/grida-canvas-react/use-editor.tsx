@@ -7,6 +7,7 @@ import deepEqual from "fast-deep-equal/es6/react.js";
 import {
   domapi,
   DOMGeometryQueryInterfaceProvider,
+  DOMImageExportInterfaceProvider,
   NoopGeometryQueryInterfaceProvider,
 } from "@/grida-canvas/backends";
 
@@ -33,22 +34,31 @@ export function useEditor(
   init?: editor.state.IEditorStateInit,
   backend: EditorContentRenderingBackend = "dom"
 ) {
-  const [_editor] = React.useState(
-    new Editor(
-      backend,
-      domapi.k.VIEWPORT_ELEMENT_ID,
-      domapi.k.EDITOR_CONTENT_ELEMENT_ID,
-      (_) => {
-        switch (backend) {
-          case "dom":
-            return new DOMGeometryQueryInterfaceProvider(_);
-          case "canvas":
-            return new NoopGeometryQueryInterfaceProvider();
-        }
-      },
-      init ?? __DEFAULT_STATE
-    )
-  );
+  const [_editor] = React.useState(() => {
+    switch (backend) {
+      case "dom": {
+        return new Editor({
+          backend: backend,
+          viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
+          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
+          geometry: (_) => new DOMGeometryQueryInterfaceProvider(_),
+          initialState: init ?? __DEFAULT_STATE,
+          plugins: {
+            export_as_image: (_) => new DOMImageExportInterfaceProvider(_),
+          },
+        });
+      }
+      case "canvas": {
+        return new Editor({
+          backend: backend,
+          viewportElement: domapi.k.VIEWPORT_ELEMENT_ID,
+          contentElement: domapi.k.EDITOR_CONTENT_ELEMENT_ID,
+          geometry: (_) => new NoopGeometryQueryInterfaceProvider(),
+          initialState: init ?? __DEFAULT_STATE,
+        });
+      }
+    }
+  });
 
   const editor = useSyncExternalStore<Editor>(
     _editor.subscribe.bind(_editor),

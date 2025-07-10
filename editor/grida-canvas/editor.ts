@@ -16,7 +16,10 @@ import iosvg from "@grida/io-svg";
 import { io } from "@grida/io";
 import { EditorFollowPlugin } from "./plugins/follow";
 import type { Grida2D } from "@grida/canvas-wasm";
-import { CanvasWasmGeometryQueryInterfaceProvider } from "./backends/wasm";
+import {
+  CanvasWasmGeometryQueryInterfaceProvider,
+  CanvasWasmImageExportInterfaceProvider,
+} from "./backends/wasm";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknwonNode,
@@ -54,42 +57,75 @@ export class Editor
     editor.api.IGuide2DActions,
     editor.api.ICameraActions,
     editor.api.IEventTargetActions,
-    editor.api.IFollowPluginActions
+    editor.api.IFollowPluginActions,
+    editor.api.IExportPluginActions
 {
   private readonly __pointer_move_throttle_ms: number = 30;
   private listeners: Set<(editor: this, action?: Action) => void>;
   private mstate: editor.state.IEditorState;
 
+  readonly backend: EditorContentRenderingBackend;
   readonly viewport: domapi.DOMViewportApi;
   _m_geometry: editor.api.IDocumentGeometryInterfaceProvider;
   get geometry() {
     return this._m_geometry;
   }
+
+  _m_exporter: editor.api.IDocumentImageExportInterfaceProvider | null = null;
+  get exporter() {
+    return this._m_exporter;
+  }
+
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
 
-  constructor(
-    readonly backend: EditorContentRenderingBackend,
-    viewportElement: string | HTMLElement,
-    contentElement: string | HTMLElement | Grida2D,
+  constructor({
+    backend,
+    viewportElement,
+    contentElement,
+    geometry,
+    initialState,
+    config = { pointer_move_throttle_ms: 30 },
+    plugins = {},
+    onCreate,
+  }: {
+    backend: EditorContentRenderingBackend;
+    viewportElement: string | HTMLElement;
+    contentElement: string | HTMLElement | Grida2D;
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
-      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider),
-    initialState: editor.state.IEditorStateInit,
-    instanceConfig: {
+      | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
+    initialState: editor.state.IEditorStateInit;
+    config?: {
       pointer_move_throttle_ms: number;
-      onCreate?: (editor: Editor) => void;
-    } = { pointer_move_throttle_ms: 30 }
-  ) {
+    };
+    onCreate?: (editor: Editor) => void;
+    plugins?: {
+      export_as_image?:
+        | editor.api.IDocumentImageExportInterfaceProvider
+        | ((
+            editor: Editor
+          ) => editor.api.IDocumentImageExportInterfaceProvider);
+    };
+  }) {
+    this.backend = backend;
     this.mstate = editor.state.init(initialState);
     this.listeners = new Set();
     this.viewport = new domapi.DOMViewportApi(viewportElement);
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
     //
-    this.__pointer_move_throttle_ms = instanceConfig.pointer_move_throttle_ms;
-    instanceConfig.onCreate?.(this);
+
+    if (plugins?.export_as_image) {
+      this._m_exporter =
+        typeof plugins.export_as_image === "function"
+          ? plugins.export_as_image(this)
+          : plugins.export_as_image;
+    }
+
+    this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
+    onCreate?.(this);
   }
 
   private _locked: boolean = false;
@@ -149,10 +185,15 @@ export class Editor
     return this._tid;
   }
 
-  public setSurface(surface: Grida2D) {
+  public bind(surface: Grida2D) {
     assert(this.backend === "canvas", "Editor is not using canvas backend");
     //
     this._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_exporter = new CanvasWasmImageExportInterfaceProvider(
       this,
       surface
     );
@@ -1853,6 +1894,19 @@ export class Editor
     this.__pligin_follow.unfollow();
   }
   // #endregion IFollowPluginActions implementation
+
+  // #region IExportPluginActions implementation
+  async exportNodeAs(
+    node_id: string,
+    format: "PNG" | "JPEG"
+  ): Promise<Uint8Array> {
+    if (!this.exporter) {
+      throw new Error("Exporter is not bound");
+    }
+
+    return this.exporter.exportNodeAsImage(node_id, format);
+  }
+  // #endregion IExportPluginActions implementation
 }
 
 export class NodeProxy<T extends grida.program.nodes.Node> {
