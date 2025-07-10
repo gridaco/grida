@@ -24,6 +24,7 @@ declare namespace createGridaCanvas {
       ): number;
       makeContextCurrent(handle: number): void;
     };
+    HEAPU8: Uint8Array;
     HEAPF32: Float32Array;
     stringToUTF8(str: string, outPtr: number, maxBytesToWrite: number): void;
     lengthBytesUTF8(str: string): number;
@@ -98,6 +99,15 @@ declare namespace createGridaCanvas {
       ptr: number,
       len: number
     ): Ptr;
+
+    _export_node_as(
+      state: GridaCanvasWebGlApplicationPtr,
+      id_ptr: number,
+      id_len: number,
+      fmt_ptr: number,
+      fmt_len: number
+    ): Ptr;
+
     _command(
       state: GridaCanvasWebGlApplicationPtr,
       id: number,

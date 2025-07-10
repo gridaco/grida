@@ -1,15 +1,29 @@
-use skia_safe::EncodedImageFormat;
+pub mod types;
+pub use types::*;
 
 use crate::{
     cache::geometry::GeometryCache,
-    node::schema::{Scene, Size},
+    node::schema::Scene,
     runtime::{
         camera::Camera2D,
         scene::{Backend, Renderer},
     },
 };
 
+use skia_safe::EncodedImageFormat;
+
 type FileData = Vec<u8>;
+
+impl Into<EncodedImageFormat> for ExportAs {
+    fn into(self) -> EncodedImageFormat {
+        match self {
+            ExportAs::PNG(_) => EncodedImageFormat::PNG,
+            ExportAs::JPEG(_) => EncodedImageFormat::JPEG,
+            ExportAs::WEBP(_) => EncodedImageFormat::WEBP,
+            ExportAs::BMP(_) => EncodedImageFormat::BMP,
+        }
+    }
+}
 
 pub enum Exported {
     PNG(FileData),
@@ -25,81 +39,6 @@ impl Exported {
             Exported::JPEG(data) => data,
             Exported::WEBP(data) => data,
             Exported::BMP(data) => data,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum ExportConstraints {
-    Scale(f32),
-    ScaleToWidth(u32),
-    ScaleToHeight(u32),
-}
-
-#[derive(Clone)]
-pub struct ExportAsPNG {
-    pub(crate) constraints: ExportConstraints,
-}
-
-impl Default for ExportAsPNG {
-    fn default() -> Self {
-        Self {
-            constraints: ExportConstraints::Scale(1.0),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ExportAsJPEG {
-    pub(crate) constraints: ExportConstraints,
-}
-
-#[derive(Clone)]
-pub struct ExportAsWEBP {
-    pub(crate) constraints: ExportConstraints,
-}
-
-#[derive(Clone)]
-pub struct ExportAsBMP {
-    pub(crate) constraints: ExportConstraints,
-}
-
-#[derive(Clone)]
-pub enum ExportAs {
-    PNG(ExportAsPNG),
-    JPEG(ExportAsJPEG),
-    WEBP(ExportAsWEBP),
-    BMP(ExportAsBMP),
-}
-
-impl ExportAs {
-    pub fn png() -> Self {
-        Self::PNG(ExportAsPNG::default())
-    }
-
-    pub fn jpeg(constraints: ExportConstraints) -> Self {
-        Self::JPEG(ExportAsJPEG { constraints })
-    }
-}
-
-impl ExportAs {
-    fn get_constraints(&self) -> &ExportConstraints {
-        match self {
-            ExportAs::PNG(config) => &config.constraints,
-            ExportAs::JPEG(config) => &config.constraints,
-            ExportAs::WEBP(config) => &config.constraints,
-            ExportAs::BMP(config) => &config.constraints,
-        }
-    }
-}
-
-impl Into<EncodedImageFormat> for ExportAs {
-    fn into(self) -> EncodedImageFormat {
-        match self {
-            ExportAs::PNG(_) => EncodedImageFormat::PNG,
-            ExportAs::JPEG(_) => EncodedImageFormat::JPEG,
-            ExportAs::WEBP(_) => EncodedImageFormat::WEBP,
-            ExportAs::BMP(_) => EncodedImageFormat::BMP,
         }
     }
 }
@@ -164,6 +103,7 @@ pub fn export_node_as(
 
     r.load_scene(scene.clone());
     let image = r.snapshot();
+    #[allow(deprecated)]
     let Some(data) = image.encode_to_data(format.clone().into()) else {
         return None;
     };

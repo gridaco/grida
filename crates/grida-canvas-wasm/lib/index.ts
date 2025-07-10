@@ -9,6 +9,16 @@ type Rectangle = {
   height: number;
 };
 
+type ExportConstraints = {
+  type: "SCALE" | "WIDTH" | "HEIGHT";
+  value: number;
+};
+
+type ExportAs = {
+  format: "PNG" | "JPEG" | "WEBP" | "BMP";
+  constraints: ExportConstraints;
+};
+
 export default async function init(
   opts?: GridaCanvasInitOptions
 ): Promise<ApplicationFactory> {
@@ -78,11 +88,11 @@ namespace utils {
 }
 
 export class Grida2D {
-  private ptr: number;
+  private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
   constructor(module: createGridaCanvas.GridaCanvasWasmBindings, ptr: number) {
     this.module = module;
-    this.ptr = ptr;
+    this.appptr = ptr;
   }
 
   _alloc_string(txt: string): [number, number] {
@@ -102,7 +112,7 @@ export class Grida2D {
    */
   loadScene(data: string) {
     const [ptr, len] = this._alloc_string(data);
-    this.module._load_scene_json(this.ptr, ptr, len - 1);
+    this.module._load_scene_json(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
   }
 
@@ -110,14 +120,14 @@ export class Grida2D {
    * @deprecated - test use only
    */
   loadDummyScene() {
-    this.module._load_dummy_scene(this.ptr);
+    this.module._load_dummy_scene(this.appptr);
   }
 
   /**
    * @deprecated - test use only
    */
   loadBenchmarkScene(cols: number, rows: number) {
-    this.module._load_benchmark_scene(this.ptr, cols, rows);
+    this.module._load_benchmark_scene(this.appptr, cols, rows);
   }
 
   /**
@@ -125,7 +135,7 @@ export class Grida2D {
    * bind this to requestAnimationFrame loop or similar
    */
   tick() {
-    this.module._tick(this.ptr);
+    this.module._tick(this.appptr);
   }
 
   /**
@@ -134,16 +144,16 @@ export class Grida2D {
    * @param height - The height of the surface.
    */
   resize(width: number, height: number) {
-    this.module._resize_surface(this.ptr, width, height);
+    this.module._resize_surface(this.appptr, width, height);
   }
 
   redraw() {
-    this.module._redraw(this.ptr);
+    this.module._redraw(this.appptr);
   }
 
   setMainCameraTransform(transform: Transform2D) {
     this.module._set_main_camera_transform(
-      this.ptr,
+      this.appptr,
       transform[0][0], // a
       transform[0][1], // c
       transform[0][2], // e
@@ -154,7 +164,7 @@ export class Grida2D {
   }
 
   getNodeIdFromPoint(x: number, y: number): string | null {
-    const ptr = this.module._get_node_id_from_point(this.ptr, x, y);
+    const ptr = this.module._get_node_id_from_point(this.appptr, x, y);
     if (ptr === 0) {
       return null;
     }
@@ -164,7 +174,7 @@ export class Grida2D {
   }
 
   getNodeIdsFromPoint(x: number, y: number): string[] {
-    const ptr = this.module._get_node_ids_from_point(this.ptr, x, y);
+    const ptr = this.module._get_node_ids_from_point(this.appptr, x, y);
     if (ptr === 0) {
       return [];
     }
@@ -175,7 +185,7 @@ export class Grida2D {
 
   getNodeIdsFromEnvelope(envelope: Rectangle): string[] {
     const ptr = this.module._get_node_ids_from_envelope(
-      this.ptr,
+      this.appptr,
       envelope.x,
       envelope.y,
       envelope.width,
@@ -192,7 +202,7 @@ export class Grida2D {
   getNodeAbsoluteBoundingBox(id: string): Rectangle | null {
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
-      this.ptr,
+      this.appptr,
       ptr,
       len - 1
     );
@@ -208,20 +218,53 @@ export class Grida2D {
     return utils.rect_from_vec4(rect);
   }
 
+  exportNodeAs(
+    id: string,
+    format: ExportAs
+  ): {
+    data: Uint8Array;
+  } {
+    const [id_ptr, id_len] = this._alloc_string(id);
+    const [fmt_ptr, fmt_len] = this._alloc_string(JSON.stringify(format));
+    const outptr = this.module._export_node_as(
+      this.appptr,
+      id_ptr,
+      id_len - 1,
+      fmt_ptr,
+      fmt_len - 1
+    );
+    this._free_string(id_ptr, id_len);
+    this._free_string(fmt_ptr, fmt_len);
+
+    if (outptr === 0) {
+      throw new Error("Failed to export node as PNG");
+    }
+
+    const data = this.module.HEAPU8.slice(
+      outptr,
+      outptr + this.module.HEAPU8.length
+    );
+    this.module._deallocate(outptr, data.length);
+
+    return {
+      data: new Uint8Array(data),
+    };
+  }
+
   execCommand(command: "ZoomIn" | "ZoomOut") {
-    this.module._command(this.ptr, ApplicationCommandID[command], 0, 0);
+    this.module._command(this.appptr, ApplicationCommandID[command], 0, 0);
   }
 
   execCommandPan(tx: number, ty: number) {
-    this.module._command(this.ptr, ApplicationCommandID.Pan, tx, ty);
+    this.module._command(this.appptr, ApplicationCommandID.Pan, tx, ty);
   }
 
   execCommandZoomDelta(tz: number) {
-    this.module._command(this.ptr, ApplicationCommandID.ZoomDelta, tz, 0);
+    this.module._command(this.appptr, ApplicationCommandID.ZoomDelta, tz, 0);
   }
 
   pointermove(x: number, y: number) {
-    this.module._pointer_move(this.ptr, x, y);
+    this.module._pointer_move(this.appptr, x, y);
   }
 
   // ====================================================================================================
@@ -229,15 +272,15 @@ export class Grida2D {
   // ====================================================================================================
 
   setDebug(debug: boolean) {
-    this.module._set_debug(this.ptr, debug);
+    this.module._set_debug(this.appptr, debug);
   }
 
   toggleDebug() {
-    this.module._toggle_debug(this.ptr);
+    this.module._toggle_debug(this.appptr);
   }
 
   setVerbose(verbose: boolean) {
-    this.module._set_verbose(this.ptr, verbose);
+    this.module._set_verbose(this.appptr, verbose);
   }
 
   /**
@@ -245,7 +288,7 @@ export class Grida2D {
    * @param show - The visibility of the tiles.
    */
   devtools_rendering_set_show_tiles(show: boolean) {
-    this.module._devtools_rendering_set_show_tiles(this.ptr, show);
+    this.module._devtools_rendering_set_show_tiles(this.appptr, show);
   }
 
   /**
@@ -253,7 +296,7 @@ export class Grida2D {
    * @param show - The visibility of the FPS meter.
    */
   devtools_rendering_set_show_fps_meter(show: boolean) {
-    this.module._devtools_rendering_set_show_fps_meter(this.ptr, show);
+    this.module._devtools_rendering_set_show_fps_meter(this.appptr, show);
   }
 
   /**
@@ -261,7 +304,7 @@ export class Grida2D {
    * @param show - The visibility of the stats.
    */
   devtools_rendering_set_show_stats(show: boolean) {
-    this.module._devtools_rendering_set_show_stats(this.ptr, show);
+    this.module._devtools_rendering_set_show_stats(this.appptr, show);
   }
 
   /**
@@ -269,7 +312,7 @@ export class Grida2D {
    * @param show - The visibility of the hit testing.
    */
   devtools_rendering_set_show_hit_testing(show: boolean) {
-    this.module._devtools_rendering_set_show_hit_testing(this.ptr, show);
+    this.module._devtools_rendering_set_show_hit_testing(this.appptr, show);
   }
 
   /**
@@ -277,6 +320,6 @@ export class Grida2D {
    * @param show - The visibility of the ruler.
    */
   devtools_rendering_set_show_ruler(show: boolean) {
-    this.module._devtools_rendering_set_show_ruler(this.ptr, show);
+    this.module._devtools_rendering_set_show_ruler(this.appptr, show);
   }
 }
