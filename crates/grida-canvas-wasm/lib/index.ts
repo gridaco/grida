@@ -133,9 +133,11 @@ export class Grida2D {
   /**
    * Tick the application clock.
    * bind this to requestAnimationFrame loop or similar
+   * @param time - The time in milliseconds. use performance.now()
+   * @default - performance.now()
    */
-  tick() {
-    this.module._tick(this.appptr);
+  tick(time?: number) {
+    this.module._tick(this.appptr, time ?? performance.now());
   }
 
   /**

@@ -45,7 +45,7 @@ declare namespace createGridaCanvas {
     // ====================================================================================================
     // APPLICATION METHODS
     // ====================================================================================================
-    _tick(state: GridaCanvasWebGlApplicationPtr): void;
+    _tick(state: GridaCanvasWebGlApplicationPtr, time: number): void;
     _resize_surface(
       state: GridaCanvasWebGlApplicationPtr,
       width: number,
