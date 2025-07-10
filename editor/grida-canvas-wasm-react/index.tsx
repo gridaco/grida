@@ -1,5 +1,5 @@
 "use client";
-import React, { useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import init, { Grida2D } from "@grida/canvas-wasm";
 import { useSize } from "@/grida-canvas-react/viewport/size";
 import cmath from "@grida/cmath";
@@ -14,9 +14,11 @@ function CanvasContent({
   debug,
   onMount,
   className,
+  dpr,
 }: {
   width: number;
   height: number;
+  dpr: number;
   data: grida.program.document.Document | null;
   transform: cmath.Transform;
   debug?: boolean;
@@ -35,8 +37,10 @@ function CanvasContent({
         console.log("grida wasm initialized");
         const grida = factory.createWebGLCanvasSurface(canvasel);
         // grida.setDebug(false);
+        grida.setVerbose(true);
 
         rendererRef.current = grida;
+
         onMount?.(grida);
 
         // start the ticker
@@ -87,10 +91,10 @@ function CanvasContent({
 
   useLayoutEffect(() => {
     if (rendererRef.current) {
-      rendererRef.current.resize(width, height);
+      rendererRef.current.resize(width * dpr, height * dpr);
       syncTransform(rendererRef.current, transform, width, height);
     }
-  }, [width, height]);
+  }, [width, height, dpr]);
 
   useLayoutEffect(() => {
     if (rendererRef.current && data) {
@@ -107,11 +111,25 @@ function CanvasContent({
   return (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height}
+      width={width * dpr}
+      height={height * dpr}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+      }}
       className={className}
     />
   );
+}
+
+function useDPR() {
+  const [dpr, setDPR] = useState<number | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setDPR(window.devicePixelRatio);
+    }
+  }, []);
+  return dpr;
 }
 
 export default function Canvas({
@@ -132,10 +150,13 @@ export default function Canvas({
   className?: string;
 }) {
   const size = useSize({ width, height });
+  // const dpr = useDPR();
+  const dpr = 1;
   return (
     <CanvasContent
       width={size.width}
       height={size.height}
+      dpr={dpr ?? 1}
       data={data}
       transform={transform}
       debug={debug}

@@ -22,6 +22,8 @@ build canvas wasm: grida-canvas-wasm-build grida-canvas-wasm-extract grida-canva
 
 serve canvas wasm: grida-canvas-wasm-serve
 
+package canvas wasm: grida-canvas-wasm-package
+
 # Build Docker image
 grida-canvas-wasm-build:
     docker build -f {{docker-grida-canvas-wasm-build-file}} -t {{docker-grida-canvas-wasm-build-image-name}} {{prj-crates-dir}}
