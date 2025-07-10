@@ -43,13 +43,8 @@ function CanvasContent({
 
         onMount?.(grida);
 
-        // start the ticker
-        const loop = () => {
-          grida.tick();
-          requestAnimationFrame(loop);
-        };
-
-        loop();
+        // The emscripten binding already handles automatic ticking via requestAnimationFrame
+        // No need for manual ticker here
       });
     }
   }, []);
