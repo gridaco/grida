@@ -64,7 +64,6 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -439,23 +438,25 @@ function SidebarRight() {
   return (
     <aside className="relative">
       <Sidebar side="right" variant="sidebar" className="hidden sm:block">
-        <header className="flex h-11 px-2 justify-between items-center gap-2">
-          <div className="flex-1">
-            <Presense />
-          </div>
-          <div className="flex items-center">
-            <Zoom
-              className={cn(
-                WorkbenchUI.inputVariants({
-                  variant: "input",
-                  size: "xs",
-                }),
-                "w-auto"
-              )}
-            />
-            <PreviewButton />
-          </div>
-        </header>
+        <SidebarHeader className="p-0">
+          <header className="flex h-11 px-2 justify-between items-center gap-2">
+            <div className="flex-1">
+              <Presense />
+            </div>
+            <div className="flex items-center">
+              <Zoom
+                className={cn(
+                  WorkbenchUI.inputVariants({
+                    variant: "input",
+                    size: "xs",
+                  }),
+                  "w-auto"
+                )}
+              />
+              <PreviewButton />
+            </div>
+          </header>
+        </SidebarHeader>
         <hr />
         {should_show_artboards_list ? (
           <>
@@ -474,7 +475,7 @@ function SidebarRight() {
             </DialogPrimitive.Root>
           </>
         ) : (
-          <>
+          <SidebarContent className="gap-0">
             <Align />
             <hr />
             <Selection
@@ -484,7 +485,7 @@ function SidebarRight() {
                 </div>
               }
             />
-          </>
+          </SidebarContent>
         )}
       </Sidebar>
     </aside>

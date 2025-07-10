@@ -641,7 +641,10 @@ function SelectionMixedProperties({
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
-        <SidebarSection hidden={config.export === "off"} className="pb-4">
+        <SidebarSection
+          hidden={config.export === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -651,10 +654,7 @@ function SelectionMixedProperties({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection
-          hidden={config.developer === "off"}
-          className="border-b pb-4"
-        >
+        <SidebarSection hidden={config.developer === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -1161,7 +1161,10 @@ function SelectedNodeProperties({
         {/* #region selection colors */}
         <SelectionColors />
         {/* #endregion selection colors */}
-        <SidebarSection hidden={config.export === "off"} className="pb-4">
+        <SidebarSection
+          hidden={config.export === "off"}
+          className="border-b pb-4"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -1171,10 +1174,7 @@ function SelectedNodeProperties({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection
-          hidden={config.developer === "off"}
-          className="border-b pb-4"
-        >
+        <SidebarSection hidden={config.developer === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
