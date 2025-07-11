@@ -1,5 +1,3 @@
-import { toPng, toSvg } from "html-to-image";
-import type { Options } from "html-to-image/lib/types";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui-editor/button";
 import { toast } from "sonner";
@@ -41,155 +39,9 @@ import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-
-function exportAsImage(
-  node_id: string,
-  format: "svg" | "png",
-  {
-    filename = `image.${format}`,
-    xpath,
-    htmlToImageOptions = {},
-  }: {
-    filename?: string;
-    xpath?: string;
-    htmlToImageOptions?: Partial<Options>;
-  }
-) {
-  const domnode = document.getElementById(node_id);
-
-  if (!domnode) {
-    toast.error("Node not found");
-    return;
-  }
-
-  // Generate a filter function based on XPath
-  let filter: Options["filter"];
-  if (xpath?.trim()) {
-    try {
-      const xpathResult = document.evaluate(
-        xpath,
-        domnode,
-        null,
-        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-        null
-      );
-
-      const excludedNodes = new Set<HTMLElement>();
-      for (let i = 0; i < xpathResult.snapshotLength; i++) {
-        const node = xpathResult.snapshotItem(i) as HTMLElement;
-        if (node) excludedNodes.add(node);
-      }
-
-      // Exclude nodes that match the XPath query
-      filter = (domNode) => excludedNodes.has(domNode as HTMLElement);
-    } catch (error) {
-      toast.error("Invalid XPath");
-      return;
-    }
-  }
-
-  // Prepare the options for html-to-image
-  const options: Options = {
-    ...htmlToImageOptions,
-    skipFonts: true,
-    preferredFontFormat: "woff2",
-    filter,
-  };
-
-  // Select the correct export function
-  const generateImage = format === "png" ? toPng : toSvg;
-
-  // Export the image
-  const task = generateImage(domnode, options).then((dataUrl) => {
-    // Convert data URL to Blob and trigger download
-    fetch(dataUrl)
-      .then((res) => res.blob())
-      .then((blob) => saveAs(blob, filename));
-  });
-
-  toast.promise(task, {
-    loading: "Exporting...",
-    success: "Exported",
-    error: "Failed to export",
-  });
-}
-
-/**
- * @see https://github.com/gridaco/puppeteer-666
- */
-function checkP666(): Promise<boolean> {
-  return fetch("http://localhost:666", {
-    method: "GET",
-  })
-    .then(() => {
-      return true;
-    })
-    .catch(() => {
-      return false;
-    });
-}
-
-/**
- * @see https://github.com/gridaco/puppeteer-666
- */
-async function exportWithP666(
-  node_id: string,
-  format: "png" | "pdf",
-  {
-    filename = `image.${format}`,
-    // xpath,
-  }: {
-    filename?: string;
-    // xpath?: string;
-  }
-) {
-  const daemonok = await checkP666();
-  if (!daemonok) {
-    console.error(
-      "Daemon is not running on port 666. @see https://github.com/gridaco/puppeteer-666"
-    );
-    toast.error("Daemon is not running on port 666");
-    return;
-  }
-
-  const domnode = document.getElementById(node_id);
-  const html = domnode!.outerHTML;
-
-  let requrl = "";
-  switch (format) {
-    case "pdf":
-      requrl = "http://localhost:666/api/pdf";
-      break;
-    case "png":
-      requrl = "http://localhost:666/api/screenshoot";
-      break;
-  }
-
-  // this will return pdf/png file (if the daemon is running)
-  const task = fetch(requrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      html,
-      options: {
-        width: domnode!.clientWidth,
-        height: domnode!.clientHeight,
-      },
-    }),
-  }).then((res) => {
-    res.blob().then((blob) => {
-      saveAs(blob, filename);
-    });
-  });
-
-  toast.promise(task, {
-    loading: "Exporting...",
-    success: "Exported",
-    error: "Failed to export",
-  });
-}
+import { exportWithP666 } from "@/grida-canvas-plugin-p666";
+import { exportAsImage } from "@/grida-canvas/backends/dom-export";
+import { useCurrentEditor } from "@/grida-canvas-react";
 
 export function ExportNodeControl({
   node_id,
@@ -200,12 +52,51 @@ export function ExportNodeControl({
   name: string;
   disabled?: boolean;
 }) {
+  const editor = useCurrentEditor();
   const advancedExportDialog = useDialogState("advenced-export", {
     refreshkey: true,
   });
 
-  const onExport = (format: "svg" | "png") => {
-    exportAsImage(node_id, format, { filename: `${name}.${format}` });
+  const onExport = async (format: "SVG" | "PNG" | "JPEG") => {
+    if (format === "SVG") {
+      toast.error("SVG export is not supported yet");
+      return;
+    }
+    const task = new Promise<Blob>(async (resolve, reject) => {
+      try {
+        const data = await editor.exportNodeAs(node_id, format);
+        const blob = new Blob([data], {
+          type: `image/${format.toLowerCase()}`,
+        });
+        return resolve(blob);
+
+        // const result = await exportAsImage(node_id, format);
+        // if (!result) {
+        //   throw new Error("Failed to export");
+        // }
+
+        // await fetch(result.url)
+        //   .then((res) => res.blob())
+        //   .then((blob) => {
+        //     resolve(blob);
+        //   })
+        //   .catch((e) => {
+        //     reject(e);
+        //   });
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    toast.promise(task, {
+      loading: "Exporting...",
+      success: "Exported",
+      error: "Failed to export",
+    });
+
+    task.then((blob) => {
+      saveAs(blob, `${name}.${format.toLowerCase()}`);
+    });
   };
 
   return (
@@ -241,10 +132,13 @@ export function ExportNodeControl({
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onExport("png")}>
+          <DropdownMenuItem onSelect={() => onExport("PNG")}>
             PNG
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onExport("svg")}>
+          <DropdownMenuItem onSelect={() => onExport("JPEG")}>
+            JPEG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onExport("SVG")}>
             SVG
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -267,27 +161,44 @@ function AdvancedExportDialog({
   defaultName: string;
 }) {
   const [backend, setBackend] = React.useState<"canvas" | "p666">("canvas");
-  const [format, setFormat] = React.useState<"png" | "svg" | "pdf">("png");
+  const [format, setFormat] = React.useState<"PNG" | "SVG" | "JPEG" | "PDF">(
+    "PNG"
+  );
   const [name, setName] = React.useState<string>(defaultName);
   const [xpath, setXPath] = React.useState<string>("");
 
   const options = {
-    canvas: ["png", "svg"],
-    p666: ["png", "pdf"],
+    canvas: ["PNG", "SVG", "JPEG"],
+    p666: ["PNG", "PDF"],
   };
 
-  const onExport = () => {
+  const onExport = async () => {
     switch (format) {
-      case "png":
-      case "svg":
-        exportAsImage(node_id, format, {
-          filename: name + "." + format,
-          xpath,
-        });
+      case "PNG":
+      case "JPEG":
+      case "SVG":
+        {
+          const result = await exportAsImage(node_id, format);
+          if (!result) {
+            toast.error("Failed to export");
+            return;
+          }
+          await fetch(result.url)
+            .then((res) => res.blob())
+            .then((blob) => {
+              saveAs(blob, `${name}.${format}`);
+            });
+        }
         break;
-      case "pdf":
-        exportWithP666(node_id, format, {
-          filename: name + "." + format,
+      case "PDF":
+        const task = exportWithP666(node_id, format).then((blob) => {
+          saveAs(blob, `${name}.${format}`);
+        });
+
+        toast.promise(task, {
+          loading: "Exporting...",
+          success: "Exported",
+          error: "Failed to export",
         });
         break;
     }
@@ -346,20 +257,20 @@ function AdvancedExportDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  value="png"
-                  disabled={!options[backend].includes("png")}
+                  value="PNG"
+                  disabled={!options[backend].includes("PNG")}
                 >
                   PNG
                 </SelectItem>
                 <SelectItem
-                  value="svg"
-                  disabled={!options[backend].includes("svg")}
+                  value="SVG"
+                  disabled={!options[backend].includes("SVG")}
                 >
                   SVG
                 </SelectItem>
                 <SelectItem
-                  value="pdf"
-                  disabled={!options[backend].includes("pdf")}
+                  value="PDF"
+                  disabled={!options[backend].includes("PDF")}
                 >
                   PDF
                 </SelectItem>

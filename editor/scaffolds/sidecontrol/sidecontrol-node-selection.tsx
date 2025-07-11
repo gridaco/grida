@@ -642,25 +642,25 @@ function SelectionMixedProperties({
         <SelectionColors />
         {/* #endregion selection colors */}
         <SidebarSection
-          hidden={config.developer === "off"}
+          hidden={config.export === "off"}
           className="border-b pb-4"
         >
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <UserDataControl disabled node_id={""} value={undefined} />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-        <SidebarSection hidden={config.export === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <ExportNodeControl disabled node_id={""} name={""} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={config.developer === "off"} className="pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <UserDataControl disabled node_id={""} value={undefined} />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
@@ -1162,9 +1162,19 @@ function SelectedNodeProperties({
         <SelectionColors />
         {/* #endregion selection colors */}
         <SidebarSection
-          hidden={config.developer === "off"}
+          hidden={config.export === "off"}
           className="border-b pb-4"
         >
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <ExportNodeControl node_id={id} name={name} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={config.developer === "off"} className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -1175,16 +1185,6 @@ function SelectedNodeProperties({
                 value={userdata}
                 onValueCommit={actions.userdata}
               />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-        <SidebarSection hidden={config.export === "off"} className="pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <ExportNodeControl node_id={id} name={name} />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>

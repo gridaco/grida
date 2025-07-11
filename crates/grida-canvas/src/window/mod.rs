@@ -16,4 +16,4 @@ pub use application::UnknownTargetApplication;
 #[cfg(not(target_arch = "wasm32"))]
 pub use application_native::NativeApplication;
 
-pub mod application_webgl;
+pub mod application_emscripten;

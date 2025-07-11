@@ -1,4 +1,6 @@
-use skia_safe::{Color, Font, FontMgr, Paint, Point, Rect, Surface};
+use crate::fonts::geistmono::geistmono;
+use crate::sys::clock::Ticker;
+use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct StatsOverlay;
 
@@ -17,20 +19,11 @@ thread_local! {
         p
     };
 
-    static FONT: Font = {
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
-        match typeface {
-            Some(tf) => Font::new(tf, 16.0),
-            None => Font::default(),
-        }
-    };
+    static FONT: Font = geistmono(16.0);
 }
 
 impl StatsOverlay {
-    pub fn draw(surface: &mut Surface, stats: &str) {
+    pub fn draw<T: Ticker>(surface: &mut Surface, stats: &str, clock: &T) {
         if stats.is_empty() {
             return;
         }
@@ -38,16 +31,29 @@ impl StatsOverlay {
         if lines.is_empty() {
             return;
         }
+
+        // Format clock information
+        let clock_info = format!(
+            "clock: {:.1}s elapsed | {:.1}Hz | {:.1}ms delta",
+            clock.elapsed().as_secs_f64(),
+            clock.hz(),
+            clock.delta().as_secs_f64() * 1000.0
+        );
+
+        // Add clock info as the first line
+        let mut all_lines = vec![clock_info.as_str()];
+        all_lines.extend_from_slice(&lines);
+
         let line_height = 20.0;
         let padding = 10.0;
         let width = 600.0;
-        let height = padding * 2.0 + line_height * lines.len() as f32;
+        let height = padding * 2.0 + line_height * all_lines.len() as f32;
         let rect = Rect::from_xywh(10.0, 130.0, width, height);
         let canvas = surface.canvas();
         BG_PAINT.with(|bg| canvas.draw_rect(rect, bg));
         TEXT_PAINT.with(|paint| {
             FONT.with(|font| {
-                for (i, line) in lines.iter().enumerate() {
+                for (i, line) in all_lines.iter().enumerate() {
                     let y = rect.top + padding + line_height * (i as f32 + 1.0);
                     canvas.draw_str(*line, Point::new(rect.left + 14.0, y), font, paint);
                 }

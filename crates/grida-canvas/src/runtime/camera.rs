@@ -46,15 +46,34 @@ impl Camera2D {
     /// Create with identity transform + no zoom (1:1).
     /// Create with identity transform + no zoom (1:1) using default zoom limits.
     pub fn new(viewport_size: Size) -> Self {
-        Self::with_zoom_constraints(
+        Self::new_with_zoom_constraints(
             viewport_size,
             Self::DEFAULT_MIN_ZOOM,
             Self::DEFAULT_MAX_ZOOM,
         )
     }
 
+    pub fn new_from_bounds(bounds: Rectangle) -> Self {
+        let dx = bounds.width / 2.0;
+        let dy = bounds.height / 2.0;
+        let transform = AffineTransform::new(bounds.x + dx, bounds.y + dy, 0.0);
+
+        Camera2D {
+            transform,
+            size: Size {
+                width: bounds.width,
+                height: bounds.height,
+            },
+            min_zoom: f32::MIN,
+            max_zoom: f32::MAX,
+            t: std::time::Instant::now(),
+            prev_transform: transform,
+            prev_quantized_camera_transform: None,
+        }
+    }
+
     /// Create a camera specifying custom zoom limits.
-    pub fn with_zoom_constraints(viewport_size: Size, min_zoom: f32, max_zoom: f32) -> Self {
+    pub fn new_with_zoom_constraints(viewport_size: Size, min_zoom: f32, max_zoom: f32) -> Self {
         let transform = AffineTransform::identity();
         let mut c = Self {
             transform,

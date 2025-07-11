@@ -1,4 +1,5 @@
-use skia_safe::{Color, Font, FontMgr, Paint, Point, Rect, Surface};
+use crate::fonts::geistmono::geistmono;
+use skia_safe::{Color, Font, Paint, Point, Rect, Surface};
 
 pub struct FpsMeter;
 
@@ -17,16 +18,7 @@ thread_local! {
         p
     };
 
-    static FONT: Font = {
-        let font_mgr = FontMgr::new();
-        let typeface = font_mgr
-            .match_family_style("Arial", skia_safe::FontStyle::default())
-            .or_else(|| font_mgr.match_family_style("", skia_safe::FontStyle::default()));
-        match typeface {
-            Some(tf) => Font::new(tf, 36.0),
-            None => Font::default(),
-        }
-    };
+    static FONT: Font = geistmono(36.0);
 }
 
 impl FpsMeter {

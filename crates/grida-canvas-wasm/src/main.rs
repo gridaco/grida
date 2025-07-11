@@ -1,12 +1,9 @@
 #![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 
 use cg::window::application::ApplicationApi;
-#[cfg(target_arch = "wasm32")]
-use cg::window::application_webgl::WebGlApplication;
-use math2::transform::AffineTransform;
+use cg::window::application_emscripten::EmscriptenApplication;
 use std::boxed::Box;
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn allocate(len: usize) -> *mut u8 {
     let mut buf = Vec::<u8>::with_capacity(len);
@@ -15,7 +12,6 @@ pub extern "C" fn allocate(len: usize) -> *mut u8 {
     ptr
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len != 0 {
@@ -23,74 +19,82 @@ pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-#[no_mangle]
-pub extern "C" fn init(width: i32, height: i32) -> Box<WebGlApplication> {
-    Box::new(WebGlApplication::new(width, height))
+pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
+    if ptr.is_null() || len == 0 {
+        return None;
+    }
+
+    let slice = std::slice::from_raw_parts(ptr, len);
+    std::str::from_utf8(slice).ok().map(|s| s.to_string())
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn tick(app: *mut WebGlApplication) {
+pub extern "C" fn init(width: i32, height: i32) -> Box<EmscriptenApplication> {
+    Box::new(EmscriptenApplication::new(width, height))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tick(app: *mut EmscriptenApplication, time: f64) {
     if let Some(app) = app.as_mut() {
-        app.tick();
+        app.tick(time);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn resize_surface(app: *mut WebGlApplication, width: i32, height: i32) {
+pub unsafe extern "C" fn resize_surface(app: *mut EmscriptenApplication, width: i32, height: i32) {
     if let Some(app) = app.as_mut() {
         app.resize(width as u32, height as u32);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn redraw(app: *mut WebGlApplication) {
+pub unsafe extern "C" fn redraw(app: *mut EmscriptenApplication) {
     if let Some(app) = app.as_mut() {
         app.redraw();
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn load_scene_json(app: *mut WebGlApplication, ptr: *const u8, len: usize) {
+pub unsafe extern "C" fn load_scene_json(
+    app: *mut EmscriptenApplication,
+    ptr: *const u8,
+    len: usize,
+) {
     if let Some(app) = app.as_mut() {
-        let slice = std::slice::from_raw_parts(ptr, len);
-        if let Ok(json) = std::str::from_utf8(slice) {
-            app.load_scene_json(json);
+        let json = __str_from_ptr_len(ptr, len);
+        if let Some(json) = json {
+            app.load_scene_json(&json);
         }
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn load_dummy_scene(app: *mut WebGlApplication) {
+pub unsafe extern "C" fn load_dummy_scene(app: *mut EmscriptenApplication) {
     if let Some(app) = app.as_mut() {
         app.load_dummy_scene();
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn load_benchmark_scene(app: *mut WebGlApplication, cols: u32, rows: u32) {
+pub unsafe extern "C" fn load_benchmark_scene(
+    app: *mut EmscriptenApplication,
+    cols: u32,
+    rows: u32,
+) {
     if let Some(app) = app.as_mut() {
         app.load_benchmark_scene(cols, rows);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn pointer_move(app: *mut WebGlApplication, x: f32, y: f32) {
+pub unsafe extern "C" fn pointer_move(app: *mut EmscriptenApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b: f32) {
+pub unsafe extern "C" fn command(app: *mut EmscriptenApplication, id: u32, a: f32, b: f32) {
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
@@ -104,10 +108,9 @@ pub unsafe extern "C" fn command(app: *mut WebGlApplication, id: u32, a: f32, b:
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn set_main_camera_transform(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     a: f32,
     c: f32,
     e: f32,
@@ -115,15 +118,15 @@ pub unsafe extern "C" fn set_main_camera_transform(
     d: f32,
     f: f32,
 ) {
+    use math2::transform::AffineTransform;
     if let Some(app) = app.as_mut() {
         app.set_main_camera_transform(AffineTransform::from_acebdf(a, c, e, b, d, f));
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn get_node_id_from_point(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     x: f32,
     y: f32,
 ) -> *const u8 {
@@ -137,10 +140,9 @@ pub unsafe extern "C" fn get_node_id_from_point(
     std::ptr::null()
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn get_node_ids_from_point(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     x: f32,
     y: f32,
 ) -> *const u8 {
@@ -159,10 +161,9 @@ pub unsafe extern "C" fn get_node_ids_from_point(
     std::ptr::null()
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn get_node_ids_from_envelope(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     x: f32,
     y: f32,
     w: f32,
@@ -184,17 +185,16 @@ pub unsafe extern "C" fn get_node_ids_from_envelope(
     std::ptr::null()
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn get_node_absolute_bounding_box(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     ptr: *const u8,
     len: usize,
 ) -> *const f32 {
     if let Some(app) = app.as_mut() {
-        let slice = std::slice::from_raw_parts(ptr, len);
-        if let Ok(id) = std::str::from_utf8(slice) {
-            if let Some(rect) = app.get_node_absolute_bounding_box(id) {
+        let id = __str_from_ptr_len(ptr, len);
+        if let Some(id) = id {
+            if let Some(rect) = app.get_node_absolute_bounding_box(&id) {
                 let vec4 = rect.to_vec4(); // [f32; 4]
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
                 std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
@@ -205,42 +205,81 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     std::ptr::null()
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_debug(app: *mut WebGlApplication, debug: bool) {
+pub unsafe extern "C" fn export_node_as(
+    app: *mut EmscriptenApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+    fmt_ptr: *const u8,
+    fmt_len: usize,
+) -> *const u8 {
+    use cg::export::ExportAs;
+
+    let (Some(app), Some(id), Some(fmt_str)) = (
+        app.as_mut(),
+        __str_from_ptr_len(id_ptr, id_len),
+        __str_from_ptr_len(fmt_ptr, fmt_len),
+    ) else {
+        return std::ptr::null();
+    };
+
+    let fmt = serde_json::from_str(&fmt_str).unwrap_or(ExportAs::png());
+
+    if let Some(exported) = app.export_node_as(&id, fmt) {
+        let data = exported.data();
+        let data_len = data.len();
+        
+        // Allocate memory for: [4 bytes for length] + [actual data]
+        let total_size = 4 + data_len;
+        let out = allocate(total_size) as *mut u8;
+        
+        // Write the length as first 4 bytes (little-endian u32)
+        let len_bytes = (data_len as u32).to_le_bytes();
+        std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
+        
+        // Write the actual data after the length
+        std::ptr::copy_nonoverlapping(data.as_ptr(), out.add(4), data_len);
+        
+        return out;
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_debug(app: *mut EmscriptenApplication, debug: bool) {
     if let Some(app) = app.as_mut() {
         app.set_debug(debug);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn toggle_debug(app: *mut WebGlApplication) {
+pub unsafe extern "C" fn toggle_debug(app: *mut EmscriptenApplication) {
     if let Some(app) = app.as_mut() {
         app.toggle_debug();
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn set_verbose(app: *mut WebGlApplication, verbose: bool) {
+pub unsafe extern "C" fn set_verbose(app: *mut EmscriptenApplication, verbose: bool) {
     if let Some(app) = app.as_mut() {
         app.set_verbose(verbose);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn devtools_rendering_set_show_ruler(app: *mut WebGlApplication, show: bool) {
+pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
+    app: *mut EmscriptenApplication,
+    show: bool,
+) {
     if let Some(app) = app.as_mut() {
         app.devtools_rendering_set_show_ruler(show);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     enabled: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -248,10 +287,9 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -259,18 +297,19 @@ pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
-pub unsafe extern "C" fn devtools_rendering_set_show_stats(app: *mut WebGlApplication, show: bool) {
+pub unsafe extern "C" fn devtools_rendering_set_show_stats(
+    app: *mut EmscriptenApplication,
+    show: bool,
+) {
     if let Some(app) = app.as_mut() {
         app.devtools_rendering_set_show_stats(show);
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
-    app: *mut WebGlApplication,
+    app: *mut EmscriptenApplication,
     show: bool,
 ) {
     if let Some(app) = app.as_mut() {
@@ -283,3 +322,4 @@ fn main() {}
 
 #[cfg(target_arch = "wasm32")]
 fn main() {}
+

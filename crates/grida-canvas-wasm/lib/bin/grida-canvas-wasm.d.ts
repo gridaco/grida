@@ -14,6 +14,7 @@ type Ptr = number;
 
 declare namespace createGridaCanvas {
   interface GridaCanvasWasmBindings {
+    // #region
     // ====================================================================================================
     // EMSCRIPTEN EXPOSED METHODS
     // ====================================================================================================
@@ -24,13 +25,25 @@ declare namespace createGridaCanvas {
       ): number;
       makeContextCurrent(handle: number): void;
     };
+
+    HEAP8: Int8Array;
+    HEAP16: Int16Array;
+    HEAP32: Int32Array;
     HEAPF32: Float32Array;
+    HEAPF64: Float64Array;
+    HEAPU8: Uint8Array;
+    HEAPU16: Uint16Array;
+    HEAPU32: Uint32Array;
+
+    UTF8ToString(ptr: number, maxBytesToRead?: number): string;
     stringToUTF8(str: string, outPtr: number, maxBytesToWrite: number): void;
     lengthBytesUTF8(str: string): number;
-    UTF8ToString(ptr: number, maxBytesToRead?: number): string;
+
     ___wbindgen_malloc(a0: number, a1: number): number;
     ___wbindgen_free(a0: number, a1: number, a2: number): void;
     ___wbindgen_realloc(a0: number, a1: number, a2: number, a3: number): number;
+
+    // #endregion
 
     // core memory wrapper
     _allocate(len: number): number;
@@ -44,7 +57,7 @@ declare namespace createGridaCanvas {
     // ====================================================================================================
     // APPLICATION METHODS
     // ====================================================================================================
-    _tick(state: GridaCanvasWebGlApplicationPtr): void;
+    _tick(state: GridaCanvasWebGlApplicationPtr, time: number): void;
     _resize_surface(
       state: GridaCanvasWebGlApplicationPtr,
       width: number,
@@ -98,6 +111,15 @@ declare namespace createGridaCanvas {
       ptr: number,
       len: number
     ): Ptr;
+
+    _export_node_as(
+      state: GridaCanvasWebGlApplicationPtr,
+      id_ptr: number,
+      id_len: number,
+      fmt_ptr: number,
+      fmt_len: number
+    ): Ptr;
+
     _command(
       state: GridaCanvasWebGlApplicationPtr,
       id: number,

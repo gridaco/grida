@@ -34,3 +34,26 @@ export class CanvasWasmGeometryQueryInterfaceProvider
     return this.surface.getNodeAbsoluteBoundingBox(node_id);
   }
 }
+
+export class CanvasWasmImageExportInterfaceProvider
+  implements editor.api.IDocumentImageExportInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {}
+
+  async exportNodeAsImage(
+    node_id: string,
+    format: "PNG" | "JPEG"
+  ): Promise<Uint8Array> {
+    const data = await this.surface.exportNodeAs(node_id, {
+      format: format,
+      constraints: {
+        type: "SCALE",
+        value: 1,
+      },
+    });
+    return data.data;
+  }
+}

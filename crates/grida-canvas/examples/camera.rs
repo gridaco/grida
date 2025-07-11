@@ -15,6 +15,7 @@ use glutin_winit::DisplayBuilder;
 use math2::transform::AffineTransform;
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{gpu, Surface};
+use std::sync::Arc;
 use std::{ffi::CString, num::NonZeroU32};
 use winit::{
     event::{Event, WindowEvent},
@@ -234,9 +235,9 @@ fn main() {
     let window_ptr = &window as *const Window;
     let mut renderer = Renderer::new(
         Backend::GL(surface_ptr),
-        Box::new(move || unsafe {
+        Some(std::sync::Arc::new(move || unsafe {
             (*window_ptr).request_redraw();
-        }),
+        })),
         Camera2D::new(Size {
             width: 800.0,
             height: 600.0,

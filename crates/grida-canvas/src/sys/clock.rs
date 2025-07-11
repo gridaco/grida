@@ -1,4 +1,12 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+pub trait Ticker {
+    fn tick(&mut self, time: f64);
+    fn now(&self) -> f64;
+    fn hz(&self) -> f64;
+    fn delta(&self) -> Duration;
+    fn elapsed(&self) -> Duration;
+}
 
 /// A single-threaded clock designed for event loop integration.
 ///
@@ -23,7 +31,9 @@ use std::time::{Duration, Instant};
 ///
 /// // In your event loop (e.g., VSync callback, redraw request, etc.)
 /// loop {
-///     clock.tick(); // Called by external event source
+///     // `now` should come from a high precision clock (e.g. `performance.now`)
+///     let now = performance_now();
+///     clock.tick(now); // Called by external event source
 ///     
 ///     // Use `clock.delta` for frame-rate independent updates
 ///     // update_animation(clock.delta);
@@ -64,9 +74,33 @@ use std::time::{Duration, Instant};
 /// Each `tick()` call performs only a few arithmetic operations, making it suitable
 /// for high-frequency event loops.
 pub struct EventLoopClock {
-    last: Instant,
-    pub delta: Duration,
-    pub elapsed: Duration,
+    last: f64,
+    /// Delta time in milliseconds
+    pub delta: f64,
+    /// Elapsed time in milliseconds
+    pub elapsed: f64,
+}
+
+impl Ticker for EventLoopClock {
+    fn tick(&mut self, time: f64) {
+        self.tick(time);
+    }
+
+    fn now(&self) -> f64 {
+        self.last
+    }
+
+    fn hz(&self) -> f64 {
+        self.hz()
+    }
+
+    fn delta(&self) -> Duration {
+        Duration::from_millis(self.delta as u64)
+    }
+
+    fn elapsed(&self) -> Duration {
+        Duration::from_millis(self.elapsed as u64)
+    }
 }
 
 impl EventLoopClock {
@@ -75,11 +109,10 @@ impl EventLoopClock {
     /// The clock starts with zero delta and elapsed time, ready to be ticked
     /// by the external event loop.
     pub fn new() -> Self {
-        let now = Instant::now();
         Self {
-            last: now,
-            delta: Duration::ZERO,
-            elapsed: Duration::ZERO,
+            last: 0.0,
+            delta: 0.0,
+            elapsed: 0.0,
         }
     }
 
@@ -104,18 +137,23 @@ impl EventLoopClock {
     /// - **Frame drop**: Tick delayed by 50ms → delta = 50ms
     /// - **System pause**: Tick after 1 second pause → delta = 1 second
     /// - **High frequency**: Ticks every ~6.94ms (144Hz) → delta ≈ 6.94ms
-    pub fn tick(&mut self) {
-        let now = Instant::now();
-        self.delta = now - self.last;
+    pub fn tick(&mut self, time_ms: f64) {
+        if self.last == 0.0 {
+            self.delta = 0.0;
+            self.last = time_ms;
+            return;
+        }
+
+        self.delta = time_ms - self.last;
         self.elapsed += self.delta;
-        self.last = now;
+        self.last = time_ms;
     }
 
     /// Returns the current time. (within this clock's context)
     ///
     /// This method returns the last tick time, which can be used for absolute time tracking.
     /// It is useful for scenarios where you need to know the exact time of the last tick.
-    pub fn now(&self) -> Instant {
+    pub fn now(&self) -> f64 {
         self.last
     }
 
@@ -124,8 +162,8 @@ impl EventLoopClock {
     /// This method calculates the frame rate based on the time delta between ticks.
     /// It is useful for monitoring and debugging frame rates in real-time applications.
     pub fn hz(&self) -> f64 {
-        if self.delta.as_secs_f64() > 0.0 {
-            1.0 / self.delta.as_secs_f64()
+        if self.delta > 0.0 {
+            1000.0 / self.delta
         } else {
             0.0
         }

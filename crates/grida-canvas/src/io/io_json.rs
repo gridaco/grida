@@ -77,7 +77,8 @@ pub struct IOContainerNode {
     pub style: Option<HashMap<String, serde_json::Value>>,
     #[serde(
         rename = "cornerRadius",
-        deserialize_with = "deserialize_corner_radius"
+        deserialize_with = "deserialize_corner_radius",
+        default = "default_corner_radius"
     )]
     pub corner_radius: Option<RectangularCornerRadius>,
     pub padding: Option<serde_json::Value>,
@@ -295,7 +296,8 @@ pub struct IORectangleNode {
     pub effects: Option<Vec<serde_json::Value>>,
     #[serde(
         rename = "cornerRadius",
-        deserialize_with = "deserialize_corner_radius"
+        deserialize_with = "deserialize_corner_radius",
+        default = "default_corner_radius"
     )]
     pub corner_radius: Option<RectangularCornerRadius>,
 }
@@ -389,6 +391,10 @@ fn default_font_weight() -> FontWeight {
     FontWeight::new(400)
 }
 
+fn default_corner_radius() -> Option<RectangularCornerRadius> {
+    None
+}
+
 pub fn parse(file: &str) -> Result<IOCanvasFile, serde_json::Error> {
     serde_json::from_str(file)
 }
@@ -430,7 +436,7 @@ impl From<Option<Fill>> for Paint {
                     opacity: 1.0,
                 })
             }
-            Some(_) | None => Paint::Solid(SolidPaint {
+            None => Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 0),
                 opacity: 1.0,
             }),
@@ -717,5 +723,97 @@ mod tests {
             !parsed.document.nodes.is_empty(),
             "nodes should not be empty"
         );
+    }
+
+    #[test]
+    fn corner_radius_optional_and_falls_back_to_zero() {
+        // Test JSON without cornerRadius field
+        let json_without_corner_radius = r#"{
+            "version": "0.0.1-beta.1+20250303",
+            "document": {
+                "bitmaps": {},
+                "properties": {},
+                "nodes": {
+                    "test-rect": {
+                        "type": "rectangle",
+                        "id": "test-rect",
+                        "name": "Test Rectangle",
+                        "left": 0.0,
+                        "top": 0.0,
+                        "width": 100.0,
+                        "height": 100.0,
+                        "fill": {
+                            "type": "solid",
+                            "color": {
+                                "r": 255,
+                                "g": 0,
+                                "b": 0,
+                                "a": 1.0
+                            }
+                        }
+                    }
+                },
+                "scenes": {}
+            }
+        }"#;
+
+        let parsed: IOCanvasFile = serde_json::from_str(json_without_corner_radius)
+            .expect("failed to parse JSON without cornerRadius");
+
+        // Verify that the rectangle node was parsed successfully
+        if let Some(IONode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
+            // corner_radius should be None when not present in JSON
+            assert!(rect_node.corner_radius.is_none());
+        } else {
+            panic!("Expected rectangle node not found");
+        }
+
+        // Test JSON with cornerRadius field
+        let json_with_corner_radius = r#"{
+            "version": "0.0.1-beta.1+20250303",
+            "document": {
+                "bitmaps": {},
+                "properties": {},
+                "nodes": {
+                    "test-rect": {
+                        "type": "rectangle",
+                        "id": "test-rect",
+                        "name": "Test Rectangle",
+                        "left": 0.0,
+                        "top": 0.0,
+                        "width": 100.0,
+                        "height": 100.0,
+                        "cornerRadius": 10.0,
+                        "fill": {
+                            "type": "solid",
+                            "color": {
+                                "r": 255,
+                                "g": 0,
+                                "b": 0,
+                                "a": 1.0
+                            }
+                        }
+                    }
+                },
+                "scenes": {}
+            }
+        }"#;
+
+        let parsed: IOCanvasFile = serde_json::from_str(json_with_corner_radius)
+            .expect("failed to parse JSON with cornerRadius");
+
+        // Verify that the rectangle node was parsed successfully with cornerRadius
+        if let Some(IONode::Rectangle(rect_node)) = parsed.document.nodes.get("test-rect") {
+            // corner_radius should be Some when present in JSON
+            assert!(rect_node.corner_radius.is_some());
+            if let Some(corner_radius) = &rect_node.corner_radius {
+                assert_eq!(corner_radius.tl, 10.0);
+                assert_eq!(corner_radius.tr, 10.0);
+                assert_eq!(corner_radius.bl, 10.0);
+                assert_eq!(corner_radius.br, 10.0);
+            }
+        } else {
+            panic!("Expected rectangle node not found");
+        }
     }
 }

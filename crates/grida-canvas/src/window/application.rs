@@ -1,10 +1,11 @@
 use crate::devtools::{fps_overlay, hit_overlay, ruler_overlay, stats_overlay, tile_overlay};
 use crate::dummy;
+use crate::export::{export_node_as, ExportAs, Exported};
 use crate::node::schema::Scene;
 use crate::resource::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::repository::ResourceRepository;
-use crate::runtime::scene::{Backend, Renderer};
+use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::scheduler;
 use crate::sys::timer::TimerMgr;
@@ -13,8 +14,9 @@ use futures::channel::mpsc;
 use math2::{rect::Rectangle, transform::AffineTransform, vector2::Vector2};
 
 pub trait ApplicationApi {
-    fn tick(&mut self);
+    fn tick(&mut self, time: f64);
     fn resize(&mut self, width: u32, height: u32);
+    fn redraw_requested(&mut self);
 
     /// Handle a [`ApplicationCommand`]. Returns `true` if the caller should exit.
     fn command(&mut self, cmd: ApplicationCommand) -> bool;
@@ -32,6 +34,7 @@ pub trait ApplicationApi {
     /// returns all node ids intersecting with the envelope in canvas space.
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle>;
+    fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
@@ -76,6 +79,7 @@ pub struct UnknownTargetApplication {
     pub(crate) clock: clock::EventLoopClock,
     pub(crate) timer: TimerMgr,
     pub(crate) scheduler: scheduler::FrameScheduler,
+    pub(crate) request_redraw: crate::runtime::scene::RequestRedrawCallback,
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::SurfaceState,
     pub(crate) input: super::input::InputState,
@@ -86,6 +90,7 @@ pub struct UnknownTargetApplication {
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
+    pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -99,8 +104,8 @@ pub struct UnknownTargetApplication {
 impl ApplicationApi for UnknownTargetApplication {
     /// tick the application clock and timer.
     /// this can be called as many times as needed, from different sources (e.g. isolated timer thread, or raf, as the platform requires)
-    fn tick(&mut self) {
-        self.clock.tick();
+    fn tick(&mut self, time: f64) {
+        self.clock.tick(time);
         self.timer.tick(self.clock.now());
     }
 
@@ -116,17 +121,23 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
+    fn redraw_requested(&mut self) {
+        self.redraw();
+    }
+
     fn command(&mut self, cmd: ApplicationCommand) -> bool {
         match cmd {
             ApplicationCommand::ZoomIn => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom * 1.2);
                 self.queue();
+                return true;
             }
             ApplicationCommand::ZoomOut => {
                 let current_zoom = self.renderer.camera.get_zoom();
                 self.renderer.camera.set_zoom(current_zoom / 1.2);
                 self.queue();
+                return true;
             }
             ApplicationCommand::ZoomDelta { delta } => {
                 let current_zoom = self.renderer.camera.get_zoom();
@@ -137,6 +148,7 @@ impl ApplicationApi for UnknownTargetApplication {
                         .set_zoom_at(current_zoom * zoom_factor, self.input.cursor);
                 }
                 self.queue();
+                return true;
             }
             ApplicationCommand::Pan { tx, ty } => {
                 let zoom = self.renderer.camera.get_zoom();
@@ -144,10 +156,30 @@ impl ApplicationApi for UnknownTargetApplication {
                     .camera
                     .translate(tx * (1.0 / zoom), ty * (1.0 / zoom));
                 self.queue();
+                return true;
             }
             ApplicationCommand::ToggleDebugMode => {
                 self.toggle_debug();
                 self.queue();
+                return true;
+            }
+            ApplicationCommand::TryCopyAsPNG => {
+                if let Some(id) = self.devtools_selection.clone() {
+                    let exported = self.export_node_as(&id, ExportAs::png());
+                    if let Some(exported) = exported {
+                        // non wasm32
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            // save to file
+
+                            use std::io::Write;
+                            let path = format!("exported_{}.png", id);
+                            let mut file = std::fs::File::create(path).unwrap();
+                            file.write_all(exported.data()).unwrap();
+                            return true;
+                        }
+                    }
+                }
             }
             ApplicationCommand::None => {}
         }
@@ -195,6 +227,13 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
         self.renderer.get_cache().geometry().get_world_bounds(id)
+    }
+
+    fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            return export_node_as(scene, &self.renderer.get_cache().geometry, id, format);
+        }
+        return None;
     }
 
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
@@ -278,8 +317,10 @@ impl UnknownTargetApplication {
         target_fps: u32,
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
+        request_redraw: Option<crate::runtime::scene::RequestRedrawCallback>,
     ) -> Self {
-        let renderer = Renderer::new(backend, Box::new(|| {}), camera);
+        let request_redraw = request_redraw.unwrap_or_else(|| std::sync::Arc::new(|| {}));
+        let renderer = Renderer::new(backend, Some(request_redraw.clone()), camera);
 
         let debug = false;
 
@@ -287,6 +328,7 @@ impl UnknownTargetApplication {
             debug,
             verbose: false,
             clock: clock::EventLoopClock::new(),
+            request_redraw,
             renderer,
             state,
             input: super::input::InputState::default(),
@@ -298,6 +340,7 @@ impl UnknownTargetApplication {
             scheduler: scheduler::FrameScheduler::new(target_fps).with_max_fps(target_fps),
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
+            devtools_selection: None,
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
@@ -309,10 +352,9 @@ impl UnknownTargetApplication {
         }
     }
 
-    /// Provide the platform-specific callback used to request a redraw from the
-    /// host window.
-    pub fn set_request_redraw(&mut self, cb: crate::runtime::scene::RequestRedrawCallback) {
-        self.renderer.set_request_redraw(cb);
+    /// Request a redraw from the host window using the provided callback.
+    pub fn request_redraw(&self) {
+        (self.request_redraw)();
     }
 
     fn queue(&mut self) {
@@ -339,7 +381,7 @@ impl UnknownTargetApplication {
         // );
     }
 
-    pub(crate) fn process_image_queue(&mut self) {
+    fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
             self.renderer.add_image(msg.src.clone(), &msg.data);
@@ -351,7 +393,7 @@ impl UnknownTargetApplication {
         }
     }
 
-    pub(crate) fn process_font_queue(&mut self) {
+    fn process_font_queue(&mut self) {
         let mut updated = false;
         let mut font_count = 0;
         while let Ok(Some(msg)) = self.font_rx.try_next() {
@@ -409,6 +451,12 @@ impl UnknownTargetApplication {
         crate::hittest::HitTester::new(self.renderer.get_cache())
     }
 
+    fn verbose(&self, msg: &str) {
+        if self.verbose {
+            println!("{}", msg);
+        }
+    }
+
     /// Hit test the current cursor position and store the result.
     pub(crate) fn perform_hit_test(&mut self) {
         if self.hit_test_interval != std::time::Duration::ZERO
@@ -431,19 +479,27 @@ impl UnknownTargetApplication {
         self.process_font_queue();
     }
 
-    pub(crate) fn redraw_requested(&mut self) {
-        self.redraw();
-    }
-
     /// Perform a redraw and print diagnostic information.
     pub(crate) fn redraw(&mut self) {
-        self.tick();
+        let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;
+        self.tick(now);
 
         let __frame_start = std::time::Instant::now();
 
         let stats = match self.renderer.flush() {
-            Some(stats) => stats,
-            None => return,
+            FrameFlushResult::OK(stats) => stats,
+            FrameFlushResult::NoFrame => {
+                self.verbose("redraw/noframe: No frame to flush");
+                return;
+            }
+            FrameFlushResult::NoScene => {
+                self.verbose("redraw/noscene: No scene to flush");
+                return;
+            }
+            FrameFlushResult::NoPending => {
+                self.verbose("redraw/nopending: No pending frame to flush");
+                return;
+            }
         };
 
         let overlay_time = self.draw_and_flush_devtools_overlay();
@@ -471,9 +527,7 @@ impl UnknownTargetApplication {
             stats.draw.tiles_used,
         );
 
-        if self.verbose {
-            println!("{}", stat_string);
-        }
+        self.verbose(&stat_string);
 
         self.last_stats = Some(stat_string);
 
@@ -492,13 +546,14 @@ impl UnknownTargetApplication {
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(surface, s);
+                    stats_overlay::StatsOverlay::draw(surface, s, &self.clock);
                 }
             }
             if self.devtools_rendering_show_hit_overlay {
                 hit_overlay::HitOverlay::draw(
                     surface,
                     self.hit_test_result.as_ref(),
+                    self.devtools_selection.as_ref(),
                     &self.renderer.camera,
                     self.renderer.get_cache(),
                     &self.renderer.fonts,

@@ -340,7 +340,7 @@ function ClipboardColor() {
       >
         <ColorPicker
           color={color}
-          onColorChange={editor.setClipboardColor}
+          onColorChange={editor.setClipboardColor.bind(editor)}
           options={options}
         />
       </PopoverContent>

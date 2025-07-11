@@ -1,10 +1,13 @@
 pub mod cache;
 pub mod devtools;
 pub mod dummy;
+pub mod export;
+pub mod fonts;
 pub mod helpers;
 pub mod hittest;
 pub mod io;
 pub mod node;
+pub mod os;
 pub mod painter;
 pub mod resource;
 pub mod runtime;
