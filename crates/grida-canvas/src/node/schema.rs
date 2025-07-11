@@ -625,6 +625,7 @@ pub struct LineNode {
     pub size: Size, // height is always 0 (ignored)
     pub stroke: Paint,
     pub stroke_width: f32,
+    /// line's stoke align is no-op, it's always center. this value is ignored, but will be affected when line transforms to a path.
     pub stroke_align: StrokeAlign,
     pub stroke_dash_array: Option<Vec<f32>>,
     pub opacity: f32,
