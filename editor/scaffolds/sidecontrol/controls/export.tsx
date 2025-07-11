@@ -112,12 +112,14 @@ export function ExportNodeControl({
 
   return (
     <>
-      <AdvancedExportDialog
-        {...advancedExportDialog.props}
-        key={advancedExportDialog.refreshkey}
-        defaultName={name}
-        node_id={node_id}
-      />
+      {editor.backend === "dom" && (
+        <AdvancedExportDialog
+          {...advancedExportDialog.props}
+          key={advancedExportDialog.refreshkey}
+          defaultName={name}
+          node_id={node_id}
+        />
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -155,11 +157,15 @@ export function ExportNodeControl({
           <DropdownMenuItem onSelect={() => onExport("PDF")}>
             PDF
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
-            <CodeIcon className="size-3.5" />
-            Advanced
-          </DropdownMenuItem>
+          {editor.backend === "dom" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>
+                <CodeIcon className="size-3.5" />
+                Advanced
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>
