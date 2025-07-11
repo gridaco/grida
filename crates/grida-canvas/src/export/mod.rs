@@ -21,6 +21,7 @@ pub enum Exported {
     WEBP(FileData),
     BMP(FileData),
     PDF(FileData),
+    SVG(FileData),
 }
 
 impl Exported {
@@ -31,6 +32,7 @@ impl Exported {
             Exported::WEBP(data) => data,
             Exported::BMP(data) => data,
             Exported::PDF(data) => data,
+            Exported::SVG(data) => data,
         }
     }
 }
@@ -41,6 +43,7 @@ pub trait Exportable {
     fn export_as_webp(self, config: ExportAsWEBP) -> Exported;
     fn export_as_bmp(self, config: ExportAsBMP) -> Exported;
     fn export_as_pdf(self, config: ExportAsPDF) -> Exported;
+    fn export_as_svg(self, config: ExportAsSVG) -> Exported;
 }
 
 pub struct ExportSize {
@@ -101,7 +104,7 @@ pub fn export_node_as(
             ExportAs::SVG(svg_format) => svg_format,
             _ => unreachable!(),
         };
-        return export_node_as_svg(format);
+        return export_node_as_svg(scene, rect, format);
     } else if format.is_format_image() {
         let format: ExportAsImage = format.clone().try_into().unwrap();
         return export_node_as_image(scene, size, rect, format);

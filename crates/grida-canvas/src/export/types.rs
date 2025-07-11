@@ -114,6 +114,10 @@ impl ExportAs {
         Self::PDF(ExportAsPDF {})
     }
 
+    pub fn svg() -> Self {
+        Self::SVG(ExportAsSVG {})
+    }
+
     pub fn is_format_image(&self) -> bool {
         matches!(
             self,

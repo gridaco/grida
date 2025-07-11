@@ -20,6 +20,7 @@ import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
   CanvasWasmPDFExportInterfaceProvider,
+  CanvasWasmSVGExportInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -45,6 +46,21 @@ function resolveNumberChangeValue(
 }
 
 export type EditorContentRenderingBackend = "dom" | "canvas";
+
+type WithEditorInstance<T> = T | ((editor: Editor) => T);
+
+function isWithEditorFunction<T>(
+  value: WithEditorInstance<T>
+): value is (editor: Editor) => T {
+  return typeof value === "function";
+}
+
+function resolveWithEditorInstance<T>(
+  instance: Editor,
+  value: WithEditorInstance<T>
+): T {
+  return isWithEditorFunction(value) ? value(instance) : value;
+}
 
 export class Editor
   implements
@@ -83,6 +99,11 @@ export class Editor
     return this._m_exporter_pdf;
   }
 
+  _m_exporter_svg: editor.api.IDocumentSVGExportInterfaceProvider | null = null;
+  private get exporterSvg() {
+    return this._m_exporter_svg;
+  }
+
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
@@ -109,14 +130,9 @@ export class Editor
     };
     onCreate?: (editor: Editor) => void;
     plugins?: {
-      export_as_image?:
-        | editor.api.IDocumentImageExportInterfaceProvider
-        | ((
-            editor: Editor
-          ) => editor.api.IDocumentImageExportInterfaceProvider);
-      export_as_pdf?:
-        | editor.api.IDocumentPDFExportInterfaceProvider
-        | ((editor: Editor) => editor.api.IDocumentPDFExportInterfaceProvider);
+      export_as_image?: WithEditorInstance<editor.api.IDocumentImageExportInterfaceProvider>;
+      export_as_pdf?: WithEditorInstance<editor.api.IDocumentPDFExportInterfaceProvider>;
+      export_as_svg?: WithEditorInstance<editor.api.IDocumentSVGExportInterfaceProvider>;
     };
   }) {
     this.backend = backend;
@@ -128,17 +144,24 @@ export class Editor
     //
 
     if (plugins?.export_as_image) {
-      this._m_exporter_image =
-        typeof plugins.export_as_image === "function"
-          ? plugins.export_as_image(this)
-          : plugins.export_as_image;
+      this._m_exporter_image = resolveWithEditorInstance(
+        this,
+        plugins.export_as_image
+      );
     }
 
     if (plugins?.export_as_pdf) {
-      this._m_exporter_pdf =
-        typeof plugins.export_as_pdf === "function"
-          ? plugins.export_as_pdf(this)
-          : plugins.export_as_pdf;
+      this._m_exporter_pdf = resolveWithEditorInstance(
+        this,
+        plugins.export_as_pdf
+      );
+    }
+
+    if (plugins?.export_as_svg) {
+      this._m_exporter_svg = resolveWithEditorInstance(
+        this,
+        plugins.export_as_svg
+      );
     }
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
@@ -216,6 +239,11 @@ export class Editor
     );
 
     this._m_exporter_pdf = new CanvasWasmPDFExportInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_exporter_svg = new CanvasWasmSVGExportInterfaceProvider(
       this,
       surface
     );
@@ -1918,10 +1946,13 @@ export class Editor
   // #endregion IFollowPluginActions implementation
 
   // #region IExportPluginActions implementation
+  exportNodeAs(node_id: string, format: "PNG" | "JPEG"): Promise<Uint8Array>;
+  exportNodeAs(node_id: string, format: "PDF"): Promise<Uint8Array>;
+  exportNodeAs(node_id: string, format: "SVG"): Promise<string>;
   async exportNodeAs(
     node_id: string,
-    format: "PNG" | "JPEG" | "PDF"
-  ): Promise<Uint8Array> {
+    format: "PNG" | "JPEG" | "PDF" | "SVG"
+  ): Promise<Uint8Array | string> {
     switch (format) {
       case "PNG":
       case "JPEG": {
@@ -1937,6 +1968,13 @@ export class Editor
         }
 
         return this.exporterPdf.exportNodeAsPDF(node_id);
+      }
+      case "SVG": {
+        if (!this.exporterSvg) {
+          throw new Error("Exporter is not bound");
+        }
+
+        return this.exporterSvg.exportNodeAsSVG(node_id);
       }
     }
 

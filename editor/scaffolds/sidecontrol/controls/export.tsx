@@ -64,32 +64,35 @@ export function ExportNodeControl({
     refreshkey: true,
   });
 
+  const exportHandler = (
+    dataPromise: Promise<Uint8Array | string>,
+    format: "SVG" | "PDF" | "PNG" | "JPEG"
+  ): Promise<Blob> => {
+    return new Promise<Blob>(async (resolve, reject) => {
+      try {
+        const data = await dataPromise;
+        const blob = new Blob([data], { type: mimes[format] });
+        resolve(blob);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
+
   const onExport = async (format: "SVG" | "PDF" | "PNG" | "JPEG") => {
     let task: Promise<Blob>;
 
     switch (format) {
       case "JPEG":
       case "PNG":
-      case "PDF": {
-        task = new Promise<Blob>(async (resolve, reject) => {
-          try {
-            const data = await editor.exportNodeAs(node_id, format);
-            const blob = new Blob([data], {
-              type: mimes[format],
-            });
-            return resolve(blob);
-          } catch (e) {
-            reject(e);
-          }
-        });
-
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
         break;
-      }
-
-      case "SVG": {
-        toast.error("SVG export is not supported yet");
-        return;
-      }
+      case "PDF":
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
+        break;
+      case "SVG":
+        task = exportHandler(editor.exportNodeAs(node_id, format), format);
+        break;
     }
 
     if (task) {
