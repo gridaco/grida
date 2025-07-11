@@ -188,7 +188,23 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
 
         match handle_window_event(&event, &self.modifiers) {
             cmd => {
-                self.app.command(cmd);
+                let ok = self.app.command(cmd.clone());
+
+                if ok {
+                    match cmd.clone() {
+                        ApplicationCommand::TryCopyAsPNG => {
+                            {
+                                // save to file
+                                use std::io::Write;
+                                let path = format!("clipboard.png");
+                                let mut file = std::fs::File::create(path).unwrap();
+                                file.write_all(self.app.clipboard.data.as_ref().unwrap())
+                                    .unwrap();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
