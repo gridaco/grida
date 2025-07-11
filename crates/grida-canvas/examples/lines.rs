@@ -51,7 +51,7 @@ async fn demo_lines() -> Scene {
         opacity: 1.0,
     });
     line_outside.stroke_width = 8.0;
-    line_outside.stroke_align = StrokeAlign::Outside;
+    line_outside._data_stroke_align = StrokeAlign::Outside;
     ids.push(line_outside.base.id.clone());
     repo.insert(Node::Line(line_outside));
 

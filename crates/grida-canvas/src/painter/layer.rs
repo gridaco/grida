@@ -376,7 +376,7 @@ impl LayerList {
                         Some(stroke_geometry(
                             &shape.to_path(),
                             n.stroke_width,
-                            n.stroke_align,
+                            n.get_stroke_align(),
                             n.stroke_dash_array.as_ref(),
                         ))
                     } else {

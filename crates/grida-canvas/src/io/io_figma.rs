@@ -1110,7 +1110,7 @@ impl FigmaConverter {
                 .convert_strokes(Some(&origin.strokes))
                 .unwrap_or(TRANSPARENT),
             stroke_width: origin.stroke_weight.unwrap_or(1.0) as f32,
-            stroke_align: Self::convert_stroke_align(
+            _data_stroke_align: Self::convert_stroke_align(
                 origin
                     .stroke_align
                     .as_ref()

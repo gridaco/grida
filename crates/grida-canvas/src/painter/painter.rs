@@ -451,7 +451,7 @@ impl<'a> Painter<'a> {
                     let stroke_path = stroke_geometry(
                         &shape.to_path(),
                         node.stroke_width,
-                        node.stroke_align,
+                        node.get_stroke_align(),
                         node.stroke_dash_array.as_ref(),
                     );
                     self.canvas.draw_path(&stroke_path, &paint);
