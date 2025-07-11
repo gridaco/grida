@@ -57,3 +57,19 @@ export class CanvasWasmImageExportInterfaceProvider
     return data.data;
   }
 }
+
+export class CanvasWasmPDFExportInterfaceProvider
+  implements editor.api.IDocumentPDFExportInterfaceProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Grida2D
+  ) {}
+
+  async exportNodeAsPDF(node_id: string): Promise<Uint8Array> {
+    const data = await this.surface.exportNodeAs(node_id, {
+      format: "PDF",
+    });
+    return data.data;
+  }
+}

@@ -4,7 +4,8 @@ pub mod types;
 pub use types::*;
 
 use crate::{
-    cache::geometry::GeometryCache, export::export_as_image::export_node_as_image,
+    cache::geometry::GeometryCache,
+    export::{export_as_image::export_node_as_image, export_as_pdf::export_node_as_pdf},
     node::schema::Scene,
 };
 
@@ -86,9 +87,11 @@ pub fn export_node_as(
     let size = size.apply_constraints(constraints);
 
     if format.is_pdf_format() {
-        // PDF export is not implemented yet
-        // TODO: Implement PDF export logic
-        return None;
+        let format: ExportAsPDF = match format {
+            ExportAs::PDF(pdf_format) => pdf_format,
+            _ => unreachable!(),
+        };
+        return export_node_as_pdf(scene, rect, format);
     } else if format.is_image_format() {
         let format: ExportAsImage = format.clone().try_into().unwrap();
         return export_node_as_image(scene, size, rect, format);

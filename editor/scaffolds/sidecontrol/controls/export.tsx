@@ -43,6 +43,13 @@ import { exportWithP666 } from "@/grida-canvas-plugin-p666";
 import { exportAsImage } from "@/grida-canvas/backends/dom-export";
 import { useCurrentEditor } from "@/grida-canvas-react";
 
+const mimes = {
+  PNG: "image/png",
+  JPEG: "image/jpeg",
+  PDF: "application/pdf",
+  SVG: "image/svg+xml",
+} as const;
+
 export function ExportNodeControl({
   node_id,
   name,
@@ -57,46 +64,47 @@ export function ExportNodeControl({
     refreshkey: true,
   });
 
-  const onExport = async (format: "SVG" | "PNG" | "JPEG") => {
-    if (format === "SVG") {
-      toast.error("SVG export is not supported yet");
-      return;
-    }
-    const task = new Promise<Blob>(async (resolve, reject) => {
-      try {
-        const data = await editor.exportNodeAs(node_id, format);
-        const blob = new Blob([data], {
-          type: `image/${format.toLowerCase()}`,
+  const onExport = async (format: "SVG" | "PDF" | "PNG" | "JPEG") => {
+    let task: Promise<Blob>;
+
+    switch (format) {
+      case "JPEG":
+      case "PNG":
+      case "PDF": {
+        task = new Promise<Blob>(async (resolve, reject) => {
+          try {
+            const data = await editor.exportNodeAs(node_id, format);
+            const blob = new Blob([data], {
+              type: mimes[format],
+            });
+            return resolve(blob);
+          } catch (e) {
+            reject(e);
+          }
         });
-        return resolve(blob);
 
-        // const result = await exportAsImage(node_id, format);
-        // if (!result) {
-        //   throw new Error("Failed to export");
-        // }
-
-        // await fetch(result.url)
-        //   .then((res) => res.blob())
-        //   .then((blob) => {
-        //     resolve(blob);
-        //   })
-        //   .catch((e) => {
-        //     reject(e);
-        //   });
-      } catch (e) {
-        reject(e);
+        break;
       }
-    });
 
-    toast.promise(task, {
-      loading: "Exporting...",
-      success: "Exported",
-      error: "Failed to export",
-    });
+      case "SVG": {
+        toast.error("SVG export is not supported yet");
+        return;
+      }
+    }
 
-    task.then((blob) => {
-      saveAs(blob, `${name}.${format.toLowerCase()}`);
-    });
+    if (task) {
+      toast.promise(task, {
+        loading: "Exporting...",
+        success: "Exported",
+        error: "Failed to export",
+      });
+
+      task.then((blob) => {
+        saveAs(blob, `${name}.${format.toLowerCase()}`);
+      });
+    } else {
+      toast.error("Export is not supported yet");
+    }
   };
 
   return (
@@ -140,6 +148,9 @@ export function ExportNodeControl({
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onExport("SVG")}>
             SVG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onExport("PDF")}>
+            PDF
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={advancedExportDialog.openDialog}>

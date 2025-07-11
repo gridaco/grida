@@ -19,6 +19,7 @@ import type { Grida2D } from "@grida/canvas-wasm";
 import {
   CanvasWasmGeometryQueryInterfaceProvider,
   CanvasWasmImageExportInterfaceProvider,
+  CanvasWasmPDFExportInterfaceProvider,
 } from "./backends/wasm";
 
 function resolveNumberChangeValue(
@@ -71,9 +72,15 @@ export class Editor
     return this._m_geometry;
   }
 
-  _m_exporter: editor.api.IDocumentImageExportInterfaceProvider | null = null;
-  get exporter() {
-    return this._m_exporter;
+  _m_exporter_image: editor.api.IDocumentImageExportInterfaceProvider | null =
+    null;
+  private get exporterImage() {
+    return this._m_exporter_image;
+  }
+
+  _m_exporter_pdf: editor.api.IDocumentPDFExportInterfaceProvider | null = null;
+  private get exporterPdf() {
+    return this._m_exporter_pdf;
   }
 
   get state(): Readonly<editor.state.IEditorState> {
@@ -107,6 +114,9 @@ export class Editor
         | ((
             editor: Editor
           ) => editor.api.IDocumentImageExportInterfaceProvider);
+      export_as_pdf?:
+        | editor.api.IDocumentPDFExportInterfaceProvider
+        | ((editor: Editor) => editor.api.IDocumentPDFExportInterfaceProvider);
     };
   }) {
     this.backend = backend;
@@ -118,10 +128,17 @@ export class Editor
     //
 
     if (plugins?.export_as_image) {
-      this._m_exporter =
+      this._m_exporter_image =
         typeof plugins.export_as_image === "function"
           ? plugins.export_as_image(this)
           : plugins.export_as_image;
+    }
+
+    if (plugins?.export_as_pdf) {
+      this._m_exporter_pdf =
+        typeof plugins.export_as_pdf === "function"
+          ? plugins.export_as_pdf(this)
+          : plugins.export_as_pdf;
     }
 
     this.__pointer_move_throttle_ms = config.pointer_move_throttle_ms;
@@ -193,7 +210,12 @@ export class Editor
       surface
     );
 
-    this._m_exporter = new CanvasWasmImageExportInterfaceProvider(
+    this._m_exporter_image = new CanvasWasmImageExportInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_exporter_pdf = new CanvasWasmPDFExportInterfaceProvider(
       this,
       surface
     );
@@ -1898,13 +1920,27 @@ export class Editor
   // #region IExportPluginActions implementation
   async exportNodeAs(
     node_id: string,
-    format: "PNG" | "JPEG"
+    format: "PNG" | "JPEG" | "PDF"
   ): Promise<Uint8Array> {
-    if (!this.exporter) {
-      throw new Error("Exporter is not bound");
+    switch (format) {
+      case "PNG":
+      case "JPEG": {
+        if (!this.exporterImage) {
+          throw new Error("Exporter is not bound");
+        }
+
+        return this.exporterImage.exportNodeAsImage(node_id, format);
+      }
+      case "PDF": {
+        if (!this.exporterPdf) {
+          throw new Error("Exporter is not bound");
+        }
+
+        return this.exporterPdf.exportNodeAsPDF(node_id);
+      }
     }
 
-    return this.exporter.exportNodeAsImage(node_id, format);
+    throw new Error("Not implemented");
   }
   // #endregion IExportPluginActions implementation
 }
