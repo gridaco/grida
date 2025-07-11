@@ -9,7 +9,7 @@ use skia_safe::{Font, FontMgr};
 /// build time.
 static ALLERTA_REGULAR: &[u8] = include_bytes!("../../fonts/Allerta/Allerta-Regular.ttf");
 
-pub fn alletra(size: f32) -> Font {
+pub fn allerta(size: f32) -> Font {
     let font_mgr = FontMgr::new();
 
     // Create a typeface from the embedded font data. This always
