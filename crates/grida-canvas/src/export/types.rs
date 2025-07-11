@@ -47,6 +47,11 @@ pub struct ExportAsPDF {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct ExportAsSVG {
+    // svg export does not support constraints
+}
+
+#[derive(Clone, Deserialize)]
 #[serde(tag = "format")]
 pub enum ExportAs {
     #[serde(rename = "PNG")]
@@ -59,6 +64,8 @@ pub enum ExportAs {
     BMP(ExportAsBMP),
     #[serde(rename = "PDF")]
     PDF(ExportAsPDF),
+    #[serde(rename = "SVG")]
+    SVG(ExportAsSVG),
 }
 
 #[derive(Clone)]
@@ -107,15 +114,19 @@ impl ExportAs {
         Self::PDF(ExportAsPDF {})
     }
 
-    pub fn is_image_format(&self) -> bool {
+    pub fn is_format_image(&self) -> bool {
         matches!(
             self,
             ExportAs::PNG(_) | ExportAs::JPEG(_) | ExportAs::WEBP(_) | ExportAs::BMP(_)
         )
     }
 
-    pub fn is_pdf_format(&self) -> bool {
+    pub fn is_format_pdf(&self) -> bool {
         matches!(self, ExportAs::PDF(_))
+    }
+
+    pub fn is_format_svg(&self) -> bool {
+        matches!(self, ExportAs::SVG(_))
     }
 }
 
@@ -127,6 +138,7 @@ impl ExportAs {
             ExportAs::WEBP(config) => &config.constraints,
             ExportAs::BMP(config) => &config.constraints,
             ExportAs::PDF(_) => &ExportConstraints::None,
+            ExportAs::SVG(_) => &ExportConstraints::None,
         }
     }
 }

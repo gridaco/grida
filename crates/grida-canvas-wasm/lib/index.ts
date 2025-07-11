@@ -14,8 +14,9 @@ type ExportConstraints = {
   value: number;
 };
 
-type ExportAs = ExportAsImage | ExportAsPDF;
+type ExportAs = ExportAsImage | ExportAsPDF | ExportAsSVG;
 type ExportAsPDF = { format: "PDF" };
+type ExportAsSVG = { format: "SVG" };
 type ExportAsImage = {
   format: "PNG" | "JPEG" | "WEBP" | "BMP";
   constraints: ExportConstraints;

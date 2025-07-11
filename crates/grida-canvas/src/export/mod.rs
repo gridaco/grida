@@ -1,11 +1,15 @@
 pub mod export_as_image;
 pub mod export_as_pdf;
+pub mod export_as_svg;
 pub mod types;
 pub use types::*;
 
 use crate::{
     cache::geometry::GeometryCache,
-    export::{export_as_image::export_node_as_image, export_as_pdf::export_node_as_pdf},
+    export::{
+        export_as_image::export_node_as_image, export_as_pdf::export_node_as_pdf,
+        export_as_svg::export_node_as_svg,
+    },
     node::schema::Scene,
 };
 
@@ -86,13 +90,19 @@ pub fn export_node_as(
     let size = ExportSize { width, height };
     let size = size.apply_constraints(constraints);
 
-    if format.is_pdf_format() {
+    if format.is_format_pdf() {
         let format: ExportAsPDF = match format {
             ExportAs::PDF(pdf_format) => pdf_format,
             _ => unreachable!(),
         };
         return export_node_as_pdf(scene, rect, format);
-    } else if format.is_image_format() {
+    } else if format.is_format_svg() {
+        let format: ExportAsSVG = match format {
+            ExportAs::SVG(svg_format) => svg_format,
+            _ => unreachable!(),
+        };
+        return export_node_as_svg(format);
+    } else if format.is_format_image() {
         let format: ExportAsImage = format.clone().try_into().unwrap();
         return export_node_as_image(scene, size, rect, format);
     } else {

@@ -13,7 +13,7 @@ use std::io::Cursor;
 pub fn export_node_as_pdf(
     scene: &Scene,
     rect: Rectangle,
-    _format: ExportAsPDF,
+    _options: ExportAsPDF,
 ) -> Option<Exported> {
     // Create a PDF document in memory
     let mut cursor = Cursor::new(Vec::new());
