@@ -46,10 +46,14 @@ pub fn export_node_as_image(
     };
 
     // 2. export node
-    match format {
+    let exported = match format {
         ExportAsImage::PNG(_) => Some(Exported::PNG(data.to_vec())),
         ExportAsImage::JPEG(_) => Some(Exported::JPEG(data.to_vec())),
         ExportAsImage::WEBP(_) => Some(Exported::WEBP(data.to_vec())),
         ExportAsImage::BMP(_) => Some(Exported::BMP(data.to_vec())),
-    }
+    };
+
+    r.free();
+
+    exported
 }
