@@ -215,6 +215,12 @@ impl<'a> Painter<'a> {
         }
     }
 
+    fn draw_fills(&self, shape: &PainterShape, fills: &Vec<Paint>) {
+        for fill in fills {
+            self.draw_fill(shape, fill);
+        }
+    }
+
     /// Draw fill for a shape using given paint.
     fn draw_fill(&self, shape: &PainterShape, fill: &Paint) {
         let canvas = self.canvas;
@@ -376,7 +382,7 @@ impl<'a> Painter<'a> {
             self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
+                        self.draw_fills(&shape, &node.fills);
                         self.draw_stroke(
                             &shape,
                             &node.stroke,
@@ -428,7 +434,7 @@ impl<'a> Painter<'a> {
             self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
+                        self.draw_fills(&shape, &node.fills);
                         self.draw_stroke(
                             &shape,
                             &node.stroke,
@@ -492,7 +498,7 @@ impl<'a> Painter<'a> {
             self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                 self.with_opacity(node.opacity, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
+                        self.draw_fills(&shape, &node.fills);
                         self.draw_stroke(
                             &shape,
                             &node.stroke,
@@ -606,7 +612,7 @@ impl<'a> Painter<'a> {
                 // Draw effects first (if any) - these won't be clipped
                 self.draw_shape_with_effect(node.effect.as_ref(), &shape, || {
                     self.with_blendmode(node.blend_mode, || {
-                        self.draw_fill(&shape, &node.fill);
+                        self.draw_fills(&shape, &node.fills);
                         if let Some(stroke) = &node.stroke {
                             self.draw_stroke(
                                 &shape,
@@ -802,6 +808,7 @@ impl<'a> Painter<'a> {
                                     width: shape.rect.width(),
                                     height: shape.rect.height(),
                                 },
+                                // TODO: support multiple fills for text
                                 match text_layer.base.fills.first() {
                                     Some(f) => f,
                                     None => return,

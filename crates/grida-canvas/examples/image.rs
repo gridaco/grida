@@ -28,12 +28,12 @@ async fn demo_image() -> Scene {
     rect1.base.name = "ImageFillRect".to_string();
     rect1.transform = AffineTransform::identity();
     rect1.size = image8ksize.clone();
-    rect1.fill = Paint::Image(ImagePaint {
+    rect1.set_fill(Paint::Image(ImagePaint {
         hash: image8k.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
+    }));
     rect1.stroke = Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,

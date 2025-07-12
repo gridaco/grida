@@ -467,7 +467,7 @@ impl From<IOContainerNode> for ContainerNode {
             corner_radius: node
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
-            fill: node.fill.into(),
+            fills: vec![node.fill.into()],
             stroke: None,
             stroke_width: 0.0,
             stroke_align: StrokeAlign::Inside,
@@ -537,7 +537,7 @@ impl From<IOEllipseNode> for Node {
                 width: node.width,
                 height: node.height,
             },
-            fill: node.fill.into(),
+            fills: vec![node.fill.into()],
             stroke: Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
                 opacity: 1.0,
@@ -570,7 +570,7 @@ impl From<IORectangleNode> for Node {
             corner_radius: node
                 .corner_radius
                 .unwrap_or(RectangularCornerRadius::zero()),
-            fill: node.fill.into(),
+            fills: vec![node.fill.into()],
             stroke: Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
                 opacity: 1.0,

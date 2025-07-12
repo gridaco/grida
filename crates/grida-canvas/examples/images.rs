@@ -25,12 +25,12 @@ async fn demo_images() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    rect1.fill = Paint::Image(ImagePaint {
+    rect1.set_fill(Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
+    }));
     rect1.stroke = Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
@@ -45,12 +45,12 @@ async fn demo_images() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    rect2.fill = Paint::Image(ImagePaint {
+    rect2.set_fill(Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
         transform: AffineTransform::identity(),
         fit: BoxFit::Cover,
-    });
+    }));
     rect2.stroke = Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
@@ -68,10 +68,10 @@ async fn demo_images() -> Scene {
         height: 200.0,
     };
     rect3.corner_radius = RectangularCornerRadius::all(40.0);
-    rect3.fill = Paint::Solid(SolidPaint {
+    rect3.set_fill(Paint::Solid(SolidPaint {
         color: Color(240, 240, 240, 255),
         opacity: 1.0,
-    });
+    }));
     rect3.stroke = Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
@@ -88,7 +88,7 @@ async fn demo_images() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    rect4.fill = Paint::Image(ImagePaint {
+    rect4.set_fill(Paint::Image(ImagePaint {
         hash: image_url.clone(),
         opacity: 1.0,
         // Rotate the image 45 degrees with BoxFit::None to showcase the paint transform
@@ -96,7 +96,7 @@ async fn demo_images() -> Scene {
             matrix: [[0.7071, -0.7071, 100.0], [0.7071, 0.7071, 0.0]],
         },
         fit: BoxFit::None,
-    });
+    }));
 
     let mut repository = NodeRepository::new();
 

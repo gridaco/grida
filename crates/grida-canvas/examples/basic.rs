@@ -40,10 +40,10 @@ async fn demo_basic() -> Scene {
         height: 100.0,
     };
     rect_node.corner_radius = RectangularCornerRadius::all(10.0);
-    rect_node.fill = Paint::Solid(SolidPaint {
+    rect_node.set_fill(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red fill
         opacity: 1.0,
-    });
+    }));
     rect_node.stroke_width = 2.0;
     rect_node.effect = Some(FilterEffect::DropShadow(FeDropShadow {
         dx: 4.0,
@@ -61,7 +61,7 @@ async fn demo_basic() -> Scene {
         width: 200.0,
         height: 200.0,
     };
-    ellipse_node.fill = Paint::RadialGradient(RadialGradientPaint {
+    ellipse_node.fills = vec![Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -78,7 +78,7 @@ async fn demo_basic() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     ellipse_node.stroke_width = 6.0;
 
     // Create a test polygon node (pentagon)
@@ -97,10 +97,10 @@ async fn demo_basic() -> Scene {
     polygon_node.blend_mode = BlendMode::Screen;
     polygon_node.transform = AffineTransform::new(800.0, 50.0, 0.0);
     polygon_node.points = pentagon_points;
-    polygon_node.fill = Paint::Solid(SolidPaint {
+    polygon_node.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 200, 0, 255), // Orange fill
         opacity: 1.0,
-    });
+    })];
     polygon_node.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255), // Black stroke
         opacity: 1.0,
@@ -117,10 +117,10 @@ async fn demo_basic() -> Scene {
         height: 200.0,
     };
     regular_polygon_node.point_count = 6; // hexagon
-    regular_polygon_node.fill = Paint::Solid(SolidPaint {
+    regular_polygon_node.fills = vec![Paint::Solid(SolidPaint {
         color: Color(0, 200, 255, 255), // Cyan fill
         opacity: 1.0,
-    });
+    })];
     regular_polygon_node.stroke_width = 4.0;
     regular_polygon_node.opacity = 0.5;
 

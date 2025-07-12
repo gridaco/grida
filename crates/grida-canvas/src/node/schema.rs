@@ -181,6 +181,15 @@ pub struct GroupNode {
     pub blend_mode: BlendMode,
 }
 
+pub trait FillsMixin {
+    fn set_fill(&mut self, fill: Paint);
+    fn set_fills(&mut self, fills: Vec<Paint>);
+}
+
+pub trait GeometryMixin {
+    fn rect(&self) -> Rectangle;
+}
+
 #[derive(Debug, Clone)]
 pub struct ContainerNode {
     pub base: BaseNode,
@@ -188,7 +197,7 @@ pub struct ContainerNode {
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
     pub children: Vec<NodeId>,
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
     pub stroke: Option<Paint>,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
@@ -199,8 +208,18 @@ pub struct ContainerNode {
     pub clip: bool,
 }
 
-impl ContainerNode {
-    pub fn rect(&self) -> Rectangle {
+impl FillsMixin for ContainerNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl GeometryMixin for ContainerNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -216,7 +235,7 @@ pub struct RectangleNode {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
     pub stroke: Paint,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
@@ -226,8 +245,18 @@ pub struct RectangleNode {
     pub effect: Option<FilterEffect>,
 }
 
-impl RectangleNode {
-    pub fn rect(&self) -> Rectangle {
+impl FillsMixin for RectangleNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl GeometryMixin for RectangleNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -263,6 +292,7 @@ pub struct ImageNode {
     pub transform: AffineTransform,
     pub size: Size,
     pub corner_radius: RectangularCornerRadius,
+    #[deprecated(note = "use hash instead")]
     pub fill: Paint,
     pub stroke: Paint,
     pub stroke_width: f32,
@@ -274,8 +304,8 @@ pub struct ImageNode {
     pub hash: String,
 }
 
-impl ImageNode {
-    pub fn rect(&self) -> Rectangle {
+impl GeometryMixin for ImageNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -294,7 +324,7 @@ pub struct EllipseNode {
     pub base: BaseNode,
     pub transform: AffineTransform,
     pub size: Size,
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
     pub stroke: Paint,
     pub stroke_width: f32,
     pub stroke_align: StrokeAlign,
@@ -304,8 +334,18 @@ pub struct EllipseNode {
     pub effect: Option<FilterEffect>,
 }
 
-impl EllipseNode {
-    pub fn rect(&self) -> Rectangle {
+impl FillsMixin for EllipseNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl GeometryMixin for EllipseNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -373,7 +413,7 @@ pub struct PolygonNode {
     pub corner_radius: f32,
 
     /// The paint used to fill the interior of the polygon.
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
     pub stroke: Paint,
@@ -387,6 +427,16 @@ pub struct PolygonNode {
     pub blend_mode: BlendMode,
     pub effect: Option<FilterEffect>,
     pub stroke_dash_array: Option<Vec<f32>>,
+}
+
+impl FillsMixin for PolygonNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
 }
 
 impl ToSkPath for PolygonNode {
@@ -425,7 +475,7 @@ pub struct RegularPolygonNode {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
     pub stroke: Paint,
@@ -440,8 +490,18 @@ pub struct RegularPolygonNode {
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
-impl RegularPolygonNode {
-    pub fn rect(&self) -> Rectangle {
+impl FillsMixin for RegularPolygonNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl GeometryMixin for RegularPolygonNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -449,7 +509,9 @@ impl RegularPolygonNode {
             height: self.size.height,
         }
     }
+}
 
+impl RegularPolygonNode {
     pub fn to_polygon(&self) -> PolygonNode {
         let w = self.size.width;
         let h = self.size.height;
@@ -477,7 +539,7 @@ impl RegularPolygonNode {
             transform: self.transform,
             points,
             corner_radius: self.corner_radius,
-            fill: self.fill.clone(),
+            fills: self.fills.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
             stroke_align: self.stroke_align,
@@ -524,7 +586,7 @@ pub struct RegularStarPolygonNode {
     pub corner_radius: f32,
 
     /// Fill paint (solid or gradient)
-    pub fill: Paint,
+    pub fills: Vec<Paint>,
 
     /// The stroke paint used to outline the polygon.
     pub stroke: Paint,
@@ -539,8 +601,18 @@ pub struct RegularStarPolygonNode {
     pub stroke_dash_array: Option<Vec<f32>>,
 }
 
-impl RegularStarPolygonNode {
-    pub fn rect(&self) -> Rectangle {
+impl FillsMixin for RegularStarPolygonNode {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = vec![fill];
+    }
+
+    fn set_fills(&mut self, fills: Vec<Paint>) {
+        self.fills = fills;
+    }
+}
+
+impl GeometryMixin for RegularStarPolygonNode {
+    fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
             y: 0.0,
@@ -548,7 +620,9 @@ impl RegularStarPolygonNode {
             height: self.size.height,
         }
     }
+}
 
+impl RegularStarPolygonNode {
     pub fn to_polygon(&self) -> PolygonNode {
         let w = self.size.width;
         let h = self.size.height;
@@ -573,7 +647,7 @@ impl RegularStarPolygonNode {
             transform: self.transform,
             points,
             corner_radius: self.corner_radius,
-            fill: self.fill.clone(),
+            fills: self.fills.clone(),
             stroke: self.stroke.clone(),
             stroke_width: self.stroke_width,
             stroke_align: self.stroke_align,

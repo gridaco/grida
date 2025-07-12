@@ -34,10 +34,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             rect.corner_radius = RectangularCornerRadius::all(20.0);
-            rect.fill = Paint::Solid(SolidPaint {
+            rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
-            });
+            }));
             rect.effect = Some(FilterEffect::DropShadow(FeDropShadow {
                 dx: 4.0,
                 dy: 4.0,
@@ -56,10 +56,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fill = Paint::Solid(SolidPaint {
+            polygon.fills = vec![Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 255), // White
                 opacity: 1.0,
-            });
+            })];
             polygon.effect = Some(FilterEffect::DropShadow(FeDropShadow {
                 dx: 4.0,
                 dy: 4.0,
@@ -83,10 +83,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             rect.corner_radius = RectangularCornerRadius::all(20.0);
-            rect.fill = Paint::Solid(SolidPaint {
+            rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
-            });
+            }));
             rect.effect = Some(FilterEffect::GaussianBlur(FeGaussianBlur {
                 radius: 4.0 * (i + 1) as f32,
             }));
@@ -102,10 +102,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             polygon.point_count = i + 3;
-            polygon.fill = Paint::Solid(SolidPaint {
+            polygon.fills = vec![Paint::Solid(SolidPaint {
                 color: Color(200, 200, 200, 255), // White
                 opacity: 1.0,
-            });
+            })];
             polygon.effect = Some(FilterEffect::GaussianBlur(FeGaussianBlur {
                 radius: 4.0 * (i + 1) as f32,
             }));
@@ -123,7 +123,7 @@ async fn demo_effects() -> Scene {
         width: 2000.0,
         height: 90.0,
     };
-    vivid_gradient_rect.fill = Paint::LinearGradient(LinearGradientPaint {
+    vivid_gradient_rect.set_fill(Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -140,7 +140,7 @@ async fn demo_effects() -> Scene {
             }, // Yellow
         ],
         opacity: 1.0,
-    });
+    }));
     let vivid_gradient_rect_id = vivid_gradient_rect.base.id.clone();
     repository.insert(Node::Rectangle(vivid_gradient_rect));
 
@@ -155,10 +155,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             blur_rect.corner_radius = RectangularCornerRadius::all(20.0);
-            blur_rect.fill = Paint::Solid(SolidPaint {
+            blur_rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
-            });
+            }));
             blur_rect.effect = Some(FilterEffect::BackdropBlur(FeBackdropBlur {
                 radius: 8.0 * (i + 1) as f32,
             }));
@@ -174,10 +174,10 @@ async fn demo_effects() -> Scene {
                 height: base_size,
             };
             blur_polygon.point_count = i + 3;
-            blur_polygon.fill = Paint::Solid(SolidPaint {
+            blur_polygon.fills = vec![Paint::Solid(SolidPaint {
                 color: Color(255, 255, 255, 128), // Semi-transparent white
                 opacity: 1.0,
-            });
+            })];
             blur_polygon.effect = Some(FilterEffect::BackdropBlur(FeBackdropBlur {
                 radius: 8.0 * (i + 1) as f32,
             }));

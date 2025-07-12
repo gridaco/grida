@@ -16,10 +16,10 @@ fn test_pdf_export() {
         height: 50.0,
     };
     rect.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect.fill = Paint::Solid(SolidPaint {
+    rect.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255), // Red
         opacity: 1.0,
-    });
+    })];
 
     let rect_id = rect.base.id.clone();
     repo.insert(Node::Rectangle(rect));

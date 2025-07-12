@@ -17,10 +17,10 @@ async fn demo_nested() -> Scene {
         width: 100.0,
         height: 100.0,
     };
-    rect.fill = Paint::Solid(SolidPaint {
+    rect.set_fill(Paint::Solid(SolidPaint {
         color: Color(255, 0, 0, 255),
         opacity: 1.0,
-    });
+    }));
     let mut current_id = rect.base.id.clone();
     repository.insert(Node::Rectangle(rect));
 
@@ -43,10 +43,10 @@ async fn demo_nested() -> Scene {
                 width: 100.0,
                 height: 100.0,
             };
-            group_rect.fill = Paint::Solid(SolidPaint {
+            group_rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(0, 255, 0, 255), // Green
                 opacity: 1.0,
-            });
+            }));
             let group_rect_id = group_rect.base.id.clone();
             repository.insert(Node::Rectangle(group_rect));
 
@@ -70,10 +70,10 @@ async fn demo_nested() -> Scene {
                 width: 100.0,
                 height: 100.0,
             };
-            container_rect.fill = Paint::Solid(SolidPaint {
+            container_rect.set_fill(Paint::Solid(SolidPaint {
                 color: Color(0, 0, 255, 255), // Blue
                 opacity: 1.0,
-            });
+            }));
             let container_rect_id = container_rect.base.id.clone();
             repository.insert(Node::Rectangle(container_rect));
 

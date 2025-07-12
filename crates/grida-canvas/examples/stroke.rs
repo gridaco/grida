@@ -36,10 +36,10 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0), // Transparent
             opacity: 1.0,
-        });
+        }));
 
         // Solid color stroke
         rect.stroke = Paint::Solid(SolidPaint {
@@ -72,10 +72,10 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0), // Transparent
             opacity: 1.0,
-        });
+        }));
 
         // Solid color stroke
         rect.stroke = Paint::Solid(SolidPaint {
@@ -100,10 +100,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
         rect.stroke = Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
@@ -120,10 +120,10 @@ async fn demo_strokes() -> Scene {
             width: base_size,
             height: base_size,
         };
-        ellipse.fill = Paint::Solid(SolidPaint {
+        ellipse.fills = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        })];
         ellipse.stroke = Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
@@ -141,10 +141,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         polygon.point_count = 6;
-        polygon.fill = Paint::Solid(SolidPaint {
+        polygon.fills = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        })];
         polygon.stroke = Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
@@ -163,10 +163,10 @@ async fn demo_strokes() -> Scene {
         };
         star.point_count = 5;
         star.inner_radius = 0.4;
-        star.fill = Paint::Solid(SolidPaint {
+        star.fills = vec![Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        })];
         star.stroke = Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 255),
             opacity: 1.0,
@@ -188,10 +188,10 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
 
         // Solid color stroke
         rect.stroke = Paint::Solid(SolidPaint {
@@ -229,10 +229,10 @@ async fn demo_strokes() -> Scene {
         rect.corner_radius = RectangularCornerRadius::all(8.0);
 
         // No fill
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
 
         // Solid color stroke
         rect.stroke = Paint::Solid(SolidPaint {
@@ -265,10 +265,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
         rect.stroke = Paint::LinearGradient(LinearGradientPaint {
             transform: AffineTransform::new(0.0, 0.0, 0.0),
             stops: vec![
@@ -296,10 +296,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
         rect.stroke = Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
@@ -327,10 +327,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
         rect.stroke = Paint::RadialGradient(RadialGradientPaint {
             transform: AffineTransform::new(base_size / 2.0, base_size / 2.0, 0.0),
             stops: vec![
@@ -362,10 +362,10 @@ async fn demo_strokes() -> Scene {
             height: base_size,
         };
         rect.corner_radius = RectangularCornerRadius::all(8.0);
-        rect.fill = Paint::Solid(SolidPaint {
+        rect.set_fill(Paint::Solid(SolidPaint {
             color: Color(0, 0, 0, 0),
             opacity: 1.0,
-        });
+        }));
         rect.stroke = Paint::Solid(SolidPaint {
             color: Color(255, 128, 0, 255), // Orange
             opacity: 1.0,

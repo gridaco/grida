@@ -27,10 +27,10 @@ fn create_rectangles(count: usize, with_effects: bool) -> Scene {
                 height: 100.0,
             },
             corner_radius: RectangularCornerRadius::zero(),
-            fill: Paint::Solid(SolidPaint {
+            fills: vec![Paint::Solid(SolidPaint {
                 color: Color(255, 0, 0, 255),
                 opacity: 1.0,
-            }),
+            })],
             stroke: Paint::Solid(SolidPaint {
                 color: Color(0, 0, 0, 255),
                 opacity: 1.0,

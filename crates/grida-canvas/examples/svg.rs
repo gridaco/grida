@@ -89,7 +89,7 @@ async fn demo_scene() -> Scene {
         height: 150.0,
     };
     rect_gradient.corner_radius = RectangularCornerRadius::all(20.0);
-    rect_gradient.fill = Paint::LinearGradient(LinearGradientPaint {
+    rect_gradient.set_fill(Paint::LinearGradient(LinearGradientPaint {
         transform: AffineTransform::from_rotatation(45.0),
         stops: vec![
             GradientStop {
@@ -106,7 +106,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    }));
     rect_gradient.stroke_width = 3.0;
     rect_gradient.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
@@ -129,7 +129,7 @@ async fn demo_scene() -> Scene {
         width: 180.0,
         height: 150.0,
     };
-    ellipse_radial.fill = Paint::RadialGradient(RadialGradientPaint {
+    ellipse_radial.fills = vec![Paint::RadialGradient(RadialGradientPaint {
         transform: AffineTransform::identity(),
         stops: vec![
             GradientStop {
@@ -146,7 +146,7 @@ async fn demo_scene() -> Scene {
             },
         ],
         opacity: 1.0,
-    });
+    })];
     ellipse_radial.stroke_width = 4.0;
     ellipse_radial.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
@@ -170,10 +170,10 @@ async fn demo_scene() -> Scene {
     hexagon.base.name = "Hexagon".to_string();
     hexagon.transform = AffineTransform::new(550.0, 200.0, 0.0);
     hexagon.points = hexagon_points;
-    hexagon.fill = Paint::Solid(SolidPaint {
+    hexagon.fills = vec![Paint::Solid(SolidPaint {
         color: Color(128, 0, 255, 255),
         opacity: 1.0,
-    });
+    })];
     hexagon.stroke_width = 3.0;
     hexagon.stroke = Paint::Solid(SolidPaint {
         color: Color(255, 255, 255, 255),
@@ -198,10 +198,10 @@ async fn demo_scene() -> Scene {
     };
     star.point_count = 5;
     star.inner_radius = 0.4;
-    star.fill = Paint::Solid(SolidPaint {
+    star.fills = vec![Paint::Solid(SolidPaint {
         color: Color(255, 215, 0, 255), // Gold
         opacity: 1.0,
-    });
+    })];
     star.stroke_width = 2.0;
     star.stroke = Paint::Solid(SolidPaint {
         color: Color(139, 69, 19, 255), // Brown
@@ -266,10 +266,10 @@ async fn demo_scene() -> Scene {
         height: 100.0,
     };
     octagon.point_count = 8;
-    octagon.fill = Paint::Solid(SolidPaint {
+    octagon.fills = vec![Paint::Solid(SolidPaint {
         color: Color(0, 255, 255, 255), // Cyan
         opacity: 0.8,
-    });
+    })];
     octagon.stroke_width = 3.0;
     octagon.stroke = Paint::Solid(SolidPaint {
         color: Color(0, 0, 0, 255),
