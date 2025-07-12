@@ -1,12 +1,10 @@
+use crate::cg::types::*;
 use crate::helpers::webfont_helper;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::{
-    BaseNode, BlendMode, BooleanPathOperation, BooleanPathOperationNode, Color, ContainerNode,
-    EllipseNode, ErrorNode, FeBackdropBlur, FeDropShadow, FeGaussianBlur, FilterEffect, FontWeight,
-    GradientStop, ImagePaint, LineNode, LinearGradientPaint, Node, NodeId, Paint, PathNode,
-    RadialGradientPaint, RectangleNode, RectangularCornerRadius, RegularPolygonNode,
-    RegularStarPolygonNode, Scene, Size, SolidPaint, StrokeAlign, TextAlign, TextAlignVertical,
-    TextDecoration, TextSpanNode, TextStyle, TextTransform,
+    BaseNode, BooleanPathOperationNode, ContainerNode, EllipseNode, ErrorNode, LineNode, Node,
+    NodeId, RectangleNode, RegularPolygonNode, RegularStarPolygonNode, SVGPathNode, Scene, Size,
+    TextSpanNode,
 };
 use figma_api::models::minimal_strokes_trait::StrokeAlign as FigmaStrokeAlign;
 use figma_api::models::type_style::{
@@ -89,7 +87,7 @@ impl From<&FigmaPaint> for Paint {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    _ref: image.image_ref.clone(),
+                    hash: image.image_ref.clone(),
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                 })
@@ -316,7 +314,7 @@ impl FigmaConverter {
 
                 Paint::Image(ImagePaint {
                     transform,
-                    _ref: url,
+                    hash: url,
                     fit,
                     opacity: image.opacity.unwrap_or(1.0) as f32,
                 })
@@ -916,7 +914,7 @@ impl FigmaConverter {
         // Convert fill geometries to path nodes
         if let Some(fill_geometries) = &origin.fill_geometry {
             for geometry in fill_geometries {
-                let path_node = Node::Path(PathNode {
+                let path_node = Node::Path(SVGPathNode {
                     base: BaseNode {
                         id: format!("{}-path-{}", origin.id, path_index),
                         name: format!("{}-path-{}", origin.name, path_index),
@@ -947,7 +945,7 @@ impl FigmaConverter {
         // stroke paint should be applied to the path, not stroke, as the stroke geometry is the baked path of the stroke.
         if let Some(stroke_geometries) = &origin.stroke_geometry {
             for geometry in stroke_geometries {
-                let path_node = Node::Path(PathNode {
+                let path_node = Node::Path(SVGPathNode {
                     base: BaseNode {
                         id: format!("{}-path-{}", origin.id, path_index),
                         name: format!("{}-path-{}", origin.name, path_index),
@@ -1285,7 +1283,6 @@ impl FigmaConverter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_convert_node() {

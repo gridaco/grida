@@ -1,3 +1,4 @@
+use crate::cg::types::*;
 use crate::node::schema::*;
 use math2::transform::AffineTransform;
 use serde::Deserialize;
@@ -588,7 +589,7 @@ impl From<IOVectorNode> for Node {
         let transform = AffineTransform::new(node.left, node.top, node.rotation);
 
         // For vector nodes, we'll create a path node with the path data
-        Node::Path(PathNode {
+        Node::Path(SVGPathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,
@@ -654,7 +655,7 @@ impl From<IOPathNode> for Node {
             .map(|vn| vector_network_to_path(vn))
             .unwrap_or_else(String::new);
 
-        Node::Path(PathNode {
+        Node::Path(SVGPathNode {
             base: BaseNode {
                 id: node.id,
                 name: node.name,

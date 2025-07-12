@@ -26,7 +26,7 @@
 //! - How DPR affects rendering performance
 //! - Performance characteristics across different device types
 
-use skia_safe::*;
+use skia_safe::{surfaces, *};
 use std::time::{Duration, Instant};
 
 struct CanvasSpec {
@@ -159,8 +159,7 @@ fn draw_complex(canvas: &Canvas) {
 
                 // Create a temporary surface for the blur effect
                 let temp_size = (circle_radius * 2.0) as i32;
-                let mut temp_surface =
-                    Surface::new_raster_n32_premul((temp_size, temp_size)).unwrap();
+                let mut temp_surface = surfaces::raster_n32_premul((temp_size, temp_size)).unwrap();
                 let temp_canvas = temp_surface.canvas();
 
                 // Draw the circle on the temporary surface
@@ -223,8 +222,8 @@ fn make_cached_image(surface: &mut Surface, dpr: f32) -> Image {
     canvas.restore();
 
     // Create a new surface with the same size for the cached image
-    let mut cached_surface =
-        Surface::new_raster_n32_premul((surface.width(), surface.height())).unwrap();
+    let mut cached_surface = surfaces::raster_n32_premul((surface.width(), surface.height()))
+        .expect("Failed to create surface");
     let cached_canvas = cached_surface.canvas();
     cached_canvas.draw_image(surface.image_snapshot(), (0, 0), None);
     cached_surface.image_snapshot()
@@ -236,7 +235,7 @@ fn run_benchmark(use_cache: bool, surface: &mut Surface, cached: &Image, dpr: f3
 
     let start = Instant::now();
     if use_cache {
-        let mut paint = Paint::default();
+        let paint = Paint::default();
         canvas.draw_image(cached, (0, 0), Some(&paint));
     } else {
         // Apply DPR scaling for uncached drawing
@@ -255,7 +254,7 @@ fn run_benchmark_for_size(spec: &CanvasSpec) {
     println!("DPR: {}", spec.dpr);
 
     // Create surface at logical size
-    let mut surface = Surface::new_raster_n32_premul(spec.logical).unwrap();
+    let mut surface = surfaces::raster_n32_premul(spec.logical).unwrap();
     let cached = make_cached_image(&mut surface, spec.dpr);
 
     const FRAMES: usize = 100;

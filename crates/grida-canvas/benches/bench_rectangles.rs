@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
 use cg::runtime::camera::Camera2D;

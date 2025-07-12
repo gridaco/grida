@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -341,7 +342,7 @@ async fn main() {
     renderer.load_scene(scene);
 
     let bounds = SkRect::from_wh(width, height);
-    let mut canvas = svg::Canvas::new(bounds, None);
+    let canvas = svg::Canvas::new(bounds, None);
 
     renderer.render_to_canvas(&canvas, width, height);
 

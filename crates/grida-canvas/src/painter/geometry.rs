@@ -1,7 +1,9 @@
 use crate::cache::geometry::GeometryCache;
+use crate::cg::types::*;
 use crate::node::repository::NodeRepository;
 use crate::node::schema::*;
 use crate::painter::cvt;
+use crate::sk::mappings::ToSkPath;
 use math2::transform::AffineTransform;
 use skia_safe::{
     path_effect::PathEffect, stroke_rec::InitStyle, Path, PathOp, Point, RRect, Rect, StrokeRec,
@@ -209,7 +211,7 @@ pub fn build_shape(node: &IntrinsicSizeNode) -> PainterShape {
         }
         IntrinsicSizeNode::Polygon(n) => {
             let path = if n.corner_radius > 0.0 {
-                n.to_path()
+                n.to_sk_path()
             } else {
                 let mut p = Path::new();
                 let mut iter = n.points.iter();

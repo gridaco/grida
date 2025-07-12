@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;
 use cg::node::schema::*;
@@ -28,7 +29,7 @@ async fn demo_basic() -> Scene {
         blur: 8.0,
         color: Color(0, 0, 0, 77),
     }));
-    image_node._ref = demo_image_id.to_string();
+    image_node.hash = demo_image_id.to_string();
 
     // Create a test rectangle node with linear gradient
     let mut rect_node = nf.create_rectangle_node();

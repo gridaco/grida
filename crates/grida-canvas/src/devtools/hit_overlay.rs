@@ -158,9 +158,9 @@ impl HitOverlay {
             .fills
             .first()
             .cloned()
-            .unwrap_or(crate::node::schema::Paint::Solid(
-                crate::node::schema::SolidPaint {
-                    color: crate::node::schema::Color(0, 0, 0, 255),
+            .unwrap_or(crate::cg::types::Paint::Solid(
+                crate::cg::types::SolidPaint {
+                    color: crate::cg::Color(0, 0, 0, 255),
                     opacity: 1.0,
                 },
             ));

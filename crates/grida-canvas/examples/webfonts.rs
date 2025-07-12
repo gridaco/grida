@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::node::factory::NodeFactory;
 use cg::node::repository::NodeRepository;

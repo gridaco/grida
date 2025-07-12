@@ -1,4 +1,5 @@
 use super::schema::*;
+use crate::cg::types::*;
 use math2::transform::AffineTransform;
 use uuid::Uuid;
 
@@ -159,8 +160,8 @@ impl NodeFactory {
     }
 
     /// Creates a new path node with default values
-    pub fn create_path_node(&self) -> PathNode {
-        PathNode {
+    pub fn create_path_node(&self) -> SVGPathNode {
+        SVGPathNode {
             base: self.default_base_node(),
             transform: AffineTransform::identity(),
             fill: Self::default_solid_paint(Self::DEFAULT_COLOR),
@@ -245,7 +246,7 @@ impl NodeFactory {
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: BlendMode::Normal,
             effect: None,
-            _ref: String::new(),
+            hash: String::new(),
         }
     }
 }

@@ -1,3 +1,4 @@
+use cg::cg::types::*;
 use cg::io::io_json::parse;
 use cg::node::schema::*;
 use cg::window;
